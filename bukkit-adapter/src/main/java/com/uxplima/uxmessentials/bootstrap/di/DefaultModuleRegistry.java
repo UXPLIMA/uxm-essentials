@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bootstrap.di;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
@@ -31,11 +32,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         this.delegate = new ListModuleRegistry();
         // Feature modules register here in dependency-first order as each context lands. teleport owns
         // all movement orchestration, so it lands before the homes/warps contexts that delegate here.
-        // warps also soft-couples to economy for its optional per-warp cost, so it lands after economy
-        // once that context exists; until then the cost is recorded but not charged (an empty provider):
+        // economy registers before warps because a warp may charge a per-warp cost through the economy
+        // provider; the economy WarpEconomy bridge is captured during economy wiring and handed to warps.
         delegate.register(new TeleportModule());
         delegate.register(new HomesModule());
-        //   .register(new EconomyModule())
+        delegate.register(new EconomyModule());
         delegate.register(new WarpsModule());
         //   … through VaultsModule. The shared kernel is not a module and never appears here.
     }

@@ -148,3 +148,43 @@ permissions:
   uxmessentials.warp.delete:
     description: '/delwarp <name> to remove a warp.'
     default: op
+  # economy context (docs/permissions.md "Economy"). Balances are DB-backed and survive world
+  # rollbacks; the native provider registers through the ServicesManager unless a foreign economy
+  # (Treasury/Vault) is already present, in which case it defers (ADR 0004). The per-currency value
+  # space lives in economy.conf, not as permission nodes.
+  uxmessentials.economy.balance:
+    description: '/balance [currency] to see your own balance.'
+    default: true
+  uxmessentials.economy.balance.others:
+    description: '/balance <player> [currency] to view another player''s balance.'
+    default: op
+  uxmessentials.economy.pay:
+    description: '/pay <player> <amount> [currency] and /payconfirm to transfer funds.'
+    default: true
+  uxmessentials.economy.pay.toggle:
+    description: '/paytoggle to refuse all incoming /pay transfers.'
+    default: true
+  uxmessentials.economy.pay.confirm.bypass:
+    description: 'Skip the /payconfirm prompt for transfers above the confirm threshold.'
+    default: op
+  uxmessentials.economy.baltop:
+    description: '/baltop [currency] [page] to view the top balances.'
+    default: true
+  uxmessentials.economy.baltop.exempt:
+    description: 'Marks the holder as hidden from every /baltop leaderboard.'
+    default: false
+  uxmessentials.economy.admin:
+    description: 'Umbrella for eco-admin mutations (/eco give, take, set).'
+    default: op
+  uxmessentials.economy.admin.give:
+    description: '/eco give <player> <amount> [currency] only.'
+    default: op
+  uxmessentials.economy.admin.take:
+    description: '/eco take <player> <amount> [currency] only.'
+    default: op
+  uxmessentials.economy.admin.set:
+    description: '/eco set <player> <amount> [currency] and /eco reset only.'
+    default: op
+  uxmessentials.economy.admin.bulk:
+    description: '/eco giveall, /eco giverandom, /eco resetall server-wide bulk mutations.'
+    default: op

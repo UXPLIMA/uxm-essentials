@@ -1,0 +1,70 @@
+package com.uxplima.uxmessentials.persistence.economy;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Objects;
+
+import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
+import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
+import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * Factory for the economy context's native-ledger persistence adapter, so the consuming bukkit-adapter wires
+ * a {@link WalletRepository} (and the debounced writer + transaction telemetry) from the {@link Persistence}
+ * handle it already holds without ever naming a jOOQ type — jOOQ is an {@code implementation} dependency of
+ * this module, kept off the consumer's compile classpath, exactly as {@code HomeRepositories} does for homes.
+ *
+ * <p>The returned {@link WalletLedger} bundles the cached jOOQ repository (offline-read accelerator,
+ * write-through at the database) with the settle writer and the telemetry batcher the economy module arms on
+ * start and drains on stop.
+ */
+@NullMarked
+public final class WalletRepositories {
+
+    private WalletRepositories() {}
+
+    /**
+     * Build the native ledger over the shared persistence DSL for the configured {@code currencies}, with the
+     * settle/telemetry loops driven by {@code scheduler} on the given debounce/flush windows.
+     */
+    public static WalletLedger ledger(
+            Persistence persistence,
+            CurrencyRegistry currencies,
+            Scheduler scheduler,
+            Logger log,
+            Clock clock,
+            Duration writeDebounce,
+            Duration batchFlush) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(currencies, "currencies");
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(clock, "clock");
+        WalletRepository repository =
+                new CachedWalletRepository(new JooqWalletRepository(persistence.dsl(), currencies, clock));
+        DebouncedWalletWriter writer = new DebouncedWalletWriter(repository, scheduler, log, writeDebounce);
+        TransactionTelemetry telemetry = new TransactionTelemetry(persistence.dsl(), scheduler, log, batchFlush);
+        return new WalletLedger(repository, writer, telemetry);
+    }
+
+    /**
+     * Build the bare cached jOOQ repository with no settle/telemetry loops — for tests and tools that exercise
+     * the ledger directly without arming background work.
+     */
+    public static WalletRepository repository(Persistence persistence, CurrencyRegistry currencies, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(currencies, "currencies");
+        Objects.requireNonNull(clock, "clock");
+        return new CachedWalletRepository(new JooqWalletRepository(persistence.dsl(), currencies, clock));
+    }
+
+    /** The jOOQ-backed {@code /paytoggle} accept-pay flag over the shared persistence DSL. */
+    public static PayPreferences payPreferences(Persistence persistence, boolean toggleDefault) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqPayPreferences(persistence.dsl(), toggleDefault);
+    }
+}

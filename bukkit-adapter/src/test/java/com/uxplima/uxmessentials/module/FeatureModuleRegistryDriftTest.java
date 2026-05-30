@@ -36,14 +36,18 @@ class FeatureModuleRegistryDriftTest {
     void defaultRegistryExposesAnImmutableDeduplicatedSet() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
 
-        // teleport, homes and warps are the landed contexts, registered dependency-first (teleport
-        // before the homes/warps contexts that delegate teleport execution to it); the registry is a
-        // valid, immutable, ordered set that resolves each by id and rejects a not-yet-landed context.
+        // teleport, homes, economy and warps are the landed contexts, registered dependency-first:
+        // teleport before the homes/warps contexts that delegate teleport execution to it, and economy
+        // before warps because a warp may charge a per-warp cost through the economy provider. The
+        // registry is a valid, immutable, ordered set that resolves each by id and rejects a not-yet-
+        // landed context.
         assertThat(registry.byId(ModuleId.of("teleport"))).isPresent();
         assertThat(registry.byId(ModuleId.of("homes"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("economy"))).isPresent();
         assertThat(registry.byId(ModuleId.of("warps"))).isPresent();
-        assertThat(registry.byId(ModuleId.of("economy"))).isEmpty();
-        assertThat(registry.all().stream().map(m -> m.id().value())).containsExactly("teleport", "homes", "warps");
+        assertThat(registry.byId(ModuleId.of("kits"))).isEmpty();
+        assertThat(registry.all().stream().map(m -> m.id().value()))
+                .containsExactly("teleport", "homes", "economy", "warps");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }

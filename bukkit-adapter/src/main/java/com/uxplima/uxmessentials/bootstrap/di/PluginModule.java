@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
+import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
+import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -89,6 +91,8 @@ public final class PluginModule {
             wireTeleport(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("homes"))) {
             wireHomes(ctx, persistence, resources, links);
+        } else if (module.id().equals(ModuleId.of("economy"))) {
+            wireEconomy(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("warps"))) {
             wireWarps(ctx, persistence, resources, links);
         }
@@ -112,17 +116,32 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
     }
 
+    private static void wireEconomy(
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
+        EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence);
+        wired.commands().forEach(resources::addCommand);
+        wired.start();
+        resources.onClose(wired::stop);
+        // Captured for warps, which lands after economy and charges a recorded per-warp cost through it.
+        links.warpEconomy = wired.warpEconomy();
+    }
+
     private static void wireWarps(
             ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "warps delegates teleport execution but the teleport engine is unavailable");
-        WarpsWiring.Wired wired = WarpsWiring.wire(ctx, persistence, engine);
+        WarpsWiring.Wired wired = WarpsWiring.wire(ctx, persistence, engine, Optional.ofNullable(links.warpEconomy));
         wired.commands().forEach(resources::addCommand);
     }
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
         private @org.jspecify.annotations.Nullable TeleportEngine teleportEngine;
+        private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
     }
 
     private static boolean skippedByCapability(FeatureModule module, ModuleContext ctx, Logger log) {

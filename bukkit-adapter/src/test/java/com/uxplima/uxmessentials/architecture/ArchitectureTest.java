@@ -72,4 +72,17 @@ class ArchitectureTest {
             .dependOnClassesThat()
             .haveFullyQualifiedName("org.bukkit.scheduler.BukkitScheduler")
             .allowEmptyShould(true);
+
+    // The economy domain/application is provider-agnostic: it models money, not Vault or Treasury. The
+    // SDK types are confined to the outbound adapter packages (economy.adapter.treasury / .vault); a
+    // contributor reaching for a Vault/Treasury type in economy.domain or economy.application breaks the
+    // single-seam design here (docs/11-economy-integration.md §5).
+    @ArchTest
+    static final ArchRule economyDomainHasNoProviderSdk = noClasses()
+            .that()
+            .resideInAnyPackage("..economy.domain..", "..economy.application..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("net.milkbowl.vault..", "me.lokka30.treasury..")
+            .allowEmptyShould(true);
 }

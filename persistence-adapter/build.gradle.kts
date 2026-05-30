@@ -5,12 +5,12 @@ plugins {
     alias(libs.plugins.jooq.codegen)
 }
 
-// jOOQ generates its classes by parsing the Flyway V1 baseline through the
-// DDLDatabase — no live database is contacted at build time. The generated
-// sources describe the same tables the migration creates at runtime, so the
-// typed DSL and the actual schema can never drift. SQLite is the default backend;
-// the DDLDatabase parses against the portable subset MySQL/MariaDB and PostgreSQL
-// also accept.
+// jOOQ generates its classes by parsing the Flyway migrations through the
+// DDLDatabase — no live database is contacted at build time. It reads every
+// V*.sql under db/migration in version order, so the generated sources describe
+// the same tables the migrations create at runtime and the typed DSL can never
+// drift from the actual schema. SQLite is the default backend; the DDLDatabase
+// parses against the portable subset MySQL/MariaDB and PostgreSQL also accept.
 
 dependencies {
     implementation(project(":core"))
@@ -41,10 +41,12 @@ jooq {
                 properties {
                     property {
                         key = "scripts"
-                        value = "src/main/resources/db/migration/V1__init.sql"
+                        value = "src/main/resources/db/migration/*.sql"
                     }
-                    // Parse the script the way Flyway lays it out: numbered files,
-                    // semicolon-delimited statements.
+                    // Parse the scripts the way Flyway lays them out: numbered files
+                    // applied in version order, semicolon-delimited statements. The glob
+                    // picks up every V*.sql, so a new context's migration regenerates its
+                    // tables without touching this build.
                     property {
                         key = "sort"
                         value = "flyway"

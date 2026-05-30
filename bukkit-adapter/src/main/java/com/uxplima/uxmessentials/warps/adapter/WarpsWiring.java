@@ -43,24 +43,37 @@ public final class WarpsWiring {
 
     private WarpsWiring() {}
 
-    /** Build the warps adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the engine. */
+    /** Build the warps adapters and use cases with no economy bridge (a recorded warp cost is not charged). */
     public static Wired wire(ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine) {
+        return wire(ctx, persistence, teleportEngine, Optional.empty());
+    }
+
+    /**
+     * Build the warps context, charging a recorded per-warp cost through {@code economy} when present. The
+     * economy context lands before warps in the registry, so its {@link WarpEconomy} bridge is captured during
+     * economy wiring and handed in here; when it is empty (economy disabled), a priced warp's cost is recorded
+     * but not charged — the soft coupling the warps context owns.
+     */
+    public static Wired wire(
+            ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine, Optional<WarpEconomy> economy) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(economy, "economy");
         KernelPorts kernel = ctx.kernel();
         WarpRepository repository = WarpRepositories.cached(persistence);
         WarpNotifier notifier = new WarpNotifier(kernel.messages(), kernel.messageSink());
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine);
-        WarpServices services = assemble(kernel, repository, notifier, teleporter);
+        WarpServices services = assemble(kernel, repository, notifier, teleporter, economy);
         return new Wired(WarpCommands.all(services, kernel.messages()));
     }
 
     private static WarpServices assemble(
-            KernelPorts kernel, WarpRepository repository, WarpNotifier notifier, WarpTeleporter teleporter) {
-        // The economy seam stays empty until the economy context lands (P3); a recorded warp cost is then
-        // charged through it, and is ignored gracefully while it is absent.
-        Optional<WarpEconomy> economy = Optional.empty();
+            KernelPorts kernel,
+            WarpRepository repository,
+            WarpNotifier notifier,
+            WarpTeleporter teleporter,
+            Optional<WarpEconomy> economy) {
         WarpAccess access = new WarpAccess(kernel.permissions(), economy);
         Clock clock = Clock.systemUTC();
         return new WarpServices(

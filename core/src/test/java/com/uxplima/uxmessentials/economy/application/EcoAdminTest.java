@@ -1,0 +1,123 @@
+package com.uxplima.uxmessentials.economy.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.CurrencyId;
+import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.economy.domain.EconomyReason;
+import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.fakes.CapturingSink;
+import com.uxplima.uxmessentials.economy.fakes.Currencies;
+import com.uxplima.uxmessentials.economy.fakes.InMemoryWalletRepository;
+import com.uxplima.uxmessentials.economy.fakes.KeyMessages;
+import com.uxplima.uxmessentials.economy.fakes.RecordingAudit;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The eco-admin surface: give/take/set/reset and the bulk verbs. Give credits and take debits through the
+ * provider, set writes an exact balance, reset returns it to the currency's starting figure, and a bulk verb
+ * audits exactly once with an affected-count (never per-target spam). An offline never-joined target is
+ * materialised so a give/set to them does not fail.
+ */
+class EcoAdminTest {
+
+    private InMemoryWalletRepository repo;
+    private RecordingAudit audit;
+    private EcoAdmin admin;
+    private PlayerRef operator;
+    private PlayerRef target;
+
+    @BeforeEach
+    void setUp() {
+        repo = new InMemoryWalletRepository();
+        audit = new RecordingAudit();
+        CurrencyRegistry registry = CurrencyRegistry.of(Set.of(Currencies.COINS), Currencies.COINS.id());
+        Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
+        NativeEconomyProvider provider = new NativeEconomyProvider(repo, registry, clock);
+        EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), new CapturingSink());
+        admin = new EcoAdmin(provider, repo, audit, notifier);
+        operator = new PlayerRef(UUID.randomUUID(), "Operator");
+        target = new PlayerRef(UUID.randomUUID(), "Target");
+    }
+
+    @Test
+    void giveCreditsAndAuditsOnce() {
+        admin.give(operator, target, Money.of(Currencies.COINS, 100));
+
+        assertThat(repo.findByOwner(target).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 100));
+        assertThat(audit.lines())
+                .singleElement()
+                .extracting(RecordingAudit.Line::reason)
+                .isEqualTo(EconomyReason.ADMIN_GIVE);
+    }
+
+    @Test
+    void takeDebitsWithinBalance() {
+        repo.credit(target, Money.of(Currencies.COINS, 100));
+
+        admin.take(operator, target, Money.of(Currencies.COINS, 40));
+
+        assertThat(repo.findByOwner(target).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 60));
+    }
+
+    @Test
+    void setWritesExactBalance() {
+        repo.credit(target, Money.of(Currencies.COINS, 100));
+
+        admin.set(operator, target, Money.of(Currencies.COINS, 7));
+
+        assertThat(repo.findByOwner(target).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 7));
+    }
+
+    @Test
+    void resetReturnsToStartingBalance() {
+        Currency starting = Currency.builder(CurrencyId.of("coins"))
+                .starting(java.math.BigDecimal.valueOf(50))
+                .build();
+        repo.credit(target, Money.of(starting, 999));
+
+        admin.reset(operator, target, starting);
+
+        assertThat(repo.findByOwner(target).orElseThrow().balanceOf(starting)).isEqualTo(Money.of(starting, 50));
+    }
+
+    @Test
+    void giveAllAuditsOnceWithAffectedCount() {
+        PlayerRef a = new PlayerRef(UUID.randomUUID(), "A");
+        PlayerRef b = new PlayerRef(UUID.randomUUID(), "B");
+        PlayerRef c = new PlayerRef(UUID.randomUUID(), "C");
+
+        int affected = admin.giveAll(operator, List.of(a, b, c), Money.of(Currencies.COINS, 10));
+
+        assertThat(affected).isEqualTo(3);
+        assertThat(audit.lines()).singleElement().satisfies(line -> {
+            assertThat(line.reason()).isEqualTo(EconomyReason.ADMIN_GIVEALL);
+            assertThat(line.affected()).isEqualTo(3);
+        });
+        assertThat(repo.findByOwner(a).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 10));
+    }
+
+    @Test
+    void giveToNeverJoinedTargetMaterialisesTheirRow() {
+        PlayerRef ghost = new PlayerRef(UUID.randomUUID(), "Ghost");
+
+        admin.give(operator, ghost, Money.of(Currencies.COINS, 25));
+
+        assertThat(repo.findByOwner(ghost).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 25));
+    }
+}
