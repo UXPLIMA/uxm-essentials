@@ -7,11 +7,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
+import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -31,23 +34,45 @@ public final class PluginModule {
     /** Wires the plugin and returns the resources to close on disable. */
     public static CloseableResources wire(JavaPlugin plugin) {
         Logger log = plugin.getLogger();
-        ConfigStore config = BootstrapConfigStore.empty();
+        com.uxplima.uxmessentials.shared.application.port.Logger kernelLog = KernelWiring.logger(plugin);
+        ConfigStore config = KernelWiring.loadConfig(plugin, kernelLog);
+        KernelPorts kernel = KernelWiring.wire(plugin, config, kernelLog);
         ModuleRegistry registry = new DefaultModuleRegistry();
         CloseableResources resources = new CloseableResources();
 
-        wireModules(registry, config, resources, log);
+        wireModules(plugin, registry, config, kernel, resources, log);
         resources.addCommand(new UxmessCommand(registry, config));
         return resources;
     }
 
     private static void wireModules(
-            ModuleRegistry registry, ConfigStore config, CloseableResources resources, Logger log) {
+            JavaPlugin plugin,
+            ModuleRegistry registry,
+            ConfigStore config,
+            KernelPorts kernel,
+            CloseableResources resources,
+            Logger log) {
         for (FeatureModule module : registry.enabledModules(config)) {
-            ModuleContext ctx = new ModuleContext(module.id(), config);
+            ConfigStore moduleConfig = config.scoped(module.id().configRoot());
+            ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);
             if (skippedByCapability(module, ctx, log)) {
                 continue;
             }
             startModule(module, ctx, resources, log);
+            wireAdapters(plugin, module, ctx, resources);
+        }
+    }
+
+    private static void wireAdapters(
+            JavaPlugin plugin, FeatureModule module, ModuleContext ctx, CloseableResources resources) {
+        // The bukkit-side adapters of each context are wired here once the context's pure module has
+        // started. teleport is the first context to land; the others plug in at their own id below.
+        if (module.id().equals(ModuleId.of("teleport"))) {
+            TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx);
+            wired.commands().forEach(resources::addCommand);
+            wired.listeners().forEach(resources::addListener);
+            wired.startBackgroundWork();
+            resources.onClose(wired::stop);
         }
     }
 

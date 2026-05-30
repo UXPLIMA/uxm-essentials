@@ -1,0 +1,109 @@
+package com.uxplima.uxmessentials.teleport.adapter.inbound.command;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.bukkit.entity.Player;
+
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
+
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
+import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
+import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmessentials.teleport.domain.Destination;
+import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * The staff direct-teleport verbs — {@code /tp}, {@code /tphere}, {@code /tpo}, {@code /tpohere} — handled
+ * without a warmup or cooldown (a staff hop is instant). {@link Pull#GO} moves the invoking player to the
+ * target ({@code /tp}, {@code /tpo}); {@link Pull#BRING} moves the target to the invoking player
+ * ({@code /tphere}, {@code /tpohere}). The {@code o} variants exist to override no-teleport flags; those
+ * flags gate only {@code /tpa} requests, so the override variants share this handler and differ only in
+ * the permission node.
+ */
+@NullMarked
+public final class AdminTpCommand extends TeleportCommandSupport implements CommandRegistration {
+
+    /** Whether the named player is the destination ({@code GO}) or is brought to the actor ({@code BRING}). */
+    public enum Pull {
+        GO,
+        BRING
+    }
+
+    private final String literal;
+    private final String permission;
+    private final String description;
+    private final Pull pull;
+
+    public AdminTpCommand(
+            TeleportServices services,
+            Messages messages,
+            String literal,
+            String permission,
+            String description,
+            Pull pull) {
+        super(services, messages);
+        this.literal = Objects.requireNonNull(literal, "literal");
+        this.permission = Objects.requireNonNull(permission, "permission");
+        this.description = Objects.requireNonNull(description, "description");
+        this.pull = Objects.requireNonNull(pull, "pull");
+    }
+
+    @Override
+    public LiteralCommandNode<CommandSourceStack> build() {
+        return Commands.literal(literal)
+                .requires(src -> src.getSender().hasPermission(permission))
+                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::run))
+                .build();
+    }
+
+    @Override
+    public String description() {
+        return description;
+    }
+
+    private int run(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        Optional<Player> target = resolveTarget(ctx);
+        if (target.isEmpty()) {
+            return 0;
+        }
+        move(sender, target.get());
+        services.notifier().send(ref(sender), TeleportMessageKey.TP_DONE);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void move(Player sender, Player target) {
+        if (pull == Pull.GO) {
+            hop(ref(sender), TeleportRefs.positionOf(target));
+        } else {
+            hop(ref(target), TeleportRefs.positionOf(sender));
+        }
+    }
+
+    private void hop(PlayerRef who, Position to) {
+        services.executor().teleport(who, Destination.at(to), TeleportKind.ADMIN);
+    }
+
+    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+        List<Player> resolved = resolver.resolve(ctx.getSource());
+        return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
+    }
+}

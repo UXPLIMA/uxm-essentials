@@ -1,0 +1,96 @@
+package com.uxplima.uxmessentials.teleport.domain;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.UUID;
+
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.domain.PendingTeleport.Outcome;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The pure move-cancels-warmup decision the teleport context owns: leaving the origin block cancels a
+ * move-armed warmup, sub-block jitter never does, the per-axis toggles gate rotation/damage cancels, and
+ * the cancelled flag is one-way so the cancel-vs-fire race resolves to a single loser.
+ */
+class PendingTeleportTest {
+
+    private static final PlayerRef MOVER = new PlayerRef(UUID.randomUUID(), "Mover");
+    private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
+    private static final Position ORIGIN = Position.of(WORLD, 10.5, 64.0, 10.5);
+
+    private static PendingTeleport armed(WarmupCancelToggles toggles) {
+        return PendingTeleport.arm(MOVER, TeleportKind.REQUEST, ORIGIN, Destination.at(ORIGIN), toggles);
+    }
+
+    @Test
+    void leavingTheOriginBlockCancelsAMoveArmedWarmup() {
+        PendingTeleport warmup = armed(WarmupCancelToggles.defaults());
+
+        Outcome outcome = warmup.onMovement(Position.of(WORLD, 12.0, 64.0, 10.5));
+
+        assertThat(outcome.didCancel()).isTrue();
+        assertThat(outcome.cancel()).contains(WarmupCancelReason.MOVED);
+        assertThat(outcome.state().isCancelled()).isTrue();
+    }
+
+    @Test
+    void subBlockJitterDoesNotCancel() {
+        PendingTeleport warmup = armed(WarmupCancelToggles.defaults());
+
+        Outcome outcome = warmup.onMovement(Position.of(WORLD, 10.9, 64.0, 10.1));
+
+        assertThat(outcome.didCancel()).isFalse();
+        assertThat(outcome.state().isCancelled()).isFalse();
+    }
+
+    @Test
+    void moveCancelOffMeansMovingDoesNotCancel() {
+        PendingTeleport warmup = armed(new WarmupCancelToggles(false, false, false));
+
+        Outcome outcome = warmup.onMovement(Position.of(WORLD, 50.0, 64.0, 50.0));
+
+        assertThat(outcome.didCancel()).isFalse();
+    }
+
+    @Test
+    void damageCancelsOnlyWhenTheToggleArmsIt() {
+        assertThat(armed(WarmupCancelToggles.defaults())
+                        .onAction(WarmupCancelReason.DAMAGED)
+                        .didCancel())
+                .isFalse();
+        assertThat(armed(new WarmupCancelToggles(true, false, true))
+                        .onAction(WarmupCancelReason.DAMAGED)
+                        .didCancel())
+                .isTrue();
+    }
+
+    @Test
+    void rotationCancelsOnlyWhenTheToggleArmsIt() {
+        assertThat(armed(new WarmupCancelToggles(true, true, false))
+                        .onAction(WarmupCancelReason.ROTATED)
+                        .didCancel())
+                .isTrue();
+    }
+
+    @Test
+    void anExplicitAbortAlwaysCancels() {
+        Outcome outcome = armed(new WarmupCancelToggles(false, false, false)).onAction(WarmupCancelReason.ABORTED);
+
+        assertThat(outcome.didCancel()).isTrue();
+    }
+
+    @Test
+    void cancellationIsOneWay() {
+        PendingTeleport cancelled = armed(WarmupCancelToggles.defaults())
+                .onMovement(Position.of(WORLD, 99.0, 64.0, 99.0))
+                .state();
+
+        Outcome second = cancelled.onMovement(Position.of(WORLD, 100.0, 64.0, 100.0));
+
+        assertThat(second.didCancel()).isFalse(); // already cancelled — no second cancel fires
+        assertThat(second.state().isCancelled()).isTrue();
+    }
+}

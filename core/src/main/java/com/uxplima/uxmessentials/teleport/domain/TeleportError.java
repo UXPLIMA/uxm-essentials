@@ -1,0 +1,62 @@
+package com.uxplima.uxmessentials.teleport.domain;
+
+import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+
+/**
+ * The modelled, expected failures of a teleport flow — the {@code E} arm of a {@code Result} a use case
+ * returns instead of throwing. Each value carries the {@link TeleportMessageKey} the adapter renders to
+ * the player, so the failure reason and its localized text never drift apart.
+ *
+ * <p>These are first-class outcomes, not exceptions: an active cooldown, a self-request, a target who
+ * has teleports toggled off, an expired or already-resolved request. A genuinely exceptional fault (a
+ * corrupt queue row, a null world handle) still throws.
+ */
+public enum TeleportError {
+
+    /** The requester aimed a teleport request at themselves. */
+    SELF_REQUEST(TeleportMessageKey.TPA_SELF),
+
+    /** The target is offline or could not be resolved. */
+    TARGET_OFFLINE(TeleportMessageKey.TPA_TARGET_OFFLINE),
+
+    /** The target has {@code /tptoggle} on and refuses incoming requests. */
+    TARGET_TOGGLED_OFF(TeleportMessageKey.TPA_TOGGLED_OFF),
+
+    /** The target has blocked the requester via {@code /tpblock}. */
+    REQUESTER_BLOCKED(TeleportMessageKey.TPA_BLOCKED),
+
+    /** No pending request matched the accept/deny/cancel. */
+    NO_PENDING_REQUEST(TeleportMessageKey.TPA_NONE_PENDING),
+
+    /** The request's time-to-live elapsed before it was resolved. */
+    REQUEST_EXPIRED(TeleportMessageKey.TPA_EXPIRED),
+
+    /** A shared cooldown gate is still counting down. */
+    ON_COOLDOWN(TeleportMessageKey.COOLDOWN_ACTIVE),
+
+    /** No captured {@code /back} location exists for the player. */
+    NO_BACK_LOCATION(TeleportMessageKey.BACK_NONE),
+
+    /** The captured {@code /back} location is a death point and death-back is not permitted. */
+    BACK_ON_DEATH_DENIED(TeleportMessageKey.BACK_DEATH_DENIED),
+
+    /** The world has no random-teleport queue and no fallback world is configured. */
+    RTP_WORLD_DISALLOWED(TeleportMessageKey.RTP_DISALLOWED),
+
+    /** The safe-location queue is momentarily empty and no urgent fallback produced a location. */
+    RTP_NO_SAFE_LOCATION(TeleportMessageKey.RTP_NO_LOCATION),
+
+    /** No spawn (named, mirrored, or default) resolves for the requested world. */
+    SPAWN_UNRESOLVED(TeleportMessageKey.SPAWN_UNRESOLVED);
+
+    private final TeleportMessageKey messageKey;
+
+    TeleportError(TeleportMessageKey messageKey) {
+        this.messageKey = messageKey;
+    }
+
+    /** The catalog key the adapter renders for this failure. */
+    public TeleportMessageKey messageKey() {
+        return messageKey;
+    }
+}

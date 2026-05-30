@@ -6,6 +6,8 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 
+import org.bukkit.event.Listener;
+
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import org.jspecify.annotations.NullMarked;
 
@@ -22,6 +24,7 @@ public final class CloseableResources implements AutoCloseable {
 
     private final Deque<Runnable> stopHooks = new ArrayDeque<>();
     private final List<CommandRegistration> commands = new ArrayList<>();
+    private final List<Listener> listeners = new ArrayList<>();
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -33,9 +36,19 @@ public final class CloseableResources implements AutoCloseable {
         commands.add(Objects.requireNonNull(command, "command"));
     }
 
+    /** Adds a Bukkit listener to register on enable; only ever from an enabled module. */
+    public void addListener(Listener listener) {
+        listeners.add(Objects.requireNonNull(listener, "listener"));
+    }
+
     /** The module-filtered commands to register. */
     public List<CommandRegistration> commands() {
         return List.copyOf(commands);
+    }
+
+    /** The module-filtered listeners to register. */
+    public List<Listener> listeners() {
+        return List.copyOf(listeners);
     }
 
     @Override
@@ -44,5 +57,6 @@ public final class CloseableResources implements AutoCloseable {
             stopHooks.pop().run();
         }
         commands.clear();
+        listeners.clear();
     }
 }

@@ -46,7 +46,6 @@ secrets/
 # Local working files — kept out of the published repo
 /CLAUDE.md
 /CLAUDE.local.md
-/README.md
 /docs/
 /notes/
 /scratch/

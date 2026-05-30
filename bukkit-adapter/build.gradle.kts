@@ -26,6 +26,10 @@ dependencies {
 
     testImplementation(libs.mockbukkit)
     testImplementation(libs.archunit.junit)
+    // MockBukkit drives the real Paper API; the test source set needs it (and Adventure) on its
+    // classpath since the production set declares them compileOnly.
+    testImplementation(libs.paper.api)
+    testImplementation(libs.bundles.adventure)
 }
 
 // Locale catalogs live in a dedicated source set so they have their own
@@ -51,7 +55,10 @@ tasks.processResources {
     val props = mapOf("version" to project.version)
     inputs.properties(props)
     filesMatching("paper-plugin.yml") { expand(props) }
-    // Fold the message catalogs into the runtime jar.
+    // Fold the message catalogs into the runtime jar. The messages source set has its own
+    // resources output that is also on the runtime classpath, so the same catalog file can arrive
+    // from both inputs; keep the folded copy.
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     from(sourceSets["messages"].resources)
 }
 

@@ -37,3 +37,66 @@ permissions:
   uxmessentials.admin.reload:
     description: 'Reload all modules via /uxmess reload.'
     default: op
+  # teleport context (docs/permissions.md "Teleport"). Value-bearing tier nodes
+  # (uxmessentials.tp.warmup.<seconds>, uxmessentials.tp.cooldown.<seconds>) are an open
+  # space granted per instance and are intentionally not enumerated here.
+  uxmessentials.tpa.use:
+    description: '/tpa, /tpaccept, /tpdeny to request and resolve a teleport.'
+    default: true
+  uxmessentials.tpahere.use:
+    description: '/tpahere to ask a player to come to you.'
+    default: true
+  uxmessentials.tpa.cancel:
+    description: '/tpcancel / /tpacancel to withdraw your outgoing request.'
+    default: true
+  uxmessentials.tpa.toggle:
+    description: '/tptoggle to refuse all incoming teleport requests.'
+    default: true
+  uxmessentials.tpa.block:
+    description: '/tpblock / /tpunblock to block a player''s requests.'
+    default: true
+  uxmessentials.tpa.all:
+    description: '/tpaall to request every online player to teleport to you.'
+    default: op
+  uxmessentials.back.use:
+    description: '/back to return to your last captured location.'
+    default: true
+  uxmessentials.back.ondeath:
+    description: 'Allow /back to return to a death location.'
+    default: true
+  uxmessentials.rtp.use:
+    description: '/rtp random teleport from the pre-warmed safe-location queue.'
+    default: true
+  uxmessentials.spawn.use:
+    description: '/spawn to teleport to the resolved server spawn.'
+    default: true
+  uxmessentials.spawn.named:
+    description: '/spawn <name> to teleport to a named spawn.'
+    default: true
+  uxmessentials.spawn.set:
+    description: '/setspawn to set the server spawn or a named spawn.'
+    default: op
+  uxmessentials.tp.use:
+    description: '/tp and /tphere direct staff teleport.'
+    default: op
+  uxmessentials.tp.others:
+    description: '/tpo and /tpohere to teleport overriding no-tp flags.'
+    default: op
+  uxmessentials.tp.position:
+    description: '/tppos to teleport to raw coordinates.'
+    default: op
+  uxmessentials.tp.offline:
+    description: '/tpoffline / /tpofflinehere to a player''s logout location.'
+    default: op
+  uxmessentials.tp.vertical:
+    description: '/top, /bottom, /jump, /up vertical teleports.'
+    default: op
+  uxmessentials.tp.all:
+    description: '/tpall to pull every online player to you.'
+    default: op
+  uxmessentials.tp.warmup.bypass:
+    description: 'Start teleports with no warmup, immune to move-cancel.'
+    default: op
+  uxmessentials.tp.cooldown.bypass:
+    description: 'Skip the shared teleport cooldown gate.'
+    default: op

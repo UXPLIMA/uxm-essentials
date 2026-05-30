@@ -36,8 +36,9 @@ class FeatureModuleRegistryDriftTest {
     void defaultRegistryExposesAnImmutableDeduplicatedSet() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
 
-        // The real registry is empty in this phase but already a valid, immutable, ordered set.
-        assertThat(registry.all()).isEmpty();
+        // teleport is the first context registered; the registry is a valid, immutable, ordered set
+        // that resolves it by id and rejects a not-yet-landed context.
+        assertThat(registry.byId(ModuleId.of("teleport"))).isPresent();
         assertThat(registry.byId(ModuleId.of("homes"))).isEmpty();
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);

@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
+import com.uxplima.uxmessentials.teleport.application.TeleportModule;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -26,9 +27,10 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
 
     public DefaultModuleRegistry() {
         this.delegate = new ListModuleRegistry();
-        // Feature modules register here in dependency-first order as each context lands:
+        // Feature modules register here in dependency-first order as each context lands. teleport owns
+        // all movement orchestration, so it lands before the homes/warps contexts that delegate here:
+        delegate.register(new TeleportModule());
         //   .register(new EconomyModule())
-        //   .register(new TeleportModule())
         //   .register(new HomesModule())
         //   … through VaultsModule. The shared kernel is not a module and never appears here.
     }

@@ -31,6 +31,7 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
             wired.commands()
                     .forEach(command -> registrar.register(command.build(), command.description(), command.aliases()));
         });
+        wired.listeners().forEach(listener -> getServer().getPluginManager().registerEvents(listener, this));
     }
 
     @Override
