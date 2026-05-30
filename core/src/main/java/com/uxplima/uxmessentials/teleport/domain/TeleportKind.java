@@ -23,6 +23,12 @@ public enum TeleportKind {
     /** A {@code /spawn} to a resolved (possibly mirrored) spawn point. */
     SPAWN,
 
+    /** A {@code /home} to one of a player's homes; the homes context delegates the hop here. */
+    HOME,
+
+    /** A {@code /warp} to a server warp; the warps context delegates the hop here. */
+    WARP,
+
     /** A respawn placement resolved through the per-world respawn chain. */
     RESPAWN,
 

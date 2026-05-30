@@ -114,6 +114,10 @@ tasks.shadowJar {
         exclude(dependency("org.xerial:.*:.*"))
         exclude(dependency("org.mariadb.jdbc:.*:.*"))
         exclude(dependency("org.postgresql:.*:.*"))
+        // The persistence adapter is the API surface the feature contexts build on — the generated
+        // jOOQ tables/records and the repository/transaction/cache bases must survive even before a
+        // consuming context references them, so keep the whole module out of dead-code elimination.
+        exclude(project(":persistence-adapter"))
     }
 }
 

@@ -2,11 +2,14 @@ package com.uxplima.uxmessentials.bootstrap.di;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.ConfigurateConfigStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.cooldown.PdcCooldowns;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
@@ -23,7 +26,10 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.scheduler.FoliaSchedule
 import com.uxplima.uxmessentials.shared.adapter.outbound.sink.BukkitMessageSink;
 import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
+import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
+import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -59,6 +65,36 @@ final class KernelWiring {
     /** A {@link Logger} over the plugin's SLF4J logger. */
     static Logger logger(Plugin plugin) {
         return new Slf4jLogger(plugin.getSLF4JLogger());
+    }
+
+    /**
+     * Open the persistence layer: resolve the backend from the {@code storage} config subtree, build the
+     * Hikari data source (single-writer WAL for the embedded SQLite default), and apply the Flyway
+     * migrations the enabled modules contribute plus the V1 baseline. The returned handle exposes the
+     * shared {@code DSLContext} the context repositories bind to, and is closed last on disable.
+     */
+    static Persistence openPersistence(Plugin plugin, ConfigStore config, Logger log, ModuleRegistry registry) {
+        Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(registry, "registry");
+        Path dataFolder = plugin.getDataFolder().toPath();
+        return Persistence.open(config, dataFolder, migrationLocations(config, registry), log);
+    }
+
+    private static List<String> migrationLocations(ConfigStore config, ModuleRegistry registry) {
+        // Always include the V1 baseline; each enabled module then contributes its own location as it
+        // declares one. A disabled module appears in neither list, so its tables stay absent.
+        List<String> locations = new ArrayList<>();
+        locations.add("db/migration");
+        for (FeatureModule module : registry.enabledModules(config)) {
+            for (MigrationSet migration : module.migrations()) {
+                if (!locations.contains(migration.location())) {
+                    locations.add(migration.location());
+                }
+            }
+        }
+        return locations;
     }
 
     /** Build every shared outbound port and bundle them for module injection. */

@@ -100,3 +100,51 @@ permissions:
   uxmessentials.tp.cooldown.bypass:
     description: 'Skip the shared teleport cooldown gate.'
     default: op
+  # homes context (docs/permissions.md "Homes"). The numbered quota node
+  # uxmessentials.home.limit.<n> (optional <world> segment) is an open value space granted per
+  # instance and is intentionally not enumerated here.
+  uxmessentials.home.use:
+    description: '/home [name] to teleport to one of your homes.'
+    default: true
+  uxmessentials.home.set:
+    description: '/sethome [name] to create or move a home, subject to the limit quota.'
+    default: true
+  uxmessentials.home.delete:
+    description: '/delhome <name> to remove one of your homes.'
+    default: true
+  uxmessentials.home.list:
+    description: '/homes to list your homes.'
+    default: true
+  uxmessentials.home.rename:
+    description: '/renamehome <old> <new> to rename a home without re-setting it.'
+    default: true
+  uxmessentials.home.move:
+    description: '/movehome <name> to move a home to your current location.'
+    default: true
+  uxmessentials.home.others:
+    description: '/home <player>:<name> to teleport to another player''s home.'
+    default: op
+  uxmessentials.home.admin:
+    description: '/homeadmin to manage another player''s homes.'
+    default: op
+  # warps context (docs/permissions.md "Warps"). The per-warp gate uxmessentials.warp.use.<warp>
+  # (optional <world> cooldown tiers, and the operator-granted per-warp nodes) is an open value space
+  # granted per warp and is intentionally not enumerated here; only the base nodes are declared.
+  uxmessentials.warp.use:
+    description: '/warp <name> to teleport to a server warp.'
+    default: true
+  uxmessentials.warp.list:
+    description: '/warps to list the warps you may use.'
+    default: true
+  uxmessentials.warp.info:
+    description: '/warpinfo <name> to show a warp''s owner, creation time and cost.'
+    default: true
+  uxmessentials.warp.set:
+    description: '/setwarp <name> to create or move a server-wide warp.'
+    default: op
+  uxmessentials.warp.move:
+    description: '/movewarp <name> to move an existing warp to your current location.'
+    default: op
+  uxmessentials.warp.delete:
+    description: '/delwarp <name> to remove a warp.'
+    default: op

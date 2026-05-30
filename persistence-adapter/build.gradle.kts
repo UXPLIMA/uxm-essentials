@@ -1,9 +1,16 @@
-plugins { id("uxmessentials.java-conventions") }
+import org.jooq.meta.jaxb.Logging
 
-// P0 stub: this module compiles and pulls in the persistence stack, but jOOQ
-// codegen is intentionally not enabled yet — there is no DB schema until a later
-// phase. The generated sources, the jooq-codegen-gradle plugin, and the Flyway
-// migration wiring land when the first bounded context's tables are defined.
+plugins {
+    id("uxmessentials.java-conventions")
+    alias(libs.plugins.jooq.codegen)
+}
+
+// jOOQ generates its classes by parsing the Flyway V1 baseline through the
+// DDLDatabase — no live database is contacted at build time. The generated
+// sources describe the same tables the migration creates at runtime, so the
+// typed DSL and the actual schema can never drift. SQLite is the default backend;
+// the DDLDatabase parses against the portable subset MySQL/MariaDB and PostgreSQL
+// also accept.
 
 dependencies {
     implementation(project(":core"))
@@ -15,8 +22,82 @@ dependencies {
     implementation(libs.caffeine)
     compileOnly(libs.slf4j.api)
 
+    // The code generator parses the DDL through jOOQ's meta-extensions DDLDatabase.
+    // It is needed only on the codegen classpath, never at runtime.
+    jooqCodegen(libs.jooq.meta.ext)
+
     testImplementation(libs.tc.junit)
     testImplementation(libs.tc.postgres) // network-backend integration tests
     testImplementation(libs.tc.mysql) // network-backend integration tests
     // SQLite needs no Testcontainer — the embedded file db runs in-process.
+}
+
+jooq {
+    configuration {
+        logging = Logging.WARN
+        generator {
+            database {
+                name = "org.jooq.meta.extensions.ddl.DDLDatabase"
+                properties {
+                    property {
+                        key = "scripts"
+                        value = "src/main/resources/db/migration/V1__init.sql"
+                    }
+                    // Parse the script the way Flyway lays it out: numbered files,
+                    // semicolon-delimited statements.
+                    property {
+                        key = "sort"
+                        value = "flyway"
+                    }
+                    property {
+                        key = "defaultNameCase"
+                        value = "as_is"
+                    }
+                }
+            }
+            generate {
+                isRecords = true
+                isFluentSetters = true
+                isJavaTimeTypes = true
+            }
+            target {
+                packageName = "com.uxplima.uxmessentials.persistence.jooq"
+                directory =
+                    layout.buildDirectory
+                        .dir("generated-src/jooq/main")
+                        .get()
+                        .asFile.path
+            }
+        }
+    }
+}
+
+// Make the generated sources part of the main compilation and order codegen first.
+sourceSets {
+    main {
+        java {
+            srcDir(layout.buildDirectory.dir("generated-src/jooq/main"))
+        }
+    }
+}
+
+tasks.named<JavaCompile>("compileJava") {
+    dependsOn(tasks.named("jooqCodegen"))
+}
+
+tasks.named<Jar>("sourcesJar") {
+    dependsOn(tasks.named("jooqCodegen"))
+    // The generated jOOQ directory is both a declared source dir and a build-output path, so the same
+    // generated file can reach the sources jar twice; keep the first and drop the duplicate.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// The generated jOOQ classes are not hand-written: keep them out of Spotless so
+// the formatter does not fight the generator. The convention plugin already
+// disables Error Prone warnings in generated code; this excludes the generated
+// directory from the formatter too.
+spotless {
+    java {
+        targetExclude("build/generated-src/**")
+    }
 }
