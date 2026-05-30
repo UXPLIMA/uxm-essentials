@@ -1,0 +1,39 @@
+name: uxmEssentials
+version: '${version}'
+main: com.uxplima.uxmessentials.bootstrap.UxmEssentialsPlugin
+bootstrapper: com.uxplima.uxmessentials.bootstrap.UxmEssentialsBootstrap
+loader: com.uxplima.uxmessentials.bootstrap.UxmEssentialsLoader
+api-version: '1.21'
+authors: ['UXPLIMA']
+description: 'All-in-one essentials: homes, warps, teleport, DB-backed economy, kits, player-state, private messages + mail, presence, lightweight moderation, item/world utilities — organised as first-class hot-reloadable feature modules with an EssentialsX migration path.'
+website: 'https://github.com/UXPLIMA/uxmEssentials'
+
+# Folia: every scheduler call goes through the injected Scheduler port; the
+# adapter routes to the right region/entity/global scheduler.
+folia-supported: true
+
+# Optional integrations — the plugin runs fully without any of them. LuckPerms
+# backs the Permissions port (else the Bukkit-permission default impl, ADR 0005);
+# Vault/Treasury are consumed/registered by the EconomyProvider adapters (ADR 0004).
+dependencies:
+  server:
+    LuckPerms:
+      load: BEFORE
+      required: false
+    Treasury:
+      load: BEFORE
+      required: false
+    Vault:
+      load: BEFORE
+      required: false
+
+# Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
+# The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with
+# each feature module; this phase ships only the administration root's nodes.
+permissions:
+  uxmessentials.admin:
+    description: 'Access to the /uxmess administration root.'
+    default: op
+  uxmessentials.admin.reload:
+    description: 'Reload all modules via /uxmess reload.'
+    default: op

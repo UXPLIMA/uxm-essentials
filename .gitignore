@@ -1,0 +1,65 @@
+# Gradle
+.gradle/
+build/
+# IntelliJ build output. Anchored to repo root so a bare `out/` does not shadow
+# nested directories named `out`, including the hexagonal
+# `<context>/application/port/out/` packages that hold outbound ports.
+/out/
+!gradle-wrapper.jar
+
+# IntelliJ
+.idea/
+*.iml
+
+# Eclipse / VS Code
+.project
+.classpath
+.settings/
+.vscode/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Dev server (run-paper)
+run/
+
+# Logs / temp
+*.log
+*.tmp
+hs_err_pid*
+replay_pid*
+
+# Secrets — never commit
+.env
+.env.*
+secrets/
+*.keystore
+*.pem
+*.key
+
+# Property-based test database (jqwik regenerates per run)
+**/.jqwik-database
+
+# Local working files — kept out of the published repo
+/CLAUDE.md
+/CLAUDE.local.md
+/README.md
+/docs/
+/notes/
+/scratch/
+/rakipler/
+
+# Editor / assistant tooling
+.claude/
+.cursor/
+.cursorrules
+.windsurfrules
+.aider*
+.continue/
+AGENTS.md
+
+# Autonomous build state (local only)
+/.uxmess-build-state.json
