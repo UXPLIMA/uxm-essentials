@@ -33,15 +33,10 @@ dependencies {
 tasks.withType<JavaCompile>().configureEach {
     options.release = 21
     options.encoding = "UTF-8"
-    // ScopedValue (JEP 446) is the canon for request-scoped locale propagation (docs/13-i18n §5,
-    // docs/02-concurrency §4.3) and is a preview API on Java 21, so preview features are enabled
-    // build-wide. -Xlint:-preview keeps the unavoidable preview note from tripping -Werror.
     options.compilerArgs.addAll(listOf(
         "-Xlint:all",
         "-Xlint:-processing",
         "-Xlint:-serial",
-        "-Xlint:-preview",
-        "--enable-preview",
         "-Werror",
         "-parameters"
     ))
@@ -77,8 +72,6 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    // Tests exercise ScopedValue-bound code paths, a preview API on Java 21 (see the JavaCompile block).
-    jvmArgs("--enable-preview")
     testLogging {
         events("passed", "failed", "skipped")
         showStandardStreams = false

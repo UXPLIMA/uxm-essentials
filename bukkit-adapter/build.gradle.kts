@@ -74,8 +74,6 @@ val localeParityCheck by tasks.registering(JavaExec::class) {
     description = "Fail if any messages_<lang>.conf is missing or has extra keys vs messages_en.conf."
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("com.uxplima.uxmessentials.i18n.LocaleParityCheck")
-    // The checker reads the MessageKeyCatalog, whose LocaleScope sibling uses the preview ScopedValue API.
-    jvmArgs("--enable-preview")
     // P9 ships LocaleParityCheck and activates the gate (the onlyIf self-skip is gone). The checker
     // needs the message catalogs and the test classes compiled, so depend on the test compile and the
     // folded resources.
@@ -88,7 +86,6 @@ val jmh by tasks.registering(JavaExec::class) {
     description = "Run JMH micro-benchmarks (baltop ordering, rtp safe-search, teleport resolution)."
     classpath = sourceSets["jmh"].runtimeClasspath
     mainClass.set("org.openjdk.jmh.Main")
-    jvmArgs("--enable-preview") // benchmarked code may touch the preview ScopedValue path
     // Persist results for the perf-regression CI job to diff against the baseline.
     args("-rf", "json", "-rff", "build/reports/jmh/result.json")
 }
@@ -102,7 +99,10 @@ tasks.shadowJar {
     // runtime symbol lookup.
     relocate("org.bstats", "com.uxplima.uxmessentials.libs.bstats")
     relocate("com.zaxxer.hikari", "com.uxplima.uxmessentials.libs.hikari")
-    relocate("org.sqlite", "com.uxplima.uxmessentials.libs.sqlite")
+    // Do NOT relocate org.sqlite — sqlite-jdbc's native (JNI) bindings reference
+    // `org.sqlite.core.NativeDB` by literal class name, which relocation cannot rewrite,
+    // so a relocated driver fails with ClassNotFoundException at first connection. The
+    // driver is safe un-relocated inside Paper's isolated per-plugin classloader.
     relocate("org.mariadb.jdbc", "com.uxplima.uxmessentials.libs.mariadb")
     relocate("org.postgresql", "com.uxplima.uxmessentials.libs.postgresql")
     relocate("org.flywaydb", "com.uxplima.uxmessentials.libs.flyway")
@@ -118,6 +118,9 @@ tasks.shadowJar {
         exclude(dependency("org.xerial:.*:.*"))
         exclude(dependency("org.mariadb.jdbc:.*:.*"))
         exclude(dependency("org.postgresql:.*:.*"))
+        // Flyway discovers DatabaseTypes (SQLite/H2/MySQL/Postgres) via a ServiceLoader Plugin file;
+        // the minimizer can't see those reflective references, so keep the whole module.
+        exclude(dependency("org.flywaydb:.*:.*"))
         // The persistence adapter is the API surface the feature contexts build on — the generated
         // jOOQ tables/records and the repository/transaction/cache bases must survive even before a
         // consuming context references them, so keep the whole module out of dead-code elimination.
@@ -135,7 +138,6 @@ tasks.runServer {
     )
     jvmArgs(
         "-Xmx4G",
-        "--enable-preview", // the plugin's ScopedValue locale propagation is a preview API on Java 21
         "-Djdk.tracePinnedThreads=full",
         "-XX:+UnlockExperimentalVMOptions",
         "-XX:+AllowEnhancedClassRedefinition",
