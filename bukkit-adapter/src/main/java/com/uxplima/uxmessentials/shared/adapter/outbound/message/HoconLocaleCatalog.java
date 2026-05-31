@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
@@ -38,10 +40,16 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     private static final String RESOURCE_DIR = "config/messages/";
 
     private final Logger log;
+    private final Path messagesDir;
     private final ConcurrentHashMap<String, Map<String, String>> byLanguage = new ConcurrentHashMap<>();
 
-    public HoconLocaleCatalog(Logger log) {
+    /**
+     * @param messagesDir the on-disk {@code config/messages} directory; a {@code messages_<lang>.conf}
+     *     present there is read in preference to the bundled copy, so operator edits take effect.
+     */
+    public HoconLocaleCatalog(Logger log, Path messagesDir) {
         this.log = Objects.requireNonNull(log, "log");
+        this.messagesDir = Objects.requireNonNull(messagesDir, "messagesDir");
         byLanguage.put(Locale.ENGLISH.getLanguage(), loadLanguage(Locale.ENGLISH.getLanguage()));
     }
 
@@ -72,23 +80,29 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     }
 
     private Map<String, String> loadLanguage(String language) {
+        Path onDisk = messagesDir.resolve("messages_" + language + ".conf");
+        if (Files.isRegularFile(onDisk)) {
+            return parse(HoconConfigurationLoader.builder().path(onDisk).build(), onDisk.toString());
+        }
         String resource = RESOURCE_DIR + "messages_" + language + ".conf";
         if (getClass().getClassLoader().getResource(resource) == null) {
             return Map.of();
         }
-        try {
-            return parse(resource);
-        } catch (ConfigurateException failure) {
-            log.error("failed to load message catalog " + resource, failure);
-            return Map.of();
-        }
+        return parse(
+                HoconConfigurationLoader.builder()
+                        .source(() -> openReader(resource))
+                        .build(),
+                resource);
     }
 
-    private Map<String, String> parse(String resource) throws ConfigurateException {
-        HoconConfigurationLoader loader = HoconConfigurationLoader.builder()
-                .source(() -> openReader(resource))
-                .build();
-        ConfigurationNode root = loader.load();
+    private Map<String, String> parse(HoconConfigurationLoader loader, String origin) {
+        ConfigurationNode root;
+        try {
+            root = loader.load();
+        } catch (ConfigurateException failure) {
+            log.error("failed to load message catalog " + origin, failure);
+            return Map.of();
+        }
         Map<String, String> table = new java.util.HashMap<>();
         for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                 root.childrenMap().entrySet()) {

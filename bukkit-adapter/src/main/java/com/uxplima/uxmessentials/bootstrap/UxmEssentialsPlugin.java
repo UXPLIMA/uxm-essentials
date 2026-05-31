@@ -24,6 +24,9 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        // First-run side effect: drop the editable default config files next to the database so an
+        // operator has something to configure. Existing files are never overwritten (see DefaultResources).
+        DefaultResources.writeInto(getDataFolder().toPath(), getLogger());
         CloseableResources wired = PluginModule.wire(this);
         this.resources = wired;
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {

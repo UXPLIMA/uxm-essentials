@@ -141,7 +141,8 @@ final class KernelWiring {
 
         Scheduler scheduler = new FoliaScheduler(plugin);
         Permissions permissions = new BukkitPermissions(metaSource(log));
-        LocaleCatalog catalog = new HoconLocaleCatalog(log);
+        Path messagesDir = plugin.getDataFolder().toPath().resolve("config").resolve("messages");
+        LocaleCatalog catalog = new HoconLocaleCatalog(log, messagesDir);
         String prefix = catalog.template(java.util.Locale.ENGLISH, PREFIX_KEY);
 
         LocaleStore localeStore = new PdcLocaleStore(plugin);

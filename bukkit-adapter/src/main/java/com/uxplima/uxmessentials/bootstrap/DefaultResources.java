@@ -1,0 +1,60 @@
+package com.uxplima.uxmessentials.bootstrap;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+import java.util.logging.Logger;
+
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * Writes the bundled default config files into the plugin data folder on first run.
+ *
+ * <p>Every operator-facing file ships as a jar resource and is copied out verbatim the first time the
+ * plugin enables, so a fresh install lands an editable {@code config.conf}, the communication content
+ * file, and the message catalogs next to the database rather than an empty folder. A file the operator
+ * already has is left untouched — the copy happens only when the target is absent, so edits and reloads
+ * survive every restart and upgrade. The config tree itself is still read with per-key fallbacks, so a
+ * partially-trimmed file keeps working; these copies exist to give the operator something to edit.
+ */
+@NullMarked
+final class DefaultResources {
+
+    /** Jar resource paths, also used verbatim as the relative target path under the data folder. */
+    private static final List<String> FILES = List.of(
+            "config.conf",
+            "communication.conf",
+            "config/messages/messages_en.conf",
+            "config/messages/messages_tr.conf");
+
+    private DefaultResources() {}
+
+    /** Copy each bundled default into {@code dataFolder}, skipping any the operator already has. */
+    static void writeInto(Path dataFolder, Logger log) {
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
+        for (String resource : FILES) {
+            writeIfMissing(dataFolder.resolve(resource), resource, log);
+        }
+    }
+
+    private static void writeIfMissing(Path target, String resource, Logger log) {
+        if (Files.exists(target)) {
+            return;
+        }
+        try (InputStream in = DefaultResources.class.getClassLoader().getResourceAsStream(resource)) {
+            if (in == null) {
+                log.warning("bundled default resource is missing from the jar: " + resource);
+                return;
+            }
+            Files.createDirectories(Objects.requireNonNull(target.getParent(), "parent"));
+            Files.copy(in, target);
+            log.info("wrote default " + resource);
+        } catch (IOException failure) {
+            log.warning("could not write default " + resource + ": " + failure.getMessage());
+        }
+    }
+}
