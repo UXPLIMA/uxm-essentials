@@ -2,6 +2,16 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [P11] - 2026-05-31
+
+Velocity cross-server sync.
+
+- A pure `NetworkMessage` codec shared by both adapters, so the bukkit bus and the Velocity proxy serialize and parse the same wire format.
+- The Velocity proxy broker ships as an optional `uxmessentials-velocity` jar that relays plugin-messaging across backends.
+- The bukkit bus client carries an origin-server loop guard so a relayed message is never re-broadcast back to the server that sent it.
+- Opt-in cross-server cache-coherence invalidates homes, warps, economy and vaults caches across backends, with the database remaining the shared source of truth.
+- Without a proxy the system degrades cleanly to local-only operation.
+
 ## [P10] - 2026-05-31
 
 Multi-source data migration.

@@ -102,6 +102,16 @@ public final class CachedWalletRepository implements WalletRepository {
         cache.invalidateAll();
     }
 
+    /**
+     * Drop one cached owner so the next read reloads it from the database. Called by the cross-server bus
+     * client when a peer reports this owner's balance changed on another backend — the shared DB already
+     * holds the authoritative figure, so dropping the cached snapshot is all that is needed for the next
+     * {@code /balance} on this backend to reflect it.
+     */
+    public void invalidateOwner(UUID owner) {
+        cache.invalidate(Objects.requireNonNull(owner, "owner"));
+    }
+
     private Optional<Wallet> loadFresh(UUID ownerUuid) {
         // The cache key is the owner uuid; the loader needs a PlayerRef and the delegate reads only the uuid
         // for the lookup (the row carries the name), so a name placeholder here never reaches a stored row.

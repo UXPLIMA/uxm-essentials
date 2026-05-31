@@ -24,6 +24,8 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -69,7 +71,15 @@ public final class PluginModule {
         // The pool is closed last (pushed first), after every module has stopped and drained its writes.
         resources.onClose(persistence::close);
 
-        wireModules(plugin, registry, config, kernel, persistence, resources, log);
+        // The cross-server bus is a kernel concern (one per backend), built before the modules so each context
+        // that opts into sync registers its listener and wraps its repository through the Bus handle. The
+        // channel is registered only after every listener is in place (start, below); a disabled backend gets a
+        // no-op bus and registers no channel, so the single-server path is unchanged.
+        BusWiring.Wired bus = BusWiring.wire(plugin, config, kernel.scheduler(), kernel.log());
+        resources.onClose(bus::stop);
+
+        wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus());
+        bus.start();
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
         resources.addCommand(new UxmessCommand(registry, config, importNode));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
@@ -103,7 +113,8 @@ public final class PluginModule {
             KernelPorts kernel,
             Persistence persistence,
             CloseableResources resources,
-            Logger log) {
+            Logger log,
+            Bus bus) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
@@ -114,7 +125,7 @@ public final class PluginModule {
                 continue;
             }
             startModule(module, ctx, resources, log);
-            wireAdapters(plugin, module, ctx, persistence, resources, links);
+            wireAdapters(plugin, module, ctx, persistence, resources, links, bus);
         }
     }
 
@@ -124,18 +135,19 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            Bus bus) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport is the first context to land and needs no database; homes builds its jOOQ
         // repository over persistence.dsl() and delegates execution to the captured teleport engine.
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("homes"))) {
-            wireHomes(ctx, persistence, resources, links);
+            wireHomes(ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("economy"))) {
-            wireEconomy(plugin, ctx, persistence, resources, links);
+            wireEconomy(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("warps"))) {
-            wireWarps(ctx, persistence, resources, links);
+            wireWarps(ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("kits"))) {
             wireKits(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
@@ -149,7 +161,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
-            wireVaults(plugin, ctx, persistence, resources);
+            wireVaults(plugin, ctx, persistence, resources, bus);
         }
     }
 
@@ -166,10 +178,10 @@ public final class PluginModule {
     }
 
     private static void wireHomes(
-            ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links) {
+            ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links, Bus bus) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
-        HomesWiring.Wired wired = HomesWiring.wire(ctx, persistence, engine);
+        HomesWiring.Wired wired = HomesWiring.wire(ctx, persistence, engine, bus);
         wired.commands().forEach(resources::addCommand);
     }
 
@@ -178,8 +190,9 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
-        EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence);
+            ContextLinks links,
+            Bus bus) {
+        EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence, bus);
         wired.commands().forEach(resources::addCommand);
         wired.start();
         resources.onClose(wired::stop);
@@ -189,10 +202,11 @@ public final class PluginModule {
     }
 
     private static void wireWarps(
-            ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links) {
+            ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links, Bus bus) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "warps delegates teleport execution but the teleport engine is unavailable");
-        WarpsWiring.Wired wired = WarpsWiring.wire(ctx, persistence, engine, Optional.ofNullable(links.warpEconomy));
+        WarpsWiring.Wired wired =
+                WarpsWiring.wire(ctx, persistence, engine, Optional.ofNullable(links.warpEconomy), bus);
         wired.commands().forEach(resources::addCommand);
     }
 
@@ -259,13 +273,13 @@ public final class PluginModule {
     }
 
     private static void wireVaults(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources, Bus bus) {
         // vaults builds its cached jOOQ VaultRepository over persistence.dsl(), the audit logger on the dedicated
-        // audit channel, the inventory-holder GUI and the InventoryClose save listener. It carries no
-        // cross-context bridge — its only collaborators are the shared persistence DSL and the Permissions
-        // reducer — so nothing is captured for a later context. On stop the still-open vault windows are
-        // close-and-saved before the pool closes.
-        VaultsWiring.Wired wired = VaultsWiring.wire(plugin, ctx, persistence);
+        // audit channel, the inventory-holder GUI and the InventoryClose save listener. It opts into cross-server
+        // sync through the bus handle — a remote vault save invalidates exactly that vault here — but carries no
+        // cross-context bridge, so nothing is captured for a later context. On stop the still-open vault windows
+        // are close-and-saved before the pool closes.
+        VaultsWiring.Wired wired = VaultsWiring.wire(plugin, ctx, persistence, bus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

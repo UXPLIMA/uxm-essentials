@@ -75,6 +75,16 @@ public final class CachedHomeRepository implements HomeRepository {
         cache.invalidateAll();
     }
 
+    /**
+     * Drop one cached owner so the next read reloads it from the database. Called by the cross-server bus
+     * client when a peer reports this owner's homes changed on another backend — the shared DB already holds
+     * the authoritative rows, so dropping the cached set lets the next {@code /home} on this backend resolve
+     * the fresh location.
+     */
+    public void invalidateOwner(UUID owner) {
+        cache.invalidate(Objects.requireNonNull(owner, "owner"));
+    }
+
     private HomeSet loadFresh(UUID ownerUuid) {
         // The cache key is the owner uuid; the loader needs a PlayerRef, and the delegate only reads the
         // uuid (the row carries no owner name), so a name placeholder here never reaches a row.

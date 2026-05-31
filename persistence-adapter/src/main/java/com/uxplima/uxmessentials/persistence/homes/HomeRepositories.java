@@ -23,4 +23,15 @@ public final class HomeRepositories {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedHomeRepository(new JooqHomeRepository(persistence.dsl()));
     }
+
+    /**
+     * The cached jOOQ {@link HomeRepository} as its concrete decorator type, so the wiring can hand the
+     * cross-server bus a per-owner invalidation hook on the same cache the commands read — a remote
+     * {@code /sethome} drops exactly that owner's cached set. Same backing as {@link #cached}; this overload
+     * exposes the decorator only so the invalidation seam can reach it.
+     */
+    public static CachedHomeRepository cachedConcrete(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new CachedHomeRepository(new JooqHomeRepository(persistence.dsl()));
+    }
 }

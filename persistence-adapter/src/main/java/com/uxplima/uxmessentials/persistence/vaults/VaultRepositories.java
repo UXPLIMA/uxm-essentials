@@ -23,4 +23,15 @@ public final class VaultRepositories {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedVaultRepository(new JooqVaultRepository(persistence.dsl()));
     }
+
+    /**
+     * The cached jOOQ {@link VaultRepository} as its concrete decorator type, so the wiring can hand the
+     * cross-server bus a per-vault invalidation hook on the same cache the GUI reads — a remote vault save
+     * drops exactly that vault's cached payload. Same backing as {@link #cached}; this overload exposes the
+     * decorator only so the invalidation seam can reach it.
+     */
+    public static CachedVaultRepository cachedConcrete(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new CachedVaultRepository(new JooqVaultRepository(persistence.dsl()));
+    }
 }

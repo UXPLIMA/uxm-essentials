@@ -31,10 +31,13 @@ import com.uxplima.uxmessentials.economy.application.port.PendingPayRegistry;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
+import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
 import com.uxplima.uxmessentials.persistence.economy.WalletLedger;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WalletSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
@@ -60,21 +63,26 @@ public final class EconomyWiring {
     private EconomyWiring() {}
 
     /** Build the economy context from {@code plugin}, {@code ctx}, and the shared {@code persistence} DSL. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence) {
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(bus, "bus");
         KernelPorts kernel = ctx.kernel();
         EconomyConfig settings = new EconomyConfig(ctx.config());
         CurrencyRegistry currencies = settings.currencies();
         Clock clock = Clock.systemUTC();
 
-        WalletLedger ledger = WalletRepositories.ledger(
+        // The cached repository is the offline-read accelerator and the cache the bus invalidates on a remote
+        // change; the broadcasting decorator wraps it so this backend's balance writes notify peers. The ledger
+        // (settle writer + telemetry) is built over the wrapped repository so a coalesced settle also announces.
+        CachedWalletRepository cached = WalletRepositories.cachedConcrete(persistence, currencies, clock);
+        bus.registry().register(WalletSync.listener(cached));
+        WalletLedger ledger = WalletRepositories.ledgerOver(
+                WalletSync.repository(cached, bus.publisher()),
                 persistence,
-                currencies,
                 kernel.scheduler(),
                 kernel.log(),
-                clock,
                 settings.writeDebounce(),
                 settings.batchFlush());
         EconomyProvider resolved = resolveProvider(plugin, kernel, settings, currencies, ledger.repository(), clock);

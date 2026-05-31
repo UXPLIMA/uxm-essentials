@@ -23,4 +23,15 @@ public final class WarpRepositories {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedWarpRepository(new JooqWarpRepository(persistence.dsl()));
     }
+
+    /**
+     * The cached jOOQ {@link WarpRepository} as its concrete decorator type, so the wiring can hand the
+     * cross-server bus an invalidation hook on the same cache the commands read — a remote {@code /setwarp}
+     * drops the cached warp set. Same backing as {@link #cached}; this overload exposes the decorator only so
+     * the invalidation seam can reach it.
+     */
+    public static CachedWarpRepository cachedConcrete(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new CachedWarpRepository(new JooqWarpRepository(persistence.dsl()));
+    }
 }

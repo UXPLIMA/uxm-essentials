@@ -1,0 +1,9 @@
+{
+  "id": "uxmessentials-velocity",
+  "name": "uxmEssentials Velocity",
+  "version": "${version}",
+  "description": "Cross-server bus broker for uxmEssentials homes/warps/economy/vaults sync.",
+  "authors": ["UXPLIMA"],
+  "dependencies": [],
+  "main": "com.uxplima.uxmessentials.velocity.UxmEssentialsVelocity"
+}

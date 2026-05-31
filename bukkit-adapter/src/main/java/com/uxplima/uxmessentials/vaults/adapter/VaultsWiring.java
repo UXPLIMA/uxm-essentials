@@ -8,8 +8,11 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.vaults.CachedVaultRepository;
 import com.uxplima.uxmessentials.persistence.vaults.VaultRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VaultSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -42,6 +45,11 @@ import org.slf4j.LoggerFactory;
  * {@code com.uxplima.uxmessentials.audit} channel (not the plugin log), so an operator routes it to a retained
  * file per docs/09-deployment. The GUI is inventory-holder based: a {@link VaultView} opens a chest sized to
  * the resolved quota and the close listener resolves the owning vault from the holder to write it through.
+ *
+ * <p>Cross-server sync rides the {@link Bus} handle: the wiring registers a {@link VaultSync} listener that
+ * invalidates exactly the {@code (owner, index)} a peer reports changed and wraps the cached repository so
+ * every local vault save announces a {@code VaultChanged} to peers. With the bus disabled the publish is a
+ * no-op and the listener is never invoked, so the single-server path is unchanged.
  */
 @NullMarked
 public final class VaultsWiring {
@@ -50,15 +58,20 @@ public final class VaultsWiring {
 
     private VaultsWiring() {}
 
-    /** Build the vaults adapters and use cases from {@code ctx} and the {@code persistence} DSL. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence) {
+    /** Build the vaults adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the bus. */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(bus, "bus");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         VaultSettings settings = new VaultSettings(ctx.config());
-        VaultRepository repository = VaultRepositories.cached(persistence);
+        // The cached repository is the read accelerator; the bus listener invalidates exactly the vault a peer
+        // reports changed, and the broadcasting decorator announces this backend's own saves to peers.
+        CachedVaultRepository cached = VaultRepositories.cachedConcrete(persistence);
+        bus.registry().register(VaultSync.listener(cached));
+        VaultRepository repository = VaultSync.repository(cached, bus.publisher());
         VaultServices services = assemble(plugin, kernel, settings, repository, clock);
         VaultCloseListener closeListener = new VaultCloseListener(services.saveVault(), kernel.scheduler());
         return new Wired(VaultCommands.all(services), List.of(closeListener), closeListener);

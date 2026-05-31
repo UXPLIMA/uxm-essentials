@@ -17,9 +17,12 @@ import com.uxplima.uxmessentials.homes.application.SetHome;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
+import com.uxplima.uxmessentials.persistence.homes.CachedHomeRepository;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -43,12 +46,17 @@ public final class HomesWiring {
     private HomesWiring() {}
 
     /** Build the homes adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the engine. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine) {
+    public static Wired wire(ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine, Bus bus) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(bus, "bus");
         KernelPorts kernel = ctx.kernel();
-        HomeRepository repository = HomeRepositories.cached(persistence);
+        // The cached repository is the read accelerator; the bus listener invalidates exactly the owner a peer
+        // reports changed, and the broadcasting decorator announces this backend's own writes to peers.
+        CachedHomeRepository cached = HomeRepositories.cachedConcrete(persistence);
+        bus.registry().register(HomeSync.listener(cached));
+        HomeRepository repository = HomeSync.repository(cached, bus.publisher());
         HomeNotifier notifier = new HomeNotifier(kernel.messages(), kernel.messageSink());
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);

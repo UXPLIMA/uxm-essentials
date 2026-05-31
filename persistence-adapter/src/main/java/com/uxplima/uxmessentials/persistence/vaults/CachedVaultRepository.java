@@ -72,4 +72,14 @@ public final class CachedVaultRepository implements VaultRepository {
     public void invalidateAll() {
         cache.invalidateAll();
     }
+
+    /**
+     * Drop one cached vault so the next open reloads its contents from the database. Called by the
+     * cross-server bus client when a peer reports this vault changed on another backend — the shared DB already
+     * holds the authoritative contents, so dropping the cached payload is all that is needed for the next open
+     * on this backend to reflect it.
+     */
+    public void invalidate(VaultId id) {
+        cache.invalidate(Objects.requireNonNull(id, "id"));
+    }
 }

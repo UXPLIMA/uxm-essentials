@@ -62,6 +62,42 @@ public final class WalletRepositories {
         return new CachedWalletRepository(new JooqWalletRepository(persistence.dsl(), currencies, clock));
     }
 
+    /**
+     * The cached jOOQ repository as its concrete decorator type, so the wiring can hand the cross-server bus a
+     * per-owner invalidation hook on the same cache the provider reads — a remote {@code /pay} or eco-admin
+     * change drops exactly that owner's cached balance. The wiring then wraps this in its broadcasting
+     * decorator and builds the ledger over the wrapped repository via {@link #ledgerOver}.
+     */
+    public static CachedWalletRepository cachedConcrete(
+            Persistence persistence, CurrencyRegistry currencies, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(currencies, "currencies");
+        Objects.requireNonNull(clock, "clock");
+        return new CachedWalletRepository(new JooqWalletRepository(persistence.dsl(), currencies, clock));
+    }
+
+    /**
+     * Build the native ledger over a caller-supplied {@code repository} (typically the cached repository
+     * already wrapped in the cross-server broadcasting decorator), so the settle writer and telemetry loops
+     * run over the same repository the native provider reads. Identical to {@link #ledger} except the
+     * repository is provided rather than constructed here.
+     */
+    public static WalletLedger ledgerOver(
+            WalletRepository repository,
+            Persistence persistence,
+            Scheduler scheduler,
+            Logger log,
+            Duration writeDebounce,
+            Duration batchFlush) {
+        Objects.requireNonNull(repository, "repository");
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(log, "log");
+        DebouncedWalletWriter writer = new DebouncedWalletWriter(repository, scheduler, log, writeDebounce);
+        TransactionTelemetry telemetry = new TransactionTelemetry(persistence.dsl(), scheduler, log, batchFlush);
+        return new WalletLedger(repository, writer, telemetry);
+    }
+
     /** The jOOQ-backed {@code /paytoggle} accept-pay flag over the shared persistence DSL. */
     public static PayPreferences payPreferences(Persistence persistence, boolean toggleDefault) {
         Objects.requireNonNull(persistence, "persistence");
