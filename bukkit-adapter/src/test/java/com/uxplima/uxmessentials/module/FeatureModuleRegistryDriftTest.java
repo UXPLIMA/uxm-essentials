@@ -59,6 +59,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("moderation"))).isPresent();
         assertThat(registry.byId(ModuleId.of("itemworld"))).isPresent();
         assertThat(registry.byId(ModuleId.of("vaults"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("communication"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -71,7 +72,8 @@ class FeatureModuleRegistryDriftTest {
                         "presence",
                         "moderation",
                         "itemworld",
-                        "vaults");
+                        "vaults",
+                        "communication");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -136,13 +138,10 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void vaultsIsRegisteredLastAndIndependentlyDisableable() {
+    void vaultsIsTheLastDbBackedContextAndIndependentlyDisableable() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule vaults =
                 registry.byId(ModuleId.of("vaults")).orElseThrow(() -> new AssertionError("vaults is not registered"));
-
-        // vaults is the 12th and final feature context, registered last in the dependency-first order.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("vaults");
 
         // Disabling exactly vaults removes only it from the enabled set; every sibling stays on.
         ConfigStore off = new FixedConfig(Map.of("modules.vaults.enabled", false));
@@ -157,6 +156,38 @@ class FeatureModuleRegistryDriftTest {
                 vaults.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactly("vault");
         assertThat(vaults.migrations()).isEmpty();
+    }
+
+    @Test
+    void communicationIsTheLastModuleShipsDisabledAndPublishesItsStaticSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule communication = registry.byId(ModuleId.of("communication"))
+                .orElseThrow(() -> new AssertionError("communication is not registered"));
+
+        // communication is the round-3 feature context, registered last after the twelve landed contexts.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("communication");
+
+        // A newly introduced module ships DISABLED: with no modules.conf override it is absent from the enabled
+        // set while every landed sibling (which default to on) stays enabled.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).doesNotContain("communication");
+        assertThat(defaults).contains("teleport", "economy", "moderation", "itemworld", "vaults");
+
+        // Explicitly enabling exactly communication brings only it on; the rest are unchanged.
+        Set<String> on =
+                registry.enabledModules(new FixedConfig(Map.of("modules.communication.enabled", true))).stream()
+                        .map(m -> m.id().value())
+                        .collect(Collectors.toSet());
+        assertThat(on).contains("communication", "teleport", "vaults");
+
+        // Its static surface is the plugin's own /broadcasttoggle; the operator-configured info-page commands
+        // (/rules, /motd, …) are dynamic and not part of this fixed table. It persists nothing — no migration.
+        Set<String> literals =
+                communication.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactly("broadcasttoggle");
+        assertThat(communication.migrations()).isEmpty();
     }
 
     @Test

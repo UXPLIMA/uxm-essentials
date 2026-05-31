@@ -2,6 +2,15 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [v2.3] - 2026-05-31
+
+Communication module.
+
+- Communication context: custom join/quit/death messages with a per-channel `DISABLE`/`DEFAULT`/`CUSTOM` mode, MiniMessage templates with `{player}`/`{displayname}`/`{count}`/`{world}` (and `{message}` for death) placeholders, and an optional one-off broadcast on a player's first-ever join.
+- A rotating announcer on a timer with a `min-players` gate and a per-player opt-out via `/broadcasttoggle`, where `RANDOM` ordering never repeats the previous line back-to-back.
+- Auto-registering server-info text commands (`/rules`, `/motd`, `/info`, …) sourced from config: each declared info page registers a permission-gated command of the same name.
+- The whole module ships disabled by default, so every channel defers to the vanilla server message until an operator opts in.
+
 ## [v2.2] - 2026-05-31
 
 Presence anti-AFK matrix and mute-command-block.

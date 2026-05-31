@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
@@ -108,7 +109,8 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(PresenceMessageKey.values(), List.of("afk", "vanish", "presence")),
                 Map.entry(ModerationMessageKey.values(), List.of("moderation", "mute", "jail")),
                 Map.entry(ItemworldMessageKey.values(), List.of("itemworld", "give", "time", "weather")),
-                Map.entry(VaultsMessageKey.values(), List.of("vault", "vaults")));
+                Map.entry(VaultsMessageKey.values(), List.of("vault", "vaults")),
+                Map.entry(CommunicationMessageKey.values(), List.of("communication")));
     }
 
     @Test

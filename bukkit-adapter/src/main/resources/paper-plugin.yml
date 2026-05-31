@@ -488,3 +488,13 @@ permissions:
   uxmessentials.vault.others:
     description: '/vault <player> [n] — open and audit another player''s vault (audit-logged).'
     default: op
+  # communication context (docs/permissions.md "Communication"). The operator's broadcast surface:
+  # connection-message policies, the rotating announcer, and the info pages. The per-page nodes
+  # uxmessentials.communication.info.<name> (one per configured info page: /rules, /motd, /info, …) are an open
+  # value space granted per page and are intentionally not enumerated here. Ships disabled by default.
+  uxmessentials.module.communication:
+    description: 'Hot-reload / inspect the communication module (connection messages, announcer, info pages).'
+    default: op
+  uxmessentials.communication.broadcasttoggle:
+    description: '/broadcasttoggle to stop or resume receiving the rotating server announcements.'
+    default: true

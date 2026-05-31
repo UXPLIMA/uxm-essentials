@@ -9,6 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
+import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
@@ -162,6 +163,8 @@ public final class PluginModule {
             wireItemworld(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus);
+        } else if (module.id().equals(ModuleId.of("communication"))) {
+            wireCommunication(plugin, ctx, resources);
         }
     }
 
@@ -306,6 +309,19 @@ public final class PluginModule {
         // BukkitVisibilityApplier drives the canSee graph that messaging's /msg resolution and teleport's /tpa
         // listing already read, so the vanish soft-couple needs no extra cross-context handle wired here.
         PresenceWiring.Wired wired = PresenceWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
+    }
+
+    private static void wireCommunication(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // communication persists nothing: the per-player broadcast opt-out is PDC-backed (survives relog), the
+        // sequence counters are transient, and the connection policies, announcer schedule, and info pages are
+        // config-authored content in communication.conf. It carries no cross-context bridge — its only
+        // collaborators are the shared Scheduler, messages/messageSink, and event ports — so nothing is captured
+        // for a later context. The announcer timer on the Scheduler port is stopped on disable.
+        CommunicationWiring.Wired wired = CommunicationWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

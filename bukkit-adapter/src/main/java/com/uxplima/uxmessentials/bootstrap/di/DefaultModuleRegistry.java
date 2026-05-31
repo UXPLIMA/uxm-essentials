@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bootstrap.di;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.communication.application.CommunicationModule;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldModule;
@@ -71,6 +72,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // dependency edge (no cross-context bridge; its only collaborators are the shared persistence DSL and the
         // Permissions reducer), so it lands last, after itemworld, completing the twelve-context set.
         delegate.register(new VaultsModule());
+        // communication is the round-3 feature context (the 13th module) — the operator's broadcast surface:
+        // connection-message policies, the rotating announcer, and the info pages. It carries no hard dependency
+        // edge (its only collaborators are the shared Scheduler, messages, and event ports), and it ships DISABLED
+        // by default, so it lands last and wires nothing until an operator enables it in modules.conf.
+        delegate.register(new CommunicationModule());
         // The shared kernel is not a module and never appears here.
     }
 

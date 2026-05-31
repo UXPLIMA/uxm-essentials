@@ -4,6 +4,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
@@ -18,7 +19,7 @@ import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 
 /**
  * The single registry of every shipped {@link MessageKey} constant, across the {@code shared} common
- * block and all eleven feature contexts.
+ * block and every feature context (the twelve landed contexts plus the round-3 {@code communication} module).
  *
  * <p>This is the one place that enumerates the per-module key enums, so the catalog is whole regardless
  * of which modules are enabled at runtime (docs/13-i18n §6 — a disabled module still ships its keys).
@@ -42,7 +43,8 @@ public final class MessageKeyCatalog {
             PresenceMessageKey.values(),
             ModerationMessageKey.values(),
             ItemworldMessageKey.values(),
-            VaultsMessageKey.values());
+            VaultsMessageKey.values(),
+            CommunicationMessageKey.values());
 
     private MessageKeyCatalog() {}
 
