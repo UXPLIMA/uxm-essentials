@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
 import java.time.Clock;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -42,14 +43,21 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
     private final DomainEventPublisher events;
     private final Logger log;
     private final Clock clock;
+    private final BooleanSupplier centerToggle;
 
     public AsyncTeleportExecutor(
-            Scheduler scheduler, BackLocationStore backStore, DomainEventPublisher events, Logger log, Clock clock) {
+            Scheduler scheduler,
+            BackLocationStore backStore,
+            DomainEventPublisher events,
+            Logger log,
+            Clock clock,
+            BooleanSupplier centerToggle) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.backStore = Objects.requireNonNull(backStore, "backStore");
         this.events = Objects.requireNonNull(events, "events");
         this.log = Objects.requireNonNull(log, "log");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.centerToggle = Objects.requireNonNull(centerToggle, "centerToggle");
     }
 
     @Override
@@ -65,7 +73,7 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
         if (player == null || !player.isOnline()) {
             return; // despawned between launch and hop — nothing to move
         }
-        Position target = resolveTarget(destination);
+        Position target = applyCentering(resolveTarget(destination));
         Location to = locationFor(target);
         if (to == null) {
             log.warn("teleport target world unloaded for {}", who.name());
@@ -87,6 +95,10 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             return; // Paper refused the hop (e.g. unloaded target); the player stayed put
         }
         scheduler.onEntity(who, () -> events.publish(new PlayerTeleported(who, kind, from, to)));
+    }
+
+    private Position applyCentering(Position target) {
+        return centerToggle.getAsBoolean() ? target.atBlockCenter() : target;
     }
 
     private Position resolveTarget(Destination destination) {

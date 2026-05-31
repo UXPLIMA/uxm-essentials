@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
-import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -16,13 +15,17 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.economy.domain.AmountParseError;
+import com.uxplima.uxmessentials.economy.domain.AmountParser;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
+import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Result;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -73,14 +76,18 @@ abstract class EconomyCommandSupport {
         return services.currencies().defaultCurrency();
     }
 
-    /** Parse a raw amount to {@code currency}'s precision; empty when it is not a positive number. */
-    static Optional<BigDecimal> amount(String raw, Currency currency) {
-        try {
-            BigDecimal parsed = currency.normalize(new BigDecimal(raw.strip()));
-            return parsed.signum() > 0 ? Optional.of(parsed) : Optional.empty();
-        } catch (NumberFormatException notANumber) {
+    /**
+     * Parse a raw amount into {@code currency}, accepting magnitude suffixes ({@code 10k}, {@code 1.5m}) and
+     * thousands separators, clamped to the currency range. On a parse failure the rejection is sent to
+     * {@code viewer} and an empty {@link Optional} returns, so a caller only proceeds with a usable figure.
+     */
+    final Optional<Money> amount(String raw, Currency currency, PlayerRef viewer) {
+        Result<Money, AmountParseError> parsed = AmountParser.parse(raw, currency);
+        if (parsed.isErr()) {
+            services.notifier().send(viewer, parsed.errorOrThrow().messageKey());
             return Optional.empty();
         }
+        return Optional.of(parsed.orElseThrow());
     }
 
     /** A {@link PlayerRef} for the live player. */

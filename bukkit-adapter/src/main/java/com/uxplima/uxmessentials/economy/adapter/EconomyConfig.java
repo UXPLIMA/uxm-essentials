@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import org.bukkit.plugin.ServicePriority;
 
+import com.uxplima.uxmessentials.economy.application.AmountFormat;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
@@ -71,6 +72,11 @@ public final class EconomyConfig {
     /** The default accept-pay flag a player takes before they ever run {@code /paytoggle}. */
     public boolean payToggleDefault() {
         return config.getBoolean("pay.toggle-default", true);
+    }
+
+    /** How balances render — {@code full} (grouped, the default) or {@code compact} (suffix-abbreviated). */
+    public AmountFormat amountFormat() {
+        return AmountFormat.fromConfig(config.getString("amount-format", AmountFormat.FULL.token()));
     }
 
     /** The {@code /payconfirm} prompt timeout. */

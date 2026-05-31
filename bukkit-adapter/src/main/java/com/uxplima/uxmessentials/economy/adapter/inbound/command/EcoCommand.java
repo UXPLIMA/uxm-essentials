@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -106,8 +105,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         if (resolved == null) {
             return Command.SINGLE_SUCCESS;
         }
-        Money money = Money.of(resolved.currency, resolved.amount);
-        offTick(() -> dispatchTarget(verb, resolved.actor, resolved.target, money));
+        offTick(() -> dispatchTarget(verb, resolved.actor, resolved.target, resolved.amount));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -155,12 +153,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             rejectUnknownCurrency(ref(sender));
             return Command.SINGLE_SUCCESS;
         }
-        Optional<BigDecimal> amount = amount(ctx.getArgument("amount", String.class), currency.get());
+        PlayerRef actor = ref(sender);
+        Optional<Money> amount = amount(ctx.getArgument("amount", String.class), currency.get(), actor);
         if (amount.isEmpty()) {
             return Command.SINGLE_SUCCESS;
         }
-        Money money = Money.of(currency.get(), amount.get());
-        PlayerRef actor = ref(sender);
+        Money money = amount.get();
         // Snapshot the online set on the tick thread (the Bukkit roster is not safe to read off-tick); the
         // mutation set is then handed to the off-tick worker so the DB writes never run on the tick thread.
         List<PlayerRef> online = EcoTargets.online();
@@ -203,17 +201,18 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             rejectUnknownCurrency(ref(sender));
             return null;
         }
-        Optional<BigDecimal> amount = amount(ctx.getArgument("amount", String.class), currency.get());
+        PlayerRef actor = ref(sender);
+        Optional<Money> amount = amount(ctx.getArgument("amount", String.class), currency.get(), actor);
         if (amount.isEmpty()) {
             return null;
         }
         Optional<PlayerRef> target = services.players().findOnlineByName(ctx.getArgument("player", String.class));
         if (target.isEmpty()) {
-            rejectUnknownTarget(ref(sender), ctx.getArgument("player", String.class));
+            rejectUnknownTarget(actor, ctx.getArgument("player", String.class));
             return null;
         }
-        return new Resolved(ref(sender), target.get(), currency.get(), amount.get());
+        return new Resolved(actor, target.get(), amount.get());
     }
 
-    private record Resolved(PlayerRef actor, PlayerRef target, Currency currency, BigDecimal amount) {}
+    private record Resolved(PlayerRef actor, PlayerRef target, Money amount) {}
 }

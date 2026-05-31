@@ -17,5 +17,11 @@ public enum SafeRejection {
     UNSAFE_GROUND,
 
     /** The candidate falls inside a protected claim. */
-    INSIDE_CLAIM
+    INSIDE_CLAIM,
+
+    /** The block the player would land on is on the operator's avoid list (lava, magma, …). */
+    AVOIDED_BLOCK,
+
+    /** The resolved landing Y falls outside the operator's configured min/max band. */
+    OUT_OF_Y_BAND
 }

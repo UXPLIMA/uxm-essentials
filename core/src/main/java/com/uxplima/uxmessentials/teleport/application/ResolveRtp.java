@@ -58,7 +58,7 @@ public final class ResolveRtp {
         WorldRef world = resolved.get();
         Optional<RtpSafeLocation> location = queue.poll(world);
         queue.requestRefill(world);
-        return dispatch(who, location, TeleportError.RTP_NO_SAFE_LOCATION);
+        return dispatch(who, location, TeleportMessageKey.RTP_NO_LOCATION, TeleportError.RTP_NO_SAFE_LOCATION);
     }
 
     /** Urgent path (respawn / first-join): the queue, else a bounded off-thread search; always refills. */
@@ -72,14 +72,16 @@ public final class ResolveRtp {
         WorldRef world = resolved.get();
         Optional<RtpSafeLocation> location = queue.urgentSearch(world);
         queue.requestRefill(world);
-        return dispatch(who, location, TeleportError.RTP_NO_SAFE_LOCATION);
+        // The urgent search ran the full attempt budget inline; an empty result means it exhausted those
+        // tries, which is a distinct, firmer "gave up" message than the background "refilling, try again".
+        return dispatch(who, location, TeleportMessageKey.RTP_EXHAUSTED, TeleportError.RTP_NO_SAFE_LOCATION);
     }
 
     private Result<Unit, TeleportError> dispatch(
-            PlayerRef who, Optional<RtpSafeLocation> location, TeleportError onEmpty) {
+            PlayerRef who, Optional<RtpSafeLocation> location, TeleportMessageKey onEmpty, TeleportError error) {
         if (location.isEmpty()) {
-            notifier.send(who, TeleportMessageKey.RTP_NO_LOCATION);
-            return Result.err(onEmpty);
+            notifier.send(who, onEmpty);
+            return Result.err(error);
         }
         engine.launch(who, Destination.at(location.get().position()), TeleportKind.RANDOM);
         return Result.ok();

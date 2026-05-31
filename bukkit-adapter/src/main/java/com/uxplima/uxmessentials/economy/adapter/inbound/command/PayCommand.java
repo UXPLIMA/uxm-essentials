@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
-import java.math.BigDecimal;
 import java.util.Optional;
 
 import org.bukkit.entity.Player;
@@ -67,18 +66,12 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
             rejectUnknownCurrency(ref(sender));
             return Command.SINGLE_SUCCESS;
         }
-        Optional<BigDecimal> amount = amount(ctx.getArgument("amount", String.class), currency.get());
-        if (amount.isEmpty()) {
-            services.notifier()
-                    .send(
-                            ref(sender),
-                            com.uxplima.uxmessentials.economy.application.EconomyMessageKey.PAY_BELOW_MINIMUM,
-                            java.util.Map.of("amount", ctx.getArgument("amount", String.class)));
+        Optional<Money> money = amount(ctx.getArgument("amount", String.class), currency.get(), ref(sender));
+        if (money.isEmpty()) {
             return Command.SINGLE_SUCCESS;
         }
         String targetName = ctx.getArgument("player", String.class);
-        Money money = Money.of(currency.get(), amount.get());
-        offTick(() -> resolveAndPay(ref(sender), targetName, money));
+        offTick(() -> resolveAndPay(ref(sender), targetName, money.get()));
         return Command.SINGLE_SUCCESS;
     }
 

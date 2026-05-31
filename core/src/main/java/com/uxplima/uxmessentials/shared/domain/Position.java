@@ -35,6 +35,15 @@ public record Position(WorldRef world, double x, double y, double z, float yaw, 
         return new Position(world, x, y, z, 0f, 0f);
     }
 
+    /**
+     * This position snapped to the centre of its block on the horizontal plane ({@code x+0.5},
+     * {@code z+0.5}), keeping the Y and the look direction. Centring a teleport destination avoids the
+     * player landing flush against a block edge or wall corner.
+     */
+    public Position atBlockCenter() {
+        return new Position(world, blockX() + 0.5, y, blockZ() + 0.5, yaw, pitch);
+    }
+
     public int blockX() {
         return (int) Math.floor(x);
     }
@@ -54,6 +63,21 @@ public record Position(WorldRef world, double x, double y, double z, float yaw, 
                 && blockX() == other.blockX()
                 && blockY() == other.blockY()
                 && blockZ() == other.blockZ();
+    }
+
+    /**
+     * The straight-line distance to {@code other} in blocks. Positions in different worlds are treated as
+     * infinitely far apart, so a cross-world move always exceeds any finite threshold.
+     */
+    public double distanceTo(Position other) {
+        Objects.requireNonNull(other, "other");
+        if (!world.equals(other.world)) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double dx = x - other.x;
+        double dy = y - other.y;
+        double dz = z - other.z;
+        return Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
     }
 
     private static void requireFinite(double value, String field) {

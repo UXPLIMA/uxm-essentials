@@ -2,6 +2,10 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [v2.1] - 2026-05-31
+
+Teleport + economy polish.
+
 ## [P12] - 2026-05-31
 
 Discord bridge.

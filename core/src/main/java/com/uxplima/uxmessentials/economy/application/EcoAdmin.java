@@ -80,7 +80,7 @@ public final class EcoAdmin {
         notifier.send(
                 actor,
                 EconomyMessageKey.ECO_ADMIN_GIVEALL,
-                Map.of("count", Integer.toString(affected), "amount", MoneyFormat.withSymbol(amount)));
+                Map.of("count", Integer.toString(affected), "amount", notifier.amount(amount)));
         return affected;
     }
 
@@ -96,7 +96,7 @@ public final class EcoAdmin {
         notifier.send(
                 actor,
                 EconomyMessageKey.ECO_ADMIN_GIVERANDOM,
-                Map.of("player", chosen.name(), "amount", MoneyFormat.withSymbol(amount)));
+                Map.of("player", chosen.name(), "amount", notifier.amount(amount)));
         return Result.ok();
     }
 
@@ -126,7 +126,7 @@ public final class EcoAdmin {
         repository.ensureOwner(target);
         Result<Unit, TransferError> result = credit ? economy.credit(target, amount) : economy.debit(target, amount);
         if (result.isErr()) {
-            notifier.send(actor, result.errorOrThrow().messageKey(), Map.of("amount", MoneyFormat.withSymbol(amount)));
+            notifier.send(actor, result.errorOrThrow().messageKey(), Map.of("amount", notifier.amount(amount)));
             return result;
         }
         audit.adminMutation(actor, target, amount, reason);
@@ -146,7 +146,7 @@ public final class EcoAdmin {
     }
 
     private void notify(PlayerRef actor, PlayerRef target, Money amount, EconomyMessageKey feedback) {
-        notifier.send(actor, feedback, Map.of("player", target.name(), "amount", MoneyFormat.withSymbol(amount)));
+        notifier.send(actor, feedback, Map.of("player", target.name(), "amount", notifier.amount(amount)));
     }
 
     private void validate(PlayerRef actor, PlayerRef target, Money amount) {

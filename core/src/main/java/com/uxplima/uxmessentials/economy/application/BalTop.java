@@ -73,6 +73,6 @@ public final class BalTop {
                 Map.of(
                         "rank", Integer.toString(rank),
                         "player", row.owner().name(),
-                        "amount", MoneyFormat.withSymbol(row.balance())));
+                        "amount", notifier.amount(row.balance())));
     }
 }

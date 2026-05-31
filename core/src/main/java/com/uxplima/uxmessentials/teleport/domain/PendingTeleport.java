@@ -59,12 +59,17 @@ public final class PendingTeleport {
     }
 
     /**
-     * Reconcile a movement: when move-cancel is armed and the player left the origin block, this warmup
-     * cancels with {@link WarmupCancelReason#MOVED}. Sub-block jitter (same block cell) never cancels.
+     * Reconcile a movement: when move-cancel is armed and the player drifted off the origin block <em>and</em>
+     * past the configured move threshold, this warmup cancels with {@link WarmupCancelReason#MOVED}. Sub-block
+     * jitter (same block cell) never cancels, and with a non-zero threshold a small drift across a block edge
+     * is tolerated too, so mouse jitter near a boundary does not abort the warmup.
      */
     public Outcome onMovement(Position to) {
         Objects.requireNonNull(to, "to");
         if (cancelled || !toggles.cancelOnMove() || origin.sameBlock(to)) {
+            return Outcome.unchanged(this);
+        }
+        if (!toggles.movePassesThreshold(origin.distanceTo(to))) {
             return Outcome.unchanged(this);
         }
         return Outcome.cancelled(markCancelled(), WarmupCancelReason.MOVED);

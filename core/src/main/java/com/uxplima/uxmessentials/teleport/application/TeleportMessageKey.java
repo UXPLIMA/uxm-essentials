@@ -38,6 +38,7 @@ public enum TeleportMessageKey implements MessageKey {
     RTP_SEARCHING("teleport.rtp.searching"),
     RTP_DISALLOWED("teleport.rtp.disallowed"),
     RTP_NO_LOCATION("teleport.rtp.no-location"),
+    RTP_EXHAUSTED("teleport.rtp.exhausted"),
 
     // spawn
     SPAWN_TELEPORTED("teleport.spawn.teleported"),

@@ -34,7 +34,7 @@ public final class Balance {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(currency, "currency");
         Money balance = economy.balance(viewer, currency);
-        notifier.send(viewer, EconomyMessageKey.WALLET_BALANCE, Map.of("amount", MoneyFormat.withSymbol(balance)));
+        notifier.send(viewer, EconomyMessageKey.WALLET_BALANCE, Map.of("amount", notifier.amount(balance)));
         return balance;
     }
 
@@ -47,7 +47,7 @@ public final class Balance {
         notifier.send(
                 viewer,
                 EconomyMessageKey.WALLET_BALANCE_OTHER,
-                Map.of("player", target.name(), "amount", MoneyFormat.withSymbol(balance)));
+                Map.of("player", target.name(), "amount", notifier.amount(balance)));
         return balance;
     }
 }

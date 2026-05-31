@@ -24,6 +24,7 @@ public enum EconomyMessageKey implements MessageKey {
     PAY_SELF("pay.self"),
     PAY_INSUFFICIENT("pay.insufficient"),
     PAY_BELOW_MINIMUM("pay.below-minimum"),
+    PAY_INVALID_AMOUNT("pay.invalid-amount"),
     PAY_TARGET_DISABLED("pay.target-disabled"),
     PAY_TARGET_UNKNOWN("pay.target-unknown"),
     PAY_ERROR("pay.error"),

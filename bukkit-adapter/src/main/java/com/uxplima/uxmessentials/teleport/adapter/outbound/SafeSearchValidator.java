@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.domain.BiomeName;
+import com.uxplima.uxmessentials.teleport.domain.BlockTypeName;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.SafeCandidate;
 import com.uxplima.uxmessentials.teleport.domain.SafeSearchArea;
@@ -71,7 +72,9 @@ public final class SafeSearchValidator {
         BiomeName biome =
                 BiomeName.of(world.getBiome(blockX, groundY, blockZ).getKey().getKey());
         boolean standingSafe = standingSafe(world, blockX, groundY, blockZ);
-        return new SafeCandidate(position, biome, standingSafe, false);
+        BlockTypeName landing = BlockTypeName.of(
+                world.getBlockAt(blockX, groundY, blockZ).getType().getKey().getKey());
+        return new SafeCandidate(position, biome, standingSafe, false, landing);
     }
 
     private static boolean standingSafe(World world, int x, int groundY, int z) {

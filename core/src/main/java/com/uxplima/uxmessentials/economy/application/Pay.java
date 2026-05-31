@@ -99,7 +99,7 @@ public final class Pay {
         notifier.send(
                 from,
                 EconomyMessageKey.PAY_CONFIRM_PROMPT,
-                Map.of("player", to.name(), "amount", MoneyFormat.withSymbol(amount)));
+                Map.of("player", to.name(), "amount", notifier.amount(amount)));
         return PayOutcome.staged();
     }
 
@@ -123,14 +123,9 @@ public final class Pay {
     private PayOutcome sent(PlayerRef from, PlayerRef to, Money amount) {
         // The provider applied both legs and emitted the WalletDebited/WalletCredited events at the source;
         // this use case only confirms to the two players.
+        notifier.send(from, EconomyMessageKey.PAY_SENT, Map.of("player", to.name(), "amount", notifier.amount(amount)));
         notifier.send(
-                from,
-                EconomyMessageKey.PAY_SENT,
-                Map.of("player", to.name(), "amount", MoneyFormat.withSymbol(amount)));
-        notifier.send(
-                to,
-                EconomyMessageKey.PAY_RECEIVED,
-                Map.of("player", from.name(), "amount", MoneyFormat.withSymbol(amount)));
+                to, EconomyMessageKey.PAY_RECEIVED, Map.of("player", from.name(), "amount", notifier.amount(amount)));
         return PayOutcome.sent();
     }
 
@@ -140,7 +135,7 @@ public final class Pay {
     }
 
     private PayOutcome reject(PlayerRef from, TransferError error, Money amount) {
-        notifier.send(from, error.messageKey(), Map.of("amount", MoneyFormat.withSymbol(amount)));
+        notifier.send(from, error.messageKey(), Map.of("amount", notifier.amount(amount)));
         return PayOutcome.rejected(error);
     }
 

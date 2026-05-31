@@ -140,7 +140,8 @@ public final class EconomyWiring {
             WalletRepository repository,
             EconomyProvider resolved,
             BaltopSnapshots snapshots) {
-        EconomyNotifier notifier = new EconomyNotifier(kernel.messages(), kernel.messageSink());
+        EconomyNotifier notifier =
+                new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat());
         EconomyAudit audit = new LoggingEconomyAudit(kernel.log());
         PayPreferences preferences = WalletRepositories.payPreferences(persistence, settings.payToggleDefault());
         PendingPayRegistry pending =

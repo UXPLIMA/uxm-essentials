@@ -92,8 +92,8 @@ public final class TeleportWiring {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
         InMemoryRequestRegistry requests = new InMemoryRequestRegistry(settings.singleRequestDisplace());
         PdcTeleportFlags flags = new PdcTeleportFlags(plugin);
-        TeleportExecutor executor =
-                new AsyncTeleportExecutor(kernel.scheduler(), backStore, kernel.events(), kernel.log(), clock);
+        TeleportExecutor executor = new AsyncTeleportExecutor(
+                kernel.scheduler(), backStore, kernel.events(), kernel.log(), clock, settings::teleportToCenter);
         PrewarmedSafeLocationQueue rtpQueue = rtpQueue(kernel, config, settings, running);
         Warmups warmups = new TrackingWarmups(kernel.warmups(), warmupTracker, settings::cancelToggles);
         TeleportEngine engine = new TeleportEngine(
@@ -134,7 +134,8 @@ public final class TeleportWiring {
     }
 
     private static List<Listener> listeners(TeleportServices services, ConfigStore config) {
-        return List.of(new TeleportListeners(services.warmupTracker(), services.captureBack(), config));
+        return List.of(new TeleportListeners(
+                services.warmupTracker(), services.captureBack(), config, services.settings()::backCapturePolicy));
     }
 
     /**

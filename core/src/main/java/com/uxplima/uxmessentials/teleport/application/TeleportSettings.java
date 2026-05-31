@@ -6,11 +6,15 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.domain.BackCapturePolicy;
 import com.uxplima.uxmessentials.teleport.domain.BiomeName;
+import com.uxplima.uxmessentials.teleport.domain.BlockTypeName;
 import com.uxplima.uxmessentials.teleport.domain.CooldownStartPhase;
 import com.uxplima.uxmessentials.teleport.domain.RespawnChain;
 import com.uxplima.uxmessentials.teleport.domain.SafeSearchPolicy;
+import com.uxplima.uxmessentials.teleport.domain.TeleportCauseCategory;
 import com.uxplima.uxmessentials.teleport.domain.WarmupCancelToggles;
+import com.uxplima.uxmessentials.teleport.domain.YBand;
 
 /**
  * A typed read view over the teleport module's {@code teleport.conf} subtree. The use cases consult
@@ -59,12 +63,39 @@ public final class TeleportSettings {
         return Math.max(0, config.getInt("default-cooldown", 5));
     }
 
-    /** The per-axis warmup cancel toggles; move-cancel defaults on, rotation and damage off. */
+    /** The per-axis warmup cancel toggles; move-cancel defaults on, rotation, damage and interact off. */
     public WarmupCancelToggles cancelToggles() {
         return new WarmupCancelToggles(
                 config.getBoolean("warmup.cancel-on-move", true),
                 config.getBoolean("warmup.cancel-on-rotate", false),
-                config.getBoolean("warmup.cancel-on-damage", false));
+                config.getBoolean("warmup.cancel-on-damage", false),
+                config.getBoolean("warmup.cancel-on-interact", false),
+                Math.max(0.0, config.getDouble("warmup.move-threshold", 0.0)));
+    }
+
+    /** Whether a teleport destination is snapped to the block centre (x+0.5, z+0.5); default true. */
+    public boolean teleportToCenter() {
+        return config.getBoolean("teleport-to-center", true);
+    }
+
+    /** The vanilla teleport causes that must not overwrite a player's {@code /back} point. */
+    public BackCapturePolicy backCapturePolicy() {
+        List<String> raw = config.getStringList("back.ignored-causes", List.of("ender_pearl", "chorus_fruit"));
+        java.util.Set<TeleportCauseCategory> ignored = raw.stream()
+                .map(TeleportSettings::parseCause)
+                .flatMap(java.util.Optional::stream)
+                .collect(java.util.stream.Collectors.toCollection(
+                        () -> java.util.EnumSet.noneOf(TeleportCauseCategory.class)));
+        return new BackCapturePolicy(ignored);
+    }
+
+    private static java.util.Optional<TeleportCauseCategory> parseCause(String raw) {
+        String token = raw.trim().toUpperCase(java.util.Locale.ROOT);
+        try {
+            return java.util.Optional.of(TeleportCauseCategory.valueOf(token));
+        } catch (IllegalArgumentException unknown) {
+            return java.util.Optional.empty();
+        }
     }
 
     /** Whether {@code /back} may return to a death location at all (also gated per-player by permission). */
@@ -72,12 +103,25 @@ public final class TeleportSettings {
         return config.getBoolean("back.on-death", true);
     }
 
-    /** The safe-search policy (excluded biomes + claim-awareness) shared across worlds. */
+    /** The safe-search policy (excluded biomes, avoided blocks, Y band, claim-awareness) across worlds. */
     public SafeSearchPolicy safeSearchPolicy() {
         List<String> excluded = config.getStringList("rtp.excluded-biomes", List.of("ocean", "deep_ocean", "river"));
+        List<String> avoid = config.getStringList("rtp.avoid-blocks", List.of("lava", "magma_block", "fire", "cactus"));
         return new SafeSearchPolicy(
                 excluded.stream().map(BiomeName::of).collect(java.util.stream.Collectors.toSet()),
+                avoid.stream().map(BlockTypeName::of).collect(java.util.stream.Collectors.toSet()),
+                rtpYBand(),
                 config.getBoolean("rtp.claim-aware", true));
+    }
+
+    /** The min/max landing-Y band an RTP candidate must fall within; unbounded when neither key is set. */
+    public YBand rtpYBand() {
+        int minY = config.getInt("rtp.min-y", Integer.MIN_VALUE);
+        int maxY = config.getInt("rtp.max-y", Integer.MAX_VALUE);
+        if (maxY < minY) {
+            return YBand.unbounded();
+        }
+        return new YBand(minY, maxY);
     }
 
     /** The per-world respawn chain; falls back to {@link RespawnChain#vanillaDefault()} when unset. */
