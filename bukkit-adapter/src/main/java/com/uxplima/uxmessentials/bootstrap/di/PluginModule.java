@@ -9,6 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
+import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
@@ -113,6 +114,8 @@ public final class PluginModule {
             wirePresence(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(plugin, ctx, persistence, resources, links);
+        } else if (module.id().equals(ModuleId.of("itemworld"))) {
+            wireItemworld(plugin, ctx, resources);
         }
     }
 
@@ -208,6 +211,17 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+    }
+
+    private static void wireItemworld(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // itemworld persists nothing: it is the full EssentialsX item/world surface as stateless ACL-thin
+        // mutations validated at the adapter boundary and applied through the kernel Scheduler. The only runtime
+        // state is the powertool/unlimited per-player toggles and the item-PDC powertool bindings, all transient
+        // and dropped with the wiring on module stop. /repair /repairall /hat /more are owned here (playerstate
+        // deferred them, §15.6), so they register here and the two modules never double-register.
+        ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
     }
 
     private static void bindMute(

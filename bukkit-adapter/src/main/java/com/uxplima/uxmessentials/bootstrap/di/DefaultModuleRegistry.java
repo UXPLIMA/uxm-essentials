@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
+import com.uxplima.uxmessentials.itemworld.application.ItemworldModule;
 import com.uxplima.uxmessentials.kits.application.KitsModule;
 import com.uxplima.uxmessentials.messaging.application.MessagingModule;
 import com.uxplima.uxmessentials.moderation.application.ModerationModule;
@@ -61,6 +62,10 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // bindings stand in for until it lands; both couplings are soft, so moderation carries no hard
         // dependency edge and lands after the contexts it informs (messaging + teleport were wired first).
         delegate.register(new ModerationModule());
+        // itemworld is stateless and ACL-thin (no DB, no persistence) and carries no hard dependency edge — its
+        // verbs mutate the live item/entity/world directly — so it lands after the contexts wired above, ahead
+        // of vaults, matching the dependency-first ordering documented in docs/10-feature-modules.md §3.
+        delegate.register(new ItemworldModule());
         //   … through VaultsModule. The shared kernel is not a module and never appears here.
     }
 

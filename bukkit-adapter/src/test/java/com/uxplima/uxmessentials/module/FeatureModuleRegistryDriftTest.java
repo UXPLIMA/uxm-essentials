@@ -44,7 +44,8 @@ class FeatureModuleRegistryDriftTest {
         // presence (vanish) — both gates degrade gracefully — so it carries no hard dependency edge. presence
         // owns the vanish state messaging and teleport read through the canSee graph; that coupling is soft.
         // moderation provides the real mute/jail gates messaging and teleport hold placeholders for, a soft
-        // couple too, so it lands last. The registry is a valid, immutable, ordered set that resolves each by
+        // couple too. itemworld is stateless and ACL-thin (no DB, no cross-context bridge) and lands after
+        // moderation, ahead of vaults. The registry is a valid, immutable, ordered set that resolves each by
         // id and rejects a not-yet-landed context.
         assertThat(registry.byId(ModuleId.of("teleport"))).isPresent();
         assertThat(registry.byId(ModuleId.of("homes"))).isPresent();
@@ -55,6 +56,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("messaging"))).isPresent();
         assertThat(registry.byId(ModuleId.of("presence"))).isPresent();
         assertThat(registry.byId(ModuleId.of("moderation"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("itemworld"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -65,9 +67,69 @@ class FeatureModuleRegistryDriftTest {
                         "playerstate",
                         "messaging",
                         "presence",
-                        "moderation");
+                        "moderation",
+                        "itemworld");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void itemworldIsIndependentlyDisableableAndPublishesItsFullVerbSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule itemworld = registry.byId(ModuleId.of("itemworld"))
+                .orElseThrow(() -> new AssertionError("itemworld is not registered"));
+
+        // Disabling exactly itemworld removes only it from the enabled set; every sibling stays on.
+        ConfigStore off = new FixedConfig(Map.of("modules.itemworld.enabled", false));
+        Set<String> enabled =
+                registry.enabledModules(off).stream().map(m -> m.id().value()).collect(Collectors.toSet());
+        assertThat(enabled).doesNotContain("itemworld");
+        assertThat(enabled).contains("teleport", "economy", "moderation");
+
+        // Enabled, itemworld contributes its full ~40-verb surface: the group-B verbs owned here and the
+        // /repair /repairall /hat /more verbs playerstate deferred (§15.6) — registered here, never twice.
+        Set<String> literals =
+                itemworld.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals)
+                .contains(
+                        "give",
+                        "item",
+                        "more",
+                        "repair",
+                        "repairall",
+                        "hat",
+                        "enchant",
+                        "itemdb", // item utils
+                        "anvil",
+                        "workbench",
+                        "enderchest",
+                        "furnace", // workstations
+                        "disposal",
+                        "condense", // cleanup
+                        "powertool",
+                        "powertooltoggle", // powertool
+                        "spawnmob",
+                        "spawner",
+                        "kill",
+                        "butcher",
+                        "killall",
+                        "remove",
+                        "unlimited", // mob/entity
+                        "time",
+                        "weather",
+                        "day",
+                        "night",
+                        "sun",
+                        "rain",
+                        "thunder", // time/weather
+                        "lightning",
+                        "fireball",
+                        "kittycannon"); // admin-fun
+        // The full surface: 12 item-utils + 9 workstations + 2 cleanup + 2 powertool + 7 mob/entity
+        // + 7 time/weather + 3 admin-fun = 42 distinct literals, no verb dropped and none registered twice.
+        assertThat(itemworld.commands()).hasSize(42);
+        assertThat(literals).hasSize(42);
+        assertThat(itemworld.migrations()).isEmpty(); // itemworld is stateless: no persistence, no migration
     }
 
     @Test

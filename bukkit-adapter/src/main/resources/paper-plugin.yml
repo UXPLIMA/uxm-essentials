@@ -340,3 +340,134 @@ permissions:
   uxmessentials.moderation.exempt:
     description: 'Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff.'
     default: op
+  # itemworld context (docs/permissions.md "Itemworld"). The largest module — the full EssentialsX item/world
+  # surface (~40 verbs) split into sub-feature groups, each independently disableable from itemworld.conf and
+  # each command additionally disableable per-command (modules.itemworld.groups.<group>.enabled and
+  # modules.itemworld.commands.<literal>.disabled). Every verb is permission-gated here; the abusable verbs
+  # (bulk /give, /spawnmob, /spawner, the /kill /butcher /killall /remove entity-purge family, the /lightning
+  # /fireball /kittycannon admin-fun verbs) are audit-logged. Inputs are validated at the adapter boundary.
+  # The reload/inspect tier for the module (and its sub-feature groups) is uxmessentials.module.itemworld.
+  uxmessentials.module.itemworld:
+    description: 'Hot-reload / inspect the itemworld module and its sub-feature groups.'
+    default: op
+  # Item utilities sub-feature group.
+  uxmessentials.give.use:
+    description: '/give <player> <item> [amount] (alias /i) — give an item to a player; bulk gives are audited.'
+    default: op
+  uxmessentials.item.use:
+    description: '/item <item> [amount] — give an item to yourself.'
+    default: op
+  uxmessentials.itemname.use:
+    description: '/itemname <name> — rename the held item.'
+    default: op
+  uxmessentials.itemlore.use:
+    description: '/itemlore <set|add|clear> [text] — edit the held item''s lore.'
+    default: op
+  uxmessentials.itemflag.use:
+    description: '/itemflag <flag> <on|off> — toggle an item meta flag.'
+    default: op
+  uxmessentials.skull.use:
+    description: '/skull [player] — get a player-head skull.'
+    default: op
+  uxmessentials.more.use:
+    description: '/more — fill the held stack to max (itemworld-owned; playerstate defers it).'
+    default: op
+  uxmessentials.enchant.use:
+    description: '/enchant <enchant> [level] — enchant the held item (level clamped at the boundary).'
+    default: op
+  uxmessentials.hat.use:
+    description: '/hat — wear the held item as a helmet (itemworld-owned; playerstate defers it).'
+    default: op
+  uxmessentials.itemdb.use:
+    description: '/itemdb [item] — look up an item''s id / data.'
+    default: op
+  uxmessentials.repair.itemworld:
+    description: '/repair and /repairall in the itemworld surface (itemworld-owned; playerstate defers them).'
+    default: op
+  # Virtual workstations sub-feature group.
+  uxmessentials.workstation.anvil:
+    description: '/anvil — open a virtual anvil.'
+    default: op
+  uxmessentials.workstation.workbench:
+    description: '/workbench (alias /craft) — open a virtual crafting table.'
+    default: op
+  uxmessentials.workstation.enderchest:
+    description: '/enderchest (alias /echest) — open your ender chest.'
+    default: op
+  uxmessentials.workstation.grindstone:
+    description: '/grindstone — open a virtual grindstone.'
+    default: op
+  uxmessentials.workstation.cartography:
+    description: '/cartography — open a virtual cartography table.'
+    default: op
+  uxmessentials.workstation.loom:
+    description: '/loom — open a virtual loom.'
+    default: op
+  uxmessentials.workstation.smithingtable:
+    description: '/smithingtable — open a virtual smithing table.'
+    default: op
+  uxmessentials.workstation.stonecutter:
+    description: '/stonecutter — open a virtual stonecutter.'
+    default: op
+  uxmessentials.workstation.furnace:
+    description: '/furnace — open a virtual furnace.'
+    default: op
+  # Inventory cleanup sub-feature group.
+  uxmessentials.disposal.use:
+    description: '/disposal (alias /trash) — open a throwaway GUI.'
+    default: op
+  uxmessentials.condense.use:
+    description: '/condense (alias /compact) [all] — recipe-stack inventory items.'
+    default: op
+  # Powertool sub-feature group.
+  uxmessentials.powertool.use:
+    description: '/powertool <command> (alias /pt) — bind a command to the held item.'
+    default: op
+  uxmessentials.powertool.toggle:
+    description: '/powertooltoggle — enable/disable your powertool bindings.'
+    default: op
+  # Mob & entity sub-feature group. The spawning and purge verbs are audit-logged.
+  uxmessentials.spawnmob.use:
+    description: '/spawnmob <type> [amount] — spawn mobs (audit-logged).'
+    default: op
+  uxmessentials.spawner.use:
+    description: '/spawner <type> — set a spawner''s mob type (audit-logged).'
+    default: op
+  uxmessentials.kill.use:
+    description: '/kill [player|entity] — kill a target (audit-logged).'
+    default: op
+  uxmessentials.butcher.use:
+    description: '/butcher [radius] — purge nearby mobs (audit-logged).'
+    default: op
+  uxmessentials.killall.use:
+    description: '/killall [type] — purge entities world-wide (audit-logged).'
+    default: op
+  uxmessentials.remove.use:
+    description: '/remove <type> [radius] — remove entities by type (audit-logged).'
+    default: op
+  uxmessentials.unlimited.use:
+    description: '/unlimited — toggle unlimited placement of held blocks.'
+    default: op
+  # Time & weather aliases sub-feature group.
+  uxmessentials.time.use:
+    description: '/time <set|add> <value> — per-world time.'
+    default: op
+  uxmessentials.weather.use:
+    description: '/weather <clear|rain|thunder> [duration].'
+    default: op
+  uxmessentials.time.alias:
+    description: '/day / /night quick time aliases.'
+    default: op
+  uxmessentials.weather.alias:
+    description: '/sun / /rain / /thunder quick weather aliases.'
+    default: op
+  # Admin-fun sub-feature group. All three are audit-logged.
+  uxmessentials.lightning.use:
+    description: '/lightning (alias /smite) [player] — strike lightning (audit-logged).'
+    default: op
+  uxmessentials.fireball.use:
+    description: '/fireball — launch a fireball (audit-logged).'
+    default: op
+  uxmessentials.kittycannon.use:
+    description: '/kittycannon — launch an exploding cat (audit-logged).'
+    default: op
