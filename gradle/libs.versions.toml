@@ -29,6 +29,9 @@ jda            = "5.6.1"
 treasury       = "1.2.0"        # me.lokka30:treasury-api — CodeMC repo, NOT Maven Central (verified 2026-05-30)
 vault          = "1.7.1"        # com.github.MilkBowl:VaultAPI — JitPack, NOT Maven Central (verified 2026-05-30)
 
+# placeholder integration (see docs/11-economy-integration.md soft-depend pattern, ADR 0004)
+placeholderapi = "2.11.6"       # me.clip:placeholderapi — extendedclip repo, NOT Maven Central (verified 2026-05-31)
+
 # tests
 junit          = "5.12.1"
 assertj        = "3.27.3"
@@ -79,6 +82,9 @@ jda               = { module = "net.dv8tion:JDA",                               
 # economy provider APIs — compileOnly soft-depends (see §9 + §16)
 treasury-api      = { module = "me.lokka30:treasury-api",                        version.ref = "treasury" }
 vault-api         = { module = "com.github.MilkBowl:VaultAPI",                   version.ref = "vault" }
+
+# placeholder API — compileOnly soft-depend; the expansion registers only when the plugin is present
+placeholderapi    = { module = "me.clip:placeholderapi",                         version.ref = "placeholderapi" }
 
 junit-bom         = { module = "org.junit:junit-bom",                            version.ref = "junit" }
 junit-jupiter     = { module = "org.junit.jupiter:junit-jupiter" }

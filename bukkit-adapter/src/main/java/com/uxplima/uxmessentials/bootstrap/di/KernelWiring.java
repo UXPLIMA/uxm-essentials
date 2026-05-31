@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.PdcLocaleStore;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.BukkitPermissions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsMetaSource;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.MetaSource;
@@ -157,7 +158,7 @@ final class KernelWiring {
                 new PdcCooldowns(plugin, permissions, Clock.systemUTC()),
                 new SchedulerWarmups(scheduler, permissions),
                 new CatalogMessages(catalog, resolver),
-                new BukkitMessageSink(scheduler, prefix),
+                new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
                 new BukkitPlayerLookup(),
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
@@ -170,6 +171,18 @@ final class KernelWiring {
         String tag = config.getString(DEFAULT_LOCALE_PATH, java.util.Locale.ENGLISH.toLanguageTag());
         java.util.Locale parsed = java.util.Locale.forLanguageTag(tag);
         return parsed.getLanguage().isEmpty() ? java.util.Locale.ENGLISH : parsed;
+    }
+
+    private static java.util.function.Function<java.util.UUID, java.util.function.UnaryOperator<String>>
+            messageBridgeFactory() {
+        // The PlaceholderAPI message bridge: when the plugin is present, a per-viewer pre-parse transform
+        // expands %papi% placeholders in operator-authored catalog content before MiniMessage parses; when
+        // absent, the factory hands back the identity transform and the sink is unchanged. The me.clip symbols
+        // are reached only inside PlaceholderApiSupport, past its plugin-present guard.
+        if (!PlaceholderApiSupport.isPresent()) {
+            return BukkitMessageSink.NO_PRE_PARSE;
+        }
+        return PlaceholderApiSupport::messageBridge;
     }
 
     private static MetaSource metaSource(Logger log) {

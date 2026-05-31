@@ -22,6 +22,11 @@ dependencies {
     compileOnly(libs.treasury.api)
     compileOnly(libs.vault.api)
 
+    // PlaceholderAPI soft-depend — compileOnly: the expansion and the message bridge
+    // touch these symbols only past the plugin-present guard, so the plugin runs fully
+    // without PlaceholderAPI installed.
+    compileOnly(libs.placeholderapi)
+
     implementation(libs.bundles.configs)
     implementation(libs.bstats.bukkit)
 

@@ -74,7 +74,7 @@ public final class VaultsWiring {
         VaultRepository repository = VaultSync.repository(cached, bus.publisher());
         VaultServices services = assemble(plugin, kernel, settings, repository, clock);
         VaultCloseListener closeListener = new VaultCloseListener(services.saveVault(), kernel.scheduler());
-        return new Wired(VaultCommands.all(services), List.of(closeListener), closeListener);
+        return new Wired(VaultCommands.all(services), List.of(closeListener), closeListener, repository);
     }
 
     private static VaultServices assemble(
@@ -106,14 +106,19 @@ public final class VaultsWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the inventory-close save listener to register
      * @param closeListener the listener, held for the stop-time flush
+     * @param repository the vault store the {@code vaults_count} placeholder reads
      */
     public record Wired(
-            List<CommandRegistration> commands, List<Listener> listeners, VaultCloseListener closeListener) {
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            VaultCloseListener closeListener,
+            VaultRepository repository) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(closeListener, "closeListener");
+            Objects.requireNonNull(repository, "repository");
         }
 
         /** Close-and-save every still-open vault window, then drop the open-window tracking. Called on stop. */

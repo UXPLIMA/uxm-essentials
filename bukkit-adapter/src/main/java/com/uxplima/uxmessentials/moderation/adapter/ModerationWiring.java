@@ -83,11 +83,16 @@ public final class ModerationWiring {
         BukkitSanctions sanctions = new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings);
         ModerationGuard guard = new ModerationGuard(kernel.permissions());
         ModerationServices services = assemble(plugin, kernel, settings, repository, sanctions, guard, clock);
-        bindGates(repository, gates, clock);
+        RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
+        RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
+        gates.bindMute(mutePolicy);
+        gates.bindJail(jailGate);
         return new Wired(
                 ModerationCommands.all(services, kernel.messages(), kernel.messageSink()),
                 listeners(services, sanctions, repository, kernel, settings, guard, clock),
-                sanctions);
+                sanctions,
+                mutePolicy,
+                jailGate);
     }
 
     private static ModerationServices assemble(
@@ -122,11 +127,6 @@ public final class ModerationWiring {
                 .players(kernel.playerLookup())
                 .targets(new BukkitTargetResolver(plugin.getServer()))
                 .build();
-    }
-
-    private static void bindGates(ModerationRepository repository, GateSinks gates, Clock clock) {
-        gates.bindMute(new RepositoryMutePolicy(repository, clock));
-        gates.bindJail(new RepositoryJailGate(repository, clock));
     }
 
     private static List<Listener> listeners(
@@ -184,13 +184,22 @@ public final class ModerationWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the login/join/freeze listeners to register
      * @param sanctions the live-player sanction adapter, for the stop-time freeze drain
+     * @param mutePolicy the mute read side the {@code muted} placeholder queries
+     * @param jailGate the jail read side the {@code jailed} placeholder queries
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, BukkitSanctions sanctions) {
+    public record Wired(
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            BukkitSanctions sanctions,
+            RepositoryMutePolicy mutePolicy,
+            RepositoryJailGate jailGate) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(sanctions, "sanctions");
+            Objects.requireNonNull(mutePolicy, "mutePolicy");
+            Objects.requireNonNull(jailGate, "jailGate");
         }
 
         /** Drop the session-scoped freeze set. Called on module stop. */

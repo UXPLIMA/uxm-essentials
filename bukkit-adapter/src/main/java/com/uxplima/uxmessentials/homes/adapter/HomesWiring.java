@@ -61,7 +61,7 @@ public final class HomesWiring {
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
         HomeServices services = assemble(ctx, repository, notifier, quota, teleporter);
-        return new Wired(HomeCommands.all(services, kernel.messages()));
+        return new Wired(HomeCommands.all(services, kernel.messages()), repository, quota);
     }
 
     private static HomeServices assemble(
@@ -88,16 +88,22 @@ public final class HomesWiring {
     }
 
     /**
-     * Everything the homes module contributes once wired: the Brigadier commands. The homes context holds
-     * no repeating scheduled work and no in-memory store beyond the repository cache, so there is nothing
-     * to drain on stop — the module's {@code stop()} clears its own bookkeeping and the cache expires.
+     * Everything the homes module contributes once wired: the Brigadier commands plus the read seams the
+     * PlaceholderAPI expansion queries (the repository for the home count, the quota reducer for the limit).
+     * The homes context holds no repeating scheduled work and no in-memory store beyond the repository
+     * cache, so there is nothing to drain on stop — the module's {@code stop()} clears its own bookkeeping
+     * and the cache expires.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param repository the home store the {@code homes_count} placeholder reads
+     * @param quota the home-limit reducer the {@code homes_limit}/{@code homes_left} placeholders read
      */
-    public record Wired(List<CommandRegistration> commands) {
+    public record Wired(List<CommandRegistration> commands, HomeRepository repository, HomeQuota quota) {
 
         public Wired {
             commands = List.copyOf(commands);
+            Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(quota, "quota");
         }
     }
 }

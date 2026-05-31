@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderKitEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderWarpEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SchedulerPendingPayRegistry;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SnapshotBaltopProvider;
+import com.uxplima.uxmessentials.economy.application.AmountFormat;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.Balance;
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
 import com.uxplima.uxmessentials.economy.application.port.PendingPayRegistry;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
+import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
@@ -129,7 +131,16 @@ public final class EconomyWiring {
         WarpEconomy warpEconomy = new ProviderWarpEconomy(resolved, currencies.defaultCurrency());
         KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency());
         return new Wired(
-                commands, warpEconomy, kitEconomy, ledger, snapshots, resolved, plugin, settings.registerProvider());
+                commands,
+                warpEconomy,
+                kitEconomy,
+                ledger,
+                snapshots,
+                resolved,
+                plugin,
+                settings.registerProvider(),
+                currencies.defaultCurrency(),
+                settings.amountFormat());
     }
 
     private static EconomyServices useCases(
@@ -174,6 +185,8 @@ public final class EconomyWiring {
      * @param provider the resolved provider this plugin uses (registered or deferred)
      * @param plugin the owning plugin, for the registration drop on stop
      * @param registered whether this plugin registered the native provider (so stop only unregisters then)
+     * @param defaultCurrency the default currency the {@code balance}/{@code baltop_position} placeholders read
+     * @param amountFormat the operator-selected amount format the {@code balance_formatted} placeholder uses
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -183,7 +196,9 @@ public final class EconomyWiring {
             BaltopSnapshots snapshots,
             EconomyProvider provider,
             Plugin plugin,
-            boolean registered) {
+            boolean registered,
+            Currency defaultCurrency,
+            AmountFormat amountFormat) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -193,6 +208,8 @@ public final class EconomyWiring {
             Objects.requireNonNull(snapshots, "snapshots");
             Objects.requireNonNull(provider, "provider");
             Objects.requireNonNull(plugin, "plugin");
+            Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+            Objects.requireNonNull(amountFormat, "amountFormat");
         }
 
         /** Arm the settle, telemetry, and baltop-refresh loops. Called once after the module starts. */

@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Resolves an owner's home limit through the shared {@code Permissions} quota reducer. The home limit is
@@ -37,7 +38,7 @@ public final class HomeQuota {
      * Resolve {@code owner}'s home limit, scoped to {@code world} so the world-scoped node form folds in.
      * Pass the world the new home would live in; a {@code null} world resolves the unscoped family only.
      */
-    public HomeLimit resolve(PlayerRef owner, WorldRef world) {
+    public HomeLimit resolve(PlayerRef owner, @Nullable WorldRef world) {
         Objects.requireNonNull(owner, "owner");
         QuotaResult resolved = permissions.resolveQuota(owner, FAMILY, world, configDefault);
         if (resolved.isUnlimited()) {

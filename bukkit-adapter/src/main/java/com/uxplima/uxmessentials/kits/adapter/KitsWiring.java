@@ -71,7 +71,7 @@ public final class KitsWiring {
         KitGranter granter = new BukkitKitGranter(kernel.log());
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
         KitServices services = assemble(kernel, repository, claims, granter, notifier, economy);
-        return new Wired(KitCommands.all(services, kernel.messages()));
+        return new Wired(KitCommands.all(services, kernel.messages()), repository);
     }
 
     private static KitServices assemble(
@@ -95,16 +95,19 @@ public final class KitsWiring {
     }
 
     /**
-     * Everything the kits module contributes once wired: the Brigadier commands. The kits context holds no
-     * repeating scheduled work and no in-memory store beyond the config-backed catalog, so there is nothing
-     * to drain on stop — the module's {@code stop()} clears its own bookkeeping.
+     * Everything the kits module contributes once wired: the Brigadier commands plus the {@link
+     * KitRepository} the {@code kit_cooldown_<id>} placeholder resolves a kit's cooldown tier against. The
+     * kits context holds no repeating scheduled work and no in-memory store beyond the config-backed catalog,
+     * so there is nothing to drain on stop — the module's {@code stop()} clears its own bookkeeping.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param repository the kit catalog the cooldown placeholder reads
      */
-    public record Wired(List<CommandRegistration> commands) {
+    public record Wired(List<CommandRegistration> commands, KitRepository repository) {
 
         public Wired {
             commands = List.copyOf(commands);
+            Objects.requireNonNull(repository, "repository");
         }
     }
 }

@@ -12,5 +12,6 @@ allprojects {
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://repo.codemc.org/repository/maven-public/")  // Treasury economy API
         maven("https://jitpack.io")                                 // Vault economy API
+        maven("https://repo.extendedclip.com/releases/")           // PlaceholderAPI
     }
 }

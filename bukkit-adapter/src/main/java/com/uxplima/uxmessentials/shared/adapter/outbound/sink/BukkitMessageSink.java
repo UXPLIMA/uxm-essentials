@@ -1,6 +1,9 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.sink;
 
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -25,6 +28,13 @@ import org.jspecify.annotations.NullMarked;
  * <p>A single {@link MiniMessage} instance handles parsing; production does not split trusted /
  * untrusted at this layer (docs/03-paper-api §4.1) — all templates are operator-owned catalog
  * content.
+ *
+ * <p>Before MiniMessage parses, the source runs through a per-viewer pre-parse transform — the {@code
+ * preParse} factory. The default factory yields the identity transform; the PlaceholderAPI integration
+ * supplies one that expands {@code %papi%} placeholders against the viewer, so operator-authored catalog
+ * content (announcer lines, join messages) may embed third-party placeholders. The transform runs on the
+ * caller's thread before the entity hop, and degrades to the identity when PlaceholderAPI is absent, so it
+ * never touches the domain and is a no-op without the soft-depend.
  */
 @NullMarked
 public final class BukkitMessageSink implements MessageSink {
@@ -32,10 +42,20 @@ public final class BukkitMessageSink implements MessageSink {
     private final Scheduler scheduler;
     private final MiniMessage miniMessage;
     private final String prefixTemplate;
+    private final Function<UUID, UnaryOperator<String>> preParse;
+
+    /** The pre-parse transform factory that performs no expansion — the no-PlaceholderAPI default. */
+    public static final Function<UUID, UnaryOperator<String>> NO_PRE_PARSE = uuid -> UnaryOperator.identity();
 
     public BukkitMessageSink(Scheduler scheduler, String prefixTemplate) {
+        this(scheduler, prefixTemplate, NO_PRE_PARSE);
+    }
+
+    public BukkitMessageSink(
+            Scheduler scheduler, String prefixTemplate, Function<UUID, UnaryOperator<String>> preParse) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.prefixTemplate = Objects.requireNonNull(prefixTemplate, "prefixTemplate");
+        this.preParse = Objects.requireNonNull(preParse, "preParse");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -43,8 +63,9 @@ public final class BukkitMessageSink implements MessageSink {
     public void deliver(PlayerRef viewer, String renderedText) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(renderedText, "renderedText");
+        String expanded = preParse.apply(viewer.uuid()).apply(renderedText);
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
-        Component component = miniMessage.deserialize(renderedText, prefix);
+        Component component = miniMessage.deserialize(expanded, prefix);
         scheduler.onEntity(viewer, () -> sendTo(viewer, component));
     }
 

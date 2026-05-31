@@ -74,7 +74,7 @@ public final class PresenceWiring {
                 clock);
         List<CommandRegistration> commands = PresenceCommands.all(services, kernel.messages());
         List<Listener> listeners = listeners(kernel, settings, services, store, visibility, notifier);
-        return new Wired(commands, listeners, sweep, store, services, running);
+        return new Wired(commands, listeners, sweep, store, services, running, clock);
     }
 
     private static List<Listener> listeners(
@@ -123,6 +123,7 @@ public final class PresenceWiring {
      * @param store the in-memory presence map, cleared on stop
      * @param services the constructed use cases, exposing the cross-context vanish query
      * @param running the flag flipped false on stop so the sweep exits
+     * @param clock the presence clock the {@code afk_duration} placeholder measures against
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -130,7 +131,8 @@ public final class PresenceWiring {
             AfkSweep afkSweep,
             InMemoryPresenceStore store,
             PresenceServices services,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            Clock clock) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -139,6 +141,7 @@ public final class PresenceWiring {
             Objects.requireNonNull(store, "store");
             Objects.requireNonNull(services, "services");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(clock, "clock");
         }
 
         /** Arm the AFK idle sweep. */

@@ -2,6 +2,14 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [v2.4] - 2026-05-31
+
+PlaceholderAPI expansion.
+
+- A `%uxmessentials_*%` PlaceholderAPI expansion exposing homes, economy, presence, kits, vaults and moderation placeholders, registered only when PlaceholderAPI is present on the server.
+- An optional `%papi%` bridge in operator message content, so configured messages can interpolate PlaceholderAPI placeholders from other plugins.
+- PlaceholderAPI is a soft-depend: the integration degrades cleanly and the plugin operates normally when PAPI is absent.
+
 ## [v2.3] - 2026-05-31
 
 Communication module.

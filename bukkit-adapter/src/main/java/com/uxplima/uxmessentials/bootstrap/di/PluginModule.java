@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
+import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
@@ -27,6 +28,14 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitCooldownPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContexts;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -79,14 +88,29 @@ public final class PluginModule {
         BusWiring.Wired bus = BusWiring.wire(plugin, config, kernel.scheduler(), kernel.log());
         resources.onClose(bus::stop);
 
-        wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus());
+        PlaceholderContexts placeholders =
+                wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus());
         bus.start();
+        registerPlaceholders(plugin, placeholders, resources, kernel.log());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
         resources.addCommand(new UxmessCommand(registry, config, importNode));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
         return resources;
+    }
+
+    private static void registerPlaceholders(
+            JavaPlugin plugin,
+            PlaceholderContexts placeholders,
+            CloseableResources resources,
+            com.uxplima.uxmessentials.shared.application.port.Logger log) {
+        // The PlaceholderAPI expansion is registered only when the plugin is present and at least one context
+        // contributed a read seam; otherwise this is a no-op and nothing is closed on disable. The registration
+        // happens after every context is wired so every enabled placeholder group is reachable.
+        PlaceholderApiSupport.registerExpansion(
+                        placeholders, plugin.getPluginMeta().getVersion(), log)
+                .ifPresent(registration -> resources.onClose(registration::close));
     }
 
     private static MigrationImportNode wireMigration(
@@ -107,7 +131,7 @@ public final class PluginModule {
         return new MigrationImportNode(service);
     }
 
-    private static void wireModules(
+    private static PlaceholderContexts wireModules(
             JavaPlugin plugin,
             ModuleRegistry registry,
             ConfigStore config,
@@ -128,6 +152,7 @@ public final class PluginModule {
             startModule(module, ctx, resources, log);
             wireAdapters(plugin, module, ctx, persistence, resources, links, bus);
         }
+        return links.placeholders.build();
     }
 
     private static void wireAdapters(
@@ -156,13 +181,13 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("messaging"))) {
             wireMessaging(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("presence"))) {
-            wirePresence(plugin, ctx, resources);
+            wirePresence(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
-            wireVaults(plugin, ctx, persistence, resources, bus);
+            wireVaults(plugin, ctx, persistence, resources, bus, links);
         } else if (module.id().equals(ModuleId.of("communication"))) {
             wireCommunication(plugin, ctx, resources);
         }
@@ -186,6 +211,7 @@ public final class PluginModule {
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
         HomesWiring.Wired wired = HomesWiring.wire(ctx, persistence, engine, bus);
         wired.commands().forEach(resources::addCommand);
+        links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
     }
 
     private static void wireEconomy(
@@ -202,6 +228,8 @@ public final class PluginModule {
         // Captured for warps and kits, which land after economy and charge a recorded cost through it.
         links.warpEconomy = wired.warpEconomy();
         links.kitEconomy = wired.kitEconomy();
+        links.placeholders.economy(new ProviderEconomyPlaceholders(
+                wired.provider(), wired.defaultCurrency(), wired.amountFormat(), BalTop.MAX_PAGE_SIZE));
     }
 
     private static void wireWarps(
@@ -219,6 +247,8 @@ public final class PluginModule {
         // The per-kit cost charges through the economy bridge captured during economy wiring when present.
         KitsWiring.Wired wired = KitsWiring.wire(plugin, ctx, Optional.ofNullable(links.kitEconomy));
         wired.commands().forEach(resources::addCommand);
+        links.placeholders.kits(
+                new KitCooldownPlaceholders(wired.repository(), ctx.kernel().cooldowns()));
     }
 
     private static void wirePlayerstate(ModuleContext ctx, CloseableResources resources) {
@@ -262,6 +292,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        links.placeholders.moderation(new GateModerationPlaceholders(wired.mutePolicy(), wired.jailGate()));
     }
 
     private static void wireItemworld(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
@@ -276,7 +307,12 @@ public final class PluginModule {
     }
 
     private static void wireVaults(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources, Bus bus) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            Bus bus,
+            ContextLinks links) {
         // vaults builds its cached jOOQ VaultRepository over persistence.dsl(), the audit logger on the dedicated
         // audit channel, the inventory-holder GUI and the InventoryClose save listener. It opts into cross-server
         // sync through the bus handle — a remote vault save invalidates exactly that vault here — but carries no
@@ -286,6 +322,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        links.placeholders.vaults(new RepositoryVaultsPlaceholders(wired.repository()));
     }
 
     private static void bindMute(
@@ -304,7 +341,8 @@ public final class PluginModule {
         }
     }
 
-    private static void wirePresence(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wirePresence(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Its
         // BukkitVisibilityApplier drives the canSee graph that messaging's /msg resolution and teleport's /tpa
         // listing already read, so the vanish soft-couple needs no extra cross-context handle wired here.
@@ -313,6 +351,7 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
+        links.placeholders.presence(new StorePresencePlaceholders(wired.store(), wired.clock()));
     }
 
     private static void wireCommunication(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
@@ -335,6 +374,8 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
+        // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
+        private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
     }
 
     private static boolean skippedByCapability(FeatureModule module, ModuleContext ctx, Logger log) {

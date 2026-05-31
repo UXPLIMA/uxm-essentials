@@ -26,6 +26,9 @@ dependencies:
     Vault:
       load: BEFORE
       required: false
+    PlaceholderAPI:
+      load: BEFORE
+      required: false
 
 # Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
 # The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with
