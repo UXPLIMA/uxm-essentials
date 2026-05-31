@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import org.jspecify.annotations.NullMarked;
@@ -116,6 +117,8 @@ public final class PluginModule {
             wireModeration(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources);
+        } else if (module.id().equals(ModuleId.of("vaults"))) {
+            wireVaults(plugin, ctx, persistence, resources);
         }
     }
 
@@ -222,6 +225,19 @@ public final class PluginModule {
         ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+    }
+
+    private static void wireVaults(
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // vaults builds its cached jOOQ VaultRepository over persistence.dsl(), the audit logger on the dedicated
+        // audit channel, the inventory-holder GUI and the InventoryClose save listener. It carries no
+        // cross-context bridge — its only collaborators are the shared persistence DSL and the Permissions
+        // reducer — so nothing is captured for a later context. On stop the still-open vault windows are
+        // close-and-saved before the pool closes.
+        VaultsWiring.Wired wired = VaultsWiring.wire(plugin, ctx, persistence);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::stop);
     }
 
     private static void bindMute(

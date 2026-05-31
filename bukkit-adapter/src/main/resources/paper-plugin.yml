@@ -471,3 +471,15 @@ permissions:
   uxmessentials.kittycannon.use:
     description: '/kittycannon — launch an exploding cat (audit-logged).'
     default: op
+  # vaults context (docs/permissions.md "Vaults"). The numbered quota nodes
+  # uxmessentials.vault.amount.<n> and uxmessentials.vault.size.<rows> are an open value space granted
+  # per instance through the Permissions reducer and are intentionally not enumerated here.
+  uxmessentials.module.vaults:
+    description: 'Hot-reload / inspect the vaults module (DB-persisted player vault storage).'
+    default: op
+  uxmessentials.vault.use:
+    description: '/vault to open your default vault (or list them), and /vault <n> to open the Nth.'
+    default: true
+  uxmessentials.vault.others:
+    description: '/vault <player> [n] — open and audit another player''s vault (audit-logged).'
+    default: op

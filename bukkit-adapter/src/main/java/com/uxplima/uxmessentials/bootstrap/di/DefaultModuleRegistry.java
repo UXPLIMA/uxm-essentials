@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.teleport.application.TeleportModule;
+import com.uxplima.uxmessentials.vaults.application.VaultsModule;
 import com.uxplima.uxmessentials.warps.application.WarpsModule;
 import org.jspecify.annotations.NullMarked;
 
@@ -66,7 +67,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // verbs mutate the live item/entity/world directly — so it lands after the contexts wired above, ahead
         // of vaults, matching the dependency-first ordering documented in docs/10-feature-modules.md §3.
         delegate.register(new ItemworldModule());
-        //   … through VaultsModule. The shared kernel is not a module and never appears here.
+        // vaults is DB-persisted player item storage (the 12th and final feature context) — it carries no hard
+        // dependency edge (no cross-context bridge; its only collaborators are the shared persistence DSL and the
+        // Permissions reducer), so it lands last, after itemworld, completing the twelve-context set.
+        delegate.register(new VaultsModule());
+        // The shared kernel is not a module and never appears here.
     }
 
     @Override

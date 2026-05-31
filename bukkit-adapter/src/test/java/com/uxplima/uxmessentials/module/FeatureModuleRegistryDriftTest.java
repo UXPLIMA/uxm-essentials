@@ -45,8 +45,9 @@ class FeatureModuleRegistryDriftTest {
         // owns the vanish state messaging and teleport read through the canSee graph; that coupling is soft.
         // moderation provides the real mute/jail gates messaging and teleport hold placeholders for, a soft
         // couple too. itemworld is stateless and ACL-thin (no DB, no cross-context bridge) and lands after
-        // moderation, ahead of vaults. The registry is a valid, immutable, ordered set that resolves each by
-        // id and rejects a not-yet-landed context.
+        // moderation, ahead of vaults. vaults is DB-persisted player item storage (the 12th and final feature
+        // context); it carries no cross-context bridge and lands last. The registry is a valid, immutable,
+        // ordered set that resolves each by id and rejects a not-yet-landed context.
         assertThat(registry.byId(ModuleId.of("teleport"))).isPresent();
         assertThat(registry.byId(ModuleId.of("homes"))).isPresent();
         assertThat(registry.byId(ModuleId.of("economy"))).isPresent();
@@ -57,6 +58,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("presence"))).isPresent();
         assertThat(registry.byId(ModuleId.of("moderation"))).isPresent();
         assertThat(registry.byId(ModuleId.of("itemworld"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("vaults"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -68,7 +70,8 @@ class FeatureModuleRegistryDriftTest {
                         "messaging",
                         "presence",
                         "moderation",
-                        "itemworld");
+                        "itemworld",
+                        "vaults");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -130,6 +133,30 @@ class FeatureModuleRegistryDriftTest {
         assertThat(itemworld.commands()).hasSize(42);
         assertThat(literals).hasSize(42);
         assertThat(itemworld.migrations()).isEmpty(); // itemworld is stateless: no persistence, no migration
+    }
+
+    @Test
+    void vaultsIsRegisteredLastAndIndependentlyDisableable() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule vaults =
+                registry.byId(ModuleId.of("vaults")).orElseThrow(() -> new AssertionError("vaults is not registered"));
+
+        // vaults is the 12th and final feature context, registered last in the dependency-first order.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("vaults");
+
+        // Disabling exactly vaults removes only it from the enabled set; every sibling stays on.
+        ConfigStore off = new FixedConfig(Map.of("modules.vaults.enabled", false));
+        Set<String> enabled =
+                registry.enabledModules(off).stream().map(m -> m.id().value()).collect(Collectors.toSet());
+        assertThat(enabled).doesNotContain("vaults");
+        assertThat(enabled).contains("teleport", "economy", "moderation", "itemworld");
+
+        // Enabled, vaults contributes its single /vault command and owns no extra Flyway location (its table is
+        // in the persistence V6 baseline, always applied), so it declares no MigrationSet of its own.
+        Set<String> literals =
+                vaults.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactly("vault");
+        assertThat(vaults.migrations()).isEmpty();
     }
 
     @Test

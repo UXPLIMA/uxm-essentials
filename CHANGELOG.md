@@ -2,6 +2,14 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [P8] - 2026-05-31
+
+Vaults.
+
+- Vaults context: the twelfth bounded context — DB-persisted player vaults, stored with queryable owner/index/size columns alongside serialized contents, never in PDC.
+- A GUI inventory-holder backs the player-facing vault, with numbered-node slot quotas governing per-vault size.
+- The admin `/vault` surface is audit-logged.
+
 ## [P7] - 2026-05-31
 
 Itemworld.
