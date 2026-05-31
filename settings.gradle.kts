@@ -16,6 +16,7 @@ include(
     ":core",
     ":bukkit-adapter",
     ":persistence-adapter",
+    ":migration",
     ":velocity-adapter",
     ":discord-adapter",
 )

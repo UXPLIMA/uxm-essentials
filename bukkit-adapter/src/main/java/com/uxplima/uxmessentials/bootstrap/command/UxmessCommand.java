@@ -47,6 +47,7 @@ public final class UxmessCommand implements CommandRegistration {
     private static final String HELP_STATUS = "/uxmess status — list modules and their enable state";
     private static final String HELP_HELP = "/uxmess help — show this help";
     private static final String HELP_RELOAD = "/uxmess reload [module] — reload all modules, or one by id";
+    private static final String HELP_IMPORT = "/uxmess import <source> [--dry-run] — import legacy data";
     private static final String RELOAD_ALL = "Reload requested for all modules.";
     private static final String RELOAD_ONE = "Reload requested for module ";
     private static final String RELOAD_UNKNOWN = "Unknown module: ";
@@ -55,10 +56,12 @@ public final class UxmessCommand implements CommandRegistration {
 
     private final ModuleRegistry registry;
     private final ConfigStore config;
+    private final MigrationImportNode importNode;
 
-    public UxmessCommand(ModuleRegistry registry, ConfigStore config) {
+    public UxmessCommand(ModuleRegistry registry, ConfigStore config, MigrationImportNode importNode) {
         this.registry = Objects.requireNonNull(registry, "registry");
         this.config = Objects.requireNonNull(config, "config");
+        this.importNode = Objects.requireNonNull(importNode, "importNode");
     }
 
     @Override
@@ -69,6 +72,7 @@ public final class UxmessCommand implements CommandRegistration {
                 .then(Commands.literal("status").executes(this::runStatus))
                 .then(Commands.literal("help").executes(this::runHelp))
                 .then(reloadNode())
+                .then(importNode.build())
                 .build();
     }
 
@@ -110,6 +114,7 @@ public final class UxmessCommand implements CommandRegistration {
         sender.sendMessage(Component.text(HELP_STATUS));
         sender.sendMessage(Component.text(HELP_HELP));
         sender.sendMessage(Component.text(HELP_RELOAD));
+        sender.sendMessage(Component.text(HELP_IMPORT));
         return Command.SINGLE_SUCCESS;
     }
 

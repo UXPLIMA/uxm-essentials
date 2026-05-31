@@ -1,0 +1,34 @@
+# Representative EssentialsX userdata file (anonymised UUID), captured for golden-file tests.
+lastAccountName: steve
+money: '1500.00'
+homes:
+  base:
+    world: world
+    world-name: world
+    x: 100.5
+    y: 64.0
+    z: -200.25
+    yaw: 90.0
+    pitch: 0.0
+  mine:
+    world: world
+    world-name: world
+    x: 12.0
+    y: 30.0
+    z: 48.0
+    yaw: 180.0
+    pitch: 12.5
+  farm:
+    world: world_nether
+    world-name: world_nether
+    x: 8.0
+    y: 70.0
+    z: 8.0
+    yaw: 0.0
+    pitch: 0.0
+mail:
+- 'Notch: welcome to the server'
+- 'Server: your application was approved'
+timestamps:
+  login: 1700000000000
+  logout: 1700000500000

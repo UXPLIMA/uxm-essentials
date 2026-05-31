@@ -1,0 +1,15 @@
+# Representative EssentialsX kits.yml (combined layout). Items are raw descriptor
+# lines exactly as EssentialsX writes them; the writer round-trips them through
+# Bukkit's item codec.
+kits:
+  starter:
+    delay: 30
+    items:
+    - 276 1
+    - 261 1
+    - 364 16
+  daily:
+    delay: 86400
+    items:
+    - diamond 5
+    - golden_apple 3

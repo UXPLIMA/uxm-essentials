@@ -1,0 +1,8 @@
+# Representative EssentialsX warp file. The warp name is the file stem ("spawn").
+world: world
+world-name: world
+x: 0.5
+y: 65.0
+z: 0.5
+yaw: 270.0
+pitch: 5.0

@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
+import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
@@ -15,6 +16,9 @@ import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
 import com.uxplima.uxmessentials.messaging.adapter.MutableMutePolicy;
+import com.uxplima.uxmessentials.migration.MigrationModule;
+import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
+import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
@@ -66,11 +70,30 @@ public final class PluginModule {
         resources.onClose(persistence::close);
 
         wireModules(plugin, registry, config, kernel, persistence, resources, log);
-        resources.addCommand(new UxmessCommand(registry, config));
+        MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
+        resources.addCommand(new UxmessCommand(registry, config, importNode));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
         return resources;
+    }
+
+    private static MigrationImportNode wireMigration(
+            JavaPlugin plugin, ConfigStore config, KernelPorts kernel, Persistence persistence) {
+        // The migration adapter is command-gated, not a steady-state feature context, so it is wired here in
+        // the operator surface rather than registered in the feature-module registry. Its enable gate ships
+        // disabled; an enabled module publishes a live /uxmess import, a disabled one a dormant command that
+        // reports the importer off. Nothing runs at enable — the importer fires only on the command.
+        MigrationModule module = new MigrationModule();
+        MigrationImportService service = MigrationWiring.wire(
+                plugin,
+                persistence,
+                config.scoped(module.id().configRoot()),
+                config.scoped(ModuleId.of("economy").configRoot()),
+                kernel.scheduler(),
+                kernel.log(),
+                module.enabled(config));
+        return new MigrationImportNode(service);
     }
 
     private static void wireModules(

@@ -1,0 +1,7 @@
+# A second player with no balance and no homes — exercises the defensive defaults
+# (missing money -> empty wallet, missing homes -> empty set), not a failed record.
+lastAccountName: alex
+mail:
+- 'Notch: see you around'
+muted: true
+muteTimeout: 1700100000000

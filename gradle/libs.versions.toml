@@ -67,6 +67,7 @@ jooq-codegen      = { module = "org.jooq:jooq-codegen",                         
 jooq-meta-ext     = { module = "org.jooq:jooq-meta-extensions",                  version.ref = "jooq" }
 caffeine          = { module = "com.github.ben-manes.caffeine:caffeine",         version.ref = "caffeine" }
 configurate-hocon = { module = "org.spongepowered:configurate-hocon",            version.ref = "configurate" }
+configurate-yaml  = { module = "org.spongepowered:configurate-yaml",             version.ref = "configurate" }
 bstats-bukkit     = { module = "org.bstats:bstats-bukkit",                       version.ref = "bstats" }
 jspecify          = { module = "org.jspecify:jspecify",                          version.ref = "jspecify" }
 slf4j-api         = { module = "org.slf4j:slf4j-api",                            version.ref = "slf4j" }

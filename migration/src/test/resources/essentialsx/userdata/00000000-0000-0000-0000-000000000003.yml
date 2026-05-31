@@ -1,0 +1,12 @@
+# A jailed and permanently-muted player (anonymised UUID), captured for golden-file tests.
+# Held in the "cell" jail (defined in jail.yml) with a wall-clock expiry, and permanently muted with
+# a reason. Exercises the JailMuteMapper producing a ModerationProfile with both a JailState and a
+# permanent MuteState.
+lastAccountName: griefer
+jailed: true
+jail: cell
+muted: true
+muteReason: spamming chat
+timestamps:
+  jail: 1700200000000
+  mute: 0

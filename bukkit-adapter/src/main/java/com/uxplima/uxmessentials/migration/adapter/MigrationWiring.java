@@ -1,0 +1,129 @@
+package com.uxplima.uxmessentials.migration.adapter;
+
+import java.nio.file.Path;
+import java.time.Clock;
+import java.util.List;
+import java.util.Objects;
+
+import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.economy.adapter.EconomyConfig;
+import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
+import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
+import com.uxplima.uxmessentials.migration.BackupSnapshot;
+import com.uxplima.uxmessentials.migration.BalancePolicy;
+import com.uxplima.uxmessentials.migration.ConflictPolicy;
+import com.uxplima.uxmessentials.migration.ImportData;
+import com.uxplima.uxmessentials.migration.ImportMode;
+import com.uxplima.uxmessentials.migration.ImportOptions;
+import com.uxplima.uxmessentials.migration.MigrationAudit;
+import com.uxplima.uxmessentials.migration.MigrationModule;
+import com.uxplima.uxmessentials.migration.RecordWriter;
+import com.uxplima.uxmessentials.migration.convert.Convert;
+import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
+import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
+import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
+import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
+import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
+import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import org.jspecify.annotations.NullMarked;
+import org.slf4j.LoggerFactory;
+
+/**
+ * The one place the migration adapter is wired (docs/12-migration §10). It assembles the EssentialsX
+ * {@link Convert} source, the source registry, the audit/backup ports, the live and dry-run writers over
+ * the persistence repositories, the {@link ImportData} use case, and the inbound
+ * {@link MigrationImportService} the {@code /uxmess import} node calls. Nothing it builds runs at plugin
+ * enable — the importer fires only on the command — and the whole wiring is gated by the
+ * {@link MigrationModule#enabled(ConfigStore)} switch, which ships disabled (§1, §9). A disabled module
+ * yields a service that reports the importer dormant and dispatches nothing.
+ */
+@NullMarked
+public final class MigrationWiring {
+
+    private static final String AUDIT_CHANNEL = "com.uxplima.uxmessentials.audit";
+    private static final String DEFAULT_SOURCE_PATH = "Essentials";
+
+    private MigrationWiring() {}
+
+    /**
+     * Build the migration service.
+     *
+     * @param plugin the plugin (for the server world list, data folder, and plugins directory)
+     * @param persistence the shared persistence DSL the writers upsert through
+     * @param migrationConfig the {@code modules.migration} config subtree (source path, conflict policy)
+     * @param economyConfig the {@code modules.economy} config subtree (the default currency)
+     * @param scheduler the off-tick dispatch port
+     * @param log operator diagnostics
+     * @param enabled the {@link MigrationModule} enable gate (ships disabled)
+     */
+    public static MigrationImportService wire(
+            Plugin plugin,
+            Persistence persistence,
+            ConfigStore migrationConfig,
+            ConfigStore economyConfig,
+            Scheduler scheduler,
+            Logger log,
+            boolean enabled) {
+        Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(migrationConfig, "migrationConfig");
+        Objects.requireNonNull(economyConfig, "economyConfig");
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(log, "log");
+        SourceRegistry registry = sourceRegistry(plugin);
+        ImportData importData = new ImportData(audit(), backup(plugin, log), log);
+        Writers writers = writers(persistence, economyConfig);
+        ImportOptions options = options(plugin, migrationConfig);
+        return new MigrationImportService(
+                registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
+    }
+
+    private static SourceRegistry sourceRegistry(Plugin plugin) {
+        WorldNameResolver worlds = new BukkitWorldNameResolver(plugin.getServer());
+        List<Convert> built = List.of(new EssentialsXConvert(worlds));
+        return new SourceRegistry(built);
+    }
+
+    private static Writers writers(Persistence persistence, ConfigStore economyConfig) {
+        HomeRepository homes = HomeRepositories.cached(persistence);
+        WarpRepository warps = WarpRepositories.cached(persistence);
+        ModerationRepository moderation = ModerationStores.repository(persistence);
+        CurrencyRegistry currencies = new EconomyConfig(economyConfig).currencies();
+        Currency defaultCurrency = currencies.defaultCurrency();
+        WalletRepository wallets = WalletRepositories.repository(persistence, currencies, Clock.systemUTC());
+        RecordWriter live = new RepositoryRecordWriter(homes, warps, wallets, moderation, defaultCurrency);
+        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation);
+        return new Writers(live, dryRun);
+    }
+
+    private static MigrationAudit audit() {
+        return new AuditChannelMigrationAudit(new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL)));
+    }
+
+    private static BackupSnapshot backup(Plugin plugin, Logger log) {
+        return new DataDirBackupSnapshot(plugin.getDataFolder().toPath(), log);
+    }
+
+    private static ImportOptions options(Plugin plugin, ConfigStore config) {
+        Path pluginsDir = plugin.getDataFolder().toPath().getParent();
+        String configured = config.getString("source-path", DEFAULT_SOURCE_PATH);
+        Path sourcePath = pluginsDir == null ? Path.of(configured) : pluginsDir.resolve(configured);
+        ConflictPolicy onConflict = ConflictPolicy.parse(config.getString("on-conflict", "skip"));
+        BalancePolicy balancePolicy = BalancePolicy.parse(config.getString("balance-policy", "skip-if-present"));
+        return new ImportOptions(sourcePath, ImportMode.LIVE, onConflict, balancePolicy);
+    }
+
+    /** Bundles the live and dry-run writers built over the persistence repositories. */
+    private record Writers(RecordWriter live, RecordWriter dryRun) {}
+}

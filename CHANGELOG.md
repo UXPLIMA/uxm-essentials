@@ -2,6 +2,16 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [P10] - 2026-05-31
+
+Multi-source data migration.
+
+- New `:migration` module built around a multi-source `Convert` port: each source registers a descriptor, and the EssentialsX importer ships first while other sources remain planned behind the same abstraction.
+- `/uxmess import <source> --dry-run` plans an import without writing: it is idempotent, backup-first, and emits a per-record audit so a re-run never double-applies and every converted record is traceable.
+- ACL mappers translate the imported data into the homes, warps, kits, economy and moderation contexts, so migrated state lands through the same boundaries as native writes.
+- Golden-file tests pin the EssentialsX parse-and-map output, and a `SupportedMappings` drift guard fails the build when the declared mappings diverge from what the converter actually produces.
+- A config-version migration ladder steps stored config forward across versions.
+
 ## [P9] - 2026-05-31
 
 i18n and locale catalog.

@@ -1,0 +1,8 @@
+# A second warp, in a different world, to cover multi-warp parsing.
+world: world
+world-name: world
+x: 256.0
+y: 72.0
+z: -128.0
+yaw: 0.0
+pitch: 0.0

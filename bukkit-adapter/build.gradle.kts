@@ -10,6 +10,7 @@ plugins {
 dependencies {
     implementation(project(":core"))
     implementation(project(":persistence-adapter"))
+    implementation(project(":migration"))
     api(project(":api"))
 
     compileOnly(libs.paper.api)

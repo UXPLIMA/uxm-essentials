@@ -1,0 +1,13 @@
+# Representative EssentialsX jail definitions snippet. Jail/mute mapping to the
+# moderation ModerationProfile is a documented EssentialsX mapping (docs/12-migration
+# §5.1); the JailMute parser/mapper land with the moderation write path. This fixture
+# pins the on-disk shape so a parser added later keeps it green.
+jails:
+  cell:
+    world: world
+    world-name: world
+    x: 50.0
+    y: 64.0
+    z: 50.0
+    yaw: 0.0
+    pitch: 0.0
