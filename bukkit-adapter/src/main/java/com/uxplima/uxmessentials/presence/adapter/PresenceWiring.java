@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.presence.adapter;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -9,8 +10,10 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.presence.adapter.inbound.command.PresenceCommands;
+import com.uxplima.uxmessentials.presence.adapter.inbound.listener.AfkPickupListener;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceActivityListener;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceLifecycleListener;
+import com.uxplima.uxmessentials.presence.adapter.inbound.listener.SleepExclusionListener;
 import com.uxplima.uxmessentials.presence.adapter.outbound.AfkSweep;
 import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitPresenceAudience;
 import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitVisibilityApplier;
@@ -70,10 +73,28 @@ public final class PresenceWiring {
                 running::get,
                 clock);
         List<CommandRegistration> commands = PresenceCommands.all(services, kernel.messages());
-        List<Listener> listeners = List.of(
-                new PresenceActivityListener(services.clearAfk(), kernel.scheduler()),
-                new PresenceLifecycleListener(store, visibility));
+        List<Listener> listeners = listeners(kernel, settings, services, store, visibility, notifier);
         return new Wired(commands, listeners, sweep, store, services, running);
+    }
+
+    private static List<Listener> listeners(
+            KernelPorts kernel,
+            PresenceSettings settings,
+            PresenceServices services,
+            InMemoryPresenceStore store,
+            VisibilityApplier visibility,
+            PresenceNotifier notifier) {
+        List<Listener> listeners = new ArrayList<>();
+        listeners.add(new PresenceActivityListener(
+                services.clearAfk(), kernel.scheduler(), settings.activityPolicy(), settings.moveThresholdBlocks()));
+        listeners.add(new PresenceLifecycleListener(store, visibility));
+        if (settings.disablePickupWhileAfk()) {
+            listeners.add(new AfkPickupListener(store, notifier));
+        }
+        if (settings.sleepIgnoresAfk()) {
+            listeners.add(new SleepExclusionListener(store));
+        }
+        return List.copyOf(listeners);
     }
 
     private static PresenceServices assemble(

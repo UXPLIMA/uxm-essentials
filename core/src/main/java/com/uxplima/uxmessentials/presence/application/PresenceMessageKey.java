@@ -21,6 +21,9 @@ public enum PresenceMessageKey implements MessageKey {
     AFK_BROADCAST_AWAY_REASON("afk.broadcast-away-reason"),
     AFK_BROADCAST_BACK("afk.broadcast-back"),
 
+    // anti-AFK: shown once per AFK session when item pickups are blocked while away
+    AFK_PICKUP_BLOCKED("afk.pickup-blocked"),
+
     // /vanish
     VANISH_ON("vanish.on"),
     VANISH_OFF("vanish.off");

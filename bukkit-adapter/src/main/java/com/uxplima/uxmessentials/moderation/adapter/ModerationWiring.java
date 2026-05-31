@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCo
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.FreezeMoveListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJoinListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationLoginListener;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandListener;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitTargetResolver;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
@@ -26,6 +27,7 @@ import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.Mute;
+import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
 import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
 import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
@@ -79,11 +81,12 @@ public final class ModerationWiring {
         ModerationSettings settings = new ModerationSettings(ctx.config());
         ModerationRepository repository = ModerationStores.repository(persistence);
         BukkitSanctions sanctions = new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings);
-        ModerationServices services = assemble(plugin, kernel, settings, repository, sanctions, clock);
+        ModerationGuard guard = new ModerationGuard(kernel.permissions());
+        ModerationServices services = assemble(plugin, kernel, settings, repository, sanctions, guard, clock);
         bindGates(repository, gates, clock);
         return new Wired(
                 ModerationCommands.all(services, kernel.messages(), kernel.messageSink()),
-                listeners(services, sanctions, repository, clock),
+                listeners(services, sanctions, repository, kernel, settings, guard, clock),
                 sanctions);
     }
 
@@ -93,10 +96,10 @@ public final class ModerationWiring {
             ModerationSettings settings,
             ModerationRepository repository,
             BukkitSanctions sanctions,
+            ModerationGuard guard,
             Clock clock) {
         ModerationNotifier notifier = new ModerationNotifier(kernel.messages(), kernel.messageSink());
         ModerationAudit audit = new LoggingModerationAudit(auditLogger());
-        ModerationGuard guard = new ModerationGuard(kernel.permissions());
         ConfigJailDirectory jails = new ConfigJailDirectory(settings);
         Sanctions sanctionPort = sanctions;
         return new ModerationServices.Builder()
@@ -127,11 +130,20 @@ public final class ModerationWiring {
     }
 
     private static List<Listener> listeners(
-            ModerationServices services, BukkitSanctions sanctions, ModerationRepository repository, Clock clock) {
+            ModerationServices services,
+            BukkitSanctions sanctions,
+            ModerationRepository repository,
+            KernelPorts kernel,
+            ModerationSettings settings,
+            ModerationGuard guard,
+            Clock clock) {
+        MutedCommandPolicy mutedCommands = new MutedCommandPolicy(settings.mutedBlockedCommands());
         return List.of(
                 new ModerationLoginListener(services.loginEnforcement()),
                 new ModerationJoinListener(services.jailCountdown(), repository, clock),
-                new FreezeMoveListener(sanctions));
+                new FreezeMoveListener(sanctions),
+                new MutedCommandListener(
+                        repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock));
     }
 
     private static Logger auditLogger() {

@@ -70,7 +70,8 @@ public enum ModerationMessageKey implements MessageKey {
     // shared moderation failures
     TARGET_EXEMPT("moderation.target-exempt"),
     BAD_DURATION("moderation.bad-duration"),
-    UNKNOWN_TARGET("moderation.unknown-target");
+    UNKNOWN_TARGET("moderation.unknown-target"),
+    MUTED_COMMAND_BLOCKED("moderation.muted-command-blocked");
 
     private final String key;
 

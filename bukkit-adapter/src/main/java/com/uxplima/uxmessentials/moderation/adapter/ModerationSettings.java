@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
@@ -21,9 +23,14 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ModerationSettings {
 
+    /** Chat-adjacent commands a muted player is blocked from running unless an operator overrides the list. */
+    private static final List<String> DEFAULT_BLOCKED_COMMANDS =
+            List.of("me", "msg", "tell", "w", "whisper", "mail", "helpop", "r", "reply");
+
     private final ConfigStore config;
     private final List<String> jails;
     private final boolean wallClockDefault;
+    private final Set<String> mutedBlockedCommands;
 
     public ModerationSettings(ConfigStore config) {
         this.config = Objects.requireNonNull(config, "config");
@@ -31,6 +38,14 @@ public final class ModerationSettings {
                 .map(name -> name.toLowerCase(Locale.ROOT))
                 .toList();
         this.wallClockDefault = "wall-clock".equalsIgnoreCase(config.getString("jail-countdown", "online-only"));
+        this.mutedBlockedCommands = config.getStringList("muted-blocked-commands", DEFAULT_BLOCKED_COMMANDS).stream()
+                .map(name -> name.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /** The command labels a muted player may not run (the mute-bypass guard list), case-folded. */
+    public Set<String> mutedBlockedCommands() {
+        return mutedBlockedCommands;
     }
 
     /** True when {@code jail} is a configured jail name. */

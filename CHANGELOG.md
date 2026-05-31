@@ -2,6 +2,13 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [v2.2] - 2026-05-31
+
+Presence anti-AFK matrix and mute-command-block.
+
+- Presence: an anti-machine activity filter so automated input no longer counts as activity, no item pickup while AFK, and the sleep/skip-night flow now ignores players who are AFK or vanished.
+- Moderation: a configurable set of muted-blocked-commands that closes the `/me` mute-bypass, so muted players can no longer route chat through whitelisted command aliases.
+
 ## [v2.1] - 2026-05-31
 
 Teleport + economy polish.
