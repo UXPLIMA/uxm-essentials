@@ -43,6 +43,12 @@ public final class PlayerStateCommands {
                 new NearCommand(services, messages),
                 new NightVisionCommand(services, messages),
                 new PersonalTimeCommand(services, messages),
-                new PersonalWeatherCommand(services, messages));
+                new PersonalWeatherCommand(services, messages),
+                new ExperienceCommand(services, messages),
+                new AirCommand(services, messages),
+                new BurnCommand(services, messages),
+                new GetPosCommand(services, messages),
+                new PingCommand(services, messages),
+                new RestCommand(services, messages));
     }
 }

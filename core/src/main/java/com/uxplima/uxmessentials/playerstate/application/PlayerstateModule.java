@@ -16,8 +16,9 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The playerstate bounded context as a first-class {@link FeatureModule}: it owns the per-player toggle/effect
  * surface — {@code /god /fly /heal /feed /gamemode /speed} plus the {@code /ext /suicide /near /nightvision
- * /flyspeed /walkspeed /ptime /pweather} verbs — over an immutable {@code PlayerStateSnapshot} reconciled with
- * the live player on its owning region thread. The module declares its command surface and enable gate here;
+ * /flyspeed /walkspeed /ptime /pweather} verbs and the {@code /exp /air /burn /getpos /ping /rest} utility
+ * verbs — over an immutable {@code PlayerStateSnapshot} reconciled with the live player on its owning region
+ * thread. The module declares its command surface and enable gate here;
  * {@code start} arms the lifecycle bookkeeping, and the bukkit-side adapters (the Brigadier handlers, the
  * in-memory snapshot store, the reconciler, the effects bridge, and the join/quit/respawn listener) are
  * constructed in the adapter wiring once the module has started.

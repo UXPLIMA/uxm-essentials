@@ -13,8 +13,12 @@ import java.util.function.UnaryOperator;
 
 import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
+import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
+import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
+import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
+import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
@@ -29,6 +33,9 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -186,6 +193,70 @@ class PlayerStateUseCasesTest {
         assertThat(nearby.requestedRadius).isEqualTo(ListNearby.MAX_RADIUS); // clamped to the bound
     }
 
+    @Test
+    void experienceGiveAddsToTheCurrentTotalAndIsLiveOnly() {
+        SetExperience exp = new SetExperience(effects, notifier);
+
+        exp.apply(alice, new ExperienceChange(ExperienceChange.Op.GIVE, ExperienceChange.Unit.POINTS, 30));
+        exp.apply(alice, new ExperienceChange(ExperienceChange.Op.GIVE, ExperienceChange.Unit.POINTS, 20));
+
+        assertThat(effects.currentExp).containsEntry(alice.uuid(), 50);
+        assertThat(events.published).isEmpty(); // exp publishes no domain event
+    }
+
+    @Test
+    void experienceTakeIsFlooredAtZeroAndResetClears() {
+        SetExperience exp = new SetExperience(effects, notifier);
+        exp.apply(alice, new ExperienceChange(ExperienceChange.Op.SET, ExperienceChange.Unit.POINTS, 40));
+
+        exp.apply(alice, new ExperienceChange(ExperienceChange.Op.TAKE, ExperienceChange.Unit.POINTS, 100));
+        assertThat(effects.currentExp).containsEntry(alice.uuid(), 0);
+
+        exp.apply(alice, new ExperienceChange(ExperienceChange.Op.SET, ExperienceChange.Unit.POINTS, 7));
+        exp.apply(alice, ExperienceChange.reset());
+        assertThat(effects.currentExp).containsEntry(alice.uuid(), 0);
+    }
+
+    @Test
+    void airAndBurnApplyThroughTheEffectsPortClampedInTheDomain() {
+        new SetAir(effects, notifier).set(alice, AirAmount.ofSeconds(15, 300));
+        new Burn(effects, notifier).burn(bob, BurnDuration.ofSeconds(BurnDuration.MAX_SECONDS + 50));
+
+        assertThat(effects.air).containsEntry(alice.uuid(), 300); // 15s = 300 ticks
+        assertThat(effects.fireSeconds).containsEntry(bob.uuid(), BurnDuration.MAX_SECONDS); // clamped
+    }
+
+    @Test
+    void restResetsWhenEnabledAndIsANoOpWhenDisabled() {
+        new ResetRest(effects, notifier, true).reset(alice);
+        assertThat(effects.restReset).containsExactly(alice.uuid());
+
+        new ResetRest(effects, notifier, false).reset(bob);
+        assertThat(effects.restReset).doesNotContain(bob.uuid()); // disabled gate blocks the effect
+    }
+
+    @Test
+    void getposAndPingReadThroughTheInfoPort() {
+        Position at = new Position(new WorldRef(UUID.randomUUID(), "world"), 1.0, 64.0, -3.0, 0f, 0f);
+        FakeInfo info = new FakeInfo(at, 42);
+
+        new ShowPosition(info, notifier).show(alice);
+        new ShowPing(info, notifier).show(alice);
+
+        // No exception and no mutation: read-only queries touch neither store nor reconciler.
+        assertThat(reconciler.reconciled).isEmpty();
+    }
+
+    @Test
+    void getposIsSilentWhenTheTargetIsOffline() {
+        FakeInfo offline = new FakeInfo(null, null);
+
+        new ShowPosition(offline, notifier).show(alice);
+        new ShowPing(offline, notifier).show(alice);
+
+        assertThat(reconciler.reconciled).isEmpty();
+    }
+
     /** A map-backed {@link PlayerStateStore} mutated via the same compute contract as the real adapter. */
     private static final class FakeStore implements PlayerStateStore {
         private final ConcurrentHashMap<UUID, PlayerStateSnapshot> map = new ConcurrentHashMap<>();
@@ -229,6 +300,10 @@ class PlayerStateUseCasesTest {
         private final Map<UUID, Boolean> nightVision = new ConcurrentHashMap<>();
         private final Map<UUID, PersonalTime> appliedTime = new ConcurrentHashMap<>();
         private final Map<UUID, PersonalWeather> appliedWeather = new ConcurrentHashMap<>();
+        private final Map<UUID, Integer> currentExp = new ConcurrentHashMap<>();
+        private final Map<UUID, Integer> air = new ConcurrentHashMap<>();
+        private final Map<UUID, Integer> fireSeconds = new ConcurrentHashMap<>();
+        private final List<UUID> restReset = new ArrayList<>();
 
         @Override
         public void heal(PlayerRef who, boolean clearEffects) {
@@ -266,6 +341,53 @@ class PlayerStateUseCasesTest {
         @Override
         public void applyWeather(PlayerRef who, PersonalWeather weather) {
             appliedWeather.put(who.uuid(), weather);
+        }
+
+        @Override
+        public void applyExperience(
+                PlayerRef who,
+                ExperienceChange change,
+                java.util.function.Consumer<PlayerEffects.ExperienceReport> onResult) {
+            int current = currentExp.getOrDefault(who.uuid(), 0);
+            int next = (int) change.resolve(current);
+            currentExp.put(who.uuid(), next);
+            onResult.accept(new PlayerEffects.ExperienceReport(next / 100, next));
+        }
+
+        @Override
+        public void setRemainingAir(PlayerRef who, AirAmount value) {
+            air.put(who.uuid(), value.ticks());
+        }
+
+        @Override
+        public void setFire(PlayerRef who, BurnDuration duration) {
+            fireSeconds.put(who.uuid(), duration.seconds());
+        }
+
+        @Override
+        public void resetRest(PlayerRef who) {
+            restReset.add(who.uuid());
+        }
+    }
+
+    /** A read-only info port returning fixed position and ping. */
+    private static final class FakeInfo implements PlayerInfo {
+        private final @Nullable Position position;
+        private final @Nullable Integer ping;
+
+        FakeInfo(@Nullable Position position, @Nullable Integer ping) {
+            this.position = position;
+            this.ping = ping;
+        }
+
+        @Override
+        public java.util.Optional<Position> positionOf(PlayerRef who) {
+            return java.util.Optional.ofNullable(position);
+        }
+
+        @Override
+        public java.util.Optional<Integer> pingOf(PlayerRef who) {
+            return java.util.Optional.ofNullable(ping);
         }
     }
 

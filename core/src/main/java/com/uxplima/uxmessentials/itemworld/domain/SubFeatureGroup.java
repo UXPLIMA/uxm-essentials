@@ -15,7 +15,10 @@ import java.util.Objects;
  */
 public enum SubFeatureGroup {
 
-    /** {@code /give /i /item /itemname /itemlore /itemflag /skull /more /repair /repairall /enchant /hat /itemdb}. */
+    /**
+     * {@code /give /i /item /itemname /itemlore /itemflag /skull /more /repair /repairall /enchant /hat /itemdb
+     * /unbreakable /disenchant /itemmodel /editsign}.
+     */
     ITEM_UTILS("item-utils"),
 
     /** {@code /anvil /workbench /enderchest /grindstone /cartography /loom /smithingtable /stonecutter /furnace}. */

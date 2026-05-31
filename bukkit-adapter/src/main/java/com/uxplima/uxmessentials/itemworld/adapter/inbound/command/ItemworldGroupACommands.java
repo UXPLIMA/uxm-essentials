@@ -49,6 +49,10 @@ public final class ItemworldGroupACommands {
         commands.add(new EnchantCommand(services));
         commands.add(new HatCommand(services));
         commands.add(new ItemDbCommand(services));
+        commands.add(new UnbreakableCommand(services));
+        commands.add(new DisenchantCommand(services));
+        commands.add(new ItemModelCommand(services));
+        commands.add(new EditSignCommand(services));
     }
 
     private static void addWorkstations(List<CommandRegistration> commands, ItemworldServices services) {

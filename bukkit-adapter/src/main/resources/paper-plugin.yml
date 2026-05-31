@@ -258,6 +258,24 @@ permissions:
   uxmessentials.pweather.use:
     description: '/pweather <clear|rain|reset> to set a per-player client-side weather.'
     default: op
+  uxmessentials.exp.use:
+    description: '/exp (/xp) get|set|give|take|reset to read or change experience.'
+    default: op
+  uxmessentials.air.use:
+    description: '/air <seconds> to set a player''s remaining air.'
+    default: op
+  uxmessentials.burn.use:
+    description: '/burn <seconds> to set a player on fire.'
+    default: op
+  uxmessentials.getpos.use:
+    description: '/getpos (/coords /whereami) to show a player''s coordinates.'
+    default: op
+  uxmessentials.ping.use:
+    description: '/ping to show a player''s round-trip latency.'
+    default: true
+  uxmessentials.rest.use:
+    description: '/rest to reset a player''s time-since-rest so phantoms stop.'
+    default: op
   uxmessentials.playerstate.others:
     description: 'Use any playerstate command with a [player] target other than yourself.'
     default: op
@@ -388,6 +406,18 @@ permissions:
     default: op
   uxmessentials.itemdb.use:
     description: '/itemdb [item] — look up an item''s id / data.'
+    default: op
+  uxmessentials.unbreakable.use:
+    description: '/unbreakable [true|false] — toggle or set the held item''s unbreakable flag.'
+    default: op
+  uxmessentials.disenchant.use:
+    description: '/disenchant [all|<enchant>] — remove all or one enchantment from the held item.'
+    default: op
+  uxmessentials.itemmodel.use:
+    description: '/itemmodel <id|clear> (alias /custommodeldata) — set or clear the held item''s custom model data.'
+    default: op
+  uxmessentials.editsign.use:
+    description: '/editsign — edit the sign you are looking at (respects build access).'
     default: op
   uxmessentials.repair.itemworld:
     description: '/repair and /repairall in the itemworld surface (itemworld-owned; playerstate defers them).'

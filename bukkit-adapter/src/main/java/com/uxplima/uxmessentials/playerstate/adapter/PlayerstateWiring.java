@@ -10,23 +10,31 @@ import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerState
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitNearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerEffects;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerInfo;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitStateReconciler;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.InMemoryPlayerStateStore;
+import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.PlayerStateNotifier;
+import com.uxplima.uxmessentials.playerstate.application.ResetRest;
+import com.uxplima.uxmessentials.playerstate.application.SetAir;
+import com.uxplima.uxmessentials.playerstate.application.SetExperience;
 import com.uxplima.uxmessentials.playerstate.application.SetGamemode;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalTime;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalWeather;
 import com.uxplima.uxmessentials.playerstate.application.SetSpeed;
+import com.uxplima.uxmessentials.playerstate.application.ShowPing;
+import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
 import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
 import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
+import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -61,25 +69,24 @@ public final class PlayerstateWiring {
         StateReconciler reconciler = new BukkitStateReconciler(kernel.scheduler());
         PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler());
         NearbyPlayers nearby = new BukkitNearbyPlayers();
+        PlayerInfo info = new BukkitPlayerInfo();
         PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
 
-        PlayerStateServices services = assemble(kernel, config, clock, store, reconciler, effects, nearby, notifier);
+        Ports ports = new Ports(store, reconciler, effects, nearby, info, notifier);
+        PlayerStateServices services = assemble(kernel, config, clock, ports);
         List<CommandRegistration> commands = PlayerStateCommands.all(services, kernel.messages());
         List<Listener> listeners = List.of(new PlayerStateListener(store, reconciler));
         return new Wired(commands, listeners);
     }
 
-    private static PlayerStateServices assemble(
-            KernelPorts kernel,
-            ConfigStore config,
-            Clock clock,
-            PlayerStateStore store,
-            StateReconciler reconciler,
-            PlayerEffects effects,
-            NearbyPlayers nearby,
-            PlayerStateNotifier notifier) {
+    private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {
         boolean healRemovesEffects = config.getBoolean("heal-remove-effects", false);
+        boolean restEnabled = config.getBoolean("rest-enabled", true);
         var events = kernel.events();
+        PlayerStateStore store = ports.store();
+        StateReconciler reconciler = ports.reconciler();
+        PlayerEffects effects = ports.effects();
+        PlayerStateNotifier notifier = ports.notifier();
         return new PlayerStateServices(
                 new ToggleGod(store, reconciler, notifier, events, clock),
                 new ToggleFly(store, reconciler, notifier, events, clock),
@@ -89,12 +96,27 @@ public final class PlayerstateWiring {
                 new SetSpeed(store, reconciler, notifier, events, clock),
                 new Extinguish(effects, notifier),
                 new Suicide(effects, notifier),
-                new ListNearby(nearby, notifier),
+                new ListNearby(ports.nearby(), notifier),
                 new ToggleNightVision(effects, notifier),
                 new SetPersonalTime(effects, notifier),
                 new SetPersonalWeather(effects, notifier),
+                new SetExperience(effects, notifier),
+                new SetAir(effects, notifier),
+                new Burn(effects, notifier),
+                new ShowPosition(ports.info(), notifier),
+                new ShowPing(ports.info(), notifier),
+                new ResetRest(effects, notifier, restEnabled),
                 kernel.playerLookup());
     }
+
+    /** The context's constructed outbound ports, bundled so {@link #assemble} stays within its argument budget. */
+    private record Ports(
+            PlayerStateStore store,
+            StateReconciler reconciler,
+            PlayerEffects effects,
+            NearbyPlayers nearby,
+            PlayerInfo info,
+            PlayerStateNotifier notifier) {}
 
     /**
      * Everything the playerstate module contributes once wired: the Brigadier commands and the

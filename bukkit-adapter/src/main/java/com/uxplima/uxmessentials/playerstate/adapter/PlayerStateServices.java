@@ -2,14 +2,20 @@ package com.uxplima.uxmessentials.playerstate.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
+import com.uxplima.uxmessentials.playerstate.application.ResetRest;
+import com.uxplima.uxmessentials.playerstate.application.SetAir;
+import com.uxplima.uxmessentials.playerstate.application.SetExperience;
 import com.uxplima.uxmessentials.playerstate.application.SetGamemode;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalTime;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalWeather;
 import com.uxplima.uxmessentials.playerstate.application.SetSpeed;
+import com.uxplima.uxmessentials.playerstate.application.ShowPing;
+import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
@@ -35,6 +41,12 @@ import org.jspecify.annotations.NullMarked;
  * @param toggleNightVision {@code /nightvision} ({@code /nv})
  * @param personalTime {@code /ptime}
  * @param personalWeather {@code /pweather}
+ * @param experience {@code /exp} ({@code /xp})
+ * @param air {@code /air}
+ * @param burn {@code /burn}
+ * @param showPosition {@code /getpos} ({@code /coords}, {@code /whereami})
+ * @param showPing {@code /ping}
+ * @param resetRest {@code /rest}
  * @param players name → ref resolution for the {@code .others} targets
  */
 @NullMarked
@@ -51,6 +63,12 @@ public record PlayerStateServices(
         ToggleNightVision toggleNightVision,
         SetPersonalTime personalTime,
         SetPersonalWeather personalWeather,
+        SetExperience experience,
+        SetAir air,
+        Burn burn,
+        ShowPosition showPosition,
+        ShowPing showPing,
+        ResetRest resetRest,
         PlayerLookup players) {
 
     public PlayerStateServices {
@@ -66,6 +84,12 @@ public record PlayerStateServices(
         Objects.requireNonNull(toggleNightVision, "toggleNightVision");
         Objects.requireNonNull(personalTime, "personalTime");
         Objects.requireNonNull(personalWeather, "personalWeather");
+        Objects.requireNonNull(experience, "experience");
+        Objects.requireNonNull(air, "air");
+        Objects.requireNonNull(burn, "burn");
+        Objects.requireNonNull(showPosition, "showPosition");
+        Objects.requireNonNull(showPing, "showPing");
+        Objects.requireNonNull(resetRest, "resetRest");
         Objects.requireNonNull(players, "players");
     }
 }

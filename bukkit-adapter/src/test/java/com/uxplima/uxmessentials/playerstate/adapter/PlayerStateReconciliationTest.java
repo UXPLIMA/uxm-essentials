@@ -4,17 +4,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.GameMode;
+import org.bukkit.Statistic;
 
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitNearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerEffects;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerInfo;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitStateReconciler;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.InMemoryPlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
+import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
+import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
+import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
+import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PlayerStateSnapshot;
@@ -168,6 +175,74 @@ class PlayerStateReconciliationTest {
 
         assertThat(found).extracting(n -> n.who().name()).containsExactly("Bob", "Carol");
         assertThat(found).noneMatch(n -> n.who().uuid().equals(alice.getUniqueId())); // self excluded
+    }
+
+    @Test
+    void experienceSetReplacesTheTotalAndReportsTheResult() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+        AtomicReference<PlayerEffects.ExperienceReport> report = new AtomicReference<>();
+
+        effects.applyExperience(
+                ref, new ExperienceChange(ExperienceChange.Op.SET, ExperienceChange.Unit.LEVELS, 5), report::set);
+
+        assertThat(alice.getLevel()).isEqualTo(5);
+        PlayerEffects.ExperienceReport result = report.get();
+        assertThat(result).isNotNull();
+        assertThat(java.util.Objects.requireNonNull(result).level()).isEqualTo(5);
+    }
+
+    @Test
+    void experienceResetZeroesTheLevel() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+        alice.setLevel(10);
+
+        effects.applyExperience(ref, ExperienceChange.reset(), report -> {});
+
+        assertThat(alice.getLevel()).isZero();
+    }
+
+    @Test
+    void airSetsTheRemainingAirClampedToTheMaximum() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+
+        effects.setRemainingAir(ref, AirAmount.ofSeconds(5, Integer.MAX_VALUE));
+
+        assertThat(alice.getRemainingAir()).isEqualTo(Math.min(100, alice.getMaximumAir()));
+    }
+
+    @Test
+    void burnSetsTheFireTicks() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+
+        effects.setFire(ref, BurnDuration.ofSeconds(3));
+
+        assertThat(alice.getFireTicks()).isEqualTo(60); // 3s * 20
+    }
+
+    @Test
+    void restResetsTheTimeSinceRestStatistic() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+        alice.setStatistic(Statistic.TIME_SINCE_REST, 80_000);
+
+        effects.resetRest(ref);
+
+        assertThat(alice.getStatistic(Statistic.TIME_SINCE_REST)).isZero();
+    }
+
+    @Test
+    void infoReportsPositionAndPingForAnOnlinePlayerAndEmptyForAGhost() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+        PlayerInfo info = new BukkitPlayerInfo();
+
+        assertThat(info.positionOf(ref)).isPresent();
+        assertThat(info.pingOf(ref)).isPresent();
+        assertThat(info.positionOf(new PlayerRef(UUID.randomUUID(), "Ghost"))).isEmpty();
     }
 
     @Test

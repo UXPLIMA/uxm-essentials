@@ -50,6 +50,20 @@ public enum ItemworldMessageKey implements MessageKey {
     HAT_NO_ITEM("itemworld.hat.no-item"),
     // /itemdb
     ITEMDB_REPORT("itemworld.itemdb.report"),
+    // /unbreakable
+    UNBREAKABLE_SET("itemworld.unbreakable.set"),
+    // /disenchant
+    DISENCHANT_ONE("itemworld.disenchant.one"),
+    DISENCHANT_ALL("itemworld.disenchant.all"),
+    DISENCHANT_NONE("itemworld.disenchant.none"),
+    DISENCHANT_NOT_PRESENT("itemworld.disenchant.not-present"),
+    // /itemmodel
+    ITEMMODEL_SET("itemworld.itemmodel.set"),
+    ITEMMODEL_CLEARED("itemworld.itemmodel.cleared"),
+    // /editsign
+    EDITSIGN_OPENED("itemworld.editsign.opened"),
+    EDITSIGN_NOT_A_SIGN("itemworld.editsign.not-a-sign"),
+    EDITSIGN_NO_ACCESS("itemworld.editsign.no-access"),
 
     // Virtual workstations — one opened line, parameterised by station name
     WORKSTATION_OPENED("itemworld.workstation.opened"),

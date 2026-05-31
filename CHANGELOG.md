@@ -2,6 +2,13 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [v2.5] - 2026-05-31
+
+Playerstate and itemworld utility verbs.
+
+- Playerstate: `/exp`, `/air`, `/burn`, `/getpos`, `/ping` and `/rest` round out the per-player utility surface, backed by a new `PlayerInfo` port for read-only lookups and `AirAmount`/`BurnDuration`/`ExperienceChange` value objects validated at the adapter boundary.
+- Itemworld item-utils: `/unbreakable`, `/disenchant`, `/itemmodel` and `/editsign` extend the item-utils sub-feature group, each input-validated before it touches the live item.
+
 ## [v2.4] - 2026-05-31
 
 PlaceholderAPI expansion.

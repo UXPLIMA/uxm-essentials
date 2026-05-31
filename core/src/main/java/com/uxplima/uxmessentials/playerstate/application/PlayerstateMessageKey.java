@@ -72,7 +72,34 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /pweather
     PWEATHER_SET("playerstate.pweather.set"),
     PWEATHER_RESET("playerstate.pweather.reset"),
-    PWEATHER_INVALID("playerstate.pweather.invalid");
+    PWEATHER_INVALID("playerstate.pweather.invalid"),
+
+    // /exp (/xp)
+    EXP_SHOW("playerstate.exp.show"),
+    EXP_SHOW_OTHER("playerstate.exp.show-other"),
+    EXP_SET("playerstate.exp.set"),
+    EXP_SET_OTHER("playerstate.exp.set-other"),
+
+    // /air
+    AIR_SET("playerstate.air.set"),
+    AIR_SET_OTHER("playerstate.air.set-other"),
+
+    // /burn
+    BURN_SET("playerstate.burn.set"),
+    BURN_SET_OTHER("playerstate.burn.set-other"),
+
+    // /getpos (/coords /whereami)
+    GETPOS_SHOW("playerstate.getpos.show"),
+    GETPOS_SHOW_OTHER("playerstate.getpos.show-other"),
+
+    // /ping
+    PING_SHOW("playerstate.ping.show"),
+    PING_SHOW_OTHER("playerstate.ping.show-other"),
+
+    // /rest
+    REST_DONE("playerstate.rest.done"),
+    REST_DONE_OTHER("playerstate.rest.done-other"),
+    REST_DISABLED("playerstate.rest.disabled");
 
     private final String key;
 

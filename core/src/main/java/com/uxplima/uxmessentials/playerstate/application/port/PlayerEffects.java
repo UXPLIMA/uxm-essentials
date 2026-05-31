@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.playerstate.application.port;
 
+import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
+import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
+import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -37,4 +40,31 @@ public interface PlayerEffects {
 
     /** Apply {@code who}'s personal client-side weather, or reset it for {@code PersonalWeather#RESET}. */
     void applyWeather(PlayerRef who, PersonalWeather weather);
+
+    /**
+     * Apply an experience {@code change} to {@code who}, reading the current total and computing the clamped
+     * non-negative target on the player's owning thread, then reporting the resulting level and point total
+     * back through {@code onResult}. {@code onResult} runs on the same thread as the mutation; an offline
+     * target neither mutates nor reports.
+     */
+    void applyExperience(
+            PlayerRef who, ExperienceChange change, java.util.function.Consumer<ExperienceReport> onResult);
+
+    /** Set {@code who}'s remaining air to {@code air} (clamped to their maximum at construction). */
+    void setRemainingAir(PlayerRef who, AirAmount air);
+
+    /** Set {@code who} on fire for {@code duration} (or put them out when the duration is zero). */
+    void setFire(PlayerRef who, BurnDuration duration);
+
+    /** Reset {@code who}'s time-since-rest statistic so accumulated phantom pressure clears. */
+    void resetRest(PlayerRef who);
+
+    /**
+     * A snapshot of a player's experience after an {@code /exp} operation: the level and the absolute
+     * experience-point total, used to render the confirmation.
+     *
+     * @param level the player's experience level
+     * @param totalPoints the player's absolute experience-point total
+     */
+    record ExperienceReport(int level, int totalPoints) {}
 }

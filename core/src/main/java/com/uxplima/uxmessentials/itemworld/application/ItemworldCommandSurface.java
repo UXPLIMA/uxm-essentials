@@ -87,6 +87,26 @@ final class ItemworldCommandSurface {
                 new Verb("enchant", "uxmessentials.enchant.use", SubFeatureGroup.ITEM_UTILS, "Enchant the held item"));
         verbs.add(new Verb("hat", "uxmessentials.hat.use", SubFeatureGroup.ITEM_UTILS, "Wear the held item as a hat"));
         verbs.add(new Verb("itemdb", "uxmessentials.itemdb.use", SubFeatureGroup.ITEM_UTILS, "Look up an item's id"));
+        verbs.add(new Verb(
+                "unbreakable",
+                "uxmessentials.unbreakable.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Toggle the held item's unbreakable flag"));
+        verbs.add(new Verb(
+                "disenchant",
+                "uxmessentials.disenchant.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Remove enchantments from the held item"));
+        verbs.add(new Verb(
+                "itemmodel",
+                "uxmessentials.itemmodel.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Set the held item's custom model data"));
+        verbs.add(new Verb(
+                "editsign",
+                "uxmessentials.editsign.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Edit the sign you are looking at"));
         // Virtual workstations.
         verbs.add(new Verb(
                 "anvil", "uxmessentials.workstation.anvil", SubFeatureGroup.WORKSTATIONS, "Open a virtual anvil"));

@@ -41,7 +41,13 @@ final class PlayerstateCommandSurface {
                 spec("near", "uxmessentials.near.use", cmd("near", "List nearby players")),
                 spec("nightvision", "uxmessentials.nightvision.use", cmd("nightvision", "Toggle night vision")),
                 spec("ptime", "uxmessentials.ptime.use", cmd("ptime", "Set your personal time")),
-                spec("pweather", "uxmessentials.pweather.use", cmd("pweather", "Set your personal weather")));
+                spec("pweather", "uxmessentials.pweather.use", cmd("pweather", "Set your personal weather")),
+                spec("exp", "uxmessentials.exp.use", cmd("exp", "Get or set experience")),
+                spec("air", "uxmessentials.air.use", cmd("air", "Set remaining air")),
+                spec("burn", "uxmessentials.burn.use", cmd("burn", "Set a player on fire")),
+                spec("getpos", "uxmessentials.getpos.use", cmd("getpos", "Show a player's coordinates")),
+                spec("ping", "uxmessentials.ping.use", cmd("ping", "Show a player's ping")),
+                spec("rest", "uxmessentials.rest.use", cmd("rest", "Reset time-since-rest so phantoms stop")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {
