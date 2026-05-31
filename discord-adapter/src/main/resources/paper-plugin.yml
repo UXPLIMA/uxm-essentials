@@ -1,0 +1,20 @@
+name: uxmessentials-discord
+version: '${version}'
+main: com.uxplima.uxmessentials.discord.UxmEssentialsDiscord
+api-version: '1.21'
+authors: ['UXPLIMA']
+description: 'Optional Discord bridge for uxmEssentials: mirrors audit events and economy notifications to Discord via JDA. Dormant until configured with a bot token.'
+website: 'https://github.com/UXPLIMA/uxmEssentials'
+
+# Folia: the JDA login and message dispatch run off-tick via Paper's async scheduler;
+# the bridge never touches a region-owned object.
+folia-supported: true
+
+# The bridge sits on top of the host plugin's audit/economy notifications. It is a
+# soft-depend: if uxmEssentials is absent the bridge has no source and stays dormant,
+# and the host plugin runs fully without this jar.
+dependencies:
+  server:
+    uxmEssentials:
+      load: BEFORE
+      required: false

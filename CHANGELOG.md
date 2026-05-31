@@ -2,6 +2,16 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [P12] - 2026-05-31
+
+Discord bridge.
+
+- An optional `uxmessentials-discord` jar that stays dormant until a bot token is configured.
+- A JDA-backed `DiscordGateway` port that forwards audit events (mute, jail, ban, eco-admin) and economy notifications to mapped channels.
+- The gateway is consumed via the `ServicesManager`, so callers depend on the port rather than JDA directly.
+- JDA work runs off-thread, keeping the bridge off the server's main thread.
+- An `origin=discord` loop sentinel prevents relayed messages from echoing back into Discord.
+
 ## [P11] - 2026-05-31
 
 Velocity cross-server sync.
