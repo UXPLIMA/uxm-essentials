@@ -16,6 +16,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -39,9 +40,9 @@ abstract class PlayerstateCommandSupport {
     /** The cross-cutting node that lets a command target a player other than the sender. */
     static final String OTHERS_PERMISSION = "uxmessentials.playerstate.others";
 
-    private static final MessageKey PLAYERS_ONLY = () -> "command.players-only";
-    private static final MessageKey UNKNOWN_PLAYER = () -> "command.unknown-player";
-    private static final MessageKey NO_PERMISSION = () -> "command.no-permission";
+    private static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
+    private static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;
+    private static final MessageKey NO_PERMISSION = SharedMessageKey.COMMAND_NO_PERMISSION;
 
     final PlayerStateServices services;
     final Messages messages;

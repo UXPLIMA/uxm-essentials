@@ -68,15 +68,12 @@ val localeParityCheck by tasks.registering(JavaExec::class) {
     description = "Fail if any messages_<lang>.conf is missing or has extra keys vs messages_en.conf."
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("com.uxplima.uxmessentials.i18n.LocaleParityCheck")
-    // The i18n catalog and its parity checker arrive with the message-catalog work;
-    // until that class is on the classpath the gate has nothing to check, so it
-    // self-skips rather than failing the build. It re-activates automatically the
-    // moment LocaleParityCheck ships.
-    onlyIf { task ->
-        (task as JavaExec).classpath.any {
-            it.isDirectory && File(it, "com/uxplima/uxmessentials/i18n/LocaleParityCheck.class").exists()
-        }
-    }
+    // The checker reads the MessageKeyCatalog, whose LocaleScope sibling uses the preview ScopedValue API.
+    jvmArgs("--enable-preview")
+    // P9 ships LocaleParityCheck and activates the gate (the onlyIf self-skip is gone). The checker
+    // needs the message catalogs and the test classes compiled, so depend on the test compile and the
+    // folded resources.
+    dependsOn(tasks.named("compileTestJava"), tasks.processResources)
 }
 tasks.named("check") { dependsOn(localeParityCheck) }
 
@@ -85,6 +82,7 @@ val jmh by tasks.registering(JavaExec::class) {
     description = "Run JMH micro-benchmarks (baltop ordering, rtp safe-search, teleport resolution)."
     classpath = sourceSets["jmh"].runtimeClasspath
     mainClass.set("org.openjdk.jmh.Main")
+    jvmArgs("--enable-preview") // benchmarked code may touch the preview ScopedValue path
     // Persist results for the perf-regression CI job to diff against the baseline.
     args("-rf", "json", "-rff", "build/reports/jmh/result.json")
 }
@@ -131,6 +129,7 @@ tasks.runServer {
     )
     jvmArgs(
         "-Xmx4G",
+        "--enable-preview", // the plugin's ScopedValue locale propagation is a preview API on Java 21
         "-Djdk.tracePinnedThreads=full",
         "-XX:+UnlockExperimentalVMOptions",
         "-XX:+AllowEnhancedClassRedefinition",

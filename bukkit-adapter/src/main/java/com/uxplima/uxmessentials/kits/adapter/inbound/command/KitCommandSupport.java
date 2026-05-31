@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -32,10 +33,10 @@ import org.jspecify.annotations.Nullable;
 abstract class KitCommandSupport {
 
     /** The catalog key for a console invoking a player-only command. */
-    static final MessageKey PLAYERS_ONLY = () -> "command.players-only";
+    static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
     /** The catalog key for a named target that could not be resolved to an online player. */
-    static final MessageKey UNKNOWN_PLAYER = () -> "command.unknown-player";
+    static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;
 
     final KitServices services;
     final Messages messages;

@@ -1,0 +1,68 @@
+package com.uxplima.uxmessentials.shared.application.message;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
+import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
+import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
+import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
+import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
+import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
+import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
+import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
+
+/**
+ * The single registry of every shipped {@link MessageKey} constant, across the {@code shared} common
+ * block and all eleven feature contexts.
+ *
+ * <p>This is the one place that enumerates the per-module key enums, so the catalog is whole regardless
+ * of which modules are enabled at runtime (docs/13-i18n §6 — a disabled module still ships its keys).
+ * Two collaborators read it: the {@code GlobalTranslator} wiring (which registers every key for the
+ * {@code translatable} path) and the locale-parity guard (which asserts this constant set equals
+ * {@code messages_en.conf}'s key set, bidirectionally). Adding a context's enum here is the one edit a
+ * new module makes to join the parity matrix.
+ */
+public final class MessageKeyCatalog {
+
+    /** The per-module key enums, in the registry's dependency-first order; {@code shared} first. */
+    private static final List<MessageKey[]> ENUMS = List.of(
+            SharedMessageKey.values(),
+            TeleportMessageKey.values(),
+            HomesMessageKey.values(),
+            EconomyMessageKey.values(),
+            WarpsMessageKey.values(),
+            KitsMessageKey.values(),
+            PlayerstateMessageKey.values(),
+            MessagingMessageKey.values(),
+            PresenceMessageKey.values(),
+            ModerationMessageKey.values(),
+            ItemworldMessageKey.values(),
+            VaultsMessageKey.values());
+
+    private MessageKeyCatalog() {}
+
+    /** Every shipped {@link MessageKey} constant, deduplicated by identity, in declaration order. */
+    public static Set<MessageKey> all() {
+        Set<MessageKey> keys = new LinkedHashSet<>();
+        for (MessageKey[] block : ENUMS) {
+            for (MessageKey key : block) {
+                keys.add(key);
+            }
+        }
+        return Set.copyOf(keys);
+    }
+
+    /** Every shipped catalog lookup string ({@link MessageKey#key()}), for the parity matrix. */
+    public static Set<String> allKeys() {
+        Set<String> keys = new LinkedHashSet<>();
+        for (MessageKey key : all()) {
+            keys.add(key.key());
+        }
+        return Set.copyOf(keys);
+    }
+}

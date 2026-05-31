@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -52,9 +54,12 @@ public final class PluginModule {
         Logger log = plugin.getLogger();
         com.uxplima.uxmessentials.shared.application.port.Logger kernelLog = KernelWiring.logger(plugin);
         ConfigStore config = KernelWiring.loadConfig(plugin, kernelLog);
-        KernelPorts kernel = KernelWiring.wire(plugin, config, kernelLog);
+        KernelWiring.Kernel wiredKernel = KernelWiring.wire(plugin, config, kernelLog);
+        KernelPorts kernel = wiredKernel.ports();
         ModuleRegistry registry = new DefaultModuleRegistry();
         CloseableResources resources = new CloseableResources();
+        // Every published command is wrapped so the requesting player's locale binds at the boundary.
+        resources.localeBinding(new LocaleBinding(wiredKernel.localeStore(), wiredKernel.serverDefault()));
 
         Persistence persistence = KernelWiring.openPersistence(plugin, config, kernelLog, registry);
         // The pool is closed last (pushed first), after every module has stopped and drained its writes.
@@ -62,6 +67,9 @@ public final class PluginModule {
 
         wireModules(plugin, registry, config, kernel, persistence, resources, log);
         resources.addCommand(new UxmessCommand(registry, config));
+        // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
+        resources.addCommand(new LangCommand(
+                wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
         return resources;
     }
 

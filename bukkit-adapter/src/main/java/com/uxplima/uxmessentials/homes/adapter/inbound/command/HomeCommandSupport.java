@@ -11,6 +11,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -26,7 +27,7 @@ import org.jspecify.annotations.Nullable;
 abstract class HomeCommandSupport {
 
     /** The catalog key for a console invoking a player-only command. */
-    static final MessageKey PLAYERS_ONLY = () -> "command.players-only";
+    static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
     final HomeServices services;
     final Messages messages;

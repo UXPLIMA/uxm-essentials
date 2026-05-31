@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -36,10 +37,10 @@ import org.jspecify.annotations.Nullable;
 abstract class MessagingCommandSupport {
 
     /** The catalog key for a console invoking a player-only command. */
-    static final MessageKey PLAYERS_ONLY = () -> "command.players-only";
+    static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
     /** The shared catalog key for a name that resolves to no player. */
-    static final MessageKey UNKNOWN_PLAYER = () -> "command.unknown-player";
+    static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;
 
     final MessagingServices services;
     final Messages messages;

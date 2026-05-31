@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -38,7 +39,7 @@ import org.jspecify.annotations.Nullable;
 abstract class EconomyCommandSupport {
 
     /** The catalog key for a console invoking a player-only command. */
-    static final MessageKey PLAYERS_ONLY = () -> "command.players-only";
+    static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
     final EconomyServices services;
     final Messages messages;

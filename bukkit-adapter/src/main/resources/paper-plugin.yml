@@ -37,6 +37,11 @@ permissions:
   uxmessentials.admin.reload:
     description: 'Reload all modules via /uxmess reload.'
     default: op
+  # i18n self surface — the per-player /lang locale override (docs/13-i18n §7). Cross-cutting,
+  # not owned by a feature context.
+  uxmessentials.lang.use:
+    description: '/lang to set or clear your personal language override.'
+    default: true
   # teleport context (docs/permissions.md "Teleport"). Value-bearing tier nodes
   # (uxmessentials.tp.warmup.<seconds>, uxmessentials.tp.cooldown.<seconds>) are an open
   # space granted per instance and are intentionally not enumerated here.

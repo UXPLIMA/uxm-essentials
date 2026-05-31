@@ -17,8 +17,11 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLocator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitWorldLookup;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.AdventureTranslations;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.PdcLocaleStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.BukkitPermissions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsMetaSource;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.MetaSource;
@@ -26,12 +29,14 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.scheduler.FoliaSchedule
 import com.uxplima.uxmessentials.shared.adapter.outbound.sink.BukkitMessageSink;
 import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
+import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -54,7 +59,37 @@ final class KernelWiring {
     /** The shared chat prefix catalog key, injected into the sink's {@code <prefix>} tag. */
     private static final MessageKey PREFIX_KEY = () -> "prefix";
 
+    /** The config path for the server-default locale used when a viewer has no override and no client. */
+    private static final String DEFAULT_LOCALE_PATH = "messages.default-locale";
+
     private KernelWiring() {}
+
+    /**
+     * The wired shared kernel: the {@link KernelPorts} every module consumes, plus the i18n collaborators
+     * the bootstrap command surface and the inbound command boundary need — the per-player override
+     * {@link LocaleStore} for {@code /lang}, the {@link LocaleCatalog} for locale validation, and the
+     * {@link LocaleResolver} the boundary binding folds the captured client locale into.
+     *
+     * @param ports the shared cross-cutting outbound ports
+     * @param localeStore the persisted {@code /lang} override store
+     * @param catalog the loaded message catalog
+     * @param resolver the per-viewer locale resolver
+     * @param serverDefault the configured server-default locale (client fallback at the boundary)
+     */
+    record Kernel(
+            KernelPorts ports,
+            LocaleStore localeStore,
+            LocaleCatalog catalog,
+            LocaleResolver resolver,
+            java.util.Locale serverDefault) {
+        Kernel {
+            Objects.requireNonNull(ports, "ports");
+            Objects.requireNonNull(localeStore, "localeStore");
+            Objects.requireNonNull(catalog, "catalog");
+            Objects.requireNonNull(resolver, "resolver");
+            Objects.requireNonNull(serverDefault, "serverDefault");
+        }
+    }
 
     /** The HOCON config file backing the {@link ConfigStore}; created from the plugin data folder. */
     static ConfigStore loadConfig(Plugin plugin, Logger log) {
@@ -97,8 +132,8 @@ final class KernelWiring {
         return locations;
     }
 
-    /** Build every shared outbound port and bundle them for module injection. */
-    static KernelPorts wire(Plugin plugin, ConfigStore config, Logger log) {
+    /** Build every shared outbound port plus the i18n collaborators, and bundle them for wiring. */
+    static Kernel wire(Plugin plugin, ConfigStore config, Logger log) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(log, "log");
@@ -108,18 +143,33 @@ final class KernelWiring {
         LocaleCatalog catalog = new HoconLocaleCatalog(log);
         String prefix = catalog.template(java.util.Locale.ENGLISH, PREFIX_KEY);
 
-        return new KernelPorts(
+        LocaleStore localeStore = new PdcLocaleStore(plugin);
+        java.util.Locale serverDefault = serverDefaultLocale(config);
+        LocaleResolver resolver = new LocaleResolver(localeStore, serverDefault);
+        // The translatable-key path (docs/13-i18n §8.2): register every catalog key with Adventure's
+        // GlobalTranslator so a Component.translatable("uxmessentials.<key>") renders per the receiving
+        // connection's locale. The MessageKey-resolve path stays the primary surface.
+        new AdventureTranslations(catalog, log).register(MessageKeyCatalog.all());
+
+        KernelPorts ports = new KernelPorts(
                 scheduler,
                 permissions,
                 new PdcCooldowns(plugin, permissions, Clock.systemUTC()),
                 new SchedulerWarmups(scheduler, permissions),
-                new CatalogMessages(catalog),
+                new CatalogMessages(catalog, resolver),
                 new BukkitMessageSink(scheduler, prefix),
                 new BukkitPlayerLookup(),
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),
                 log);
+        return new Kernel(ports, localeStore, catalog, resolver, serverDefault);
+    }
+
+    private static java.util.Locale serverDefaultLocale(ConfigStore config) {
+        String tag = config.getString(DEFAULT_LOCALE_PATH, java.util.Locale.ENGLISH.toLanguageTag());
+        java.util.Locale parsed = java.util.Locale.forLanguageTag(tag);
+        return parsed.getLanguage().isEmpty() ? java.util.Locale.ENGLISH : parsed;
     }
 
     private static MetaSource metaSource(Logger log) {

@@ -4,9 +4,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -19,17 +16,21 @@ import org.jspecify.annotations.NullMarked;
  * no Adventure type crosses this boundary, which is what keeps the kernel free of {@code net.kyori};
  * the tag parsing into a {@code Component} happens once downstream in {@link BukkitMessageSink}.
  *
- * <p>The viewer's locale comes from the online {@link Player}'s client locale, falling back to English
- * for an offline or unknown viewer. The per-key {@code en} fallback chain itself lives behind the
+ * <p>The viewer's locale is resolved per viewer by the {@link LocaleResolver} through the
+ * override → request-scope → server-default → {@code en} chain, so two players on one server each see
+ * their own language from the same call site, and a deferred message renders in the requester's locale
+ * via the request-scope binding. The per-key {@code en} fallback chain itself lives behind the
  * {@link LocaleCatalog}; this class only chooses which locale to ask for.
  */
 @NullMarked
 public final class CatalogMessages implements Messages {
 
     private final LocaleCatalog catalog;
+    private final LocaleResolver locales;
 
-    public CatalogMessages(LocaleCatalog catalog) {
+    public CatalogMessages(LocaleCatalog catalog, LocaleResolver locales) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
+        this.locales = Objects.requireNonNull(locales, "locales");
     }
 
     @Override
@@ -37,13 +38,9 @@ public final class CatalogMessages implements Messages {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(placeholders, "placeholders");
-        String template = catalog.template(localeOf(viewer), key);
+        Locale locale = locales.resolve(viewer);
+        String template = catalog.template(locale, key);
         return substitute(template, placeholders);
-    }
-
-    private Locale localeOf(PlayerRef viewer) {
-        Player player = Bukkit.getPlayer(viewer.uuid());
-        return player != null ? player.locale() : Locale.ENGLISH;
     }
 
     private static String substitute(String template, Map<String, String> placeholders) {

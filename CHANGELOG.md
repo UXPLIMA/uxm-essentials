@@ -2,6 +2,14 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [P9] - 2026-05-31
+
+i18n and locale catalog.
+
+- Per-player locale resolution: a player's client locale, overridable via `/lang`, propagated through the message pipeline with a `ScopedValue` so every rendered message resolves against the right catalog, with an `en` fallback chain when a key or locale is missing.
+- Activated the i18n drift guards — `localeParityCheck`, `NoInlineUserMessage`, and `MessageKey`-parity checks — so locale catalogs can never drift from the `MessageKey` constants and no user-facing message is inlined outside the catalog.
+- Shipped a complete Turkish (`tr`) locale carrying the full key set as the English authority.
+
 ## [P8] - 2026-05-31
 
 Vaults.
