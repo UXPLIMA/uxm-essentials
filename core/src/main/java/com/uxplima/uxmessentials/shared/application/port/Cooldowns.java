@@ -55,18 +55,30 @@ public interface Cooldowns {
 
     /**
      * A tiered cooldown's identity: the feature segment used to build the permission nodes, the
-     * config-default duration in seconds when the player holds no matching tier node, and the
-     * {@link CooldownStartPhase} that decides when the clock starts.
+     * {@code stampScope} the per-holder stamp is keyed under, the config-default duration in seconds
+     * when the player holds no matching tier node, and the {@link CooldownStartPhase} that decides when
+     * the clock starts.
+     *
+     * <p>The {@code feature} and {@code stampScope} are separate so a family of related cooldowns can
+     * share one tier node space while each keeps its own independent stamp. {@code /kit} uses this: every
+     * kit resolves its wait against the shared {@code uxmessentials.kit.cooldown.<seconds>} tier
+     * ({@code feature = "kit"}), but each kit stamps under its own per-id scope ({@code stampScope =
+     * "kit." + id}) so claiming one kit does not start another's cooldown. The teleport and warp kinds set
+     * {@code stampScope} equal to {@code feature} — one tier, one stamp.
      *
      * @param feature the node segment, e.g. {@code tp} → {@code uxmessentials.tp.cooldown.<seconds>}
+     * @param stampScope the per-holder stamp key; defaults to {@code feature} for a single-stamp kind
      * @param defaultSeconds the config fallback in seconds when no tier node matches
      * @param startPhase when the cooldown clock starts for this kind
      */
-    record CooldownKind(String feature, long defaultSeconds, CooldownStartPhase startPhase) {
+    record CooldownKind(String feature, String stampScope, long defaultSeconds, CooldownStartPhase startPhase) {
 
         public CooldownKind {
             if (feature == null || feature.isBlank()) {
                 throw new IllegalArgumentException("feature must be non-blank");
+            }
+            if (stampScope == null || stampScope.isBlank()) {
+                throw new IllegalArgumentException("stampScope must be non-blank");
             }
             if (defaultSeconds < 0) {
                 throw new IllegalArgumentException("defaultSeconds must be >= 0: " + defaultSeconds);
@@ -74,9 +86,24 @@ public interface Cooldowns {
             Objects.requireNonNull(startPhase, "startPhase");
         }
 
+        /** A kind whose stamp is keyed by its own feature — the single-tier, single-stamp form. */
+        public CooldownKind(String feature, long defaultSeconds, CooldownStartPhase startPhase) {
+            this(feature, feature, defaultSeconds, startPhase);
+        }
+
         /** A cooldown that starts on arrival — the canonical teleport default. */
         public static CooldownKind onTeleport(String feature, long defaultSeconds) {
             return new CooldownKind(feature, defaultSeconds, CooldownStartPhase.TELEPORT);
+        }
+
+        /**
+         * A cooldown sharing the {@code feature} tier node space but stamped under a distinct
+         * {@code stampScope}, so related instances rate-limit independently. {@code /kit} keys each kit
+         * here: {@code scoped("kit", "kit." + id, seconds, TELEPORT)}.
+         */
+        public static CooldownKind scoped(
+                String feature, String stampScope, long defaultSeconds, CooldownStartPhase startPhase) {
+            return new CooldownKind(feature, stampScope, defaultSeconds, startPhase);
         }
 
         /** The permission node prefix this kind resolves its tier against. */
@@ -96,7 +123,7 @@ public interface Cooldowns {
 
         /** A copy of this kind with a different start phase, for operator-driven reconfiguration. */
         public CooldownKind withStartPhase(@Nullable CooldownStartPhase phase) {
-            return new CooldownKind(feature, defaultSeconds, phase == null ? startPhase : phase);
+            return new CooldownKind(feature, stampScope, defaultSeconds, phase == null ? startPhase : phase);
         }
     }
 }

@@ -188,3 +188,68 @@ permissions:
   uxmessentials.economy.admin.bulk:
     description: '/eco giveall, /eco giverandom, /eco resetall server-wide bulk mutations.'
     default: op
+  # kits context (docs/permissions.md "Kits"). The per-kit gate uxmessentials.kit.<id> and the cooldown
+  # tier uxmessentials.kit.cooldown.<seconds> are an open value space granted per kit and are intentionally
+  # not enumerated here; only the base nodes are declared. Per-kit permission gating is data-driven in
+  # kits.conf, and per-player claim/cooldown state lives in PDC.
+  uxmessentials.kit.use:
+    description: '/kit and /kits to claim a kit and list the kits you may claim.'
+    default: true
+  uxmessentials.kit.preview:
+    description: '/showkit <name> to preview a kit''s contents without claiming it.'
+    default: true
+  uxmessentials.kit.cooldown.bypass:
+    description: 'Skip kit cooldowns and re-claim one-time kits.'
+    default: op
+  uxmessentials.kit.others:
+    description: '/kit <name> <player> to give a kit to another player.'
+    default: op
+  uxmessentials.kit.edit:
+    description: '/createkit, /delkit, /kiteditor to define, remove and edit kit contents.'
+    default: op
+  uxmessentials.kit.reset:
+    description: '/kitreset <player> [kit] to clear a player''s claim/cooldown stamps.'
+    default: op
+  # playerstate context (docs/permissions.md "Playerstate"). Toggle/effect verbs over an immutable
+  # PlayerStateSnapshot reconciled on the owning region thread. Each verb has its own base node; the single
+  # uxmessentials.playerstate.others node gates the [player] target form of every self/other command.
+  # /repair, /repairall, /hat and /more are owned by the itemworld context and are declared there, not here.
+  uxmessentials.god.use:
+    description: '/god [player] to toggle damage immunity.'
+    default: op
+  uxmessentials.fly.use:
+    description: '/fly [player] to toggle flight.'
+    default: op
+  uxmessentials.heal.use:
+    description: '/heal [player] to restore health.'
+    default: op
+  uxmessentials.feed.use:
+    description: '/feed [player] to restore hunger.'
+    default: op
+  uxmessentials.gamemode.use:
+    description: '/gamemode <mode> [player] and the /gmc /gms /gma /gmsp aliases.'
+    default: op
+  uxmessentials.speed.use:
+    description: '/speed, /walkspeed and /flyspeed to set walk/fly speed.'
+    default: op
+  uxmessentials.extinguish.use:
+    description: '/ext (/extinguish) [player] to put out a burning player.'
+    default: op
+  uxmessentials.suicide.use:
+    description: '/suicide to kill yourself.'
+    default: true
+  uxmessentials.near.use:
+    description: '/near [radius] to list nearby players.'
+    default: op
+  uxmessentials.nightvision.use:
+    description: '/nightvision (/nv) to toggle a night-vision effect on yourself.'
+    default: op
+  uxmessentials.ptime.use:
+    description: '/ptime <value|reset> to set a per-player client-side time.'
+    default: op
+  uxmessentials.pweather.use:
+    description: '/pweather <clear|rain|reset> to set a per-player client-side weather.'
+    default: op
+  uxmessentials.playerstate.others:
+    description: 'Use any playerstate command with a [player] target other than yourself.'
+    default: op

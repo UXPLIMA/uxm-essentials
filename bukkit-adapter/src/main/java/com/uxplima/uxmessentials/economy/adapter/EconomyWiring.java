@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.adapter.outbound.EconomyProviderRegistrar;
 import com.uxplima.uxmessentials.economy.adapter.outbound.LoggingEconomyAudit;
 import com.uxplima.uxmessentials.economy.adapter.outbound.PermissionBaltopExemption;
+import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderKitEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderWarpEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SchedulerPendingPayRegistry;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SnapshotBaltopProvider;
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
 import com.uxplima.uxmessentials.economy.application.port.PendingPayRegistry;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.persistence.economy.WalletLedger;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -117,7 +119,9 @@ public final class EconomyWiring {
                 useCases(persistence, kernel, settings, currencies, ledger.repository(), resolved, snapshots);
         List<CommandRegistration> commands = EconomyCommands.all(services, kernel.messages());
         WarpEconomy warpEconomy = new ProviderWarpEconomy(resolved, currencies.defaultCurrency());
-        return new Wired(commands, warpEconomy, ledger, snapshots, resolved, plugin, settings.registerProvider());
+        KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency());
+        return new Wired(
+                commands, warpEconomy, kitEconomy, ledger, snapshots, resolved, plugin, settings.registerProvider());
     }
 
     private static EconomyServices useCases(
@@ -150,11 +154,12 @@ public final class EconomyWiring {
 
     /**
      * Everything the economy module contributes once wired: the Brigadier commands, the {@code WarpEconomy}
-     * bridge the warps context charges through, and the lifecycle for the settle/telemetry/baltop loops and the
-     * {@code ServicesManager} registration.
+     * and {@code KitEconomy} bridges the warps and kits contexts charge through, and the lifecycle for the
+     * settle/telemetry/baltop loops and the {@code ServicesManager} registration.
      *
      * @param commands the Brigadier command registrations to publish
      * @param warpEconomy the bridge warps charges a per-warp cost through
+     * @param kitEconomy the bridge kits charges a per-kit cost through
      * @param ledger the native-ledger persistence handle whose loops are armed/drained
      * @param snapshots the per-currency baltop snapshots whose refresh loop is armed/stopped
      * @param provider the resolved provider this plugin uses (registered or deferred)
@@ -164,6 +169,7 @@ public final class EconomyWiring {
     public record Wired(
             List<CommandRegistration> commands,
             WarpEconomy warpEconomy,
+            KitEconomy kitEconomy,
             WalletLedger ledger,
             BaltopSnapshots snapshots,
             EconomyProvider provider,
@@ -173,6 +179,7 @@ public final class EconomyWiring {
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(warpEconomy, "warpEconomy");
+            Objects.requireNonNull(kitEconomy, "kitEconomy");
             Objects.requireNonNull(ledger, "ledger");
             Objects.requireNonNull(snapshots, "snapshots");
             Objects.requireNonNull(provider, "provider");

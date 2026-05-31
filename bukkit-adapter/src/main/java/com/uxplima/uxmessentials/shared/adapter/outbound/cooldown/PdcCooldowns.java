@@ -53,7 +53,7 @@ public final class PdcCooldowns implements Cooldowns {
         if (permissions.has(who, kind.bypassNode())) {
             return Result.ok();
         }
-        return gate(who, keys.forName(kind.feature()));
+        return gate(who, keys.forName(kind.stampScope()));
     }
 
     @Override
@@ -64,7 +64,7 @@ public final class PdcCooldowns implements Cooldowns {
             return;
         }
         long seconds = resolveSeconds(who, kind.cooldownNode(), kind.defaultSeconds());
-        writeStamp(who, keys.forName(kind.feature()), seconds);
+        writeStamp(who, keys.forName(kind.stampScope()), seconds);
     }
 
     @Override

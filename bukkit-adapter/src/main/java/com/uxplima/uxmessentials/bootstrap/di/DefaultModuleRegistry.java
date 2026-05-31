@@ -5,6 +5,8 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
+import com.uxplima.uxmessentials.kits.application.KitsModule;
+import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
@@ -17,11 +19,11 @@ import org.jspecify.annotations.NullMarked;
  * The single registration site for every {@link FeatureModule}.
  *
  * <p>Registration is explicit and ordered dependency-first (prerequisites before dependents):
- * {@code economy} before {@code warps} because a warp may charge a cost through the economy
- * provider, {@code teleport} before {@code homes} and {@code warps} because they delegate teleport
- * execution. No bounded context has shipped yet, so the list is currently empty; each context adds
- * exactly one {@code register(...)} line at its dependency-correct position when it lands. The
- * registry stays the greppable, authoritative answer to "which contexts exist?".
+ * {@code economy} before {@code warps} and {@code kits} because a warp or kit may charge a cost through
+ * the economy provider, {@code teleport} before {@code homes} and {@code warps} because they delegate
+ * teleport execution. Each context adds exactly one {@code register(...)} line at its dependency-correct
+ * position when it lands. The registry stays the greppable, authoritative answer to "which contexts
+ * exist?".
  */
 @NullMarked
 public final class DefaultModuleRegistry implements ModuleRegistry {
@@ -38,6 +40,12 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         delegate.register(new HomesModule());
         delegate.register(new EconomyModule());
         delegate.register(new WarpsModule());
+        // kits registers after economy because a kit may charge a per-kit cost through the economy provider;
+        // the economy KitEconomy bridge is captured during economy wiring and handed to kits.
+        delegate.register(new KitsModule());
+        // playerstate is self-contained — transient in-memory snapshots, no DB and no cross-context bridge —
+        // so its position is not dependency-constrained; it lands after kits.
+        delegate.register(new PlayerstateModule());
         //   … through VaultsModule. The shared kernel is not a module and never appears here.
     }
 

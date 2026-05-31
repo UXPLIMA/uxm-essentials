@@ -9,7 +9,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
+import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
+import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -95,6 +98,10 @@ public final class PluginModule {
             wireEconomy(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("warps"))) {
             wireWarps(ctx, persistence, resources, links);
+        } else if (module.id().equals(ModuleId.of("kits"))) {
+            wireKits(plugin, ctx, resources, links);
+        } else if (module.id().equals(ModuleId.of("playerstate"))) {
+            wirePlayerstate(ctx, resources);
         }
     }
 
@@ -126,8 +133,9 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.start();
         resources.onClose(wired::stop);
-        // Captured for warps, which lands after economy and charges a recorded per-warp cost through it.
+        // Captured for warps and kits, which land after economy and charge a recorded cost through it.
         links.warpEconomy = wired.warpEconomy();
+        links.kitEconomy = wired.kitEconomy();
     }
 
     private static void wireWarps(
@@ -138,10 +146,27 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
     }
 
+    private static void wireKits(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+        // kits need no database: definitions live in kits.conf and claim/cooldown state is transient PDC.
+        // The per-kit cost charges through the economy bridge captured during economy wiring when present.
+        KitsWiring.Wired wired = KitsWiring.wire(plugin, ctx, Optional.ofNullable(links.kitEconomy));
+        wired.commands().forEach(resources::addCommand);
+    }
+
+    private static void wirePlayerstate(ModuleContext ctx, CloseableResources resources) {
+        // playerstate persists nothing: the per-player snapshot map is transient in-memory state, and all
+        // live-player reconciliation routes through the kernel Scheduler port onto the owning region thread.
+        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+    }
+
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
         private @org.jspecify.annotations.Nullable TeleportEngine teleportEngine;
         private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
+        private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
     }
 
     private static boolean skippedByCapability(FeatureModule module, ModuleContext ctx, Logger log) {

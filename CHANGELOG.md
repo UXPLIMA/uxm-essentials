@@ -2,6 +2,14 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [P3] - 2026-05-30
+
+Economy context and provider abstraction.
+
+- Multi-currency economy domain (`Wallet`, `Money`, `Currency`, `Transaction`): DB-backed and double-spend-guarded, with debounced writes through a cached wallet repository so balance mutations stay consistent under load without thrashing the database.
+- `EconomyProvider` port with a native ledger implementation plus Treasury and Vault adapters wired through the Bukkit `ServicesManager` using a register-or-defer strategy, so uxmEssentials can serve as the economy provider or yield to an existing one.
+- Player economy commands (`/balance`, `/pay`, `/baltop`) and the `eco` admin surface, backed by the `EconomyProviderContractTest` that pins adapter behaviour to the port contract.
+
 ## [P2] - 2026-05-30
 
 Persistence layer, homes and warps.

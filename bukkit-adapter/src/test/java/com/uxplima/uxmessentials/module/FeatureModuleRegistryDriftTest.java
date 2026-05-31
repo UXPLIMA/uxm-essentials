@@ -36,18 +36,21 @@ class FeatureModuleRegistryDriftTest {
     void defaultRegistryExposesAnImmutableDeduplicatedSet() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
 
-        // teleport, homes, economy and warps are the landed contexts, registered dependency-first:
-        // teleport before the homes/warps contexts that delegate teleport execution to it, and economy
-        // before warps because a warp may charge a per-warp cost through the economy provider. The
-        // registry is a valid, immutable, ordered set that resolves each by id and rejects a not-yet-
-        // landed context.
+        // teleport, homes, economy, warps, kits and playerstate are the landed contexts, registered
+        // dependency-first: teleport before the homes/warps contexts that delegate teleport execution to it,
+        // and economy before warps and kits because each may charge a cost through the economy provider.
+        // playerstate is self-contained (transient in-memory snapshots, no DB, no cross-context bridge) and
+        // lands after kits. The registry is a valid, immutable, ordered set that resolves each by id and
+        // rejects a not-yet-landed context.
         assertThat(registry.byId(ModuleId.of("teleport"))).isPresent();
         assertThat(registry.byId(ModuleId.of("homes"))).isPresent();
         assertThat(registry.byId(ModuleId.of("economy"))).isPresent();
         assertThat(registry.byId(ModuleId.of("warps"))).isPresent();
-        assertThat(registry.byId(ModuleId.of("kits"))).isEmpty();
+        assertThat(registry.byId(ModuleId.of("kits"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("playerstate"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("messaging"))).isEmpty();
         assertThat(registry.all().stream().map(m -> m.id().value()))
-                .containsExactly("teleport", "homes", "economy", "warps");
+                .containsExactly("teleport", "homes", "economy", "warps", "kits", "playerstate");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }

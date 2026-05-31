@@ -1,0 +1,71 @@
+package com.uxplima.uxmessentials.playerstate.adapter;
+
+import java.util.Objects;
+
+import com.uxplima.uxmessentials.playerstate.application.Extinguish;
+import com.uxplima.uxmessentials.playerstate.application.Feed;
+import com.uxplima.uxmessentials.playerstate.application.Heal;
+import com.uxplima.uxmessentials.playerstate.application.ListNearby;
+import com.uxplima.uxmessentials.playerstate.application.SetGamemode;
+import com.uxplima.uxmessentials.playerstate.application.SetPersonalTime;
+import com.uxplima.uxmessentials.playerstate.application.SetPersonalWeather;
+import com.uxplima.uxmessentials.playerstate.application.SetSpeed;
+import com.uxplima.uxmessentials.playerstate.application.Suicide;
+import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
+import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
+import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * The constructed playerstate use cases the Brigadier commands share, built once per module start by
+ * {@code PlayerstateWiring} from the kernel ports and the context's own in-memory store, reconciler, effects
+ * bridge, and nearby scan. Held so every command reads the same use cases; the context's only adapter-side
+ * runtime state is the in-memory snapshot map (cleared on stop), so there is nothing else to drain.
+ *
+ * @param toggleGod {@code /god}
+ * @param toggleFly {@code /fly}
+ * @param heal {@code /heal}
+ * @param feed {@code /feed}
+ * @param setGamemode {@code /gamemode} and its {@code /gmc /gms /gma /gmsp} aliases
+ * @param setSpeed {@code /speed}, {@code /walkspeed}, {@code /flyspeed}
+ * @param extinguish {@code /ext} ({@code /extinguish})
+ * @param suicide {@code /suicide}
+ * @param listNearby {@code /near}
+ * @param toggleNightVision {@code /nightvision} ({@code /nv})
+ * @param personalTime {@code /ptime}
+ * @param personalWeather {@code /pweather}
+ * @param players name → ref resolution for the {@code .others} targets
+ */
+@NullMarked
+public record PlayerStateServices(
+        ToggleGod toggleGod,
+        ToggleFly toggleFly,
+        Heal heal,
+        Feed feed,
+        SetGamemode setGamemode,
+        SetSpeed setSpeed,
+        Extinguish extinguish,
+        Suicide suicide,
+        ListNearby listNearby,
+        ToggleNightVision toggleNightVision,
+        SetPersonalTime personalTime,
+        SetPersonalWeather personalWeather,
+        PlayerLookup players) {
+
+    public PlayerStateServices {
+        Objects.requireNonNull(toggleGod, "toggleGod");
+        Objects.requireNonNull(toggleFly, "toggleFly");
+        Objects.requireNonNull(heal, "heal");
+        Objects.requireNonNull(feed, "feed");
+        Objects.requireNonNull(setGamemode, "setGamemode");
+        Objects.requireNonNull(setSpeed, "setSpeed");
+        Objects.requireNonNull(extinguish, "extinguish");
+        Objects.requireNonNull(suicide, "suicide");
+        Objects.requireNonNull(listNearby, "listNearby");
+        Objects.requireNonNull(toggleNightVision, "toggleNightVision");
+        Objects.requireNonNull(personalTime, "personalTime");
+        Objects.requireNonNull(personalWeather, "personalWeather");
+        Objects.requireNonNull(players, "players");
+    }
+}
