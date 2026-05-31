@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.domain.CooldownStartPhase;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -43,6 +44,7 @@ public final class TeleportEngine {
     private final PlayerNotifier notifier;
     private final DomainEventPublisher events;
     private final TeleportSettings settings;
+    private final JailGate jail;
 
     public TeleportEngine(
             Cooldowns cooldowns,
@@ -50,13 +52,15 @@ public final class TeleportEngine {
             TeleportExecutor executor,
             PlayerNotifier notifier,
             DomainEventPublisher events,
-            TeleportSettings settings) {
+            TeleportSettings settings,
+            JailGate jail) {
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.warmups = Objects.requireNonNull(warmups, "warmups");
         this.executor = Objects.requireNonNull(executor, "executor");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.jail = Objects.requireNonNull(jail, "jail");
     }
 
     /**
@@ -69,6 +73,12 @@ public final class TeleportEngine {
         Objects.requireNonNull(mover, "mover");
         Objects.requireNonNull(destination, "destination");
         Objects.requireNonNull(kind, "kind");
+        if (jail.isJailed(mover)) {
+            // A jailed player cannot self-teleport — /home, /warp, /spawn, /back, /rtp all funnel through here
+            // (docs/permissions.md). The moderation context owns the gate; without moderation it is NEVER.
+            notifier.send(mover, TeleportMessageKey.JAILED);
+            return Result.err(TeleportError.JAILED);
+        }
         Result<Unit, Duration> gate = cooldowns.check(mover, cooldownKind());
         if (gate.isErr()) {
             notifyCooldown(mover, gate.errorOrThrow());

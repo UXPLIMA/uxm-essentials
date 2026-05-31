@@ -81,10 +81,22 @@ class TeleportCommandPathTest {
         // executor stands in for the entity hop; the real AsyncTeleportExecutor is exercised on a live
         // server. Every other adapter here — registry, spawn directory, PDC flags, world lookup — is real.
         executor = new RecordingExecutor();
-        TeleportEngine engine =
-                new TeleportEngine(new NoCooldowns(), new ImmediateWarmups(), executor, notifier, events, settings);
+        TeleportEngine engine = new TeleportEngine(
+                new NoCooldowns(),
+                new ImmediateWarmups(),
+                executor,
+                notifier,
+                events,
+                settings,
+                com.uxplima.uxmessentials.teleport.application.port.JailGate.NEVER);
         requestTeleport = new RequestTeleport(
-                requests, new PdcTeleportFlags(plugin), notifier, events, settings, Clock.systemUTC());
+                requests,
+                new PdcTeleportFlags(plugin),
+                notifier,
+                events,
+                settings,
+                com.uxplima.uxmessentials.teleport.application.port.JailGate.NEVER,
+                Clock.systemUTC());
         acceptTeleport = new AcceptTeleport(requests, engine, notifier, events, Clock.systemUTC());
         resolveSpawn = new ResolveSpawn(spawns, worldLookup(), engine, notifier);
     }

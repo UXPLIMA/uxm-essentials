@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
 import com.uxplima.uxmessentials.kits.application.KitsModule;
 import com.uxplima.uxmessentials.messaging.application.MessagingModule;
+import com.uxplima.uxmessentials.moderation.application.ModerationModule;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
@@ -56,6 +57,10 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // through the canSee graph; that coupling is soft (both degrade to "fully visible" without presence),
         // so presence carries no hard dependency edge and lands after the contexts it informs.
         delegate.register(new PresenceModule());
+        // moderation provides the real MutePolicy (messaging) and JailGate (teleport) the placeholder NEVER
+        // bindings stand in for until it lands; both couplings are soft, so moderation carries no hard
+        // dependency edge and lands after the contexts it informs (messaging + teleport were wired first).
+        delegate.register(new ModerationModule());
         //   … through VaultsModule. The shared kernel is not a module and never appears here.
     }
 

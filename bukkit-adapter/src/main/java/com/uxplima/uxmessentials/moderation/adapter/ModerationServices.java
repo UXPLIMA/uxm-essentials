@@ -1,0 +1,262 @@
+package com.uxplima.uxmessentials.moderation.adapter;
+
+import java.util.Objects;
+
+import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.Freeze;
+import com.uxplima.uxmessentials.moderation.application.IssueWarn;
+import com.uxplima.uxmessentials.moderation.application.Jail;
+import com.uxplima.uxmessentials.moderation.application.JailCountdown;
+import com.uxplima.uxmessentials.moderation.application.Kick;
+import com.uxplima.uxmessentials.moderation.application.KickAll;
+import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
+import com.uxplima.uxmessentials.moderation.application.Mute;
+import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
+import com.uxplima.uxmessentials.moderation.application.Seen;
+import com.uxplima.uxmessentials.moderation.application.TempBan;
+import com.uxplima.uxmessentials.moderation.application.UnbanIp;
+import com.uxplima.uxmessentials.moderation.application.Unjail;
+import com.uxplima.uxmessentials.moderation.application.Unmute;
+import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.TargetResolver;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * The constructed moderation use cases plus the lookups the inbound adapter needs, bundled so each Brigadier
+ * command and each listener takes one collaborator rather than a dozen. Built once in {@link ModerationWiring}
+ * and shared read-only across the command surface and the login/join listeners.
+ */
+@NullMarked
+public final class ModerationServices {
+
+    private final Mute mute;
+    private final Unmute unmute;
+    private final Jail jail;
+    private final Unjail unjail;
+    private final TempBan tempBan;
+    private final Kick kick;
+    private final KickAll kickAll;
+    private final IssueWarn warn;
+    private final ReviewWarns reviewWarns;
+    private final BanIp banIp;
+    private final UnbanIp unbanIp;
+    private final Freeze freeze;
+    private final Seen seen;
+    private final JailCountdown jailCountdown;
+    private final LoginEnforcement loginEnforcement;
+    private final ModerationRepository repository;
+    private final PlayerLookup players;
+    private final TargetResolver targets;
+
+    ModerationServices(Builder builder) {
+        this.mute = Objects.requireNonNull(builder.mute, "mute");
+        this.unmute = Objects.requireNonNull(builder.unmute, "unmute");
+        this.jail = Objects.requireNonNull(builder.jail, "jail");
+        this.unjail = Objects.requireNonNull(builder.unjail, "unjail");
+        this.tempBan = Objects.requireNonNull(builder.tempBan, "tempBan");
+        this.kick = Objects.requireNonNull(builder.kick, "kick");
+        this.kickAll = Objects.requireNonNull(builder.kickAll, "kickAll");
+        this.warn = Objects.requireNonNull(builder.warn, "warn");
+        this.reviewWarns = Objects.requireNonNull(builder.reviewWarns, "reviewWarns");
+        this.banIp = Objects.requireNonNull(builder.banIp, "banIp");
+        this.unbanIp = Objects.requireNonNull(builder.unbanIp, "unbanIp");
+        this.freeze = Objects.requireNonNull(builder.freeze, "freeze");
+        this.seen = Objects.requireNonNull(builder.seen, "seen");
+        this.jailCountdown = Objects.requireNonNull(builder.jailCountdown, "jailCountdown");
+        this.loginEnforcement = Objects.requireNonNull(builder.loginEnforcement, "loginEnforcement");
+        this.repository = Objects.requireNonNull(builder.repository, "repository");
+        this.players = Objects.requireNonNull(builder.players, "players");
+        this.targets = Objects.requireNonNull(builder.targets, "targets");
+    }
+
+    public Mute mute() {
+        return mute;
+    }
+
+    public Unmute unmute() {
+        return unmute;
+    }
+
+    public Jail jail() {
+        return jail;
+    }
+
+    public Unjail unjail() {
+        return unjail;
+    }
+
+    public TempBan tempBan() {
+        return tempBan;
+    }
+
+    public Kick kick() {
+        return kick;
+    }
+
+    public KickAll kickAll() {
+        return kickAll;
+    }
+
+    public IssueWarn warn() {
+        return warn;
+    }
+
+    public ReviewWarns reviewWarns() {
+        return reviewWarns;
+    }
+
+    public BanIp banIp() {
+        return banIp;
+    }
+
+    public UnbanIp unbanIp() {
+        return unbanIp;
+    }
+
+    public Freeze freeze() {
+        return freeze;
+    }
+
+    public Seen seen() {
+        return seen;
+    }
+
+    public JailCountdown jailCountdown() {
+        return jailCountdown;
+    }
+
+    public LoginEnforcement loginEnforcement() {
+        return loginEnforcement;
+    }
+
+    public ModerationRepository repository() {
+        return repository;
+    }
+
+    public PlayerLookup players() {
+        return players;
+    }
+
+    public TargetResolver targets() {
+        return targets;
+    }
+
+    /** Step builder so {@link ModerationWiring} assembles the bundle field-by-field without a 17-arg call. */
+    @NullMarked
+    static final class Builder {
+        private @org.jspecify.annotations.Nullable Mute mute;
+        private @org.jspecify.annotations.Nullable Unmute unmute;
+        private @org.jspecify.annotations.Nullable Jail jail;
+        private @org.jspecify.annotations.Nullable Unjail unjail;
+        private @org.jspecify.annotations.Nullable TempBan tempBan;
+        private @org.jspecify.annotations.Nullable Kick kick;
+        private @org.jspecify.annotations.Nullable KickAll kickAll;
+        private @org.jspecify.annotations.Nullable IssueWarn warn;
+        private @org.jspecify.annotations.Nullable ReviewWarns reviewWarns;
+        private @org.jspecify.annotations.Nullable BanIp banIp;
+        private @org.jspecify.annotations.Nullable UnbanIp unbanIp;
+        private @org.jspecify.annotations.Nullable Freeze freeze;
+        private @org.jspecify.annotations.Nullable Seen seen;
+        private @org.jspecify.annotations.Nullable JailCountdown jailCountdown;
+        private @org.jspecify.annotations.Nullable LoginEnforcement loginEnforcement;
+        private @org.jspecify.annotations.Nullable ModerationRepository repository;
+        private @org.jspecify.annotations.Nullable PlayerLookup players;
+        private @org.jspecify.annotations.Nullable TargetResolver targets;
+
+        Builder mute(Mute value) {
+            this.mute = value;
+            return this;
+        }
+
+        Builder unmute(Unmute value) {
+            this.unmute = value;
+            return this;
+        }
+
+        Builder jail(Jail value) {
+            this.jail = value;
+            return this;
+        }
+
+        Builder unjail(Unjail value) {
+            this.unjail = value;
+            return this;
+        }
+
+        Builder tempBan(TempBan value) {
+            this.tempBan = value;
+            return this;
+        }
+
+        Builder kick(Kick value) {
+            this.kick = value;
+            return this;
+        }
+
+        Builder kickAll(KickAll value) {
+            this.kickAll = value;
+            return this;
+        }
+
+        Builder warn(IssueWarn value) {
+            this.warn = value;
+            return this;
+        }
+
+        Builder reviewWarns(ReviewWarns value) {
+            this.reviewWarns = value;
+            return this;
+        }
+
+        Builder banIp(BanIp value) {
+            this.banIp = value;
+            return this;
+        }
+
+        Builder unbanIp(UnbanIp value) {
+            this.unbanIp = value;
+            return this;
+        }
+
+        Builder freeze(Freeze value) {
+            this.freeze = value;
+            return this;
+        }
+
+        Builder seen(Seen value) {
+            this.seen = value;
+            return this;
+        }
+
+        Builder jailCountdown(JailCountdown value) {
+            this.jailCountdown = value;
+            return this;
+        }
+
+        Builder loginEnforcement(LoginEnforcement value) {
+            this.loginEnforcement = value;
+            return this;
+        }
+
+        Builder repository(ModerationRepository value) {
+            this.repository = value;
+            return this;
+        }
+
+        Builder players(PlayerLookup value) {
+            this.players = value;
+            return this;
+        }
+
+        Builder targets(TargetResolver value) {
+            this.targets = value;
+            return this;
+        }
+
+        ModerationServices build() {
+            // The constructor validates every field is present; a missing collaborator fails fast there.
+            return new ModerationServices(this);
+        }
+    }
+}

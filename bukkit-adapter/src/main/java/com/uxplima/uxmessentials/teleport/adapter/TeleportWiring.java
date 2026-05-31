@@ -64,7 +64,10 @@ public final class TeleportWiring {
         TeleportSettings settings = new TeleportSettings(config);
         PlayerNotifier notifier = new PlayerNotifier(kernel.messages(), kernel.messageSink());
         WarmupTracker warmupTracker = new WarmupTracker();
-        TeleportServices services = assemble(plugin, kernel, config, settings, notifier, warmupTracker, clock, running);
+        // The jail gate forwards to NEVER until the moderation context lands and rebinds it (soft couple).
+        MutableJailGate jailGate = new MutableJailGate();
+        TeleportServices services =
+                assemble(plugin, kernel, config, settings, notifier, warmupTracker, jailGate, clock, running);
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), running::get);
         return new Wired(
@@ -72,6 +75,7 @@ public final class TeleportWiring {
                 TeleportCommands.all(services, kernel.messages()),
                 listeners(services, config),
                 sweep,
+                jailGate,
                 running);
     }
 
@@ -82,6 +86,7 @@ public final class TeleportWiring {
             TeleportSettings settings,
             PlayerNotifier notifier,
             WarmupTracker warmupTracker,
+            MutableJailGate jailGate,
             Clock clock,
             AtomicBoolean running) {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
@@ -91,8 +96,8 @@ public final class TeleportWiring {
                 new AsyncTeleportExecutor(kernel.scheduler(), backStore, kernel.events(), kernel.log(), clock);
         PrewarmedSafeLocationQueue rtpQueue = rtpQueue(kernel, config, settings, running);
         Warmups warmups = new TrackingWarmups(kernel.warmups(), warmupTracker, settings::cancelToggles);
-        TeleportEngine engine =
-                new TeleportEngine(kernel.cooldowns(), warmups, executor, notifier, kernel.events(), settings);
+        TeleportEngine engine = new TeleportEngine(
+                kernel.cooldowns(), warmups, executor, notifier, kernel.events(), settings, jailGate);
         return new TeleportServices.Builder()
                 .engine(engine)
                 .notifier(notifier)
@@ -105,7 +110,8 @@ public final class TeleportWiring {
                 .executor(executor)
                 .players(kernel.playerLookup())
                 .worlds(kernel.worldLookup())
-                .requestTeleport(new RequestTeleport(requests, flags, notifier, kernel.events(), settings, clock))
+                .requestTeleport(
+                        new RequestTeleport(requests, flags, notifier, kernel.events(), settings, jailGate, clock))
                 .acceptTeleport(new AcceptTeleport(requests, engine, notifier, kernel.events(), clock))
                 .captureBack(new CaptureBack(backStore, engine, notifier, kernel.events(), clock))
                 .resolveRtp(new ResolveRtp(rtpQueue, kernel.worldLookup(), engine, notifier, settings))
@@ -147,6 +153,7 @@ public final class TeleportWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             RequestExpirySweep expirySweep,
+            MutableJailGate jailGate,
             AtomicBoolean running) {
 
         public Wired {
@@ -154,6 +161,7 @@ public final class TeleportWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(expirySweep, "expirySweep");
+            Objects.requireNonNull(jailGate, "jailGate");
             Objects.requireNonNull(running, "running");
         }
 

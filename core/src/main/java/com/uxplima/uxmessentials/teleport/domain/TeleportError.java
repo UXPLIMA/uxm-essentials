@@ -47,7 +47,10 @@ public enum TeleportError {
     RTP_NO_SAFE_LOCATION(TeleportMessageKey.RTP_NO_LOCATION),
 
     /** No spawn (named, mirrored, or default) resolves for the requested world. */
-    SPAWN_UNRESOLVED(TeleportMessageKey.SPAWN_UNRESOLVED);
+    SPAWN_UNRESOLVED(TeleportMessageKey.SPAWN_UNRESOLVED),
+
+    /** The mover is jailed; the moderation context's jail gate blocks every self-initiated teleport. */
+    JAILED(TeleportMessageKey.JAILED);
 
     private final TeleportMessageKey messageKey;
 

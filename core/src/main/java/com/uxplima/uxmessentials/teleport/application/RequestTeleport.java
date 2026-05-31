@@ -9,6 +9,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.RequestRegistry;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFlags;
 import com.uxplima.uxmessentials.teleport.domain.RequestDirection;
@@ -33,6 +34,7 @@ public final class RequestTeleport {
     private final PlayerNotifier notifier;
     private final DomainEventPublisher events;
     private final TeleportSettings settings;
+    private final JailGate jail;
     private final Clock clock;
 
     public RequestTeleport(
@@ -41,12 +43,14 @@ public final class RequestTeleport {
             PlayerNotifier notifier,
             DomainEventPublisher events,
             TeleportSettings settings,
+            JailGate jail,
             Clock clock) {
         this.requests = Objects.requireNonNull(requests, "requests");
         this.flags = Objects.requireNonNull(flags, "flags");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.jail = Objects.requireNonNull(jail, "jail");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -69,6 +73,10 @@ public final class RequestTeleport {
     }
 
     private Optional<TeleportError> gate(PlayerRef requester, PlayerRef target) {
+        if (jail.isJailed(requester)) {
+            notifier.send(requester, TeleportMessageKey.JAILED);
+            return Optional.of(TeleportError.JAILED);
+        }
         if (requester.equals(target)) {
             return Optional.of(TeleportError.SELF_REQUEST);
         }

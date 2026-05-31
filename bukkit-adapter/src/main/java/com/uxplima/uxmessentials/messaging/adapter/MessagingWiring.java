@@ -66,8 +66,11 @@ public final class MessagingWiring {
         MessagingSettings settings = new MessagingSettings(ctx.config());
         AtomicBoolean running = new AtomicBoolean(true);
         Stores stores = stores(plugin, persistence);
-        MessagingServices services =
-                assemble(kernel, settings, stores, mute.orElse(MutePolicy.NEVER), Clock.systemUTC());
+        // The mute gate forwards to NEVER until the moderation context lands and rebinds it (soft couple). If
+        // a real policy is already available it is bound up front; otherwise moderation binds it on wire.
+        MutableMutePolicy mutePolicy = new MutableMutePolicy();
+        mute.ifPresent(mutePolicy::bind);
+        MessagingServices services = assemble(kernel, settings, stores, mutePolicy, Clock.systemUTC());
         MailExpirySweep sweep = new MailExpirySweep(
                 kernel.scheduler(),
                 stores.mail(),
@@ -77,7 +80,7 @@ public final class MessagingWiring {
                 kernel.log(),
                 Clock.systemUTC());
         List<CommandRegistration> commands = MessagingCommands.all(services, kernel.messages(), kernel.messageSink());
-        return new Wired(commands, sweep, stores, running);
+        return new Wired(commands, sweep, stores, mutePolicy, running);
     }
 
     private static MessagingServices assemble(
@@ -142,15 +145,21 @@ public final class MessagingWiring {
      * @param commands the Brigadier command registrations to publish
      * @param expirySweep the self-rescheduling mail-expiry sweep, armed by the caller
      * @param stores the constructed stores, for the stop-time drain of the transient ones
+     * @param mutePolicy the rebindable mute gate the moderation context fills in when it wires
      * @param running the flag flipped false on stop so the sweep exits
      */
     public record Wired(
-            List<CommandRegistration> commands, MailExpirySweep expirySweep, Stores stores, AtomicBoolean running) {
+            List<CommandRegistration> commands,
+            MailExpirySweep expirySweep,
+            Stores stores,
+            MutableMutePolicy mutePolicy,
+            AtomicBoolean running) {
 
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(expirySweep, "expirySweep");
             Objects.requireNonNull(stores, "stores");
+            Objects.requireNonNull(mutePolicy, "mutePolicy");
             Objects.requireNonNull(running, "running");
         }
 

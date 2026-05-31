@@ -48,6 +48,9 @@ public enum TeleportMessageKey implements MessageKey {
     TP_DONE("teleport.tp.done"),
     TP_NO_TARGET_BLOCK("teleport.tp.no-target-block"),
 
+    // a jailed player may not self-teleport — the moderation context's JailGate denies it here
+    JAILED("teleport.jailed"),
+
     // shared cooldown / warmup feedback owned by the teleport tiers
     COOLDOWN_ACTIVE("teleport.cooldown.active"),
     WARMUP_STARTED("teleport.warmup.started"),

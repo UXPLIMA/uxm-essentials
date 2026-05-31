@@ -107,7 +107,8 @@ class TeleportEngineTest {
                 executor,
                 new PlayerNotifier(new NoopMessages(), new NoopSink()),
                 new NoopEvents(),
-                new TeleportSettings(new PhaseConfig(phase)));
+                new TeleportSettings(new PhaseConfig(phase)),
+                com.uxplima.uxmessentials.teleport.application.port.JailGate.NEVER);
     }
 
     /** A minimal {@link ConfigStore} that drives only the cooldown-start-phase the engine reads. */

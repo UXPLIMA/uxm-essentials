@@ -12,6 +12,8 @@ import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
+import com.uxplima.uxmessentials.messaging.adapter.MutableMutePolicy;
+import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
@@ -22,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
@@ -105,9 +108,11 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(ctx, resources);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
-            wireMessaging(plugin, ctx, persistence, resources);
+            wireMessaging(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources);
+        } else if (module.id().equals(ModuleId.of("moderation"))) {
+            wireModeration(plugin, ctx, persistence, resources, links);
         }
     }
 
@@ -119,6 +124,8 @@ public final class PluginModule {
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.teleportEngine = wired.services().engine();
+        // Captured for moderation, which lands later and rebinds this jail gate to the real jail policy.
+        links.jailGate = wired.jailGate();
     }
 
     private static void wireHomes(
@@ -169,14 +176,54 @@ public final class PluginModule {
     }
 
     private static void wireMessaging(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
         // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its transient reply /
-        // socialspy / toggle stores in-memory/PDC. The mute gate is left empty (moderation has not landed),
-        // so the wiring binds MutePolicy.NEVER; the vanish gate degrades to "fully visible" without presence.
+        // socialspy / toggle stores in-memory/PDC. The mute gate starts on MutePolicy.NEVER and is captured
+        // here so moderation rebinds it when it lands; the vanish gate degrades to "fully visible" without
+        // presence.
         MessagingWiring.Wired wired = MessagingWiring.wire(plugin, ctx, persistence, Optional.empty());
         wired.commands().forEach(resources::addCommand);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
+        links.mutePolicy = wired.mutePolicy();
+    }
+
+    private static void wireModeration(
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
+        // moderation builds its jOOQ ModerationRepository over persistence.dsl(), the audit logger on the
+        // dedicated audit channel, and the login/join/freeze listeners. It rebinds the messaging mute gate and
+        // the teleport jail gate captured during their wiring to the real policies — when either context is
+        // disabled its holder is absent, so the bind is a no-op and that gate stays NEVER.
+        ModerationWiring.GateSinks gates =
+                new ModerationWiring.GateSinks(policy -> bindMute(links, policy), gate -> bindJail(links, gate));
+        ModerationWiring.Wired wired = ModerationWiring.wire(plugin, ctx, persistence, gates);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::stop);
+    }
+
+    private static void bindMute(
+            ContextLinks links, com.uxplima.uxmessentials.messaging.application.port.MutePolicy policy) {
+        MutableMutePolicy holder = links.mutePolicy;
+        if (holder != null) {
+            holder.bind(policy);
+        }
+    }
+
+    private static void bindJail(
+            ContextLinks links, com.uxplima.uxmessentials.teleport.application.port.JailGate gate) {
+        MutableJailGate holder = links.jailGate;
+        if (holder != null) {
+            holder.bind(gate);
+        }
     }
 
     private static void wirePresence(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
@@ -195,6 +242,8 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable TeleportEngine teleportEngine;
         private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
+        private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
+        private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
     }
 
     private static boolean skippedByCapability(FeatureModule module, ModuleContext ctx, Logger log) {

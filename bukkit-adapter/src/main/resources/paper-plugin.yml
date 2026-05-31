@@ -304,3 +304,39 @@ permissions:
   uxmessentials.vanish.persist:
     description: 'Remain vanished across a relog instead of reappearing on join.'
     default: op
+  # moderation context (docs/permissions.md "Moderation"). Lightweight per-player mute / jail / tempban; every
+  # action is audit-logged and permission-gated. A muted player cannot /msg (messaging gate) and a jailed
+  # player cannot /home or /tpa (teleport gate). The exempt node is target-side immunity.
+  uxmessentials.moderation.mute:
+    description: '/mute <player> [duration] [reason] (/tempmute is the explicit duration alias).'
+    default: op
+  uxmessentials.moderation.unmute:
+    description: '/unmute <player>.'
+    default: op
+  uxmessentials.moderation.jail:
+    description: '/jail <player> <jail> [duration] [reason]; online-only or wall-clock countdown per config.'
+    default: op
+  uxmessentials.moderation.unjail:
+    description: '/unjail <player>.'
+    default: op
+  uxmessentials.moderation.tempban:
+    description: '/tempban <player> <duration> [reason].'
+    default: op
+  uxmessentials.moderation.kick:
+    description: '/kick <player> [reason]; /kickall [reason] to clear non-exempt players.'
+    default: op
+  uxmessentials.moderation.warn:
+    description: '/warn <player> [reason] and /warns <player> — issue and review warning history.'
+    default: op
+  uxmessentials.moderation.banip:
+    description: '/banip <player|ip> [reason] / /unbanip <ip> — IP ban with stored-IP alt detection.'
+    default: op
+  uxmessentials.moderation.freeze:
+    description: '/freeze <player> / /unfreeze <player> — pin a player in place pending review.'
+    default: op
+  uxmessentials.moderation.seen:
+    description: '/seen <player> and /seenip <player> — last-seen / last-IP lookup, surfaces alts.'
+    default: op
+  uxmessentials.moderation.exempt:
+    description: 'Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff.'
+    default: op

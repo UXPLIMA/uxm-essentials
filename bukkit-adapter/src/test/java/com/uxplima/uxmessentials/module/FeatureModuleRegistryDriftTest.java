@@ -36,16 +36,16 @@ class FeatureModuleRegistryDriftTest {
     void defaultRegistryExposesAnImmutableDeduplicatedSet() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
 
-        // teleport, homes, economy, warps, kits, playerstate, messaging and presence are the landed contexts,
-        // registered dependency-first: teleport before the homes/warps contexts that delegate teleport
-        // execution to it, and economy before warps and kits because each may charge a cost through the
-        // economy provider. playerstate is self-contained (transient in-memory snapshots, no DB, no
+        // teleport, homes, economy, warps, kits, playerstate, messaging, presence and moderation are the
+        // landed contexts, registered dependency-first: teleport before the homes/warps contexts that delegate
+        // teleport execution to it, and economy before warps and kits because each may charge a cost through
+        // the economy provider. playerstate is self-contained (transient in-memory snapshots, no DB, no
         // cross-context bridge) and lands after kits. messaging soft-couples to moderation (mute) and
-        // presence (vanish) — both gates degrade gracefully — so it carries no hard dependency edge and lands
-        // after playerstate. presence owns the vanish state messaging and teleport read through the canSee
-        // graph; that coupling is soft, so presence carries no hard edge and lands after the contexts it
-        // informs. The registry is a valid, immutable, ordered set that resolves each by id and rejects a
-        // not-yet-landed context.
+        // presence (vanish) — both gates degrade gracefully — so it carries no hard dependency edge. presence
+        // owns the vanish state messaging and teleport read through the canSee graph; that coupling is soft.
+        // moderation provides the real mute/jail gates messaging and teleport hold placeholders for, a soft
+        // couple too, so it lands last. The registry is a valid, immutable, ordered set that resolves each by
+        // id and rejects a not-yet-landed context.
         assertThat(registry.byId(ModuleId.of("teleport"))).isPresent();
         assertThat(registry.byId(ModuleId.of("homes"))).isPresent();
         assertThat(registry.byId(ModuleId.of("economy"))).isPresent();
@@ -54,10 +54,18 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("playerstate"))).isPresent();
         assertThat(registry.byId(ModuleId.of("messaging"))).isPresent();
         assertThat(registry.byId(ModuleId.of("presence"))).isPresent();
-        assertThat(registry.byId(ModuleId.of("moderation"))).isEmpty();
+        assertThat(registry.byId(ModuleId.of("moderation"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
-                        "teleport", "homes", "economy", "warps", "kits", "playerstate", "messaging", "presence");
+                        "teleport",
+                        "homes",
+                        "economy",
+                        "warps",
+                        "kits",
+                        "playerstate",
+                        "messaging",
+                        "presence",
+                        "moderation");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }

@@ -2,6 +2,14 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [P6] - 2026-05-31
+
+Moderation.
+
+- Moderation context: mute, jail and tempban as the core escalation surface, plus kick, warn, banip (with alt-detection), freeze and seen, all backed by a DB-backed `ModerationProfile`.
+- Every action is audit-logged and permission-gated, with ban-on-login enforcement so banned players are rejected at the door.
+- Cross-wired into existing contexts: mute gates messaging delivery and jail gates teleport, so a punishment in the moderation context is enforced where the behaviour actually happens.
+
 ## [P5] - 2026-05-31
 
 Messaging, mail and presence.
