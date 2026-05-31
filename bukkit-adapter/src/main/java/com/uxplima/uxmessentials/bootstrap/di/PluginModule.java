@@ -11,8 +11,10 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
+import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
+import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -102,6 +104,10 @@ public final class PluginModule {
             wireKits(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(ctx, resources);
+        } else if (module.id().equals(ModuleId.of("messaging"))) {
+            wireMessaging(plugin, ctx, persistence, resources);
+        } else if (module.id().equals(ModuleId.of("presence"))) {
+            wirePresence(plugin, ctx, resources);
         }
     }
 
@@ -160,6 +166,28 @@ public final class PluginModule {
         PlayerstateWiring.Wired wired = PlayerstateWiring.wire(ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+    }
+
+    private static void wireMessaging(
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its transient reply /
+        // socialspy / toggle stores in-memory/PDC. The mute gate is left empty (moderation has not landed),
+        // so the wiring binds MutePolicy.NEVER; the vanish gate degrades to "fully visible" without presence.
+        MessagingWiring.Wired wired = MessagingWiring.wire(plugin, ctx, persistence, Optional.empty());
+        wired.commands().forEach(resources::addCommand);
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
+    }
+
+    private static void wirePresence(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Its
+        // BukkitVisibilityApplier drives the canSee graph that messaging's /msg resolution and teleport's /tpa
+        // listing already read, so the vanish soft-couple needs no extra cross-context handle wired here.
+        PresenceWiring.Wired wired = PresenceWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
     }
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */

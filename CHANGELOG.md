@@ -2,6 +2,22 @@
 
 All notable changes to uxmEssentials are documented in this file.
 
+## [P5] - 2026-05-31
+
+Messaging, mail and presence.
+
+- Messaging context: private direct messages with a reply target carrying a TTL so `/r` expires gracefully, persistent text-only mail delivered to offline players and read on login, and the `/ignore`, `/socialspy`, and `/helpop` surface, all vanish-aware so hidden staff stay hidden in delivery and conversation routing.
+- Presence context: automatic and manual AFK with vanish support, an in-memory `PlayerPresence` model, a sweep timer that ages idle players into AFK, and integration with the visibility layer so presence transitions respect who can see whom.
+- Tests for the messaging domain/use cases and persistence, plus the presence model and sweep behaviour.
+
+## [P4] - 2026-05-31
+
+Kits and player-state contexts.
+
+- Kits context: config-driven kit definitions with per-kit cooldown/one-time claim tracking persisted via PDC, permission gating plus an optional economy cost soft-coupled through the economy port, and the authoring command surface (`/createkit`, `/delkit`, `/kiteditor`, `/kitreset`, `/showkit`, `/kits`, `/kit`).
+- Player-state context: an immutable per-player snapshot held in a `ConcurrentHashMap` and reconciled on the owning region thread, covering god/fly/heal/feed/gamemode/speed plus utility verbs (`/extinguish`, `/suicide`, `/near`, `/nightvision`, `/ptime`, `/pweather`).
+- Tests for the kit domain/use cases and claim store, plus the player-state snapshot, value objects, use cases, and region-thread reconciliation.
+
 ## [P3] - 2026-05-30
 
 Economy context and provider abstraction.

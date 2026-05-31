@@ -253,3 +253,54 @@ permissions:
   uxmessentials.playerstate.others:
     description: 'Use any playerstate command with a [player] target other than yourself.'
     default: op
+  # messaging context (docs/permissions.md "Messaging"). Direct PM + persistent mail only (no public
+  # chat — out of charter). Delivery is ignore-aware, mute-gated (the moderation context gates outbound
+  # messaging), and reply-TTL bounded; a vanished target is hidden from /msg resolution (presence context).
+  uxmessentials.msg.use:
+    description: '/msg <player> <text> to send a private message.'
+    default: true
+  uxmessentials.msg.reply:
+    description: '/reply <text> to answer your last conversation (reply-TTL bounded).'
+    default: true
+  uxmessentials.msg.toggle:
+    description: '/msgtoggle to refuse incoming /msg / /reply (mail still delivers).'
+    default: true
+  uxmessentials.msg.ignore:
+    description: '/ignore <player> / /unignore <player> to manage your own ignore list.'
+    default: true
+  uxmessentials.mail.use:
+    description: '/mail read / /mail send <player> <text> / /mail clear (/mailclear) — persistent offline mail.'
+    default: true
+  uxmessentials.helpop.use:
+    description: '/helpop <text> to open a player-to-staff support request.'
+    default: true
+  uxmessentials.helpop.receive:
+    description: 'Receive /helpop requests (staff side).'
+    default: op
+  uxmessentials.msg.color:
+    description: 'Render MiniMessage tags in PM/mail bodies (default plain text).'
+    default: op
+  uxmessentials.msg.socialspy:
+    description: '/socialspy to observe other players'' private messages (staff).'
+    default: op
+  uxmessentials.msg.bypass.ignore:
+    description: 'Reach a player who has ignored you (staff).'
+    default: op
+  # presence context (docs/permissions.md "Presence"). AFK is auto (idle sweep) + manual (/afk); vanish is
+  # staff-only and is honoured by /list, tab, messaging /msg resolution and teleport /tpa visibility through
+  # the canSee graph the presence VisibilityApplier drives.
+  uxmessentials.afk.use:
+    description: '/afk [reason] to toggle your AFK state (auto-AFK also applies on idle).'
+    default: true
+  uxmessentials.afk.kick.exempt:
+    description: 'Never auto-kicked for being AFK past the configured timeout.'
+    default: op
+  uxmessentials.vanish.use:
+    description: '/vanish to become invisible to other players; suppresses fake join/quit.'
+    default: op
+  uxmessentials.vanish.see:
+    description: 'See other vanished players (staff-among-staff visibility) and target them with /tp.'
+    default: op
+  uxmessentials.vanish.persist:
+    description: 'Remain vanished across a relog instead of reappearing on join.'
+    default: op

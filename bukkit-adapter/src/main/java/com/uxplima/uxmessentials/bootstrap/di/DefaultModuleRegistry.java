@@ -6,7 +6,9 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
 import com.uxplima.uxmessentials.kits.application.KitsModule;
+import com.uxplima.uxmessentials.messaging.application.MessagingModule;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
+import com.uxplima.uxmessentials.presence.application.PresenceModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
@@ -46,6 +48,14 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // playerstate is self-contained — transient in-memory snapshots, no DB and no cross-context bridge —
         // so its position is not dependency-constrained; it lands after kits.
         delegate.register(new PlayerstateModule());
+        // messaging soft-couples to moderation (mute-gated sending) and presence (vanish-aware /msg
+        // resolution); both gates degrade gracefully when the other module is off, so messaging carries no
+        // hard dependency edge and lands here independently of either.
+        delegate.register(new MessagingModule());
+        // presence owns the vanish state that messaging's /msg resolution and teleport's /tpa listing read
+        // through the canSee graph; that coupling is soft (both degrade to "fully visible" without presence),
+        // so presence carries no hard dependency edge and lands after the contexts it informs.
+        delegate.register(new PresenceModule());
         //   … through VaultsModule. The shared kernel is not a module and never appears here.
     }
 
