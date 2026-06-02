@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
@@ -115,9 +116,9 @@ public final class PluginModule {
     }
 
     private static void applyCatalog(JavaPlugin plugin, KernelPorts kernel, CloseableResources resources) {
-        List<CommandDefinition> defs = resources.registered().stream()
+        List<CommandDefinition> defs = CommandAliasDefaults.augment(resources.registered().stream()
                 .map(r -> new CommandDefinition(new CommandId(r.commandId()), r.defaultName(), r.defaultAliases()))
-                .toList();
+                .toList());
         Map<String, CommandOverride> overrides =
                 new CommandCatalogConfig(plugin.getDataFolder().toPath(), kernel.log()).load();
         CommandCatalog.Resolution resolution = CommandCatalog.resolve(defs, overrides);
