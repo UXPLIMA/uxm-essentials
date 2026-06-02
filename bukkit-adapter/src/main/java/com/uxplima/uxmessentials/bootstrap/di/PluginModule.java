@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.bootstrap.di;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,6 +46,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
+import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.command.CommandOverride;
@@ -123,9 +127,31 @@ public final class PluginModule {
                 new CommandCatalogConfig(plugin.getDataFolder().toPath(), kernel.log()).load();
         CommandCatalog.Resolution resolution = CommandCatalog.resolve(defs, overrides);
         resolution.warnings().forEach(w -> kernel.log().warn("command catalog: {}", w.message()));
+        // Seed the editable file from the resolved surface so a fresh install lands a self-documenting
+        // commands.conf instead of an empty folder the catalog would silently ignore.
+        writeDefaultCatalog(plugin, resolution.effective(), kernel.log());
         Map<String, EffectiveCommand> byId =
                 resolution.effective().stream().collect(Collectors.toMap(e -> e.id().value(), e -> e));
         resources.catalogBinding(new CatalogBinding(byId));
+    }
+
+    private static void writeDefaultCatalog(
+            JavaPlugin plugin,
+            List<EffectiveCommand> effective,
+            com.uxplima.uxmessentials.shared.application.port.Logger log) {
+        // Skip if any commands/ directory already exists: an operator who created or split the file keeps
+        // full control, and renames/alias edits survive every restart and upgrade untouched.
+        Path dir = plugin.getDataFolder().toPath().resolve("commands");
+        if (Files.exists(dir)) {
+            return;
+        }
+        try {
+            Files.createDirectories(dir);
+            Files.writeString(dir.resolve("commands.conf"), CommandCatalogRenderer.render(effective));
+            log.info("wrote default command catalog with {} commands", effective.size());
+        } catch (IOException failure) {
+            log.error("failed to write default command catalog to " + dir, failure);
+        }
     }
 
     private static void registerPlaceholders(
