@@ -62,3 +62,5 @@ AGENTS.md
 
 # Autonomous build state (local only)
 /.uxmess-build-state.json
+/.uxmess-autotask-state.json
+/.claude-autotask/
