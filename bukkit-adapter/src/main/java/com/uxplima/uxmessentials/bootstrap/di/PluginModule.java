@@ -1,8 +1,11 @@
 package com.uxplima.uxmessentials.bootstrap.di;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -25,9 +28,11 @@ import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitCooldownPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
@@ -36,6 +41,11 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
+import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
+import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
+import com.uxplima.uxmessentials.shared.application.command.CommandId;
+import com.uxplima.uxmessentials.shared.application.command.CommandOverride;
+import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -98,7 +108,23 @@ public final class PluginModule {
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
+        // Resolved last, once every module and the bootstrap commands have contributed, so the catalog sees
+        // the full default surface before it applies the operator's rename/alias/disable choices.
+        applyCatalog(plugin, kernel, resources);
         return resources;
+    }
+
+    private static void applyCatalog(JavaPlugin plugin, KernelPorts kernel, CloseableResources resources) {
+        List<CommandDefinition> defs = resources.registered().stream()
+                .map(r -> new CommandDefinition(new CommandId(r.commandId()), r.defaultName(), r.defaultAliases()))
+                .toList();
+        Map<String, CommandOverride> overrides =
+                new CommandCatalogConfig(plugin.getDataFolder().toPath(), kernel.log()).load();
+        CommandCatalog.Resolution resolution = CommandCatalog.resolve(defs, overrides);
+        resolution.warnings().forEach(w -> kernel.log().warn("command catalog: {}", w.message()));
+        Map<String, EffectiveCommand> byId =
+                resolution.effective().stream().collect(Collectors.toMap(e -> e.id().value(), e -> e));
+        resources.catalogBinding(new CatalogBinding(byId));
     }
 
     private static void registerPlaceholders(
