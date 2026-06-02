@@ -1,0 +1,106 @@
+package com.uxplima.uxmessentials.presence.adapter.inbound.command;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
+import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * {@code /realname <player>} ({@code uxmessentials.realname.use}): resolve a display name back to the underlying
+ * account name, the inverse of the cosmetic rename a chat plugin or nickname feature applies. The query matches
+ * either a player's account name or their rendered display name, case-insensitively, against the online set
+ * filtered through the sender's {@code canSee} graph — the same seam {@code /list}, {@code /msg} and {@code /tpa}
+ * read — so a vanished player the sender may not see is unresolvable, never revealing a name they could not
+ * otherwise learn. The console has no {@code canSee} graph and may resolve anyone. A pure read: no use case, no
+ * state mutation, just a scan of the visible online set and one resolved reply.
+ */
+@NullMarked
+public final class RealnameCommand extends PresenceCommandSupport implements CommandRegistration {
+
+    private static final String PERMISSION = "uxmessentials.realname.use";
+    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
+
+    public RealnameCommand(PresenceServices services, Messages messages) {
+        super(services, messages);
+    }
+
+    @Override
+    public LiteralCommandNode<CommandSourceStack> build() {
+        return Commands.literal("realname")
+                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .then(Commands.argument("player", StringArgumentType.word()).executes(this::run))
+                .build();
+    }
+
+    @Override
+    public List<String> aliases() {
+        return List.of();
+    }
+
+    @Override
+    public String description() {
+        return "Look up a player's real name.";
+    }
+
+    private int run(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String query = StringArgumentType.getString(ctx, "player");
+        PlayerRef viewer = viewerRef(sender);
+        Player match = findVisibleMatch(sender, query);
+        if (match == null) {
+            reply(sender, viewer, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query));
+            return Command.SINGLE_SUCCESS;
+        }
+        String display = PLAIN.serialize(match.displayName());
+        reply(sender, viewer, PresenceMessageKey.REALNAME_RESULT, Map.of("display", display, "name", match.getName()));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** First online player the sender may see whose account or display name matches {@code query}, else {@code null}. */
+    private @Nullable Player findVisibleMatch(CommandSender sender, String query) {
+        Player viewer = sender instanceof Player player ? player : null;
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            if (viewer != null && !viewer.canSee(target)) {
+                continue;
+            }
+            if (target.getName().equalsIgnoreCase(query)
+                    || PLAIN.serialize(target.displayName()).equalsIgnoreCase(query)) {
+                return target;
+            }
+        }
+        return null;
+    }
+
+    private void reply(CommandSender sender, PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+        sender.sendMessage(MiniMessage.miniMessage().deserialize(messages.resolve(viewer, key, placeholders)));
+    }
+
+    private static PlayerRef viewerRef(CommandSender sender) {
+        if (sender instanceof Player player) {
+            return ref(player);
+        }
+        return new PlayerRef(new UUID(0L, 0L), sender.getName());
+    }
+}

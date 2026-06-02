@@ -15,10 +15,10 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * stays small and the command/permission pairing is one greppable table the permissions guard checks against
  * {@code paper-plugin.yml}.
  *
- * <p>Three commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /vanish}
- * ({@code uxmessentials.vanish.use}), and {@code /list} ({@code uxmessentials.list.use}). The vanish-see node
- * ({@code uxmessentials.vanish.see}) gates visibility, not a command, so it is enforced in the
- * {@code VisibilityApplier} rather than declared as a literal here.
+ * <p>Four commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /vanish}
+ * ({@code uxmessentials.vanish.use}), {@code /list} ({@code uxmessentials.list.use}), and {@code /realname <player>}
+ * ({@code uxmessentials.realname.use}). The vanish-see node ({@code uxmessentials.vanish.see}) gates visibility,
+ * not a command, so it is enforced in the {@code VisibilityApplier} rather than declared as a literal here.
  */
 final class PresenceCommandSurface {
 
@@ -28,7 +28,8 @@ final class PresenceCommandSurface {
         return List.of(
                 spec("afk", "uxmessentials.afk.use", cmd("afk", "Toggle your AFK state")),
                 spec("vanish", "uxmessentials.vanish.use", cmd("vanish", "Toggle staff vanish")),
-                spec("list", "uxmessentials.list.use", cmd("list", "List online players")));
+                spec("list", "uxmessentials.list.use", cmd("list", "List online players")),
+                spec("realname", "uxmessentials.realname.use", cmd("realname", "Look up a player's real name")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

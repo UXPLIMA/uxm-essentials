@@ -29,7 +29,11 @@ public enum PresenceMessageKey implements MessageKey {
     VANISH_OFF("vanish.off"),
 
     // /list — the vanish-aware online roster
-    LIST_PLAYERS("list.players");
+    LIST_PLAYERS("list.players"),
+
+    // /realname — resolve a visible player's display name to their account name
+    REALNAME_RESULT("presence.realname-result"),
+    REALNAME_NOT_FOUND("presence.realname-not-found");
 
     private final String key;
 
