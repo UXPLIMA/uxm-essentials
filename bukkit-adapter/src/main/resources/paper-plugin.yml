@@ -237,6 +237,9 @@ permissions:
   uxmessentials.foodlevel.use:
     description: '/foodlevel <amount> [player] to set a player''s food level.'
     default: op
+  uxmessentials.health.use:
+    description: '/health <amount> [player] to set a player''s health.'
+    default: op
   uxmessentials.gamemode.use:
     description: '/gamemode <mode> [player] and the /gmc /gms /gma /gmsp aliases.'
     default: op

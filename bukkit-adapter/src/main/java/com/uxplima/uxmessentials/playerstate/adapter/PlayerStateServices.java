@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.playerstate.application.SetAir;
 import com.uxplima.uxmessentials.playerstate.application.SetExperience;
 import com.uxplima.uxmessentials.playerstate.application.SetFoodLevel;
 import com.uxplima.uxmessentials.playerstate.application.SetGamemode;
+import com.uxplima.uxmessentials.playerstate.application.SetHealth;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalTime;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalWeather;
 import com.uxplima.uxmessentials.playerstate.application.SetSpeed;
@@ -36,6 +37,7 @@ import org.jspecify.annotations.NullMarked;
  * @param heal {@code /heal}
  * @param feed {@code /feed}
  * @param foodLevel {@code /foodlevel}
+ * @param health {@code /health}
  * @param setGamemode {@code /gamemode} and its {@code /gmc /gms /gma /gmsp} aliases
  * @param setSpeed {@code /speed}, {@code /walkspeed}, {@code /flyspeed}
  * @param extinguish {@code /ext} ({@code /extinguish})
@@ -60,6 +62,7 @@ public record PlayerStateServices(
         Heal heal,
         Feed feed,
         SetFoodLevel foodLevel,
+        SetHealth health,
         SetGamemode setGamemode,
         SetSpeed setSpeed,
         Extinguish extinguish,
@@ -83,6 +86,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(heal, "heal");
         Objects.requireNonNull(feed, "feed");
         Objects.requireNonNull(foodLevel, "foodLevel");
+        Objects.requireNonNull(health, "health");
         Objects.requireNonNull(setGamemode, "setGamemode");
         Objects.requireNonNull(setSpeed, "setSpeed");
         Objects.requireNonNull(extinguish, "extinguish");

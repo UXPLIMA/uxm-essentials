@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.playerstate.application.SetAir;
 import com.uxplima.uxmessentials.playerstate.application.SetExperience;
 import com.uxplima.uxmessentials.playerstate.application.SetFoodLevel;
 import com.uxplima.uxmessentials.playerstate.application.SetGamemode;
+import com.uxplima.uxmessentials.playerstate.application.SetHealth;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalTime;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalWeather;
 import com.uxplima.uxmessentials.playerstate.application.SetSpeed;
@@ -95,6 +96,7 @@ public final class PlayerstateWiring {
                 new Heal(effects, notifier, events, clock, healRemovesEffects),
                 new Feed(effects, notifier, events, clock),
                 new SetFoodLevel(effects, notifier),
+                new SetHealth(effects, notifier),
                 new SetGamemode(store, reconciler, notifier, events, clock),
                 new SetSpeed(store, reconciler, notifier, events, clock),
                 new Extinguish(effects, notifier),

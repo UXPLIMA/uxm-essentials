@@ -40,6 +40,10 @@ public enum PlayerstateMessageKey implements MessageKey {
     FOOD_SET("playerstate.foodlevel.set"),
     FOOD_SET_OTHER("playerstate.foodlevel.set-other"),
 
+    // /health
+    HEALTH_SET("playerstate.health.set"),
+    HEALTH_SET_OTHER("playerstate.health.set-other"),
+
     // /gamemode
     GAMEMODE_SET("playerstate.gamemode.self"),
     GAMEMODE_SET_OTHER("playerstate.gamemode.other"),

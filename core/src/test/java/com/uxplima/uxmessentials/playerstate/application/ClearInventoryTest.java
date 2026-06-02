@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
+import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -118,6 +119,9 @@ class ClearInventoryTest {
 
         @Override
         public void setFoodLevel(PlayerRef who, FoodLevel value) {}
+
+        @Override
+        public void setHealth(PlayerRef who, HealthLevel value) {}
 
         @Override
         public void resetRest(PlayerRef who) {}

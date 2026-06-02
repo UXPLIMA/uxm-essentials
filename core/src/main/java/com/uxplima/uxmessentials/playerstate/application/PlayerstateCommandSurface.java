@@ -33,6 +33,7 @@ final class PlayerstateCommandSurface {
                 spec("heal", "uxmessentials.heal.use", cmd("heal", "Restore health")),
                 spec("feed", "uxmessentials.feed.use", cmd("feed", "Restore hunger")),
                 spec("foodlevel", "uxmessentials.foodlevel.use", cmd("foodlevel", "Set a player's food level")),
+                spec("health", "uxmessentials.health.use", cmd("health", "Set a player's health")),
                 spec("gamemode", "uxmessentials.gamemode.use", cmd("gamemode", "Set game mode")),
                 spec("speed", "uxmessentials.speed.use", cmd("speed", "Set walk and fly speed")),
                 spec("flyspeed", "uxmessentials.speed.use", cmd("flyspeed", "Set fly speed")),

@@ -31,6 +31,7 @@ public final class PlayerStateCommands {
                 new HealCommand(services, messages),
                 new FeedCommand(services, messages),
                 new FoodLevelCommand(services, messages),
+                new HealthCommand(services, messages),
                 new GamemodeCommand(services, messages),
                 new GamemodeAliasCommand("gmc", GameModeRef.CREATIVE, services, messages),
                 new GamemodeAliasCommand("gms", GameModeRef.SURVIVAL, services, messages),
