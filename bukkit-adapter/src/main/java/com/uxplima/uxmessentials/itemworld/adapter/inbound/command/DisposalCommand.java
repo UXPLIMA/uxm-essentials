@@ -1,12 +1,14 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
-import org.bukkit.Bukkit;
+import java.util.Map;
+
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
@@ -16,20 +18,24 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.gui.StorageGui;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /disposal} (alias {@code /trash}): open a throwaway window — anything left inside when it closes is
- * discarded. The window is a fresh, holder-less double-chest inventory backed by nothing: items dropped into
- * it are never written to a real container, so closing the view silently drops them. Opening is entity-bound,
- * so it is scheduled on the player's region thread through the kernel {@code Scheduler}, then reported through
- * {@link ItemworldMessageKey#DISPOSAL_OPENED}.
+ * discarded. The window is a fresh uxmLib {@link StorageGui} backed by nothing: items dropped into it are
+ * never written to a real container and the menu has no close handler, so closing the view silently drops
+ * them. Opening is entity-bound, so it is scheduled on the player's region thread through the kernel
+ * {@code Scheduler}, then reported through {@link ItemworldMessageKey#DISPOSAL_OPENED}.
  */
 @NullMarked
 public final class DisposalCommand extends ItemworldCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.disposal.use";
-    private static final int DISPOSAL_SLOTS = 54;
+    private static final int DISPOSAL_ROWS = 6;
+
+    private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
     public DisposalCommand(ItemworldServices services) {
         super(services, "disposal", SubFeatureGroup.CLEANUP, "Open a throwaway window.");
@@ -63,10 +69,16 @@ public final class DisposalCommand extends ItemworldCommandSupport implements Co
         }
         PlayerRef viewer = ref(player);
         services.kernel().scheduler().onEntity(viewer, () -> {
-            Inventory disposal = Bukkit.createInventory((InventoryHolder) null, DISPOSAL_SLOTS);
-            player.openInventory(disposal);
+            StorageGui disposal =
+                    Guis.storage().title(title(viewer)).rows(DISPOSAL_ROWS).build();
+            disposal.open(player);
             reply(ctx, ItemworldMessageKey.DISPOSAL_OPENED);
         });
         return Command.SINGLE_SUCCESS;
+    }
+
+    private Component title(PlayerRef viewer) {
+        return miniMessage.deserialize(
+                services.kernel().messages().resolve(viewer, ItemworldMessageKey.DISPOSAL_TITLE, Map.of()));
     }
 }

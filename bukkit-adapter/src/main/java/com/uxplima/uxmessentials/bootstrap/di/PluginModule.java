@@ -49,6 +49,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
+import com.uxplima.uxmlib.gui.Guis;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -143,6 +144,8 @@ public final class PluginModule {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
+        // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires.
+        Guis.install(plugin);
         for (FeatureModule module : registry.enabledModules(config)) {
             ConfigStore moduleConfig = config.scoped(module.id().configRoot());
             ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);

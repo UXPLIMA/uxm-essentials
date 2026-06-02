@@ -70,6 +70,7 @@ public enum ItemworldMessageKey implements MessageKey {
 
     // Cleanup — /disposal
     DISPOSAL_OPENED("itemworld.disposal.opened"),
+    DISPOSAL_TITLE("itemworld.disposal.title"),
     // /condense
     CONDENSE_DONE("itemworld.condense.done"),
     CONDENSE_NOTHING("itemworld.condense.nothing"),
