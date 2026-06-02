@@ -64,6 +64,12 @@ public enum PlayerstateMessageKey implements MessageKey {
     INVENTORY_CLEARED("playerstate.clearinventory.self"),
     INVENTORY_CLEARED_OTHER("playerstate.clearinventory.other"),
 
+    // /invsee
+    INVSEE_OPENED("playerstate.invsee.opened"),
+
+    // /endersee
+    ENDERSEE_OPENED("playerstate.endersee.opened"),
+
     // /suicide
     SUICIDE("playerstate.suicide"),
 

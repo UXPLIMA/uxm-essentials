@@ -252,6 +252,12 @@ permissions:
   uxmessentials.clearinventory.use:
     description: '/clearinventory (/ci /clear) [player] to empty a player''s inventory.'
     default: op
+  uxmessentials.invsee.use:
+    description: '/invsee [player] to view a player''s inventory.'
+    default: op
+  uxmessentials.endersee.use:
+    description: '/endersee [player] to view a player''s ender chest.'
+    default: op
   uxmessentials.suicide.use:
     description: '/suicide to kill yourself.'
     default: true

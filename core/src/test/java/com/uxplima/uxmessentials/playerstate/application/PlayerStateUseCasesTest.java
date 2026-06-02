@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 
+import com.uxplima.uxmessentials.playerstate.application.port.InventoryViewer;
 import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
@@ -254,6 +255,26 @@ class PlayerStateUseCasesTest {
     }
 
     @Test
+    void openInventoryViewOpensTheSubjectsInventoryForTheViewer() {
+        RecordingInventoryViewer viewer = new RecordingInventoryViewer();
+        OpenContainer open = new OpenContainer(viewer, notifier);
+
+        open.openInventory(alice, bob);
+
+        assertThat(viewer.inventoryViews).containsEntry(alice.uuid(), bob.uuid());
+    }
+
+    @Test
+    void openEnderChestViewOpensTheSubjectsEnderChestForTheViewer() {
+        RecordingInventoryViewer viewer = new RecordingInventoryViewer();
+        OpenContainer open = new OpenContainer(viewer, notifier);
+
+        open.openEnderChest(alice, bob);
+
+        assertThat(viewer.enderViews).containsEntry(alice.uuid(), bob.uuid());
+    }
+
+    @Test
     void getposAndPingReadThroughTheInfoPort() {
         Position at = new Position(new WorldRef(UUID.randomUUID(), "world"), 1.0, 64.0, -3.0, 0f, 0f);
         FakeInfo info = new FakeInfo(at, 42);
@@ -403,6 +424,22 @@ class PlayerStateUseCasesTest {
         @Override
         public void resetRest(PlayerRef who) {
             restReset.add(who.uuid());
+        }
+    }
+
+    /** An inventory viewer that records the (viewer → subject) pairing of each open it was asked for. */
+    private static final class RecordingInventoryViewer implements InventoryViewer {
+        private final Map<UUID, UUID> inventoryViews = new ConcurrentHashMap<>();
+        private final Map<UUID, UUID> enderViews = new ConcurrentHashMap<>();
+
+        @Override
+        public void viewInventory(PlayerRef viewer, PlayerRef subject) {
+            inventoryViews.put(viewer.uuid(), subject.uuid());
+        }
+
+        @Override
+        public void viewEnderChest(PlayerRef viewer, PlayerRef subject) {
+            enderViews.put(viewer.uuid(), subject.uuid());
         }
     }
 

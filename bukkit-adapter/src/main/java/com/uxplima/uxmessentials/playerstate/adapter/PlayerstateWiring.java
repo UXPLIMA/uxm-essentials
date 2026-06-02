@@ -8,6 +8,7 @@ import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitNearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerEffects;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerInfo;
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
+import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.playerstate.application.PlayerStateNotifier;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
 import com.uxplima.uxmessentials.playerstate.application.SetAir;
@@ -35,6 +37,7 @@ import com.uxplima.uxmessentials.playerstate.application.Suicide;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
 import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
+import com.uxplima.uxmessentials.playerstate.application.port.InventoryViewer;
 import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
@@ -71,11 +74,12 @@ public final class PlayerstateWiring {
         PlayerStateStore store = new InMemoryPlayerStateStore();
         StateReconciler reconciler = new BukkitStateReconciler(kernel.scheduler());
         PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler());
+        InventoryViewer inventoryViewer = new BukkitInventoryViewer(kernel.scheduler());
         NearbyPlayers nearby = new BukkitNearbyPlayers();
         PlayerInfo info = new BukkitPlayerInfo();
         PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
 
-        Ports ports = new Ports(store, reconciler, effects, nearby, info, notifier);
+        Ports ports = new Ports(store, reconciler, effects, inventoryViewer, nearby, info, notifier);
         PlayerStateServices services = assemble(kernel, config, clock, ports);
         List<CommandRegistration> commands = PlayerStateCommands.all(services, kernel.messages());
         List<Listener> listeners = List.of(new PlayerStateListener(store, reconciler));
@@ -89,6 +93,7 @@ public final class PlayerstateWiring {
         PlayerStateStore store = ports.store();
         StateReconciler reconciler = ports.reconciler();
         PlayerEffects effects = ports.effects();
+        InventoryViewer inventoryViewer = ports.inventoryViewer();
         PlayerStateNotifier notifier = ports.notifier();
         return new PlayerStateServices(
                 new ToggleGod(store, reconciler, notifier, events, clock),
@@ -101,6 +106,7 @@ public final class PlayerstateWiring {
                 new SetSpeed(store, reconciler, notifier, events, clock),
                 new Extinguish(effects, notifier),
                 new ClearInventory(effects, notifier),
+                new OpenContainer(inventoryViewer, notifier),
                 new Suicide(effects, notifier),
                 new ListNearby(ports.nearby(), notifier),
                 new ToggleNightVision(effects, notifier),
@@ -120,6 +126,7 @@ public final class PlayerstateWiring {
             PlayerStateStore store,
             StateReconciler reconciler,
             PlayerEffects effects,
+            InventoryViewer inventoryViewer,
             NearbyPlayers nearby,
             PlayerInfo info,
             PlayerStateNotifier notifier) {}

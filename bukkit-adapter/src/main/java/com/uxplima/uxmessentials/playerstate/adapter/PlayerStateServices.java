@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
+import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
 import com.uxplima.uxmessentials.playerstate.application.SetAir;
 import com.uxplima.uxmessentials.playerstate.application.SetExperience;
@@ -42,6 +43,7 @@ import org.jspecify.annotations.NullMarked;
  * @param setSpeed {@code /speed}, {@code /walkspeed}, {@code /flyspeed}
  * @param extinguish {@code /ext} ({@code /extinguish})
  * @param clearInventory {@code /clearinventory} ({@code /ci}, {@code /clear})
+ * @param openContainer {@code /invsee} and {@code /endersee}
  * @param suicide {@code /suicide}
  * @param listNearby {@code /near}
  * @param toggleNightVision {@code /nightvision} ({@code /nv})
@@ -67,6 +69,7 @@ public record PlayerStateServices(
         SetSpeed setSpeed,
         Extinguish extinguish,
         ClearInventory clearInventory,
+        OpenContainer openContainer,
         Suicide suicide,
         ListNearby listNearby,
         ToggleNightVision toggleNightVision,
@@ -91,6 +94,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(setSpeed, "setSpeed");
         Objects.requireNonNull(extinguish, "extinguish");
         Objects.requireNonNull(clearInventory, "clearInventory");
+        Objects.requireNonNull(openContainer, "openContainer");
         Objects.requireNonNull(suicide, "suicide");
         Objects.requireNonNull(listNearby, "listNearby");
         Objects.requireNonNull(toggleNightVision, "toggleNightVision");
