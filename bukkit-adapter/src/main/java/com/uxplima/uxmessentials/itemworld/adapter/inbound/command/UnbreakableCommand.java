@@ -5,7 +5,6 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -18,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -70,10 +70,10 @@ public final class UnbreakableCommand extends ItemworldCommandSupport implements
     private void apply(
             CommandContext<CommandSourceStack> ctx, Player player, ItemStack hand, Optional<Boolean> requested) {
         services.kernel().scheduler().onEntity(ref(player), () -> {
-            ItemMeta meta = hand.getItemMeta();
-            boolean state = requested.orElse(!meta.isUnbreakable());
-            meta.setUnbreakable(state);
-            hand.setItemMeta(meta);
+            boolean current = hand.getItemMeta().isUnbreakable();
+            boolean state = requested.orElse(!current);
+            ItemStack updated = ItemBuilder.from(hand).unbreakable(state).build();
+            player.getInventory().setItemInMainHand(updated);
             reply(ctx, ItemworldMessageKey.UNBREAKABLE_SET, Map.of("state", state ? "true" : "false"));
         });
     }

@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -71,8 +72,8 @@ public final class RepairCommand extends ItemworldCommandSupport implements Comm
             return;
         }
         services.kernel().scheduler().onEntity(ref(player), () -> {
-            damageable.setDamage(0);
-            hand.setItemMeta(meta);
+            ItemStack repaired = ItemBuilder.from(hand).damage(0).build();
+            player.getInventory().setItemInMainHand(repaired);
             reply(ctx, ItemworldMessageKey.REPAIR_DONE);
         });
     }

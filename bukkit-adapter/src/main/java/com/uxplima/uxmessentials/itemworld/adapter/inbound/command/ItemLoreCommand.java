@@ -1,18 +1,14 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
@@ -23,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -81,38 +78,38 @@ public final class ItemLoreCommand extends ItemworldCommandSupport implements Co
     private void edit(
             CommandContext<CommandSourceStack> ctx, Player player, ItemStack hand, Mode mode, Optional<String> text) {
         services.kernel().scheduler().onEntity(ref(player), () -> {
-            ItemMeta meta = hand.getItemMeta();
-            switch (mode) {
-                case SET -> applySet(ctx, meta, text);
-                case ADD -> applyAdd(ctx, meta, text);
-                case CLEAR -> applyClear(ctx, meta);
-            }
-            hand.setItemMeta(meta);
+            ItemStack built =
+                    switch (mode) {
+                        case SET -> applySet(ctx, hand, text);
+                        case ADD -> applyAdd(ctx, hand, text);
+                        case CLEAR -> applyClear(ctx, hand);
+                    };
+            player.getInventory().setItemInMainHand(built);
         });
     }
 
-    private void applySet(CommandContext<CommandSourceStack> ctx, ItemMeta meta, Optional<String> text) {
+    private ItemStack applySet(CommandContext<CommandSourceStack> ctx, ItemStack hand, Optional<String> text) {
         String line = text.orElse("");
-        meta.lore(List.of(MiniMessage.miniMessage().deserialize(line)));
+        ItemStack built = ItemBuilder.from(hand)
+                .lore(MiniMessage.miniMessage().deserialize(line))
+                .build();
         reply(ctx, ItemworldMessageKey.ITEMLORE_SET, Map.of("text", line));
+        return built;
     }
 
-    private void applyAdd(CommandContext<CommandSourceStack> ctx, ItemMeta meta, Optional<String> text) {
+    private ItemStack applyAdd(CommandContext<CommandSourceStack> ctx, ItemStack hand, Optional<String> text) {
         String line = text.orElse("");
-        List<Component> lore = meta.hasLore() ? new ArrayList<>(requireLore(meta)) : new ArrayList<>();
-        lore.add(MiniMessage.miniMessage().deserialize(line));
-        meta.lore(lore);
+        ItemStack built = ItemBuilder.from(hand)
+                .addLore(MiniMessage.miniMessage().deserialize(line))
+                .build();
         reply(ctx, ItemworldMessageKey.ITEMLORE_ADDED, Map.of("text", line));
+        return built;
     }
 
-    private void applyClear(CommandContext<CommandSourceStack> ctx, ItemMeta meta) {
-        meta.lore(null);
+    private ItemStack applyClear(CommandContext<CommandSourceStack> ctx, ItemStack hand) {
+        ItemStack built = ItemBuilder.from(hand).clearLore().build();
         reply(ctx, ItemworldMessageKey.ITEMLORE_CLEARED);
-    }
-
-    private static List<Component> requireLore(ItemMeta meta) {
-        List<Component> lore = meta.lore();
-        return lore == null ? List.of() : lore;
+        return built;
     }
 
     private enum Mode {

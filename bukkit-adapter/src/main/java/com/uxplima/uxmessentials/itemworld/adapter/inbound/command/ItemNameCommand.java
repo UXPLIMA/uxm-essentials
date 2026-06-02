@@ -5,7 +5,6 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -20,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -70,14 +70,15 @@ public final class ItemNameCommand extends ItemworldCommandSupport implements Co
 
     private void rename(CommandContext<CommandSourceStack> ctx, Player player, ItemStack hand, Optional<String> name) {
         services.kernel().scheduler().onEntity(ref(player), () -> {
-            ItemMeta meta = hand.getItemMeta();
             if (name.isPresent() && !name.get().isBlank()) {
-                meta.displayName(MiniMessage.miniMessage().deserialize(name.get()));
-                hand.setItemMeta(meta);
+                ItemStack updated = ItemBuilder.from(hand)
+                        .name(MiniMessage.miniMessage().deserialize(name.get()))
+                        .build();
+                player.getInventory().setItemInMainHand(updated);
                 reply(ctx, ItemworldMessageKey.ITEMNAME_SET, Map.of("name", name.get()));
             } else {
-                meta.displayName(null);
-                hand.setItemMeta(meta);
+                ItemStack updated = ItemBuilder.from(hand).clearName().build();
+                player.getInventory().setItemInMainHand(updated);
                 reply(ctx, ItemworldMessageKey.ITEMNAME_CLEARED);
             }
         });

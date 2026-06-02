@@ -7,7 +7,6 @@ import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.SkullMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -20,12 +19,14 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
+import com.uxplima.uxmlib.item.SkullData;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /skull [player]}: get a player-head skull — the named player's head, or the sender's own when no name
- * is given. The owning profile is resolved by name to an {@link OfflinePlayer}; the skull is added to the
- * player's inventory on their region thread and reported through {@link ItemworldMessageKey#SKULL_GIVEN}.
+ * is given. The owning profile is resolved by name off the region thread; the skull is added to the player's
+ * inventory on their region thread and reported through {@link ItemworldMessageKey#SKULL_GIVEN}.
  */
 @NullMarked
 public final class SkullCommand extends ItemworldCommandSupport implements CommandRegistration {
@@ -65,14 +66,14 @@ public final class SkullCommand extends ItemworldCommandSupport implements Comma
     }
 
     private void give(CommandContext<CommandSourceStack> ctx, Player player, String owner) {
+        // Resolve the name -> profile off the region thread (the by-name lookup blocks); applying the head by
+        // its resolved UUID at build time does not, so the region-thread hop below stays non-blocking.
         OfflinePlayer profile = player.getServer().getOfflinePlayer(owner);
         services.kernel().scheduler().onEntity(ref(player), () -> {
-            ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
-            if (skull.getItemMeta() instanceof SkullMeta meta) {
-                meta.setOwningPlayer(profile);
-                skull.setItemMeta(meta);
-            }
-            player.getInventory().addItem(skull);
+            ItemStack head = ItemBuilder.of(Material.PLAYER_HEAD)
+                    .skull(SkullData.ofUuid(profile.getUniqueId()))
+                    .build();
+            player.getInventory().addItem(head);
             reply(ctx, ItemworldMessageKey.SKULL_GIVEN, Map.of("player", owner));
         });
     }

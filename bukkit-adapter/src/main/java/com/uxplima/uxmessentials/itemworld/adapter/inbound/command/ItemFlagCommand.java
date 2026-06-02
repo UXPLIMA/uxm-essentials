@@ -6,7 +6,6 @@ import java.util.Optional;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -20,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.outbound.BukkitItemResolver;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -77,13 +77,10 @@ public final class ItemFlagCommand extends ItemworldCommandSupport implements Co
             return;
         }
         services.kernel().scheduler().onEntity(ref(player), () -> {
-            ItemMeta meta = hand.getItemMeta();
-            if (on) {
-                meta.addItemFlags(flag.get());
-            } else {
-                meta.removeItemFlags(flag.get());
-            }
-            hand.setItemMeta(meta);
+            ItemStack built = on
+                    ? ItemBuilder.from(hand).flags(flag.get()).build()
+                    : ItemBuilder.from(hand).removeFlags(flag.get()).build();
+            player.getInventory().setItemInMainHand(built);
             reply(ctx, ItemworldMessageKey.ITEMFLAG_TOGGLED, Map.of("flag", token, "state", on ? "on" : "off"));
         });
     }

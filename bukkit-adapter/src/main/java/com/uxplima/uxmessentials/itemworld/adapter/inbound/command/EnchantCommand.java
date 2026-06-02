@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.EnchantSpec;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -83,7 +84,10 @@ public final class EnchantCommand extends ItemworldCommandSupport implements Com
         }
         EnchantSpec resolved = spec.get();
         services.kernel().scheduler().onEntity(ref(player), () -> {
-            hand.addUnsafeEnchantment(enchantment.get(), resolved.level());
+            ItemStack updated = ItemBuilder.from(hand)
+                    .enchant(enchantment.get(), resolved.level())
+                    .build();
+            player.getInventory().setItemInMainHand(updated);
             reply(ctx, ItemworldMessageKey.ENCHANT_APPLIED, placeholders(rawId, resolved.level()));
             if (resolved.clamped()) {
                 reply(

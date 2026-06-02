@@ -3,9 +3,9 @@ package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 import java.util.Map;
 
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -64,15 +65,16 @@ public final class RepairAllCommand extends ItemworldCommandSupport implements C
     }
 
     private static int repairContents(Player player) {
+        Inventory inventory = player.getInventory();
+        ItemStack[] contents = inventory.getContents();
         int repaired = 0;
-        for (ItemStack item : player.getInventory().getContents()) {
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack item = contents[slot];
             if (item == null || item.getType().isAir()) {
                 continue;
             }
-            ItemMeta meta = item.getItemMeta();
-            if (meta instanceof Damageable damageable && damageable.hasDamage()) {
-                damageable.setDamage(0);
-                item.setItemMeta(meta);
+            if (item.getItemMeta() instanceof Damageable damageable && damageable.hasDamage()) {
+                inventory.setItem(slot, ItemBuilder.from(item).damage(0).build());
                 repaired++;
             }
         }

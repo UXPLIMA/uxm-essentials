@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.EnchantSpec;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -82,7 +83,8 @@ public final class DisenchantCommand extends ItemworldCommandSupport implements 
                 reply(ctx, ItemworldMessageKey.DISENCHANT_NONE);
                 return;
             }
-            hand.removeEnchantments();
+            ItemStack built = ItemBuilder.from(hand).clearEnchants().build();
+            player.getInventory().setItemInMainHand(built);
             reply(ctx, ItemworldMessageKey.DISENCHANT_ALL);
         });
     }
@@ -99,7 +101,9 @@ public final class DisenchantCommand extends ItemworldCommandSupport implements 
                 reply(ctx, ItemworldMessageKey.DISENCHANT_NOT_PRESENT, Map.of("enchant", rawId));
                 return;
             }
-            hand.removeEnchantment(enchantment.get());
+            ItemStack built =
+                    ItemBuilder.from(hand).removeEnchant(enchantment.get()).build();
+            player.getInventory().setItemInMainHand(built);
             reply(ctx, ItemworldMessageKey.DISENCHANT_ONE, Map.of("enchant", rawId));
         });
     }
