@@ -13,9 +13,9 @@ import java.util.UUID;
 
 import org.bukkit.Material;
 import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -42,9 +42,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommand;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultInventoryHolder;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.listener.VaultCloseListener;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
@@ -55,6 +53,8 @@ import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
 import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
+import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.gui.StorageGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,30 +67,31 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of the vault GUI open → store → close → save round-trip through the real Brigadier
- * {@code /vault} node, the inventory-holder GUI and the {@code InventoryClose} save listener, backed by the
- * real cached jOOQ {@code VaultRepository} (from {@link VaultRepositories}) over an embedded SQLite database.
- * {@code /vault} opens a holder-backed
- * window sized to the resolved quota; an item placed in it and the window closed is serialized and written
- * through to the DB; re-opening the same vault re-reads the stored item — proving vaults are DB-persisted and
- * survive past the live GUI, never PDC.
+ * {@code /vault} node and uxmLib's {@code StorageGui}, backed by the real cached jOOQ {@code VaultRepository}
+ * (from {@link VaultRepositories}) over an embedded SQLite database. {@code /vault} opens a {@code StorageGui}
+ * sized to the resolved quota; an item placed in it and the window closed is serialized and written through to
+ * the DB; re-opening the same vault re-reads the stored item — proving vaults are DB-persisted and survive past
+ * the live GUI, never PDC.
  *
- * <p>The scheduler is a synchronous double so the entity-bound open and the async save run inline; the events
- * are dispatched into the registered close listener directly (MockBukkit does not auto-route inventory events
- * to a listener that was not registered through a plugin), exactly as a live {@code InventoryCloseEvent} would.
+ * <p>The scheduler is a synchronous double so the entity-bound open and the async save run inline. uxmLib's
+ * menu listener is installed via {@link Guis#install} against a mock plugin, and the close is dispatched as a
+ * real {@link InventoryCloseEvent} through the plugin manager — exactly the path a live close takes — so the
+ * GUI's own close handler writes the vault through.
  */
 class VaultGuiPathTest {
 
     private ServerMock server;
+    private Plugin plugin;
     private PlayerMock player;
     private Persistence persistence;
     private VaultRepository repository;
     private VaultServices services;
-    private VaultCloseListener closeListener;
     private RecordingSink sink;
 
     @BeforeEach
     void setUp(@TempDir Path dataFolder) {
         server = MockBukkit.mock();
+        plugin = MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         player = server.addPlayer("Alice");
         player.setOp(true);
@@ -98,8 +99,7 @@ class VaultGuiPathTest {
         repository = VaultRepositories.cached(persistence);
         sink = new RecordingSink();
         services = services();
-        closeListener =
-                new VaultCloseListener(services.saveVault(), services.kernel().scheduler());
+        Guis.install(plugin);
     }
 
     @AfterEach
@@ -114,13 +114,12 @@ class VaultGuiPathTest {
 
         execute(dispatcher, "vault 1");
         Inventory vault = player.getOpenInventory().getTopInventory();
-        assertThat(vault.getHolder()).isInstanceOf(VaultInventoryHolder.class);
+        assertThat(vault.getHolder()).isInstanceOf(StorageGui.class);
         assertThat(vault.getSize()).isEqualTo(54); // the default 6-row size quota
 
-        // Store an item and close the window: the close listener serializes and writes it through.
-        closeListener.onOpen(new InventoryOpenEvent(player.getOpenInventory()));
+        // Store an item and close the window: the StorageGui's close handler serializes and writes it through.
         vault.setItem(0, new ItemStack(Material.DIAMOND, 12));
-        closeListener.onClose(new InventoryCloseEvent(player.getOpenInventory()));
+        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
 
         // The stored item is durable in the DB, not just in the live GUI.
         assertThat(repository.find(VaultId.of(ref(), 1))).isPresent();
@@ -140,7 +139,7 @@ class VaultGuiPathTest {
 
         execute(dispatcher, "vault");
 
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(VaultInventoryHolder.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(StorageGui.class);
         assertThat(sink.keys).contains(com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_OPENED);
     }
 
@@ -167,13 +166,14 @@ class VaultGuiPathTest {
         VaultAmountQuota amount = new VaultAmountQuota(kernel.permissions(), 3);
         VaultSizeQuota size = new VaultSizeQuota(kernel.permissions(), 6);
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
-        VaultView view = new VaultView(server, kernel.messages());
+        SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
+        VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
         VaultAudit audit = (a, o, u, i) -> {};
         return new VaultServices(
                 new OpenVault(repository, amount, size, Clock.systemUTC()),
                 new ListVaults(repository),
                 new OpenAdminVault(repository, size, audit, Clock.systemUTC()),
-                new SaveVault(repository, new NoEvents(), Clock.systemUTC()),
+                saveVault,
                 notifier,
                 view,
                 kernel);

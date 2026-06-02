@@ -8,6 +8,7 @@ allprojects {
     version = project.findProperty("projectVersion")?.toString() ?: "0.1.0-SNAPSHOT"
 
     repositories {
+        mavenLocal() // uxmLib is consumed from ~/.m2 during the dogfood (publishToMavenLocal)
         mavenCentral()
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://repo.codemc.org/repository/maven-public/")  // Treasury economy API

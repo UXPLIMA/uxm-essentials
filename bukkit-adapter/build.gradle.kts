@@ -30,6 +30,10 @@ dependencies {
     implementation(libs.bundles.configs)
     implementation(libs.bstats.bukkit)
 
+    // uxmLib GUI toolkit (dogfood) — consumed from mavenLocal; pulls uxmlib-item + uxmlib-common
+    // transitively (configurate is already shaded here, same 4.1.2). Shaded + relocated below.
+    implementation("com.uxplima.uxmlib:uxmlib-gui:0.1.0-SNAPSHOT")
+
     testImplementation(libs.mockbukkit)
     testImplementation(libs.archunit.junit)
     // MockBukkit drives the real Paper API; the test source set needs it (and Adventure) on its
@@ -109,12 +113,17 @@ tasks.shadowJar {
     relocate("org.jooq", "com.uxplima.uxmessentials.libs.jooq")
     relocate("com.github.benmanes.caffeine", "com.uxplima.uxmessentials.libs.caffeine")
     relocate("org.spongepowered.configurate", "com.uxplima.uxmessentials.libs.configurate")
+    // uxmLib (dogfood) — relocate into our per-plugin namespace so two plugins shading it cannot clash.
+    relocate("com.uxplima.uxmlib", "com.uxplima.uxmessentials.libs.uxmlib")
     mergeServiceFiles()
     minimize {
         // bStats and Configurate use reflection / service loading the minimizer
         // can't see; never the JDBC drivers (loaded reflectively by Hikari).
         exclude(dependency("org.bstats:.*:.*"))
         exclude(dependency("org.spongepowered:.*:.*"))
+        // uxmLib uses reflection (Brigadier/registry/MiniMessage) + a GuiListener the minimizer can't
+        // trace from the few entry points the adapter touches; keep its modules whole.
+        exclude(dependency("com.uxplima.uxmlib:.*:.*"))
         exclude(dependency("org.xerial:.*:.*"))
         exclude(dependency("org.mariadb.jdbc:.*:.*"))
         exclude(dependency("org.postgresql:.*:.*"))

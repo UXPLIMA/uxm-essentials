@@ -2,44 +2,55 @@ package com.uxplima.uxmessentials.vaults.adapter.inbound.gui;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-import org.bukkit.Server;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec;
+import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
+import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
+import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.gui.StorageGui;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Builds and opens the inventory-holder-based GUI for a vault: a chest-style inventory sized to the vault's
- * resolved {@link VaultSize}, backed by a {@link VaultInventoryHolder} that carries the {@link Vault} identity
- * so the close listener can resolve the owning vault from the holder. The vault's opaque contents are decoded
- * into the slots through {@link VaultItemCodec}, and the title is a {@link MessageKey} rendered in the viewer's
- * locale and parsed into a {@code Component} — never an inline literal.
+ * Opens a vault as a uxmLib {@link StorageGui}: a storage menu sized to the vault's resolved {@link VaultSize}
+ * that lets the player take, place, and swap freely. The vault's opaque contents are decoded into the slots
+ * through {@link VaultItemCodec}, and the title is a {@link MessageKey} rendered in the viewer's locale and
+ * parsed into a {@code Component} — never an inline literal.
+ *
+ * <p>The window's {@code (owner, vault)} identity is captured per open, so the {@link StorageGui#onClose close
+ * handler} writes exactly that vault straight to the database; each open window is tracked so {@link #flushAll}
+ * can save every still-open vault on module stop (the {@code open-guis=N} the doctor line reports). Each window
+ * is persisted at most once — whichever of close-or-flush reaches it first claims it.
  *
  * <p>{@link #open} touches the live player, so it must run on the player's region thread; the caller schedules
- * it through the kernel {@code Scheduler}.
+ * it through the kernel {@code Scheduler}. The write-back is dispatched async off that same scheduler.
  */
 @NullMarked
 public final class VaultView {
 
-    private final Server server;
     private final Messages messages;
+    private final SaveVault saveVault;
+    private final Scheduler scheduler;
     private final MiniMessage miniMessage;
+    private final Set<OpenWindow> open = ConcurrentHashMap.newKeySet();
 
-    public VaultView(Server server, Messages messages) {
-        this.server = Objects.requireNonNull(server, "server");
+    public VaultView(Messages messages, SaveVault saveVault, Scheduler scheduler) {
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.saveVault = Objects.requireNonNull(saveVault, "saveVault");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -52,14 +63,38 @@ public final class VaultView {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
-        VaultInventoryHolder holder = new VaultInventoryHolder(viewer, owner, vault);
-        Component title = title(viewer, owner, vault.index());
-        Inventory inventory = server.createInventory(holder, vault.size().slots(), title);
-        holder.bind(inventory);
-        ItemStack[] decoded =
-                VaultItemCodec.decode(vault.contents(), vault.size().slots());
-        inventory.setContents(decoded);
-        player.openInventory(inventory);
+        StorageGui gui = Guis.storage()
+                .title(title(viewer, owner, vault.index()))
+                .rows(vault.size().slots() / 9)
+                .build();
+        gui.setContents(VaultItemCodec.decode(vault.contents(), vault.size().slots()));
+        OpenWindow window = new OpenWindow(owner, vault, gui);
+        open.add(window);
+        gui.onClose(event -> {
+            if (open.remove(window)) {
+                persist(window);
+            }
+        });
+        gui.open(player);
+    }
+
+    /** Save every still-open vault and forget it; called on module stop so none is lost on disable. */
+    public void flushAll() {
+        for (OpenWindow window : Set.copyOf(open)) {
+            if (open.remove(window)) {
+                persist(window);
+            }
+        }
+    }
+
+    /** The number of vault windows currently open (the {@code open-guis=N} the doctor line reports). */
+    public int openCount() {
+        return open.size();
+    }
+
+    private void persist(OpenWindow window) {
+        VaultContents contents = VaultItemCodec.encode(window.gui().contents());
+        scheduler.async(() -> saveVault.save(window.owner(), window.vault(), contents));
     }
 
     private Component title(PlayerRef viewer, PlayerRef owner, int index) {
@@ -69,5 +104,13 @@ public final class VaultView {
                 ? Map.of("player", owner.name(), "index", Integer.toString(index))
                 : Map.of("index", Integer.toString(index));
         return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+    }
+
+    private record OpenWindow(PlayerRef owner, Vault vault, StorageGui gui) {
+        OpenWindow {
+            Objects.requireNonNull(owner, "owner");
+            Objects.requireNonNull(vault, "vault");
+            Objects.requireNonNull(gui, "gui");
+        }
     }
 }

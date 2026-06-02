@@ -19,7 +19,6 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommands;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.listener.VaultCloseListener;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.LoggingVaultAudit;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
@@ -30,21 +29,23 @@ import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
 import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
+import com.uxplima.uxmlib.gui.Guis;
 import org.jspecify.annotations.NullMarked;
 import org.slf4j.LoggerFactory;
 
 /**
  * Constructs the vaults context's adapters and use cases over the injected kernel ports and the persistence
- * DSL, and produces everything the plugin must register: the Brigadier {@code /vault} command and the
- * {@code InventoryClose} save listener. This is the one place the vaults context is wired — nothing else news
- * up its classes.
+ * DSL, and produces everything the plugin must register: the Brigadier {@code /vault} command, with the vault
+ * windows themselves handled by uxmLib's {@code StorageGui}. This is the one place the vaults context is wired
+ * — nothing else news up its classes.
  *
  * <p>The repository is the cached jOOQ adapter over {@code persistence.dsl()} (write-through at the database,
  * invalidate in the Caffeine cache); the two numbered-quota families resolve through the shared
  * {@code Permissions} reducer with the {@code vaults.conf} defaults; the audit trail goes to the dedicated
  * {@code com.uxplima.uxmessentials.audit} channel (not the plugin log), so an operator routes it to a retained
- * file per docs/09-deployment. The GUI is inventory-holder based: a {@link VaultView} opens a chest sized to
- * the resolved quota and the close listener resolves the owning vault from the holder to write it through.
+ * file per docs/09-deployment. The GUI rides uxmLib's menu framework: {@link Guis#install} registers the one
+ * menu listener and {@link VaultView} opens a {@code StorageGui} sized to the resolved quota that writes the
+ * vault through on close.
  *
  * <p>Cross-server sync rides the {@link Bus} handle: the wiring registers a {@link VaultSync} listener that
  * invalidates exactly the {@code (owner, index)} a peer reports changed and wraps the cached repository so
@@ -72,23 +73,24 @@ public final class VaultsWiring {
         CachedVaultRepository cached = VaultRepositories.cachedConcrete(persistence);
         bus.registry().register(VaultSync.listener(cached));
         VaultRepository repository = VaultSync.repository(cached, bus.publisher());
-        VaultServices services = assemble(plugin, kernel, settings, repository, clock);
-        VaultCloseListener closeListener = new VaultCloseListener(services.saveVault(), kernel.scheduler());
-        return new Wired(VaultCommands.all(services), List.of(closeListener), closeListener, repository);
+        VaultServices services = assemble(kernel, settings, repository, clock);
+        Guis.install(plugin);
+        return new Wired(VaultCommands.all(services), List.of(), services.view(), repository);
     }
 
     private static VaultServices assemble(
-            Plugin plugin, KernelPorts kernel, VaultSettings settings, VaultRepository repository, Clock clock) {
+            KernelPorts kernel, VaultSettings settings, VaultRepository repository, Clock clock) {
         VaultAmountQuota amountQuota = new VaultAmountQuota(kernel.permissions(), settings.defaultAmount());
         VaultSizeQuota sizeQuota = new VaultSizeQuota(kernel.permissions(), settings.defaultSize());
         VaultAudit audit = new LoggingVaultAudit(auditLogger());
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
-        VaultView view = new VaultView(plugin.getServer(), kernel.messages());
+        SaveVault saveVault = new SaveVault(repository, kernel.events(), clock);
+        VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
         return new VaultServices(
                 new OpenVault(repository, amountQuota, sizeQuota, clock),
                 new ListVaults(repository),
                 new OpenAdminVault(repository, sizeQuota, audit, clock),
-                new SaveVault(repository, kernel.events(), clock),
+                saveVault,
                 notifier,
                 view,
                 kernel);
@@ -99,32 +101,29 @@ public final class VaultsWiring {
     }
 
     /**
-     * Everything the vaults module contributes once wired: the Brigadier {@code /vault} command, the
-     * {@code InventoryClose} save listener, and the listener held so {@code stop()} flushes every still-open
-     * vault before the pool closes (the {@code open-guis=N} the doctor line reports).
+     * Everything the vaults module contributes once wired: the Brigadier {@code /vault} command and the
+     * {@link VaultView} held so {@code stop()} flushes every still-open vault before the pool closes (the
+     * {@code open-guis=N} the doctor line reports). The menu close events are routed by uxmLib's own listener
+     * (installed via {@link Guis#install}), so this module registers no inventory listener of its own.
      *
      * @param commands the Brigadier command registrations to publish
-     * @param listeners the inventory-close save listener to register
-     * @param closeListener the listener, held for the stop-time flush
+     * @param listeners the Bukkit listeners to register (none here; the menu listener is uxmLib's)
+     * @param view the GUI, held for the stop-time flush
      * @param repository the vault store the {@code vaults_count} placeholder reads
      */
     public record Wired(
-            List<CommandRegistration> commands,
-            List<Listener> listeners,
-            VaultCloseListener closeListener,
-            VaultRepository repository) {
+            List<CommandRegistration> commands, List<Listener> listeners, VaultView view, VaultRepository repository) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
-            Objects.requireNonNull(closeListener, "closeListener");
+            Objects.requireNonNull(view, "view");
             Objects.requireNonNull(repository, "repository");
         }
 
-        /** Close-and-save every still-open vault window, then drop the open-window tracking. Called on stop. */
+        /** Save every still-open vault window before the pool closes. Called on module stop. */
         public void stop() {
-            closeListener.flushAll();
-            closeListener.clear();
+            view.flushAll();
         }
     }
 }
