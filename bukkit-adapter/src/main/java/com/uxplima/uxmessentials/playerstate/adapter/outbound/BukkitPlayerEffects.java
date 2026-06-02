@@ -69,6 +69,11 @@ public final class BukkitPlayerEffects implements PlayerEffects {
     }
 
     @Override
+    public void clearInventory(PlayerRef who) {
+        onEntity(who, player -> player.getInventory().clear());
+    }
+
+    @Override
     public void kill(PlayerRef who) {
         onEntity(who, player -> player.setHealth(0.0));
     }

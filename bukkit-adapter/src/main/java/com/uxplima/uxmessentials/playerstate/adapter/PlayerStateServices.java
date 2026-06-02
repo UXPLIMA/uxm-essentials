@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerstate.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.Burn;
+import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
@@ -36,6 +37,7 @@ import org.jspecify.annotations.NullMarked;
  * @param setGamemode {@code /gamemode} and its {@code /gmc /gms /gma /gmsp} aliases
  * @param setSpeed {@code /speed}, {@code /walkspeed}, {@code /flyspeed}
  * @param extinguish {@code /ext} ({@code /extinguish})
+ * @param clearInventory {@code /clearinventory} ({@code /ci}, {@code /clear})
  * @param suicide {@code /suicide}
  * @param listNearby {@code /near}
  * @param toggleNightVision {@code /nightvision} ({@code /nv})
@@ -58,6 +60,7 @@ public record PlayerStateServices(
         SetGamemode setGamemode,
         SetSpeed setSpeed,
         Extinguish extinguish,
+        ClearInventory clearInventory,
         Suicide suicide,
         ListNearby listNearby,
         ToggleNightVision toggleNightVision,
@@ -79,6 +82,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(setGamemode, "setGamemode");
         Objects.requireNonNull(setSpeed, "setSpeed");
         Objects.requireNonNull(extinguish, "extinguish");
+        Objects.requireNonNull(clearInventory, "clearInventory");
         Objects.requireNonNull(suicide, "suicide");
         Objects.requireNonNull(listNearby, "listNearby");
         Objects.requireNonNull(toggleNightVision, "toggleNightVision");

@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerInfo;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitStateReconciler;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.InMemoryPlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.Burn;
+import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
@@ -95,6 +96,7 @@ public final class PlayerstateWiring {
                 new SetGamemode(store, reconciler, notifier, events, clock),
                 new SetSpeed(store, reconciler, notifier, events, clock),
                 new Extinguish(effects, notifier),
+                new ClearInventory(effects, notifier),
                 new Suicide(effects, notifier),
                 new ListNearby(ports.nearby(), notifier),
                 new ToggleNightVision(effects, notifier),

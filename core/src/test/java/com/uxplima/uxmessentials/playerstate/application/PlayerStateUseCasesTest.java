@@ -296,6 +296,7 @@ class PlayerStateUseCasesTest {
         private final List<UUID> clearedEffectsFor = new ArrayList<>();
         private final List<UUID> fed = new ArrayList<>();
         private final List<UUID> extinguished = new ArrayList<>();
+        private final List<UUID> cleared = new ArrayList<>();
         private final List<UUID> killed = new ArrayList<>();
         private final Map<UUID, Boolean> nightVision = new ConcurrentHashMap<>();
         private final Map<UUID, PersonalTime> appliedTime = new ConcurrentHashMap<>();
@@ -321,6 +322,11 @@ class PlayerStateUseCasesTest {
         @Override
         public void extinguish(PlayerRef who) {
             extinguished.add(who.uuid());
+        }
+
+        @Override
+        public void clearInventory(PlayerRef who) {
+            cleared.add(who.uuid());
         }
 
         @Override

@@ -52,6 +52,10 @@ public enum PlayerstateMessageKey implements MessageKey {
     EXTINGUISHED("playerstate.extinguish.self"),
     EXTINGUISHED_OTHER("playerstate.extinguish.other"),
 
+    // /clearinventory
+    INVENTORY_CLEARED("playerstate.clearinventory.self"),
+    INVENTORY_CLEARED_OTHER("playerstate.clearinventory.other"),
+
     // /suicide
     SUICIDE("playerstate.suicide"),
 

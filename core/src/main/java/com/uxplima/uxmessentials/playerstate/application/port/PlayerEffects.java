@@ -29,6 +29,9 @@ public interface PlayerEffects {
     /** Put out {@code who} if they are on fire. */
     void extinguish(PlayerRef who);
 
+    /** Empty {@code who}'s inventory (main, armor and offhand). */
+    void clearInventory(PlayerRef who);
+
     /** Kill {@code who} (the {@code /suicide} self-kill). */
     void kill(PlayerRef who);
 

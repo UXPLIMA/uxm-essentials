@@ -37,6 +37,10 @@ final class PlayerstateCommandSurface {
                 spec("flyspeed", "uxmessentials.speed.use", cmd("flyspeed", "Set fly speed")),
                 spec("walkspeed", "uxmessentials.speed.use", cmd("walkspeed", "Set walk speed")),
                 spec("ext", "uxmessentials.extinguish.use", cmd("ext", "Put out a burning player")),
+                spec(
+                        "clearinventory",
+                        "uxmessentials.clearinventory.use",
+                        cmd("clearinventory", "Clear a player's inventory")),
                 spec("suicide", "uxmessentials.suicide.use", cmd("suicide", "Kill yourself")),
                 spec("near", "uxmessentials.near.use", cmd("near", "List nearby players")),
                 spec("nightvision", "uxmessentials.nightvision.use", cmd("nightvision", "Toggle night vision")),

@@ -243,6 +243,9 @@ permissions:
   uxmessentials.extinguish.use:
     description: '/ext (/extinguish) [player] to put out a burning player.'
     default: op
+  uxmessentials.clearinventory.use:
+    description: '/clearinventory (/ci /clear) [player] to empty a player''s inventory.'
+    default: op
   uxmessentials.suicide.use:
     description: '/suicide to kill yourself.'
     default: true
