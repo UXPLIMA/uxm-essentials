@@ -6,8 +6,6 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -20,6 +18,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -76,17 +75,13 @@ public final class ItemModelCommand extends ItemworldCommandSupport implements C
 
     private void apply(CommandContext<CommandSourceStack> ctx, Player player, ItemStack hand, Optional<Integer> id) {
         services.kernel().scheduler().onEntity(ref(player), () -> {
-            ItemMeta meta = hand.getItemMeta();
-            CustomModelDataComponent model = meta.getCustomModelDataComponent();
+            List<Float> floats = id.map(value -> List.of((float) (int) value)).orElseGet(List::of);
+            ItemStack updated =
+                    ItemBuilder.from(hand).customModelDataFloats(floats).build();
+            player.getInventory().setItemInMainHand(updated);
             if (id.isPresent()) {
-                model.setFloats(List.of((float) (int) id.get()));
-                meta.setCustomModelDataComponent(model);
-                hand.setItemMeta(meta);
                 reply(ctx, ItemworldMessageKey.ITEMMODEL_SET, Map.of("id", String.valueOf(id.get())));
             } else {
-                model.setFloats(List.of());
-                meta.setCustomModelDataComponent(model);
-                hand.setItemMeta(meta);
                 reply(ctx, ItemworldMessageKey.ITEMMODEL_CLEARED);
             }
         });
