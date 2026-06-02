@@ -78,6 +78,11 @@ public final class TeleportSettings {
         return config.getBoolean("teleport-to-center", true);
     }
 
+    /** Whether to flash a short title on the player's screen when a teleport lands. */
+    public boolean arrivalTitle() {
+        return config.getBoolean("arrival-title", true);
+    }
+
     /** The vanilla teleport causes that must not overwrite a player's {@code /back} point. */
     public BackCapturePolicy backCapturePolicy() {
         List<String> raw = config.getStringList("back.ignored-causes", List.of("ender_pearl", "chorus_fruit"));

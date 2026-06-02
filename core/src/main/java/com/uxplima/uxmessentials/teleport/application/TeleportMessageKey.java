@@ -45,6 +45,9 @@ public enum TeleportMessageKey implements MessageKey {
     SPAWN_SET("teleport.spawn.set"),
     SPAWN_UNRESOLVED("teleport.spawn.unresolved"),
 
+    // arrival HUD — the short title flashed on the screen when a teleport lands
+    ARRIVED_TITLE("teleport.arrived.title"),
+
     // admin / positional
     TP_DONE("teleport.tp.done"),
     TP_NO_TARGET_BLOCK("teleport.tp.no-target-block"),

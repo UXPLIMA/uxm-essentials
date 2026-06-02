@@ -44,6 +44,7 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
     private final Logger log;
     private final Clock clock;
     private final BooleanSupplier centerToggle;
+    private final TeleportArrivalHud arrivalHud;
 
     public AsyncTeleportExecutor(
             Scheduler scheduler,
@@ -51,13 +52,15 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             DomainEventPublisher events,
             Logger log,
             Clock clock,
-            BooleanSupplier centerToggle) {
+            BooleanSupplier centerToggle,
+            TeleportArrivalHud arrivalHud) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.backStore = Objects.requireNonNull(backStore, "backStore");
         this.events = Objects.requireNonNull(events, "events");
         this.log = Objects.requireNonNull(log, "log");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.centerToggle = Objects.requireNonNull(centerToggle, "centerToggle");
+        this.arrivalHud = Objects.requireNonNull(arrivalHud, "arrivalHud");
     }
 
     @Override
@@ -94,7 +97,10 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
         if (Boolean.FALSE.equals(ok)) {
             return; // Paper refused the hop (e.g. unloaded target); the player stayed put
         }
-        scheduler.onEntity(who, () -> events.publish(new PlayerTeleported(who, kind, from, to)));
+        scheduler.onEntity(who, () -> {
+            events.publish(new PlayerTeleported(who, kind, from, to));
+            arrivalHud.arrived(who, kind);
+        });
     }
 
     private Position applyCentering(Position target) {

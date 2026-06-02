@@ -33,6 +33,8 @@ dependencies {
     // uxmLib GUI toolkit (dogfood) — consumed from mavenLocal; pulls uxmlib-item + uxmlib-common
     // transitively (configurate is already shaded here, same 4.1.2). Shaded + relocated below.
     implementation("com.uxplima.uxmlib:uxmlib-gui:0.1.0-SNAPSHOT")
+    // uxmLib HUD toolkit (dogfood) — Titles for the teleport arrival banner. Pulls uxmlib-common only.
+    implementation("com.uxplima.uxmlib:uxmlib-hud:0.1.0-SNAPSHOT")
 
     testImplementation(libs.mockbukkit)
     testImplementation(libs.archunit.junit)
