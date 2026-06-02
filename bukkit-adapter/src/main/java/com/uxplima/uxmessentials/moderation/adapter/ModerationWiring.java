@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitTargetResolver;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
@@ -33,6 +34,7 @@ import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
+import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
@@ -113,6 +115,8 @@ public final class ModerationWiring {
                 .jail(new Jail(repository, jails, sanctionPort, guard, notifier, audit, kernel.events(), clock))
                 .unjail(new Unjail(repository, sanctionPort, notifier, audit, kernel.events(), clock))
                 .tempBan(new TempBan(repository, sanctionPort, guard, notifier, audit, kernel.events(), clock))
+                .ban(new Ban(repository, sanctionPort, guard, notifier, audit, kernel.events(), clock))
+                .unban(new Unban(repository, notifier, audit))
                 .kick(new Kick(sanctionPort, guard, notifier, audit))
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
                 .warn(new IssueWarn(repository, guard, notifier, audit, kernel.events(), clock))

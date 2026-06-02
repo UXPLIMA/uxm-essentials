@@ -93,6 +93,11 @@ public final class LoggingModerationAudit implements ModerationAudit {
     }
 
     @Override
+    public void unbanned(PlayerRef actor, PlayerRef target, boolean ok) {
+        audit.info("event=player_unban actor={} target={} ok={}", actor.uuid(), target.uuid(), ok);
+    }
+
+    @Override
     public void warned(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {
         audit.info(
                 "event=player_warn actor={} target={} ok={} reason={}", actor.uuid(), target.uuid(), ok, quote(reason));

@@ -37,8 +37,11 @@ public interface ModerationAudit {
     /** {@code event=player_unjail} — an {@code /unjail}. */
     void unjailed(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason);
 
-    /** {@code event=player_tempban} — a {@code /tempban}. */
+    /** {@code event=player_tempban} — a {@code /tempban} or a {@code /ban} (the permanent form). */
     void tempbanned(PlayerRef actor, PlayerRef target, String duration, boolean ok, Optional<String> reason);
+
+    /** {@code event=player_unban} — an {@code /unban}. */
+    void unbanned(PlayerRef actor, PlayerRef target, boolean ok);
 
     /** {@code event=player_warn} — a {@code /warn}. */
     void warned(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason);

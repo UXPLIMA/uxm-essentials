@@ -34,6 +34,12 @@ public enum ModerationMessageKey implements MessageKey {
     TEMPBAN_APPLIED("moderation.tempban.applied"),
     TEMPBAN_KICK("moderation.tempban.kick"),
 
+    // /ban, /unban — permanent UUID ban and its lift
+    BAN_APPLIED("moderation.ban.applied"),
+    BAN_KICK("moderation.ban.kick"),
+    BAN_LIFTED("moderation.unban.applied"),
+    BAN_NOT_BANNED("moderation.unban.not-banned"),
+
     // /kick, /kickall
     KICK_APPLIED("moderation.kick.applied"),
     KICK_KICKED("moderation.kick.kicked"),

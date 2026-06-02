@@ -369,6 +369,9 @@ permissions:
   uxmessentials.moderation.tempban:
     description: '/tempban <player> <duration> [reason].'
     default: op
+  uxmessentials.moderation.ban:
+    description: '/ban <player> [reason] and /unban <player> — permanent UUID ban and its lift.'
+    default: op
   uxmessentials.moderation.kick:
     description: '/kick <player> [reason]; /kickall [reason] to clear non-exempt players.'
     default: op

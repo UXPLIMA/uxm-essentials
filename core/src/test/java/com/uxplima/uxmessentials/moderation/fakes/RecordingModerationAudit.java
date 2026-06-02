@@ -49,6 +49,11 @@ public final class RecordingModerationAudit implements ModerationAudit {
     }
 
     @Override
+    public void unbanned(PlayerRef actor, PlayerRef target, boolean ok) {
+        lines.add(new Line("player_unban", ok));
+    }
+
+    @Override
     public void warned(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {
         lines.add(new Line("player_warn", ok));
     }

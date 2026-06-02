@@ -36,7 +36,10 @@ public enum ModerationError {
     NOT_JAILED(ModerationMessageKey.UNJAIL_NOT_JAILED),
 
     /** The {@code /unbanip} address was not banned. */
-    NOT_IP_BANNED(ModerationMessageKey.UNBANIP_NOT_BANNED);
+    NOT_IP_BANNED(ModerationMessageKey.UNBANIP_NOT_BANNED),
+
+    /** The {@code /unban} target was not banned. */
+    NOT_BANNED(ModerationMessageKey.BAN_NOT_BANNED);
 
     private final ModerationMessageKey messageKey;
 

@@ -32,6 +32,8 @@ final class ModerationCommandSurface {
                 spec("jail", "uxmessentials.moderation.jail", "Confine a player to a jail"),
                 spec("unjail", "uxmessentials.moderation.unjail", "Release a jailed player"),
                 spec("tempban", "uxmessentials.moderation.tempban", "Ban a player for a duration"),
+                spec("ban", "uxmessentials.moderation.ban", "Permanently ban a player"),
+                spec("unban", "uxmessentials.moderation.ban", "Lift a player's permanent ban"),
                 spec("kick", "uxmessentials.moderation.kick", "Kick a player"),
                 spec("kickall", "uxmessentials.moderation.kick", "Kick all non-exempt players"),
                 spec("warn", "uxmessentials.moderation.warn", "Warn a player"),

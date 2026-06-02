@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
@@ -14,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
+import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
@@ -35,6 +37,8 @@ public final class ModerationServices {
     private final Jail jail;
     private final Unjail unjail;
     private final TempBan tempBan;
+    private final Ban ban;
+    private final Unban unban;
     private final Kick kick;
     private final KickAll kickAll;
     private final IssueWarn warn;
@@ -55,6 +59,8 @@ public final class ModerationServices {
         this.jail = Objects.requireNonNull(builder.jail, "jail");
         this.unjail = Objects.requireNonNull(builder.unjail, "unjail");
         this.tempBan = Objects.requireNonNull(builder.tempBan, "tempBan");
+        this.ban = Objects.requireNonNull(builder.ban, "ban");
+        this.unban = Objects.requireNonNull(builder.unban, "unban");
         this.kick = Objects.requireNonNull(builder.kick, "kick");
         this.kickAll = Objects.requireNonNull(builder.kickAll, "kickAll");
         this.warn = Objects.requireNonNull(builder.warn, "warn");
@@ -88,6 +94,14 @@ public final class ModerationServices {
 
     public TempBan tempBan() {
         return tempBan;
+    }
+
+    public Ban ban() {
+        return ban;
+    }
+
+    public Unban unban() {
+        return unban;
     }
 
     public Kick kick() {
@@ -150,6 +164,8 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable Jail jail;
         private @org.jspecify.annotations.Nullable Unjail unjail;
         private @org.jspecify.annotations.Nullable TempBan tempBan;
+        private @org.jspecify.annotations.Nullable Ban ban;
+        private @org.jspecify.annotations.Nullable Unban unban;
         private @org.jspecify.annotations.Nullable Kick kick;
         private @org.jspecify.annotations.Nullable KickAll kickAll;
         private @org.jspecify.annotations.Nullable IssueWarn warn;
@@ -186,6 +202,16 @@ public final class ModerationServices {
 
         Builder tempBan(TempBan value) {
             this.tempBan = value;
+            return this;
+        }
+
+        Builder ban(Ban value) {
+            this.ban = value;
+            return this;
+        }
+
+        Builder unban(Unban value) {
+            this.unban = value;
             return this;
         }
 
