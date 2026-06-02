@@ -26,4 +26,19 @@ public interface CommandRegistration {
     default List<String> aliases() {
         return List.of();
     }
+
+    /** Stable id the command catalog keys overrides against; the built node's root literal. */
+    default String commandId() {
+        return build().getLiteral();
+    }
+
+    /** The code-side primary name; equal to {@link #commandId()} until an override renames it. */
+    default String defaultName() {
+        return commandId();
+    }
+
+    /** The code-side aliases; equal to {@link #aliases()} until an override replaces them. */
+    default List<String> defaultAliases() {
+        return aliases();
+    }
 }
