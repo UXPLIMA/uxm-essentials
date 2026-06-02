@@ -17,9 +17,9 @@ import org.jspecify.annotations.NullMarked;
  * The communication bounded context as a first-class {@link FeatureModule}: it owns the connection-message
  * policies (the join/quit/death templates chosen by {@code ResolveJoinMessage} / {@code ResolveQuitMessage} /
  * {@code ResolveDeathMessage}), the rotating announcer on the {@code Scheduler} port ({@code NextAnnouncement}
- * honouring no-immediate-repeat and the min-players gate), the static {@code /broadcasttoggle} command, and the
- * operator-configured info pages ({@code /rules}, {@code /motd}, {@code /info}) registered dynamically from the
- * {@code InfoRegistry}.
+ * honouring no-immediate-repeat and the min-players gate), the static {@code /broadcast} and
+ * {@code /broadcasttoggle} commands, and the operator-configured info pages ({@code /rules}, {@code /motd},
+ * {@code /info}) registered dynamically from the {@code InfoRegistry}.
  *
  * <p><b>Ships disabled by default.</b> A newly introduced module is off until an operator enables it in
  * {@code modules.conf}, so out of the box this context changes nothing: no listeners, no announcer timer, no
@@ -55,9 +55,9 @@ public final class CommunicationModule implements FeatureModule {
 
     @Override
     public List<CommandSpec> commands() {
-        // The static surface only: /broadcasttoggle. The operator-configured info-page commands (/rules, /motd,
-        // …) are dynamic — built from the config-derived InfoRegistry at start and registered by the adapter —
-        // so they are not part of this fixed table.
+        // The static surface only: /broadcast and /broadcasttoggle. The operator-configured info-page commands
+        // (/rules, /motd, …) are dynamic — built from the config-derived InfoRegistry at start and registered by
+        // the adapter — so they are not part of this fixed table.
         return CommunicationCommandSurface.staticCommands();
     }
 

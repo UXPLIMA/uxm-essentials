@@ -534,3 +534,6 @@ permissions:
   uxmessentials.communication.broadcasttoggle:
     description: '/broadcasttoggle to stop or resume receiving the rotating server announcements.'
     default: true
+  uxmessentials.communication.broadcast:
+    description: '/broadcast to send a one-off announcement to all online players.'
+    default: op

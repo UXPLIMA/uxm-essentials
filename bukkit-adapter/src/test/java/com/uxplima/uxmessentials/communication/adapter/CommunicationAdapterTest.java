@@ -20,6 +20,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationCommands;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ConnectionMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AtomicSequenceCounter;
+import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
 import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRandomSource;
@@ -140,7 +141,28 @@ class CommunicationAdapterTest {
         for (CommandRegistration command : commands()) {
             literals.add(command.build().getLiteral());
         }
-        assertThat(literals).containsExactlyInAnyOrder("broadcasttoggle", "rules", "motd");
+        assertThat(literals).containsExactlyInAnyOrder("broadcast", "broadcasttoggle", "rules", "motd");
+    }
+
+    @Test
+    void broadcastIsListedInTheCommandSurface() {
+        List<String> literals = new ArrayList<>();
+        for (CommandRegistration command : commands()) {
+            literals.add(command.build().getLiteral());
+        }
+        assertThat(literals).contains("broadcast");
+    }
+
+    @Test
+    void broadcastDeliversTheMessageToOnlinePlayersAsOperatorContent() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommands();
+
+        execute(dispatcher, "broadcast hello world");
+
+        // The operator-authored body lands in the sink with the configured prefix prepended, never as a MessageKey.
+        assertThat(sink.lines).hasSize(1);
+        assertThat(sink.lines.get(0)).endsWith("hello world");
+        assertThat(sink.keys).isEmpty();
     }
 
     private CommandDispatcher<CommandSourceStack> registerCommands() {
@@ -155,7 +177,8 @@ class CommunicationAdapterTest {
         CommunicationNotifier notifier = new CommunicationNotifier(sink, sink);
         BroadcastOptOut optOut = new BroadcastOptOut(optOutStore, notifier, new NoEvents(), Clock.systemUTC());
         InfoRegistry registry = settings.infoRegistry();
-        return CommunicationCommands.all(optOut, registry, new BukkitInfoSender(sink), notifier, sink);
+        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(sink, optOutStore);
+        return CommunicationCommands.all(optOut, registry, new BukkitInfoSender(sink), notifier, sink, broadcaster);
     }
 
     private com.uxplima.uxmessentials.communication.application.port.RandomSource random() {

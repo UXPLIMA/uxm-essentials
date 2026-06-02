@@ -12,8 +12,10 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
  * The communication context's command surface as platform-neutral {@link CommandSpec}s. It has two halves. The
- * <em>static</em> half is the plugin's own {@code /broadcasttoggle} ({@code uxmessentials.communication.broadcasttoggle}),
- * which is fixed and greppable so the permissions guard checks it against {@code paper-plugin.yml}. The
+ * <em>static</em> half is the plugin's own operator commands — {@code /broadcast}
+ * ({@code uxmessentials.communication.broadcast}) and {@code /broadcasttoggle}
+ * ({@code uxmessentials.communication.broadcasttoggle}) — which are fixed and greppable so the permissions guard
+ * checks them against {@code paper-plugin.yml}. The
  * <em>dynamic</em> half is the operator-configured info pages: one command per {@link InfoPage} in the
  * {@code InfoRegistry} ({@code /rules}, {@code /motd}, {@code /info}, any custom page), each guarded by a
  * per-page permission node derived from its command name.
@@ -30,12 +32,20 @@ final class CommunicationCommandSurface {
 
     private CommunicationCommandSurface() {}
 
-    /** The static command surface: just {@code /broadcasttoggle}. The info commands are added dynamically. */
+    /**
+     * The static command surface: the operator {@code /broadcast} plus the per-player {@code /broadcasttoggle}. The
+     * info commands are added dynamically.
+     */
     static List<CommandSpec> staticCommands() {
-        return List.of(spec(
-                "broadcasttoggle",
-                "uxmessentials.communication.broadcasttoggle",
-                command("broadcasttoggle", "Toggle whether you receive server announcements")));
+        return List.of(
+                spec(
+                        "broadcast",
+                        "uxmessentials.communication.broadcast",
+                        command("broadcast", "Send an announcement to all online players")),
+                spec(
+                        "broadcasttoggle",
+                        "uxmessentials.communication.broadcasttoggle",
+                        command("broadcasttoggle", "Toggle whether you receive server announcements")));
     }
 
     /** One {@link CommandSpec} per configured info page, guarded by a per-page permission node. */

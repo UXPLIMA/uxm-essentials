@@ -69,14 +69,15 @@ public final class CommunicationWiring {
         InfoRegistry registry = settings.infoRegistry();
 
         CommunicationServices services = assemble(kernel, settings, optOutStore, random, notifier);
+        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(kernel.messageSink(), optOutStore);
         AnnouncerTask announcer = new AnnouncerTask(
                 kernel.scheduler(),
                 services.nextAnnouncement(),
-                new BukkitAnnouncerBroadcaster(kernel.messageSink(), optOutStore),
+                broadcaster,
                 settings::announcerSchedule,
                 running::get);
         List<CommandRegistration> commands = CommunicationCommands.all(
-                services.broadcastOptOut(), registry, infoSender, notifier, kernel.messages());
+                services.broadcastOptOut(), registry, infoSender, notifier, kernel.messages(), broadcaster);
         List<Listener> listeners = listeners(services, registry, infoSender, settings);
         return new Wired(commands, listeners, announcer, running);
     }
