@@ -36,6 +36,10 @@ public enum PlayerstateMessageKey implements MessageKey {
     FED("playerstate.feed.self"),
     FED_OTHER("playerstate.feed.other"),
 
+    // /foodlevel
+    FOOD_SET("playerstate.foodlevel.set"),
+    FOOD_SET_OTHER("playerstate.foodlevel.set-other"),
+
     // /gamemode
     GAMEMODE_SET("playerstate.gamemode.self"),
     GAMEMODE_SET_OTHER("playerstate.gamemode.other"),

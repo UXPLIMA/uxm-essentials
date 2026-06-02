@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
+import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -138,6 +139,12 @@ public final class BukkitPlayerEffects implements PlayerEffects {
     public void setFire(PlayerRef who, BurnDuration duration) {
         Objects.requireNonNull(duration, "duration");
         onEntity(who, player -> player.setFireTicks(duration.ticks()));
+    }
+
+    @Override
+    public void setFoodLevel(PlayerRef who, FoodLevel food) {
+        Objects.requireNonNull(food, "food");
+        onEntity(who, player -> player.setFoodLevel(food.value()));
     }
 
     @Override

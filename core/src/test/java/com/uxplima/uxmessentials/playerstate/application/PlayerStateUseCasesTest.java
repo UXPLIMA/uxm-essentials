@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
 import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
+import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
@@ -227,6 +228,14 @@ class PlayerStateUseCasesTest {
     }
 
     @Test
+    void foodLevelAppliesThroughTheEffectsPortClampedInTheDomain() {
+        new SetFoodLevel(effects, notifier).set(alice, FoodLevel.of(25));
+
+        assertThat(effects.food).containsEntry(alice.uuid(), 20); // clamped to the vanilla maximum
+        assertThat(FoodLevel.of(-3).value()).isZero(); // a negative request empties the bar
+    }
+
+    @Test
     void restResetsWhenEnabledAndIsANoOpWhenDisabled() {
         new ResetRest(effects, notifier, true).reset(alice);
         assertThat(effects.restReset).containsExactly(alice.uuid());
@@ -304,6 +313,7 @@ class PlayerStateUseCasesTest {
         private final Map<UUID, Integer> currentExp = new ConcurrentHashMap<>();
         private final Map<UUID, Integer> air = new ConcurrentHashMap<>();
         private final Map<UUID, Integer> fireSeconds = new ConcurrentHashMap<>();
+        private final Map<UUID, Integer> food = new ConcurrentHashMap<>();
         private final List<UUID> restReset = new ArrayList<>();
 
         @Override
@@ -368,6 +378,11 @@ class PlayerStateUseCasesTest {
         @Override
         public void setFire(PlayerRef who, BurnDuration duration) {
             fireSeconds.put(who.uuid(), duration.seconds());
+        }
+
+        @Override
+        public void setFoodLevel(PlayerRef who, FoodLevel value) {
+            food.put(who.uuid(), value.value());
         }
 
         @Override

@@ -1,0 +1,67 @@
+package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
+
+import java.util.Optional;
+
+import org.bukkit.entity.Player;
+
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
+import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * {@code /foodlevel <amount> [player]} ({@code uxmessentials.foodlevel.use}): set a player's hunger to a
+ * specific value. The amount is bounded {@code 0..20} by Brigadier and re-clamped in the domain
+ * ({@link FoodLevel}). Distinct from {@code /feed}, which always restores to full. The {@code .others} target is
+ * gated by the shared {@code uxmessentials.playerstate.others} node; the {@code SetFoodLevel} use case owns the
+ * effect and feedback.
+ */
+@NullMarked
+public final class FoodLevelCommand extends PlayerstateCommandSupport implements CommandRegistration {
+
+    private static final String PERMISSION = "uxmessentials.foodlevel.use";
+
+    public FoodLevelCommand(PlayerStateServices services, Messages messages) {
+        super(services, messages);
+    }
+
+    @Override
+    public LiteralCommandNode<CommandSourceStack> build() {
+        return Commands.literal("foodlevel")
+                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .then(Commands.argument("amount", IntegerArgumentType.integer(0, FoodLevel.MAX_FOOD))
+                        .executes(this::set)
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .executes(this::set)))
+                .build();
+    }
+
+    @Override
+    public String description() {
+        return "Set a player's food level.";
+    }
+
+    private int set(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        Optional<PlayerRef> target = resolveTarget(ctx, sender);
+        if (target.isEmpty()) {
+            return 0;
+        }
+        FoodLevel food = FoodLevel.of(ctx.getArgument("amount", Integer.class));
+        services.foodLevel().setFor(ref(sender), target.get(), food);
+        return Command.SINGLE_SUCCESS;
+    }
+}

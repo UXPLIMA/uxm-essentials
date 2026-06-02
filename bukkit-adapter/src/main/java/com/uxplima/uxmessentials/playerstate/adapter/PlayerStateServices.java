@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
 import com.uxplima.uxmessentials.playerstate.application.SetAir;
 import com.uxplima.uxmessentials.playerstate.application.SetExperience;
+import com.uxplima.uxmessentials.playerstate.application.SetFoodLevel;
 import com.uxplima.uxmessentials.playerstate.application.SetGamemode;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalTime;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalWeather;
@@ -34,6 +35,7 @@ import org.jspecify.annotations.NullMarked;
  * @param toggleFly {@code /fly}
  * @param heal {@code /heal}
  * @param feed {@code /feed}
+ * @param foodLevel {@code /foodlevel}
  * @param setGamemode {@code /gamemode} and its {@code /gmc /gms /gma /gmsp} aliases
  * @param setSpeed {@code /speed}, {@code /walkspeed}, {@code /flyspeed}
  * @param extinguish {@code /ext} ({@code /extinguish})
@@ -57,6 +59,7 @@ public record PlayerStateServices(
         ToggleFly toggleFly,
         Heal heal,
         Feed feed,
+        SetFoodLevel foodLevel,
         SetGamemode setGamemode,
         SetSpeed setSpeed,
         Extinguish extinguish,
@@ -79,6 +82,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(toggleFly, "toggleFly");
         Objects.requireNonNull(heal, "heal");
         Objects.requireNonNull(feed, "feed");
+        Objects.requireNonNull(foodLevel, "foodLevel");
         Objects.requireNonNull(setGamemode, "setGamemode");
         Objects.requireNonNull(setSpeed, "setSpeed");
         Objects.requireNonNull(extinguish, "extinguish");

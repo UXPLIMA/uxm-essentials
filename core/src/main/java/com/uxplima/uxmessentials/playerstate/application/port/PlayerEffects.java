@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerstate.application.port;
 import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
+import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -58,6 +59,9 @@ public interface PlayerEffects {
 
     /** Set {@code who} on fire for {@code duration} (or put them out when the duration is zero). */
     void setFire(PlayerRef who, BurnDuration duration);
+
+    /** Set {@code who}'s food level to {@code food} (clamped to {@code 0..20} in the domain). */
+    void setFoodLevel(PlayerRef who, FoodLevel food);
 
     /** Reset {@code who}'s time-since-rest statistic so accumulated phantom pressure clears. */
     void resetRest(PlayerRef who);
