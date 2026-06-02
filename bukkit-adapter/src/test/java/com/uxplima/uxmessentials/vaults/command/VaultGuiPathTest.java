@@ -104,6 +104,7 @@ class VaultGuiPathTest {
 
     @AfterEach
     void tearDown() {
+        Guis.uninstall(); // reset the static install state so the next test re-installs the menu listener
         persistence.close();
         MockBukkit.unmock();
     }

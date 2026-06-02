@@ -144,8 +144,10 @@ public final class PluginModule {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
-        // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires.
+        // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
+        // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
+        resources.onClose(Guis::uninstall);
         for (FeatureModule module : registry.enabledModules(config)) {
             ConfigStore moduleConfig = config.scoped(module.id().configRoot());
             ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);
