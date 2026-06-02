@@ -26,7 +26,10 @@ public enum PresenceMessageKey implements MessageKey {
 
     // /vanish
     VANISH_ON("vanish.on"),
-    VANISH_OFF("vanish.off");
+    VANISH_OFF("vanish.off"),
+
+    // /list — the vanish-aware online roster
+    LIST_PLAYERS("list.players");
 
     private final String key;
 

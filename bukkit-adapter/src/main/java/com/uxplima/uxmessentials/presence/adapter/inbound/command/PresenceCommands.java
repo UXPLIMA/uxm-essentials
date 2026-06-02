@@ -9,8 +9,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Builds the presence context's Brigadier command surface (docs/10-feature-modules.md §15.8) as
- * {@link CommandRegistration}s over the constructed {@link PresenceServices}: {@code /afk [reason]} and
- * {@code /vanish}. Collected in one greppable table so the literal/permission pairing matches the permissions
+ * {@link CommandRegistration}s over the constructed {@link PresenceServices}: {@code /afk [reason]},
+ * {@code /vanish}, and {@code /list}. Collected in one greppable table so the literal/permission pairing matches the permissions
  * reference and the kernel's {@code PresenceCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS}
  * handler registers each.
  */
@@ -21,6 +21,9 @@ public final class PresenceCommands {
 
     /** Every presence command, in surface order. */
     public static List<CommandRegistration> all(PresenceServices services, Messages messages) {
-        return List.of(new AfkCommand(services, messages), new VanishCommand(services, messages));
+        return List.of(
+                new AfkCommand(services, messages),
+                new VanishCommand(services, messages),
+                new ListCommand(services, messages));
     }
 }

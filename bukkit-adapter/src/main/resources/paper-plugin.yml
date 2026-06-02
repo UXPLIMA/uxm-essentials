@@ -318,6 +318,9 @@ permissions:
   uxmessentials.afk.use:
     description: '/afk [reason] to toggle your AFK state (auto-AFK also applies on idle).'
     default: true
+  uxmessentials.list.use:
+    description: '/list to see who is online.'
+    default: true
   uxmessentials.afk.kick.exempt:
     description: 'Never auto-kicked for being AFK past the configured timeout.'
     default: op
