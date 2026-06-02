@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerstate.application.port;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -21,4 +22,7 @@ public interface PlayerInfo {
 
     /** The round-trip latency of {@code who} in milliseconds, or empty when they are offline. */
     Optional<Integer> pingOf(PlayerRef who);
+
+    /** The total time {@code who} has played, or empty when offline. */
+    Optional<Duration> playtimeOf(PlayerRef who);
 }

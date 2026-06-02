@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.playerstate.application.SetPersonalTime;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalWeather;
 import com.uxplima.uxmessentials.playerstate.application.SetSpeed;
 import com.uxplima.uxmessentials.playerstate.application.ShowPing;
+import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
@@ -54,6 +55,7 @@ import org.jspecify.annotations.NullMarked;
  * @param burn {@code /burn}
  * @param showPosition {@code /getpos} ({@code /coords}, {@code /whereami})
  * @param showPing {@code /ping}
+ * @param showPlaytime {@code /playtime}
  * @param resetRest {@code /rest}
  * @param players name → ref resolution for the {@code .others} targets
  */
@@ -80,6 +82,7 @@ public record PlayerStateServices(
         Burn burn,
         ShowPosition showPosition,
         ShowPing showPing,
+        ShowPlaytime showPlaytime,
         ResetRest resetRest,
         PlayerLookup players) {
 
@@ -105,6 +108,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(burn, "burn");
         Objects.requireNonNull(showPosition, "showPosition");
         Objects.requireNonNull(showPing, "showPing");
+        Objects.requireNonNull(showPlaytime, "showPlaytime");
         Objects.requireNonNull(resetRest, "resetRest");
         Objects.requireNonNull(players, "players");
     }

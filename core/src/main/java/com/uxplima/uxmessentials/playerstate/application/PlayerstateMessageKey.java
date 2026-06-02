@@ -114,6 +114,10 @@ public enum PlayerstateMessageKey implements MessageKey {
     PING_SHOW("playerstate.ping.show"),
     PING_SHOW_OTHER("playerstate.ping.show-other"),
 
+    // /playtime
+    PLAYTIME_SHOW("playerstate.playtime.show"),
+    PLAYTIME_SHOW_OTHER("playerstate.playtime.show-other"),
+
     // /rest
     REST_DONE("playerstate.rest.done"),
     REST_DONE_OTHER("playerstate.rest.done-other"),

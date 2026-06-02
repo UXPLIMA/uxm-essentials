@@ -55,6 +55,7 @@ final class PlayerstateCommandSurface {
                 spec("burn", "uxmessentials.burn.use", cmd("burn", "Set a player on fire")),
                 spec("getpos", "uxmessentials.getpos.use", cmd("getpos", "Show a player's coordinates")),
                 spec("ping", "uxmessentials.ping.use", cmd("ping", "Show a player's ping")),
+                spec("playtime", "uxmessentials.playtime.use", cmd("playtime", "Show a player's total play time")),
                 spec("rest", "uxmessentials.rest.use", cmd("rest", "Reset time-since-rest so phantoms stop")));
     }
 

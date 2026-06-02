@@ -277,7 +277,7 @@ class PlayerStateUseCasesTest {
     @Test
     void getposAndPingReadThroughTheInfoPort() {
         Position at = new Position(new WorldRef(UUID.randomUUID(), "world"), 1.0, 64.0, -3.0, 0f, 0f);
-        FakeInfo info = new FakeInfo(at, 42);
+        FakeInfo info = new FakeInfo(at, 42, java.time.Duration.ofHours(5));
 
         new ShowPosition(info, notifier).show(alice);
         new ShowPing(info, notifier).show(alice);
@@ -288,12 +288,31 @@ class PlayerStateUseCasesTest {
 
     @Test
     void getposIsSilentWhenTheTargetIsOffline() {
-        FakeInfo offline = new FakeInfo(null, null);
+        FakeInfo offline = new FakeInfo(null, null, null);
 
         new ShowPosition(offline, notifier).show(alice);
         new ShowPing(offline, notifier).show(alice);
 
         assertThat(reconciler.reconciled).isEmpty();
+    }
+
+    @Test
+    void playtimeReadsThroughTheInfoPortAndIsSilentWhenOffline() {
+        FakeInfo online = new FakeInfo(null, null, java.time.Duration.ofHours(5));
+
+        new ShowPlaytime(online, notifier).show(alice);
+        assertThat(reconciler.reconciled).isEmpty(); // read-only: nothing is reconciled
+
+        FakeInfo offline = new FakeInfo(null, null, null);
+        var captured = new ArrayList<String>();
+        PlayerStateNotifier capturing =
+                new PlayerStateNotifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
+
+        new ShowPlaytime(offline, capturing).show(alice);
+        assertThat(captured).isEmpty(); // offline target sends nothing
+
+        new ShowPlaytime(online, capturing).show(alice);
+        assertThat(captured).containsExactly(PlayerstateMessageKey.PLAYTIME_SHOW.key()); // self uses the self key
     }
 
     /** A map-backed {@link PlayerStateStore} mutated via the same compute contract as the real adapter. */
@@ -443,14 +462,16 @@ class PlayerStateUseCasesTest {
         }
     }
 
-    /** A read-only info port returning fixed position and ping. */
+    /** A read-only info port returning fixed position, ping, and play time. */
     private static final class FakeInfo implements PlayerInfo {
         private final @Nullable Position position;
         private final @Nullable Integer ping;
+        private final java.time.@Nullable Duration playtime;
 
-        FakeInfo(@Nullable Position position, @Nullable Integer ping) {
+        FakeInfo(@Nullable Position position, @Nullable Integer ping, java.time.@Nullable Duration playtime) {
             this.position = position;
             this.ping = ping;
+            this.playtime = playtime;
         }
 
         @Override
@@ -461,6 +482,11 @@ class PlayerStateUseCasesTest {
         @Override
         public java.util.Optional<Integer> pingOf(PlayerRef who) {
             return java.util.Optional.ofNullable(ping);
+        }
+
+        @Override
+        public java.util.Optional<java.time.Duration> playtimeOf(PlayerRef who) {
+            return java.util.Optional.ofNullable(playtime);
         }
     }
 

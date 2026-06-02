@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.playerstate.application.SetPersonalTime;
 import com.uxplima.uxmessentials.playerstate.application.SetPersonalWeather;
 import com.uxplima.uxmessentials.playerstate.application.SetSpeed;
 import com.uxplima.uxmessentials.playerstate.application.ShowPing;
+import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
@@ -117,6 +118,7 @@ public final class PlayerstateWiring {
                 new Burn(effects, notifier),
                 new ShowPosition(ports.info(), notifier),
                 new ShowPing(ports.info(), notifier),
+                new ShowPlaytime(ports.info(), notifier),
                 new ResetRest(effects, notifier, restEnabled),
                 kernel.playerLookup());
     }
