@@ -110,6 +110,43 @@ class ItemworldCommandPathTest {
     }
 
     @Test
+    void giveallDeliversToEveryOnlinePlayer() {
+        config.put("give-cap", 64);
+        PlayerMock bob = server.addPlayer("Bob");
+        CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();
+
+        execute(dispatcher, "giveall diamond 5");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.GIVEALL_DONE);
+        assertThat(countOfFor(player, Material.DIAMOND)).isEqualTo(5);
+        assertThat(countOfFor(bob, Material.DIAMOND)).isEqualTo(5);
+    }
+
+    @Test
+    void giveallRejectsAnUnknownItemId() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();
+
+        execute(dispatcher, "giveall not_a_real_item 1");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.UNKNOWN_ITEM);
+        assertThat(sink.keys).doesNotContain(ItemworldMessageKey.GIVEALL_DONE);
+        assertThat(player.getInventory().getContents())
+                .allSatisfy(stack -> assertThat(stack).isNull());
+    }
+
+    @Test
+    void giveallRefusesAnOverCapAmount() {
+        config.put("give-cap", 64);
+        CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();
+
+        execute(dispatcher, "giveall diamond 100"); // 100 > the give-cap of 64
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.AMOUNT_OUT_OF_RANGE);
+        assertThat(sink.keys).doesNotContain(ItemworldMessageKey.GIVEALL_DONE);
+        assertThat(player.getInventory().contains(Material.DIAMOND)).isFalse();
+    }
+
+    @Test
     void disposalOpensAThrowawayWindow() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();
 
@@ -214,8 +251,12 @@ class ItemworldCommandPathTest {
     }
 
     private int countOf(Material material) {
+        return countOfFor(player, material);
+    }
+
+    private int countOfFor(PlayerMock who, Material material) {
         int total = 0;
-        for (ItemStack stack : player.getInventory().getContents()) {
+        for (ItemStack stack : who.getInventory().getContents()) {
             if (stack != null && stack.getType() == material) {
                 total += stack.getAmount();
             }

@@ -419,6 +419,9 @@ permissions:
   uxmessentials.give.use:
     description: '/give <player> <item> [amount] (alias /i) — give an item to a player; bulk gives are audited.'
     default: op
+  uxmessentials.giveall.use:
+    description: '/giveall <item> [amount] — give an item to every online player; bulk gives are audited per recipient.'
+    default: op
   uxmessentials.item.use:
     description: '/item <item> [amount] — give an item to yourself.'
     default: op

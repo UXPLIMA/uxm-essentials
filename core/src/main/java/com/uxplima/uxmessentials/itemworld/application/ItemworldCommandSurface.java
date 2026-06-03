@@ -67,6 +67,11 @@ final class ItemworldCommandSurface {
         // Item utils — /give (/i is the adapter alias of /give), /item, cosmetics, /more, repair, /enchant, /hat,
         // /itemdb.
         verbs.add(new Verb("give", "uxmessentials.give.use", SubFeatureGroup.ITEM_UTILS, "Give an item to a player"));
+        verbs.add(new Verb(
+                "giveall",
+                "uxmessentials.giveall.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Give an item to every online player"));
         verbs.add(new Verb("item", "uxmessentials.item.use", SubFeatureGroup.ITEM_UTILS, "Give yourself an item"));
         verbs.add(
                 new Verb("itemname", "uxmessentials.itemname.use", SubFeatureGroup.ITEM_UTILS, "Rename the held item"));

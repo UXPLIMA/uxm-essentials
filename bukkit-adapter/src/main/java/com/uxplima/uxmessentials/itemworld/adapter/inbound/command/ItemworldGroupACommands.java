@@ -38,6 +38,7 @@ public final class ItemworldGroupACommands {
 
     private static void addItemUtils(List<CommandRegistration> commands, ItemworldServices services) {
         commands.add(new GiveCommand(services));
+        commands.add(new GiveAllCommand(services));
         commands.add(new ItemCommand(services));
         commands.add(new ItemNameCommand(services));
         commands.add(new ItemLoreCommand(services));

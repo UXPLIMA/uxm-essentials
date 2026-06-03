@@ -20,6 +20,8 @@ public enum ItemworldMessageKey implements MessageKey {
     // Item utils — /give, /i
     GIVE_GIVEN("itemworld.give.given"),
     GIVE_RECEIVED("itemworld.give.received"),
+    // /giveall
+    GIVEALL_DONE("itemworld.giveall.done"),
     // /item
     ITEM_GIVEN("itemworld.item.given"),
     // /itemname
