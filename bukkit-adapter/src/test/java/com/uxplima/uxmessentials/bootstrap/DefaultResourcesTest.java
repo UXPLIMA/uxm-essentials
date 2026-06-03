@@ -26,7 +26,7 @@ class DefaultResourcesTest {
         DefaultResources.writeInto(dataFolder, JUL);
 
         assertThat(dataFolder.resolve("config.conf")).isRegularFile();
-        assertThat(dataFolder.resolve("communication.conf")).isRegularFile();
+        assertThat(dataFolder.resolve("modules/communication/config.conf")).isRegularFile();
         assertThat(dataFolder.resolve("config/messages/messages_en.conf")).isRegularFile();
         assertThat(dataFolder.resolve("config/messages/messages_tr.conf")).isRegularFile();
     }
@@ -34,7 +34,7 @@ class DefaultResourcesTest {
     @Test
     void writtenConfigParsesToTheDocumentedDefaults(@TempDir Path dataFolder) {
         DefaultResources.writeInto(dataFolder, JUL);
-        ConfigStore config = ConfigurateConfigStore.load(dataFolder.resolve("config.conf"), new NoopLogger());
+        ConfigStore config = ConfigurateConfigStore.loadLayout(dataFolder, new NoopLogger());
 
         assertThat(config.getString("storage.backend", "?")).isEqualTo("sqlite");
         assertThat(config.getString("storage.file", "?")).isEqualTo("uxmessentials.db");

@@ -14,11 +14,12 @@ import org.jspecify.annotations.NullMarked;
  * Writes the bundled default config files into the plugin data folder on first run.
  *
  * <p>Every operator-facing file ships as a jar resource and is copied out verbatim the first time the
- * plugin enables, so a fresh install lands an editable {@code config.conf}, the communication content
- * file, and the message catalogs next to the database rather than an empty folder. A file the operator
- * already has is left untouched — the copy happens only when the target is absent, so edits and reloads
- * survive every restart and upgrade. The config tree itself is still read with per-key fallbacks, so a
- * partially-trimmed file keeps working; these copies exist to give the operator something to edit.
+ * plugin enables, so a fresh install lands an editable root {@code config.conf}, the per-module tree
+ * under {@code modules/}, and the message catalogs next to the database rather than an empty folder. A
+ * file the operator already has is left untouched — the copy happens only when the target is absent, so
+ * edits and reloads survive every restart and upgrade. The config tree itself is still read with per-key
+ * fallbacks, so a partially-trimmed file keeps working; these copies exist to give the operator
+ * something to edit.
  */
 @NullMarked
 final class DefaultResources {
@@ -26,7 +27,21 @@ final class DefaultResources {
     /** Jar resource paths, also used verbatim as the relative target path under the data folder. */
     private static final List<String> FILES = List.of(
             "config.conf",
-            "communication.conf",
+            "modules/teleport/config.conf",
+            "modules/teleport/rtp.conf",
+            "modules/homes/config.conf",
+            "modules/warps/config.conf",
+            "modules/economy/config.conf",
+            "modules/economy/currencies.conf",
+            "modules/kits/config.conf",
+            "modules/playerstate/config.conf",
+            "modules/messaging/config.conf",
+            "modules/presence/config.conf",
+            "modules/moderation/config.conf",
+            "modules/itemworld/config.conf",
+            "modules/vaults/config.conf",
+            "modules/communication/config.conf",
+            "modules/migration/config.conf",
             "config/messages/messages_en.conf",
             "config/messages/messages_tr.conf");
 
