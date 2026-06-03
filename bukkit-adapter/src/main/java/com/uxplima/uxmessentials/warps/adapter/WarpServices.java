@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.warps.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
 import com.uxplima.uxmessentials.warps.application.MoveWarp;
@@ -23,6 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * @param listWarps {@code /warps}
  * @param warpInfo {@code /warpinfo}
  * @param moveWarp {@code /movewarp}
+ * @param warpMenu the read-only {@code /warps} browse menu the bare {@code /warps} command opens
  * @param players name → ref resolution, available for future owner-attribution forms
  */
 @NullMarked
@@ -33,6 +35,7 @@ public record WarpServices(
         ListWarps listWarps,
         WarpInfo warpInfo,
         MoveWarp moveWarp,
+        WarpMenuView warpMenu,
         PlayerLookup players) {
 
     public WarpServices {
@@ -42,6 +45,7 @@ public record WarpServices(
         Objects.requireNonNull(listWarps, "listWarps");
         Objects.requireNonNull(warpInfo, "warpInfo");
         Objects.requireNonNull(moveWarp, "moveWarp");
+        Objects.requireNonNull(warpMenu, "warpMenu");
         Objects.requireNonNull(players, "players");
     }
 }

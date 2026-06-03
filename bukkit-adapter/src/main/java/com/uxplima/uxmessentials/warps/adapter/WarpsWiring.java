@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommands;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
 import com.uxplima.uxmessentials.warps.adapter.outbound.TeleportWarpAdapter;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
@@ -93,13 +94,16 @@ public final class WarpsWiring {
             Optional<WarpEconomy> economy) {
         WarpAccess access = new WarpAccess(kernel.permissions(), economy);
         Clock clock = Clock.systemUTC();
+        UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier);
+        WarpMenuView warpMenu = new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp);
         return new WarpServices(
-                new UseWarp(repository, access, teleporter, notifier),
+                useWarp,
                 new SetWarp(repository, notifier, kernel.events(), clock),
                 new DelWarp(repository, notifier, kernel.events()),
                 new ListWarps(repository, kernel.permissions(), notifier),
                 new WarpInfo(repository, notifier),
                 new MoveWarp(repository, notifier),
+                warpMenu,
                 kernel.playerLookup());
     }
 

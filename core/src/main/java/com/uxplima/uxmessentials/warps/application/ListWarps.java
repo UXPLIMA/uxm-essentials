@@ -15,6 +15,10 @@ import com.uxplima.uxmessentials.warps.domain.Warp;
  * so a player never sees a warp they cannot teleport to. The visible warps (in creation order) are returned
  * for the adapter to render as a clickable MiniMessage list; the header / per-entry / empty feedback is
  * pushed through the notifier so all text resolves from {@link WarpsMessageKey}.
+ *
+ * <p>The same filter is exposed side-effect-free as {@link #available(PlayerRef)} so the {@code /warps} browse
+ * menu can list exactly the warps the chat list shows without re-sending the chat feedback; {@link #list} now
+ * delegates to it and then notifies.
  */
 public final class ListWarps {
 
@@ -28,11 +32,21 @@ public final class ListWarps {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
+    /**
+     * The warps {@code viewer} may use, in stored creation order, with no side effect — a warp whose per-warp
+     * permission they lack or whose optional extra permission they do not hold is dropped. This is the same
+     * filter the chat {@link #list} renders; the {@code /warps} browse menu calls this directly so the GUI and
+     * the text list never disagree on what a player may warp to.
+     */
+    public List<Warp> available(PlayerRef viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        return repository.all().stream().filter(warp -> canUse(viewer, warp)).toList();
+    }
+
     /** The warps {@code viewer} may use, also pushing the header/entries (or the empty notice) to them. */
     public List<Warp> list(PlayerRef viewer) {
         Objects.requireNonNull(viewer, "viewer");
-        List<Warp> visible =
-                repository.all().stream().filter(warp -> canUse(viewer, warp)).toList();
+        List<Warp> visible = available(viewer);
         if (visible.isEmpty()) {
             notifier.send(viewer, WarpsMessageKey.WARP_LIST_EMPTY);
             return visible;

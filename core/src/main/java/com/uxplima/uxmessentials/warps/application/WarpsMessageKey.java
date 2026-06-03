@@ -27,6 +27,15 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_LIST_ENTRY("warp.list.entry"),
     WARP_LIST_EMPTY("warp.list.empty"),
 
+    // browse menu (/warps)
+    WARP_MENU_TITLE("warp.menu.title"),
+    WARP_MENU_ENTRY_NAME("warp.menu.entry.name"),
+    WARP_MENU_LORE_COST("warp.menu.lore.cost"),
+    WARP_MENU_LORE_PERMISSION("warp.menu.lore.permission"),
+    WARP_MENU_LORE_USABLE("warp.menu.lore.usable"),
+    WARP_MENU_PREV("warp.menu.prev"),
+    WARP_MENU_NEXT("warp.menu.next"),
+
     // info
     WARP_INFO_HEADER("warp.info.header"),
     WARP_INFO_OWNER("warp.info.owner"),
