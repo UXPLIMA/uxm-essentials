@@ -331,7 +331,7 @@ permissions:
     description: '/msgtoggle to refuse incoming /msg / /reply (mail still delivers).'
     default: true
   uxmessentials.msg.ignore:
-    description: '/ignore <player> / /unignore <player> to manage your own ignore list.'
+    description: '/ignore <player> / /unignore <player> / /ignorelist to manage and view your own ignore list.'
     default: true
   uxmessentials.mail.use:
     description: '/mail read / /mail send <player> <text> / /mail clear (/mailclear) — persistent offline mail.'

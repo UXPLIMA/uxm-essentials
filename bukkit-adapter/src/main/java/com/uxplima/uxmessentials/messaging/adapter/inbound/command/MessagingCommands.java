@@ -28,6 +28,7 @@ public final class MessagingCommands {
                 new MsgToggleCommand(services, messages, sink),
                 new IgnoreCommand(services, messages, sink),
                 new UnignoreCommand(services, messages, sink),
+                new IgnoreListCommand(services, messages, sink),
                 new SocialSpyCommand(services, messages, sink),
                 new MailClearCommand(services, messages, sink),
                 new HelpOpCommand(services, messages, sink));

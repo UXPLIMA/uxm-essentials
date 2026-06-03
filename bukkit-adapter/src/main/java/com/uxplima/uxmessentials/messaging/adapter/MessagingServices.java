@@ -5,6 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
 import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
+import com.uxplima.uxmessentials.messaging.application.ListIgnores;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
 import com.uxplima.uxmessentials.messaging.application.Reply;
@@ -32,6 +33,7 @@ import org.jspecify.annotations.NullMarked;
  * @param msgToggle {@code /msgtoggle}
  * @param ignore {@code /ignore}
  * @param unignore {@code /unignore}
+ * @param listIgnores {@code /ignorelist}
  * @param socialSpy {@code /socialspy}
  * @param helpOp {@code /helpop}
  * @param players name → ref resolution for {@code /msg} and {@code /ignore} targets
@@ -47,6 +49,7 @@ public record MessagingServices(
         MsgToggle msgToggle,
         Ignore ignore,
         Unignore unignore,
+        ListIgnores listIgnores,
         SocialSpy socialSpy,
         HelpOp helpOp,
         PlayerLookup players,
@@ -61,6 +64,7 @@ public record MessagingServices(
         Objects.requireNonNull(msgToggle, "msgToggle");
         Objects.requireNonNull(ignore, "ignore");
         Objects.requireNonNull(unignore, "unignore");
+        Objects.requireNonNull(listIgnores, "listIgnores");
         Objects.requireNonNull(socialSpy, "socialSpy");
         Objects.requireNonNull(helpOp, "helpOp");
         Objects.requireNonNull(players, "players");

@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The messaging bounded context as a first-class {@link FeatureModule}: it owns the persistent
  * {@code MailBox} and {@code IgnoreList}, the transient {@code /reply} targets, and the
- * {@code /msg /reply /mail /msgtoggle /ignore /unignore /socialspy /mailclear /helpop} command surface
+ * {@code /msg /reply /mail /msgtoggle /ignore /unignore /ignorelist /socialspy /mailclear /helpop} command surface
  * (docs/10-feature-modules.md §15.7 — NO public chat). It <em>soft-couples</em> to two other contexts: a
  * muted sender is gated by the moderation context, and a vanished target is hidden from {@code /msg}
  * resolution by the presence context; both degrade to "no mute" / "fully visible" when the other module is

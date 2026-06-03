@@ -16,8 +16,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * permissions guard checks against {@code paper-plugin.yml}.
  *
  * <p>Only {@code /msg} {@code /reply} {@code /mail} are the private-channel surface; {@code /msgtoggle}
- * {@code /ignore} {@code /unignore} {@code /socialspy} {@code /mailclear} {@code /helpop} round it out. There
- * is no public-chat command — that is out of charter.
+ * {@code /ignore} {@code /unignore} {@code /ignorelist} {@code /socialspy} {@code /mailclear} {@code /helpop}
+ * round it out. There is no public-chat command — that is out of charter.
  */
 final class MessagingCommandSurface {
 
@@ -31,6 +31,7 @@ final class MessagingCommandSurface {
                 spec("msgtoggle", "uxmessentials.msg.toggle", command("msgtoggle", "Refuse incoming private messages")),
                 spec("ignore", "uxmessentials.msg.ignore", command("ignore", "Ignore a player")),
                 spec("unignore", "uxmessentials.msg.ignore", command("unignore", "Stop ignoring a player")),
+                spec("ignorelist", "uxmessentials.msg.ignore", command("ignorelist", "List the players you ignore")),
                 spec("socialspy", "uxmessentials.msg.socialspy", command("socialspy", "Observe private messages")),
                 spec("mailclear", "uxmessentials.mail.use", command("mailclear", "Clear your mailbox")),
                 spec("helpop", "uxmessentials.helpop.use", command("helpop", "Open a staff support request")));

@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.messaging.adapter.outbound.PdcMessageToggleStor
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
 import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
+import com.uxplima.uxmessentials.messaging.application.ListIgnores;
 import com.uxplima.uxmessentials.messaging.application.MessagingNotifier;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
@@ -114,6 +115,7 @@ public final class MessagingWiring {
                 new MsgToggle(stores.toggles(), notifier),
                 new Ignore(stores.ignores(), notifier),
                 new Unignore(stores.ignores(), notifier),
+                new ListIgnores(stores.ignores(), notifier),
                 new SocialSpy(stores.socialSpy(), notifier),
                 new HelpOp(new BukkitStaffAudience(), delivery, mute, notifier, kernel.events(), clock),
                 kernel.playerLookup(),
