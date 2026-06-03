@@ -7,9 +7,9 @@ import java.util.Objects;
 /**
  * One operator-curated kit: its {@link KitId}, the {@link KitItem stacks} it grants, the cooldown between
  * claims, whether it may be claimed only once ({@code oneTime}), whether it is gated behind the per-kit
- * permission node, and the optional {@link KitCost}. Kits are defined in {@code kits.conf} and loaded into
- * this value object; a kit is never mutated in place — an edit produces a new definition the repository
- * overwrites the entry with.
+ * permission node, and the optional {@link KitCost}. Each kit is defined in its own
+ * {@code modules/kits/kits/<id>.conf} file and loaded into this value object; a kit is never mutated in
+ * place — an edit produces a new definition the repository overwrites the kit's file with.
  *
  * <p>The cooldown is the default tier when the player holds no numbered {@code uxmessentials.kit.cooldown.
  * <seconds>} node; the {@code Cooldowns} port resolves the effective wait per claim against it. The

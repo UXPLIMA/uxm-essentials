@@ -328,7 +328,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts) {
-        // kits need no database: definitions live in kits.conf and claim/cooldown state is transient PDC.
+        // kits need no database: definitions live in modules/kits/kits/<id>.conf and claim/cooldown state
+        // is transient PDC.
         // The per-kit cost charges through the economy bridge captured during economy wiring when present.
         KitsWiring.Wired wired = KitsWiring.wire(plugin, ctx, Optional.ofNullable(links.kitEconomy), guiLayouts);
         wired.commands().forEach(resources::addCommand);

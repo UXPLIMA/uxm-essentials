@@ -7,11 +7,11 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 
 /**
- * The store of operator-curated kit definitions. Kits are config-driven — the definitions live in
- * {@code kits.conf} (Configurate), loaded once on enable and swapped atomically on reload — so this port is
- * the application's read/write view over that config-backed catalog rather than a database table. The
- * authoring commands ({@code /createkit}, {@code /delkit}, {@code /kiteditor}) go through {@link #save} and
- * {@link #delete}, which the adapter persists back to {@code kits.conf}.
+ * The store of operator-curated kit definitions. Kits are config-driven — each definition lives in its own
+ * {@code modules/kits/kits/<id>.conf} (Configurate), loaded once on enable and swapped atomically on reload —
+ * so this port is the application's read/write view over that config-backed catalog rather than a database
+ * table. The authoring commands ({@code /createkit}, {@code /delkit}, {@code /kiteditor}) go through
+ * {@link #save} and {@link #delete}, which the adapter persists to the kit's own file.
  *
  * <p>Kits are server-wide, so a {@link KitId} is unique across the whole catalog. Lookup and the listing are
  * the hot paths and stay in memory; saving and deleting are rare authoring operations.

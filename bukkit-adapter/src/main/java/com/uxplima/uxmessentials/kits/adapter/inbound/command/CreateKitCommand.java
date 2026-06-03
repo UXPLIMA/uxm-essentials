@@ -22,7 +22,8 @@ import org.jspecify.annotations.NullMarked;
  * {@code /createkit <name>}: define a new kit from the staff member's current inventory
  * ({@code uxmessentials.kit.edit}). The inventory is serialized into the kit's item list; the new kit is
  * free, repeatable, and ungated by default — an operator tunes its cooldown, one-time flag, permission, and
- * cost in {@code kits.conf} afterward. The duplicate-id refusal and the persist are the
+ * cost in the kit's {@code modules/kits/kits/<name>.conf} file afterward. The duplicate-id refusal and the
+ * persist are the
  * {@link com.uxplima.uxmessentials.kits.application.CreateKit} use case's job.
  */
 @NullMarked

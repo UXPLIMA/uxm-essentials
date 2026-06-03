@@ -19,9 +19,9 @@ import org.jspecify.annotations.NullMarked;
  * {@code :core} layer never sees one.
  *
  * <p>An empty or air stack is dropped at encode time so a kit defined from a partially-filled inventory does
- * not store blank slots. A payload that fails to decode (a corrupt or version-incompatible {@code kits.conf}
- * entry) is surfaced as an {@link IllegalArgumentException} the caller logs and skips, rather than silently
- * granting nothing.
+ * not store blank slots. A payload that fails to decode (a corrupt or version-incompatible kit file) is
+ * surfaced as an {@link IllegalArgumentException} the caller logs and skips, rather than silently granting
+ * nothing.
  */
 @NullMarked
 public final class KitItemCodec {

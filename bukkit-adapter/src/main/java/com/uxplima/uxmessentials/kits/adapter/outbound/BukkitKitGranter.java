@@ -21,8 +21,8 @@ import org.jspecify.annotations.NullMarked;
  * region), so the inventory mutation is region-correct without an extra hop.
  *
  * <p>An offline recipient has no inventory to fill, so the grant no-ops and reports that everything "fit" —
- * there is nothing to overflow. A single corrupt {@code kits.conf} entry is logged and skipped rather than
- * aborting the whole claim, so one bad item never denies a player the rest of a kit.
+ * there is nothing to overflow. A single corrupt kit item is logged and skipped rather than aborting the
+ * whole claim, so one bad item never denies a player the rest of a kit.
  */
 @NullMarked
 public final class BukkitKitGranter implements KitGranter {

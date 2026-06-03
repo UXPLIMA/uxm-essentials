@@ -35,12 +35,13 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Constructs the kits context's adapters and use cases over the injected kernel ports, the {@code kits.conf}
- * catalog, and the PDC claim store, and produces the Brigadier command list the plugin registers. This is
- * the one place the kits context is wired — nothing else news up its classes.
+ * Constructs the kits context's adapters and use cases over the injected kernel ports, the per-kit files
+ * under {@code modules/kits/kits/}, and the PDC claim store, and produces the Brigadier command list the
+ * plugin registers. This is the one place the kits context is wired — nothing else news up its classes.
  *
- * <p>The repository is the Configurate adapter over {@code kits.conf} (read-on-load, write-through on
- * authoring). The claim store and the granter are PDC- and inventory-backed Bukkit adapters; the shared
+ * <p>The repository is the Configurate adapter over the per-kit files (read-on-load, write-through on
+ * authoring; a legacy {@code kits.conf} monolith is split into per-kit files on first load). The claim store
+ * and the granter are PDC- and inventory-backed Bukkit adapters; the shared
  * {@code Cooldowns} and {@code Permissions} kernel ports cover the cooldown and permission gates. The per-kit
  * cost soft-couples to the economy context: the {@link KitEconomy} seam is injected as an {@link Optional},
  * {@link Optional#empty()} when economy is disabled, so a priced kit's cost is recorded but not charged until
@@ -49,7 +50,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class KitsWiring {
 
-    private static final String KITS_FILE = "kits.conf";
+    private static final String LEGACY_KITS_FILE = "kits.conf";
 
     private KitsWiring() {}
 
@@ -70,8 +71,10 @@ public final class KitsWiring {
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
-        Path file = plugin.getDataFolder().toPath().resolve(KITS_FILE);
-        KitRepository repository = ConfigurateKitRepository.load(file, kernel.log());
+        Path dataFolder = plugin.getDataFolder().toPath();
+        Path kitsDir = dataFolder.resolve("modules").resolve("kits").resolve("kits");
+        Path legacy = dataFolder.resolve(LEGACY_KITS_FILE);
+        KitRepository repository = ConfigurateKitRepository.load(kitsDir, legacy, kernel.log());
         KitClaimStore claims = new PdcKitClaims(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());

@@ -219,8 +219,8 @@ permissions:
     default: op
   # kits context (docs/permissions.md "Kits"). The per-kit gate uxmessentials.kit.<id> and the cooldown
   # tier uxmessentials.kit.cooldown.<seconds> are an open value space granted per kit and are intentionally
-  # not enumerated here; only the base nodes are declared. Per-kit permission gating is data-driven in
-  # kits.conf, and per-player claim/cooldown state lives in PDC.
+  # not enumerated here; only the base nodes are declared. Per-kit permission gating is data-driven in each
+  # kit's modules/kits/kits/<id>.conf file, and per-player claim/cooldown state lives in PDC.
   uxmessentials.kit.use:
     description: '/kit and /kits to claim a kit and list the kits you may claim.'
     default: true

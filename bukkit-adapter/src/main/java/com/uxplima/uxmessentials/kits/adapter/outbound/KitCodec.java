@@ -15,30 +15,30 @@ import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.ConfigurationNode;
 
 /**
- * Reads and writes one {@code kits.conf} entry as a {@link KitDefinition}. The HOCON shape is
+ * Reads and writes one kit as a {@link KitDefinition}. Each kit lives in its own {@code <id>.conf} under
+ * {@code modules/kits/kits/}, whose root node <em>is</em> the kit:
  *
  * <pre>{@code
- * kits {
- *   starter {
- *     cooldown = 0          # seconds between claims; 0 = no cooldown
- *     one-time = true       # claimable once per player
- *     permission = false    # require uxmessentials.kit.<id>
- *     cost = 0              # claim price; charged only when economy is wired
- *     items = [ "<base64>", { data = "<base64>", amount = 16 } ]
- *   }
- * }
+ * # modules/kits/kits/starter.conf
+ * cooldown = 0          # seconds between claims; 0 = no cooldown
+ * one-time = true       # claimable once per player
+ * permission = false    # require uxmessentials.kit.<id>
+ * cost = 0              # claim price; charged only when economy is wired
+ * items = [ "<base64>", { data = "<base64>", amount = 16 } ]
  * }</pre>
  *
- * An item is either a bare Base64 string (its serialized form carries the amount) or a {@code {data, amount}}
- * map for readability. A read that cannot produce a valid definition returns empty so the repository skips
- * the entry rather than failing the whole load.
+ * The same codec also reads each entry of the previous {@code kits.conf} monolith — a {@code kits { <id> {
+ * ... } }} tree — which the repository imports once on first load and splits into per-file kits. An item is
+ * either a bare Base64 string (its serialized form carries the amount) or a {@code {data, amount}} map for
+ * readability. A read that cannot produce a valid definition returns empty so the repository skips the kit
+ * rather than failing the whole load.
  */
 @NullMarked
 final class KitCodec {
 
     private KitCodec() {}
 
-    /** Parse the node {@code node} under id {@code id} into a definition, or empty when it is malformed. */
+    /** Parse the node {@code node} for id {@code id} into a definition, or empty when it is malformed. */
     static Optional<KitDefinition> read(String id, ConfigurationNode node) {
         try {
             KitId kitId = KitId.of(id);

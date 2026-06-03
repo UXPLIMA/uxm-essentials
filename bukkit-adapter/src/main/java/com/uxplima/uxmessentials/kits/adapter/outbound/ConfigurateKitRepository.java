@@ -1,6 +1,12 @@
 package com.uxplima.uxmessentials.kits.adapter.outbound;
 
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,40 +25,48 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
- * The {@link KitRepository} backed by {@code kits.conf} (Configurate HOCON). Kit definitions are loaded once
- * on construction into an immutable id-keyed map held in an {@link AtomicReference}, so reads (the hot
- * {@code /kit} / {@code /kits} paths) are lock-free against the snapshot they fetch. The rare authoring
- * operations ({@code /createkit}, {@code /delkit}, {@code /kiteditor}) rebuild the map, swap the reference,
- * and write the whole tree back to disk, so the in-memory catalog and the file never drift.
+ * The {@link KitRepository} backed by one HOCON file per kit under {@code modules/kits/kits/}: each kit lives
+ * in its own {@code <id>.conf}, whose root node is the kit (cooldown, one-time, permission, cost, items).
+ * Definitions are loaded once on construction into an immutable id-keyed map held in an {@link AtomicReference},
+ * so reads (the hot {@code /kit} / {@code /kits} paths) are lock-free against the snapshot they fetch. The rare
+ * authoring operations ({@code /createkit}, {@code /delkit}, {@code /kiteditor}) touch only the one kit's file
+ * and then swap the in-memory snapshot, so the catalog and the folder never drift.
  *
- * <p>Parsing each entry is delegated to {@link KitCodec}; a malformed entry is logged and skipped at load so
- * one bad kit never strands the rest. The file write is serialized by {@code synchronized} on this
- * repository — authoring is single-operator and rare, so the coarse lock is fine and keeps the save atomic
- * against a concurrent edit.
+ * <p>Parsing each file is delegated to {@link KitCodec}; a malformed or unreadable file is logged and skipped
+ * at load so one bad kit never strands the rest. A save writes the kit to a sibling temp file and then moves
+ * it into place ({@link StandardCopyOption#ATOMIC_MOVE} where the filesystem supports it), so a crash mid-write
+ * never leaves a half-written kit file. Writes are serialized by {@code synchronized} on this repository —
+ * authoring is single-operator and rare, so the coarse lock is fine.
+ *
+ * <p>A pre-existing single {@code kits.conf} monolith (the previous layout) is split into per-kit files on the
+ * first load and renamed to {@code kits.conf.migrated}, so existing servers keep their kits and the monolith is
+ * imported exactly once.
  */
 @NullMarked
 public final class ConfigurateKitRepository implements KitRepository {
 
-    private final Path file;
+    private static final String SUFFIX = ".conf";
+
+    private final Path dir;
     private final Logger log;
-    private final HoconConfigurationLoader loader;
     private final AtomicReference<Map<String, KitDefinition>> kits;
 
-    private ConfigurateKitRepository(
-            Path file, Logger log, HoconConfigurationLoader loader, Map<String, KitDefinition> initial) {
-        this.file = file;
+    private ConfigurateKitRepository(Path dir, Logger log, Map<String, KitDefinition> initial) {
+        this.dir = dir;
         this.log = log;
-        this.loader = loader;
         this.kits = new AtomicReference<>(Map.copyOf(initial));
     }
 
-    /** Load {@code file} once; an absent or unreadable file yields an empty catalog. */
-    public static ConfigurateKitRepository load(Path file, Logger log) {
-        Objects.requireNonNull(file, "file");
+    /**
+     * Load every kit file under {@code dir}. If a legacy {@code legacyMonolith} {@code kits.conf} exists it is
+     * split into per-kit files first and renamed aside, so an upgraded server keeps its kits.
+     */
+    public static ConfigurateKitRepository load(Path dir, Path legacyMonolith, Logger log) {
+        Objects.requireNonNull(dir, "dir");
+        Objects.requireNonNull(legacyMonolith, "legacyMonolith");
         Objects.requireNonNull(log, "log");
-        HoconConfigurationLoader loader =
-                HoconConfigurationLoader.builder().path(file).build();
-        return new ConfigurateKitRepository(file, log, loader, read(loader, file, log));
+        migrateMonolith(dir, legacyMonolith, log);
+        return new ConfigurateKitRepository(dir, log, readAll(dir, log));
     }
 
     @Override
@@ -75,17 +89,29 @@ public final class ConfigurateKitRepository implements KitRepository {
     @Override
     public synchronized void save(KitDefinition definition) {
         Objects.requireNonNull(definition, "definition");
+        try {
+            writeKitFile(definition);
+        } catch (IOException failure) {
+            log.error("failed to save kit " + definition.id().value() + " under " + dir, failure);
+            return;
+        }
         Map<String, KitDefinition> next = new LinkedHashMap<>(current());
         next.put(definition.id().value(), definition);
-        persist(next);
+        kits.set(Map.copyOf(next));
     }
 
     @Override
     public synchronized void delete(KitId id) {
         Objects.requireNonNull(id, "id");
+        try {
+            Files.deleteIfExists(fileFor(id.value()));
+        } catch (IOException failure) {
+            log.error("failed to delete kit " + id.value() + " under " + dir, failure);
+            return;
+        }
         Map<String, KitDefinition> next = new LinkedHashMap<>(current());
         if (next.remove(id.value()) != null) {
-            persist(next);
+            kits.set(Map.copyOf(next));
         }
     }
 
@@ -93,43 +119,104 @@ public final class ConfigurateKitRepository implements KitRepository {
         return Objects.requireNonNull(kits.get(), "kits");
     }
 
-    private void persist(Map<String, KitDefinition> next) {
+    private Path fileFor(String id) {
+        return dir.resolve(id + SUFFIX);
+    }
+
+    private void writeKitFile(KitDefinition definition) throws IOException {
+        Files.createDirectories(dir);
+        Path target = fileFor(definition.id().value());
+        Path temp = dir.resolve(definition.id().value() + SUFFIX + ".tmp");
+        CommentedConfigurationNode root = CommentedConfigurationNode.root();
+        KitCodec.write(root, definition);
+        HoconConfigurationLoader.builder().path(temp).build().save(root);
+        atomicMove(temp, target);
+    }
+
+    private static void atomicMove(Path temp, Path target) throws IOException {
         try {
-            CommentedConfigurationNode root = CommentedConfigurationNode.root();
-            ConfigurationNode kitsNode = root.node("kits");
-            for (KitDefinition definition : next.values()) {
-                KitCodec.write(kitsNode.node(definition.id().value()), definition);
-            }
-            loader.save(root);
-            kits.set(Map.copyOf(next));
-        } catch (ConfigurateException failure) {
-            log.error("failed to save kits to " + file, failure);
+            Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException atomicUnsupported) {
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
-    private static Map<String, KitDefinition> read(HoconConfigurationLoader loader, Path file, Logger log) {
+    private static Map<String, KitDefinition> readAll(Path dir, Logger log) {
         Map<String, KitDefinition> loaded = new LinkedHashMap<>();
-        ConfigurationNode kitsNode = rootKitsNode(loader, file, log);
-        for (Map.Entry<Object, ? extends ConfigurationNode> entry :
-                kitsNode.childrenMap().entrySet()) {
-            String id = String.valueOf(entry.getKey());
-            KitCodec.read(id, entry.getValue())
-                    .ifPresentOrElse(
-                            kit -> loaded.put(kit.id().value(), kit),
-                            () -> log.warn("skipping malformed kit entry: " + id));
+        if (!Files.isDirectory(dir)) {
+            return loaded;
+        }
+        for (Path file : sortedConfFiles(dir, log)) {
+            readFile(file, log).ifPresent(kit -> loaded.put(kit.id().value(), kit));
         }
         return loaded;
     }
 
-    private static ConfigurationNode rootKitsNode(HoconConfigurationLoader loader, Path file, Logger log) {
-        if (!java.nio.file.Files.exists(file)) {
-            return CommentedConfigurationNode.root();
+    private static List<Path> sortedConfFiles(Path dir, Logger log) {
+        List<Path> files = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "*" + SUFFIX)) {
+            stream.forEach(files::add);
+        } catch (IOException failure) {
+            log.error("failed to list kit files under " + dir, failure);
+            return List.of();
+        }
+        files.sort(
+                (a, b) -> a.getFileName().toString().compareTo(b.getFileName().toString()));
+        return files;
+    }
+
+    private static Optional<KitDefinition> readFile(Path file, Logger log) {
+        String name = file.getFileName().toString();
+        String id = name.substring(0, name.length() - SUFFIX.length());
+        try {
+            ConfigurationNode root =
+                    HoconConfigurationLoader.builder().path(file).build().load();
+            Optional<KitDefinition> kit = KitCodec.read(id, root);
+            if (kit.isEmpty()) {
+                log.warn("skipping malformed kit file: " + file);
+            }
+            return kit;
+        } catch (ConfigurateException failure) {
+            log.error("failed to read kit file " + file + "; skipping it", failure);
+            return Optional.empty();
+        }
+    }
+
+    private static void migrateMonolith(Path dir, Path legacyMonolith, Logger log) {
+        if (!Files.isRegularFile(legacyMonolith)) {
+            return;
         }
         try {
-            return loader.load().node("kits");
-        } catch (ConfigurateException failure) {
-            log.error("failed to load kits from " + file + "; starting with an empty catalog", failure);
-            return CommentedConfigurationNode.root();
+            Files.createDirectories(dir);
+            int split = splitMonolith(dir, legacyMonolith);
+            Files.move(legacyMonolith, legacyMonolith.resolveSibling(legacyMonolith.getFileName() + ".migrated"));
+            log.info("split legacy kits.conf into {} per-kit file(s) under " + dir, split);
+        } catch (IOException failure) {
+            log.error("failed to migrate legacy kits.conf at " + legacyMonolith, failure);
         }
+    }
+
+    private static int splitMonolith(Path dir, Path legacyMonolith) throws IOException {
+        ConfigurationNode kitsNode = HoconConfigurationLoader.builder()
+                .path(legacyMonolith)
+                .build()
+                .load()
+                .node("kits");
+        int split = 0;
+        for (Map.Entry<Object, ? extends ConfigurationNode> entry :
+                kitsNode.childrenMap().entrySet()) {
+            String id = String.valueOf(entry.getKey());
+            Optional<KitDefinition> kit = KitCodec.read(id, entry.getValue());
+            if (kit.isPresent()) {
+                CommentedConfigurationNode root = CommentedConfigurationNode.root();
+                KitCodec.write(root, kit.get());
+                HoconConfigurationLoader.builder()
+                        .path(dir.resolve(kit.get().id().value() + SUFFIX))
+                        .build()
+                        .save(root);
+                split++;
+            }
+        }
+        return split;
     }
 }

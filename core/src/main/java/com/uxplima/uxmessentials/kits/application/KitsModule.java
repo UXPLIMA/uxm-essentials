@@ -14,14 +14,16 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The kits bounded context as a first-class {@link FeatureModule}: it owns the kit definitions (config-driven
- * in {@code kits.conf}), the claim rules (per-kit permission, the shared cooldown gate, the persisted
- * one-time stamp, and an optional cost), and the kit claim/list/authoring/reset commands. The per-kit cost
+ * The kits bounded context as a first-class {@link FeatureModule}: it owns the kit definitions (config-driven,
+ * one file per kit under {@code modules/kits/kits/}), the claim rules (per-kit permission, the shared cooldown
+ * gate, the persisted one-time stamp, and an optional cost), and the kit claim/list/authoring/reset commands.
+ * The per-kit cost
  * soft-couples to the economy context: kits charge only when an economy provider is present, so the module
  * is registered after economy but never hard depends on it.
  *
- * <p>The module needs no database. Kit definitions live in {@code kits.conf}, and per-player claim/cooldown
- * state is transient PDC, so the module declares no migration location — a disabled module wires nothing and
+ * <p>The module needs no database. Kit definitions live one file per kit under {@code modules/kits/kits/}, and
+ * per-player claim/cooldown state is transient PDC, so the module declares no migration location — a disabled
+ * module wires nothing and
  * leaves no schema behind. The module declares its command surface and enable gate here; {@code start} arms
  * the lifecycle bookkeeping, and the bukkit-side adapters (the Brigadier handlers, the config-backed
  * repository, and the PDC claim store) are constructed in the adapter wiring once the module has started.
@@ -59,8 +61,8 @@ public final class KitsModule implements FeatureModule {
 
     @Override
     public List<MigrationSet> migrations() {
-        // Kits need no database: definitions live in kits.conf and claim/cooldown state is transient PDC,
-        // so the module owns no Flyway location.
+        // Kits need no database: definitions live one file per kit under modules/kits/kits/ and
+        // claim/cooldown state is transient PDC, so the module owns no Flyway location.
         return List.of();
     }
 
