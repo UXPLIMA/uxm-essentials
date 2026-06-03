@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
@@ -110,7 +111,8 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(ModerationMessageKey.values(), List.of("moderation", "mute", "jail")),
                 Map.entry(ItemworldMessageKey.values(), List.of("itemworld", "give", "time", "weather")),
                 Map.entry(VaultsMessageKey.values(), List.of("vault", "vaults")),
-                Map.entry(CommunicationMessageKey.values(), List.of("communication")));
+                Map.entry(CommunicationMessageKey.values(), List.of("communication")),
+                Map.entry(HologramsMessageKey.values(), List.of("hologram")));
     }
 
     @Test

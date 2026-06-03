@@ -35,6 +35,8 @@ dependencies {
     implementation("com.uxplima.uxmlib:uxmlib-gui:0.1.0-SNAPSHOT")
     // uxmLib HUD toolkit (dogfood) — Titles for the teleport arrival banner. Pulls uxmlib-common only.
     implementation("com.uxplima.uxmlib:uxmlib-hud:0.1.0-SNAPSHOT")
+    // uxmLib integration toolkit (dogfood) — native-Display holograms for the holograms context.
+    implementation("com.uxplima.uxmlib:uxmlib-integration:0.1.0-SNAPSHOT")
 
     testImplementation(libs.mockbukkit)
     testImplementation(libs.archunit.junit)

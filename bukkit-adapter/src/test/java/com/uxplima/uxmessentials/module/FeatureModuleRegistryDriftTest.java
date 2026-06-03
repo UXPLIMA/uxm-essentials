@@ -60,6 +60,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("itemworld"))).isPresent();
         assertThat(registry.byId(ModuleId.of("vaults"))).isPresent();
         assertThat(registry.byId(ModuleId.of("communication"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("holograms"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -73,7 +74,8 @@ class FeatureModuleRegistryDriftTest {
                         "moderation",
                         "itemworld",
                         "vaults",
-                        "communication");
+                        "communication",
+                        "holograms");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -181,16 +183,13 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void communicationIsTheLastModuleShipsDisabledAndPublishesItsStaticSurface() {
+    void communicationShipsDisabledAndPublishesItsStaticSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule communication = registry.byId(ModuleId.of("communication"))
                 .orElseThrow(() -> new AssertionError("communication is not registered"));
 
-        // communication is the round-3 feature context, registered last after the twelve landed contexts.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("communication");
-
-        // A newly introduced module ships DISABLED: with no modules.conf override it is absent from the enabled
-        // set while every landed sibling (which default to on) stays enabled.
+        // communication is the round-3 feature context; it ships DISABLED. With no modules.conf override it is
+        // absent from the enabled set while every landed sibling (which defaults to on) stays enabled.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
@@ -213,6 +212,35 @@ class FeatureModuleRegistryDriftTest {
                 .containsExactlyInAnyOrder(
                         "broadcast", "broadcastworld", "me", "broadcasttoggle", "clearchat", "togglechat");
         assertThat(communication.migrations()).isEmpty();
+    }
+
+    @Test
+    void hologramsIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule holograms = registry.byId(ModuleId.of("holograms"))
+                .orElseThrow(() -> new AssertionError("holograms is not registered"));
+
+        // holograms is the round-4 world-placed display context, registered last after the thirteen prior modules.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("holograms");
+
+        // It ships ENABLED (a steady-state world-placed feature like warps/vaults): with no modules.conf override
+        // it is on, and disabling exactly holograms removes only it while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("holograms", "teleport", "vaults");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.holograms.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("holograms");
+        assertThat(off).contains("teleport", "economy", "vaults");
+
+        // Enabled, holograms contributes its single /hologram command and owns no extra Flyway location (its
+        // tables are in the persistence V13 baseline, always applied), so it declares no MigrationSet of its own.
+        Set<String> literals =
+                holograms.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactly("hologram");
+        assertThat(holograms.migrations()).isEmpty();
     }
 
     @Test

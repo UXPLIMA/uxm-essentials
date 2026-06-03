@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationModule;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
+import com.uxplima.uxmessentials.holograms.application.HologramsModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldModule;
 import com.uxplima.uxmessentials.kits.application.KitsModule;
@@ -77,6 +78,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // edge (its only collaborators are the shared Scheduler, messages, and event ports), and it ships DISABLED
         // by default, so it lands last and wires nothing until an operator enables it in modules.conf.
         delegate.register(new CommunicationModule());
+        // holograms is a world-placed display feature (named, multi-line TextDisplay holograms behind
+        // /hologram) — it carries no hard dependency edge (its only collaborators are the shared persistence
+        // DSL, the Scheduler, messages, and event ports), and like warps/vaults it ships ENABLED as a
+        // steady-state feature, so it lands last after communication.
+        delegate.register(new HologramsModule());
         // The shared kernel is not a module and never appears here.
     }
 

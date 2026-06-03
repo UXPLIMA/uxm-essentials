@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.application.BalTop;
+import com.uxplima.uxmessentials.holograms.adapter.HologramsWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
@@ -257,6 +258,8 @@ public final class PluginModule {
             wireVaults(plugin, ctx, persistence, resources, bus, links);
         } else if (module.id().equals(ModuleId.of("communication"))) {
             wireCommunication(plugin, ctx, resources);
+        } else if (module.id().equals(ModuleId.of("holograms"))) {
+            wireHolograms(plugin, ctx, persistence, resources);
         }
     }
 
@@ -452,6 +455,18 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
+        resources.onClose(wired::stop);
+    }
+
+    private static void wireHolograms(
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // holograms builds its cached jOOQ HologramRepository over persistence.dsl() and its renderer over the
+        // uxmLib native-Display API; the holograms / hologram_lines tables ship in the persistence V13 baseline,
+        // always applied. It carries no cross-context bridge — its only collaborators are the shared Scheduler,
+        // messages/messageSink, and event ports. On wire every stored hologram is spawned (each on its own region
+        // thread); on disable the spawned display entities are despawned so a reload re-spawns cleanly.
+        HologramsWiring.Wired wired = HologramsWiring.wire(plugin, ctx, persistence);
+        wired.commands().forEach(resources::addCommand);
         resources.onClose(wired::stop);
     }
 

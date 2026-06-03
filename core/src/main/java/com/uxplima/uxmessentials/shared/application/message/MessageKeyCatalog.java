@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
@@ -44,7 +45,8 @@ public final class MessageKeyCatalog {
             ModerationMessageKey.values(),
             ItemworldMessageKey.values(),
             VaultsMessageKey.values(),
-            CommunicationMessageKey.values());
+            CommunicationMessageKey.values(),
+            HologramsMessageKey.values());
 
     private MessageKeyCatalog() {}
 

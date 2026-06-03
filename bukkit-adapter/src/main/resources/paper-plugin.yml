@@ -706,3 +706,12 @@ permissions:
   uxmessentials.communication.chat.bypass:
     description: 'Keep chatting while public chat is locked by /togglechat.'
     default: op
+  # holograms context (docs/permissions.md "Holograms"). The single /hologram command (with its
+  # create / delete / list / addline / setline / removeline / movehere subcommands) is an operator surface,
+  # gated as a whole by uxmessentials.hologram.use; uxmessentials.module.holograms is the reload/inspect tier.
+  uxmessentials.module.holograms:
+    description: 'Hot-reload / inspect the holograms module (native-Display holograms behind /hologram).'
+    default: op
+  uxmessentials.hologram.use:
+    description: '/hologram to create, edit, move, list and delete native-Display holograms.'
+    default: op
