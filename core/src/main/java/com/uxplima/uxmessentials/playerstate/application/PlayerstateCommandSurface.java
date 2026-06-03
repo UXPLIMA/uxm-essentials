@@ -56,7 +56,11 @@ final class PlayerstateCommandSurface {
                 spec("getpos", "uxmessentials.getpos.use", cmd("getpos", "Show a player's coordinates")),
                 spec("ping", "uxmessentials.ping.use", cmd("ping", "Show a player's ping")),
                 spec("playtime", "uxmessentials.playtime.use", cmd("playtime", "Show a player's total play time")),
-                spec("rest", "uxmessentials.rest.use", cmd("rest", "Reset time-since-rest so phantoms stop")));
+                spec("rest", "uxmessentials.rest.use", cmd("rest", "Reset time-since-rest so phantoms stop")),
+                spec(
+                        "depth",
+                        "uxmessentials.depth.use",
+                        cmd("depth", "Show how far you are above or below sea level")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

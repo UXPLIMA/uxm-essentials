@@ -53,6 +53,7 @@ public final class PlayerStateCommands {
                 new AirCommand(services, messages),
                 new BurnCommand(services, messages),
                 new GetPosCommand(services, messages),
+                new DepthCommand(services, messages),
                 new PingCommand(services, messages),
                 new PlaytimeCommand(services, messages),
                 new RestCommand(services, messages));

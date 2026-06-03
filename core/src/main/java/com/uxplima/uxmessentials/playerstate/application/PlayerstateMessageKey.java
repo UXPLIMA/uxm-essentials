@@ -121,7 +121,12 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /rest
     REST_DONE("playerstate.rest.done"),
     REST_DONE_OTHER("playerstate.rest.done-other"),
-    REST_DISABLED("playerstate.rest.disabled");
+    REST_DISABLED("playerstate.rest.disabled"),
+
+    // /depth
+    DEPTH_ABOVE("playerstate.depth.above"),
+    DEPTH_AT("playerstate.depth.at"),
+    DEPTH_BELOW("playerstate.depth.below");
 
     private final String key;
 
