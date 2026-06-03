@@ -297,6 +297,9 @@ permissions:
   uxmessentials.compass.use:
     description: '/compass to show the direction you are facing.'
     default: true
+  uxmessentials.world.use:
+    description: '/world to show the world you are standing in.'
+    default: true
   uxmessentials.ping.use:
     description: '/ping to show a player''s round-trip latency.'
     default: true

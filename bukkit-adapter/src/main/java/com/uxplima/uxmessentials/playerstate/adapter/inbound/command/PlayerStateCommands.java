@@ -57,6 +57,7 @@ public final class PlayerStateCommands {
                 new BiomeCommand(services, messages),
                 new SeedCommand(services, messages),
                 new CompassCommand(services, messages),
+                new WorldCommand(services, messages),
                 new PingCommand(services, messages),
                 new PlaytimeCommand(services, messages),
                 new RestCommand(services, messages));
