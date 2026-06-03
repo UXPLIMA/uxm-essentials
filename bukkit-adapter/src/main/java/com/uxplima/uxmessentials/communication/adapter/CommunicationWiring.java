@@ -50,7 +50,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class CommunicationWiring {
 
-    private static final String CONTENT_FILE = "communication.conf";
+    private static final String CONTENT_FILE = "modules/communication/config.conf";
 
     private CommunicationWiring() {}
 
