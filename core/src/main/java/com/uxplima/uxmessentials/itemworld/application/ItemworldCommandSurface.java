@@ -214,6 +214,7 @@ final class ItemworldCommandSurface {
                 "break", "uxmessentials.break.use", SubFeatureGroup.ADMIN_FUN, "Break the block you are looking at"));
         verbs.add(new Verb(
                 "tree", "uxmessentials.tree.use", SubFeatureGroup.ADMIN_FUN, "Generate a tree where you are looking"));
+        verbs.add(new Verb("nuke", "uxmessentials.nuke.use", SubFeatureGroup.ADMIN_FUN, "Rain lightning over an area"));
         return List.copyOf(verbs);
     }
 

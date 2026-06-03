@@ -157,4 +157,15 @@ public final class LoggingItemworldAudit implements ItemworldAudit {
         }
         audit.info("event=itemworld_tree actor={} type={} ok=true", actor.uuid(), type);
     }
+
+    @Override
+    public void nuked(PlayerRef actor, Optional<PlayerRef> target) {
+        if (!config.auditEnabled("nuke")) {
+            return;
+        }
+        audit.info(
+                "event=itemworld_nuke actor={} target={} ok=true",
+                actor.uuid(),
+                target.map(PlayerRef::uuid).map(Object::toString).orElse("location"));
+    }
 }

@@ -471,6 +471,9 @@ class ItemworldCommandPathTest {
 
         @Override
         public void grewTree(PlayerRef actor, String type) {}
+
+        @Override
+        public void nuked(PlayerRef actor, Optional<PlayerRef> target) {}
     }
 
     private static final class NoopLogger implements Logger {

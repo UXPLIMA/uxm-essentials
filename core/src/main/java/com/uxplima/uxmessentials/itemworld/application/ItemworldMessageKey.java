@@ -126,6 +126,8 @@ public enum ItemworldMessageKey implements MessageKey {
 
     // Admin-fun — /lightning
     LIGHTNING_STRUCK("itemworld.lightning.struck"),
+    // /nuke
+    NUKE_DONE("itemworld.nuke.done"),
     // /fireball
     FIREBALL_LAUNCHED("itemworld.fireball.launched"),
     // /kittycannon

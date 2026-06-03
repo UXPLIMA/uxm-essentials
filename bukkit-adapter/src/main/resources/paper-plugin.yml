@@ -434,7 +434,8 @@ permissions:
   # each command additionally disableable per-command (modules.itemworld.groups.<group>.enabled and
   # modules.itemworld.commands.<literal>.disabled). Every verb is permission-gated here; the abusable verbs
   # (bulk /give, /spawnmob, /spawner, the /kill /butcher /killall /remove entity-purge family, the /lightning
-  # /fireball /kittycannon admin-fun verbs) are audit-logged. Inputs are validated at the adapter boundary.
+  # /fireball /kittycannon /break /tree /nuke admin-fun verbs) are audit-logged. Inputs are validated at the
+  # adapter boundary.
   # The reload/inspect tier for the module (and its sub-feature groups) is uxmessentials.module.itemworld.
   uxmessentials.module.itemworld:
     description: 'Hot-reload / inspect the itemworld module and its sub-feature groups.'
@@ -577,7 +578,7 @@ permissions:
   uxmessentials.weather.alias:
     description: '/sun / /rain / /thunder quick weather aliases.'
     default: op
-  # Admin-fun sub-feature group. All three are audit-logged.
+  # Admin-fun sub-feature group. Every verb here is audit-logged.
   uxmessentials.lightning.use:
     description: '/lightning (alias /smite) [player] — strike lightning (audit-logged).'
     default: op
@@ -592,6 +593,9 @@ permissions:
     default: op
   uxmessentials.tree.use:
     description: '/tree <type> — generate a tree of the given type where you are looking (audit-logged).'
+    default: op
+  uxmessentials.nuke.use:
+    description: '/nuke [player] — rain lightning over an area (audit-logged).'
     default: op
   # vaults context (docs/permissions.md "Vaults"). The numbered quota nodes
   # uxmessentials.vault.amount.<n> and uxmessentials.vault.size.<rows> are an open value space granted

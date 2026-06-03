@@ -11,8 +11,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * (docs/09-deployment.md §Audit logging, docs/permissions.md §Audit trail). Only the <em>abusable</em>
  * itemworld verbs emit a line: a bulk {@code /give}, a {@code /spawnmob}, a {@code /spawner} retype, the
  * {@code /kill}//{@code /butcher}//{@code /killall}//{@code /remove} entity-purge family, and the {@code
- * /lightning}//{@code /fireball}//{@code /kittycannon} admin-fun verbs. The cosmetic and workstation verbs are
- * not audited. The event names mirror the {@code itemworld_*} rows in the audit catalogue one-for-one.
+ * /lightning}//{@code /fireball}//{@code /kittycannon}//{@code /break}//{@code /tree}//{@code /nuke} admin-fun
+ * verbs. The cosmetic and workstation verbs are not audited. The event names mirror the {@code itemworld_*}
+ * rows in the audit catalogue one-for-one.
  *
  * <p>The implementation lands with the bukkit-adapter (mirroring {@code LoggingModerationAudit}); the use
  * cases depend only on this contract. Each abusable-verb audit line is additionally gated by a per-action
@@ -58,4 +59,7 @@ public interface ItemworldAudit {
 
     /** {@code event=itemworld_tree} — a {@code /tree} of the given type, grown where the caller is looking. */
     void grewTree(PlayerRef actor, String type);
+
+    /** {@code event=itemworld_nuke} — a {@code /nuke} raining lightning over the looked-at area or a player. */
+    void nuked(PlayerRef actor, Optional<PlayerRef> target);
 }

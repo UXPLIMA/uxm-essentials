@@ -11,8 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.BookMeta;
+import org.bukkit.block.Block;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -49,15 +48,15 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /book} through its real Brigadier node. A held written book is unlocked back
- * into an editable writable book that keeps the original pages ({@code BOOK_UNLOCKED}); a writable book, a
- * non-book item, or an empty hand is rejected ({@code NOT_A_WRITTEN_BOOK}) and the held type is unchanged. The
- * message sink records which {@link MessageKey} each path delivered.
+ * MockBukkit coverage of {@code /nuke} through its real Brigadier node. With admin-fun enabled an op rains
+ * lightning over the area they are looking at ({@code NUKE_DONE}); a named target that is offline answers
+ * {@code UNKNOWN_TARGET}. MockBukkit's {@code strikeLightning} is a no-op, so the outcome is asserted by the
+ * reply key rather than world state — exactly like {@code /lightning} would be.
  */
-class BookCommandTest {
+class NukeCommandTest {
 
     private ServerMock server;
-    private PlayerMock player;
+    private TargetingPlayer player;
     private RecordingSink sink;
     private MutableConfig config;
 
@@ -65,7 +64,8 @@ class BookCommandTest {
     void setUp() {
         server = MockBukkit.mock();
         server.addSimpleWorld("world");
-        player = server.addPlayer("Alice");
+        player = new TargetingPlayer(server, "Alice");
+        server.addPlayer(player);
         player.setOp(true);
         sink = new RecordingSink();
         config = new MutableConfig();
@@ -77,48 +77,36 @@ class BookCommandTest {
     }
 
     @Test
-    void literalIsBook() {
-        assertThat(new BookCommand(services()).build().getLiteral()).isEqualTo("book");
+    void literalIsNuke() {
+        assertThat(new NukeCommand(services()).build().getLiteral()).isEqualTo("nuke");
     }
 
     @Test
-    @SuppressWarnings("deprecation") // String page API is the only one MockBukkit implements; pages() throws there
-    void heldWrittenBookBecomesWritable() {
-        ItemStack written = new ItemStack(Material.WRITTEN_BOOK);
-        BookMeta meta = (BookMeta) written.getItemMeta();
-        meta.setPages(List.of("hello"));
-        written.setItemMeta(meta);
-        player.getInventory().setItemInMainHand(written);
-
-        execute("book");
-
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        assertThat(hand.getType()).isEqualTo(Material.WRITABLE_BOOK);
-        BookMeta result = (BookMeta) hand.getItemMeta();
-        assertThat(result.getPages()).contains("hello");
-        assertThat(sink.keys).contains(ItemworldMessageKey.BOOK_UNLOCKED);
+    void hasNoAliases() {
+        assertThat(new NukeCommand(services()).aliases()).isEmpty();
     }
 
     @Test
-    void heldWritableBookIsRejected() {
-        player.getInventory().setItemInMainHand(new ItemStack(Material.WRITABLE_BOOK));
+    void selfNukeStrikesAndReports() {
+        Block target = player.getWorld().getBlockAt(0, 64, 0);
+        target.setType(Material.STONE);
+        player.target = target;
 
-        execute("book");
+        execute("nuke");
 
-        assertThat(sink.keys).contains(ItemworldMessageKey.NOT_A_WRITTEN_BOOK);
-        assertThat(player.getInventory().getItemInMainHand().getType()).isEqualTo(Material.WRITABLE_BOOK);
+        assertThat(sink.keys).contains(ItemworldMessageKey.NUKE_DONE);
     }
 
     @Test
-    void emptyHandIsRejected() {
-        execute("book");
+    void namedUnknownTargetReported() {
+        execute("nuke Ghost");
 
-        assertThat(sink.keys).contains(ItemworldMessageKey.NOT_A_WRITTEN_BOOK);
+        assertThat(sink.keys).contains(ItemworldMessageKey.UNKNOWN_TARGET);
     }
 
     private void execute(String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new BookCommand(services()).build());
+        dispatcher.getRoot().addChild(new NukeCommand(services()).build());
         try {
             dispatcher.execute(input, CommandSourceStackMock.from(player));
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
@@ -145,7 +133,21 @@ class BookCommandTest {
                 new NoopLogger());
     }
 
-    /** A map-backed {@link ConfigStore} scoped to {@code modules.itemworld}; defaults keep /book enabled. */
+    /** A {@link PlayerMock} whose looked-at block is supplied directly, since MockBukkit does not raytrace. */
+    private static final class TargetingPlayer extends PlayerMock {
+        private org.bukkit.block.@org.jspecify.annotations.Nullable Block target;
+
+        TargetingPlayer(ServerMock server, String name) {
+            super(server, name);
+        }
+
+        @Override
+        public org.bukkit.block.@org.jspecify.annotations.Nullable Block getTargetBlockExact(int maxDistance) {
+            return target;
+        }
+    }
+
+    /** A map-backed {@link ConfigStore} scoped to {@code modules.itemworld}; defaults keep /nuke enabled. */
     private static final class MutableConfig implements ConfigStore {
         private final Map<String, Object> values = new HashMap<>();
 
@@ -184,7 +186,7 @@ class BookCommandTest {
         }
     }
 
-    /** Runs scheduled work inline so entity-bound effects are observable without ticking Folia. */
+    /** Runs scheduled work inline so the entity-bound strike is observable without ticking Folia. */
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
