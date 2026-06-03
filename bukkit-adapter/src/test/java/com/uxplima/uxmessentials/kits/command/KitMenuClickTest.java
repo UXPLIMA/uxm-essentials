@@ -10,8 +10,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -60,22 +64,21 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /kits} browse menu through the real Brigadier {@code /kits} node and uxmLib's
- * {@code PaginatedGui}. Bare {@code /kits} opens a paginated menu whose content slots hold one display icon per
- * kit the player may claim — backed by a fake {@link KitRepository} of three kits — proving the read-only menu
- * renders one icon per available kit. {@code /kits list} keeps the chat path, asserted by the {@code KIT_LIST}
- * keys it produces. The scheduler is a synchronous double so the entity-bound open runs inline, and uxmLib's
- * menu listener is installed against a mock plugin (reset on teardown) exactly as the vault GUI test does.
+ * MockBukkit coverage that a {@code /kits} menu icon click claims that kit through the same {@link ClaimKit}
+ * use case the {@code /kit} command drives. The bare {@code /kits} node opens the paginated menu, then a
+ * left-click on content slot 0 (the first kit, {@code starter}) is fired through the installed uxmLib menu
+ * listener. Because the real {@link ClaimKit} sends {@code KIT_CLAIMED} for the granted kit, the test asserts
+ * the click claimed exactly the clicked kit: the recording granter saw one grant and {@code KIT_CLAIMED}
+ * carried {@code kit=starter}. A control click on an empty slot claims nothing.
  */
-class KitsMenuPathTest {
-
-    private static final int KIT_COUNT = 3;
+class KitMenuClickTest {
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
     private KitServices services;
     private RecordingSink sink;
+    private RecordingGranter granter;
 
     @BeforeEach
     void setUp() {
@@ -84,6 +87,7 @@ class KitsMenuPathTest {
         player = server.addPlayer("Alice");
         player.setOp(true);
         sink = new RecordingSink();
+        granter = new RecordingGranter();
         services = services();
         Guis.install(plugin);
     }
@@ -95,36 +99,38 @@ class KitsMenuPathTest {
     }
 
     @Test
-    void bareKitsOpensAPaginatedMenuWithOneIconPerAvailableKit() {
+    void clickingAKitIconClaimsThatKit() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-
         execute(dispatcher, "kits");
-
         Inventory menu = player.getOpenInventory().getTopInventory();
         assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
-        assertThat(menu.getSize()).isEqualTo(54); // a 6-row paginated menu
-        assertThat(contentIcons(menu)).isEqualTo(KIT_COUNT);
+
+        fireClick(0);
+
+        assertThat(granter.grants).hasSize(1);
+        assertThat(sink.deliveries).anySatisfy(delivery -> {
+            assertThat(delivery.key()).isEqualTo(KitsMessageKey.KIT_CLAIMED);
+            assertThat(delivery.placeholders()).containsEntry("kit", "starter");
+        });
     }
 
     @Test
-    void kitsListDrivesTheChatPath() {
+    void clickingAnEmptySlotClaimsNothing() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        execute(dispatcher, "kits");
 
-        execute(dispatcher, "kits list");
+        fireClick(44); // a content row slot past the three kits, so nothing is bound there
 
-        assertThat(sink.keys).contains(KitsMessageKey.KIT_LIST_HEADER);
+        assertThat(granter.grants).isEmpty();
+        assertThat(sink.keys).doesNotContain(KitsMessageKey.KIT_CLAIMED);
     }
 
-    /** Non-air icons in the content rows (slots 0..44), excluding the reserved bottom-row nav buttons. */
-    private int contentIcons(Inventory menu) {
-        int count = 0;
-        for (int slot = 0; slot < 45; slot++) {
-            ItemStack item = menu.getItem(slot);
-            if (item != null && !item.getType().isAir()) {
-                count++;
-            }
-        }
-        return count;
+    /** Left-click the given content slot of the open menu through the installed listener. */
+    private void fireClick(int slot) {
+        InventoryView view = player.getOpenInventory();
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(event);
     }
 
     private CommandDispatcher<CommandSourceStack> registerCommand() {
@@ -147,7 +153,6 @@ class KitsMenuPathTest {
         KitClaimStore claims = new NoClaims();
         KitNotifier notifier = new KitNotifier(messages, sink);
         KitRepository repository = new FakeRepository();
-        KitGranter granter = (who, items) -> KitGranter.Grant.complete();
         KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock);
@@ -193,6 +198,17 @@ class KitsMenuPathTest {
         public void delete(KitId id) {}
     }
 
+    /** Records every grant so the test can prove a click drove exactly one claim. */
+    private static final class RecordingGranter implements KitGranter {
+        private final List<List<KitItem>> grants = new ArrayList<>();
+
+        @Override
+        public Grant grant(PlayerRef recipient, List<KitItem> items) {
+            grants.add(items);
+            return Grant.complete();
+        }
+    }
+
     private static final class NoClaims implements KitClaimStore {
         @Override
         public boolean hasClaimed(PlayerRef who, KitId kit) {
@@ -209,13 +225,17 @@ class KitsMenuPathTest {
         public void resetAll(PlayerRef who) {}
     }
 
+    /** A resolved message: its key and the placeholders it carried, so a claim's target kit is assertable. */
+    private record Delivery(MessageKey key, Map<String, String> placeholders) {}
+
     /** Records each delivered key so a path's outcome is asserted by the message it produced. */
     private static final class RecordingSink implements MessageSink {
         private final List<MessageKey> keys = new ArrayList<>();
+        private final List<Delivery> deliveries = new ArrayList<>();
 
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
-            // renderedText is the key() string (see KeyMessages); the key list is what tests assert on
+            // renderedText is the key() string (see KeyMessages); the recorded keys/deliveries drive asserts
         }
     }
 
@@ -223,6 +243,7 @@ class KitsMenuPathTest {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             sink.keys.add(key);
+            sink.deliveries.add(new Delivery(key, Map.copyOf(placeholders)));
             return key.key();
         }
     }

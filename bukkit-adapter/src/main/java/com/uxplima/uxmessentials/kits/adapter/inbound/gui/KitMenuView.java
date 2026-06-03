@@ -13,6 +13,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
+import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -32,11 +33,14 @@ import org.jspecify.annotations.NullMarked;
  * bottom row. The kit list is the {@code ListKits.available} filter the chat list also uses, so the menu never
  * advertises a kit the player can no longer take. Each icon shows the kit's name and its cost/cooldown/one-time
  * detail as lore — every line resolved from a {@link MessageKey} in the viewer's locale, never an inline
- * literal. Clicking an icon does nothing; the menu is purely a browser.
+ * literal. Clicking an icon claims that kit through the same {@link ClaimKit} use case the {@code /kit}
+ * command drives — the view adds no claim, cooldown, or cost logic of its own; ClaimKit gates the claim and
+ * sends the result message — and then closes the menu.
  *
  * <p>An icon's material is the kit's first item type (decoded through {@link KitItemCodec}), falling back to a
  * chest for an empty kit. {@link #open} touches the live player, so the caller schedules it on the viewer's
- * entity thread through the kernel {@link Scheduler}.
+ * entity thread through the kernel {@link Scheduler}; a claim grants items into the live inventory, so it runs
+ * on the viewer's entity thread through that same scheduler.
  */
 @NullMarked
 public final class KitMenuView {
@@ -48,11 +52,13 @@ public final class KitMenuView {
 
     private final Messages messages;
     private final Scheduler scheduler;
+    private final ClaimKit claimKit;
     private final MiniMessage miniMessage;
 
-    public KitMenuView(Messages messages, Scheduler scheduler) {
+    public KitMenuView(Messages messages, Scheduler scheduler, ClaimKit claimKit) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.claimKit = Objects.requireNonNull(claimKit, "claimKit");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -65,10 +71,24 @@ public final class KitMenuView {
         scheduler.onEntity(viewer, () -> {
             PaginatedGui gui =
                     Guis.paginated().title(title(viewer)).rows(MENU_ROWS).build();
-            gui.populate(snapshot, ItemPopulator.display(kit -> icon(viewer, kit)));
+            gui.populate(
+                    snapshot,
+                    ItemPopulator.of(kit -> icon(viewer, kit), (kit, event) -> onIconClick(player, viewer, gui, kit)));
             gui.set(PREV_SLOT, GuiItem.previousPage(gui, navIcon(viewer, KitsMessageKey.KIT_MENU_PREV)));
             gui.set(NEXT_SLOT, GuiItem.nextPage(gui, navIcon(viewer, KitsMessageKey.KIT_MENU_NEXT)));
             gui.open(player);
+        });
+    }
+
+    /**
+     * Claim the clicked kit and close the menu. The kit identity comes from the bound element, never from
+     * re-reading the clicked icon. The claim grants items into the live inventory, so it runs on the viewer's
+     * entity thread; {@link ClaimKit} gates the claim and sends the success or failure message itself.
+     */
+    private void onIconClick(Player player, PlayerRef viewer, PaginatedGui gui, KitDefinition kit) {
+        scheduler.onEntity(viewer, () -> {
+            claimKit.claim(viewer, kit.id());
+            gui.close(player);
         });
     }
 

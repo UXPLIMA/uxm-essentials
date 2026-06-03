@@ -84,9 +84,10 @@ public final class KitsWiring {
             Optional<KitEconomy> economy) {
         KitAccess access = new KitAccess(kernel.permissions(), kernel.cooldowns(), claims, economy);
         Clock clock = Clock.systemUTC();
-        KitMenuView kitMenu = new KitMenuView(kernel.messages(), kernel.scheduler());
+        ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, kernel.events(), clock);
+        KitMenuView kitMenu = new KitMenuView(kernel.messages(), kernel.scheduler(), claimKit);
         return new KitServices(
-                new ClaimKit(repository, access, granter, notifier, kernel.events(), clock),
+                claimKit,
                 new ListKits(repository, kernel.permissions(), claims, notifier),
                 new ShowKit(repository, notifier),
                 new CreateKit(repository, notifier),
