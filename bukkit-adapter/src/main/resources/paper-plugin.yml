@@ -449,6 +449,9 @@ permissions:
   uxmessentials.firework.use:
     description: '/firework <color|clear|power> — style or power the held firework rocket.'
     default: op
+  uxmessentials.potion.use:
+    description: '/potion <effect> [duration] [amplifier] — add a potion effect to the held potion.'
+    default: op
   uxmessentials.book.use:
     description: '/book — unlock a written book for editing.'
     default: op

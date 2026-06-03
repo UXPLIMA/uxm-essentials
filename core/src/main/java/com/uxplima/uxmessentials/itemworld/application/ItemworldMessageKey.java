@@ -41,6 +41,10 @@ public enum ItemworldMessageKey implements MessageKey {
     FIREWORK_POWER_SET("itemworld.firework.power-set"),
     FIREWORK_CLEARED("itemworld.firework.cleared"),
     NOT_A_FIREWORK("itemworld.firework.not-a-firework"),
+    // /potion
+    POTION_EFFECT_ADDED("itemworld.potion.effect-added"),
+    POTION_UNKNOWN_EFFECT("itemworld.potion.unknown-effect"),
+    NOT_A_POTION("itemworld.potion.not-a-potion"),
     // /book
     BOOK_UNLOCKED("itemworld.book.unlocked"),
     NOT_A_WRITTEN_BOOK("itemworld.book.not-a-written-book"),

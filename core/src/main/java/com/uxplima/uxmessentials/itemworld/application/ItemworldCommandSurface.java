@@ -86,6 +86,11 @@ final class ItemworldCommandSurface {
                 SubFeatureGroup.ITEM_UTILS,
                 "Style or power the held firework rocket"));
         verbs.add(new Verb(
+                "potion",
+                "uxmessentials.potion.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Add a potion effect to the held potion"));
+        verbs.add(new Verb(
                 "book", "uxmessentials.book.use", SubFeatureGroup.ITEM_UTILS, "Unlock a written book for editing"));
         verbs.add(new Verb("more", "uxmessentials.more.use", SubFeatureGroup.ITEM_UTILS, "Fill the held stack to max"));
         verbs.add(new Verb(
