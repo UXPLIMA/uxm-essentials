@@ -29,11 +29,12 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The vertical / line-of-sight positional verbs — {@code /top}, {@code /bottom}, {@code /jump},
- * {@code /up}, {@code /down}, {@code /ascend}, {@code /descend} — sharing one node builder and differing
- * only by {@link Kind}. Each resolves a destination from the player's column or line of sight on the region
- * thread, then issues an instant hop through the async executor. {@code /jump}, {@code /down},
- * {@code /ascend} and {@code /descend} report "no target block" when nothing suitable is in sight (no solid
- * block below the feet, or no standable gap further up/down the column).
+ * {@code /up}, {@code /down}, {@code /ascend}, {@code /descend}, {@code /thru} — sharing one node builder
+ * and differing only by {@link Kind}. Each resolves a destination from the player's column or line of
+ * sight on the region thread, then issues an instant hop through the async executor. {@code /jump},
+ * {@code /down}, {@code /ascend}, {@code /descend} and {@code /thru} report "no target block" when nothing
+ * suitable is in sight (no solid block below the feet, no standable gap up/down the column, or no open
+ * space beyond the wall you face).
  */
 @NullMarked
 public final class VerticalCommand extends TeleportCommandSupport implements CommandRegistration {
@@ -49,7 +50,8 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
         UP,
         DOWN,
         ASCEND,
-        DESCEND
+        DESCEND,
+        THRU
     }
 
     private final String literal;
@@ -105,6 +107,7 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
             case DOWN -> downTarget(sender, origin);
             case ASCEND -> ascendTarget(sender, origin);
             case DESCEND -> descendTarget(sender, origin);
+            case THRU -> thruTarget(sender, origin);
         };
     }
 
@@ -142,6 +145,42 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
             }
         }
         return Optional.empty();
+    }
+
+    private static Optional<Position> thruTarget(Player sender, Location origin) {
+        World world = sender.getWorld();
+        RayTraceResult trace = world.rayTraceBlocks(
+                sender.getEyeLocation(), sender.getEyeLocation().getDirection(), JUMP_REACH);
+        Block wall = trace == null ? null : trace.getHitBlock();
+        if (wall == null) {
+            return Optional.empty();
+        }
+        int y = origin.getBlockY();
+        int[] step = horizontalStep(sender.getEyeLocation().getDirection());
+        int x = wall.getX();
+        int z = wall.getZ();
+        for (int i = 0; i < JUMP_REACH; i++) {
+            x += step[0];
+            z += step[1];
+            if (standable(world, x, y - 1, z)) {
+                return Optional.of(passage(origin, x, y, z));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** The dominant horizontal axis of a look direction as a unit block step on x or z. */
+    private static int[] horizontalStep(org.bukkit.util.Vector direction) {
+        if (Math.abs(direction.getX()) >= Math.abs(direction.getZ())) {
+            return new int[] {direction.getX() >= 0 ? 1 : -1, 0};
+        }
+        return new int[] {0, direction.getZ() >= 0 ? 1 : -1};
+    }
+
+    /** A standing position at the centre of block column {@code x/z}, foot level {@code y}, keeping the look. */
+    private static Position passage(Location origin, int x, int y, int z) {
+        Position current = BukkitRefs.toPosition(origin);
+        return new Position(current.world(), x + 0.5, y, z + 0.5, current.yaw(), current.pitch());
     }
 
     /** A solid floor at {@code y} with two air blocks above — a gap a player can stand in. */

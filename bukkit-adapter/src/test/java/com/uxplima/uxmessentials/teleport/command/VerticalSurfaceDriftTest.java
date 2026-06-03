@@ -9,11 +9,11 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the vertical teleport family — {@code /down} plus the EssentialsX {@code /ascend} and
- * {@code /descend} verbs — into the teleport context's command surface. EssentialsX ships these together;
- * this guard fails if any of them ever drops out of the surface or wires under a permission node other than
- * the shared {@code uxmessentials.tp.vertical} the rest of the vertical verbs already use, which would
- * otherwise drift the permissions reference and paper-plugin.yml.
+ * Pins the vertical teleport family — {@code /down} plus the EssentialsX {@code /ascend},
+ * {@code /descend} and {@code /thru} verbs — into the teleport context's command surface. EssentialsX
+ * ships these together; this guard fails if any of them ever drops out of the surface or wires under a
+ * permission node other than the shared {@code uxmessentials.tp.vertical} the rest of the vertical verbs
+ * already use, which would otherwise drift the permissions reference and paper-plugin.yml.
  */
 class VerticalSurfaceDriftTest {
 
@@ -51,5 +51,15 @@ class VerticalSurfaceDriftTest {
     void ascendDescendReuseTheSharedVerticalPermission() {
         assertThat(verticalSpec("ascend").permission()).isEqualTo("uxmessentials.tp.vertical");
         assertThat(verticalSpec("descend").permission()).isEqualTo("uxmessentials.tp.vertical");
+    }
+
+    @Test
+    void teleportSurfaceExposesThru() {
+        assertThat(verticalSpec("thru").literal()).isEqualTo("thru");
+    }
+
+    @Test
+    void thruReusesTheSharedVerticalPermission() {
+        assertThat(verticalSpec("thru").permission()).isEqualTo("uxmessentials.tp.vertical");
     }
 }
