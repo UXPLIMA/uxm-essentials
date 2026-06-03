@@ -288,6 +288,9 @@ permissions:
   uxmessentials.depth.use:
     description: '/depth to show your height relative to sea level.'
     default: true
+  uxmessentials.compass.use:
+    description: '/compass to show the direction you are facing.'
+    default: true
   uxmessentials.ping.use:
     description: '/ping to show a player''s round-trip latency.'
     default: true

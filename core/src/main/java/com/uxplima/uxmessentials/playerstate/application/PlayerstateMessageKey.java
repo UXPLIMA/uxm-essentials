@@ -126,7 +126,18 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /depth
     DEPTH_ABOVE("playerstate.depth.above"),
     DEPTH_AT("playerstate.depth.at"),
-    DEPTH_BELOW("playerstate.depth.below");
+    DEPTH_BELOW("playerstate.depth.below"),
+
+    // /compass — the framing line plus the eight cardinal/intercardinal direction words it embeds
+    COMPASS_SHOW("playerstate.compass.show"),
+    COMPASS_NORTH("playerstate.compass.north"),
+    COMPASS_NORTH_EAST("playerstate.compass.north-east"),
+    COMPASS_EAST("playerstate.compass.east"),
+    COMPASS_SOUTH_EAST("playerstate.compass.south-east"),
+    COMPASS_SOUTH("playerstate.compass.south"),
+    COMPASS_SOUTH_WEST("playerstate.compass.south-west"),
+    COMPASS_WEST("playerstate.compass.west"),
+    COMPASS_NORTH_WEST("playerstate.compass.north-west");
 
     private final String key;
 
