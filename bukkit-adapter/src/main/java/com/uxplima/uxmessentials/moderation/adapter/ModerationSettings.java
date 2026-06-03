@@ -48,6 +48,11 @@ public final class ModerationSettings {
         return mutedBlockedCommands;
     }
 
+    /** The configured jail names, sorted, for {@code /jails} to list (already lower-cased and immutable). */
+    public List<String> jailNames() {
+        return jails;
+    }
+
     /** True when {@code jail} is a configured jail name. */
     public boolean hasJail(String jail) {
         return jails.contains(jail.toLowerCase(Locale.ROOT));

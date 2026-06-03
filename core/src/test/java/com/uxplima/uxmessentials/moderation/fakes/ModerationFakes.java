@@ -118,5 +118,10 @@ public final class ModerationFakes {
         public boolean isWallClock(String jail) {
             return wallClock.contains(jail);
         }
+
+        @Override
+        public java.util.List<String> names() {
+            return existing.stream().sorted().toList();
+        }
     }
 }

@@ -29,6 +29,9 @@ public enum ModerationMessageKey implements MessageKey {
     JAIL_ALREADY("moderation.jail.already"),
     UNJAIL_APPLIED("moderation.unjail.applied"),
     UNJAIL_NOT_JAILED("moderation.unjail.not-jailed"),
+    JAILS_HEADER("moderation.jails.header"),
+    JAILS_ENTRY("moderation.jails.entry"),
+    JAILS_EMPTY("moderation.jails.empty"),
 
     // /tempban
     TEMPBAN_APPLIED("moderation.tempban.applied"),

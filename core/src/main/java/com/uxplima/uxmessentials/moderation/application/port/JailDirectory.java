@@ -16,4 +16,7 @@ public interface JailDirectory {
 
     /** Whether {@code jail} counts down on online time only (the default) or wall-clock, per its config. */
     boolean isWallClock(String jail);
+
+    /** The configured jail names, sorted, for {@code /jails} to list back to an operator. */
+    java.util.List<String> names();
 }

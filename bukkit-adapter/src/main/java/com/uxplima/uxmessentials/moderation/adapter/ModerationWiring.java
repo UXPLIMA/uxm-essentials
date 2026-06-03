@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.moderation.application.Jail;
 import com.uxplima.uxmessentials.moderation.application.JailCountdown;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
+import com.uxplima.uxmessentials.moderation.application.ListJails;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
@@ -121,6 +122,7 @@ public final class ModerationWiring {
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
                 .warn(new IssueWarn(repository, guard, notifier, audit, kernel.events(), clock))
                 .reviewWarns(new ReviewWarns(repository, notifier))
+                .listJails(new ListJails(jails, notifier))
                 .banIp(new BanIp(repository, notifier, audit, kernel.events(), clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit))
                 .freeze(new Freeze(sanctionPort, guard, notifier, audit))

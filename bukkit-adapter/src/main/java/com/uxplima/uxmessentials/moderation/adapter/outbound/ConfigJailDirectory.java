@@ -32,4 +32,9 @@ public final class ConfigJailDirectory implements JailDirectory {
         Objects.requireNonNull(jail, "jail");
         return settings.isWallClock(jail);
     }
+
+    @Override
+    public java.util.List<String> names() {
+        return settings.jailNames().stream().sorted().toList();
+    }
 }
