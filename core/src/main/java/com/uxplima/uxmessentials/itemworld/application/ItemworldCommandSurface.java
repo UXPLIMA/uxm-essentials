@@ -85,6 +85,8 @@ final class ItemworldCommandSurface {
                 "uxmessentials.firework.use",
                 SubFeatureGroup.ITEM_UTILS,
                 "Style or power the held firework rocket"));
+        verbs.add(new Verb(
+                "book", "uxmessentials.book.use", SubFeatureGroup.ITEM_UTILS, "Unlock a written book for editing"));
         verbs.add(new Verb("more", "uxmessentials.more.use", SubFeatureGroup.ITEM_UTILS, "Fill the held stack to max"));
         verbs.add(new Verb(
                 "repair", "uxmessentials.repair.itemworld", SubFeatureGroup.ITEM_UTILS, "Repair the held item"));

@@ -446,6 +446,9 @@ permissions:
   uxmessentials.firework.use:
     description: '/firework <color|clear|power> — style or power the held firework rocket.'
     default: op
+  uxmessentials.book.use:
+    description: '/book — unlock a written book for editing.'
+    default: op
   uxmessentials.more.use:
     description: '/more — fill the held stack to max (itemworld-owned; playerstate defers it).'
     default: op
