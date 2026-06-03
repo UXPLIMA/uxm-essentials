@@ -62,6 +62,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("communication"))).isPresent();
         assertThat(registry.byId(ModuleId.of("holograms"))).isPresent();
         assertThat(registry.byId(ModuleId.of("playerwarps"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -77,7 +78,8 @@ class FeatureModuleRegistryDriftTest {
                         "vaults",
                         "communication",
                         "holograms",
-                        "playerwarps");
+                        "playerwarps",
+                        "scoreboard");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -247,14 +249,15 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void playerwarpsIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+    void playerwarpsShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule playerwarps = registry.byId(ModuleId.of("playerwarps"))
                 .orElseThrow(() -> new AssertionError("playerwarps is not registered"));
 
         // playerwarps is the 14th context — player-owned warps keyed (owner, name), delegating teleport
-        // execution like warps — registered last after the thirteen prior modules.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("playerwarps");
+        // execution like warps. The later scoreboard context now lands last, so playerwarps must merely be
+        // registered, not last.
+        assertThat(registry.byId(ModuleId.of("playerwarps"))).isPresent();
 
         // It ships ENABLED (a steady-state feature like warps/vaults/holograms): with no modules.conf override it
         // is on, and disabling exactly playerwarps removes only it while every sibling stays on.
@@ -276,6 +279,37 @@ class FeatureModuleRegistryDriftTest {
                 playerwarps.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactlyInAnyOrder("pwarp", "setpwarp", "delpwarp", "pwarps");
         assertThat(playerwarps.migrations()).isEmpty();
+    }
+
+    @Test
+    void scoreboardIsTheLastModuleShipsDisabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule scoreboard = registry.byId(ModuleId.of("scoreboard"))
+                .orElseThrow(() -> new AssertionError("scoreboard is not registered"));
+
+        // scoreboard is the 15th context — a per-player sidebar plus a tablist header/footer on uxmlib-hud —
+        // registered last after the fourteen prior modules.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("scoreboard");
+
+        // It ships DISABLED (like communication, its content is operator data): with no modules.conf override it is
+        // absent from the enabled set while every steady-state sibling stays on. Explicitly enabling exactly it
+        // brings only it on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).doesNotContain("scoreboard");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.scoreboard.enabled", true))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(on).contains("scoreboard", "teleport", "holograms");
+
+        // Enabled, scoreboard contributes its single /scoreboard command and persists nothing (the display content
+        // is config-authored and the per-player visibility bit is PDC-backed), so it declares no MigrationSet.
+        Set<String> literals =
+                scoreboard.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactly("scoreboard");
+        assertThat(scoreboard.migrations()).isEmpty();
     }
 
     @Test

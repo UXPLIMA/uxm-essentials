@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.application.ModerationModule;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
+import com.uxplima.uxmessentials.scoreboard.application.ScoreboardModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
@@ -89,6 +90,13 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // other hard dependency edge (its only collaborators are the shared persistence DSL, the Permissions
         // reducer, and the teleport engine), and like warps/holograms it ships ENABLED, so it lands last.
         delegate.register(new PlayerwarpsModule());
+        // scoreboard is the 15th context — a per-player sidebar plus a tablist header/footer rendered from
+        // operator-authored MiniMessage content on the Scheduler refresh timer, dogfooding uxmlib-hud's
+        // SidebarManager and Tablist (already used for the teleport arrival title). Like communication it carries no
+        // hard dependency edge (its only collaborators are the shared Scheduler, messages, and event ports) and
+        // ships DISABLED by default — operators author the lines before enabling — so it lands last and wires
+        // nothing until enabled in modules.conf.
+        delegate.register(new ScoreboardModule());
         // The shared kernel is not a module and never appears here.
     }
 

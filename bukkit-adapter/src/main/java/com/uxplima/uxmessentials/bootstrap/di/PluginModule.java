@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
+import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
@@ -263,6 +264,8 @@ public final class PluginModule {
             wireHolograms(plugin, ctx, persistence, resources);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
             wirePlayerwarps(ctx, persistence, resources, links);
+        } else if (module.id().equals(ModuleId.of("scoreboard"))) {
+            wireScoreboard(plugin, ctx, resources);
         }
     }
 
@@ -483,6 +486,19 @@ public final class PluginModule {
                 "playerwarps delegates teleport execution but the teleport engine is unavailable");
         PlayerwarpsWiring.Wired wired = PlayerwarpsWiring.wire(ctx, persistence, engine);
         wired.commands().forEach(resources::addCommand);
+    }
+
+    private static void wireScoreboard(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // scoreboard persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the sidebar /
+        // tablist content is config-authored under modules/scoreboard/config.conf. It carries no cross-context bridge
+        // — its only collaborators are the shared Scheduler, messages/messageSink, and event ports — so nothing is
+        // captured for a later context. The renderer dogfoods uxmlib-hud's SidebarManager/Tablist; the render timer
+        // on the Scheduler port is stopped and every active board torn down on disable.
+        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
     }
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */

@@ -738,3 +738,12 @@ permissions:
   uxmessentials.pwarp.public:
     description: '/pwarp public|private <name> to toggle a player warp''s visibility.'
     default: true
+  # scoreboard context (docs/permissions.md "Scoreboard"). A per-player sidebar plus a tablist header/footer
+  # rendered from operator MiniMessage content; the module ships disabled. uxmessentials.scoreboard.use is the
+  # self-service toggle (default true) and uxmessentials.module.scoreboard is the reload/inspect tier.
+  uxmessentials.module.scoreboard:
+    description: 'Hot-reload / inspect the scoreboard module (per-player sidebar and tablist on uxmlib-hud).'
+    default: op
+  uxmessentials.scoreboard.use:
+    description: '/scoreboard (alias /sb) to toggle whether you see the scoreboard display.'
+    default: true
