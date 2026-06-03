@@ -15,9 +15,10 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * stays small and the command/permission pairing is one greppable table the permissions guard checks against
  * {@code paper-plugin.yml}.
  *
- * <p>Five commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /vanish}
+ * <p>Six commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /vanish}
  * ({@code uxmessentials.vanish.use}), {@code /list} ({@code uxmessentials.list.use}), {@code /realname <player>}
- * ({@code uxmessentials.realname.use}), and {@code /whois <player>} ({@code uxmessentials.whois.use}). The
+ * ({@code uxmessentials.realname.use}), {@code /whois <player>} ({@code uxmessentials.whois.use}), and
+ * {@code /gc} ({@code uxmessentials.gc.use}). The
  * vanish-see node ({@code uxmessentials.vanish.see}) gates visibility,
  * not a command, so it is enforced in the {@code VisibilityApplier} rather than declared as a literal here.
  */
@@ -31,7 +32,8 @@ final class PresenceCommandSurface {
                 spec("vanish", "uxmessentials.vanish.use", cmd("vanish", "Toggle staff vanish")),
                 spec("list", "uxmessentials.list.use", cmd("list", "List online players")),
                 spec("realname", "uxmessentials.realname.use", cmd("realname", "Look up a player's real name")),
-                spec("whois", "uxmessentials.whois.use", cmd("whois", "Show information about an online player")));
+                spec("whois", "uxmessentials.whois.use", cmd("whois", "Show information about an online player")),
+                spec("gc", "uxmessentials.gc.use", cmd("gc", "Show server health")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

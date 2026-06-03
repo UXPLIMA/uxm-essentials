@@ -37,7 +37,10 @@ public enum PresenceMessageKey implements MessageKey {
 
     // /whois — staff identity/status summary for one visible online player
     WHOIS_RESULT("presence.whois-result"),
-    WHOIS_NOT_FOUND("presence.whois-not-found");
+    WHOIS_NOT_FOUND("presence.whois-not-found"),
+
+    // /gc — server health read-out (TPS, uptime, memory, loaded chunks and entities)
+    GC_RESULT("presence.gc-result");
 
     private final String key;
 
