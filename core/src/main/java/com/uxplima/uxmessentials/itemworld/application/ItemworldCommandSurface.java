@@ -210,6 +210,8 @@ final class ItemworldCommandSurface {
         verbs.add(new Verb("fireball", "uxmessentials.fireball.use", SubFeatureGroup.ADMIN_FUN, "Launch a fireball"));
         verbs.add(new Verb(
                 "kittycannon", "uxmessentials.kittycannon.use", SubFeatureGroup.ADMIN_FUN, "Launch an exploding cat"));
+        verbs.add(new Verb(
+                "break", "uxmessentials.break.use", SubFeatureGroup.ADMIN_FUN, "Break the block you are looking at"));
         return List.copyOf(verbs);
     }
 

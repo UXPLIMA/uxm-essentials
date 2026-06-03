@@ -587,6 +587,9 @@ permissions:
   uxmessentials.kittycannon.use:
     description: '/kittycannon — launch an exploding cat (audit-logged).'
     default: op
+  uxmessentials.break.use:
+    description: '/break — instantly break the block you are looking at (audit-logged).'
+    default: op
   # vaults context (docs/permissions.md "Vaults"). The numbered quota nodes
   # uxmessentials.vault.amount.<n> and uxmessentials.vault.size.<rows> are an open value space granted
   # per instance through the Permissions reducer and are intentionally not enumerated here.

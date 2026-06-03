@@ -52,4 +52,7 @@ public interface ItemworldAudit {
 
     /** {@code event=itemworld_kittycannon} — a {@code /kittycannon}. */
     void firedKittycannon(PlayerRef actor);
+
+    /** {@code event=itemworld_break} — a {@code /break} of the looked-at block, recorded with its type. */
+    void brokeBlock(PlayerRef actor, String blockType);
 }

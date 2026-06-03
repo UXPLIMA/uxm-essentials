@@ -11,9 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.PotionMeta;
-import org.bukkit.potion.PotionEffectType;
+import org.bukkit.block.Block;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -50,15 +48,15 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /potion} through its real Brigadier node. A held potion gains a custom
- * {@link org.bukkit.potion.PotionEffect} of the named type ({@code POTION_EFFECT_ADDED}); an unknown effect
- * name ({@code POTION_UNKNOWN_EFFECT}) or a non-potion / empty hand ({@code NOT_A_POTION}) is rejected and the
- * held item is unchanged. The message sink records which {@link MessageKey} each path delivered.
+ * MockBukkit coverage of {@code /break} through its real Brigadier node. With admin-fun enabled an op who is
+ * looking at a solid block has that block replaced with air ({@code BREAK_DONE}); when nothing is in range the
+ * command answers {@code BREAK_NO_TARGET} and breaks nothing. MockBukkit does not raytrace, so the looked-at
+ * block is supplied through a {@code getTargetBlockExact} stub on the player.
  */
-class PotionCommandTest {
+class BreakCommandTest {
 
     private ServerMock server;
-    private PlayerMock player;
+    private TargetingPlayer player;
     private RecordingSink sink;
     private MutableConfig config;
 
@@ -66,7 +64,8 @@ class PotionCommandTest {
     void setUp() {
         server = MockBukkit.mock();
         server.addSimpleWorld("world");
-        player = server.addPlayer("Alice");
+        player = new TargetingPlayer(server, "Alice");
+        server.addPlayer(player);
         player.setOp(true);
         sink = new RecordingSink();
         config = new MutableConfig();
@@ -78,58 +77,39 @@ class PotionCommandTest {
     }
 
     @Test
-    void literalIsPotion() {
-        assertThat(new PotionCommand(services()).build().getLiteral()).isEqualTo("potion");
+    void literalIsBreak() {
+        assertThat(new BreakCommand(services()).build().getLiteral()).isEqualTo("break");
     }
 
     @Test
-    void heldPotionGetsEffect() {
-        player.getInventory().setItemInMainHand(new ItemStack(Material.POTION));
-
-        execute("potion speed 30 1");
-
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        assertThat(hand.getType()).isEqualTo(Material.POTION);
-        PotionMeta meta = (PotionMeta) hand.getItemMeta();
-        assertThat(meta.getCustomEffects()).anySatisfy(effect -> {
-            assertThat(effect.getType()).isEqualTo(PotionEffectType.SPEED);
-            assertThat(effect.getDuration()).isEqualTo(600);
-            assertThat(effect.getAmplifier()).isEqualTo(1);
-        });
-        assertThat(sink.keys).contains(ItemworldMessageKey.POTION_EFFECT_ADDED);
+    void hasNoAliases() {
+        assertThat(new BreakCommand(services()).aliases()).isEmpty();
     }
 
     @Test
-    void unknownEffectRejected() {
-        player.getInventory().setItemInMainHand(new ItemStack(Material.POTION));
+    void solidTargetBecomesAir() {
+        Block target = player.getWorld().getBlockAt(0, 64, 0);
+        target.setType(Material.STONE);
+        player.target = target;
 
-        execute("potion bogus 10 1");
+        execute("break");
 
-        assertThat(sink.keys).contains(ItemworldMessageKey.POTION_UNKNOWN_EFFECT);
-        PotionMeta meta = (PotionMeta) player.getInventory().getItemInMainHand().getItemMeta();
-        assertThat(meta.getCustomEffects()).isEmpty();
+        assertThat(player.getWorld().getBlockAt(0, 64, 0).getType()).isEqualTo(Material.AIR);
+        assertThat(sink.keys).contains(ItemworldMessageKey.BREAK_DONE);
     }
 
     @Test
-    void nonPotionRejected() {
-        player.getInventory().setItemInMainHand(new ItemStack(Material.STONE));
+    void noTargetIsReported() {
+        player.target = null;
 
-        execute("potion speed 10 1");
+        execute("break");
 
-        assertThat(sink.keys).contains(ItemworldMessageKey.NOT_A_POTION);
-        assertThat(player.getInventory().getItemInMainHand().getType()).isEqualTo(Material.STONE);
-    }
-
-    @Test
-    void emptyHandRejected() {
-        execute("potion speed 10 1");
-
-        assertThat(sink.keys).contains(ItemworldMessageKey.NOT_A_POTION);
+        assertThat(sink.keys).contains(ItemworldMessageKey.BREAK_NO_TARGET);
     }
 
     private void execute(String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new PotionCommand(services()).build());
+        dispatcher.getRoot().addChild(new BreakCommand(services()).build());
         try {
             dispatcher.execute(input, CommandSourceStackMock.from(player));
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
@@ -156,7 +136,21 @@ class PotionCommandTest {
                 new NoopLogger());
     }
 
-    /** A map-backed {@link ConfigStore} scoped to {@code modules.itemworld}; defaults keep /potion enabled. */
+    /** A {@link PlayerMock} whose looked-at block is supplied directly, since MockBukkit does not raytrace. */
+    private static final class TargetingPlayer extends PlayerMock {
+        private org.bukkit.block.@org.jspecify.annotations.Nullable Block target;
+
+        TargetingPlayer(ServerMock server, String name) {
+            super(server, name);
+        }
+
+        @Override
+        public org.bukkit.block.@org.jspecify.annotations.Nullable Block getTargetBlockExact(int maxDistance) {
+            return target;
+        }
+    }
+
+    /** A map-backed {@link ConfigStore} scoped to {@code modules.itemworld}; defaults keep /break enabled. */
     private static final class MutableConfig implements ConfigStore {
         private final Map<String, Object> values = new HashMap<>();
 
@@ -195,7 +189,7 @@ class PotionCommandTest {
         }
     }
 
-    /** Runs scheduled work inline so entity-bound effects are observable without ticking Folia. */
+    /** Runs scheduled work inline so the entity-bound break is observable without ticking Folia. */
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {

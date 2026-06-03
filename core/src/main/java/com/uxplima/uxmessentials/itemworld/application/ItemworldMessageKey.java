@@ -130,6 +130,9 @@ public enum ItemworldMessageKey implements MessageKey {
     FIREBALL_LAUNCHED("itemworld.fireball.launched"),
     // /kittycannon
     KITTYCANNON_FIRED("itemworld.kittycannon.fired"),
+    // /break
+    BREAK_DONE("itemworld.break.done"),
+    BREAK_NO_TARGET("itemworld.break.no-target"),
 
     // Shared validation failures surfaced at the adapter boundary before a domain call
     UNKNOWN_ITEM("itemworld.unknown-item"),

@@ -141,4 +141,12 @@ public final class LoggingItemworldAudit implements ItemworldAudit {
         }
         audit.info("event=itemworld_kittycannon actor={} ok=true", actor.uuid());
     }
+
+    @Override
+    public void brokeBlock(PlayerRef actor, String blockType) {
+        if (!config.auditEnabled("break")) {
+            return;
+        }
+        audit.info("event=itemworld_break actor={} block={} ok=true", actor.uuid(), blockType);
+    }
 }
