@@ -22,7 +22,7 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
- * The {@link LocaleCatalog} that loads each {@code config/messages/messages_<lang>.conf} as a flat map
+ * The {@link LocaleCatalog} that loads each {@code messages/messages_<lang>.conf} as a flat map
  * of catalog key to MiniMessage template. Catalog keys are quoted, dot-separated strings
  * ({@code "home.teleported"}), so they are read as literal HOCON map keys rather than nested paths.
  *
@@ -37,14 +37,14 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 @NullMarked
 public final class HoconLocaleCatalog implements LocaleCatalog {
 
-    private static final String RESOURCE_DIR = "config/messages/";
+    private static final String RESOURCE_DIR = "messages/";
 
     private final Logger log;
     private final Path messagesDir;
     private final ConcurrentHashMap<String, Map<String, String>> byLanguage = new ConcurrentHashMap<>();
 
     /**
-     * @param messagesDir the on-disk {@code config/messages} directory; a {@code messages_<lang>.conf}
+     * @param messagesDir the on-disk {@code messages} directory; a {@code messages_<lang>.conf}
      *     present there is read in preference to the bundled copy, so operator edits take effect.
      */
     public HoconLocaleCatalog(Logger log, Path messagesDir) {

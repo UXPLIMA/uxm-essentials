@@ -15,7 +15,7 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
- * Reads the bundled {@code config/messages/messages_<lang>.conf} catalogs as flat key sets, shared by
+ * Reads the bundled {@code messages/messages_<lang>.conf} catalogs as flat key sets, shared by
  * the locale-parity Gradle gate ({@link LocaleParityCheck}) and the JUnit matrix guard
  * ({@code MessageKeyLocaleParityDriftTest}). The {@code prefix} key is the sink's injected {@code
  * <prefix>} tag, not a player-facing message, so it is excluded from the parity comparison.
@@ -23,7 +23,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 final class CatalogKeys {
 
     static final String PREFIX_KEY = "prefix";
-    private static final String RESOURCE_DIR = "config/messages/";
+    private static final String RESOURCE_DIR = "messages/";
 
     private CatalogKeys() {}
 

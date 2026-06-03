@@ -42,8 +42,8 @@ final class DefaultResources {
             "modules/vaults/config.conf",
             "modules/communication/config.conf",
             "modules/migration/config.conf",
-            "config/messages/messages_en.conf",
-            "config/messages/messages_tr.conf");
+            "messages/messages_en.conf",
+            "messages/messages_tr.conf");
 
     private DefaultResources() {}
 

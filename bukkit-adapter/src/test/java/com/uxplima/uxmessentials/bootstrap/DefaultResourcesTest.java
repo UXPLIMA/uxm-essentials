@@ -27,8 +27,8 @@ class DefaultResourcesTest {
 
         assertThat(dataFolder.resolve("config.conf")).isRegularFile();
         assertThat(dataFolder.resolve("modules/communication/config.conf")).isRegularFile();
-        assertThat(dataFolder.resolve("config/messages/messages_en.conf")).isRegularFile();
-        assertThat(dataFolder.resolve("config/messages/messages_tr.conf")).isRegularFile();
+        assertThat(dataFolder.resolve("messages/messages_en.conf")).isRegularFile();
+        assertThat(dataFolder.resolve("messages/messages_tr.conf")).isRegularFile();
     }
 
     @Test
