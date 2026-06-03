@@ -6,6 +6,7 @@ import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -22,7 +23,8 @@ public final class ModerationCommands {
     private ModerationCommands() {}
 
     /** Every moderation command, in surface order. */
-    public static List<CommandRegistration> all(ModerationServices services, Messages messages, MessageSink sink) {
+    public static List<CommandRegistration> all(
+            ModerationServices services, Messages messages, MessageSink sink, Scheduler scheduler) {
         return List.of(
                 new MuteCommand(services, messages, sink),
                 new TempmuteCommand(services, messages, sink),
@@ -90,7 +92,8 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.seen().seenIp(a, t)));
+                        (a, t) -> services.seen().seenIp(a, t)),
+                new SudoCommand(scheduler, messages, sink));
     }
 
     private static SimpleTargetCommand target(

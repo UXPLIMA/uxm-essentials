@@ -90,7 +90,7 @@ public final class ModerationWiring {
         gates.bindMute(mutePolicy);
         gates.bindJail(jailGate);
         return new Wired(
-                ModerationCommands.all(services, kernel.messages(), kernel.messageSink()),
+                ModerationCommands.all(services, kernel.messages(), kernel.messageSink(), kernel.scheduler()),
                 listeners(services, sanctions, repository, kernel, settings, guard, clock),
                 sanctions,
                 mutePolicy,

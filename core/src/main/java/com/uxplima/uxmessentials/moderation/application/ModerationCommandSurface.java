@@ -43,7 +43,8 @@ final class ModerationCommandSurface {
                 spec("freeze", "uxmessentials.moderation.freeze", "Freeze a player in place"),
                 spec("unfreeze", "uxmessentials.moderation.freeze", "Release a frozen player"),
                 spec("seen", "uxmessentials.moderation.seen", "Show a player's last-seen"),
-                spec("seenip", "uxmessentials.moderation.seen", "Show a player's last IP and alts"));
+                spec("seenip", "uxmessentials.moderation.seen", "Show a player's last IP and alts"),
+                spec("sudo", "uxmessentials.moderation.sudo", "Run a command as another player"));
     }
 
     private static CommandSpec spec(String literal, String permission, String description) {

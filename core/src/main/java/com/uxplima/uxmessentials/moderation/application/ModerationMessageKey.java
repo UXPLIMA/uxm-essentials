@@ -66,6 +66,9 @@ public enum ModerationMessageKey implements MessageKey {
     UNFREEZE_NOTIFY_TARGET("moderation.unfreeze.notify-target"),
     FREEZE_BLOCKED("moderation.freeze.blocked"),
 
+    // /sudo
+    SUDO_DONE("moderation.sudo.done"),
+
     // /seen, /seenip
     SEEN_REPORT("moderation.seen.report"),
     SEEN_NEVER("moderation.seen.never"),
