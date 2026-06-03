@@ -146,6 +146,16 @@ final class ItemworldCommandSurface {
                 "uxmessentials.iteminfo.use",
                 SubFeatureGroup.ITEM_UTILS,
                 "Inspect the item you are holding"));
+        verbs.add(new Verb(
+                "copyinv",
+                "uxmessentials.copyinv.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Copy a player's inventory into yours"));
+        verbs.add(new Verb(
+                "endercopy",
+                "uxmessentials.endercopy.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Copy a player's ender chest into yours"));
         // Virtual workstations.
         verbs.add(new Verb(
                 "anvil", "uxmessentials.workstation.anvil", SubFeatureGroup.WORKSTATIONS, "Open a virtual anvil"));
@@ -190,6 +200,8 @@ final class ItemworldCommandSurface {
         verbs.add(new Verb("disposal", "uxmessentials.disposal.use", SubFeatureGroup.CLEANUP, "Open a throwaway GUI"));
         verbs.add(new Verb(
                 "condense", "uxmessentials.condense.use", SubFeatureGroup.CLEANUP, "Recipe-stack inventory items"));
+        verbs.add(new Verb(
+                "enderclear", "uxmessentials.enderclear.use", SubFeatureGroup.CLEANUP, "Clear an ender chest"));
         // Powertool.
         verbs.add(new Verb(
                 "powertool",
@@ -240,6 +252,9 @@ final class ItemworldCommandSurface {
         verbs.add(new Verb("fireball", "uxmessentials.fireball.use", SubFeatureGroup.ADMIN_FUN, "Launch a fireball"));
         verbs.add(new Verb(
                 "kittycannon", "uxmessentials.kittycannon.use", SubFeatureGroup.ADMIN_FUN, "Launch an exploding cat"));
+        verbs.add(new Verb(
+                "antioch", "uxmessentials.antioch.use", SubFeatureGroup.ADMIN_FUN, "Throw a primed TNT grenade"));
+        verbs.add(new Verb("beezooka", "uxmessentials.beezooka.use", SubFeatureGroup.ADMIN_FUN, "Launch an angry bee"));
         verbs.add(new Verb(
                 "break", "uxmessentials.break.use", SubFeatureGroup.ADMIN_FUN, "Break the block you are looking at"));
         verbs.add(new Verb(

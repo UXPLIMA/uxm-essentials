@@ -143,6 +143,22 @@ public final class LoggingItemworldAudit implements ItemworldAudit {
     }
 
     @Override
+    public void threwAntioch(PlayerRef actor) {
+        if (!config.auditEnabled("antioch")) {
+            return;
+        }
+        audit.info("event=itemworld_antioch actor={} ok=true", actor.uuid());
+    }
+
+    @Override
+    public void firedBeezooka(PlayerRef actor) {
+        if (!config.auditEnabled("beezooka")) {
+            return;
+        }
+        audit.info("event=itemworld_beezooka actor={} ok=true", actor.uuid());
+    }
+
+    @Override
     public void brokeBlock(PlayerRef actor, String blockType) {
         if (!config.auditEnabled("break")) {
             return;

@@ -152,6 +152,17 @@ public enum ItemworldMessageKey implements MessageKey {
     FIREBALL_LAUNCHED("itemworld.fireball.launched"),
     // /kittycannon
     KITTYCANNON_FIRED("itemworld.kittycannon.fired"),
+    // /antioch
+    ANTIOCH_THROWN("itemworld.antioch.thrown"),
+    // /beezooka
+    BEEZOOKA_FIRED("itemworld.beezooka.fired"),
+    // /enderclear
+    ENDERCLEAR_DONE("itemworld.enderclear.done"),
+    ENDERCLEAR_DONE_OTHER("itemworld.enderclear.done-other"),
+    // /copyinv
+    COPYINV_DONE("itemworld.copyinv.done"),
+    // /endercopy
+    ENDERCOPY_DONE("itemworld.endercopy.done"),
     // /break
     BREAK_DONE("itemworld.break.done"),
     BREAK_NO_TARGET("itemworld.break.no-target"),

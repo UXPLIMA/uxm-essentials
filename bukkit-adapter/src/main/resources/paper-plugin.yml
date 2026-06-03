@@ -464,7 +464,7 @@ permissions:
   # each command additionally disableable per-command (modules.itemworld.groups.<group>.enabled and
   # modules.itemworld.commands.<literal>.disabled). Every verb is permission-gated here; the abusable verbs
   # (bulk /give, /spawnmob, /spawner, the /kill /butcher /killall /remove entity-purge family, the /lightning
-  # /fireball /kittycannon /break /tree /nuke admin-fun verbs) are audit-logged. Inputs are validated at the
+  # /fireball /kittycannon /antioch /beezooka /break /tree /nuke admin-fun verbs) are audit-logged. Inputs are validated at the
   # adapter boundary.
   # The reload/inspect tier for the module (and its sub-feature groups) is uxmessentials.module.itemworld.
   uxmessentials.module.itemworld:
@@ -540,6 +540,12 @@ permissions:
   uxmessentials.iteminfo.use:
     description: '/iteminfo — inspect the metadata of the item in your hand.'
     default: op
+  uxmessentials.copyinv.use:
+    description: '/copyinv <player> — copy a player''s inventory into yours.'
+    default: op
+  uxmessentials.endercopy.use:
+    description: '/endercopy <player> — copy a player''s ender chest into yours.'
+    default: op
   uxmessentials.repair.itemworld:
     description: '/repair and /repairall in the itemworld surface (itemworld-owned; playerstate defers them).'
     default: op
@@ -577,6 +583,9 @@ permissions:
     default: op
   uxmessentials.condense.use:
     description: '/condense (alias /compact) [all] — recipe-stack inventory items.'
+    default: op
+  uxmessentials.enderclear.use:
+    description: '/enderclear (alias /clearec) [player] — clear an ender chest.'
     default: op
   # Powertool sub-feature group.
   uxmessentials.powertool.use:
@@ -632,6 +641,12 @@ permissions:
     default: op
   uxmessentials.kittycannon.use:
     description: '/kittycannon — launch an exploding cat (audit-logged).'
+    default: op
+  uxmessentials.antioch.use:
+    description: '/antioch (alias /grenade) — throw a primed TNT grenade (audit-logged).'
+    default: op
+  uxmessentials.beezooka.use:
+    description: '/beezooka (alias /beecannon) — launch an angry bee (audit-logged).'
     default: op
   uxmessentials.break.use:
     description: '/break — instantly break the block you are looking at (audit-logged).'

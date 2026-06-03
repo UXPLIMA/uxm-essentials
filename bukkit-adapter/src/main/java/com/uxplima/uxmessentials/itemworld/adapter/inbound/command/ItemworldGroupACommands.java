@@ -62,6 +62,8 @@ public final class ItemworldGroupACommands {
         commands.add(new ItemModelCommand(services));
         commands.add(new EditSignCommand(services));
         commands.add(new ItemInfoCommand(services));
+        commands.add(new CopyInvCommand(services));
+        commands.add(new EnderCopyCommand(services));
     }
 
     private static void addWorkstations(List<CommandRegistration> commands, ItemworldServices services) {
@@ -73,5 +75,6 @@ public final class ItemworldGroupACommands {
     private static void addCleanup(List<CommandRegistration> commands, ItemworldServices services) {
         commands.add(new DisposalCommand(services));
         commands.add(new CondenseCommand(services));
+        commands.add(new EnderClearCommand(services));
     }
 }

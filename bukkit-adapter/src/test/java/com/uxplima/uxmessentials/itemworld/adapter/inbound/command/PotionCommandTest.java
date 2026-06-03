@@ -340,6 +340,12 @@ class PotionCommandTest {
         public void firedKittycannon(PlayerRef actor) {}
 
         @Override
+        public void threwAntioch(PlayerRef actor) {}
+
+        @Override
+        public void firedBeezooka(PlayerRef actor) {}
+
+        @Override
         public void brokeBlock(PlayerRef actor, String blockType) {}
 
         @Override

@@ -17,14 +17,14 @@ public enum SubFeatureGroup {
 
     /**
      * {@code /give /i /item /itemname /itemlore /itemflag /skull /more /repair /repairall /enchant /hat /itemdb
-     * /unbreakable /disenchant /itemmodel /editsign}.
+     * /unbreakable /disenchant /itemmodel /editsign /copyinv /endercopy}.
      */
     ITEM_UTILS("item-utils"),
 
     /** {@code /anvil /workbench /enderchest /grindstone /cartography /loom /smithingtable /stonecutter /furnace}. */
     WORKSTATIONS("workstations"),
 
-    /** {@code /disposal /condense}. */
+    /** {@code /disposal /condense /enderclear}. */
     CLEANUP("cleanup"),
 
     /** {@code /powertool /powertooltoggle}. */
@@ -36,7 +36,7 @@ public enum SubFeatureGroup {
     /** {@code /time /weather} and the {@code /sun /rain /thunder /day /night} aliases. */
     TIME_WEATHER("time-weather"),
 
-    /** {@code /lightning /fireball /kittycannon}. */
+    /** {@code /lightning /fireball /kittycannon /antioch /beezooka /break /tree /bigtree /nuke}. */
     ADMIN_FUN("admin-fun");
 
     private final String configKey;
