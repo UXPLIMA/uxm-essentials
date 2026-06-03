@@ -33,7 +33,11 @@ public enum PresenceMessageKey implements MessageKey {
 
     // /realname — resolve a visible player's display name to their account name
     REALNAME_RESULT("presence.realname-result"),
-    REALNAME_NOT_FOUND("presence.realname-not-found");
+    REALNAME_NOT_FOUND("presence.realname-not-found"),
+
+    // /whois — staff identity/status summary for one visible online player
+    WHOIS_RESULT("presence.whois-result"),
+    WHOIS_NOT_FOUND("presence.whois-not-found");
 
     private final String key;
 

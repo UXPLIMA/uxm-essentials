@@ -348,6 +348,9 @@ permissions:
   uxmessentials.realname.use:
     description: '/realname <player> to look up a player''s real account name.'
     default: true
+  uxmessentials.whois.use:
+    description: '/whois <player> to view an online player''s account, identity and status.'
+    default: op
   uxmessentials.afk.kick.exempt:
     description: 'Never auto-kicked for being AFK past the configured timeout.'
     default: op
