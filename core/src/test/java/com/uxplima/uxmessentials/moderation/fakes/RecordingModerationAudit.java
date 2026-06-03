@@ -100,6 +100,16 @@ public final class RecordingModerationAudit implements ModerationAudit {
         lines.add(new Line("alt_detected", true));
     }
 
+    @Override
+    public void jailLocationDefined(PlayerRef actor, String jail) {
+        lines.add(new Line("jail_location_set", true));
+    }
+
+    @Override
+    public void jailLocationRemoved(PlayerRef actor, String jail) {
+        lines.add(new Line("jail_location_delete", true));
+    }
+
     /** A recorded audit line, keyed by its event name and ok flag so a test can match it. */
     public sealed interface Recorded permits Line, ClearLine {
         String event();

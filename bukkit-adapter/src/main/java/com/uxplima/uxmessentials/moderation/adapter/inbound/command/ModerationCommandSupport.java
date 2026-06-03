@@ -13,10 +13,13 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -81,5 +84,26 @@ abstract class ModerationCommandSupport {
     /** The live player behind {@code target}, if connected — for a command that must act on a session. */
     static @Nullable Player onlinePlayer(CommandContext<CommandSourceStack> ctx, PlayerRef target) {
         return ctx.getSource().getSender().getServer().getPlayer(target.uuid());
+    }
+
+    /**
+     * The invoking player, or {@code null} (after sending the players-only reply) for a console source. Used
+     * by the position-capturing commands ({@code /setjail}) a console cannot run.
+     */
+    final @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (sender instanceof Player player) {
+            return player;
+        }
+        notify(ctx, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of());
+        return null;
+    }
+
+    /**
+     * The player's current {@link Position}. Paper marks {@code Player#getLocation()} nullable (null only for
+     * an entity with no world, which a connected player never is), so the non-null assertion lives here once.
+     */
+    static Position position(Player player) {
+        return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
     }
 }

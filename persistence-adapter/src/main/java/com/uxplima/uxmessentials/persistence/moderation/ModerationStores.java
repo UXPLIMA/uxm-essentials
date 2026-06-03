@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.persistence.moderation;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import org.jspecify.annotations.NullMarked;
@@ -26,5 +27,11 @@ public final class ModerationStores {
     public static ModerationRepository repository(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqModerationRepository(persistence.dsl());
+    }
+
+    /** A jOOQ {@link JailLocationStore} over the shared persistence DSL — the writable jail-location seam. */
+    public static JailLocationStore jailLocationStore(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqJailLocationStore(persistence.dsl());
     }
 }

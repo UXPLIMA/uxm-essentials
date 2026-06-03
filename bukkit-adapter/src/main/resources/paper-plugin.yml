@@ -418,7 +418,7 @@ permissions:
     description: '/unmute <player>.'
     default: op
   uxmessentials.moderation.jail:
-    description: '/jail <player> <jail> [duration] [reason]; /jails lists configured jails; /jailedplayers lists who is jailed.'
+    description: '/jail <player> <jail> [duration] [reason]; /jails lists configured jails; /jailedplayers lists who is jailed; /setjail <name> defines a jail at your location; /deljail <name> removes a defined jail.'
     default: op
   uxmessentials.moderation.unjail:
     description: '/unjail <player>.'

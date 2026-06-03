@@ -48,6 +48,8 @@ public final class ModerationCommands {
                         (a, t) -> services.unjail().unjail(a, t)),
                 new JailsCommand(services, messages, sink),
                 new JailedPlayersCommand(services, messages, sink, scheduler),
+                new SetJailCommand(services, messages, sink),
+                new DelJailCommand(services, messages, sink),
                 new TempbanCommand(services, messages, sink),
                 new BanCommand(services, messages, sink),
                 new UnbanCommand(services, messages, sink),

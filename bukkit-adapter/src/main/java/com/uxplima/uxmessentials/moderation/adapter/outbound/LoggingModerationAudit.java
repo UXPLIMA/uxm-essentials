@@ -158,6 +158,16 @@ public final class LoggingModerationAudit implements ModerationAudit {
                 kicked ? "kick" : "allow");
     }
 
+    @Override
+    public void jailLocationDefined(PlayerRef actor, String jail) {
+        audit.info("event=jail_location_set actor={} jail={} ok=true", actor.uuid(), jail);
+    }
+
+    @Override
+    public void jailLocationRemoved(PlayerRef actor, String jail) {
+        audit.info("event=jail_location_delete actor={} jail={} ok=true", actor.uuid(), jail);
+    }
+
     private static String quote(Optional<String> reason) {
         String value = reason.orElse("");
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";

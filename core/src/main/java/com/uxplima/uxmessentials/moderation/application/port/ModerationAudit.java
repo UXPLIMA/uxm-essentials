@@ -72,4 +72,10 @@ public interface ModerationAudit {
 
     /** {@code event=alt_detected} — a connecting IP matched an existing sanction or the known-alt set at login. */
     void altDetected(UUID uuid, String ip, List<UUID> matchedAlts, boolean kicked);
+
+    /** {@code event=jail_location_set} — a {@code /setjail} saved (or re-anchored) a stored jail location. */
+    void jailLocationDefined(PlayerRef actor, String jail);
+
+    /** {@code event=jail_location_delete} — a {@code /deljail} removed a stored jail location. */
+    void jailLocationRemoved(PlayerRef actor, String jail);
 }

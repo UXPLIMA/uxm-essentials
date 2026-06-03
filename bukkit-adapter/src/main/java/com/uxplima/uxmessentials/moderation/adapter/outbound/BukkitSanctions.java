@@ -16,11 +16,14 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationSettings;
+import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -30,8 +33,10 @@ import org.jspecify.annotations.NullMarked;
  * state owned here — a {@code ConcurrentHashMap}-backed UUID set the move listener consults — so a relog
  * clears a freeze; it is not DB-backed.
  *
- * <p>The jail teleport resolves the named jail's location from {@link ModerationSettings}; an unresolved jail
- * (missing world) is a no-op rather than a crash. Release teleports back to the world spawn.
+ * <p>The jail teleport resolves the named jail's location store-first — the DB-backed {@link JailLocationStore}
+ * an operator fills with {@code /setjail}, falling back to {@link ModerationSettings} (the {@code
+ * moderation.conf} jails), so an in-game {@code /setjail} overrides a same-named config entry. An unresolved
+ * jail (missing world) is a no-op rather than a crash. Release teleports back to the world spawn.
  */
 @NullMarked
 public final class BukkitSanctions implements Sanctions {
@@ -39,12 +44,15 @@ public final class BukkitSanctions implements Sanctions {
     private final Server server;
     private final Scheduler scheduler;
     private final ModerationSettings settings;
+    private final JailLocationStore jailLocations;
     private final Set<UUID> frozen = ConcurrentHashMap.newKeySet();
 
-    public BukkitSanctions(Server server, Scheduler scheduler, ModerationSettings settings) {
+    public BukkitSanctions(
+            Server server, Scheduler scheduler, ModerationSettings settings, JailLocationStore jailLocations) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.jailLocations = Objects.requireNonNull(jailLocations, "jailLocations");
     }
 
     @Override
@@ -104,6 +112,20 @@ public final class BukkitSanctions implements Sanctions {
     }
 
     private Optional<Location> jailLocation(String jail) {
+        Optional<Location> stored = storedJailLocation(jail);
+        return stored.isPresent() ? stored : configJailLocation(jail);
+    }
+
+    private Optional<Location> storedJailLocation(String jail) {
+        return jailLocations.find(StoredJail.normalise(jail)).flatMap(stored -> {
+            Position at = stored.location();
+            World world = server.getWorld(at.world().uid());
+            World byName = world == null ? server.getWorld(at.world().name()) : world;
+            return byName == null ? Optional.empty() : Optional.of(BukkitRefs.toLocation(byName, at));
+        });
+    }
+
+    private Optional<Location> configJailLocation(String jail) {
         return settings.location(jail).flatMap(loc -> {
             World world = server.getWorld(loc.world());
             return world == null ? Optional.empty() : Optional.of(new Location(world, loc.x(), loc.y(), loc.z()));

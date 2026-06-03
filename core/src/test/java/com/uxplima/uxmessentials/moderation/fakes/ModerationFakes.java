@@ -8,6 +8,8 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.port.JailDirectory;
+import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
+import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -43,6 +45,36 @@ public final class ModerationFakes {
     /** A {@link JailDirectory} where the named jails exist; {@code wallClock} marks the wall-clock ones. */
     public static JailDirectory jails(Set<String> existing, Set<String> wallClock) {
         return new FixedJails(existing, wallClock);
+    }
+
+    /** A {@link JailLocationStore} backed by an in-memory name → jail map, for the use-case tests. */
+    public static final class FakeJailLocationStore implements JailLocationStore {
+        private final Map<String, StoredJail> byName = new java.util.HashMap<>();
+
+        @Override
+        public void save(StoredJail jail) {
+            byName.put(jail.name(), jail);
+        }
+
+        @Override
+        public boolean exists(String name) {
+            return byName.containsKey(name);
+        }
+
+        @Override
+        public Optional<StoredJail> find(String name) {
+            return Optional.ofNullable(byName.get(name));
+        }
+
+        @Override
+        public boolean delete(String name) {
+            return byName.remove(name) != null;
+        }
+
+        @Override
+        public java.util.List<String> names() {
+            return byName.keySet().stream().sorted().toList();
+        }
     }
 
     /** A recording event publisher exposing the published events. */

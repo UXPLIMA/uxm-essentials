@@ -19,4 +19,6 @@ public sealed interface ModerationEvent extends DomainEvent
                 PlayerTempbanned,
                 PlayerWarned,
                 PlayerIpBanned,
-                AltDetected {}
+                AltDetected,
+                JailLocationDefined,
+                JailLocationRemoved {}

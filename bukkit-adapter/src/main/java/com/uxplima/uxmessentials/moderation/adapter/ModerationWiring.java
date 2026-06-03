@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationL
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandListener;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitTargetResolver;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyStore;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
@@ -22,6 +23,7 @@ import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
 import com.uxplima.uxmessentials.moderation.application.CommandSpy;
+import com.uxplima.uxmessentials.moderation.application.DelJail;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
@@ -42,6 +44,7 @@ import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
 import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.Seen;
+import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.TempWarn;
@@ -49,6 +52,7 @@ import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
+import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
@@ -93,11 +97,13 @@ public final class ModerationWiring {
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config());
         ModerationRepository repository = ModerationStores.repository(persistence);
-        BukkitSanctions sanctions = new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings);
+        JailLocationStore jailLocations = ModerationStores.jailLocationStore(persistence);
+        BukkitSanctions sanctions =
+                new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings, jailLocations);
         ModerationGuard guard = new ModerationGuard(kernel.permissions());
         InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
         ModerationServices services =
-                assemble(plugin, kernel, settings, repository, sanctions, guard, commandSpyStore, clock);
+                assemble(plugin, kernel, settings, repository, jailLocations, sanctions, guard, commandSpyStore, clock);
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
@@ -116,13 +122,14 @@ public final class ModerationWiring {
             KernelPorts kernel,
             ModerationSettings settings,
             ModerationRepository repository,
+            JailLocationStore jailLocations,
             BukkitSanctions sanctions,
             ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
             Clock clock) {
         ModerationNotifier notifier = new ModerationNotifier(kernel.messages(), kernel.messageSink());
         ModerationAudit audit = new LoggingModerationAudit(auditLogger());
-        ConfigJailDirectory jails = new ConfigJailDirectory(settings);
+        CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
         Sanctions sanctionPort = sanctions;
         return new ModerationServices.Builder()
                 .mute(new Mute(repository, guard, notifier, audit, kernel.events(), clock))
@@ -140,6 +147,8 @@ public final class ModerationWiring {
                 .clearWarns(new ClearWarns(repository, notifier, audit))
                 .listJails(new ListJails(jails, notifier))
                 .listJailed(new ListJailed(repository, kernel.playerLookup(), notifier, clock))
+                .setJail(new SetJail(jailLocations, notifier, audit, kernel.events(), clock))
+                .delJail(new DelJail(jailLocations, notifier, audit, kernel.events(), clock))
                 .listBans(new ListBans(repository, kernel.playerLookup(), notifier, clock))
                 .listMutes(new ListMutes(repository, kernel.playerLookup(), notifier, clock))
                 .banIp(new BanIp(repository, notifier, audit, kernel.events(), clock))

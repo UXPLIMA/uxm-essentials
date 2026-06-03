@@ -33,6 +33,11 @@ public enum ModerationMessageKey implements MessageKey {
     JAILS_ENTRY("moderation.jails.entry"),
     JAILS_EMPTY("moderation.jails.empty"),
 
+    // /setjail, /deljail — define and remove a stored jail location at the staff member's position
+    SETJAIL_SAVED("moderation.setjail.saved"),
+    DELJAIL_DELETED("moderation.deljail.deleted"),
+    DELJAIL_NOT_FOUND("moderation.deljail.not-found"),
+
     // /jailedplayers — review of currently jailed players
     JAILEDLIST_HEADER("moderation.jailedlist-header"),
     JAILEDLIST_ENTRY("moderation.jailedlist-entry"),
