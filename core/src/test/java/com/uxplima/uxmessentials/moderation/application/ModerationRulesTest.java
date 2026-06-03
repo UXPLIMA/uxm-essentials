@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
+import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctions;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
@@ -40,6 +41,7 @@ class ModerationRulesTest {
     private ModerationFakes.RecordingEvents events;
     private Clock clock;
     private ModerationGuard guard;
+    private SanctionHistoryRecorder history;
 
     @BeforeEach
     void setUp() {
@@ -48,11 +50,12 @@ class ModerationRulesTest {
         events = new ModerationFakes.RecordingEvents();
         clock = Clock.fixed(T0, ZoneOffset.UTC);
         guard = new ModerationGuard(ModerationFakes.exempt(EXEMPT.uuid()));
+        history = new SanctionHistoryRecorder(new FakeSanctionHistory(), clock);
     }
 
     @Test
     void timedMuteIsStoredAuditedAndMaterializesAnOfflineRow() {
-        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, clock);
+        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, history, clock);
 
         var result = mute.mute(ADMIN, TARGET, "1h30m", Optional.of("spam"));
 
@@ -70,7 +73,7 @@ class ModerationRulesTest {
 
     @Test
     void exemptTargetCannotBeMutedAndTheRefusalIsAudited() {
-        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, clock);
+        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, history, clock);
 
         var result = mute.mute(ADMIN, EXEMPT, "", Optional.empty());
 
@@ -83,7 +86,7 @@ class ModerationRulesTest {
 
     @Test
     void malformedMuteDurationIsRejected() {
-        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, clock);
+        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, history, clock);
 
         var result = mute.mute(ADMIN, TARGET, "10x", Optional.empty());
 
@@ -93,7 +96,7 @@ class ModerationRulesTest {
 
     @Test
     void unmuteOfAnUnmutedPlayerIsRefused() {
-        Unmute unmute = new Unmute(repository, ModerationFakes.notifier(), audit, events, clock);
+        Unmute unmute = new Unmute(repository, ModerationFakes.notifier(), audit, events, history, clock);
 
         var result = unmute.unmute(ADMIN, TARGET);
 
@@ -105,7 +108,8 @@ class ModerationRulesTest {
     @Test
     void tempbanRequiresADurationAndKicksAnOnlineTarget() {
         FakeSanctions sanctions = new FakeSanctions(TARGET);
-        TempBan tempBan = new TempBan(repository, sanctions, guard, ModerationFakes.notifier(), audit, events, clock);
+        TempBan tempBan =
+                new TempBan(repository, sanctions, guard, ModerationFakes.notifier(), audit, events, history, clock);
 
         assertThat(tempBan.tempban(ADMIN, TARGET, "", Optional.empty()).errorOrThrow())
                 .isEqualTo(ModerationError.BAD_DURATION);

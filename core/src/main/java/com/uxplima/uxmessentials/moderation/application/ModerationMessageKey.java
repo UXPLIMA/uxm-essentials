@@ -63,6 +63,16 @@ public enum ModerationMessageKey implements MessageKey {
     MUTELIST_ENTRY("moderation.mutelist-entry"),
     MUTELIST_EMPTY("moderation.mutelist-empty"),
 
+    // /banhistory — a player's full ban/unban history (newest-first)
+    BANHISTORY_HEADER("moderation.banhistory.header"),
+    BANHISTORY_ENTRY("moderation.banhistory.entry"),
+    BANHISTORY_EMPTY("moderation.banhistory.empty"),
+
+    // /mutehistory — a player's full mute/unmute history (newest-first)
+    MUTEHISTORY_HEADER("moderation.mutehistory.header"),
+    MUTEHISTORY_ENTRY("moderation.mutehistory.entry"),
+    MUTEHISTORY_EMPTY("moderation.mutehistory.empty"),
+
     // /kick, /kickall
     KICK_APPLIED("moderation.kick.applied"),
     KICK_KICKED("moderation.kick.kicked"),

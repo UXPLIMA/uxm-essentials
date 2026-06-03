@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerTempbanned;
 import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
+import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctions;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
@@ -39,6 +40,7 @@ class BanTest {
         FakeSanctions sanctions = new FakeSanctions(TARGET);
         ModerationFakes.RecordingEvents events = new ModerationFakes.RecordingEvents();
         RecordingModerationAudit audit = new RecordingModerationAudit();
+        FakeSanctionHistory history = new FakeSanctionHistory();
         Ban ban = new Ban(
                 repository,
                 sanctions,
@@ -46,6 +48,7 @@ class BanTest {
                 ModerationFakes.notifier(),
                 audit,
                 events,
+                new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         var result = ban.ban(ACTOR, TARGET, Optional.of("griefing"));
@@ -58,6 +61,11 @@ class BanTest {
         assertThat(sanctions.kicked).containsExactly(TARGET);
         assertThat(events.events).hasSize(1).first().isInstanceOf(PlayerTempbanned.class);
         assertThat(audit.lines).singleElement().isEqualTo(new RecordingModerationAudit.Line("player_tempban", true));
+        // A successful permanent ban records exactly one BAN history row, no expiry.
+        assertThat(history.appended).singleElement().satisfies(row -> {
+            assertThat(row.action()).isEqualTo(com.uxplima.uxmessentials.moderation.domain.SanctionAction.BAN);
+            assertThat(row.expiry()).isEmpty();
+        });
     }
 
     @Test
@@ -66,6 +74,7 @@ class BanTest {
         FakeSanctions sanctions = new FakeSanctions(TARGET);
         ModerationFakes.RecordingEvents events = new ModerationFakes.RecordingEvents();
         RecordingModerationAudit audit = new RecordingModerationAudit();
+        FakeSanctionHistory history = new FakeSanctionHistory();
         Ban ban = new Ban(
                 repository,
                 sanctions,
@@ -73,6 +82,7 @@ class BanTest {
                 ModerationFakes.notifier(),
                 audit,
                 events,
+                new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         var result = ban.ban(ACTOR, TARGET, Optional.empty());
@@ -82,6 +92,8 @@ class BanTest {
         assertThat(repository.loadTempban(TARGET)).isInstanceOf(TempbanState.None.class);
         assertThat(sanctions.kicked).isEmpty();
         assertThat(audit.lines).singleElement().isEqualTo(new RecordingModerationAudit.Line("player_tempban", false));
+        // A refused ban records no history row.
+        assertThat(history.appended).isEmpty();
     }
 
     @Test
@@ -91,25 +103,40 @@ class BanTest {
                 TARGET,
                 TempbanState.active(NOW.plus(Duration.ofDays(365_000)), Issuer.of(ACTOR), Optional.empty(), NOW));
         RecordingModerationAudit audit = new RecordingModerationAudit();
-        Unban unban = new Unban(repository, ModerationFakes.notifier(), audit);
+        FakeSanctionHistory history = new FakeSanctionHistory();
+        Unban unban = new Unban(
+                repository,
+                ModerationFakes.notifier(),
+                audit,
+                new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)));
 
         var result = unban.unban(ACTOR, TARGET);
 
         assertThat(result.isOk()).isTrue();
         assertThat(repository.loadTempban(TARGET)).isInstanceOf(TempbanState.None.class);
         assertThat(audit.lines).singleElement().isEqualTo(new RecordingModerationAudit.Line("player_unban", true));
+        // A successful unban records exactly one UNBAN history row.
+        assertThat(history.appended).singleElement().satisfies(row -> assertThat(row.action())
+                .isEqualTo(com.uxplima.uxmessentials.moderation.domain.SanctionAction.UNBAN));
     }
 
     @Test
     void unbanOfANotBannedPlayerIsRefused() {
         FakeModerationRepository repository = new FakeModerationRepository();
         RecordingModerationAudit audit = new RecordingModerationAudit();
-        Unban unban = new Unban(repository, ModerationFakes.notifier(), audit);
+        FakeSanctionHistory history = new FakeSanctionHistory();
+        Unban unban = new Unban(
+                repository,
+                ModerationFakes.notifier(),
+                audit,
+                new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)));
 
         var result = unban.unban(ACTOR, TARGET);
 
         assertThat(result.isErr()).isTrue();
         assertThat(result.errorOrThrow()).isEqualTo(ModerationError.NOT_BANNED);
         assertThat(audit.lines).singleElement().isEqualTo(new RecordingModerationAudit.Line("player_unban", false));
+        // A refused unban records no history row.
+        assertThat(history.appended).isEmpty();
     }
 }

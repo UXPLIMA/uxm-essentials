@@ -37,6 +37,7 @@ public final class BanIp {
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
+    private final SanctionHistoryRecorder history;
     private final Clock clock;
 
     public BanIp(
@@ -44,11 +45,13 @@ public final class BanIp {
             ModerationNotifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
+            SanctionHistoryRecorder history,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
+        this.history = Objects.requireNonNull(history, "history");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -62,6 +65,7 @@ public final class BanIp {
         Optional<Duration> span = SanctionDuration.parse(rawDuration).duration();
         IpBan ban = new IpBan(target.ip(), span.map(now::plus), reason, target.uuid(), Issuer.of(actor), now);
         repository.saveIpBan(ban);
+        history.banIp(actor, target.uuid(), target.ip(), reason, span.map(now::plus));
         List<UUID> alts = repository.altsByIp(target.ip(), target.uuid().orElse(NO_UUID));
         events.publish(new PlayerIpBanned(ban));
         events.publish(new AltDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true));

@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import org.jspecify.annotations.NullMarked;
 
@@ -33,5 +34,11 @@ public final class ModerationStores {
     public static JailLocationStore jailLocationStore(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqJailLocationStore(persistence.dsl());
+    }
+
+    /** A jOOQ {@link SanctionHistory} over the shared persistence DSL — the append-only history seam. */
+    public static SanctionHistory sanctionHistory(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqSanctionHistory(persistence.dsl());
     }
 }

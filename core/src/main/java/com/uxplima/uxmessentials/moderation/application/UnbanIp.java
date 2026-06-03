@@ -19,11 +19,17 @@ public final class UnbanIp {
     private final ModerationRepository repository;
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
+    private final SanctionHistoryRecorder history;
 
-    public UnbanIp(ModerationRepository repository, ModerationNotifier notifier, ModerationAudit audit) {
+    public UnbanIp(
+            ModerationRepository repository,
+            ModerationNotifier notifier,
+            ModerationAudit audit,
+            SanctionHistoryRecorder history) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
+        this.history = Objects.requireNonNull(history, "history");
     }
 
     /** Lift the IP ban on {@code ip}, or refuse when it was not banned. */
@@ -35,6 +41,7 @@ public final class UnbanIp {
             notifier.send(actor, ModerationError.NOT_IP_BANNED.messageKey());
             return Result.err(ModerationError.NOT_IP_BANNED);
         }
+        history.unbanIp(actor, ip);
         audit.ipUnbanned(actor, ip, true);
         notifier.send(actor, ModerationMessageKey.UNBANIP_APPLIED, Map.of("ip", ip));
         return Result.ok();

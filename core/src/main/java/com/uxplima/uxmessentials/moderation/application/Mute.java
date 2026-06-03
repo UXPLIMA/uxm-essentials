@@ -31,6 +31,7 @@ public final class Mute {
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
+    private final SanctionHistoryRecorder history;
     private final Clock clock;
 
     public Mute(
@@ -39,12 +40,14 @@ public final class Mute {
             ModerationNotifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
+            SanctionHistoryRecorder history,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
+        this.history = Objects.requireNonNull(history, "history");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -73,6 +76,7 @@ public final class Mute {
                 .orElseGet(() -> MuteState.permanent(issuer, reason, now));
         repository.ensureUserExists(target, now);
         repository.saveMute(target, mute);
+        history.mute(actor, target, reason, parsed.duration().map(now::plus));
         notifyTarget(target, parsed, reason);
         events.publish(new PlayerMuted(target, mute, now));
         Optional<String> label = parsed.duration().map(SanctionDuration::format);

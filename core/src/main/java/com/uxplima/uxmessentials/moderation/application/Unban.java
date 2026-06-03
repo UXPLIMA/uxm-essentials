@@ -22,11 +22,17 @@ public final class Unban {
     private final ModerationRepository repository;
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
+    private final SanctionHistoryRecorder history;
 
-    public Unban(ModerationRepository repository, ModerationNotifier notifier, ModerationAudit audit) {
+    public Unban(
+            ModerationRepository repository,
+            ModerationNotifier notifier,
+            ModerationAudit audit,
+            SanctionHistoryRecorder history) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
+        this.history = Objects.requireNonNull(history, "history");
     }
 
     /** Lift {@code target}'s ban, or refuse when the target is not banned. */
@@ -39,6 +45,7 @@ public final class Unban {
             return Result.err(ModerationError.NOT_BANNED);
         }
         repository.saveTempban(target, TempbanState.none());
+        history.unban(actor, target);
         audit.unbanned(actor, target, true);
         notifier.send(actor, ModerationMessageKey.BAN_LIFTED, Map.of("player", target.name()));
         return Result.ok();

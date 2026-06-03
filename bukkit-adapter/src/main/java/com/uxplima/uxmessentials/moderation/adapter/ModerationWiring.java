@@ -42,7 +42,10 @@ import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
 import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
 import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
+import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
+import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
+import com.uxplima.uxmessentials.moderation.application.SanctionHistoryRecorder;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
@@ -55,6 +58,7 @@ import com.uxplima.uxmessentials.moderation.application.Unmute;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -98,12 +102,24 @@ public final class ModerationWiring {
         ModerationSettings settings = new ModerationSettings(ctx.config());
         ModerationRepository repository = ModerationStores.repository(persistence);
         JailLocationStore jailLocations = ModerationStores.jailLocationStore(persistence);
+        SanctionHistory sanctionHistory = ModerationStores.sanctionHistory(persistence);
+        SanctionHistoryRecorder historyRecorder = new SanctionHistoryRecorder(sanctionHistory, clock);
         BukkitSanctions sanctions =
                 new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings, jailLocations);
         ModerationGuard guard = new ModerationGuard(kernel.permissions());
         InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
-        ModerationServices services =
-                assemble(plugin, kernel, settings, repository, jailLocations, sanctions, guard, commandSpyStore, clock);
+        ModerationServices services = assemble(
+                plugin,
+                kernel,
+                settings,
+                repository,
+                jailLocations,
+                sanctionHistory,
+                historyRecorder,
+                sanctions,
+                guard,
+                commandSpyStore,
+                clock);
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
@@ -123,6 +139,8 @@ public final class ModerationWiring {
             ModerationSettings settings,
             ModerationRepository repository,
             JailLocationStore jailLocations,
+            SanctionHistory sanctionHistory,
+            SanctionHistoryRecorder history,
             BukkitSanctions sanctions,
             ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
@@ -132,13 +150,13 @@ public final class ModerationWiring {
         CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
         Sanctions sanctionPort = sanctions;
         return new ModerationServices.Builder()
-                .mute(new Mute(repository, guard, notifier, audit, kernel.events(), clock))
-                .unmute(new Unmute(repository, notifier, audit, kernel.events(), clock))
+                .mute(new Mute(repository, guard, notifier, audit, kernel.events(), history, clock))
+                .unmute(new Unmute(repository, notifier, audit, kernel.events(), history, clock))
                 .jail(new Jail(repository, jails, sanctionPort, guard, notifier, audit, kernel.events(), clock))
                 .unjail(new Unjail(repository, sanctionPort, notifier, audit, kernel.events(), clock))
-                .tempBan(new TempBan(repository, sanctionPort, guard, notifier, audit, kernel.events(), clock))
-                .ban(new Ban(repository, sanctionPort, guard, notifier, audit, kernel.events(), clock))
-                .unban(new Unban(repository, notifier, audit))
+                .tempBan(new TempBan(repository, sanctionPort, guard, notifier, audit, kernel.events(), history, clock))
+                .ban(new Ban(repository, sanctionPort, guard, notifier, audit, kernel.events(), history, clock))
+                .unban(new Unban(repository, notifier, audit, history))
                 .kick(new Kick(sanctionPort, guard, notifier, audit))
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
                 .warn(new IssueWarn(repository, guard, notifier, audit, kernel.events(), clock))
@@ -151,9 +169,11 @@ public final class ModerationWiring {
                 .delJail(new DelJail(jailLocations, notifier, audit, kernel.events(), clock))
                 .listBans(new ListBans(repository, kernel.playerLookup(), notifier, clock))
                 .listMutes(new ListMutes(repository, kernel.playerLookup(), notifier, clock))
-                .banIp(new BanIp(repository, notifier, audit, kernel.events(), clock))
-                .tempBanIp(new TempBanIp(repository, notifier, audit, kernel.events(), clock))
-                .unbanIp(new UnbanIp(repository, notifier, audit))
+                .reviewBanHistory(new ReviewBanHistory(sanctionHistory, notifier))
+                .reviewMuteHistory(new ReviewMuteHistory(sanctionHistory, notifier))
+                .banIp(new BanIp(repository, notifier, audit, kernel.events(), history, clock))
+                .tempBanIp(new TempBanIp(repository, notifier, audit, kernel.events(), history, clock))
+                .unbanIp(new UnbanIp(repository, notifier, audit, history))
                 .freeze(new Freeze(sanctionPort, guard, notifier, audit))
                 .seen(new Seen(repository, kernel.playerLookup(), notifier, clock))
                 .listAlts(new ListAlts(repository, kernel.playerLookup(), notifier))

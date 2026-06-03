@@ -10,7 +10,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
+import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
+import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -28,6 +30,8 @@ class TempBanIpTest {
     private static final PlayerRef OFFENDER = new PlayerRef(UUID.randomUUID(), "griefer");
     private static final String IP = "203.0.113.7";
 
+    private final FakeSanctionHistory history = new FakeSanctionHistory();
+
     @Test
     void tempBanIpBarsTheAddressUntilExpiryThenAdmitsIt() {
         FakeModerationRepository repository = new FakeModerationRepository();
@@ -37,6 +41,12 @@ class TempBanIpTest {
                 ACTOR, new BanIp.Target(IP, Optional.of(OFFENDER.uuid())), "1h", Optional.of("alts"));
 
         assertThat(result.isOk()).isTrue();
+        // A successful tempbanip records exactly one BAN history row with the banned IP and an expiry.
+        assertThat(history.appended).singleElement().satisfies(row -> {
+            assertThat(row.action()).isEqualTo(SanctionAction.BAN);
+            assertThat(row.ip()).contains(IP);
+            assertThat(row.expiry()).isPresent();
+        });
         // Before the hour is up, the login listener refuses a connection from the banned address.
         LoginEnforcement gate = enforcement(repository, NOW.plus(Duration.ofMinutes(30)));
         assertThat(gate.evaluate(OFFENDER, IP).allowed()).isFalse();
@@ -57,6 +67,8 @@ class TempBanIpTest {
         // Nothing was written: the address is still admitted.
         assertThat(enforcement(repository, NOW).evaluate(OFFENDER, IP).allowed())
                 .isTrue();
+        // A refused tempbanip records no history row.
+        assertThat(history.appended).isEmpty();
     }
 
     private TempBanIp useCase(FakeModerationRepository repository, Clock clock) {
@@ -65,6 +77,7 @@ class TempBanIpTest {
                 ModerationFakes.notifier(),
                 new RecordingModerationAudit(),
                 new ModerationFakes.RecordingEvents(),
+                new SanctionHistoryRecorder(history, clock),
                 clock);
     }
 

@@ -41,6 +41,8 @@ final class ModerationCommandSurface {
                 spec("unban", "uxmessentials.moderation.ban", "Lift a player's permanent ban"),
                 spec("banlist", "uxmessentials.moderation.banlist", "Review currently banned players"),
                 spec("mutelist", "uxmessentials.moderation.mutelist", "Review currently muted players"),
+                spec("banhistory", "uxmessentials.moderation.ban", "Review a player's ban history"),
+                spec("mutehistory", "uxmessentials.moderation.mute", "Review a player's mute history"),
                 spec("kick", "uxmessentials.moderation.kick", "Kick a player"),
                 spec("kickall", "uxmessentials.moderation.kick", "Kick all non-exempt players"),
                 spec("warn", "uxmessentials.moderation.warn", "Warn a player"),

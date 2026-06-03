@@ -20,6 +20,8 @@ import com.uxplima.uxmessentials.moderation.application.ListJails;
 import com.uxplima.uxmessentials.moderation.application.ListMutes;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.Mute;
+import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
+import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
@@ -62,6 +64,8 @@ public final class ModerationServices {
     private final DelJail delJail;
     private final ListBans listBans;
     private final ListMutes listMutes;
+    private final ReviewBanHistory reviewBanHistory;
+    private final ReviewMuteHistory reviewMuteHistory;
     private final BanIp banIp;
     private final TempBanIp tempBanIp;
     private final UnbanIp unbanIp;
@@ -95,6 +99,8 @@ public final class ModerationServices {
         this.delJail = Objects.requireNonNull(builder.delJail, "delJail");
         this.listBans = Objects.requireNonNull(builder.listBans, "listBans");
         this.listMutes = Objects.requireNonNull(builder.listMutes, "listMutes");
+        this.reviewBanHistory = Objects.requireNonNull(builder.reviewBanHistory, "reviewBanHistory");
+        this.reviewMuteHistory = Objects.requireNonNull(builder.reviewMuteHistory, "reviewMuteHistory");
         this.banIp = Objects.requireNonNull(builder.banIp, "banIp");
         this.tempBanIp = Objects.requireNonNull(builder.tempBanIp, "tempBanIp");
         this.unbanIp = Objects.requireNonNull(builder.unbanIp, "unbanIp");
@@ -185,6 +191,14 @@ public final class ModerationServices {
         return listMutes;
     }
 
+    public ReviewBanHistory reviewBanHistory() {
+        return reviewBanHistory;
+    }
+
+    public ReviewMuteHistory reviewMuteHistory() {
+        return reviewMuteHistory;
+    }
+
     public BanIp banIp() {
         return banIp;
     }
@@ -255,6 +269,8 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable DelJail delJail;
         private @org.jspecify.annotations.Nullable ListBans listBans;
         private @org.jspecify.annotations.Nullable ListMutes listMutes;
+        private @org.jspecify.annotations.Nullable ReviewBanHistory reviewBanHistory;
+        private @org.jspecify.annotations.Nullable ReviewMuteHistory reviewMuteHistory;
         private @org.jspecify.annotations.Nullable BanIp banIp;
         private @org.jspecify.annotations.Nullable TempBanIp tempBanIp;
         private @org.jspecify.annotations.Nullable UnbanIp unbanIp;
@@ -360,6 +376,16 @@ public final class ModerationServices {
 
         Builder listMutes(ListMutes value) {
             this.listMutes = value;
+            return this;
+        }
+
+        Builder reviewBanHistory(ReviewBanHistory value) {
+            this.reviewBanHistory = value;
+            return this;
+        }
+
+        Builder reviewMuteHistory(ReviewMuteHistory value) {
+            this.reviewMuteHistory = value;
             return this;
         }
 

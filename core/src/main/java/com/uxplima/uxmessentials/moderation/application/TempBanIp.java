@@ -40,6 +40,7 @@ public final class TempBanIp {
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
+    private final SanctionHistoryRecorder history;
     private final Clock clock;
 
     public TempBanIp(
@@ -47,11 +48,13 @@ public final class TempBanIp {
             ModerationNotifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
+            SanctionHistoryRecorder history,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
+        this.history = Objects.requireNonNull(history, "history");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -76,6 +79,7 @@ public final class TempBanIp {
         Instant now = clock.instant();
         IpBan ban = new IpBan(target.ip(), Optional.of(now.plus(span)), reason, target.uuid(), Issuer.of(actor), now);
         repository.saveIpBan(ban);
+        history.banIp(actor, target.uuid(), target.ip(), reason, Optional.of(now.plus(span)));
         List<UUID> alts = repository.altsByIp(target.ip(), target.uuid().orElse(NO_UUID));
         events.publish(new PlayerIpBanned(ban));
         events.publish(new AltDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true));

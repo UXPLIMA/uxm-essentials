@@ -41,6 +41,7 @@ public final class Ban {
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
+    private final SanctionHistoryRecorder history;
     private final Clock clock;
 
     public Ban(
@@ -50,6 +51,7 @@ public final class Ban {
             ModerationNotifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
+            SanctionHistoryRecorder history,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
@@ -57,6 +59,7 @@ public final class Ban {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
+        this.history = Objects.requireNonNull(history, "history");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -81,6 +84,7 @@ public final class Ban {
                 (TempbanState.Active) TempbanState.active(now.plus(PERMANENT_SPAN), Issuer.of(actor), reason, now);
         repository.ensureUserExists(target, now);
         repository.saveTempban(target, ban);
+        history.ban(actor, target, reason, Optional.empty());
         kickNow(target, reason);
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, PERMANENT_LABEL, true, reason);

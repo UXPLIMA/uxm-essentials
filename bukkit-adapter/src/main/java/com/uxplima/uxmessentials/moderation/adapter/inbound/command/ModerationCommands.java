@@ -55,6 +55,8 @@ public final class ModerationCommands {
                 new UnbanCommand(services, messages, sink),
                 new BanListCommand(services, messages, sink, scheduler),
                 new MuteListCommand(services, messages, sink, scheduler),
+                new BanHistoryCommand(services, messages, sink, scheduler),
+                new MuteHistoryCommand(services, messages, sink, scheduler),
                 new KickCommand(services, messages, sink),
                 new KickallCommand(services, messages, sink),
                 new WarnCommand(services, messages, sink),

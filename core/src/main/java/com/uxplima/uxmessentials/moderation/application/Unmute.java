@@ -26,6 +26,7 @@ public final class Unmute {
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
+    private final SanctionHistoryRecorder history;
     private final Clock clock;
 
     public Unmute(
@@ -33,11 +34,13 @@ public final class Unmute {
             ModerationNotifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
+            SanctionHistoryRecorder history,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
+        this.history = Objects.requireNonNull(history, "history");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -52,6 +55,7 @@ public final class Unmute {
         }
         Instant now = clock.instant();
         repository.saveMute(target, MuteState.none());
+        history.unmute(actor, target);
         events.publish(new PlayerUnmuted(target, now));
         audit.unmuted(actor, target, true, Optional.empty());
         notifier.send(actor, ModerationMessageKey.UNMUTE_APPLIED);

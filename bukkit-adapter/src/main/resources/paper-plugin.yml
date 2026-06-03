@@ -415,7 +415,7 @@ permissions:
   # action is audit-logged and permission-gated. A muted player cannot /msg (messaging gate) and a jailed
   # player cannot /home or /tpa (teleport gate). The exempt node is target-side immunity.
   uxmessentials.moderation.mute:
-    description: '/mute <player> [duration] [reason] (/tempmute is the explicit duration alias).'
+    description: '/mute <player> [duration] [reason] (/tempmute is the explicit duration alias); /mutehistory <player> reviews a player''s full mute/unmute history.'
     default: op
   uxmessentials.moderation.unmute:
     description: '/unmute <player>.'
@@ -430,7 +430,7 @@ permissions:
     description: '/tempban <player> <duration> [reason].'
     default: op
   uxmessentials.moderation.ban:
-    description: '/ban <player> [reason] and /unban <player> — permanent UUID ban and its lift.'
+    description: '/ban <player> [reason] and /unban <player> — permanent UUID ban and its lift; /banhistory <player> reviews a player''s full ban/unban history.'
     default: op
   uxmessentials.moderation.banlist:
     description: '/banlist to review the players currently banned.'
