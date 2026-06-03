@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.homes.application.SetHome;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
+import com.uxplima.uxmessentials.homes.application.port.MainHomePreference;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeName;
@@ -63,7 +64,7 @@ class HomeCommandPathTest {
         DomainEventPublisher events = new CapturingEvents();
         setHome = new SetHome(repository, quota, notifier, events, Clock.system(ZoneOffset.UTC));
         delHome = new DelHome(repository, notifier, events);
-        teleportHome = new TeleportHome(repository, teleporter, notifier);
+        teleportHome = new TeleportHome(repository, new NoMainHome(), teleporter, notifier);
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
     }
 
@@ -167,6 +168,20 @@ class HomeCommandPathTest {
         private Map<String, Home> owned(PlayerRef owner) {
             return byOwner.computeIfAbsent(owner.uuid(), u -> new java.util.LinkedHashMap<>());
         }
+    }
+
+    /** A main-home store that holds no choice, so plain {@code /home} keeps using the first-created home. */
+    private static final class NoMainHome implements MainHomePreference {
+        @Override
+        public java.util.Optional<HomeName> mainHomeOf(PlayerRef owner) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public void setMainHome(PlayerRef owner, HomeName name) {}
+
+        @Override
+        public void clear(PlayerRef owner) {}
     }
 
     private static final class RecordingTeleporter implements HomeTeleporter {

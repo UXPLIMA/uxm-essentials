@@ -15,9 +15,11 @@ import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.MoveHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHome;
+import com.uxplima.uxmessentials.homes.application.SetMainHome;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
+import com.uxplima.uxmessentials.homes.application.port.MainHomePreference;
 import com.uxplima.uxmessentials.persistence.homes.CachedHomeRepository;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -58,22 +60,24 @@ public final class HomesWiring {
         CachedHomeRepository cached = HomeRepositories.cachedConcrete(persistence);
         bus.registry().register(HomeSync.listener(cached));
         HomeRepository repository = HomeSync.repository(cached, bus.publisher());
+        MainHomePreference mainHomes = HomeRepositories.mainHomePreference(persistence);
         HomeNotifier notifier = new HomeNotifier(kernel.messages(), kernel.messageSink());
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
-        HomeServices services = assemble(ctx, repository, notifier, quota, teleporter);
+        HomeServices services = assemble(ctx, repository, mainHomes, notifier, quota, teleporter);
         return new Wired(HomeCommands.all(services, kernel.messages()), repository, quota);
     }
 
     private static HomeServices assemble(
             ModuleContext ctx,
             HomeRepository repository,
+            MainHomePreference mainHomes,
             HomeNotifier notifier,
             HomeQuota quota,
             HomeTeleporter teleporter) {
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
-        TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier);
+        TeleportHome teleportHome = new TeleportHome(repository, mainHomes, teleporter, notifier);
         HomeMenuView homeMenu = new HomeMenuView(kernel.messages(), kernel.scheduler(), teleportHome);
         return new HomeServices(
                 new SetHome(repository, quota, notifier, kernel.events(), clock),
@@ -82,6 +86,7 @@ public final class HomesWiring {
                 teleportHome,
                 new RenameHome(repository, notifier),
                 new MoveHome(repository, notifier),
+                new SetMainHome(repository, mainHomes, notifier),
                 new HomeAdmin(repository, teleporter, notifier, kernel.events()),
                 homeMenu,
                 kernel.playerLookup());

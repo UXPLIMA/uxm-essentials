@@ -22,6 +22,9 @@ public enum HomesMessageKey implements MessageKey {
     // teleport
     HOME_TELEPORTING("home.teleporting"),
 
+    // main-home choice (/setmainhome)
+    HOME_MAIN_SET("home.main-set"),
+
     // listing
     HOME_LIST_HEADER("home.list.header"),
     HOME_LIST_ENTRY("home.list.entry"),

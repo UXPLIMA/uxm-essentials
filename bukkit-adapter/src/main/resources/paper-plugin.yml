@@ -132,6 +132,9 @@ permissions:
   uxmessentials.home.move:
     description: '/movehome <name> to move a home to your current location.'
     default: true
+  uxmessentials.home.setmain:
+    description: '/setmainhome <name> (alias /mainhome) to choose the home /home goes to.'
+    default: true
   uxmessentials.home.others:
     description: '/home <player>:<name> to teleport to another player''s home.'
     default: op

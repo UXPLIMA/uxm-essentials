@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.MoveHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHome;
+import com.uxplima.uxmessentials.homes.application.SetMainHome;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import org.jspecify.annotations.NullMarked;
@@ -25,6 +26,7 @@ import org.jspecify.annotations.NullMarked;
  * @param teleportHome {@code /home}
  * @param renameHome {@code /renamehome}
  * @param moveHome {@code /movehome}
+ * @param setMainHome {@code /setmainhome}
  * @param homeAdmin {@code /homeadmin}
  * @param homeMenu the read-only {@code /homes} browse menu the bare {@code /homes} command opens
  * @param players name → ref resolution for the admin and {@code .others} forms
@@ -37,6 +39,7 @@ public record HomeServices(
         TeleportHome teleportHome,
         RenameHome renameHome,
         MoveHome moveHome,
+        SetMainHome setMainHome,
         HomeAdmin homeAdmin,
         HomeMenuView homeMenu,
         PlayerLookup players) {
@@ -48,6 +51,7 @@ public record HomeServices(
         Objects.requireNonNull(teleportHome, "teleportHome");
         Objects.requireNonNull(renameHome, "renameHome");
         Objects.requireNonNull(moveHome, "moveHome");
+        Objects.requireNonNull(setMainHome, "setMainHome");
         Objects.requireNonNull(homeAdmin, "homeAdmin");
         Objects.requireNonNull(homeMenu, "homeMenu");
         Objects.requireNonNull(players, "players");

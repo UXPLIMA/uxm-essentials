@@ -30,9 +30,11 @@ import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.MoveHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHome;
+import com.uxplima.uxmessentials.homes.application.SetMainHome;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
+import com.uxplima.uxmessentials.homes.application.port.MainHomePreference;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
@@ -143,9 +145,10 @@ class HomesMenuPathTest {
         HomeNotifier notifier = new HomeNotifier(messages, sink);
         HomeRepository repository = new FakeHomeRepository();
         HomeTeleporter teleporter = new RecordingTeleporter();
+        MainHomePreference mainHomes = new NoMainHome();
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
         Clock clock = Clock.systemUTC();
-        TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier);
+        TeleportHome teleportHome = new TeleportHome(repository, mainHomes, teleporter, notifier);
         HomeMenuView homeMenu = new HomeMenuView(messages, new SyncScheduler(), teleportHome);
         return new HomeServices(
                 new SetHome(repository, quota, notifier, new NoEvents(), clock),
@@ -154,9 +157,24 @@ class HomesMenuPathTest {
                 teleportHome,
                 new RenameHome(repository, notifier),
                 new MoveHome(repository, notifier),
+                new SetMainHome(repository, mainHomes, notifier),
                 new HomeAdmin(repository, teleporter, notifier, new NoEvents()),
                 homeMenu,
                 new NoPlayerLookup());
+    }
+
+    /** A main-home store that holds no choice, so plain {@code /home} keeps using the first-created home. */
+    private static final class NoMainHome implements MainHomePreference {
+        @Override
+        public Optional<HomeName> mainHomeOf(PlayerRef owner) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void setMainHome(PlayerRef owner, HomeName name) {}
+
+        @Override
+        public void clear(PlayerRef owner) {}
     }
 
     /** Three owner-owned homes in creation order, returned for any owner the menu/list asks for. */

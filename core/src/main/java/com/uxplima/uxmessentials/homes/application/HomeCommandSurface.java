@@ -34,6 +34,10 @@ final class HomeCommandSurface {
                         "uxmessentials.home.move",
                         HomeCommand.of("movehome", "Move a home to your current location")),
                 spec(
+                        "setmainhome",
+                        "uxmessentials.home.setmain",
+                        HomeCommand.of("setmainhome", "Set your main /home destination")),
+                spec(
                         "homeadmin",
                         "uxmessentials.home.admin",
                         HomeCommand.of("homeadmin", "Manage another player's homes")));

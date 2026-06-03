@@ -27,6 +27,7 @@ public final class HomeCommands {
                 new HomesCommand(services, messages),
                 new RenameHomeCommand(services, messages),
                 new MoveHomeCommand(services, messages),
+                new SetMainHomeCommand(services, messages),
                 new HomeAdminCommand(services, messages));
     }
 }
