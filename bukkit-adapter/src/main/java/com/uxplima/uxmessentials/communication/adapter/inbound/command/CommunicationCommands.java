@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.communication.application.CommunicationNotifier
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
@@ -41,17 +42,20 @@ public final class CommunicationCommands {
             BukkitInfoSender infoSender,
             CommunicationNotifier notifier,
             Messages messages,
-            BukkitAnnouncerBroadcaster broadcaster) {
+            BukkitAnnouncerBroadcaster broadcaster,
+            MessageSink sink) {
         Objects.requireNonNull(optOut, "optOut");
         Objects.requireNonNull(registry, "registry");
         Objects.requireNonNull(infoSender, "infoSender");
         Objects.requireNonNull(notifier, "notifier");
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(broadcaster, "broadcaster");
+        Objects.requireNonNull(sink, "sink");
         List<CommandRegistration> commands = new ArrayList<>();
         commands.add(new BroadcastCommand(broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastToggleCommand(optOut, messages));
         commands.add(new MeCommand(messages, notifier));
+        commands.add(new ClearChatCommand(messages, notifier, sink));
         for (InfoPage page : registry.all()) {
             commands.add(new InfoPageCommand(page.command(), registry, infoSender, notifier, messages));
         }

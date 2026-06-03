@@ -43,6 +43,10 @@ final class EconomyCommandSurface {
                         "uxmessentials.economy.pay.toggle",
                         EconomyCommand.of("paytoggle", List.of(), "Toggle accepting incoming pay")),
                 spec(
+                        "payall",
+                        "uxmessentials.economy.payall",
+                        EconomyCommand.of("payall", List.of(), "Pay every online player")),
+                spec(
                         "baltop",
                         "uxmessentials.economy.baltop",
                         EconomyCommand.of("baltop", List.of("balancetop"), "View the top balances")),
@@ -54,6 +58,10 @@ final class EconomyCommandSurface {
                         "sell",
                         "uxmessentials.economy.sell",
                         EconomyCommand.of("sell", List.of(), "Sell held items at their configured worth")),
+                spec(
+                        "sellall",
+                        "uxmessentials.economy.sell",
+                        EconomyCommand.of("sellall", List.of(), "Sell every sellable item in your inventory")),
                 spec(
                         "eco",
                         "uxmessentials.economy.admin",

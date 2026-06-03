@@ -24,7 +24,9 @@ import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.LookupWorth;
 import com.uxplima.uxmessentials.economy.application.NativeEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.Pay;
+import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
+import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
 import com.uxplima.uxmessentials.economy.application.WorthTable;
 import com.uxplima.uxmessentials.economy.application.port.BaltopExemption;
@@ -164,13 +166,16 @@ public final class EconomyWiring {
         EconomyProvider baltopProvider = new SnapshotBaltopProvider(resolved, snapshots);
         WorthTable worth = settings.worthTable();
         Currency defaultCurrency = currencies.defaultCurrency();
+        Pay pay = new Pay(resolved, preferences, pending, notifier, clock);
         return new EconomyServices(
                 new Balance(resolved, notifier),
-                new Pay(resolved, preferences, pending, notifier, clock),
+                pay,
+                new PayAll(pay, notifier),
                 new PayToggle(preferences, notifier),
                 new BalTop(baltopProvider, notifier, settings.baltopPageSize()),
                 new LookupWorth(worth, notifier, defaultCurrency),
                 new SellItem(resolved, worth, notifier, defaultCurrency),
+                new SellAll(resolved, worth, notifier, defaultCurrency),
                 new EcoAdmin(resolved, repository, audit, notifier),
                 currencies,
                 snapshots,

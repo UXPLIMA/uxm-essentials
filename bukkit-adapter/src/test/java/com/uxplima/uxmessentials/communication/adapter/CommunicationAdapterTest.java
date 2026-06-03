@@ -141,7 +141,8 @@ class CommunicationAdapterTest {
         for (CommandRegistration command : commands()) {
             literals.add(command.build().getLiteral());
         }
-        assertThat(literals).containsExactlyInAnyOrder("broadcast", "broadcasttoggle", "me", "rules", "motd");
+        assertThat(literals)
+                .containsExactlyInAnyOrder("broadcast", "broadcasttoggle", "me", "clearchat", "rules", "motd");
     }
 
     @Test
@@ -190,7 +191,8 @@ class CommunicationAdapterTest {
         BroadcastOptOut optOut = new BroadcastOptOut(optOutStore, notifier, new NoEvents(), Clock.systemUTC());
         InfoRegistry registry = settings.infoRegistry();
         BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(sink, optOutStore);
-        return CommunicationCommands.all(optOut, registry, new BukkitInfoSender(sink), notifier, sink, broadcaster);
+        return CommunicationCommands.all(
+                optOut, registry, new BukkitInfoSender(sink), notifier, sink, broadcaster, sink);
     }
 
     private com.uxplima.uxmessentials.communication.application.port.RandomSource random() {

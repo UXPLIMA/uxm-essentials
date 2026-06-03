@@ -77,7 +77,13 @@ public final class CommunicationWiring {
                 settings::announcerSchedule,
                 running::get);
         List<CommandRegistration> commands = CommunicationCommands.all(
-                services.broadcastOptOut(), registry, infoSender, notifier, kernel.messages(), broadcaster);
+                services.broadcastOptOut(),
+                registry,
+                infoSender,
+                notifier,
+                kernel.messages(),
+                broadcaster,
+                kernel.messageSink());
         List<Listener> listeners = listeners(services, registry, infoSender, settings);
         return new Wired(commands, listeners, announcer, running);
     }

@@ -53,6 +53,7 @@ public final class ItemworldGroupACommands {
         commands.add(new EnchantCommand(services));
         commands.add(new HatCommand(services));
         commands.add(new ItemDbCommand(services));
+        commands.add(new ShowItemCommand(services));
         commands.add(new RecipeCommand(services));
         commands.add(new UnbreakableCommand(services));
         commands.add(new DisenchantCommand(services));

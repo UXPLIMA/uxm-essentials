@@ -110,6 +110,7 @@ class FeatureModuleRegistryDriftTest {
                         "enchant",
                         "itemdb",
                         "recipe",
+                        "showitem",
                         "unbreakable",
                         "disenchant",
                         "itemmodel",
@@ -121,13 +122,15 @@ class FeatureModuleRegistryDriftTest {
                         "disposal",
                         "condense", // cleanup
                         "powertool",
-                        "powertooltoggle", // powertool
+                        "powertooltoggle",
+                        "powertoollist", // powertool
                         "spawnmob",
                         "spawner",
                         "kill",
                         "butcher",
                         "killall",
                         "remove",
+                        "entitycount",
                         "unlimited", // mob/entity
                         "time",
                         "weather",
@@ -143,10 +146,10 @@ class FeatureModuleRegistryDriftTest {
                         "tree",
                         "bigtree",
                         "nuke"); // admin-fun
-        // The full surface: 21 item-utils + 9 workstations + 2 cleanup + 2 powertool + 7 mob/entity
-        // + 7 time/weather + 7 admin-fun = 55 distinct literals, no verb dropped and none registered twice.
-        assertThat(itemworld.commands()).hasSize(55);
-        assertThat(literals).hasSize(55);
+        // The full surface: 22 item-utils + 9 workstations + 2 cleanup + 3 powertool + 8 mob/entity
+        // + 7 time/weather + 7 admin-fun = 58 distinct literals, no verb dropped and none registered twice.
+        assertThat(itemworld.commands()).hasSize(58);
+        assertThat(literals).hasSize(58);
         assertThat(itemworld.migrations()).isEmpty(); // itemworld is stateless: no persistence, no migration
     }
 
@@ -195,11 +198,12 @@ class FeatureModuleRegistryDriftTest {
                         .collect(Collectors.toSet());
         assertThat(on).contains("communication", "teleport", "vaults");
 
-        // Its static surface is the plugin's own /broadcast, /me, and /broadcasttoggle; the operator-configured
-        // info-page commands (/rules, /motd, …) are dynamic and not part of this fixed table. It persists nothing.
+        // Its static surface is the plugin's own /broadcast, /me, /broadcasttoggle, and /clearchat; the
+        // operator-configured info-page commands (/rules, /motd, …) are dynamic and not part of this fixed
+        // table. It persists nothing.
         Set<String> literals =
                 communication.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
-        assertThat(literals).containsExactlyInAnyOrder("broadcast", "me", "broadcasttoggle");
+        assertThat(literals).containsExactlyInAnyOrder("broadcast", "me", "broadcasttoggle", "clearchat");
         assertThat(communication.migrations()).isEmpty();
     }
 

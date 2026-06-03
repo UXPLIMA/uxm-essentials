@@ -9,7 +9,9 @@ import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.LookupWorth;
 import com.uxplima.uxmessentials.economy.application.Pay;
+import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
+import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -25,10 +27,12 @@ import org.jspecify.annotations.NullMarked;
  *
  * @param balance {@code /balance}
  * @param pay {@code /pay} and {@code /payconfirm}
+ * @param payAll {@code /payall}
  * @param payToggle {@code /paytoggle}
  * @param balTop {@code /baltop}
  * @param lookupWorth {@code /worth}
  * @param sellItem {@code /sell}
+ * @param sellAll {@code /sellall}
  * @param ecoAdmin {@code /eco}
  * @param currencies the closed currency set commands resolve the optional {@code [currency]} argument against
  * @param baltopSnapshots the per-currency leaderboard snapshots the {@code /baltop} command reads
@@ -40,10 +44,12 @@ import org.jspecify.annotations.NullMarked;
 public record EconomyServices(
         Balance balance,
         Pay pay,
+        PayAll payAll,
         PayToggle payToggle,
         BalTop balTop,
         LookupWorth lookupWorth,
         SellItem sellItem,
+        SellAll sellAll,
         EcoAdmin ecoAdmin,
         CurrencyRegistry currencies,
         BaltopSnapshots baltopSnapshots,
@@ -54,10 +60,12 @@ public record EconomyServices(
     public EconomyServices {
         Objects.requireNonNull(balance, "balance");
         Objects.requireNonNull(pay, "pay");
+        Objects.requireNonNull(payAll, "payAll");
         Objects.requireNonNull(payToggle, "payToggle");
         Objects.requireNonNull(balTop, "balTop");
         Objects.requireNonNull(lookupWorth, "lookupWorth");
         Objects.requireNonNull(sellItem, "sellItem");
+        Objects.requireNonNull(sellAll, "sellAll");
         Objects.requireNonNull(ecoAdmin, "ecoAdmin");
         Objects.requireNonNull(currencies, "currencies");
         Objects.requireNonNull(baltopSnapshots, "baltopSnapshots");

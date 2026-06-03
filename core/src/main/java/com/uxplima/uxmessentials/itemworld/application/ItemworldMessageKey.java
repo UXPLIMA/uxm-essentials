@@ -64,6 +64,9 @@ public enum ItemworldMessageKey implements MessageKey {
     HAT_NO_ITEM("itemworld.hat.no-item"),
     // /itemdb
     ITEMDB_REPORT("itemworld.itemdb.report"),
+    // /showitem
+    SHOWITEM_BROADCAST("itemworld.showitem.broadcast"),
+    SHOWITEM_SHOWN("itemworld.showitem.shown"),
     // /recipe
     RECIPE_SHAPED("itemworld.recipe.shaped"),
     RECIPE_SHAPELESS("itemworld.recipe.shapeless"),
@@ -100,6 +103,10 @@ public enum ItemworldMessageKey implements MessageKey {
     // /powertooltoggle
     POWERTOOL_ENABLED("itemworld.powertool.enabled"),
     POWERTOOL_DISABLED("itemworld.powertool.disabled"),
+    // /powertoollist
+    POWERTOOL_LIST_HEADER("itemworld.powertool.list-header"),
+    POWERTOOL_LIST_ENTRY("itemworld.powertool.list-entry"),
+    POWERTOOL_LIST_EMPTY("itemworld.powertool.list-empty"),
 
     // Mob & entity — /spawnmob
     SPAWNMOB_SPAWNED("itemworld.spawnmob.spawned"),
@@ -115,6 +122,10 @@ public enum ItemworldMessageKey implements MessageKey {
     KILLALL_DONE("itemworld.killall.done"),
     // /remove
     REMOVE_DONE("itemworld.remove.done"),
+    // /entitycount
+    ENTITYCOUNT_HEADER("itemworld.entitycount.header"),
+    ENTITYCOUNT_ENTRY("itemworld.entitycount.entry"),
+    ENTITYCOUNT_NONE("itemworld.entitycount.none"),
     // /unlimited
     UNLIMITED_ENABLED("itemworld.unlimited.enabled"),
     UNLIMITED_DISABLED("itemworld.unlimited.disabled"),

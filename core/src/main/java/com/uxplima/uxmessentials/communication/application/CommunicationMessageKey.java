@@ -28,6 +28,10 @@ public enum CommunicationMessageKey implements MessageKey {
     // /me — the third-person action broadcast line; the typed action is a placeholder, never re-parsed.
     ME("communication.me"),
 
+    // /clearchat — the cleared notice the flushed players see, and the actor confirmation.
+    CLEARCHAT_CLEARED("communication.clearchat.cleared"),
+    CLEARCHAT_BY("communication.clearchat.by"),
+
     // /uxmess reload communication — the announcer schedule was reloaded.
     ANNOUNCER_RELOADED("communication.announcer-reloaded");
 

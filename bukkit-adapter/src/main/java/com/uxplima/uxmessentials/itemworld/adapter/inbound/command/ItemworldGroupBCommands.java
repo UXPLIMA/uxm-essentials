@@ -64,6 +64,7 @@ public final class ItemworldGroupBCommands {
             PowertoolToggleStore toggles) {
         commands.add(new PowertoolCommand(services, policy, store));
         commands.add(new PowertoolToggleCommand(services, toggles));
+        commands.add(new PowertoolListCommand(services, store));
     }
 
     private static void addMobEntity(
@@ -77,6 +78,7 @@ public final class ItemworldGroupBCommands {
         commands.add(new ButcherCommand(services, purgePolicy));
         commands.add(new KillAllCommand(services, purgePolicy));
         commands.add(new RemoveCommand(services, purgePolicy));
+        commands.add(new EntityCountCommand(services));
         commands.add(new UnlimitedCommand(services, unlimited));
     }
 

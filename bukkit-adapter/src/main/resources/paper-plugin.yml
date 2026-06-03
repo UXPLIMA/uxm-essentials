@@ -178,6 +178,9 @@ permissions:
   uxmessentials.economy.pay.confirm.bypass:
     description: 'Skip the /payconfirm prompt for transfers above the confirm threshold.'
     default: op
+  uxmessentials.economy.payall:
+    description: '/payall <amount> [currency] — pay every online player from your own wallet.'
+    default: op
   uxmessentials.economy.baltop:
     description: '/baltop [currency] [page] to view the top balances.'
     default: true
@@ -504,6 +507,9 @@ permissions:
   uxmessentials.itemdb.use:
     description: '/itemdb [item] — look up an item''s id / data.'
     default: op
+  uxmessentials.showitem.use:
+    description: '/showitem — broadcast the held item to chat for everyone online.'
+    default: true
   uxmessentials.recipe.use:
     description: '/recipe [item] — show an item''s crafting recipe.'
     default: op
@@ -583,6 +589,9 @@ permissions:
   uxmessentials.remove.use:
     description: '/remove <type> [radius] — remove entities by type (audit-logged).'
     default: op
+  uxmessentials.entitycount.use:
+    description: '/entitycount [radius] — tally nearby entities by type for lag diagnosis.'
+    default: op
   uxmessentials.unlimited.use:
     description: '/unlimited — toggle unlimited placement of held blocks.'
     default: op
@@ -646,3 +655,9 @@ permissions:
   uxmessentials.communication.me:
     description: '/me to broadcast a third-person action message to all online players.'
     default: true
+  uxmessentials.communication.clearchat:
+    description: '/clearchat (alias /chatclear) to flush the chat for online players.'
+    default: op
+  uxmessentials.communication.clearchat.exempt:
+    description: 'Keep your chat scrollback when staff run /clearchat.'
+    default: false

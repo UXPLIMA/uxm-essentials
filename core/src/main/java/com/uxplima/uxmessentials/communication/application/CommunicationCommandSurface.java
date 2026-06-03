@@ -49,7 +49,11 @@ final class CommunicationCommandSurface {
                 spec(
                         "broadcasttoggle",
                         "uxmessentials.communication.broadcasttoggle",
-                        command("broadcasttoggle", "Toggle whether you receive server announcements")));
+                        command("broadcasttoggle", "Toggle whether you receive server announcements")),
+                spec(
+                        "clearchat",
+                        "uxmessentials.communication.clearchat",
+                        command("clearchat", "Flush the chat for online players")));
     }
 
     /** One {@link CommandSpec} per configured info page, guarded by a per-page permission node. */

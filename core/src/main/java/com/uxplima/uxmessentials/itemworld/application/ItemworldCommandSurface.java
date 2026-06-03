@@ -105,6 +105,11 @@ final class ItemworldCommandSurface {
         verbs.add(new Verb("hat", "uxmessentials.hat.use", SubFeatureGroup.ITEM_UTILS, "Wear the held item as a hat"));
         verbs.add(new Verb("itemdb", "uxmessentials.itemdb.use", SubFeatureGroup.ITEM_UTILS, "Look up an item's id"));
         verbs.add(new Verb(
+                "showitem",
+                "uxmessentials.showitem.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Broadcast the held item to chat"));
+        verbs.add(new Verb(
                 "recipe", "uxmessentials.recipe.use", SubFeatureGroup.ITEM_UTILS, "Show an item's crafting recipe"));
         verbs.add(new Verb(
                 "unbreakable",
@@ -181,6 +186,11 @@ final class ItemworldCommandSurface {
                 "uxmessentials.powertool.toggle",
                 SubFeatureGroup.POWERTOOL,
                 "Toggle your powertool bindings"));
+        verbs.add(new Verb(
+                "powertoollist",
+                "uxmessentials.powertool.use",
+                SubFeatureGroup.POWERTOOL,
+                "List the held item's powertool bindings"));
         // Mob & entity.
         verbs.add(new Verb("spawnmob", "uxmessentials.spawnmob.use", SubFeatureGroup.MOB_ENTITY, "Spawn mobs"));
         verbs.add(new Verb(
@@ -191,6 +201,11 @@ final class ItemworldCommandSurface {
                 "killall", "uxmessentials.killall.use", SubFeatureGroup.MOB_ENTITY, "Purge entities world-wide"));
         verbs.add(
                 new Verb("remove", "uxmessentials.remove.use", SubFeatureGroup.MOB_ENTITY, "Remove entities by type"));
+        verbs.add(new Verb(
+                "entitycount",
+                "uxmessentials.entitycount.use",
+                SubFeatureGroup.MOB_ENTITY,
+                "Count nearby entities by type"));
         verbs.add(new Verb(
                 "unlimited",
                 "uxmessentials.unlimited.use",

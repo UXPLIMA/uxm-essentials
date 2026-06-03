@@ -36,6 +36,9 @@ public enum EconomyMessageKey implements MessageKey {
     PAY_TOGGLE_ON("pay.toggle-on"),
     PAY_TOGGLE_OFF("pay.toggle-off"),
 
+    // /payall
+    PAYALL_SENT("wallet.payall-sent"),
+
     // currency selection
     CURRENCY_UNKNOWN("currency.unknown"),
     CURRENCY_UNSUPPORTED("currency.unsupported"),
@@ -60,6 +63,8 @@ public enum EconomyMessageKey implements MessageKey {
     SELL_NOTHING_TO_SELL("wallet.sell-nothing"),
     SELL_NOT_SELLABLE("wallet.sell-not-sellable"),
     SELL_NO_ITEM_IN_HAND("wallet.sell-no-item-in-hand"),
+    // /sellall
+    SELLALL_SUMMARY("wallet.sellall-summary"),
 
     // eco admin
     ECO_ADMIN_GIVEN("eco.admin.given"),
