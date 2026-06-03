@@ -5,10 +5,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.Material;
+
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.CachedWarpRepository;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -53,8 +57,9 @@ public final class WarpsWiring {
     private WarpsWiring() {}
 
     /** Build the warps adapters and use cases with no economy bridge (a recorded warp cost is not charged). */
-    public static Wired wire(ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine, Bus bus) {
-        return wire(ctx, persistence, teleportEngine, Optional.empty(), bus);
+    public static Wired wire(
+            ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine, Bus bus, GuiLayouts guiLayouts) {
+        return wire(ctx, persistence, teleportEngine, Optional.empty(), bus, guiLayouts);
     }
 
     /**
@@ -68,12 +73,14 @@ public final class WarpsWiring {
             Persistence persistence,
             TeleportEngine teleportEngine,
             Optional<WarpEconomy> economy,
-            Bus bus) {
+            Bus bus,
+            GuiLayouts guiLayouts) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         // The cached repository is the read accelerator; the bus listener drops the cached set when a peer
         // reports a change, and the broadcasting decorator announces this backend's own writes to peers.
@@ -82,7 +89,8 @@ public final class WarpsWiring {
         WarpRepository repository = WarpSync.repository(cached, bus.publisher());
         WarpNotifier notifier = new WarpNotifier(kernel.messages(), kernel.messageSink());
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine);
-        WarpServices services = assemble(kernel, repository, notifier, teleporter, economy);
+        GuiLayout menuLayout = guiLayouts.load("warps", "warps-menu", GuiLayout.paginatedDefault(Material.ENDER_PEARL));
+        WarpServices services = assemble(kernel, repository, notifier, teleporter, economy, menuLayout);
         return new Wired(WarpCommands.all(services, kernel.messages()));
     }
 
@@ -91,11 +99,12 @@ public final class WarpsWiring {
             WarpRepository repository,
             WarpNotifier notifier,
             WarpTeleporter teleporter,
-            Optional<WarpEconomy> economy) {
+            Optional<WarpEconomy> economy,
+            GuiLayout menuLayout) {
         WarpAccess access = new WarpAccess(kernel.permissions(), economy);
         Clock clock = Clock.systemUTC();
         UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier);
-        WarpMenuView warpMenu = new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp);
+        WarpMenuView warpMenu = new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp, menuLayout);
         return new WarpServices(
                 useWarp,
                 new SetWarp(repository, notifier, kernel.events(), clock),

@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 
+import org.bukkit.Material;
+
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommands;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenuView;
 import com.uxplima.uxmessentials.homes.adapter.outbound.TeleportHomeAdapter;
@@ -24,6 +26,8 @@ import com.uxplima.uxmessentials.persistence.homes.CachedHomeRepository;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -49,11 +53,13 @@ public final class HomesWiring {
     private HomesWiring() {}
 
     /** Build the homes adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the engine. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine, Bus bus) {
+    public static Wired wire(
+            ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine, Bus bus, GuiLayouts guiLayouts) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         // The cached repository is the read accelerator; the bus listener invalidates exactly the owner a peer
         // reports changed, and the broadcasting decorator announces this backend's own writes to peers.
@@ -64,7 +70,8 @@ public final class HomesWiring {
         HomeNotifier notifier = new HomeNotifier(kernel.messages(), kernel.messageSink());
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
-        HomeServices services = assemble(ctx, repository, mainHomes, notifier, quota, teleporter);
+        GuiLayout menuLayout = guiLayouts.load("homes", "homes-menu", GuiLayout.paginatedDefault(Material.RED_BED));
+        HomeServices services = assemble(ctx, repository, mainHomes, notifier, quota, teleporter, menuLayout);
         return new Wired(HomeCommands.all(services, kernel.messages()), repository, quota);
     }
 
@@ -74,11 +81,12 @@ public final class HomesWiring {
             MainHomePreference mainHomes,
             HomeNotifier notifier,
             HomeQuota quota,
-            HomeTeleporter teleporter) {
+            HomeTeleporter teleporter,
+            GuiLayout menuLayout) {
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         TeleportHome teleportHome = new TeleportHome(repository, mainHomes, teleporter, notifier);
-        HomeMenuView homeMenu = new HomeMenuView(kernel.messages(), kernel.scheduler(), teleportHome);
+        HomeMenuView homeMenu = new HomeMenuView(kernel.messages(), kernel.scheduler(), teleportHome, menuLayout);
         return new HomeServices(
                 new SetHome(repository, quota, notifier, kernel.events(), clock),
                 new DelHome(repository, notifier, kernel.events()),

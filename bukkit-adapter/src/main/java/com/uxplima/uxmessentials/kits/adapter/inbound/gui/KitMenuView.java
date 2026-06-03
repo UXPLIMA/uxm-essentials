@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -45,20 +46,17 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class KitMenuView {
 
-    private static final int MENU_ROWS = 6;
-    private static final int PREV_SLOT = 48;
-    private static final int NEXT_SLOT = 50;
-    private static final Material FALLBACK_ICON = Material.CHEST;
-
     private final Messages messages;
     private final Scheduler scheduler;
     private final ClaimKit claimKit;
+    private final GuiLayout layout;
     private final MiniMessage miniMessage;
 
-    public KitMenuView(Messages messages, Scheduler scheduler, ClaimKit claimKit) {
+    public KitMenuView(Messages messages, Scheduler scheduler, ClaimKit claimKit, GuiLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.claimKit = Objects.requireNonNull(claimKit, "claimKit");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -69,15 +67,20 @@ public final class KitMenuView {
         Objects.requireNonNull(kits, "kits");
         List<KitDefinition> snapshot = List.copyOf(kits);
         scheduler.onEntity(viewer, () -> {
-            PaginatedGui gui =
-                    Guis.paginated().title(title(viewer)).rows(MENU_ROWS).build();
+            PaginatedGui gui = build(viewer);
             gui.populate(
                     snapshot,
                     ItemPopulator.of(kit -> icon(viewer, kit), (kit, event) -> onIconClick(player, viewer, gui, kit)));
-            gui.set(PREV_SLOT, GuiItem.previousPage(gui, navIcon(viewer, KitsMessageKey.KIT_MENU_PREV)));
-            gui.set(NEXT_SLOT, GuiItem.nextPage(gui, navIcon(viewer, KitsMessageKey.KIT_MENU_NEXT)));
+            gui.set(layout.prevSlot(), GuiItem.previousPage(gui, navIcon(viewer, KitsMessageKey.KIT_MENU_PREV)));
+            gui.set(layout.nextSlot(), GuiItem.nextPage(gui, navIcon(viewer, KitsMessageKey.KIT_MENU_NEXT)));
             gui.open(player);
         });
+    }
+
+    private PaginatedGui build(PlayerRef viewer) {
+        Guis.PaginatedBuilder builder = Guis.paginated().title(title(viewer)).rows(layout.rows());
+        layout.explicitContentSlots().ifPresent(builder::contentSlots);
+        return builder.build();
     }
 
     /**
@@ -129,18 +132,20 @@ public final class KitMenuView {
     }
 
     private ItemStack navIcon(PlayerRef viewer, MessageKey key) {
-        return ItemBuilder.of(Material.ARROW).name(text(viewer, key, Map.of())).build();
+        return ItemBuilder.of(layout.navIcon())
+                .name(text(viewer, key, Map.of()))
+                .build();
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
     }
 
-    private static Material material(KitDefinition kit) {
+    private Material material(KitDefinition kit) {
         if (kit.items().isEmpty()) {
-            return FALLBACK_ICON;
+            return layout.fallbackIcon();
         }
         Material type = KitItemCodec.decode(kit.items().get(0)).getType();
-        return type.isAir() ? FALLBACK_ICON : type;
+        return type.isAir() ? layout.fallbackIcon() : type;
     }
 }

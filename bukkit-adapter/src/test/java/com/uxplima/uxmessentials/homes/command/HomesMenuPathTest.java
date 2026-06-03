@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -38,6 +39,7 @@ import com.uxplima.uxmessentials.homes.application.port.MainHomePreference;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -149,7 +151,8 @@ class HomesMenuPathTest {
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
         Clock clock = Clock.systemUTC();
         TeleportHome teleportHome = new TeleportHome(repository, mainHomes, teleporter, notifier);
-        HomeMenuView homeMenu = new HomeMenuView(messages, new SyncScheduler(), teleportHome);
+        HomeMenuView homeMenu = new HomeMenuView(
+                messages, new SyncScheduler(), teleportHome, GuiLayout.paginatedDefault(Material.RED_BED));
         return new HomeServices(
                 new SetHome(repository, quota, notifier, new NoEvents(), clock),
                 new DelHome(repository, notifier, new NoEvents()),

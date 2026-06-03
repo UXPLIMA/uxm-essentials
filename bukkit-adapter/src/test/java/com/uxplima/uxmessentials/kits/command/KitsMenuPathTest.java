@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -37,6 +38,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -151,7 +153,8 @@ class KitsMenuPathTest {
         KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock);
-        KitMenuView kitMenu = new KitMenuView(messages, new SyncScheduler(), claimKit);
+        KitMenuView kitMenu =
+                new KitMenuView(messages, new SyncScheduler(), claimKit, GuiLayout.paginatedDefault(Material.CHEST));
         return new KitServices(
                 claimKit,
                 new ListKits(repository, permissions, claims, notifier),

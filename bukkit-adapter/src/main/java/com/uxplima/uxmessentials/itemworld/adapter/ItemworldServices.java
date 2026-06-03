@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import org.jspecify.annotations.NullMarked;
 
@@ -22,13 +23,16 @@ import org.jspecify.annotations.NullMarked;
  * @param kernel the shared cross-cutting outbound ports (scheduler, messages, lookups, …)
  * @param audit the abusable-verb audit trail on the {@code com.uxplima.uxmessentials.audit} channel
  * @param config the live, immutable {@code itemworld.conf} view (sub-feature-group + per-command gate, caps)
+ * @param disposalLayout the externalised {@code /disposal} window layout (its row count) loaded once at wire time
  */
 @NullMarked
-public record ItemworldServices(KernelPorts kernel, ItemworldAudit audit, ItemworldConfig config) {
+public record ItemworldServices(
+        KernelPorts kernel, ItemworldAudit audit, ItemworldConfig config, GuiLayout disposalLayout) {
 
     public ItemworldServices {
         Objects.requireNonNull(kernel, "kernel");
         Objects.requireNonNull(audit, "audit");
         Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(disposalLayout, "disposalLayout");
     }
 }

@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -22,6 +23,7 @@ import org.bukkit.plugin.Plugin;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -153,7 +155,8 @@ class WarpMenuClickTest {
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         Clock clock = Clock.systemUTC();
         UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier);
-        WarpMenuView warpMenu = new WarpMenuView(messages, new SyncScheduler(), useWarp);
+        WarpMenuView warpMenu = new WarpMenuView(
+                messages, new SyncScheduler(), useWarp, GuiLayout.paginatedDefault(Material.ENDER_PEARL));
         return new WarpServices(
                 useWarp,
                 new SetWarp(repository, notifier, new NoEvents(), clock),

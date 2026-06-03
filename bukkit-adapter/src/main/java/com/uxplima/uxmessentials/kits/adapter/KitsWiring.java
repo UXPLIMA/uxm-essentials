@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.Material;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommands;
@@ -27,6 +28,8 @@ import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -51,8 +54,8 @@ public final class KitsWiring {
     private KitsWiring() {}
 
     /** Build the kits adapters and use cases with no economy bridge (a recorded kit cost is not charged). */
-    public static Wired wire(Plugin plugin, ModuleContext ctx) {
-        return wire(plugin, ctx, Optional.empty());
+    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts) {
+        return wire(plugin, ctx, Optional.empty(), guiLayouts);
     }
 
     /**
@@ -61,17 +64,19 @@ public final class KitsWiring {
      * economy wiring and handed in here; when it is empty (economy disabled), a priced kit's cost is recorded
      * but not charged — the soft coupling the kits context owns.
      */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Optional<KitEconomy> economy) {
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Optional<KitEconomy> economy, GuiLayouts guiLayouts) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(economy, "economy");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         Path file = plugin.getDataFolder().toPath().resolve(KITS_FILE);
         KitRepository repository = ConfigurateKitRepository.load(file, kernel.log());
         KitClaimStore claims = new PdcKitClaims(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
-        KitServices services = assemble(kernel, repository, claims, granter, notifier, economy);
+        GuiLayout menuLayout = guiLayouts.load("kits", "kits-menu", GuiLayout.paginatedDefault(Material.CHEST));
+        KitServices services = assemble(kernel, repository, claims, granter, notifier, economy, menuLayout);
         return new Wired(KitCommands.all(services, kernel.messages()), repository);
     }
 
@@ -81,11 +86,12 @@ public final class KitsWiring {
             KitClaimStore claims,
             KitGranter granter,
             KitNotifier notifier,
-            Optional<KitEconomy> economy) {
+            Optional<KitEconomy> economy,
+            GuiLayout menuLayout) {
         KitAccess access = new KitAccess(kernel.permissions(), kernel.cooldowns(), claims, economy);
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, kernel.events(), clock);
-        KitMenuView kitMenu = new KitMenuView(kernel.messages(), kernel.scheduler(), claimKit);
+        KitMenuView kitMenu = new KitMenuView(kernel.messages(), kernel.scheduler(), claimKit, menuLayout);
         return new KitServices(
                 claimKit,
                 new ListKits(repository, kernel.permissions(), claims, notifier),

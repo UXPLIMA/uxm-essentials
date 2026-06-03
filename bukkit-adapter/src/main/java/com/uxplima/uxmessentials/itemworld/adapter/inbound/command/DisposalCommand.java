@@ -33,7 +33,6 @@ import org.jspecify.annotations.NullMarked;
 public final class DisposalCommand extends ItemworldCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.disposal.use";
-    private static final int DISPOSAL_ROWS = 6;
 
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
@@ -69,8 +68,10 @@ public final class DisposalCommand extends ItemworldCommandSupport implements Co
         }
         PlayerRef viewer = ref(player);
         services.kernel().scheduler().onEntity(viewer, () -> {
-            StorageGui disposal =
-                    Guis.storage().title(title(viewer)).rows(DISPOSAL_ROWS).build();
+            StorageGui disposal = Guis.storage()
+                    .title(title(viewer))
+                    .rows(services.disposalLayout().rows())
+                    .build();
             disposal.open(player);
             reply(ctx, ItemworldMessageKey.DISPOSAL_OPENED);
         });

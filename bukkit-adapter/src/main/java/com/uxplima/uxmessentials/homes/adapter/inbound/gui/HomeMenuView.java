@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -14,6 +13,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -37,8 +37,8 @@ import org.jspecify.annotations.NullMarked;
  * cooldown, or teleport logic of its own; TeleportHome resolves the home and delegates the gated hop to the
  * teleport context — and then closes the menu.
  *
- * <p>Homes carry no item, so every icon uses a single fixed bed-flavoured {@link #FALLBACK_ICON}. The clicked
- * home's identity comes from the bound element ({@code home.name()}), never from re-reading the icon, so case
+ * <p>Homes carry no item, so every icon uses the single fixed bed-flavoured fallback material the layout
+ * supplies. The clicked home's identity comes from the bound element ({@code home.name()}), never from re-reading the icon, so case
  * normalisation is irrelevant. {@link #open} touches the live player, so the caller schedules it on the viewer's
  * entity thread through the kernel {@link Scheduler}; a click hops the live player, so it too runs on the
  * viewer's entity thread through that same scheduler.
@@ -46,20 +46,17 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class HomeMenuView {
 
-    private static final int MENU_ROWS = 6;
-    private static final int PREV_SLOT = 48;
-    private static final int NEXT_SLOT = 50;
-    private static final Material FALLBACK_ICON = Material.RED_BED;
-
     private final Messages messages;
     private final Scheduler scheduler;
     private final TeleportHome teleportHome;
+    private final GuiLayout layout;
     private final MiniMessage miniMessage;
 
-    public HomeMenuView(Messages messages, Scheduler scheduler, TeleportHome teleportHome) {
+    public HomeMenuView(Messages messages, Scheduler scheduler, TeleportHome teleportHome, GuiLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.teleportHome = Objects.requireNonNull(teleportHome, "teleportHome");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -70,16 +67,21 @@ public final class HomeMenuView {
         Objects.requireNonNull(homes, "homes");
         List<Home> snapshot = List.copyOf(homes);
         scheduler.onEntity(viewer, () -> {
-            PaginatedGui gui =
-                    Guis.paginated().title(title(viewer)).rows(MENU_ROWS).build();
+            PaginatedGui gui = build(viewer);
             gui.populate(
                     snapshot,
                     ItemPopulator.of(
                             home -> icon(viewer, home), (home, event) -> onIconClick(player, viewer, gui, home)));
-            gui.set(PREV_SLOT, GuiItem.previousPage(gui, navIcon(viewer, HomesMessageKey.HOME_MENU_PREV)));
-            gui.set(NEXT_SLOT, GuiItem.nextPage(gui, navIcon(viewer, HomesMessageKey.HOME_MENU_NEXT)));
+            gui.set(layout.prevSlot(), GuiItem.previousPage(gui, navIcon(viewer, HomesMessageKey.HOME_MENU_PREV)));
+            gui.set(layout.nextSlot(), GuiItem.nextPage(gui, navIcon(viewer, HomesMessageKey.HOME_MENU_NEXT)));
             gui.open(player);
         });
+    }
+
+    private PaginatedGui build(PlayerRef viewer) {
+        Guis.PaginatedBuilder builder = Guis.paginated().title(title(viewer)).rows(layout.rows());
+        layout.explicitContentSlots().ifPresent(builder::contentSlots);
+        return builder.build();
     }
 
     /**
@@ -99,7 +101,7 @@ public final class HomeMenuView {
     }
 
     private ItemStack icon(PlayerRef viewer, Home home) {
-        return ItemBuilder.of(FALLBACK_ICON)
+        return ItemBuilder.of(layout.fallbackIcon())
                 .name(text(
                         viewer,
                         HomesMessageKey.HOME_MENU_ENTRY_NAME,
@@ -112,7 +114,9 @@ public final class HomeMenuView {
     }
 
     private ItemStack navIcon(PlayerRef viewer, MessageKey key) {
-        return ItemBuilder.of(Material.ARROW).name(text(viewer, key, Map.of())).build();
+        return ItemBuilder.of(layout.navIcon())
+                .name(text(viewer, key, Map.of()))
+                .build();
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {

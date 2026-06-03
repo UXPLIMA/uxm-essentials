@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -205,6 +206,9 @@ public final class PluginModule {
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
         resources.onClose(Guis::uninstall);
+        // The browse-menu layout loader resolves modules/<m>/gui/<name>.conf disk-first then bundled; built once
+        // here with the data folder so every GUI-using context loads its layout the same way.
+        GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
         for (FeatureModule module : registry.enabledModules(config)) {
             ConfigStore moduleConfig = config.scoped(module.id().configRoot());
             ModuleContext ctx = new ModuleContext(module.id(), moduleConfig, kernel);
@@ -212,7 +216,7 @@ public final class PluginModule {
                 continue;
             }
             startModule(module, ctx, resources, log);
-            wireAdapters(plugin, module, ctx, persistence, resources, links, bus);
+            wireAdapters(plugin, module, ctx, persistence, resources, links, bus, guiLayouts);
         }
         return links.placeholders.build();
     }
@@ -224,20 +228,21 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            Bus bus) {
+            Bus bus,
+            GuiLayouts guiLayouts) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("homes"))) {
-            wireHomes(ctx, persistence, resources, links, bus);
+            wireHomes(ctx, persistence, resources, links, bus, guiLayouts);
         } else if (module.id().equals(ModuleId.of("economy"))) {
             wireEconomy(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("warps"))) {
-            wireWarps(ctx, persistence, resources, links, bus);
+            wireWarps(ctx, persistence, resources, links, bus, guiLayouts);
         } else if (module.id().equals(ModuleId.of("kits"))) {
-            wireKits(plugin, ctx, resources, links);
+            wireKits(plugin, ctx, resources, links, guiLayouts);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(ctx, resources);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
@@ -247,7 +252,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
-            wireItemworld(plugin, ctx, resources);
+            wireItemworld(plugin, ctx, resources, guiLayouts);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links);
         } else if (module.id().equals(ModuleId.of("communication"))) {
@@ -272,10 +277,15 @@ public final class PluginModule {
     }
 
     private static void wireHomes(
-            ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links, Bus bus) {
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links,
+            Bus bus,
+            GuiLayouts guiLayouts) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
-        HomesWiring.Wired wired = HomesWiring.wire(ctx, persistence, engine, bus);
+        HomesWiring.Wired wired = HomesWiring.wire(ctx, persistence, engine, bus, guiLayouts);
         wired.commands().forEach(resources::addCommand);
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
     }
@@ -299,19 +309,28 @@ public final class PluginModule {
     }
 
     private static void wireWarps(
-            ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links, Bus bus) {
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links,
+            Bus bus,
+            GuiLayouts guiLayouts) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "warps delegates teleport execution but the teleport engine is unavailable");
         WarpsWiring.Wired wired =
-                WarpsWiring.wire(ctx, persistence, engine, Optional.ofNullable(links.warpEconomy), bus);
+                WarpsWiring.wire(ctx, persistence, engine, Optional.ofNullable(links.warpEconomy), bus, guiLayouts);
         wired.commands().forEach(resources::addCommand);
     }
 
     private static void wireKits(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            ContextLinks links,
+            GuiLayouts guiLayouts) {
         // kits need no database: definitions live in kits.conf and claim/cooldown state is transient PDC.
         // The per-kit cost charges through the economy bridge captured during economy wiring when present.
-        KitsWiring.Wired wired = KitsWiring.wire(plugin, ctx, Optional.ofNullable(links.kitEconomy));
+        KitsWiring.Wired wired = KitsWiring.wire(plugin, ctx, Optional.ofNullable(links.kitEconomy), guiLayouts);
         wired.commands().forEach(resources::addCommand);
         links.placeholders.kits(
                 new KitCooldownPlaceholders(wired.repository(), ctx.kernel().cooldowns()));
@@ -361,13 +380,14 @@ public final class PluginModule {
         links.placeholders.moderation(new GateModerationPlaceholders(wired.mutePolicy(), wired.jailGate()));
     }
 
-    private static void wireItemworld(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireItemworld(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, GuiLayouts guiLayouts) {
         // itemworld persists nothing: it is the full EssentialsX item/world surface as stateless ACL-thin
         // mutations validated at the adapter boundary and applied through the kernel Scheduler. The only runtime
         // state is the powertool/unlimited per-player toggles and the item-PDC powertool bindings, all transient
         // and dropped with the wiring on module stop. /repair /repairall /hat /more are owned here (playerstate
         // deferred them, §15.6), so they register here and the two modules never double-register.
-        ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx);
+        ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx, guiLayouts);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
     }

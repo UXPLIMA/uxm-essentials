@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.itemworld.domain.MobSpec;
 import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -139,7 +140,7 @@ class TreeCommandTest {
     }
 
     private ItemworldServices services() {
-        return new ItemworldServices(kernel(), audit, ItemworldConfig.from(config));
+        return new ItemworldServices(kernel(), audit, ItemworldConfig.from(config), GuiLayout.storageDefault(6));
     }
 
     private KernelPorts kernel() {

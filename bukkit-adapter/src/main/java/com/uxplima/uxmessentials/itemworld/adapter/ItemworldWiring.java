@@ -19,6 +19,8 @@ import com.uxplima.uxmessentials.itemworld.application.PowertoolPolicy;
 import com.uxplima.uxmessentials.itemworld.application.PurgePolicy;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -44,17 +46,20 @@ import org.slf4j.LoggerFactory;
 public final class ItemworldWiring {
 
     private static final String AUDIT_CHANNEL = "com.uxplima.uxmessentials.audit";
+    private static final int DISPOSAL_ROWS = 6;
 
     private ItemworldWiring() {}
 
     /** Build the itemworld adapters from {@code ctx}, ready to register with the plugin. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx) {
+    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         ItemworldConfig config = ItemworldConfig.from(ctx.config());
         ItemworldAudit audit = new LoggingItemworldAudit(auditLogger(), config);
-        ItemworldServices services = new ItemworldServices(kernel, audit, config);
+        GuiLayout disposalLayout = guiLayouts.load("itemworld", "disposal", GuiLayout.storageDefault(DISPOSAL_ROWS));
+        ItemworldServices services = new ItemworldServices(kernel, audit, config, disposalLayout);
 
         PowertoolPolicy powertoolPolicy = new PowertoolPolicy();
         PurgePolicy purgePolicy = new PurgePolicy(config);

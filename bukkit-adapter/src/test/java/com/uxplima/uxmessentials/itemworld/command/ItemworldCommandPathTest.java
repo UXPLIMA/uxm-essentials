@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.itemworld.domain.MobSpec;
 import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -234,7 +235,8 @@ class ItemworldCommandPathTest {
     }
 
     private CommandDispatcher<CommandSourceStack> registerGroupA() {
-        ItemworldServices services = new ItemworldServices(kernel(), new NoopAudit(), ItemworldConfig.from(config));
+        ItemworldServices services = new ItemworldServices(
+                kernel(), new NoopAudit(), ItemworldConfig.from(config), GuiLayout.storageDefault(6));
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         for (CommandRegistration command : ItemworldGroupACommands.all(services)) {
             dispatcher.getRoot().addChild(command.build());

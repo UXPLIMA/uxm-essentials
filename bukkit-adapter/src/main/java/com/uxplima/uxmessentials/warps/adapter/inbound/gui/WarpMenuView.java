@@ -5,13 +5,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -36,8 +36,8 @@ import org.jspecify.annotations.NullMarked;
  * {@code /warp} command drives — the view adds no warp, gate, cost, or cooldown logic of its own; UseWarp gates
  * access, charges any cost, and delegates the hop to the teleport context — and then closes the menu.
  *
- * <p>Warps carry no item, so every icon uses a single fixed teleport-flavoured {@link #FALLBACK_ICON}. The
- * clicked warp's identity comes from the bound element ({@code warp.name()}), never from re-reading the icon, so
+ * <p>Warps carry no item, so every icon uses the single fixed teleport-flavoured fallback material the
+ * layout supplies. The clicked warp's identity comes from the bound element ({@code warp.name()}), never from re-reading the icon, so
  * case normalisation is irrelevant. {@link #open} touches the live player, so the caller schedules it on the
  * viewer's entity thread through the kernel {@link Scheduler}; a click hops the live player, so it too runs on
  * the viewer's entity thread through that same scheduler.
@@ -45,20 +45,17 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WarpMenuView {
 
-    private static final int MENU_ROWS = 6;
-    private static final int PREV_SLOT = 48;
-    private static final int NEXT_SLOT = 50;
-    private static final Material FALLBACK_ICON = Material.ENDER_PEARL;
-
     private final Messages messages;
     private final Scheduler scheduler;
     private final UseWarp useWarp;
+    private final GuiLayout layout;
     private final MiniMessage miniMessage;
 
-    public WarpMenuView(Messages messages, Scheduler scheduler, UseWarp useWarp) {
+    public WarpMenuView(Messages messages, Scheduler scheduler, UseWarp useWarp, GuiLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.useWarp = Objects.requireNonNull(useWarp, "useWarp");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -69,16 +66,21 @@ public final class WarpMenuView {
         Objects.requireNonNull(warps, "warps");
         List<Warp> snapshot = List.copyOf(warps);
         scheduler.onEntity(viewer, () -> {
-            PaginatedGui gui =
-                    Guis.paginated().title(title(viewer)).rows(MENU_ROWS).build();
+            PaginatedGui gui = build(viewer);
             gui.populate(
                     snapshot,
                     ItemPopulator.of(
                             warp -> icon(viewer, warp), (warp, event) -> onIconClick(player, viewer, gui, warp)));
-            gui.set(PREV_SLOT, GuiItem.previousPage(gui, navIcon(viewer, WarpsMessageKey.WARP_MENU_PREV)));
-            gui.set(NEXT_SLOT, GuiItem.nextPage(gui, navIcon(viewer, WarpsMessageKey.WARP_MENU_NEXT)));
+            gui.set(layout.prevSlot(), GuiItem.previousPage(gui, navIcon(viewer, WarpsMessageKey.WARP_MENU_PREV)));
+            gui.set(layout.nextSlot(), GuiItem.nextPage(gui, navIcon(viewer, WarpsMessageKey.WARP_MENU_NEXT)));
             gui.open(player);
         });
+    }
+
+    private PaginatedGui build(PlayerRef viewer) {
+        Guis.PaginatedBuilder builder = Guis.paginated().title(title(viewer)).rows(layout.rows());
+        layout.explicitContentSlots().ifPresent(builder::contentSlots);
+        return builder.build();
     }
 
     /**
@@ -98,7 +100,7 @@ public final class WarpMenuView {
     }
 
     private ItemStack icon(PlayerRef viewer, Warp warp) {
-        return ItemBuilder.of(FALLBACK_ICON)
+        return ItemBuilder.of(layout.fallbackIcon())
                 .name(text(
                         viewer,
                         WarpsMessageKey.WARP_MENU_ENTRY_NAME,
@@ -126,7 +128,9 @@ public final class WarpMenuView {
     }
 
     private ItemStack navIcon(PlayerRef viewer, MessageKey key) {
-        return ItemBuilder.of(Material.ARROW).name(text(viewer, key, Map.of())).build();
+        return ItemBuilder.of(layout.navIcon())
+                .name(text(viewer, key, Map.of()))
+                .build();
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {

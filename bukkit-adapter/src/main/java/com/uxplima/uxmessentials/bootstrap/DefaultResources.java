@@ -42,6 +42,10 @@ final class DefaultResources {
             "modules/vaults/config.conf",
             "modules/communication/config.conf",
             "modules/migration/config.conf",
+            "modules/kits/gui/kits-menu.conf",
+            "modules/warps/gui/warps-menu.conf",
+            "modules/homes/gui/homes-menu.conf",
+            "modules/itemworld/gui/disposal.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");
 
