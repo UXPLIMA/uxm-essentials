@@ -21,6 +21,16 @@ public enum KitsMessageKey implements MessageKey {
     KIT_LIST_ENTRY("kit.list.entry"),
     KIT_LIST_EMPTY("kit.list.empty"),
 
+    // browse menu (/kits)
+    KIT_MENU_TITLE("kit.menu.title"),
+    KIT_MENU_ENTRY_NAME("kit.menu.entry.name"),
+    KIT_MENU_LORE_COOLDOWN("kit.menu.lore.cooldown"),
+    KIT_MENU_LORE_ONETIME("kit.menu.lore.one-time"),
+    KIT_MENU_LORE_COST("kit.menu.lore.cost"),
+    KIT_MENU_LORE_CLAIMABLE("kit.menu.lore.claimable"),
+    KIT_MENU_PREV("kit.menu.prev"),
+    KIT_MENU_NEXT("kit.menu.next"),
+
     // preview (/showkit)
     KIT_PREVIEW_HEADER("kit.preview.header"),
     KIT_PREVIEW_ENTRY("kit.preview.entry"),

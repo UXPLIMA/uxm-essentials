@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommands;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitGranter;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.PdcKitClaims;
@@ -83,6 +84,7 @@ public final class KitsWiring {
             Optional<KitEconomy> economy) {
         KitAccess access = new KitAccess(kernel.permissions(), kernel.cooldowns(), claims, economy);
         Clock clock = Clock.systemUTC();
+        KitMenuView kitMenu = new KitMenuView(kernel.messages(), kernel.scheduler());
         return new KitServices(
                 new ClaimKit(repository, access, granter, notifier, kernel.events(), clock),
                 new ListKits(repository, kernel.permissions(), claims, notifier),
@@ -91,6 +93,7 @@ public final class KitsWiring {
                 new DelKit(repository, notifier),
                 new KitEditor(repository, notifier),
                 new KitReset(repository, claims, notifier),
+                kitMenu,
                 kernel.playerLookup());
     }
 

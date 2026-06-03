@@ -35,11 +35,21 @@ public final class ListKits {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
+    /**
+     * The kits {@code viewer} may claim, in catalog order, with no side effect — a one-time kit they have
+     * already consumed and a permission-gated kit they lack the node for are dropped. This is the same filter
+     * the chat {@link #list} renders; the {@code /kits} browse menu calls this directly so the GUI and the
+     * text list never disagree on what a player may take.
+     */
+    public List<KitDefinition> available(PlayerRef viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        return repository.all().stream().filter(kit -> claimable(viewer, kit)).toList();
+    }
+
     /** The kits {@code viewer} may claim, also pushing the header/entries (or the empty notice) to them. */
     public List<KitDefinition> list(PlayerRef viewer) {
         Objects.requireNonNull(viewer, "viewer");
-        List<KitDefinition> visible =
-                repository.all().stream().filter(kit -> claimable(viewer, kit)).toList();
+        List<KitDefinition> visible = available(viewer);
         if (visible.isEmpty()) {
             notifier.send(viewer, KitsMessageKey.KIT_LIST_EMPTY);
             return visible;
