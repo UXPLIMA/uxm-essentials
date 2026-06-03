@@ -92,10 +92,10 @@ final class KernelWiring {
         }
     }
 
-    /** The HOCON config file backing the {@link ConfigStore}; created from the plugin data folder. */
+    /** The HOCON config backing the {@link ConfigStore}; the root file plus the per-module layout. */
     static ConfigStore loadConfig(Plugin plugin, Logger log) {
-        Path file = plugin.getDataFolder().toPath().resolve("config.conf");
-        return ConfigurateConfigStore.load(file, log);
+        Path dataFolder = plugin.getDataFolder().toPath();
+        return ConfigurateConfigStore.loadLayout(dataFolder, log);
     }
 
     /** A {@link Logger} over the plugin's SLF4J logger. */
