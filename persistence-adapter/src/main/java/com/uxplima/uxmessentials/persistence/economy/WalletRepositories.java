@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
+import com.uxplima.uxmessentials.economy.application.port.WorthOverrideStore;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -102,5 +103,11 @@ public final class WalletRepositories {
     public static PayPreferences payPreferences(Persistence persistence, boolean toggleDefault) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqPayPreferences(persistence.dsl(), toggleDefault);
+    }
+
+    /** The jOOQ-backed {@code /setworth} per-item price override store over the shared persistence DSL. */
+    public static WorthOverrideStore worthOverrideStore(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqWorthOverrideStore(persistence.dsl());
     }
 }

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
 import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
+import com.uxplima.uxmessentials.economy.application.SetWorth;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -33,6 +34,7 @@ import org.jspecify.annotations.NullMarked;
  * @param lookupWorth {@code /worth}
  * @param sellItem {@code /sell}
  * @param sellAll {@code /sellall}
+ * @param setWorth {@code /setworth}
  * @param ecoAdmin {@code /eco}
  * @param currencies the closed currency set commands resolve the optional {@code [currency]} argument against
  * @param baltopSnapshots the per-currency leaderboard snapshots the {@code /baltop} command reads
@@ -50,6 +52,7 @@ public record EconomyServices(
         LookupWorth lookupWorth,
         SellItem sellItem,
         SellAll sellAll,
+        SetWorth setWorth,
         EcoAdmin ecoAdmin,
         CurrencyRegistry currencies,
         BaltopSnapshots baltopSnapshots,
@@ -66,6 +69,7 @@ public record EconomyServices(
         Objects.requireNonNull(lookupWorth, "lookupWorth");
         Objects.requireNonNull(sellItem, "sellItem");
         Objects.requireNonNull(sellAll, "sellAll");
+        Objects.requireNonNull(setWorth, "setWorth");
         Objects.requireNonNull(ecoAdmin, "ecoAdmin");
         Objects.requireNonNull(currencies, "currencies");
         Objects.requireNonNull(baltopSnapshots, "baltopSnapshots");

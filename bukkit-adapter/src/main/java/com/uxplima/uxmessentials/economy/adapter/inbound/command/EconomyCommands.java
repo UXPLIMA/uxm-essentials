@@ -32,6 +32,7 @@ public final class EconomyCommands {
                 new WorthCommand(services, messages),
                 new SellCommand(services, messages),
                 new SellAllCommand(services, messages),
+                new SetWorthCommand(services, messages),
                 new EcoCommand(services, messages));
     }
 }

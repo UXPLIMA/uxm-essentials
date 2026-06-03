@@ -49,8 +49,28 @@ public final class RecordingAudit implements EconomyAudit {
         lines.add(new Line("economy_admin_bulk", reason, affected));
     }
 
+    private final List<WorthLine> worthLines = new ArrayList<>();
+
+    /** One recorded worth-override audit line: its event name and the affected material. */
+    public record WorthLine(String event, String material) {}
+
+    @Override
+    public void worthSet(PlayerRef actor, String material, Money price) {
+        worthLines.add(new WorthLine("economy_setworth", material));
+    }
+
+    @Override
+    public void worthCleared(PlayerRef actor, String material) {
+        worthLines.add(new WorthLine("economy_setworth_clear", material));
+    }
+
     /** Every recorded line, in order. */
     public List<Line> lines() {
         return List.copyOf(lines);
+    }
+
+    /** Every recorded worth-override line, in order. */
+    public List<WorthLine> worthLines() {
+        return List.copyOf(worthLines);
     }
 }

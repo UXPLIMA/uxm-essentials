@@ -92,6 +92,21 @@ public final class LoggingEconomyAudit implements EconomyAudit {
                 reason);
     }
 
+    @Override
+    public void worthSet(PlayerRef actor, String material, Money price) {
+        log.info(
+                "event=economy_setworth actor={} material={} currency={} price={}",
+                actor.uuid(),
+                material,
+                currency(price),
+                price.amount());
+    }
+
+    @Override
+    public void worthCleared(PlayerRef actor, String material) {
+        log.info("event=economy_setworth_clear actor={} material={}", actor.uuid(), material);
+    }
+
     private static String currency(Money amount) {
         return amount.currency().id().value();
     }

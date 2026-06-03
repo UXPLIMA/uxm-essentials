@@ -63,6 +63,10 @@ final class EconomyCommandSurface {
                         "uxmessentials.economy.sell",
                         EconomyCommand.of("sellall", List.of(), "Sell every sellable item in your inventory")),
                 spec(
+                        "setworth",
+                        "uxmessentials.economy.setworth",
+                        EconomyCommand.of("setworth", List.of(), "Set an item's sell worth")),
+                spec(
                         "eco",
                         "uxmessentials.economy.admin",
                         EconomyCommand.of("eco", List.of("economy"), "Eco-admin balance mutations")));

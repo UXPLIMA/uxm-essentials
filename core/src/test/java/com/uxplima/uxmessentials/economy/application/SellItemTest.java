@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.fakes.CapturingSink;
 import com.uxplima.uxmessentials.economy.fakes.Currencies;
 import com.uxplima.uxmessentials.economy.fakes.InMemoryWalletRepository;
+import com.uxplima.uxmessentials.economy.fakes.InMemoryWorthOverrideStore;
 import com.uxplima.uxmessentials.economy.fakes.KeyMessages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,12 +39,12 @@ class SellItemTest {
         seller = new PlayerRef(UUID.randomUUID(), "Alice");
     }
 
-    private SellItem sellWith(WorthTable table) {
+    private SellItem sellWith(WorthSource worth) {
         CurrencyRegistry registry = CurrencyRegistry.single(Currencies.COINS);
         Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
         NativeEconomyProvider provider = new NativeEconomyProvider(repo, registry, clock);
         EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), sink);
-        return new SellItem(provider, table, notifier, Currencies.COINS);
+        return new SellItem(provider, worth, notifier, Currencies.COINS);
     }
 
     @Test
@@ -68,6 +69,19 @@ class SellItemTest {
         assertThat(repo.findByOwner(seller).orElseThrow().balanceOf(Currencies.COINS))
                 .isEqualTo(Money.of(Currencies.COINS, 40));
         assertThat(sink.delivered("wallet.sell-sold")).isTrue();
+    }
+
+    @Test
+    void anOverridePriceChangesTheProceeds() {
+        InMemoryWorthOverrideStore overrides = new InMemoryWorthOverrideStore();
+        overrides.set("diamond", new BigDecimal("25"));
+        WorthSource worth =
+                new CombiningWorthSource(overrides, new WorthTable(Map.of("diamond", new BigDecimal("10"))));
+        SellItem sell = sellWith(worth);
+
+        SellOutcome outcome = sell.sell(seller, "diamond", 4);
+
+        assertThat(outcome.earned()).contains(Money.of(Currencies.COINS, 100));
     }
 
     @Test

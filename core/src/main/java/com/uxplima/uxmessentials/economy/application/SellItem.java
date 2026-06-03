@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /sell}: convert a counted material into currency at its configured {@link WorthTable} worth and
+ * {@code /sell}: convert a counted material into currency at its configured {@link WorthSource} worth and
  * credit the seller through the {@link EconomyProvider} — never a PDC stamp, so the proceeds survive a world
  * rollback like every other balance (the economy hard invariant). Returns a {@link SellOutcome} so the
  * adapter knows whether to remove the items from the inventory: only a credit that actually applied is
@@ -23,11 +23,11 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class SellItem {
 
     private final EconomyProvider economy;
-    private final WorthTable worth;
+    private final WorthSource worth;
     private final EconomyNotifier notifier;
     private final Currency currency;
 
-    public SellItem(EconomyProvider economy, WorthTable worth, EconomyNotifier notifier, Currency currency) {
+    public SellItem(EconomyProvider economy, WorthSource worth, EconomyNotifier notifier, Currency currency) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.worth = Objects.requireNonNull(worth, "worth");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

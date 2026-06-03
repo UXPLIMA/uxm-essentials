@@ -199,6 +199,9 @@ permissions:
   uxmessentials.economy.sell:
     description: '/sell [amount] to sell held items at their configured worth.'
     default: true
+  uxmessentials.economy.setworth:
+    description: '/setworth [item] <price>|clear to set or clear an item''s sell worth override.'
+    default: op
   uxmessentials.economy.admin:
     description: 'Umbrella for eco-admin mutations (/eco give, take, set).'
     default: op

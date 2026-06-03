@@ -33,4 +33,13 @@ public interface EconomyAudit {
 
     /** A bulk eco-admin mutation — one line with the affected count, never per-target spam. */
     void bulkMutation(PlayerRef actor, Money amount, int affected, EconomyReason reason);
+
+    /**
+     * {@code event=economy_setworth} — {@code actor} set the per-item worth override of {@code material} to
+     * {@code price}. A pricing-policy change, not a balance mutation, so it carries no {@link EconomyReason}.
+     */
+    void worthSet(PlayerRef actor, String material, Money price);
+
+    /** {@code event=economy_setworth_clear} — {@code actor} cleared the worth override of {@code material}. */
+    void worthCleared(PlayerRef actor, String material);
 }

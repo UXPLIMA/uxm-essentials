@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.SnapshotBaltopProvider
 import com.uxplima.uxmessentials.economy.application.AmountFormat;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.Balance;
+import com.uxplima.uxmessentials.economy.application.CombiningWorthSource;
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.LookupWorth;
@@ -28,6 +29,8 @@ import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
 import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
+import com.uxplima.uxmessentials.economy.application.SetWorth;
+import com.uxplima.uxmessentials.economy.application.WorthSource;
 import com.uxplima.uxmessentials.economy.application.WorthTable;
 import com.uxplima.uxmessentials.economy.application.port.BaltopExemption;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
@@ -35,6 +38,7 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
 import com.uxplima.uxmessentials.economy.application.port.PendingPayRegistry;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
+import com.uxplima.uxmessentials.economy.application.port.WorthOverrideStore;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
@@ -164,7 +168,9 @@ public final class EconomyWiring {
                 new SchedulerPendingPayRegistry(kernel.scheduler(), kernel.log(), settings.confirmTimeout());
         Clock clock = Clock.systemUTC();
         EconomyProvider baltopProvider = new SnapshotBaltopProvider(resolved, snapshots);
-        WorthTable worth = settings.worthTable();
+        WorthTable configWorth = settings.worthTable();
+        WorthOverrideStore worthOverrides = WalletRepositories.worthOverrideStore(persistence);
+        WorthSource worth = new CombiningWorthSource(worthOverrides, configWorth);
         Currency defaultCurrency = currencies.defaultCurrency();
         Pay pay = new Pay(resolved, preferences, pending, notifier, clock);
         return new EconomyServices(
@@ -176,6 +182,7 @@ public final class EconomyWiring {
                 new LookupWorth(worth, notifier, defaultCurrency),
                 new SellItem(resolved, worth, notifier, defaultCurrency),
                 new SellAll(resolved, worth, notifier, defaultCurrency),
+                new SetWorth(worthOverrides, notifier, audit, defaultCurrency),
                 new EcoAdmin(resolved, repository, audit, notifier),
                 currencies,
                 snapshots,

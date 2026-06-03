@@ -15,7 +15,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /sellall}: sell every sellable item in the seller's inventory at its configured {@link WorthTable}
+ * {@code /sellall}: sell every sellable item in the seller's inventory at its configured {@link WorthSource}
  * worth in one credit, the bulk counterpart to {@code /sell}. It reuses the same pricing table and the same
  * DB-backed {@link EconomyProvider} credit (never a PDC stamp — the economy hard invariant), but folds the
  * whole inventory snapshot into a single proceeds figure so the seller is credited once and notified once
@@ -28,11 +28,11 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class SellAll {
 
     private final EconomyProvider economy;
-    private final WorthTable worth;
+    private final WorthSource worth;
     private final EconomyNotifier notifier;
     private final Currency currency;
 
-    public SellAll(EconomyProvider economy, WorthTable worth, EconomyNotifier notifier, Currency currency) {
+    public SellAll(EconomyProvider economy, WorthSource worth, EconomyNotifier notifier, Currency currency) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.worth = Objects.requireNonNull(worth, "worth");
         this.notifier = Objects.requireNonNull(notifier, "notifier");

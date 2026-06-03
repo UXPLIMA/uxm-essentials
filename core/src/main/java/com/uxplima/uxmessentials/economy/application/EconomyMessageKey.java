@@ -66,6 +66,13 @@ public enum EconomyMessageKey implements MessageKey {
     // /sellall
     SELLALL_SUMMARY("wallet.sellall-summary"),
 
+    // /setworth
+    SETWORTH_SET("wallet.setworth-set"),
+    SETWORTH_CLEARED("wallet.setworth-cleared"),
+    SETWORTH_NOT_SET("wallet.setworth-not-set"),
+    SETWORTH_UNKNOWN_ITEM("wallet.setworth-unknown-item"),
+    SETWORTH_NO_ITEM_IN_HAND("wallet.setworth-no-item-in-hand"),
+
     // eco admin
     ECO_ADMIN_GIVEN("eco.admin.given"),
     ECO_ADMIN_TAKEN("eco.admin.taken"),
