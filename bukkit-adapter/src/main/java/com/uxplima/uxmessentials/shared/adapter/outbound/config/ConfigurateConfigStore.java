@@ -1,25 +1,31 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.config;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
- * The {@link ConfigStore} backed by a Configurate HOCON file. The parsed tree is loaded once on
- * construction and held in an {@link AtomicReference}; {@link #reload()} re-reads the file and swaps
- * the reference, so a reader either sees the whole previous tree or the whole new one — never a
- * half-applied config (CLAUDE.md "swapped atomically via AtomicReference on reload").
+ * The {@link ConfigStore} backed by Configurate HOCON. The on-disk layout is per-module: a root
+ * {@code config.conf} holds globals, and each {@code modules/<module>/config.conf} (plus any sibling
+ * {@code <x>.conf}) is mounted into one in-memory tree at {@code modules.<module>} (and
+ * {@code modules.<module>.<x>}). Callers still navigate dotted paths against the merged tree, so the
+ * file split is invisible above this adapter. The tree is held in an {@link AtomicReference} swapped
+ * whole on {@link #reload()} (CLAUDE.md atomic-reload rule). A legacy monolith {@code config.conf}
+ * (inline {@code modules.*}) still resolves because the root file is the base of the merged tree.
  *
  * <p>Dotted HOCON paths ({@code modules.homes.enabled}) are navigated by splitting on {@code .} and
  * descending through {@link ConfigurationNode#node(Object...)}; an absent or virtual node yields the
@@ -33,26 +39,32 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 @NullMarked
 public final class ConfigurateConfigStore implements ConfigStore {
 
-    private final Path file;
+    private final Path rootFile;
+    private final @Nullable Path modulesDir; // null = single-file mode (back-compat / tests)
     private final Logger log;
-    private final HoconConfigurationLoader loader;
     private final AtomicReference<ConfigurationNode> tree;
 
-    private ConfigurateConfigStore(Path file, Logger log, HoconConfigurationLoader loader, ConfigurationNode root) {
-        this.file = file;
+    private ConfigurateConfigStore(Path rootFile, @Nullable Path modulesDir, Logger log, ConfigurationNode tree) {
+        this.rootFile = rootFile;
+        this.modulesDir = modulesDir;
         this.log = log;
-        this.loader = loader;
-        this.tree = new AtomicReference<>(root);
+        this.tree = new AtomicReference<>(tree);
     }
 
-    /** Load {@code file} once; an absent file yields an empty tree so every read returns its fallback. */
+    /** Single-file load (legacy / tests): the whole tree is one {@code file}. */
     public static ConfigurateConfigStore load(Path file, Logger log) {
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(log, "log");
-        HoconConfigurationLoader loader =
-                HoconConfigurationLoader.builder().path(file).build();
-        ConfigurationNode root = read(loader, file, log);
-        return new ConfigurateConfigStore(file, log, loader, root);
+        return new ConfigurateConfigStore(file, null, log, merged(file, null, log));
+    }
+
+    /** Layout load: root {@code config.conf} plus every {@code modules/<module>/} file under {@code dataFolder}. */
+    public static ConfigurateConfigStore loadLayout(Path dataFolder, Logger log) {
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
+        Path root = dataFolder.resolve("config.conf");
+        Path modules = dataFolder.resolve("modules");
+        return new ConfigurateConfigStore(root, modules, log, merged(root, modules, log));
     }
 
     @Override
@@ -99,22 +111,60 @@ public final class ConfigurateConfigStore implements ConfigStore {
 
     @Override
     public void reload() {
-        tree.set(read(loader, file, log));
+        tree.set(merged(rootFile, modulesDir, log));
     }
 
     private ConfigurationNode at(String path) {
         Objects.requireNonNull(path, "path");
         Object[] segments = path.split("\\.");
-        ConfigurationNode root = Objects.requireNonNull(tree.get(), "tree");
-        return root.node(segments);
+        return Objects.requireNonNull(tree.get(), "tree").node(segments);
     }
 
-    private static ConfigurationNode read(HoconConfigurationLoader loader, Path file, Logger log) {
+    /** Build the merged tree: the root file, then each module file mounted at its path. */
+    private static ConfigurationNode merged(Path rootFile, @Nullable Path modulesDir, Logger log) {
+        ConfigurationNode tree = readFile(rootFile, log);
+        if (modulesDir != null && Files.isDirectory(modulesDir)) {
+            try (Stream<Path> dirs = Files.list(modulesDir)) {
+                dirs.filter(Files::isDirectory).sorted().forEach(dir -> mountModule(tree, dir, log));
+            } catch (IOException failure) {
+                log.error("could not list module config dir " + modulesDir, failure);
+            }
+        }
+        return tree;
+    }
+
+    private static void mountModule(ConfigurationNode tree, Path moduleDir, Logger log) {
+        String module = moduleDir.getFileName().toString();
+        try (Stream<Path> files = Files.list(moduleDir)) {
+            files.filter(p -> p.getFileName().toString().endsWith(".conf"))
+                    .sorted()
+                    .forEach(file -> {
+                        String name = file.getFileName().toString();
+                        ConfigurationNode target = name.equals("config.conf")
+                                ? tree.node("modules", module)
+                                : tree.node("modules", module, name.substring(0, name.length() - ".conf".length()));
+                        mergeInto(target, file, log);
+                    });
+        } catch (IOException failure) {
+            log.error("could not list module config files in " + moduleDir, failure);
+        }
+    }
+
+    private static void mergeInto(ConfigurationNode target, Path file, Logger log) {
+        try {
+            target.mergeFrom(
+                    HoconConfigurationLoader.builder().path(file).build().load());
+        } catch (ConfigurateException failure) {
+            log.error("failed to load config " + file, failure);
+        }
+    }
+
+    private static ConfigurationNode readFile(Path file, Logger log) {
         if (!Files.exists(file)) {
             return CommentedConfigurationNode.root();
         }
         try {
-            return loader.load();
+            return HoconConfigurationLoader.builder().path(file).build().load();
         } catch (ConfigurateException failure) {
             log.error("failed to load config " + file + "; keeping defaults", failure);
             return CommentedConfigurationNode.root();
