@@ -131,6 +131,9 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /biome
     BIOME_SHOW("playerstate.biome.show"),
 
+    // /seed
+    SEED_SHOW("playerstate.seed.show"),
+
     // /compass — the framing line plus the eight cardinal/intercardinal direction words it embeds
     COMPASS_SHOW("playerstate.compass.show"),
     COMPASS_NORTH("playerstate.compass.north"),

@@ -291,6 +291,9 @@ permissions:
   uxmessentials.biome.use:
     description: '/biome to show the biome you are standing in.'
     default: true
+  uxmessentials.seed.use:
+    description: '/seed to show the seed of the world you are standing in.'
+    default: true
   uxmessentials.compass.use:
     description: '/compass to show the direction you are facing.'
     default: true
