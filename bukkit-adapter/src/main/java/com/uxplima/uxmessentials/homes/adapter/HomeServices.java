@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.homes.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenuView;
 import com.uxplima.uxmessentials.homes.application.DelHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
@@ -25,6 +26,7 @@ import org.jspecify.annotations.NullMarked;
  * @param renameHome {@code /renamehome}
  * @param moveHome {@code /movehome}
  * @param homeAdmin {@code /homeadmin}
+ * @param homeMenu the read-only {@code /homes} browse menu the bare {@code /homes} command opens
  * @param players name → ref resolution for the admin and {@code .others} forms
  */
 @NullMarked
@@ -36,6 +38,7 @@ public record HomeServices(
         RenameHome renameHome,
         MoveHome moveHome,
         HomeAdmin homeAdmin,
+        HomeMenuView homeMenu,
         PlayerLookup players) {
 
     public HomeServices {
@@ -46,6 +49,7 @@ public record HomeServices(
         Objects.requireNonNull(renameHome, "renameHome");
         Objects.requireNonNull(moveHome, "moveHome");
         Objects.requireNonNull(homeAdmin, "homeAdmin");
+        Objects.requireNonNull(homeMenu, "homeMenu");
         Objects.requireNonNull(players, "players");
     }
 }

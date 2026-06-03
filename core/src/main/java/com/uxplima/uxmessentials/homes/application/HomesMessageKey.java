@@ -27,6 +27,13 @@ public enum HomesMessageKey implements MessageKey {
     HOME_LIST_ENTRY("home.list.entry"),
     HOME_LIST_EMPTY("home.list.empty"),
 
+    // browse menu (/homes)
+    HOME_MENU_TITLE("home.menu.title"),
+    HOME_MENU_ENTRY_NAME("home.menu.entry.name"),
+    HOME_MENU_LORE_USABLE("home.menu.lore.usable"),
+    HOME_MENU_PREV("home.menu.prev"),
+    HOME_MENU_NEXT("home.menu.next"),
+
     // failures
     HOME_NOT_FOUND("home.not-found"),
     HOME_NONE("home.none"),

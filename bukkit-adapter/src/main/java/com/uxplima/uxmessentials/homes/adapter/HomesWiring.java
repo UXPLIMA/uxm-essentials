@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommands;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenuView;
 import com.uxplima.uxmessentials.homes.adapter.outbound.TeleportHomeAdapter;
 import com.uxplima.uxmessentials.homes.application.DelHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
@@ -72,14 +73,17 @@ public final class HomesWiring {
             HomeTeleporter teleporter) {
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
+        TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier);
+        HomeMenuView homeMenu = new HomeMenuView(kernel.messages(), kernel.scheduler(), teleportHome);
         return new HomeServices(
                 new SetHome(repository, quota, notifier, kernel.events(), clock),
                 new DelHome(repository, notifier, kernel.events()),
                 new ListHomes(repository, notifier),
-                new TeleportHome(repository, teleporter, notifier),
+                teleportHome,
                 new RenameHome(repository, notifier),
                 new MoveHome(repository, notifier),
                 new HomeAdmin(repository, teleporter, notifier, kernel.events()),
+                homeMenu,
                 kernel.playerLookup());
     }
 
