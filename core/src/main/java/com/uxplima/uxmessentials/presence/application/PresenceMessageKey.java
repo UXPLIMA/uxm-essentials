@@ -35,6 +35,13 @@ public enum PresenceMessageKey implements MessageKey {
     REALNAME_RESULT("presence.realname-result"),
     REALNAME_NOT_FOUND("presence.realname-not-found"),
 
+    // /nick — set or clear a display name (own, or another player's when gated)
+    NICK_SET("presence.nick-set"),
+    NICK_CLEARED("presence.nick-cleared"),
+    NICK_SET_OTHER("presence.nick-set-other"),
+    NICK_INVALID("presence.nick-invalid"),
+    NICK_TARGET_UNKNOWN("presence.nick-target-unknown"),
+
     // /whois — staff identity/status summary for one visible online player
     WHOIS_RESULT("presence.whois-result"),
     WHOIS_NOT_FOUND("presence.whois-not-found"),

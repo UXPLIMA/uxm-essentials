@@ -120,6 +120,7 @@ public final class TeleportWiring {
                 .executor(executor)
                 .players(kernel.playerLookup())
                 .worlds(kernel.worldLookup())
+                .scheduler(kernel.scheduler())
                 .requestTeleport(
                         new RequestTeleport(requests, flags, notifier, kernel.events(), settings, jailGate, clock))
                 .acceptTeleport(new AcceptTeleport(requests, engine, notifier, kernel.events(), clock))

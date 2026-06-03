@@ -48,6 +48,19 @@ public enum EconomyMessageKey implements MessageKey {
     BALTOP_ROW("baltop.row"),
     BALTOP_EMPTY("baltop.empty"),
 
+    // /worth
+    WORTH_RESULT("wallet.worth-result"),
+    WORTH_RESULT_STACK("wallet.worth-result-stack"),
+    WORTH_UNKNOWN_ITEM("wallet.worth-unknown-item"),
+    WORTH_NO_ITEM_IN_HAND("wallet.worth-no-item-in-hand"),
+    WORTH_NOT_SELLABLE("wallet.worth-not-sellable"),
+
+    // /sell
+    SELL_SOLD("wallet.sell-sold"),
+    SELL_NOTHING_TO_SELL("wallet.sell-nothing"),
+    SELL_NOT_SELLABLE("wallet.sell-not-sellable"),
+    SELL_NO_ITEM_IN_HAND("wallet.sell-no-item-in-hand"),
+
     // eco admin
     ECO_ADMIN_GIVEN("eco.admin.given"),
     ECO_ADMIN_TAKEN("eco.admin.taken"),

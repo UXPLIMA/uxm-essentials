@@ -22,6 +22,12 @@ public interface TeleportFlags {
      */
     void setAcceptsRequests(PlayerRef who, boolean accepting);
 
+    /** True when {@code who} has {@code /tpauto} on and auto-accepts incoming requests. */
+    boolean autoAccepts(PlayerRef who);
+
+    /** Flip {@code who}'s {@code /tpauto} state, returning the new "auto-accepts" value. */
+    boolean toggleAutoAccepts(PlayerRef who);
+
     /** True when {@code target} has blocked {@code requester} via {@code /tpblock}. */
     boolean hasBlocked(PlayerRef target, PlayerRef requester);
 

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.teleport.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryBackLocationStore;
@@ -48,6 +49,7 @@ public final class TeleportServices {
     private final TeleportExecutor executor;
     private final PlayerLookup players;
     private final WorldLookup worlds;
+    private final Scheduler scheduler;
 
     public TeleportServices(Builder builder) {
         this.requestTeleport = Objects.requireNonNull(builder.requestTeleport, "requestTeleport");
@@ -67,6 +69,7 @@ public final class TeleportServices {
         this.executor = Objects.requireNonNull(builder.executor, "executor");
         this.players = Objects.requireNonNull(builder.players, "players");
         this.worlds = Objects.requireNonNull(builder.worlds, "worlds");
+        this.scheduler = Objects.requireNonNull(builder.scheduler, "scheduler");
     }
 
     public RequestTeleport requestTeleport() {
@@ -137,6 +140,11 @@ public final class TeleportServices {
         return worlds;
     }
 
+    /** The Folia-aware scheduler the auto-accept branch hops to the target's region thread through. */
+    public Scheduler scheduler() {
+        return scheduler;
+    }
+
     /** Release every in-memory store and queue this context holds. Called on module stop. */
     public void drain() {
         warmupTracker.clear();
@@ -165,6 +173,7 @@ public final class TeleportServices {
         private @org.jspecify.annotations.Nullable TeleportExecutor executor;
         private @org.jspecify.annotations.Nullable PlayerLookup players;
         private @org.jspecify.annotations.Nullable WorldLookup worlds;
+        private @org.jspecify.annotations.Nullable Scheduler scheduler;
 
         public Builder requestTeleport(RequestTeleport value) {
             this.requestTeleport = value;
@@ -248,6 +257,11 @@ public final class TeleportServices {
 
         public Builder worlds(WorldLookup value) {
             this.worlds = value;
+            return this;
+        }
+
+        public Builder scheduler(Scheduler value) {
+            this.scheduler = value;
             return this;
         }
 

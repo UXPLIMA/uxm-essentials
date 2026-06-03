@@ -14,9 +14,11 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.adapter.inbound.command.WhoisCommand;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
+import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.presence.application.ResolveVisibility;
+import com.uxplima.uxmessentials.presence.application.SetNick;
 import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -52,7 +54,9 @@ class WhoisCommandPathTest {
                 mock(MarkAfk.class),
                 mock(ClearAfkOnActivity.class),
                 mock(ToggleVanish.class),
-                mock(ResolveVisibility.class));
+                mock(ResolveVisibility.class),
+                mock(SetNick.class),
+                mock(ClearNick.class));
         command = new WhoisCommand(services, new EchoMessages());
     }
 

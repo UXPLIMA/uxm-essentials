@@ -5,9 +5,11 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
+import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
@@ -66,6 +68,23 @@ final class ModerationRows {
                 issuer,
                 Optional.ofNullable(row.getReason()),
                 Instant.ofEpochMilli(row.getCreatedAt()));
+    }
+
+    static BanEntry toBanEntry(ModerationTempbansRecord row) {
+        return new BanEntry(
+                UUID.fromString(row.getTarget()),
+                issuer(row.getBannedBy(), row.getBannedByName()),
+                Optional.ofNullable(row.getReason()),
+                Instant.ofEpochMilli(row.getUntil()));
+    }
+
+    static MuteEntry toMuteEntry(ModerationMutesRecord row) {
+        Long until = row.getUntil();
+        return new MuteEntry(
+                UUID.fromString(row.getTarget()),
+                issuer(row.getMutedBy(), row.getMutedByName()),
+                Optional.ofNullable(row.getReason()),
+                Optional.ofNullable(until).map(Instant::ofEpochMilli));
     }
 
     static Warn toWarn(ModerationWarnsRecord row) {

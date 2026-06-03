@@ -60,6 +60,9 @@ permissions:
   uxmessentials.tpa.toggle:
     description: '/tptoggle to refuse all incoming teleport requests.'
     default: true
+  uxmessentials.tpa.auto:
+    description: '/tpauto to auto-accept incoming teleport requests.'
+    default: true
   uxmessentials.tpa.block:
     description: '/tpblock / /tpunblock to block a player''s requests.'
     default: true
@@ -181,6 +184,12 @@ permissions:
   uxmessentials.economy.baltop.exempt:
     description: 'Marks the holder as hidden from every /baltop leaderboard.'
     default: false
+  uxmessentials.economy.worth:
+    description: '/worth [item] to report an item''s configured sell value.'
+    default: true
+  uxmessentials.economy.sell:
+    description: '/sell [amount] to sell held items at their configured worth.'
+    default: true
   uxmessentials.economy.admin:
     description: 'Umbrella for eco-admin mutations (/eco give, take, set).'
     default: op
@@ -363,6 +372,12 @@ permissions:
   uxmessentials.realname.use:
     description: '/realname <player> to look up a player''s real account name.'
     default: true
+  uxmessentials.nick.use:
+    description: '/nick <name> | off to set or clear your display name.'
+    default: true
+  uxmessentials.nick.others:
+    description: '/nick <player> <name> to set another player''s display name.'
+    default: op
   uxmessentials.whois.use:
     description: '/whois <player> to view an online player''s account, identity and status.'
     default: op
@@ -407,6 +422,12 @@ permissions:
     default: op
   uxmessentials.moderation.ban:
     description: '/ban <player> [reason] and /unban <player> — permanent UUID ban and its lift.'
+    default: op
+  uxmessentials.moderation.banlist:
+    description: '/banlist to review the players currently banned.'
+    default: op
+  uxmessentials.moderation.mutelist:
+    description: '/mutelist to review the players currently muted.'
     default: op
   uxmessentials.moderation.kick:
     description: '/kick <player> [reason]; /kickall [reason] to clear non-exempt players.'

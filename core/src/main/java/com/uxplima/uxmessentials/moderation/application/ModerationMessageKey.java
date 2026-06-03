@@ -43,6 +43,16 @@ public enum ModerationMessageKey implements MessageKey {
     BAN_LIFTED("moderation.unban.applied"),
     BAN_NOT_BANNED("moderation.unban.not-banned"),
 
+    // /banlist — review of currently banned players
+    BANLIST_HEADER("moderation.banlist-header"),
+    BANLIST_ENTRY("moderation.banlist-entry"),
+    BANLIST_EMPTY("moderation.banlist-empty"),
+
+    // /mutelist — review of currently muted players
+    MUTELIST_HEADER("moderation.mutelist-header"),
+    MUTELIST_ENTRY("moderation.mutelist-entry"),
+    MUTELIST_EMPTY("moderation.mutelist-empty"),
+
     // /kick, /kickall
     KICK_APPLIED("moderation.kick.applied"),
     KICK_KICKED("moderation.kick.kicked"),

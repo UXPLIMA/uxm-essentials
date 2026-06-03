@@ -28,6 +28,7 @@ public final class PresenceCommands {
                 new VanishCommand(services, messages),
                 new ListCommand(services, messages),
                 new RealnameCommand(services, messages),
+                new NickCommand(services, messages),
                 new WhoisCommand(services, messages),
                 new GcCommand(services, messages),
                 new StaffCommand(services, messages));

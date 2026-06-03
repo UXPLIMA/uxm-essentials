@@ -21,9 +21,12 @@ import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.Balance;
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
+import com.uxplima.uxmessentials.economy.application.LookupWorth;
 import com.uxplima.uxmessentials.economy.application.NativeEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
+import com.uxplima.uxmessentials.economy.application.SellItem;
+import com.uxplima.uxmessentials.economy.application.WorthTable;
 import com.uxplima.uxmessentials.economy.application.port.BaltopExemption;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
@@ -159,11 +162,15 @@ public final class EconomyWiring {
                 new SchedulerPendingPayRegistry(kernel.scheduler(), kernel.log(), settings.confirmTimeout());
         Clock clock = Clock.systemUTC();
         EconomyProvider baltopProvider = new SnapshotBaltopProvider(resolved, snapshots);
+        WorthTable worth = settings.worthTable();
+        Currency defaultCurrency = currencies.defaultCurrency();
         return new EconomyServices(
                 new Balance(resolved, notifier),
                 new Pay(resolved, preferences, pending, notifier, clock),
                 new PayToggle(preferences, notifier),
                 new BalTop(baltopProvider, notifier, settings.baltopPageSize()),
+                new LookupWorth(worth, notifier, defaultCurrency),
+                new SellItem(resolved, worth, notifier, defaultCurrency),
                 new EcoAdmin(resolved, repository, audit, notifier),
                 currencies,
                 snapshots,

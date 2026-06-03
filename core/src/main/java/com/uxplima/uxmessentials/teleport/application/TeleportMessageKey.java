@@ -31,6 +31,10 @@ public enum TeleportMessageKey implements MessageKey {
     TPA_TOGGLE_ON("teleport.tpa.toggle-on"),
     TPA_TOGGLE_OFF("teleport.tpa.toggle-off"),
 
+    // /tpauto — auto-accept incoming requests
+    TPAUTO_ON("teleport.tpauto-on"),
+    TPAUTO_OFF("teleport.tpauto-off"),
+
     // back
     BACK_RETURNED("teleport.back.returned"),
     BACK_NONE("teleport.back.none"),

@@ -34,6 +34,7 @@ final class PresenceCommandSurface {
                 spec("vanish", "uxmessentials.vanish.use", cmd("vanish", "Toggle staff vanish")),
                 spec("list", "uxmessentials.list.use", cmd("list", "List online players")),
                 spec("realname", "uxmessentials.realname.use", cmd("realname", "Look up a player's real name")),
+                spec("nick", "uxmessentials.nick.use", cmd("nick", "Set or clear a player's display name")),
                 spec("whois", "uxmessentials.whois.use", cmd("whois", "Show information about an online player")),
                 spec("gc", "uxmessentials.gc.use", cmd("gc", "Show server health")),
                 spec("staff", "uxmessentials.staff.use", cmd("staff", "List online staff")));

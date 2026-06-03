@@ -18,11 +18,15 @@ import com.uxplima.uxmessentials.presence.adapter.outbound.AfkSweep;
 import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitPresenceAudience;
 import com.uxplima.uxmessentials.presence.adapter.outbound.BukkitVisibilityApplier;
 import com.uxplima.uxmessentials.presence.adapter.outbound.InMemoryPresenceStore;
+import com.uxplima.uxmessentials.presence.adapter.outbound.PdcNickStore;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
+import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
 import com.uxplima.uxmessentials.presence.application.PresenceNotifier;
 import com.uxplima.uxmessentials.presence.application.ResolveVisibility;
+import com.uxplima.uxmessentials.presence.application.SetNick;
 import com.uxplima.uxmessentials.presence.application.ToggleVanish;
+import com.uxplima.uxmessentials.presence.application.port.NickStore;
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.presence.application.port.VisibilityApplier;
@@ -62,8 +66,9 @@ public final class PresenceWiring {
         VisibilityApplier visibility = new BukkitVisibilityApplier(plugin, kernel.scheduler());
         PresenceAudience audience = new BukkitPresenceAudience();
         PresenceNotifier notifier = new PresenceNotifier(kernel.messages(), kernel.messageSink());
+        NickStore nicks = new PdcNickStore(plugin, kernel.scheduler());
 
-        PresenceServices services = assemble(kernel, store, visibility, audience, notifier, clock);
+        PresenceServices services = assemble(kernel, store, visibility, audience, notifier, nicks, clock);
         AfkSweep sweep = new AfkSweep(
                 kernel.scheduler(),
                 store,
@@ -103,13 +108,16 @@ public final class PresenceWiring {
             VisibilityApplier visibility,
             PresenceAudience audience,
             PresenceNotifier notifier,
+            NickStore nicks,
             Clock clock) {
         var events = kernel.events();
         MarkAfk markAfk = new MarkAfk(store, audience, notifier, events, clock);
         ClearAfkOnActivity clearAfk = new ClearAfkOnActivity(store, audience, notifier, events, clock);
         ToggleVanish toggleVanish = new ToggleVanish(store, visibility, notifier, events, clock);
         ResolveVisibility resolveVisibility = new ResolveVisibility(store, kernel.permissions());
-        return new PresenceServices(markAfk, clearAfk, toggleVanish, resolveVisibility);
+        SetNick setNick = new SetNick(nicks, notifier);
+        ClearNick clearNick = new ClearNick(nicks, notifier);
+        return new PresenceServices(markAfk, clearAfk, toggleVanish, resolveVisibility, setNick, clearNick);
     }
 
     /**

@@ -9,9 +9,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
+import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
@@ -51,6 +53,35 @@ public final class FakeModerationRepository implements ModerationRepository {
     @Override
     public TempbanState loadTempban(PlayerRef target) {
         return tempbans.getOrDefault(target.uuid(), TempbanState.none());
+    }
+
+    @Override
+    public List<BanEntry> activeBans(Instant now, int limit) {
+        return tempbans.entrySet().stream()
+                .filter(e -> e.getValue() instanceof TempbanState.Active active && active.isActiveAt(now))
+                .map(e -> {
+                    TempbanState.Active active = (TempbanState.Active) e.getValue();
+                    return new BanEntry(e.getKey(), active.issuer(), active.reason(), active.until());
+                })
+                .limit(limit)
+                .toList();
+    }
+
+    @Override
+    public List<MuteEntry> activeMutes(Instant now, int limit) {
+        return mutes.entrySet().stream()
+                .filter(e -> e.getValue().isActiveAt(now))
+                .map(e -> muteEntry(e.getKey(), e.getValue()))
+                .limit(limit)
+                .toList();
+    }
+
+    private static MuteEntry muteEntry(UUID target, MuteState mute) {
+        if (mute instanceof MuteState.Permanent permanent) {
+            return new MuteEntry(target, permanent.issuer(), permanent.reason(), Optional.empty());
+        }
+        MuteState.Timed timed = (MuteState.Timed) mute;
+        return new MuteEntry(target, timed.issuer(), timed.reason(), Optional.of(timed.until()));
     }
 
     @Override

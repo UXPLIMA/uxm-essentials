@@ -5,9 +5,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
+import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
@@ -38,6 +40,19 @@ public interface ModerationRepository {
 
     /** The current tempban alone, for the ban-on-login check. */
     TempbanState loadTempban(PlayerRef target);
+
+    /**
+     * The bans still in effect at {@code now} (both timed and the far-future rows a {@code /ban} records),
+     * newest-first and capped at {@code limit} so the {@code /banlist} read stays within budget. Expired
+     * tempbans are filtered out at the query.
+     */
+    List<BanEntry> activeBans(Instant now, int limit);
+
+    /**
+     * The mutes still in effect at {@code now} (permanent rows and timed rows not yet expired), newest-first
+     * and capped at {@code limit} so the {@code /mutelist} read stays within budget.
+     */
+    List<MuteEntry> activeMutes(Instant now, int limit);
 
     /** Upsert {@code target}'s mute. {@link MuteState.None} deletes the row. */
     void saveMute(PlayerRef target, MuteState mute);

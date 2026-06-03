@@ -14,9 +14,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
+import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
@@ -75,6 +77,28 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
                         .fetchOne())
                 .map(ModerationRows::toTempban)
                 .orElseGet(TempbanState::none));
+    }
+
+    @Override
+    public List<BanEntry> activeBans(Instant now, int limit) {
+        Objects.requireNonNull(now, "now");
+        return read(dsl -> dsl.selectFrom(MODERATION_TEMPBANS)
+                .where(MODERATION_TEMPBANS.UNTIL.gt(now.toEpochMilli()))
+                .orderBy(MODERATION_TEMPBANS.CREATED_AT.desc())
+                .limit(Math.max(0, limit))
+                .fetch()
+                .map(ModerationRows::toBanEntry));
+    }
+
+    @Override
+    public List<MuteEntry> activeMutes(Instant now, int limit) {
+        Objects.requireNonNull(now, "now");
+        return read(dsl -> dsl.selectFrom(MODERATION_MUTES)
+                .where(MODERATION_MUTES.UNTIL.isNull().or(MODERATION_MUTES.UNTIL.gt(now.toEpochMilli())))
+                .orderBy(MODERATION_MUTES.CREATED_AT.desc())
+                .limit(Math.max(0, limit))
+                .fetch()
+                .map(ModerationRows::toMuteEntry));
     }
 
     @Override

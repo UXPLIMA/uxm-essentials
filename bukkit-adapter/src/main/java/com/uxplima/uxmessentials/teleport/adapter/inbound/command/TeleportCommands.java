@@ -62,6 +62,7 @@ public final class TeleportCommands {
                 new TpToggleCommand(s, m),
                 new TpSetToggleCommand(s, m, "tpon", true),
                 new TpSetToggleCommand(s, m, "tpoff", false),
+                new TpAutoCommand(s, m),
                 new TpBlockCommand(s, m, "tpblock", "Block a player's requests", true),
                 new TpBlockCommand(s, m, "tpunblock", "Unblock a player's requests", false),
                 new TpaAllCommand(s, m),

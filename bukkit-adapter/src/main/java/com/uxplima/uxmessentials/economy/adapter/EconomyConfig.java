@@ -2,11 +2,15 @@ package com.uxplima.uxmessentials.economy.adapter;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.bukkit.plugin.ServicePriority;
 
 import com.uxplima.uxmessentials.economy.application.AmountFormat;
+import com.uxplima.uxmessentials.economy.application.WorthTable;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
@@ -53,6 +57,41 @@ public final class EconomyConfig {
         }
         return CurrencyRegistry.single(builder.build());
     }
+
+    /**
+     * The per-item sell value table {@code /worth} reads and {@code /sell} credits against, parsed from the
+     * {@code worth.items} string list of {@code material:price} tokens. A blank, malformed, or non-positive
+     * entry is skipped so a typo never poisons the whole table; an empty list yields an empty table where
+     * every material reads as not-sellable.
+     */
+    public WorthTable worthTable() {
+        Map<String, BigDecimal> prices = new HashMap<>();
+        for (String token : config.getStringList("worth.items", List.of())) {
+            parseWorth(token).ifPresent(entry -> prices.put(entry.material(), entry.price()));
+        }
+        return new WorthTable(prices);
+    }
+
+    private static java.util.Optional<WorthEntry> parseWorth(String token) {
+        int split = token.lastIndexOf(':');
+        if (split <= 0 || split == token.length() - 1) {
+            return java.util.Optional.empty();
+        }
+        String material = token.substring(0, split).strip();
+        if (material.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        try {
+            BigDecimal price = new BigDecimal(token.substring(split + 1).strip());
+            return price.signum() <= 0
+                    ? java.util.Optional.empty()
+                    : java.util.Optional.of(new WorthEntry(material, price));
+        } catch (NumberFormatException notANumber) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    private record WorthEntry(String material, BigDecimal price) {}
 
     /** The {@code ServicePriority} the native provider registers at; {@code Normal} unless raised on purpose. */
     public ServicePriority registerPriority() {

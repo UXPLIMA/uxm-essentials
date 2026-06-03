@@ -47,6 +47,14 @@ final class EconomyCommandSurface {
                         "uxmessentials.economy.baltop",
                         EconomyCommand.of("baltop", List.of("balancetop"), "View the top balances")),
                 spec(
+                        "worth",
+                        "uxmessentials.economy.worth",
+                        EconomyCommand.of("worth", List.of(), "Report a held item's configured sell value")),
+                spec(
+                        "sell",
+                        "uxmessentials.economy.sell",
+                        EconomyCommand.of("sell", List.of(), "Sell held items at their configured worth")),
+                spec(
                         "eco",
                         "uxmessentials.economy.admin",
                         EconomyCommand.of("eco", List.of("economy"), "Eco-admin balance mutations")));

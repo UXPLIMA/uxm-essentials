@@ -30,10 +30,13 @@ import org.jspecify.annotations.NullMarked;
 public final class PdcTeleportFlags implements TeleportFlags {
 
     private final NamespacedKey toggleKey;
+    private final NamespacedKey autoKey;
     private final ConcurrentHashMap<UUID, Set<UUID>> blocks = new ConcurrentHashMap<>();
 
     public PdcTeleportFlags(Plugin plugin) {
-        this.toggleKey = new NamespacedKey(Objects.requireNonNull(plugin, "plugin"), "tp-toggle-off");
+        Objects.requireNonNull(plugin, "plugin");
+        this.toggleKey = new NamespacedKey(plugin, "tp-toggle-off");
+        this.autoKey = new NamespacedKey(plugin, "tp-auto-accept");
     }
 
     @Override
@@ -69,6 +72,29 @@ public final class PdcTeleportFlags implements TeleportFlags {
         }
         byte off = accepting ? (byte) 0 : (byte) 1;
         player.getPersistentDataContainer().set(toggleKey, PersistentDataType.BYTE, off);
+    }
+
+    @Override
+    public boolean autoAccepts(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        Player player = Bukkit.getPlayer(who.uuid());
+        if (player == null) {
+            return false; // an offline target cannot be requested anyway; default to not auto-accepting
+        }
+        byte on = player.getPersistentDataContainer().getOrDefault(autoKey, PersistentDataType.BYTE, (byte) 0);
+        return on == 1;
+    }
+
+    @Override
+    public boolean toggleAutoAccepts(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        Player player = Bukkit.getPlayer(who.uuid());
+        if (player == null) {
+            return false;
+        }
+        boolean nowAuto = !autoAccepts(who);
+        player.getPersistentDataContainer().set(autoKey, PersistentDataType.BYTE, nowAuto ? (byte) 1 : (byte) 0);
+        return nowAuto;
     }
 
     @Override

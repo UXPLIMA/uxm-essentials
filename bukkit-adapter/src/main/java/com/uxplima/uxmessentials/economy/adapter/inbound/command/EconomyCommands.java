@@ -28,6 +28,8 @@ public final class EconomyCommands {
                 new PayConfirmCommand(services, messages),
                 new PayToggleCommand(services, messages),
                 new BaltopCommand(services, messages),
+                new WorthCommand(services, messages),
+                new SellCommand(services, messages),
                 new EcoCommand(services, messages));
     }
 }

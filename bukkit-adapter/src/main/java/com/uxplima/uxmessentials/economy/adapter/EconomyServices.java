@@ -7,8 +7,10 @@ import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.Balance;
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
+import com.uxplima.uxmessentials.economy.application.LookupWorth;
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
+import com.uxplima.uxmessentials.economy.application.SellItem;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -25,6 +27,8 @@ import org.jspecify.annotations.NullMarked;
  * @param pay {@code /pay} and {@code /payconfirm}
  * @param payToggle {@code /paytoggle}
  * @param balTop {@code /baltop}
+ * @param lookupWorth {@code /worth}
+ * @param sellItem {@code /sell}
  * @param ecoAdmin {@code /eco}
  * @param currencies the closed currency set commands resolve the optional {@code [currency]} argument against
  * @param baltopSnapshots the per-currency leaderboard snapshots the {@code /baltop} command reads
@@ -38,6 +42,8 @@ public record EconomyServices(
         Pay pay,
         PayToggle payToggle,
         BalTop balTop,
+        LookupWorth lookupWorth,
+        SellItem sellItem,
         EcoAdmin ecoAdmin,
         CurrencyRegistry currencies,
         BaltopSnapshots baltopSnapshots,
@@ -50,6 +56,8 @@ public record EconomyServices(
         Objects.requireNonNull(pay, "pay");
         Objects.requireNonNull(payToggle, "payToggle");
         Objects.requireNonNull(balTop, "balTop");
+        Objects.requireNonNull(lookupWorth, "lookupWorth");
+        Objects.requireNonNull(sellItem, "sellItem");
         Objects.requireNonNull(ecoAdmin, "ecoAdmin");
         Objects.requireNonNull(currencies, "currencies");
         Objects.requireNonNull(baltopSnapshots, "baltopSnapshots");

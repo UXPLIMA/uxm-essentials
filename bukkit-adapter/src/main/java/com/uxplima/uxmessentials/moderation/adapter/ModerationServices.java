@@ -11,7 +11,9 @@ import com.uxplima.uxmessentials.moderation.application.Jail;
 import com.uxplima.uxmessentials.moderation.application.JailCountdown;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
+import com.uxplima.uxmessentials.moderation.application.ListBans;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
+import com.uxplima.uxmessentials.moderation.application.ListMutes;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
@@ -47,6 +49,8 @@ public final class ModerationServices {
     private final ReviewWarns reviewWarns;
     private final ClearWarns clearWarns;
     private final ListJails listJails;
+    private final ListBans listBans;
+    private final ListMutes listMutes;
     private final BanIp banIp;
     private final UnbanIp unbanIp;
     private final Freeze freeze;
@@ -71,6 +75,8 @@ public final class ModerationServices {
         this.reviewWarns = Objects.requireNonNull(builder.reviewWarns, "reviewWarns");
         this.clearWarns = Objects.requireNonNull(builder.clearWarns, "clearWarns");
         this.listJails = Objects.requireNonNull(builder.listJails, "listJails");
+        this.listBans = Objects.requireNonNull(builder.listBans, "listBans");
+        this.listMutes = Objects.requireNonNull(builder.listMutes, "listMutes");
         this.banIp = Objects.requireNonNull(builder.banIp, "banIp");
         this.unbanIp = Objects.requireNonNull(builder.unbanIp, "unbanIp");
         this.freeze = Objects.requireNonNull(builder.freeze, "freeze");
@@ -134,6 +140,14 @@ public final class ModerationServices {
         return listJails;
     }
 
+    public ListBans listBans() {
+        return listBans;
+    }
+
+    public ListMutes listMutes() {
+        return listMutes;
+    }
+
     public BanIp banIp() {
         return banIp;
     }
@@ -186,6 +200,8 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable ReviewWarns reviewWarns;
         private @org.jspecify.annotations.Nullable ClearWarns clearWarns;
         private @org.jspecify.annotations.Nullable ListJails listJails;
+        private @org.jspecify.annotations.Nullable ListBans listBans;
+        private @org.jspecify.annotations.Nullable ListMutes listMutes;
         private @org.jspecify.annotations.Nullable BanIp banIp;
         private @org.jspecify.annotations.Nullable UnbanIp unbanIp;
         private @org.jspecify.annotations.Nullable Freeze freeze;
@@ -258,6 +274,16 @@ public final class ModerationServices {
 
         Builder listJails(ListJails value) {
             this.listJails = value;
+            return this;
+        }
+
+        Builder listBans(ListBans value) {
+            this.listBans = value;
+            return this;
+        }
+
+        Builder listMutes(ListMutes value) {
+            this.listMutes = value;
             return this;
         }
 
