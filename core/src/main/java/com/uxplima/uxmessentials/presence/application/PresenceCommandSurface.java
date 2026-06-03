@@ -15,12 +15,14 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * stays small and the command/permission pairing is one greppable table the permissions guard checks against
  * {@code paper-plugin.yml}.
  *
- * <p>Six commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /vanish}
+ * <p>Seven commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /vanish}
  * ({@code uxmessentials.vanish.use}), {@code /list} ({@code uxmessentials.list.use}), {@code /realname <player>}
- * ({@code uxmessentials.realname.use}), {@code /whois <player>} ({@code uxmessentials.whois.use}), and
- * {@code /gc} ({@code uxmessentials.gc.use}). The
+ * ({@code uxmessentials.realname.use}), {@code /whois <player>} ({@code uxmessentials.whois.use}),
+ * {@code /gc} ({@code uxmessentials.gc.use}), and {@code /staff} ({@code uxmessentials.staff.use}). The
  * vanish-see node ({@code uxmessentials.vanish.see}) gates visibility,
- * not a command, so it is enforced in the {@code VisibilityApplier} rather than declared as a literal here.
+ * not a command, so it is enforced in the {@code VisibilityApplier} rather than declared as a literal here. The
+ * staff-membership node ({@code uxmessentials.staff.member}) marks who appears in {@code /staff} and is likewise
+ * not a command literal.
  */
 final class PresenceCommandSurface {
 
@@ -33,7 +35,8 @@ final class PresenceCommandSurface {
                 spec("list", "uxmessentials.list.use", cmd("list", "List online players")),
                 spec("realname", "uxmessentials.realname.use", cmd("realname", "Look up a player's real name")),
                 spec("whois", "uxmessentials.whois.use", cmd("whois", "Show information about an online player")),
-                spec("gc", "uxmessentials.gc.use", cmd("gc", "Show server health")));
+                spec("gc", "uxmessentials.gc.use", cmd("gc", "Show server health")),
+                spec("staff", "uxmessentials.staff.use", cmd("staff", "List online staff")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

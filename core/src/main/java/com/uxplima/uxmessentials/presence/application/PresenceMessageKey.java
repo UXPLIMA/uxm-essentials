@@ -40,7 +40,11 @@ public enum PresenceMessageKey implements MessageKey {
     WHOIS_NOT_FOUND("presence.whois-not-found"),
 
     // /gc — server health read-out (TPS, uptime, memory, loaded chunks and entities)
-    GC_RESULT("presence.gc-result");
+    GC_RESULT("presence.gc-result"),
+
+    // /staff — the vanish-aware online staff roster (holders of uxmessentials.staff.member)
+    STAFF_LIST("presence.staff-list"),
+    STAFF_EMPTY("presence.staff-empty");
 
     private final String key;
 

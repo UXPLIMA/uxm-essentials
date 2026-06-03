@@ -366,6 +366,12 @@ permissions:
   uxmessentials.gc.use:
     description: '/gc to show server health: TPS, uptime, memory and loaded chunks.'
     default: op
+  uxmessentials.staff.use:
+    description: '/staff to list online staff members.'
+    default: op
+  uxmessentials.staff.member:
+    description: 'Marks a player as staff so they appear in /staff.'
+    default: op
   uxmessentials.afk.kick.exempt:
     description: 'Never auto-kicked for being AFK past the configured timeout.'
     default: op
