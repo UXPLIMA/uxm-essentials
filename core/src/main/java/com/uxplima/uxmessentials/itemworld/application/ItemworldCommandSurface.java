@@ -88,6 +88,8 @@ final class ItemworldCommandSurface {
         verbs.add(new Verb("hat", "uxmessentials.hat.use", SubFeatureGroup.ITEM_UTILS, "Wear the held item as a hat"));
         verbs.add(new Verb("itemdb", "uxmessentials.itemdb.use", SubFeatureGroup.ITEM_UTILS, "Look up an item's id"));
         verbs.add(new Verb(
+                "recipe", "uxmessentials.recipe.use", SubFeatureGroup.ITEM_UTILS, "Show an item's crafting recipe"));
+        verbs.add(new Verb(
                 "unbreakable",
                 "uxmessentials.unbreakable.use",
                 SubFeatureGroup.ITEM_UTILS,

@@ -446,6 +446,9 @@ permissions:
   uxmessentials.itemdb.use:
     description: '/itemdb [item] — look up an item''s id / data.'
     default: op
+  uxmessentials.recipe.use:
+    description: '/recipe [item] — show an item''s crafting recipe.'
+    default: op
   uxmessentials.unbreakable.use:
     description: '/unbreakable [true|false] — toggle or set the held item''s unbreakable flag.'
     default: op

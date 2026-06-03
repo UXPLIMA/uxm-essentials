@@ -50,6 +50,10 @@ public enum ItemworldMessageKey implements MessageKey {
     HAT_NO_ITEM("itemworld.hat.no-item"),
     // /itemdb
     ITEMDB_REPORT("itemworld.itemdb.report"),
+    // /recipe
+    RECIPE_SHAPED("itemworld.recipe.shaped"),
+    RECIPE_SHAPELESS("itemworld.recipe.shapeless"),
+    RECIPE_NONE("itemworld.recipe.none"),
     // /unbreakable
     UNBREAKABLE_SET("itemworld.unbreakable.set"),
     // /disenchant
