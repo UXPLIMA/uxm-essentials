@@ -54,6 +54,7 @@ public final class PlayerStateCommands {
                 new BurnCommand(services, messages),
                 new GetPosCommand(services, messages),
                 new DepthCommand(services, messages),
+                new BiomeCommand(services, messages),
                 new CompassCommand(services, messages),
                 new PingCommand(services, messages),
                 new PlaytimeCommand(services, messages),

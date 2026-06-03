@@ -58,6 +58,7 @@ final class PlayerstateCommandSurface {
                 spec("playtime", "uxmessentials.playtime.use", cmd("playtime", "Show a player's total play time")),
                 spec("rest", "uxmessentials.rest.use", cmd("rest", "Reset time-since-rest so phantoms stop")),
                 spec("depth", "uxmessentials.depth.use", cmd("depth", "Show how far you are above or below sea level")),
+                spec("biome", "uxmessentials.biome.use", cmd("biome", "Show the biome you are standing in")),
                 spec("compass", "uxmessentials.compass.use", cmd("compass", "Show the direction you are facing")));
     }
 

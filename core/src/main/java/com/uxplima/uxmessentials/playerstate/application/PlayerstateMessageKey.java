@@ -128,6 +128,9 @@ public enum PlayerstateMessageKey implements MessageKey {
     DEPTH_AT("playerstate.depth.at"),
     DEPTH_BELOW("playerstate.depth.below"),
 
+    // /biome
+    BIOME_SHOW("playerstate.biome.show"),
+
     // /compass — the framing line plus the eight cardinal/intercardinal direction words it embeds
     COMPASS_SHOW("playerstate.compass.show"),
     COMPASS_NORTH("playerstate.compass.north"),
