@@ -67,6 +67,7 @@ import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
+import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmlib.gui.Guis;
@@ -266,6 +267,8 @@ public final class PluginModule {
             wirePlayerwarps(ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
             wireScoreboard(plugin, ctx, resources);
+        } else if (module.id().equals(ModuleId.of("vote"))) {
+            wireVote(plugin, ctx, persistence, resources);
         }
     }
 
@@ -495,6 +498,22 @@ public final class PluginModule {
         // captured for a later context. The renderer dogfoods uxmlib-hud's SidebarManager/Tablist; the render timer
         // on the Scheduler port is stopped and every active board torn down on disable.
         ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
+    }
+
+    private static void wireVote(
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // vote builds its counter-cached jOOQ VoteRepository over persistence.dsl() (the vote_party counter and
+        // vote_queue offline reward batches ship in the persistence V15 baseline, always applied), the console
+        // reward dispatcher on the global region thread, and the online audience for the party rewards and
+        // thank-you broadcast. It carries no cross-context bridge — its only collaborators are the shared
+        // persistence DSL, Scheduler, messages/messageSink, and event ports. The reflective Votifier listener
+        // self-registers behind a plugin-present guard on start and is dropped on disable, so the module runs
+        // unchanged whether or not Votifier is installed.
+        VoteWiring.Wired wired = VoteWiring.wire(plugin, ctx, persistence);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

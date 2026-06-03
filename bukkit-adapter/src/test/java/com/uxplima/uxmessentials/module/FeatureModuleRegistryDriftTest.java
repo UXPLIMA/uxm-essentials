@@ -63,6 +63,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("holograms"))).isPresent();
         assertThat(registry.byId(ModuleId.of("playerwarps"))).isPresent();
         assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -79,7 +80,8 @@ class FeatureModuleRegistryDriftTest {
                         "communication",
                         "holograms",
                         "playerwarps",
-                        "scoreboard");
+                        "scoreboard",
+                        "vote");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -282,14 +284,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void scoreboardIsTheLastModuleShipsDisabledAndPublishesItsSurface() {
+    void scoreboardShipsDisabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule scoreboard = registry.byId(ModuleId.of("scoreboard"))
                 .orElseThrow(() -> new AssertionError("scoreboard is not registered"));
 
-        // scoreboard is the 15th context — a per-player sidebar plus a tablist header/footer on uxmlib-hud —
-        // registered last after the fourteen prior modules.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("scoreboard");
+        // scoreboard is the 15th context — a per-player sidebar plus a tablist header/footer on uxmlib-hud. The
+        // later vote context now lands last, so scoreboard must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
 
         // It ships DISABLED (like communication, its content is operator data): with no modules.conf override it is
         // absent from the enabled set while every steady-state sibling stays on. Explicitly enabling exactly it
@@ -310,6 +312,37 @@ class FeatureModuleRegistryDriftTest {
                 scoreboard.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactly("scoreboard");
         assertThat(scoreboard.migrations()).isEmpty();
+    }
+
+    @Test
+    void voteIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule vote =
+                registry.byId(ModuleId.of("vote")).orElseThrow(() -> new AssertionError("vote is not registered"));
+
+        // vote is the 16th context — a Votifier-bridged vote-rewards and vote-party feature — registered last
+        // after the fifteen prior modules.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("vote");
+
+        // It ships ENABLED (a steady-state feature, inert until rewards/links are authored): with no modules.conf
+        // override it is on, and disabling exactly vote removes only it while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("vote", "teleport", "economy", "holograms", "playerwarps");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.vote.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("vote");
+        assertThat(off).contains("teleport", "economy", "playerwarps");
+
+        // Enabled, vote contributes exactly /vote and /voteparty (the /vote testreward action is a subcommand,
+        // not a literal) and owns no extra Flyway location (its vote_party and vote_queue tables are in the
+        // persistence V15 baseline, always applied), so it declares no MigrationSet of its own.
+        Set<String> literals =
+                vote.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactlyInAnyOrder("vote", "voteparty");
+        assertThat(vote.migrations()).isEmpty();
     }
 
     @Test

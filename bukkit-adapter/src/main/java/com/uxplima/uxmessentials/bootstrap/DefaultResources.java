@@ -44,6 +44,7 @@ final class DefaultResources {
             "modules/communication/join-quit.conf",
             "modules/communication/announcer.conf",
             "modules/communication/info-pages.conf",
+            "modules/vote/config.conf",
             "modules/migration/config.conf",
             "modules/kits/gui/kits-menu.conf",
             "modules/warps/gui/warps-menu.conf",

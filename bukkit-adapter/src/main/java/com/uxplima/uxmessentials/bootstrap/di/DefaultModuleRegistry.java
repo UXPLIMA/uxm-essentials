@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.teleport.application.TeleportModule;
 import com.uxplima.uxmessentials.vaults.application.VaultsModule;
+import com.uxplima.uxmessentials.vote.application.VoteModule;
 import com.uxplima.uxmessentials.warps.application.WarpsModule;
 import org.jspecify.annotations.NullMarked;
 
@@ -97,6 +98,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // ships DISABLED by default — operators author the lines before enabling — so it lands last and wires
         // nothing until enabled in modules.conf.
         delegate.register(new ScoreboardModule());
+        // vote is the 16th context — a Votifier-bridged vote-rewards and vote-party feature. It carries no hard
+        // dependency edge (its only collaborators are the shared persistence DSL, the Scheduler, messages, and
+        // event ports, plus a console-dispatch port), and like the steady-state features it ships ENABLED but
+        // inert until rewards/links are authored, so it lands last after scoreboard.
+        delegate.register(new VoteModule());
         // The shared kernel is not a module and never appears here.
     }
 

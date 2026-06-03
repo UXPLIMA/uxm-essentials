@@ -29,6 +29,11 @@ dependencies:
     PlaceholderAPI:
       load: BEFORE
       required: false
+    # NuVotifier/Votifier feeds the vote context; the vote listener is reached reflectively behind a
+    # plugin-present guard, so the plugin runs fully without Votifier installed.
+    Votifier:
+      load: BEFORE
+      required: false
 
 # Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
 # The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with
@@ -747,3 +752,20 @@ permissions:
   uxmessentials.scoreboard.use:
     description: '/scoreboard (alias /sb) to toggle whether you see the scoreboard display.'
     default: true
+  # vote context (docs/permissions.md "Vote"). A Votifier-bridged vote-rewards and vote-party feature: an
+  # incoming vote runs the configured per-vote rewards and advances a server-wide party counter that fires
+  # party rewards for everyone once a threshold is reached (an offline voter's reward is queued and paid on
+  # join). The vote-links and reward commands are config content, not permission nodes.
+  # uxmessentials.module.vote is the reload/inspect tier.
+  uxmessentials.module.vote:
+    description: 'Hot-reload / inspect the vote module (Votifier vote rewards and vote party).'
+    default: op
+  uxmessentials.vote.use:
+    description: '/vote to see the server''s vote links.'
+    default: true
+  uxmessentials.voteparty.use:
+    description: '/voteparty to see progress towards the next vote party.'
+    default: true
+  uxmessentials.vote.testreward:
+    description: '/vote testreward to simulate a vote for yourself and verify the configured rewards.'
+    default: op
