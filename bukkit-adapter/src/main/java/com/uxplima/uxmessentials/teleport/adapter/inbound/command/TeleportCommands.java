@@ -83,6 +83,7 @@ public final class TeleportCommands {
                 new VerticalCommand(s, m, "top", "Teleport to the highest block above", Kind.TOP),
                 new VerticalCommand(s, m, "bottom", "Teleport to the lowest safe block", Kind.BOTTOM),
                 new VerticalCommand(s, m, "jump", "Teleport to the block you look at", Kind.JUMP),
-                new VerticalCommand(s, m, "up", "Teleport up onto a placed block", Kind.UP));
+                new VerticalCommand(s, m, "up", "Teleport up onto a placed block", Kind.UP),
+                new VerticalCommand(s, m, "down", "Teleport down to the first block below", Kind.DOWN));
     }
 }

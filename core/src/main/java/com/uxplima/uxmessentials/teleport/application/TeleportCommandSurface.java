@@ -91,7 +91,11 @@ final class TeleportCommandSurface {
                         "jump",
                         "uxmessentials.tp.vertical",
                         DescribedCommand.of("jump", "Teleport to the block you look at")),
-                spec("up", "uxmessentials.tp.vertical", DescribedCommand.of("up", "Teleport up onto a placed block")));
+                spec("up", "uxmessentials.tp.vertical", DescribedCommand.of("up", "Teleport up onto a placed block")),
+                spec(
+                        "down",
+                        "uxmessentials.tp.vertical",
+                        DescribedCommand.of("down", "Teleport down to the first block below")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

@@ -29,9 +29,10 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The vertical / line-of-sight positional verbs — {@code /top}, {@code /bottom}, {@code /jump},
- * {@code /up} — sharing one node builder and differing only by {@link Kind}. Each resolves a destination
- * from the player's column or line of sight on the region thread, then issues an instant hop through the
- * async executor. {@code /jump} reports "no target block" when nothing is in sight.
+ * {@code /up}, {@code /down} — sharing one node builder and differing only by {@link Kind}. Each resolves
+ * a destination from the player's column or line of sight on the region thread, then issues an instant hop
+ * through the async executor. {@code /jump} and {@code /down} report "no target block" when nothing is in
+ * sight (or no solid block lies below the player's feet).
  */
 @NullMarked
 public final class VerticalCommand extends TeleportCommandSupport implements CommandRegistration {
@@ -44,7 +45,8 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
         TOP,
         BOTTOM,
         JUMP,
-        UP
+        UP,
+        DOWN
     }
 
     private final String literal;
@@ -97,7 +99,20 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
             case BOTTOM -> Optional.of(at(origin, sender.getWorld().getMinHeight() + 1));
             case UP -> Optional.of(at(origin, origin.getBlockY() + blocks));
             case JUMP -> jumpTarget(sender, origin);
+            case DOWN -> downTarget(sender, origin);
         };
+    }
+
+    private static Optional<Position> downTarget(Player sender, Location origin) {
+        World world = sender.getWorld();
+        int x = origin.getBlockX();
+        int z = origin.getBlockZ();
+        for (int y = origin.getBlockY() - 1; y >= world.getMinHeight(); y--) {
+            if (world.getBlockAt(x, y, z).getType().isSolid()) {
+                return Optional.of(at(origin, y + 1));
+            }
+        }
+        return Optional.empty();
     }
 
     private static Position at(Location origin, int y) {
