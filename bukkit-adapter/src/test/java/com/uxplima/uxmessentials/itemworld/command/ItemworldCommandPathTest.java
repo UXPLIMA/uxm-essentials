@@ -120,6 +120,61 @@ class ItemworldCommandPathTest {
     }
 
     @Test
+    void fireworkAddsAColouredBallEffectToTheHeldRocket() {
+        player.getInventory().setItemInMainHand(new ItemStack(Material.FIREWORK_ROCKET));
+        CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();
+
+        execute(dispatcher, "firework red");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.FIREWORK_STYLED);
+        org.bukkit.inventory.meta.FireworkMeta meta = heldFireworkMeta();
+        assertThat(meta.getEffects()).isNotEmpty();
+        assertThat(meta.getEffects().get(0).getColors()).contains(org.bukkit.DyeColor.RED.getFireworkColor());
+    }
+
+    @Test
+    void fireworkPowerSetsTheRocketFlightPower() {
+        player.getInventory().setItemInMainHand(new ItemStack(Material.FIREWORK_ROCKET));
+        CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();
+
+        execute(dispatcher, "firework power 2");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.FIREWORK_POWER_SET);
+        assertThat(heldFireworkMeta().getPower()).isEqualTo(2);
+    }
+
+    @Test
+    void fireworkClearRemovesEffectsFromTheRocket() {
+        player.getInventory().setItemInMainHand(new ItemStack(Material.FIREWORK_ROCKET));
+        CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();
+
+        execute(dispatcher, "firework red");
+        assertThat(heldFireworkMeta().getEffects()).isNotEmpty();
+
+        sink.keys.clear();
+        execute(dispatcher, "firework clear");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.FIREWORK_CLEARED);
+        assertThat(heldFireworkMeta().getEffects()).isEmpty();
+    }
+
+    @Test
+    void fireworkRefusesAHandThatIsNotARocket() {
+        player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND));
+        CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();
+
+        execute(dispatcher, "firework red");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.NOT_A_FIREWORK);
+        assertThat(player.getInventory().getItemInMainHand().getType()).isEqualTo(Material.DIAMOND);
+    }
+
+    private org.bukkit.inventory.meta.FireworkMeta heldFireworkMeta() {
+        return (org.bukkit.inventory.meta.FireworkMeta)
+                player.getInventory().getItemInMainHand().getItemMeta();
+    }
+
+    @Test
     void disablingTheCleanupGroupMakesDisposalAnswerDisabledAndDoNothing() {
         config.put("groups.cleanup.enabled", false); // switch off the whole cleanup sub-feature group
         CommandDispatcher<CommandSourceStack> dispatcher = registerGroupA();

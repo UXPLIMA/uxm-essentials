@@ -34,6 +34,11 @@ public enum ItemworldMessageKey implements MessageKey {
     ITEMFLAG_UNKNOWN("itemworld.itemflag.unknown"),
     // /skull
     SKULL_GIVEN("itemworld.skull.given"),
+    // /firework
+    FIREWORK_STYLED("itemworld.firework.styled"),
+    FIREWORK_POWER_SET("itemworld.firework.power-set"),
+    FIREWORK_CLEARED("itemworld.firework.cleared"),
+    NOT_A_FIREWORK("itemworld.firework.not-a-firework"),
     // /more
     MORE_FILLED("itemworld.more.filled"),
     MORE_ALREADY_FULL("itemworld.more.already-full"),

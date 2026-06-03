@@ -75,6 +75,11 @@ final class ItemworldCommandSurface {
         verbs.add(new Verb(
                 "itemflag", "uxmessentials.itemflag.use", SubFeatureGroup.ITEM_UTILS, "Toggle an item meta flag"));
         verbs.add(new Verb("skull", "uxmessentials.skull.use", SubFeatureGroup.ITEM_UTILS, "Get a player-head skull"));
+        verbs.add(new Verb(
+                "firework",
+                "uxmessentials.firework.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Style or power the held firework rocket"));
         verbs.add(new Verb("more", "uxmessentials.more.use", SubFeatureGroup.ITEM_UTILS, "Fill the held stack to max"));
         verbs.add(new Verb(
                 "repair", "uxmessentials.repair.itemworld", SubFeatureGroup.ITEM_UTILS, "Repair the held item"));

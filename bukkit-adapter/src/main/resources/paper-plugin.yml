@@ -434,6 +434,9 @@ permissions:
   uxmessentials.skull.use:
     description: '/skull [player] — get a player-head skull.'
     default: op
+  uxmessentials.firework.use:
+    description: '/firework <color|clear|power> — style or power the held firework rocket.'
+    default: op
   uxmessentials.more.use:
     description: '/more — fill the held stack to max (itemworld-owned; playerstate defers it).'
     default: op
