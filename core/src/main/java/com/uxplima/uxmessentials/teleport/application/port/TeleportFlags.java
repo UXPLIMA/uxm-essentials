@@ -16,6 +16,12 @@ public interface TeleportFlags {
     /** Flip {@code who}'s {@code /tptoggle} state, returning the new "accepts requests" value. */
     boolean toggleRequests(PlayerRef who);
 
+    /**
+     * Idempotently set whether {@code who} accepts incoming requests; {@code /tpon} and {@code /tpoff}
+     * use this rather than the flip {@link #toggleRequests}.
+     */
+    void setAcceptsRequests(PlayerRef who, boolean accepting);
+
     /** True when {@code target} has blocked {@code requester} via {@code /tpblock}. */
     boolean hasBlocked(PlayerRef target, PlayerRef requester);
 

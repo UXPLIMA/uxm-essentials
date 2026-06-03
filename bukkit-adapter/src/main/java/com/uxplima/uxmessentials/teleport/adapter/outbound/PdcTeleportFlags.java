@@ -61,6 +61,17 @@ public final class PdcTeleportFlags implements TeleportFlags {
     }
 
     @Override
+    public void setAcceptsRequests(PlayerRef who, boolean accepting) {
+        Objects.requireNonNull(who, "who");
+        Player player = Bukkit.getPlayer(who.uuid());
+        if (player == null) {
+            return; // an offline player defaults to accepting; nothing to stamp
+        }
+        byte off = accepting ? (byte) 0 : (byte) 1;
+        player.getPersistentDataContainer().set(toggleKey, PersistentDataType.BYTE, off);
+    }
+
+    @Override
     public boolean hasBlocked(PlayerRef target, PlayerRef requester) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(requester, "requester");

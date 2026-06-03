@@ -48,6 +48,14 @@ final class TeleportCommandSurface {
                         "tptoggle",
                         "uxmessentials.tpa.toggle",
                         DescribedCommand.of("tptoggle", "Refuse all incoming requests", "toggletp")),
+                spec(
+                        "tpon",
+                        "uxmessentials.tpa.toggle",
+                        DescribedCommand.of("tpon", "Accept incoming teleport requests")),
+                spec(
+                        "tpoff",
+                        "uxmessentials.tpa.toggle",
+                        DescribedCommand.of("tpoff", "Refuse incoming teleport requests")),
                 spec("tpblock", "uxmessentials.tpa.block", DescribedCommand.of("tpblock", "Block a player's requests")),
                 spec(
                         "tpunblock",
