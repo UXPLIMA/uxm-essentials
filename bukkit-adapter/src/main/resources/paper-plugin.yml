@@ -88,7 +88,7 @@ permissions:
     description: '/setspawn to set the server spawn or a named spawn.'
     default: op
   uxmessentials.tp.use:
-    description: '/tp and /tphere direct staff teleport.'
+    description: '/tp, /tphere, /goto, /bring and /tprandomplayer (/tprp) direct staff teleport.'
     default: op
   uxmessentials.tp.others:
     description: '/tpo and /tpohere to teleport overriding no-tp flags.'
@@ -448,7 +448,10 @@ permissions:
     description: '/freeze <player> / /unfreeze <player> — pin a player in place pending review.'
     default: op
   uxmessentials.moderation.seen:
-    description: '/seen <player> and /seenip <player> — last-seen / last-IP lookup, surfaces alts.'
+    description: '/seen, /seenip and /alts <player> — last-seen / last-IP lookup, surfaces alts.'
+    default: op
+  uxmessentials.moderation.commandspy:
+    description: '/commandspy (/cspy) to watch the commands other players run.'
     default: op
   uxmessentials.moderation.sudo:
     description: '/sudo <player> <command> — run a command as another player.'
@@ -500,6 +503,12 @@ permissions:
     default: op
   uxmessentials.more.use:
     description: '/more — fill the held stack to max (itemworld-owned; playerstate defers it).'
+    default: op
+  uxmessentials.itemamount.use:
+    description: '/itemamount <amount> (/amount) — set the held stack amount, clamped to the give cap.'
+    default: op
+  uxmessentials.itemdamage.use:
+    description: '/itemdamage <damage> (/durability) — set the held item''s durability damage.'
     default: op
   uxmessentials.enchant.use:
     description: '/enchant <enchant> [level] — enchant the held item (level clamped at the boundary).'

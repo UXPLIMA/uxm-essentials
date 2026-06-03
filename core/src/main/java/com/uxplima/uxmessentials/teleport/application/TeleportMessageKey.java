@@ -58,6 +58,7 @@ public enum TeleportMessageKey implements MessageKey {
     // admin / positional
     TP_DONE("teleport.tp.done"),
     TP_NO_TARGET_BLOCK("teleport.tp.no-target-block"),
+    TPRANDOM_NONE("teleport.tprandom.none"),
 
     // a jailed player may not self-teleport — the moderation context's JailGate denies it here
     JAILED("teleport.jailed"),

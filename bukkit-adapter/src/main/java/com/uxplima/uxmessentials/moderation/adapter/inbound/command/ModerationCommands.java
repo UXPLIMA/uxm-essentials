@@ -15,7 +15,8 @@ import org.jspecify.annotations.NullMarked;
  * table so the literal/permission pairing matches the permissions reference and the kernel's
  * {@code ModerationCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each. The
  * single-argument verbs ({@code /unmute /unjail /freeze /unfreeze /seen /seenip /warns}) share the
- * {@link SimpleTargetCommand} shape, each binding its own node and use-case action.
+ * {@link SimpleTargetCommand} shape, each binding its own node and use-case action. {@code /alts} is the
+ * off-tick alt-detection read on the seen node and {@code /commandspy} is the staff command-watch toggle.
  */
 @NullMarked
 public final class ModerationCommands {
@@ -100,6 +101,8 @@ public final class ModerationCommands {
                         messages,
                         sink,
                         (a, t) -> services.seen().seenIp(a, t)),
+                new AltsCommand(services, messages, sink, scheduler),
+                new CommandSpyCommand(services, messages, sink),
                 new SudoCommand(scheduler, messages, sink));
     }
 

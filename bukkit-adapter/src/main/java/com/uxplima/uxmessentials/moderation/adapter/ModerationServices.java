@@ -5,12 +5,14 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
+import com.uxplima.uxmessentials.moderation.application.CommandSpy;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
 import com.uxplima.uxmessentials.moderation.application.JailCountdown;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
+import com.uxplima.uxmessentials.moderation.application.ListAlts;
 import com.uxplima.uxmessentials.moderation.application.ListBans;
 import com.uxplima.uxmessentials.moderation.application.ListJailed;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
@@ -61,6 +63,8 @@ public final class ModerationServices {
     private final UnbanIp unbanIp;
     private final Freeze freeze;
     private final Seen seen;
+    private final ListAlts listAlts;
+    private final CommandSpy commandSpy;
     private final JailCountdown jailCountdown;
     private final LoginEnforcement loginEnforcement;
     private final ModerationRepository repository;
@@ -90,6 +94,8 @@ public final class ModerationServices {
         this.unbanIp = Objects.requireNonNull(builder.unbanIp, "unbanIp");
         this.freeze = Objects.requireNonNull(builder.freeze, "freeze");
         this.seen = Objects.requireNonNull(builder.seen, "seen");
+        this.listAlts = Objects.requireNonNull(builder.listAlts, "listAlts");
+        this.commandSpy = Objects.requireNonNull(builder.commandSpy, "commandSpy");
         this.jailCountdown = Objects.requireNonNull(builder.jailCountdown, "jailCountdown");
         this.loginEnforcement = Objects.requireNonNull(builder.loginEnforcement, "loginEnforcement");
         this.repository = Objects.requireNonNull(builder.repository, "repository");
@@ -185,6 +191,14 @@ public final class ModerationServices {
         return seen;
     }
 
+    public ListAlts listAlts() {
+        return listAlts;
+    }
+
+    public CommandSpy commandSpy() {
+        return commandSpy;
+    }
+
     public JailCountdown jailCountdown() {
         return jailCountdown;
     }
@@ -230,6 +244,8 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable UnbanIp unbanIp;
         private @org.jspecify.annotations.Nullable Freeze freeze;
         private @org.jspecify.annotations.Nullable Seen seen;
+        private @org.jspecify.annotations.Nullable ListAlts listAlts;
+        private @org.jspecify.annotations.Nullable CommandSpy commandSpy;
         private @org.jspecify.annotations.Nullable JailCountdown jailCountdown;
         private @org.jspecify.annotations.Nullable LoginEnforcement loginEnforcement;
         private @org.jspecify.annotations.Nullable ModerationRepository repository;
@@ -343,6 +359,16 @@ public final class ModerationServices {
 
         Builder seen(Seen value) {
             this.seen = value;
+            return this;
+        }
+
+        Builder listAlts(ListAlts value) {
+            this.listAlts = value;
+            return this;
+        }
+
+        Builder commandSpy(CommandSpy value) {
+            this.commandSpy = value;
             return this;
         }
 

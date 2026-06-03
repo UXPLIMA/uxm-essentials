@@ -51,6 +51,12 @@ public enum ItemworldMessageKey implements MessageKey {
     // /more
     MORE_FILLED("itemworld.more.filled"),
     MORE_ALREADY_FULL("itemworld.more.already-full"),
+    // /itemamount
+    ITEMAMOUNT_SET("itemworld.itemamount.set"),
+    // /itemdamage
+    ITEMDAMAGE_SET("itemworld.itemdamage.set"),
+    ITEMDAMAGE_NOT_DAMAGEABLE("itemworld.itemdamage.not-damageable"),
+    ITEMDAMAGE_OUT_OF_RANGE("itemworld.itemdamage.out-of-range"),
     // /repair, /repairall
     REPAIR_DONE("itemworld.repair.done"),
     REPAIR_NOTHING("itemworld.repair.nothing"),

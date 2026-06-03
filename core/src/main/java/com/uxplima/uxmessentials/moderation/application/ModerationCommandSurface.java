@@ -52,6 +52,8 @@ final class ModerationCommandSurface {
                 spec("unfreeze", "uxmessentials.moderation.freeze", "Release a frozen player"),
                 spec("seen", "uxmessentials.moderation.seen", "Show a player's last-seen"),
                 spec("seenip", "uxmessentials.moderation.seen", "Show a player's last IP and alts"),
+                spec("alts", "uxmessentials.moderation.seen", "List accounts sharing a player's IP"),
+                spec("commandspy", "uxmessentials.moderation.commandspy", "Watch the commands players run"),
                 spec("sudo", "uxmessentials.moderation.sudo", "Run a command as another player"));
     }
 

@@ -48,6 +48,8 @@ public final class ItemworldGroupACommands {
         commands.add(new PotionCommand(services));
         commands.add(new BookCommand(services));
         commands.add(new MoreCommand(services));
+        commands.add(new ItemAmountCommand(services));
+        commands.add(new ItemDamageCommand(services));
         commands.add(new RepairCommand(services));
         commands.add(new RepairAllCommand(services));
         commands.add(new EnchantCommand(services));

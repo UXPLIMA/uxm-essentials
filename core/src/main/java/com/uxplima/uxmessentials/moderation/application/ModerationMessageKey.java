@@ -88,6 +88,17 @@ public enum ModerationMessageKey implements MessageKey {
     UNFREEZE_NOTIFY_TARGET("moderation.unfreeze.notify-target"),
     FREEZE_BLOCKED("moderation.freeze.blocked"),
 
+    // /commandspy — staff toggle to watch the commands other players run
+    COMMANDSPY_ON("moderation.commandspy.on"),
+    COMMANDSPY_OFF("moderation.commandspy.off"),
+    COMMANDSPY_OBSERVED("moderation.commandspy.observed"),
+
+    // /alts — accounts sharing a target's last IP
+    ALTS_HEADER("moderation.alts.header"),
+    ALTS_ENTRY("moderation.alts.entry"),
+    ALTS_NONE("moderation.alts.none"),
+    ALTS_NO_IP("moderation.alts.no-ip"),
+
     // /sudo
     SUDO_DONE("moderation.sudo.done"),
 

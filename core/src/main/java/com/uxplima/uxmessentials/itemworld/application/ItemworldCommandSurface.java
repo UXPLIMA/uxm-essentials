@@ -94,6 +94,16 @@ final class ItemworldCommandSurface {
                 "book", "uxmessentials.book.use", SubFeatureGroup.ITEM_UTILS, "Unlock a written book for editing"));
         verbs.add(new Verb("more", "uxmessentials.more.use", SubFeatureGroup.ITEM_UTILS, "Fill the held stack to max"));
         verbs.add(new Verb(
+                "itemamount",
+                "uxmessentials.itemamount.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Set the held stack's amount"));
+        verbs.add(new Verb(
+                "itemdamage",
+                "uxmessentials.itemdamage.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Set the held item's durability damage"));
+        verbs.add(new Verb(
                 "repair", "uxmessentials.repair.itemworld", SubFeatureGroup.ITEM_UTILS, "Repair the held item"));
         verbs.add(new Verb(
                 "repairall",

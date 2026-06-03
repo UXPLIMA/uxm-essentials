@@ -8,6 +8,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCommands;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.CommandSpyListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.FreezeMoveListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJoinListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationLoginListener;
@@ -15,16 +16,19 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedComman
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitTargetResolver;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyStore;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
+import com.uxplima.uxmessentials.moderation.application.CommandSpy;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
 import com.uxplima.uxmessentials.moderation.application.JailCountdown;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
+import com.uxplima.uxmessentials.moderation.application.ListAlts;
 import com.uxplima.uxmessentials.moderation.application.ListBans;
 import com.uxplima.uxmessentials.moderation.application.ListJailed;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
@@ -91,15 +95,18 @@ public final class ModerationWiring {
         ModerationRepository repository = ModerationStores.repository(persistence);
         BukkitSanctions sanctions = new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings);
         ModerationGuard guard = new ModerationGuard(kernel.permissions());
-        ModerationServices services = assemble(plugin, kernel, settings, repository, sanctions, guard, clock);
+        InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
+        ModerationServices services =
+                assemble(plugin, kernel, settings, repository, sanctions, guard, commandSpyStore, clock);
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
         gates.bindJail(jailGate);
         return new Wired(
                 ModerationCommands.all(services, kernel.messages(), kernel.messageSink(), kernel.scheduler()),
-                listeners(services, sanctions, repository, kernel, settings, guard, clock),
+                listeners(services, sanctions, repository, kernel, settings, guard, commandSpyStore, clock),
                 sanctions,
+                commandSpyStore,
                 mutePolicy,
                 jailGate);
     }
@@ -111,6 +118,7 @@ public final class ModerationWiring {
             ModerationRepository repository,
             BukkitSanctions sanctions,
             ModerationGuard guard,
+            InMemoryCommandSpyStore commandSpyStore,
             Clock clock) {
         ModerationNotifier notifier = new ModerationNotifier(kernel.messages(), kernel.messageSink());
         ModerationAudit audit = new LoggingModerationAudit(auditLogger());
@@ -139,6 +147,8 @@ public final class ModerationWiring {
                 .unbanIp(new UnbanIp(repository, notifier, audit))
                 .freeze(new Freeze(sanctionPort, guard, notifier, audit))
                 .seen(new Seen(repository, kernel.playerLookup(), notifier, clock))
+                .listAlts(new ListAlts(repository, kernel.playerLookup(), notifier))
+                .commandSpy(new CommandSpy(commandSpyStore, notifier))
                 .jailCountdown(new JailCountdown(repository, sanctionPort, audit, kernel.events(), clock))
                 .loginEnforcement(new LoginEnforcement(repository, notifier, audit, clock))
                 .repository(repository)
@@ -154,6 +164,7 @@ public final class ModerationWiring {
             KernelPorts kernel,
             ModerationSettings settings,
             ModerationGuard guard,
+            InMemoryCommandSpyStore commandSpyStore,
             Clock clock) {
         MutedCommandPolicy mutedCommands = new MutedCommandPolicy(settings.mutedBlockedCommands());
         return List.of(
@@ -161,7 +172,8 @@ public final class ModerationWiring {
                 new ModerationJoinListener(services.jailCountdown(), repository, clock),
                 new FreezeMoveListener(sanctions),
                 new MutedCommandListener(
-                        repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock));
+                        repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock),
+                new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));
     }
 
     private static Logger auditLogger() {
@@ -200,8 +212,9 @@ public final class ModerationWiring {
      * set).
      *
      * @param commands the Brigadier command registrations to publish
-     * @param listeners the login/join/freeze listeners to register
+     * @param listeners the login/join/freeze/commandspy listeners to register
      * @param sanctions the live-player sanction adapter, for the stop-time freeze drain
+     * @param commandSpyStore the session-scoped commandspy set, for the stop-time drain
      * @param mutePolicy the mute read side the {@code muted} placeholder queries
      * @param jailGate the jail read side the {@code jailed} placeholder queries
      */
@@ -209,6 +222,7 @@ public final class ModerationWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             BukkitSanctions sanctions,
+            InMemoryCommandSpyStore commandSpyStore,
             RepositoryMutePolicy mutePolicy,
             RepositoryJailGate jailGate) {
 
@@ -216,13 +230,15 @@ public final class ModerationWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(sanctions, "sanctions");
+            Objects.requireNonNull(commandSpyStore, "commandSpyStore");
             Objects.requireNonNull(mutePolicy, "mutePolicy");
             Objects.requireNonNull(jailGate, "jailGate");
         }
 
-        /** Drop the session-scoped freeze set. Called on module stop. */
+        /** Drop the session-scoped freeze and commandspy sets. Called on module stop. */
         public void stop() {
             sanctions.clear();
+            commandSpyStore.clear();
         }
     }
 }
