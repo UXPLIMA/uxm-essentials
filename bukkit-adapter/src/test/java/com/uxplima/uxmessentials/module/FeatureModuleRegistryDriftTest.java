@@ -141,11 +141,12 @@ class FeatureModuleRegistryDriftTest {
                         "kittycannon",
                         "break",
                         "tree",
+                        "bigtree",
                         "nuke"); // admin-fun
         // The full surface: 21 item-utils + 9 workstations + 2 cleanup + 2 powertool + 7 mob/entity
-        // + 7 time/weather + 6 admin-fun = 54 distinct literals, no verb dropped and none registered twice.
-        assertThat(itemworld.commands()).hasSize(54);
-        assertThat(literals).hasSize(54);
+        // + 7 time/weather + 7 admin-fun = 55 distinct literals, no verb dropped and none registered twice.
+        assertThat(itemworld.commands()).hasSize(55);
+        assertThat(literals).hasSize(55);
         assertThat(itemworld.migrations()).isEmpty(); // itemworld is stateless: no persistence, no migration
     }
 

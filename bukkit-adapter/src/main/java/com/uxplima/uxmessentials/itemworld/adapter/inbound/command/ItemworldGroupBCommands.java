@@ -96,6 +96,7 @@ public final class ItemworldGroupBCommands {
         commands.add(new KittycannonCommand(services));
         commands.add(new BreakCommand(services));
         commands.add(new TreeCommand(services));
+        commands.add(new BigTreeCommand(services));
         commands.add(new NukeCommand(services));
     }
 }
