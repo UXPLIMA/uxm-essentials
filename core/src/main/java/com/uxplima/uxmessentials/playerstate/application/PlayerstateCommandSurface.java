@@ -62,7 +62,11 @@ final class PlayerstateCommandSurface {
                 spec("biome", "uxmessentials.biome.use", cmd("biome", "Show the biome you are standing in")),
                 spec("seed", "uxmessentials.seed.use", cmd("seed", "Show the seed of the world you are standing in")),
                 spec("compass", "uxmessentials.compass.use", cmd("compass", "Show the direction you are facing")),
-                spec("world", "uxmessentials.world.use", cmd("world", "Show the world you are standing in")));
+                spec("world", "uxmessentials.world.use", cmd("world", "Show the world you are standing in")),
+                spec(
+                        "dimension",
+                        "uxmessentials.dimension.use",
+                        cmd("dimension", "Show the dimension you are standing in")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

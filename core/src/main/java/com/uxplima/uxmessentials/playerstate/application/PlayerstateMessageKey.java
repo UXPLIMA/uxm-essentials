@@ -150,7 +150,10 @@ public enum PlayerstateMessageKey implements MessageKey {
     COMPASS_SOUTH("playerstate.compass.south"),
     COMPASS_SOUTH_WEST("playerstate.compass.south-west"),
     COMPASS_WEST("playerstate.compass.west"),
-    COMPASS_NORTH_WEST("playerstate.compass.north-west");
+    COMPASS_NORTH_WEST("playerstate.compass.north-west"),
+
+    // /dimension
+    DIMENSION_SHOW("playerstate.dimension.show");
 
     private final String key;
 

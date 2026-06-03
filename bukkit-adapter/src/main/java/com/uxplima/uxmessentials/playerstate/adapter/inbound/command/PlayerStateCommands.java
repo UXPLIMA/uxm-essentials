@@ -59,6 +59,7 @@ public final class PlayerStateCommands {
                 new SeedCommand(services, messages),
                 new CompassCommand(services, messages),
                 new WorldCommand(services, messages),
+                new DimensionCommand(services, messages),
                 new PingCommand(services, messages),
                 new PlaytimeCommand(services, messages),
                 new RestCommand(services, messages));
