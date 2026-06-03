@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -92,6 +93,9 @@ public final class PluginModule {
         CloseableResources resources = new CloseableResources();
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
         resources.localeBinding(new LocaleBinding(wiredKernel.localeStore(), wiredKernel.serverDefault()));
+        // A bare arg-only command answers with its usage instead of Brigadier's red parse error; injected
+        // between the catalog and the locale wrap so the usage line resolves in the player's language.
+        resources.usageBinding(new UsageBinding(kernel.messages()));
 
         Persistence persistence = KernelWiring.openPersistence(plugin, config, kernelLog, registry);
         // The pool is closed last (pushed first), after every module has stopped and drained its writes.

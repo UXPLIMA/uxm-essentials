@@ -11,6 +11,7 @@ import org.bukkit.event.Listener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -22,9 +23,11 @@ import org.jspecify.annotations.Nullable;
  * the plugin's {@code LifecycleEvents.COMMANDS} handler publishes — a disabled module contributes
  * nothing, so its command literal never reaches the dispatcher. Every published command is wrapped by
  * the shared {@link LocaleBinding} so the requesting player's locale is bound at the inbound boundary
- * (docs/13-i18n §5) before any handler resolves a message. Before that wrap, the resolved
- * {@link CatalogBinding} renames, realiases or drops each registration so an operator's
- * {@code commands/*.conf} edits change what gets published.
+ * (docs/13-i18n §5) before any handler resolves a message. The chokepoint runs three binding steps in
+ * order: the resolved {@link CatalogBinding} renames, realiases or drops each registration so an operator's
+ * {@code commands/*.conf} edits change what gets published; then the {@link UsageBinding} injects a coloured
+ * usage executor onto any root that has arguments but no root executor; then the {@link LocaleBinding} binds
+ * the locale, picking up the injected executor so the usage line resolves in the player's language.
  */
 @NullMarked
 public final class CloseableResources implements AutoCloseable {
@@ -34,6 +37,7 @@ public final class CloseableResources implements AutoCloseable {
     private final List<Listener> listeners = new ArrayList<>();
     private @Nullable LocaleBinding localeBinding;
     private @Nullable CatalogBinding catalogBinding;
+    private @Nullable UsageBinding usageBinding;
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -60,19 +64,29 @@ public final class CloseableResources implements AutoCloseable {
         this.catalogBinding = Objects.requireNonNull(binding, "binding");
     }
 
+    /** Sets the {@link UsageBinding} applied between the catalog and the locale wrap to inject usage executors. */
+    public void usageBinding(UsageBinding binding) {
+        this.usageBinding = Objects.requireNonNull(binding, "binding");
+    }
+
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */
     List<CommandRegistration> registered() {
         return List.copyOf(commands);
     }
 
     /**
-     * The module-filtered commands to register. The catalog rename/realias/drop is applied first, then
-     * each survivor is wrapped to bind the requester's locale.
+     * The module-filtered commands to register. The catalog rename/realias/drop is applied first, then a
+     * usage executor is injected onto any arg-only root, then each survivor is wrapped to bind the
+     * requester's locale.
      */
     public List<CommandRegistration> commands() {
         CatalogBinding catalog = this.catalogBinding;
         List<CommandRegistration> resolved =
                 catalog == null ? List.copyOf(commands) : catalog.apply(List.copyOf(commands));
+        UsageBinding usage = this.usageBinding;
+        if (usage != null) {
+            resolved = resolved.stream().map(usage::wrap).toList();
+        }
         LocaleBinding binding = this.localeBinding;
         if (binding == null) {
             return resolved;

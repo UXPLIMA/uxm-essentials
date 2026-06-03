@@ -21,6 +21,7 @@ public enum SharedMessageKey implements MessageKey {
     COMMAND_NO_PERMISSION("command.no-permission"),
     COMMAND_PLAYERS_ONLY("command.players-only"),
     COMMAND_UNKNOWN_PLAYER("command.unknown-player"),
+    COMMAND_USAGE("command.usage"),
 
     // shared cooldown / warmup feedback rendered from the Cooldowns / Warmups ports
     COOLDOWN_ACTIVE("cooldown.active"),
