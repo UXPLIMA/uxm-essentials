@@ -25,6 +25,9 @@ public enum CommunicationMessageKey implements MessageKey {
     // /rules /motd /info — a requested info page that is not configured.
     INFO_PAGE_MISSING("communication.info-page-missing"),
 
+    // /me — the third-person action broadcast line; the typed action is a placeholder, never re-parsed.
+    ME("communication.me"),
+
     // /uxmess reload communication — the announcer schedule was reloaded.
     ANNOUNCER_RELOADED("communication.announcer-reloaded");
 

@@ -597,3 +597,6 @@ permissions:
   uxmessentials.communication.broadcast:
     description: '/broadcast to send a one-off announcement to all online players.'
     default: op
+  uxmessentials.communication.me:
+    description: '/me to broadcast a third-person action message to all online players.'
+    default: true

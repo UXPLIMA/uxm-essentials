@@ -141,7 +141,7 @@ class CommunicationAdapterTest {
         for (CommandRegistration command : commands()) {
             literals.add(command.build().getLiteral());
         }
-        assertThat(literals).containsExactlyInAnyOrder("broadcast", "broadcasttoggle", "rules", "motd");
+        assertThat(literals).containsExactlyInAnyOrder("broadcast", "broadcasttoggle", "me", "rules", "motd");
     }
 
     @Test
@@ -163,6 +163,18 @@ class CommunicationAdapterTest {
         assertThat(sink.lines).hasSize(1);
         assertThat(sink.lines.get(0)).endsWith("hello world");
         assertThat(sink.keys).isEmpty();
+    }
+
+    @Test
+    void meCommandBroadcastsActionToAllOnlinePlayers() {
+        PlayerMock bob = server.addPlayer("Bob");
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommands();
+
+        execute(dispatcher, "me waves");
+
+        // The action lands on every online player through the parity-checked ME key, never as raw operator content.
+        assertThat(sink.keys).containsExactly(CommunicationMessageKey.ME, CommunicationMessageKey.ME);
+        assertThat(bob.getName()).isNotBlank();
     }
 
     private CommandDispatcher<CommandSourceStack> registerCommands() {

@@ -51,6 +51,7 @@ public final class CommunicationCommands {
         List<CommandRegistration> commands = new ArrayList<>();
         commands.add(new BroadcastCommand(broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastToggleCommand(optOut, messages));
+        commands.add(new MeCommand(messages, notifier));
         for (InfoPage page : registry.all()) {
             commands.add(new InfoPageCommand(page.command(), registry, infoSender, notifier, messages));
         }
