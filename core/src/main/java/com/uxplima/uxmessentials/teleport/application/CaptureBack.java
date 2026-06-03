@@ -80,6 +80,31 @@ public final class CaptureBack {
         return Result.ok();
     }
 
+    /**
+     * Return {@code who} specifically to their last death point ({@code /deathback}). Unlike {@code /back},
+     * which returns to the most recent of (teleport, death), this only acts on a death capture: a missing
+     * capture or a non-death one (the player's last capture was a teleport) declines with no return, and a
+     * death capture still honours the {@code deathBackAllowed} gate so the death-back permission governs both
+     * commands the same way.
+     */
+    public Result<Unit, TeleportError> backToDeath(PlayerRef who, boolean deathBackAllowed) {
+        Objects.requireNonNull(who, "who");
+        Optional<BackLocation> current = store.current(who);
+        if (current.isEmpty() || !current.get().requiresDeathBack()) {
+            notifier.send(who, TeleportMessageKey.DEATHBACK_NONE);
+            return Result.err(TeleportError.NO_BACK_LOCATION);
+        }
+        BackLocation location = current.get();
+        Result<Position, TeleportError> target = location.resolveReturn(deathBackAllowed);
+        if (target.isErr()) {
+            notifier.send(who, TeleportMessageKey.BACK_DEATH_DENIED);
+            return Result.err(target.errorOrThrow());
+        }
+        engine.launch(who, Destination.at(target.orElseThrow()), TeleportKind.BACK);
+        notifier.send(who, TeleportMessageKey.BACK_RETURNED);
+        return Result.ok();
+    }
+
     private void capture(PlayerRef who, BackLocation location) {
         Objects.requireNonNull(who, "who");
         store.capture(who, location);

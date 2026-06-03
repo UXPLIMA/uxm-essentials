@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
@@ -78,6 +79,16 @@ final class ModerationRows {
                 Instant.ofEpochMilli(row.getUntil()));
     }
 
+    static JailEntry toJailEntry(ModerationJailsRecord row) {
+        return new JailEntry(
+                UUID.fromString(row.getTarget()),
+                row.getJail(),
+                issuer(row.getJailedBy(), row.getJailedByName()),
+                Optional.ofNullable(row.getReason()),
+                Optional.ofNullable(row.getUntil()).map(Instant::ofEpochMilli),
+                Optional.ofNullable(row.getRemainingMillis()).map(Duration::ofMillis));
+    }
+
     static MuteEntry toMuteEntry(ModerationMutesRecord row) {
         Long until = row.getUntil();
         return new MuteEntry(
@@ -91,7 +102,8 @@ final class ModerationRows {
         return new Warn(
                 issuer(row.getWarnedBy(), row.getWarnedByName()),
                 Optional.ofNullable(row.getReason()),
-                Instant.ofEpochMilli(row.getTs()));
+                Instant.ofEpochMilli(row.getTs()),
+                Optional.ofNullable(row.getExpiresAt()).map(Instant::ofEpochMilli));
     }
 
     private static Issuer issuer(@Nullable String uuid, String name) {

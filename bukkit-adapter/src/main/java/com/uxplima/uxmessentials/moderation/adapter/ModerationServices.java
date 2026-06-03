@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.moderation.application.JailCountdown;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
 import com.uxplima.uxmessentials.moderation.application.ListBans;
+import com.uxplima.uxmessentials.moderation.application.ListJailed;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
 import com.uxplima.uxmessentials.moderation.application.ListMutes;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
@@ -20,6 +21,7 @@ import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
+import com.uxplima.uxmessentials.moderation.application.TempWarn;
 import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
@@ -47,9 +49,11 @@ public final class ModerationServices {
     private final Kick kick;
     private final KickAll kickAll;
     private final IssueWarn warn;
+    private final TempWarn tempWarn;
     private final ReviewWarns reviewWarns;
     private final ClearWarns clearWarns;
     private final ListJails listJails;
+    private final ListJailed listJailed;
     private final ListBans listBans;
     private final ListMutes listMutes;
     private final BanIp banIp;
@@ -74,9 +78,11 @@ public final class ModerationServices {
         this.kick = Objects.requireNonNull(builder.kick, "kick");
         this.kickAll = Objects.requireNonNull(builder.kickAll, "kickAll");
         this.warn = Objects.requireNonNull(builder.warn, "warn");
+        this.tempWarn = Objects.requireNonNull(builder.tempWarn, "tempWarn");
         this.reviewWarns = Objects.requireNonNull(builder.reviewWarns, "reviewWarns");
         this.clearWarns = Objects.requireNonNull(builder.clearWarns, "clearWarns");
         this.listJails = Objects.requireNonNull(builder.listJails, "listJails");
+        this.listJailed = Objects.requireNonNull(builder.listJailed, "listJailed");
         this.listBans = Objects.requireNonNull(builder.listBans, "listBans");
         this.listMutes = Objects.requireNonNull(builder.listMutes, "listMutes");
         this.banIp = Objects.requireNonNull(builder.banIp, "banIp");
@@ -131,6 +137,10 @@ public final class ModerationServices {
         return warn;
     }
 
+    public TempWarn tempWarn() {
+        return tempWarn;
+    }
+
     public ReviewWarns reviewWarns() {
         return reviewWarns;
     }
@@ -141,6 +151,10 @@ public final class ModerationServices {
 
     public ListJails listJails() {
         return listJails;
+    }
+
+    public ListJailed listJailed() {
+        return listJailed;
     }
 
     public ListBans listBans() {
@@ -204,9 +218,11 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable Kick kick;
         private @org.jspecify.annotations.Nullable KickAll kickAll;
         private @org.jspecify.annotations.Nullable IssueWarn warn;
+        private @org.jspecify.annotations.Nullable TempWarn tempWarn;
         private @org.jspecify.annotations.Nullable ReviewWarns reviewWarns;
         private @org.jspecify.annotations.Nullable ClearWarns clearWarns;
         private @org.jspecify.annotations.Nullable ListJails listJails;
+        private @org.jspecify.annotations.Nullable ListJailed listJailed;
         private @org.jspecify.annotations.Nullable ListBans listBans;
         private @org.jspecify.annotations.Nullable ListMutes listMutes;
         private @org.jspecify.annotations.Nullable BanIp banIp;
@@ -270,6 +286,11 @@ public final class ModerationServices {
             return this;
         }
 
+        Builder tempWarn(TempWarn value) {
+            this.tempWarn = value;
+            return this;
+        }
+
         Builder reviewWarns(ReviewWarns value) {
             this.reviewWarns = value;
             return this;
@@ -282,6 +303,11 @@ public final class ModerationServices {
 
         Builder listJails(ListJails value) {
             this.listJails = value;
+            return this;
+        }
+
+        Builder listJailed(ListJailed value) {
+            this.listJailed = value;
             return this;
         }
 

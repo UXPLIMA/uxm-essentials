@@ -26,6 +26,7 @@ public final class MessagingCommands {
                 new ReplyCommand(services, messages, sink),
                 new MailCommand(services, messages, sink),
                 new MsgToggleCommand(services, messages, sink),
+                new RtoggleCommand(services, messages, sink),
                 new IgnoreCommand(services, messages, sink),
                 new UnignoreCommand(services, messages, sink),
                 new IgnoreListCommand(services, messages, sink),

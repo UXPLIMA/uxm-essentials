@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -10,6 +11,7 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
+import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerWarned;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -17,13 +19,16 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 
 /**
- * {@code /warn <player> [reason]}: append a warning to a player's history. The exempt target is refused
- * (audit-logged). Otherwise the warning is appended to the append-only history (never overwritten), the
- * target (if online) is told, {@code PlayerWarned} is published with the new total, and the action is
- * audit-logged. There is no warn-escalation ladder — that is explicitly out of charter; this records the
- * warning and its count only.
+ * {@code /tempwarn <player> <duration> [reason]}: append a warning that lapses on its own. It is the timed
+ * sibling of {@code /warn} ({@link IssueWarn}) — same exempt refusal, same append-only history, same
+ * {@code PlayerWarned} event and audit line, same warn permission — differing only in that the warning carries
+ * a wall-clock expiry, so it stops counting once the span elapses without an operator running {@code /unwarn}.
+ *
+ * <p>Like {@code /tempban} there is no permanent form here: a blank, malformed or zero duration is refused
+ * with {@code BAD_DURATION} (use {@code /warn} for a warning that stands until cleared). The new total the
+ * target is told is the repository's post-append count, which already excludes warnings that have lapsed.
  */
-public final class IssueWarn {
+public final class TempWarn {
 
     private final ModerationRepository repository;
     private final ModerationGuard guard;
@@ -32,7 +37,7 @@ public final class IssueWarn {
     private final DomainEventPublisher events;
     private final Clock clock;
 
-    public IssueWarn(
+    public TempWarn(
             ModerationRepository repository,
             ModerationGuard guard,
             ModerationNotifier notifier,
@@ -47,29 +52,46 @@ public final class IssueWarn {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Warn {@code target} with an optional reason, returning the appended warning. */
-    public Result<PlayerWarned, ModerationError> warn(PlayerRef actor, PlayerRef target, Optional<String> reason) {
+    /** Warn {@code target} for the parsed span of {@code rawDuration}, returning the appended warning. */
+    public Result<PlayerWarned, ModerationError> warn(
+            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(rawDuration, "rawDuration");
         Objects.requireNonNull(reason, "reason");
         if (guard.isExempt(target)) {
             audit.warned(actor, target, false, reason);
             notifier.send(actor, ModerationError.TARGET_EXEMPT.messageKey());
             return Result.err(ModerationError.TARGET_EXEMPT);
         }
+        Optional<Duration> span = SanctionDuration.parse(rawDuration).duration();
+        if (span.isEmpty()) {
+            // A tempwarn must be timed: a permanent or malformed input is BAD_DURATION (use /warn instead).
+            audit.warned(actor, target, false, reason);
+            notifier.send(actor, ModerationError.BAD_DURATION.messageKey());
+            return Result.err(ModerationError.BAD_DURATION);
+        }
+        return apply(actor, target, span.get(), reason);
+    }
+
+    private Result<PlayerWarned, ModerationError> apply(
+            PlayerRef actor, PlayerRef target, Duration span, Optional<String> reason) {
         Instant now = clock.instant();
-        Warn warn = Warn.standing(Issuer.of(actor), reason, now);
+        Warn warn = Warn.timed(Issuer.of(actor), reason, now, now.plus(span));
         repository.ensureUserExists(target, now);
         int total = repository.appendWarn(target, warn);
         PlayerWarned event = new PlayerWarned(target, warn, total);
         notifier.send(target, ModerationMessageKey.WARN_NOTIFY_TARGET, Map.of("reason", reason.orElse("")));
         events.publish(event);
         audit.warned(actor, target, true, reason);
-        notifier.send(actor, ModerationMessageKey.WARN_APPLIED, applied(target, total));
+        notifier.send(actor, ModerationMessageKey.TEMPWARN_APPLIED, applied(target, total, span));
         return Result.ok(event);
     }
 
-    private static Map<String, String> applied(PlayerRef target, int total) {
-        return Map.of("player", target.name(), "count", Integer.toString(total));
+    private static Map<String, String> applied(PlayerRef target, int total, Duration span) {
+        return Map.of(
+                "player", target.name(),
+                "count", Integer.toString(total),
+                "duration", SanctionDuration.format(span));
     }
 }

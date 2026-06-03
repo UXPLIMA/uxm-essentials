@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.messaging.application.port.ConversationStore;
+import com.uxplima.uxmessentials.messaging.application.port.ReplyRoutingStore;
 import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
 import com.uxplima.uxmessentials.messaging.domain.LastConversation;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
@@ -33,6 +34,7 @@ public final class Reply {
     private final ConversationStore conversations;
     private final PlayerLookup players;
     private final VanishVisibility vanish;
+    private final ReplyRoutingStore replyRouting;
     private final MessagingNotifier notifier;
     private final Duration replyTtl;
     private final Clock clock;
@@ -42,6 +44,7 @@ public final class Reply {
             ConversationStore conversations,
             PlayerLookup players,
             VanishVisibility vanish,
+            ReplyRoutingStore replyRouting,
             MessagingNotifier notifier,
             Duration replyTtl,
             Clock clock) {
@@ -49,6 +52,7 @@ public final class Reply {
         this.conversations = Objects.requireNonNull(conversations, "conversations");
         this.players = Objects.requireNonNull(players, "players");
         this.vanish = Objects.requireNonNull(vanish, "vanish");
+        this.replyRouting = Objects.requireNonNull(replyRouting, "replyRouting");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.replyTtl = Objects.requireNonNull(replyTtl, "replyTtl");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -68,6 +72,11 @@ public final class Reply {
     private Result<Unit, MessagingError> resolveAndSend(PlayerRef sender, PlayerRef partner, MessageBody body) {
         Optional<PlayerRef> online = players.findByUuid(partner.uuid());
         if (online.isEmpty() || !players.isOnline(partner.uuid()) || vanish.isHiddenFrom(sender, partner)) {
+            return reject(sender);
+        }
+        if (!replyRouting.acceptsReplies(online.get())) {
+            // The partner turned reply routing off via /rtoggle — decline as if there were no fresh
+            // conversation, so the back-channel reply never leaks that they are on the server.
             return reject(sender);
         }
         return sendMessage.deliver(sender, online.get(), body);

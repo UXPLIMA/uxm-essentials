@@ -35,10 +35,11 @@ public enum TeleportMessageKey implements MessageKey {
     TPAUTO_ON("teleport.tpauto-on"),
     TPAUTO_OFF("teleport.tpauto-off"),
 
-    // back
+    // back, deathback
     BACK_RETURNED("teleport.back.returned"),
     BACK_NONE("teleport.back.none"),
     BACK_DEATH_DENIED("teleport.back.death-denied"),
+    DEATHBACK_NONE("teleport.deathback.none"),
 
     // rtp
     RTP_SEARCHING("teleport.rtp.searching"),

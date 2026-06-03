@@ -33,6 +33,11 @@ public enum ModerationMessageKey implements MessageKey {
     JAILS_ENTRY("moderation.jails.entry"),
     JAILS_EMPTY("moderation.jails.empty"),
 
+    // /jailedplayers — review of currently jailed players
+    JAILEDLIST_HEADER("moderation.jailedlist-header"),
+    JAILEDLIST_ENTRY("moderation.jailedlist-entry"),
+    JAILEDLIST_EMPTY("moderation.jailedlist-empty"),
+
     // /tempban
     TEMPBAN_APPLIED("moderation.tempban.applied"),
     TEMPBAN_KICK("moderation.tempban.kick"),
@@ -58,8 +63,9 @@ public enum ModerationMessageKey implements MessageKey {
     KICK_KICKED("moderation.kick.kicked"),
     KICKALL_APPLIED("moderation.kickall.applied"),
 
-    // /warn, /warns, /unwarn
+    // /warn, /tempwarn, /warns, /unwarn
     WARN_APPLIED("moderation.warn.applied"),
+    TEMPWARN_APPLIED("moderation.tempwarn.applied"),
     WARN_NOTIFY_TARGET("moderation.warn.notify-target"),
     WARNS_HEADER("moderation.warns.header"),
     WARNS_ENTRY("moderation.warns.entry"),

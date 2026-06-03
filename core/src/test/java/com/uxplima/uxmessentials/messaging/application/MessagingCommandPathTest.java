@@ -78,6 +78,7 @@ class MessagingCommandPathTest {
                 conversations,
                 new OnlineLookup(bob),
                 VanishVisibility.ALWAYS_VISIBLE,
+                new AcceptingReplyRouting(),
                 notifier,
                 Duration.ofMinutes(5),
                 clock);
@@ -159,6 +160,26 @@ class MessagingCommandPathTest {
         assertThat(reply.reply(alice, hello).errorOrThrow()).isEqualTo(MessagingError.NO_REPLY_TARGET);
     }
 
+    @Test
+    void replyToAPartnerWithReplyRoutingOffDeclinesWithoutLeaking() {
+        MessagingNotifier notifier = new MessagingNotifier(new KeyMessages(), new NoopSink());
+        Reply gated = new Reply(
+                sendMessage,
+                conversations,
+                new OnlineLookup(bob),
+                VanishVisibility.ALWAYS_VISIBLE,
+                new RefusingReplyRouting(),
+                notifier,
+                Duration.ofMinutes(5),
+                clock);
+        conversations.remember(alice, LastConversation.with(bob, clock.instant()));
+
+        var result = gated.reply(alice, hello);
+
+        assertThat(result.errorOrThrow()).isEqualTo(MessagingError.NO_REPLY_TARGET);
+        assertThat(delivery.delivered).isEmpty();
+    }
+
     // --- fakes -------------------------------------------------------------------------------------------
 
     private static final class FakeDelivery implements MessageDelivery {
@@ -238,6 +259,32 @@ class MessagingCommandPathTest {
         @Override
         public boolean toggle(PlayerRef who) {
             return refusing.remove(who.uuid()) || !refusing.add(who.uuid());
+        }
+    }
+
+    private static final class AcceptingReplyRouting
+            implements com.uxplima.uxmessentials.messaging.application.port.ReplyRoutingStore {
+        @Override
+        public boolean acceptsReplies(PlayerRef who) {
+            return true;
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            return true;
+        }
+    }
+
+    private static final class RefusingReplyRouting
+            implements com.uxplima.uxmessentials.messaging.application.port.ReplyRoutingStore {
+        @Override
+        public boolean acceptsReplies(PlayerRef who) {
+            return false;
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            return false;
         }
     }
 

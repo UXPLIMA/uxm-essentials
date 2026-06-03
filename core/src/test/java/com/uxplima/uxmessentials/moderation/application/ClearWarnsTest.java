@@ -29,14 +29,14 @@ class ClearWarnsTest {
     @Test
     void clearRemovesEveryWarningAndAuditsTheCount() {
         FakeModerationRepository repository = new FakeModerationRepository();
-        repository.appendWarn(TARGET, new Warn(Issuer.of(ACTOR), Optional.of("first"), NOW));
-        repository.appendWarn(TARGET, new Warn(Issuer.of(ACTOR), Optional.of("second"), NOW));
+        repository.appendWarn(TARGET, Warn.standing(Issuer.of(ACTOR), Optional.of("first"), NOW));
+        repository.appendWarn(TARGET, Warn.standing(Issuer.of(ACTOR), Optional.of("second"), NOW));
         RecordingModerationAudit audit = new RecordingModerationAudit();
         ClearWarns clearWarns = new ClearWarns(repository, ModerationFakes.notifier(), audit);
 
         clearWarns.clear(ACTOR, TARGET);
 
-        assertThat(repository.warns(TARGET)).isEmpty();
+        assertThat(repository.warns(TARGET, NOW)).isEmpty();
         assertThat(audit.lines)
                 .singleElement()
                 .isEqualTo(new RecordingModerationAudit.ClearLine("player_unwarn", true, 2));
@@ -50,7 +50,7 @@ class ClearWarnsTest {
 
         clearWarns.clear(ACTOR, TARGET);
 
-        assertThat(repository.warns(TARGET)).isEmpty();
+        assertThat(repository.warns(TARGET, NOW)).isEmpty();
         assertThat(audit.lines)
                 .singleElement()
                 .isEqualTo(new RecordingModerationAudit.ClearLine("player_unwarn", false, 0));

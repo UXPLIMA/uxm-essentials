@@ -28,6 +28,10 @@ public enum MessagingMessageKey implements MessageKey {
     MSG_TOGGLE_ON("msg.toggle-on"),
     MSG_TOGGLE_OFF("msg.toggle-off"),
 
+    // /rtoggle
+    REPLY_TOGGLE_ON("msg.rtoggle-on"),
+    REPLY_TOGGLE_OFF("msg.rtoggle-off"),
+
     // /ignore, /unignore
     IGNORE_ADDED("ignore.added"),
     IGNORE_REMOVED("ignore.removed"),

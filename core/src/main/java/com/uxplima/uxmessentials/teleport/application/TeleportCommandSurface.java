@@ -71,6 +71,10 @@ final class TeleportCommandSurface {
                         DescribedCommand.of("tpaall", "Request every player to teleport to you")),
                 // back
                 spec("back", "uxmessentials.back.use", DescribedCommand.of("back", "Return to your last location")),
+                spec(
+                        "deathback",
+                        "uxmessentials.back.use",
+                        DescribedCommand.of("deathback", "Return to your last death location", "dback")),
                 // rtp
                 spec("rtp", "uxmessentials.rtp.use", DescribedCommand.of("rtp", "Random teleport", "wild")),
                 // spawn

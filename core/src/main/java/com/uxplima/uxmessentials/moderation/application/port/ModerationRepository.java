@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
+import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
 import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
@@ -54,6 +55,14 @@ public interface ModerationRepository {
      */
     List<MuteEntry> activeMutes(Instant now, int limit);
 
+    /**
+     * The jails still in effect at {@code now} (permanent, online-only and wall-clock rows whose expiry has
+     * not passed), newest-first and capped at {@code limit} so the {@code /jailedplayers} read stays within
+     * budget. An online-only sentence is always returned while it has a row, since its countdown advances on
+     * online time rather than the wall clock.
+     */
+    List<JailEntry> activeJails(Instant now, int limit);
+
     /** Upsert {@code target}'s mute. {@link MuteState.None} deletes the row. */
     void saveMute(PlayerRef target, MuteState mute);
 
@@ -63,11 +72,15 @@ public interface ModerationRepository {
     /** Upsert {@code target}'s tempban. {@link TempbanState.None} deletes the row. */
     void saveTempban(PlayerRef target, TempbanState tempban);
 
-    /** Append one warning to {@code target}'s history and return the new total count. */
+    /**
+     * Append one warning to {@code target}'s history and return the count of warnings still in effect at the
+     * appended warning's issue instant — a standing warning and any timed warning not yet lapsed. The history
+     * itself stays append-only; the count simply excludes already-lapsed timed warnings.
+     */
     int appendWarn(PlayerRef target, Warn warn);
 
-    /** {@code target}'s warning history, newest-first. */
-    List<Warn> warns(PlayerRef target);
+    /** {@code target}'s warnings still in effect at {@code now}, newest-first (lapsed timed warnings dropped). */
+    List<Warn> warns(PlayerRef target, Instant now);
 
     /** Remove all of {@code target}'s warnings; returns the number removed. */
     int clearWarns(PlayerRef target);

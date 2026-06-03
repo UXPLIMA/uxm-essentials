@@ -70,10 +70,10 @@ permissions:
     description: '/tpaall to request every online player to teleport to you.'
     default: op
   uxmessentials.back.use:
-    description: '/back to return to your last captured location.'
+    description: '/back to return to your last captured location; /deathback (alias /dback) to return to your last death location.'
     default: true
   uxmessentials.back.ondeath:
-    description: 'Allow /back to return to a death location.'
+    description: 'Allow /back and /deathback to return to a death location.'
     default: true
   uxmessentials.rtp.use:
     description: '/rtp random teleport from the pre-warmed safe-location queue.'
@@ -343,7 +343,7 @@ permissions:
     description: '/reply <text> to answer your last conversation (reply-TTL bounded).'
     default: true
   uxmessentials.msg.toggle:
-    description: '/msgtoggle to refuse incoming /msg / /reply (mail still delivers).'
+    description: '/msgtoggle to refuse incoming /msg / /reply; /rtoggle to refuse only incoming /reply routing (mail still delivers).'
     default: true
   uxmessentials.msg.ignore:
     description: '/ignore <player> / /unignore <player> / /ignorelist to manage and view your own ignore list.'
@@ -418,7 +418,7 @@ permissions:
     description: '/unmute <player>.'
     default: op
   uxmessentials.moderation.jail:
-    description: '/jail <player> <jail> [duration] [reason]; online-only or wall-clock countdown per config.'
+    description: '/jail <player> <jail> [duration] [reason]; /jails lists configured jails; /jailedplayers lists who is jailed.'
     default: op
   uxmessentials.moderation.unjail:
     description: '/unjail <player>.'
@@ -439,7 +439,7 @@ permissions:
     description: '/kick <player> [reason]; /kickall [reason] to clear non-exempt players.'
     default: op
   uxmessentials.moderation.warn:
-    description: '/warn <player> [reason], /warns <player> and /unwarn <player> — issue, review and clear warning history.'
+    description: '/warn <player> [reason], /tempwarn <player> <duration> [reason], /warns <player> and /unwarn <player> — issue (standing or timed), review and clear warning history.'
     default: op
   uxmessentials.moderation.banip:
     description: '/banip <player|ip> [reason] / /unbanip <ip> — IP ban with stored-IP alt detection.'
@@ -657,6 +657,9 @@ permissions:
     default: true
   uxmessentials.communication.broadcast:
     description: '/broadcast to send a one-off announcement to all online players.'
+    default: op
+  uxmessentials.communication.broadcastworld:
+    description: '/broadcastworld (alias /bcw) to send a one-off announcement only to players in your world.'
     default: op
   uxmessentials.communication.me:
     description: '/me to broadcast a third-person action message to all online players.'

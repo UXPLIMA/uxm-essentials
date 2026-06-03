@@ -164,8 +164,30 @@ class ModerationRulesTest {
         var second = warn.warn(ADMIN, TARGET, Optional.of("second"));
 
         assertThat(second.orElseThrow().totalWarnings()).isEqualTo(2);
-        assertThat(repository.warns(TARGET)).hasSize(2);
+        assertThat(repository.warns(TARGET, T0)).hasSize(2);
         // newest-first
-        assertThat(repository.warns(TARGET).get(0).reason()).contains("second");
+        assertThat(repository.warns(TARGET, T0).get(0).reason()).contains("second");
+    }
+
+    @Test
+    void tempWarnAppendsATimedWarningThatLapsesOutOfTheReadAtExpiry() {
+        TempWarn tempWarn = new TempWarn(repository, guard, ModerationFakes.notifier(), audit, events, clock);
+
+        var result = tempWarn.warn(ADMIN, TARGET, "1h", Optional.of("cooldown"));
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(repository.warns(TARGET, T0.plus(Duration.ofMinutes(30)))).hasSize(1);
+        assertThat(repository.warns(TARGET, T0.plus(Duration.ofHours(2)))).isEmpty();
+        assertThat(repository.ensured).containsExactly(TARGET.uuid());
+    }
+
+    @Test
+    void tempWarnWithoutADurationIsRejected() {
+        TempWarn tempWarn = new TempWarn(repository, guard, ModerationFakes.notifier(), audit, events, clock);
+
+        var result = tempWarn.warn(ADMIN, TARGET, "", Optional.empty());
+
+        assertThat(result.errorOrThrow()).isEqualTo(ModerationError.BAD_DURATION);
+        assertThat(repository.warns(TARGET, T0)).isEmpty();
     }
 }

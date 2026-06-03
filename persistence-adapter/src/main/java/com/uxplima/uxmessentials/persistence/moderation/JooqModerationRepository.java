@@ -16,6 +16,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
+import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
 import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
@@ -102,6 +103,17 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
+    public List<JailEntry> activeJails(Instant now, int limit) {
+        Objects.requireNonNull(now, "now");
+        return read(dsl -> dsl.selectFrom(MODERATION_JAILS)
+                .where(MODERATION_JAILS.UNTIL.isNull().or(MODERATION_JAILS.UNTIL.gt(now.toEpochMilli())))
+                .orderBy(MODERATION_JAILS.CREATED_AT.desc())
+                .limit(Math.max(0, limit))
+                .fetch()
+                .map(ModerationRows::toJailEntry));
+    }
+
+    @Override
     public void saveMute(PlayerRef target, MuteState mute) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(mute, "mute");
@@ -130,10 +142,13 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
-    public List<Warn> warns(PlayerRef target) {
+    public List<Warn> warns(PlayerRef target, Instant now) {
         Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(now, "now");
+        long nowMillis = now.toEpochMilli();
         return read(dsl -> dsl.selectFrom(MODERATION_WARNS)
                 .where(MODERATION_WARNS.TARGET.eq(target.uuid().toString()))
+                .and(MODERATION_WARNS.EXPIRES_AT.isNull().or(MODERATION_WARNS.EXPIRES_AT.gt(nowMillis)))
                 .orderBy(MODERATION_WARNS.TS.desc(), MODERATION_WARNS.ID.desc())
                 .fetch()
                 .map(ModerationRows::toWarn));

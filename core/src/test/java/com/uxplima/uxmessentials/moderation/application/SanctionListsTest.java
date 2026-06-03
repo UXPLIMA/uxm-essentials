@@ -88,6 +88,25 @@ class SanctionListsTest {
         assertThat(notifier.keys).containsExactly("moderation.mutelist-header", "moderation.mutelist-entry");
     }
 
+    @Test
+    void jailedListWithNoJailsRendersEmpty() {
+        new ListJailed(repo, players, notifier.notifier(), clock).list(staff);
+
+        assertThat(notifier.keys).containsExactly("moderation.jailedlist-empty");
+    }
+
+    @Test
+    void jailedListRendersHeaderAndEntryPerJail() {
+        repo.saveJail(
+                target,
+                com.uxplima.uxmessentials.moderation.domain.JailState.permanent(
+                        "cells", Issuer.console("Staff"), Optional.of("grief"), Instant.EPOCH));
+
+        new ListJailed(repo, players, notifier.notifier(), clock).list(staff);
+
+        assertThat(notifier.keys).containsExactly("moderation.jailedlist-header", "moderation.jailedlist-entry");
+    }
+
     private static final class CapturingNotifier {
         private final List<String> keys = new ArrayList<>();
 

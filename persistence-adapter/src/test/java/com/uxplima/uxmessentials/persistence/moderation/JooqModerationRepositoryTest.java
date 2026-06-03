@@ -101,24 +101,41 @@ class JooqModerationRepositoryTest {
 
     @Test
     void warnHistoryIsAppendOnlyAndReadNewestFirst() {
-        assertThat(repository.appendWarn(alice, new Warn(STAFF, Optional.of("first"), T0)))
+        assertThat(repository.appendWarn(alice, Warn.standing(STAFF, Optional.of("first"), T0)))
                 .isEqualTo(1);
-        assertThat(repository.appendWarn(alice, new Warn(STAFF, Optional.of("second"), T0.plusSeconds(60))))
+        assertThat(repository.appendWarn(alice, Warn.standing(STAFF, Optional.of("second"), T0.plusSeconds(60))))
                 .isEqualTo(2);
 
-        List<Warn> history = repository.warns(alice);
+        List<Warn> history = repository.warns(alice, T0.plusSeconds(120));
         assertThat(history).hasSize(2);
         assertThat(history.get(0).reason()).contains("second");
         assertThat(history.get(1).reason()).contains("first");
     }
 
     @Test
+    void tempWarnLapsesOutOfTheReadAndCountOnceItsExpiryPasses() {
+        Instant expiry = T0.plusSeconds(60);
+        assertThat(repository.appendWarn(alice, Warn.standing(STAFF, Optional.of("standing"), T0)))
+                .isEqualTo(1);
+        assertThat(repository.appendWarn(alice, Warn.timed(STAFF, Optional.of("timed"), T0, expiry)))
+                .isEqualTo(2);
+
+        // Before the expiry both count; the row stays in the append-only table either way.
+        assertThat(repository.warns(alice, T0.plusSeconds(30))).hasSize(2);
+        // After the expiry only the standing warning is still in effect.
+        List<Warn> remaining = repository.warns(alice, expiry.plusSeconds(1));
+        assertThat(remaining).hasSize(1);
+        assertThat(remaining.get(0).reason()).contains("standing");
+        assertThat(repository.clearWarns(alice)).isEqualTo(2);
+    }
+
+    @Test
     void clearWarnsRemovesEveryRowAndReportsTheCount() {
-        repository.appendWarn(alice, new Warn(STAFF, Optional.of("first"), T0));
-        repository.appendWarn(alice, new Warn(STAFF, Optional.of("second"), T0.plusSeconds(60)));
+        repository.appendWarn(alice, Warn.standing(STAFF, Optional.of("first"), T0));
+        repository.appendWarn(alice, Warn.standing(STAFF, Optional.of("second"), T0.plusSeconds(60)));
 
         assertThat(repository.clearWarns(alice)).isEqualTo(2);
-        assertThat(repository.warns(alice)).isEmpty();
+        assertThat(repository.warns(alice, T0.plusSeconds(120))).isEmpty();
         assertThat(repository.clearWarns(alice)).isZero();
     }
 

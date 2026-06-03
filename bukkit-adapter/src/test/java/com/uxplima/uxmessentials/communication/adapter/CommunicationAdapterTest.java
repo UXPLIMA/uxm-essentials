@@ -143,7 +143,14 @@ class CommunicationAdapterTest {
         }
         assertThat(literals)
                 .containsExactlyInAnyOrder(
-                        "broadcast", "broadcasttoggle", "me", "clearchat", "togglechat", "rules", "motd");
+                        "broadcast",
+                        "broadcastworld",
+                        "broadcasttoggle",
+                        "me",
+                        "clearchat",
+                        "togglechat",
+                        "rules",
+                        "motd");
     }
 
     @Test

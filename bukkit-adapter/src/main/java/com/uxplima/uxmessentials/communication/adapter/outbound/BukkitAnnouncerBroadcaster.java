@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.communication.adapter.outbound;
 
 import java.util.Objects;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -36,6 +37,26 @@ public final class BukkitAnnouncerBroadcaster {
     public void broadcast(String line) {
         Objects.requireNonNull(line, "line");
         for (Player player : Bukkit.getOnlinePlayers()) {
+            PlayerRef who = BukkitRefs.toRef(player);
+            if (optOut.receivesBroadcasts(who)) {
+                sink.deliver(who, line);
+            }
+        }
+    }
+
+    /**
+     * Send {@code line} only to online, opted-in players in the world identified by {@code worldId} — the
+     * fan-out a {@code /broadcastworld} restricts to the sender's world. Same opt-out and per-viewer region
+     * hop as {@link #broadcast(String)}; a player who left the world between the scan and the send is simply
+     * skipped.
+     */
+    public void broadcastToWorld(String line, UUID worldId) {
+        Objects.requireNonNull(line, "line");
+        Objects.requireNonNull(worldId, "worldId");
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!player.getWorld().getUID().equals(worldId)) {
+                continue;
+            }
             PlayerRef who = BukkitRefs.toRef(player);
             if (optOut.receivesBroadcasts(who)) {
                 sink.deliver(who, line);

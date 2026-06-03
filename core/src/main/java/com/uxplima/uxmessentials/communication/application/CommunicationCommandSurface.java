@@ -43,6 +43,10 @@ final class CommunicationCommandSurface {
                         "uxmessentials.communication.broadcast",
                         command("broadcast", "Send an announcement to all online players")),
                 spec(
+                        "broadcastworld",
+                        "uxmessentials.communication.broadcastworld",
+                        command("broadcastworld", "Send an announcement to players in your world")),
+                spec(
                         "me",
                         "uxmessentials.communication.me",
                         command("me", "Broadcast an action message about yourself")),

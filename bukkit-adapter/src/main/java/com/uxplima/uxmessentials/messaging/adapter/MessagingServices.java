@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.messaging.application.ListIgnores;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
 import com.uxplima.uxmessentials.messaging.application.Reply;
+import com.uxplima.uxmessentials.messaging.application.ReplyToggle;
 import com.uxplima.uxmessentials.messaging.application.SendMail;
 import com.uxplima.uxmessentials.messaging.application.SendMessage;
 import com.uxplima.uxmessentials.messaging.application.SocialSpy;
@@ -31,6 +32,7 @@ import org.jspecify.annotations.NullMarked;
  * @param readMail {@code /mail read}
  * @param clearMail {@code /mail clear}, {@code /mailclear}
  * @param msgToggle {@code /msgtoggle}
+ * @param replyToggle {@code /rtoggle}
  * @param ignore {@code /ignore}
  * @param unignore {@code /unignore}
  * @param listIgnores {@code /ignorelist}
@@ -47,6 +49,7 @@ public record MessagingServices(
         ReadMail readMail,
         ClearMail clearMail,
         MsgToggle msgToggle,
+        ReplyToggle replyToggle,
         Ignore ignore,
         Unignore unignore,
         ListIgnores listIgnores,
@@ -62,6 +65,7 @@ public record MessagingServices(
         Objects.requireNonNull(readMail, "readMail");
         Objects.requireNonNull(clearMail, "clearMail");
         Objects.requireNonNull(msgToggle, "msgToggle");
+        Objects.requireNonNull(replyToggle, "replyToggle");
         Objects.requireNonNull(ignore, "ignore");
         Objects.requireNonNull(unignore, "unignore");
         Objects.requireNonNull(listIgnores, "listIgnores");

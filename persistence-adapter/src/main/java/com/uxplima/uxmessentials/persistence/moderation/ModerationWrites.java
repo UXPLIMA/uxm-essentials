@@ -109,6 +109,7 @@ final class ModerationWrites {
 
     static int appendWarn(DSLContext dsl, PlayerRef target, Warn warn) {
         long nextId = nextWarnId(dsl);
+        Long expiresAt = warn.expiresAt().map(Instant::toEpochMilli).orElse(null);
         dsl.insertInto(MODERATION_WARNS)
                 .set(MODERATION_WARNS.ID, nextId)
                 .set(MODERATION_WARNS.TARGET, target.uuid().toString())
@@ -116,9 +117,20 @@ final class ModerationWrites {
                 .set(MODERATION_WARNS.WARNED_BY, issuerUuid(warn.issuer()))
                 .set(MODERATION_WARNS.WARNED_BY_NAME, warn.issuer().name())
                 .set(MODERATION_WARNS.TS, warn.issuedAt().toEpochMilli())
+                .set(MODERATION_WARNS.EXPIRES_AT, expiresAt)
                 .execute();
+        // The count the actor is told excludes warnings already lapsed at this warning's issue instant; the
+        // just-inserted warning is active, so it is always included.
         return dsl.fetchCount(
-                MODERATION_WARNS, MODERATION_WARNS.TARGET.eq(target.uuid().toString()));
+                MODERATION_WARNS,
+                MODERATION_WARNS
+                        .TARGET
+                        .eq(target.uuid().toString())
+                        .and(notLapsed(warn.issuedAt().toEpochMilli())));
+    }
+
+    private static org.jooq.Condition notLapsed(long now) {
+        return MODERATION_WARNS.EXPIRES_AT.isNull().or(MODERATION_WARNS.EXPIRES_AT.gt(now));
     }
 
     static int clearWarns(DSLContext dsl, PlayerRef target) {

@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
+import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
 import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
@@ -76,6 +77,19 @@ public final class FakeModerationRepository implements ModerationRepository {
                 .toList();
     }
 
+    @Override
+    public List<JailEntry> activeJails(Instant now, int limit) {
+        return jails.entrySet().stream()
+                .filter(e -> e.getValue() instanceof JailState.Active active && active.isActiveAt(now))
+                .map(e -> jailEntry(e.getKey(), (JailState.Active) e.getValue()))
+                .limit(limit)
+                .toList();
+    }
+
+    private static JailEntry jailEntry(UUID target, JailState.Active jail) {
+        return new JailEntry(target, jail.jail(), jail.issuer(), jail.reason(), jail.until(), jail.remaining());
+    }
+
     private static MuteEntry muteEntry(UUID target, MuteState mute) {
         if (mute instanceof MuteState.Permanent permanent) {
             return new MuteEntry(target, permanent.issuer(), permanent.reason(), Optional.empty());
@@ -103,12 +117,13 @@ public final class FakeModerationRepository implements ModerationRepository {
     public int appendWarn(PlayerRef target, Warn warn) {
         List<Warn> list = warns.computeIfAbsent(target.uuid(), uuid -> new ArrayList<>());
         list.add(warn);
-        return list.size();
+        return (int) list.stream().filter(w -> !w.isExpiredAt(warn.issuedAt())).count();
     }
 
     @Override
-    public List<Warn> warns(PlayerRef target) {
+    public List<Warn> warns(PlayerRef target, Instant now) {
         List<Warn> list = new ArrayList<>(warns.getOrDefault(target.uuid(), List.of()));
+        list.removeIf(warn -> warn.isExpiredAt(now));
         java.util.Collections.reverse(list);
         return list;
     }

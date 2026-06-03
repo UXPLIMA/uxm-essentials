@@ -199,12 +199,14 @@ class FeatureModuleRegistryDriftTest {
                         .collect(Collectors.toSet());
         assertThat(on).contains("communication", "teleport", "vaults");
 
-        // Its static surface is the plugin's own /broadcast, /me, /broadcasttoggle, /clearchat, and /togglechat;
-        // the operator-configured info-page commands (/rules, /motd, …) are dynamic and not part of this fixed
-        // table. It persists nothing.
+        // Its static surface is the plugin's own /broadcast, /broadcastworld, /me, /broadcasttoggle, /clearchat,
+        // and /togglechat; the operator-configured info-page commands (/rules, /motd, …) are dynamic and not part
+        // of this fixed table. It persists nothing.
         Set<String> literals =
                 communication.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
-        assertThat(literals).containsExactlyInAnyOrder("broadcast", "me", "broadcasttoggle", "clearchat", "togglechat");
+        assertThat(literals)
+                .containsExactlyInAnyOrder(
+                        "broadcast", "broadcastworld", "me", "broadcasttoggle", "clearchat", "togglechat");
         assertThat(communication.migrations()).isEmpty();
     }
 

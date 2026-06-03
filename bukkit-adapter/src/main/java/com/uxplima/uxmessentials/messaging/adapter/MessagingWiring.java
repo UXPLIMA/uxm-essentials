@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemoryConversation
 import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemorySocialSpyStore;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.MailExpirySweep;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.PdcMessageToggleStore;
+import com.uxplima.uxmessentials.messaging.adapter.outbound.PdcReplyRoutingStore;
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
 import com.uxplima.uxmessentials.messaging.application.HelpOp;
 import com.uxplima.uxmessentials.messaging.application.Ignore;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.messaging.application.MessagingNotifier;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
 import com.uxplima.uxmessentials.messaging.application.Reply;
+import com.uxplima.uxmessentials.messaging.application.ReplyToggle;
 import com.uxplima.uxmessentials.messaging.application.SendMail;
 import com.uxplima.uxmessentials.messaging.application.SendMessage;
 import com.uxplima.uxmessentials.messaging.application.SocialSpy;
@@ -106,6 +108,7 @@ public final class MessagingWiring {
                         stores.conversations(),
                         kernel.playerLookup(),
                         vanish,
+                        stores.replyRouting(),
                         notifier,
                         settings.replyTtl(),
                         clock),
@@ -113,6 +116,7 @@ public final class MessagingWiring {
                 new ReadMail(stores.mail(), delivery, notifier),
                 new ClearMail(stores.mail(), notifier),
                 new MsgToggle(stores.toggles(), notifier),
+                new ReplyToggle(stores.replyRouting(), notifier),
                 new Ignore(stores.ignores(), notifier),
                 new Unignore(stores.ignores(), notifier),
                 new ListIgnores(stores.ignores(), notifier),
@@ -128,6 +132,7 @@ public final class MessagingWiring {
                 MessagingStores.ignores(persistence),
                 new InMemoryConversationStore(),
                 new PdcMessageToggleStore(plugin),
+                new PdcReplyRoutingStore(plugin),
                 new InMemorySocialSpyStore());
     }
 
@@ -137,6 +142,7 @@ public final class MessagingWiring {
             IgnoreStore ignores,
             InMemoryConversationStore conversations,
             PdcMessageToggleStore toggles,
+            PdcReplyRoutingStore replyRouting,
             InMemorySocialSpyStore socialSpy) {}
 
     /**

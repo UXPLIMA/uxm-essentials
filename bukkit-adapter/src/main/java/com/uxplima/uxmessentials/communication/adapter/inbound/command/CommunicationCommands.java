@@ -56,6 +56,7 @@ public final class CommunicationCommands {
         Objects.requireNonNull(chatLock, "chatLock");
         List<CommandRegistration> commands = new ArrayList<>();
         commands.add(new BroadcastCommand(broadcaster, BROADCAST_PREFIX));
+        commands.add(new BroadcastWorldCommand(messages, broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastToggleCommand(optOut, messages));
         commands.add(new MeCommand(messages, notifier));
         commands.add(new ClearChatCommand(messages, notifier, sink));

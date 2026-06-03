@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.moderation.application.JailCountdown;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
 import com.uxplima.uxmessentials.moderation.application.ListBans;
+import com.uxplima.uxmessentials.moderation.application.ListJailed;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
 import com.uxplima.uxmessentials.moderation.application.ListMutes;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
@@ -39,6 +40,7 @@ import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
+import com.uxplima.uxmessentials.moderation.application.TempWarn;
 import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
@@ -125,9 +127,11 @@ public final class ModerationWiring {
                 .kick(new Kick(sanctionPort, guard, notifier, audit))
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
                 .warn(new IssueWarn(repository, guard, notifier, audit, kernel.events(), clock))
-                .reviewWarns(new ReviewWarns(repository, notifier))
+                .tempWarn(new TempWarn(repository, guard, notifier, audit, kernel.events(), clock))
+                .reviewWarns(new ReviewWarns(repository, notifier, clock))
                 .clearWarns(new ClearWarns(repository, notifier, audit))
                 .listJails(new ListJails(jails, notifier))
+                .listJailed(new ListJailed(repository, kernel.playerLookup(), notifier, clock))
                 .listBans(new ListBans(repository, kernel.playerLookup(), notifier, clock))
                 .listMutes(new ListMutes(repository, kernel.playerLookup(), notifier, clock))
                 .banIp(new BanIp(repository, notifier, audit, kernel.events(), clock))

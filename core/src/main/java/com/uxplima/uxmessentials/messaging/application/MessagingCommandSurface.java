@@ -29,6 +29,7 @@ final class MessagingCommandSurface {
                 spec("reply", "uxmessentials.msg.reply", command("reply", "Reply to your last conversation")),
                 spec("mail", "uxmessentials.mail.use", command("mail", "Read, send or clear your mail")),
                 spec("msgtoggle", "uxmessentials.msg.toggle", command("msgtoggle", "Refuse incoming private messages")),
+                spec("rtoggle", "uxmessentials.msg.toggle", command("rtoggle", "Toggle whether you receive replies")),
                 spec("ignore", "uxmessentials.msg.ignore", command("ignore", "Ignore a player")),
                 spec("unignore", "uxmessentials.msg.ignore", command("unignore", "Stop ignoring a player")),
                 spec("ignorelist", "uxmessentials.msg.ignore", command("ignorelist", "List the players you ignore")),
