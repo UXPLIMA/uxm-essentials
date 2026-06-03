@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.kits.application.KitsModule;
 import com.uxplima.uxmessentials.messaging.application.MessagingModule;
 import com.uxplima.uxmessentials.moderation.application.ModerationModule;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
@@ -83,6 +84,11 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // DSL, the Scheduler, messages, and event ports), and like warps/vaults it ships ENABLED as a
         // steady-state feature, so it lands last after communication.
         delegate.register(new HologramsModule());
+        // playerwarps is the 14th context — player-owned warps keyed (owner, name). Like warps it delegates
+        // teleport execution to the teleport engine, so it must land after teleport (it does); it carries no
+        // other hard dependency edge (its only collaborators are the shared persistence DSL, the Permissions
+        // reducer, and the teleport engine), and like warps/holograms it ships ENABLED, so it lands last.
+        delegate.register(new PlayerwarpsModule());
         // The shared kernel is not a module and never appears here.
     }
 

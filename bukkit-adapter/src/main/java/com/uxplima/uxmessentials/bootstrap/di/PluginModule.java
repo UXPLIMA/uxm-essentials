@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
+import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
@@ -260,6 +261,8 @@ public final class PluginModule {
             wireCommunication(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
             wireHolograms(plugin, ctx, persistence, resources);
+        } else if (module.id().equals(ModuleId.of("playerwarps"))) {
+            wirePlayerwarps(ctx, persistence, resources, links);
         }
     }
 
@@ -468,6 +471,18 @@ public final class PluginModule {
         HologramsWiring.Wired wired = HologramsWiring.wire(plugin, ctx, persistence);
         wired.commands().forEach(resources::addCommand);
         resources.onClose(wired::stop);
+    }
+
+    private static void wirePlayerwarps(
+            ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links) {
+        // player-warps delegates teleport execution to the captured teleport engine exactly as warps does; its
+        // cached jOOQ repository over persistence.dsl() is keyed per owner, and the player_warps table ships in
+        // the persistence V14 baseline, always applied. It carries no cross-context bridge beyond the engine.
+        TeleportEngine engine = Objects.requireNonNull(
+                links.teleportEngine,
+                "playerwarps delegates teleport execution but the teleport engine is unavailable");
+        PlayerwarpsWiring.Wired wired = PlayerwarpsWiring.wire(ctx, persistence, engine);
+        wired.commands().forEach(resources::addCommand);
     }
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */

@@ -715,3 +715,26 @@ permissions:
   uxmessentials.hologram.use:
     description: '/hologram to create, edit, move, list and delete native-Display holograms.'
     default: op
+  # player-warps context (docs/permissions.md "Player Warps"). Player-owned warps keyed (owner, name): the
+  # base nodes default true (self-service), the visibility toggle gates /pwarp public|private, and the
+  # numbered quota node uxmessentials.pwarp.limit.<n> (optional <world> segment, highest <n> wins) is an open
+  # value space granted per player and is intentionally not enumerated here. uxmessentials.module.playerwarps
+  # is the reload/inspect tier.
+  uxmessentials.module.playerwarps:
+    description: 'Hot-reload / inspect the playerwarps module (player-owned warps behind /pwarp).'
+    default: op
+  uxmessentials.pwarp.use:
+    description: '/pwarp <name> [owner] to teleport to your own or a player''s public warp.'
+    default: true
+  uxmessentials.pwarp.set:
+    description: '/setpwarp <name> to create or move a player-owned warp at your location.'
+    default: true
+  uxmessentials.pwarp.delete:
+    description: '/delpwarp <name> to remove one of your player warps.'
+    default: true
+  uxmessentials.pwarp.list:
+    description: '/pwarps [player] to list your warps or a player''s public warps.'
+    default: true
+  uxmessentials.pwarp.public:
+    description: '/pwarp public|private <name> to toggle a player warp''s visibility.'
+    default: true

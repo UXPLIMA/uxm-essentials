@@ -61,6 +61,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("vaults"))).isPresent();
         assertThat(registry.byId(ModuleId.of("communication"))).isPresent();
         assertThat(registry.byId(ModuleId.of("holograms"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("playerwarps"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -75,7 +76,8 @@ class FeatureModuleRegistryDriftTest {
                         "itemworld",
                         "vaults",
                         "communication",
-                        "holograms");
+                        "holograms",
+                        "playerwarps");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -220,8 +222,9 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule holograms = registry.byId(ModuleId.of("holograms"))
                 .orElseThrow(() -> new AssertionError("holograms is not registered"));
 
-        // holograms is the round-4 world-placed display context, registered last after the thirteen prior modules.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("holograms");
+        // holograms is the round-4 world-placed display context, registered after the prior modules; the later
+        // playerwarps context now lands last, so holograms must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("holograms"))).isPresent();
 
         // It ships ENABLED (a steady-state world-placed feature like warps/vaults): with no modules.conf override
         // it is on, and disabling exactly holograms removes only it while every sibling stays on.
@@ -241,6 +244,38 @@ class FeatureModuleRegistryDriftTest {
                 holograms.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactly("hologram");
         assertThat(holograms.migrations()).isEmpty();
+    }
+
+    @Test
+    void playerwarpsIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule playerwarps = registry.byId(ModuleId.of("playerwarps"))
+                .orElseThrow(() -> new AssertionError("playerwarps is not registered"));
+
+        // playerwarps is the 14th context — player-owned warps keyed (owner, name), delegating teleport
+        // execution like warps — registered last after the thirteen prior modules.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("playerwarps");
+
+        // It ships ENABLED (a steady-state feature like warps/vaults/holograms): with no modules.conf override it
+        // is on, and disabling exactly playerwarps removes only it while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("playerwarps", "teleport", "warps", "holograms");
+        Set<String> off =
+                registry.enabledModules(new FixedConfig(Map.of("modules.playerwarps.enabled", false))).stream()
+                        .map(m -> m.id().value())
+                        .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("playerwarps");
+        assertThat(off).contains("teleport", "warps", "holograms");
+
+        // Enabled, playerwarps contributes exactly /pwarp /setpwarp /delpwarp /pwarps and owns no extra Flyway
+        // location (its player_warps table is in the persistence V14 baseline, always applied), so it declares
+        // no MigrationSet of its own.
+        Set<String> literals =
+                playerwarps.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactlyInAnyOrder("pwarp", "setpwarp", "delpwarp", "pwarps");
+        assertThat(playerwarps.migrations()).isEmpty();
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
@@ -46,7 +47,8 @@ public final class MessageKeyCatalog {
             ItemworldMessageKey.values(),
             VaultsMessageKey.values(),
             CommunicationMessageKey.values(),
-            HologramsMessageKey.values());
+            HologramsMessageKey.values(),
+            PlayerwarpsMessageKey.values());
 
     private MessageKeyCatalog() {}
 

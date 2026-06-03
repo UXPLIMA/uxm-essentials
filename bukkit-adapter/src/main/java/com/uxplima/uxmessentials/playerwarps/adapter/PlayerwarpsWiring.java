@@ -1,0 +1,91 @@
+package com.uxplima.uxmessentials.playerwarps.adapter;
+
+import java.time.Clock;
+import java.util.List;
+import java.util.Objects;
+
+import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommands;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
+import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
+import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
+import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
+import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * Constructs the player-warps context's adapters and use cases over the injected kernel ports, the persistence
+ * DSL, and the teleport context's engine, and produces the Brigadier command list the plugin registers. This
+ * is the one place the player-warps context is wired — nothing else news up its classes.
+ *
+ * <p>The repository is the jOOQ adapter behind a Caffeine read-cache decorator keyed by owner (write-through
+ * at the delegate, invalidate in the cache). The teleporter delegates execution to the teleport context —
+ * player-warps never re-implements movement — which is why the wiring receives the already-constructed
+ * {@link TeleportEngine}. The per-owner count limit resolves through {@link PlayerWarpQuota} over the shared
+ * {@code Permissions} reducer with the module's {@code default-limit} config value as the fallback.
+ */
+@NullMarked
+public final class PlayerwarpsWiring {
+
+    private static final int DEFAULT_LIMIT = 3;
+
+    private PlayerwarpsWiring() {}
+
+    /** Build the player-warps adapters and use cases over the kernel ports and the teleport engine. */
+    public static Wired wire(ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine) {
+        Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(teleportEngine, "teleportEngine");
+        KernelPorts kernel = ctx.kernel();
+        PlayerWarpRepository repository = PlayerWarpRepositories.cached(persistence);
+        PlayerWarpNotifier notifier = new PlayerWarpNotifier(kernel.messages(), kernel.messageSink());
+        PlayerWarpTeleporter teleporter = new TeleportPlayerWarpAdapter(teleportEngine);
+        PlayerWarpQuota quota = new PlayerWarpQuota(kernel.permissions(), defaultLimit(ctx));
+        PlayerWarpServices services = assemble(kernel, repository, notifier, teleporter, quota);
+        return new Wired(PlayerWarpCommands.all(services, kernel.messages()));
+    }
+
+    private static PlayerWarpServices assemble(
+            KernelPorts kernel,
+            PlayerWarpRepository repository,
+            PlayerWarpNotifier notifier,
+            PlayerWarpTeleporter teleporter,
+            PlayerWarpQuota quota) {
+        Clock clock = Clock.systemUTC();
+        return new PlayerWarpServices(
+                new SetPlayerWarp(repository, quota, notifier, kernel.events(), clock),
+                new DelPlayerWarp(repository, notifier, kernel.events()),
+                new UsePlayerWarp(repository, teleporter, notifier),
+                new ListPlayerWarps(repository, notifier),
+                new SetPlayerWarpVisibility(repository, notifier),
+                kernel.playerLookup());
+    }
+
+    private static int defaultLimit(ModuleContext ctx) {
+        return Math.max(0, ctx.config().getInt("default-limit", DEFAULT_LIMIT));
+    }
+
+    /**
+     * Everything the player-warps module contributes once wired: the Brigadier commands. The context holds no
+     * repeating scheduled work and no in-memory store beyond the repository cache, so there is nothing to
+     * drain on stop — the module's {@code stop()} clears its own bookkeeping and the cache expires.
+     *
+     * @param commands the Brigadier command registrations to publish
+     */
+    public record Wired(List<CommandRegistration> commands) {
+
+        public Wired {
+            commands = List.copyOf(commands);
+        }
+    }
+}
