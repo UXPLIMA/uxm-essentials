@@ -15,8 +15,9 @@ import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurationNode;
 
 /**
- * Parses a {@code communication.conf} Configurate tree into immutable {@link CommunicationContent}. The HOCON
- * shape is
+ * Parses the merged communication-content Configurate tree into immutable {@link CommunicationContent}. The keys
+ * are authored across the {@code join-quit.conf}, {@code announcer.conf}, and {@code info-pages.conf} siblings under
+ * {@code modules/communication/} and merged at the root before this reads them, so the combined HOCON shape is
  *
  * <pre>{@code
  * join  { mode = CUSTOM, ordering = SEQUENTIAL, templates = [ "<welcome {player}>" ] }

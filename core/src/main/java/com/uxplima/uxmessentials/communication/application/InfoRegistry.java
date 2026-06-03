@@ -10,7 +10,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 
 /**
- * Maps a command name to its {@link InfoPage}. The operator declares pages in {@code communication.conf}
+ * Maps a command name to its {@link InfoPage}. The operator declares pages in {@code info-pages.conf}
  * ({@code rules}, {@code motd}, {@code info}, and any custom page); the module reads them into this registry and
  * registers one dynamic command per page. A {@code /rules} lookup returns the page's lines for the adapter to
  * render through MiniMessage; a lookup for an unconfigured page returns empty, which the command surface reports

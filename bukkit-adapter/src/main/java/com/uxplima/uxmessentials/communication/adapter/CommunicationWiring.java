@@ -35,8 +35,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Constructs the communication context's adapters and use cases over the injected kernel ports and the
- * {@code communication.conf} content, and produces everything the plugin must register: the Brigadier command
+ * Constructs the communication context's adapters and use cases over the injected kernel ports and the operator
+ * content under {@code modules/communication/}, and produces everything the plugin must register: the Brigadier command
  * list (the static {@code /broadcasttoggle} plus the config-derived info-page commands), the join/quit/death
  * connection listeners, and the self-rescheduling announcer timer on the {@code Scheduler} port. This is the one
  * place the communication context is wired — nothing else news up its classes.
@@ -50,7 +50,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class CommunicationWiring {
 
-    private static final String CONTENT_FILE = "modules/communication/config.conf";
+    private static final String MODULE_DIR = "modules/communication";
 
     private CommunicationWiring() {}
 
@@ -59,8 +59,8 @@ public final class CommunicationWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         KernelPorts kernel = ctx.kernel();
-        Path file = plugin.getDataFolder().toPath().resolve(CONTENT_FILE);
-        CommunicationSettings settings = new CommunicationSettings(file, kernel.log());
+        Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
+        CommunicationSettings settings = new CommunicationSettings(dir, kernel.log());
         AtomicBoolean running = new AtomicBoolean(true);
 
         BroadcastOptOutStore optOutStore = new PdcBroadcastOptOutStore(plugin);

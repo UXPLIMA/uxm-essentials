@@ -51,7 +51,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of the communication adapter against a real (mock) Bukkit server, end-to-end through the
- * {@code communication.conf} content the {@link CommunicationContentCodec} parses: the
+ * split {@code modules/communication} content the {@link CommunicationContentCodec} parses: the
  * {@link ConnectionMessageListener} overriding a join message per a {@code CUSTOM} policy, an auto-registered info
  * command ({@code /rules}) printing the configured page through the real Brigadier node, and
  * {@code /broadcasttoggle} flipping the PDC-backed opt-out and confirming with the plugin's own
@@ -75,7 +75,7 @@ class CommunicationAdapterTest {
         player = server.addPlayer("Alice");
         player.setOp(true);
         sink = new RecordingSink();
-        settings = new CommunicationSettings(writeConfig(dataDir), new NoopLogger());
+        settings = new CommunicationSettings(writeContent(dataDir), new NoopLogger());
         // One store over one mock plugin so the toggle write and the assertion read the same PDC namespace.
         optOutStore = new PdcBroadcastOptOutStore(MockBukkit.createMockPlugin());
     }
@@ -218,21 +218,28 @@ class CommunicationAdapterTest {
         return new PlayerRef(player.getUniqueId(), player.getName());
     }
 
-    private Path writeConfig(Path dataDir) throws Exception {
-        Path file = dataDir.resolve("communication.conf");
+    private Path writeContent(Path dataDir) throws Exception {
+        Path dir = dataDir.resolve("modules").resolve("communication");
+        Files.createDirectories(dir);
         Files.writeString(
-                file,
+                dir.resolve("join-quit.conf"),
                 """
                 join { mode = CUSTOM, ordering = SEQUENTIAL, templates = [ "welcome {player}" ] }
                 quit { mode = DEFAULT }
                 death { mode = DEFAULT }
-                announcer { interval-seconds = 60, min-players = 0, ordering = SEQUENTIAL, lines = [] }
+                """);
+        Files.writeString(
+                dir.resolve("announcer.conf"),
+                "announcer { interval-seconds = 60, min-players = 0, ordering = SEQUENTIAL, lines = [] }\n");
+        Files.writeString(
+                dir.resolve("info-pages.conf"),
+                """
                 info-pages {
                   rules = [ "Rule one", "Rule two" ]
                   motd = [ "Welcome {player}" ]
                 }
                 """);
-        return file;
+        return dir;
     }
 
     private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {

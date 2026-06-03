@@ -443,7 +443,8 @@ public final class PluginModule {
     private static void wireCommunication(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
         // communication persists nothing: the per-player broadcast opt-out is PDC-backed (survives relog), the
         // sequence counters are transient, and the connection policies, announcer schedule, and info pages are
-        // config-authored content in communication.conf. It carries no cross-context bridge — its only
+        // config-authored content in the modules/communication content files. It carries no cross-context bridge — its
+        // only
         // collaborators are the shared Scheduler, messages/messageSink, and event ports — so nothing is captured
         // for a later context. The announcer timer on the Scheduler port is stopped on disable.
         CommunicationWiring.Wired wired = CommunicationWiring.wire(plugin, ctx);

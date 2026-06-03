@@ -20,6 +20,12 @@ class DefaultResourcesLayoutTest {
         assertThat(Files.exists(dir.resolve("modules/economy/currencies.conf"))).isTrue();
         assertThat(Files.exists(dir.resolve("modules/communication/config.conf")))
                 .isTrue();
+        assertThat(Files.exists(dir.resolve("modules/communication/join-quit.conf")))
+                .isTrue();
+        assertThat(Files.exists(dir.resolve("modules/communication/announcer.conf")))
+                .isTrue();
+        assertThat(Files.exists(dir.resolve("modules/communication/info-pages.conf")))
+                .isTrue();
         assertThat(Files.exists(dir.resolve("messages/messages_en.conf"))).isTrue();
     }
 }

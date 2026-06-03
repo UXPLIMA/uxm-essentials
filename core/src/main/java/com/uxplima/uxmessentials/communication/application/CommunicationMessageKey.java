@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * text. These resolve through both locale catalogs and are parity-checked.
  *
  * <p>Deliberately <em>not</em> here: the operator-authored join/quit/death templates, the announcer lines, and
- * the {@code /rules} / {@code /motd} body. That is operator content in {@code communication.conf}, rendered
+ * the {@code /rules} / {@code /motd} body. That is operator content in the module's content siblings, rendered
  * through MiniMessage, and never a {@code MessageKey} — so the locale-parity guard never sees it. Only the
  * plugin's own confirmations and errors live here.
  *

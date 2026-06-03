@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>The split between the plugin's own strings and operator content is owned here: {@code /broadcasttoggle}
  * confirmations, the missing-info-page error, and the announcer-reloaded notice are {@code CommunicationMessageKey}s
  * in both locale catalogs (parity-checked); the join/quit/death templates, announcer lines, and info-page bodies
- * are config-authored operator content in {@code communication.conf}, rendered through MiniMessage and never
+ * are config-authored operator content in the module's content siblings, rendered through MiniMessage and never
  * parity-checked. The use cases, the announcer timer, the connection/death listeners, the opt-out store, and the
  * info-page commands are constructed in the adapter wiring once the module has started; the lifecycle bookkeeping
  * here keeps {@code stop()} honest — the announcer timer observes the running flag and exits cleanly on disable.

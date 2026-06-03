@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.communication.adapter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -18,12 +19,14 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
- * The communication context's operator content, loaded once from {@code communication.conf} at wiring time and
- * held in an {@link AtomicReference} so a reload swaps a fresh {@link CommunicationContent} whole — readers see
- * either the previous or the new content, never a half-applied tree (CLAUDE.md "swapped atomically via
- * AtomicReference on reload"). An absent or unreadable file yields fully inert content, so a server that enables
- * the module without authoring the file gets the do-nothing defaults: every channel defers to vanilla and the
- * announcer is silent.
+ * The communication context's operator content, loaded once at wiring time from the {@code join-quit.conf},
+ * {@code announcer.conf}, and {@code info-pages.conf} siblings under {@code modules/communication/} and held in an
+ * {@link AtomicReference} so a reload swaps a fresh {@link CommunicationContent} whole — readers see either the
+ * previous or the new content, never a half-applied tree (CLAUDE.md "swapped atomically via AtomicReference on
+ * reload"). The three files are merged at the root into one tree before the codec reads them, so the parsed model
+ * is identical to the old single-file layout. An absent directory, an absent sibling, or an unreadable file yields
+ * fully inert content for that part, so a server that enables the module without authoring the files gets the
+ * do-nothing defaults: every channel defers to vanilla and the announcer is silent.
  *
  * <p>The policy and schedule suppliers handed to the use cases read the live content on each call, so a reload
  * takes effect on the next join/quit/death or announcer tick with no re-wiring. The info pages are operator
@@ -32,16 +35,16 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 @NullMarked
 public final class CommunicationSettings {
 
-    private final Path file;
+    private static final List<String> CONTENT_FILES = List.of("join-quit.conf", "announcer.conf", "info-pages.conf");
+
+    private final Path moduleDir;
     private final Logger log;
-    private final HoconConfigurationLoader loader;
     private final AtomicReference<CommunicationContent> content;
 
-    public CommunicationSettings(Path file, Logger log) {
-        this.file = Objects.requireNonNull(file, "file");
+    public CommunicationSettings(Path moduleDir, Logger log) {
+        this.moduleDir = Objects.requireNonNull(moduleDir, "moduleDir");
         this.log = Objects.requireNonNull(log, "log");
-        this.loader = HoconConfigurationLoader.builder().path(file).build();
-        this.content = new AtomicReference<>(CommunicationContentCodec.read(read(loader, file, log)));
+        this.content = new AtomicReference<>(CommunicationContentCodec.read(mergedContent(moduleDir, log)));
     }
 
     /** The live join-channel policy; read fresh by {@code ResolveJoinMessage} each connection. */
@@ -79,24 +82,32 @@ public final class CommunicationSettings {
         return InfoRegistry.of(current().infoPages());
     }
 
-    /** Re-read {@code communication.conf} and swap the parsed content atomically. */
+    /** Re-read the content sibling files and swap the parsed content atomically. */
     public void reload() {
-        content.set(CommunicationContentCodec.read(read(loader, file, log)));
+        content.set(CommunicationContentCodec.read(mergedContent(moduleDir, log)));
     }
 
     private CommunicationContent current() {
         return Objects.requireNonNull(content.get(), "content");
     }
 
-    private static ConfigurationNode read(HoconConfigurationLoader loader, Path file, Logger log) {
+    private static ConfigurationNode mergedContent(Path moduleDir, Logger log) {
+        ConfigurationNode merged = CommentedConfigurationNode.root();
+        for (String name : CONTENT_FILES) {
+            mergeFile(merged, moduleDir.resolve(name), log);
+        }
+        return merged;
+    }
+
+    private static void mergeFile(ConfigurationNode target, Path file, Logger log) {
         if (!Files.exists(file)) {
-            return CommentedConfigurationNode.root();
+            return;
         }
         try {
-            return loader.load();
+            target.mergeFrom(
+                    HoconConfigurationLoader.builder().path(file).build().load());
         } catch (ConfigurateException failure) {
             log.error("failed to load " + file + "; communication runs inert", failure);
-            return CommentedConfigurationNode.root();
         }
     }
 
