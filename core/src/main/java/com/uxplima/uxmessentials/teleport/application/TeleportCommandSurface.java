@@ -41,6 +41,10 @@ final class TeleportCommandSurface {
                         "uxmessentials.tpa.cancel",
                         DescribedCommand.of("tpcancel", "Withdraw your outgoing request", "tpacancel")),
                 spec(
+                        "tpalist",
+                        "uxmessentials.tpa.use",
+                        DescribedCommand.of("tpalist", "List players waiting on your teleport reply", "tprequests")),
+                spec(
                         "tptoggle",
                         "uxmessentials.tpa.toggle",
                         DescribedCommand.of("tptoggle", "Refuse all incoming requests", "toggletp")),

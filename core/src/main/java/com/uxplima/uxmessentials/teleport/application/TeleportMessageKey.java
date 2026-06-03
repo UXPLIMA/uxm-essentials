@@ -26,6 +26,8 @@ public enum TeleportMessageKey implements MessageKey {
     TPA_TOGGLED_OFF("teleport.tpa.toggled-off"),
     TPA_BLOCKED("teleport.tpa.blocked"),
     TPA_NONE_PENDING("teleport.tpa.none-pending"),
+    TPA_LIST_HEADER("teleport.tpa.list-header"),
+    TPA_LIST_ENTRY("teleport.tpa.list-entry"),
     TPA_TOGGLE_ON("teleport.tpa.toggle-on"),
     TPA_TOGGLE_OFF("teleport.tpa.toggle-off"),
 

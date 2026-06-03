@@ -58,6 +58,7 @@ public final class TeleportCommands {
                         "Withdraw your outgoing request",
                         List.of("tpacancel"),
                         Mode.CANCEL),
+                new TpaListCommand(s, m),
                 new TpToggleCommand(s, m),
                 new TpBlockCommand(s, m, "tpblock", "Block a player's requests", true),
                 new TpBlockCommand(s, m, "tpunblock", "Unblock a player's requests", false),

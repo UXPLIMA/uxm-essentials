@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PrewarmedSafeLocationQueue;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
+import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
@@ -32,6 +33,7 @@ public final class TeleportServices {
 
     private final RequestTeleport requestTeleport;
     private final AcceptTeleport acceptTeleport;
+    private final ListPendingRequests listPendingRequests;
     private final CaptureBack captureBack;
     private final ResolveRtp resolveRtp;
     private final ResolveSpawn resolveSpawn;
@@ -50,6 +52,7 @@ public final class TeleportServices {
     public TeleportServices(Builder builder) {
         this.requestTeleport = Objects.requireNonNull(builder.requestTeleport, "requestTeleport");
         this.acceptTeleport = Objects.requireNonNull(builder.acceptTeleport, "acceptTeleport");
+        this.listPendingRequests = Objects.requireNonNull(builder.listPendingRequests, "listPendingRequests");
         this.captureBack = Objects.requireNonNull(builder.captureBack, "captureBack");
         this.resolveRtp = Objects.requireNonNull(builder.resolveRtp, "resolveRtp");
         this.resolveSpawn = Objects.requireNonNull(builder.resolveSpawn, "resolveSpawn");
@@ -72,6 +75,10 @@ public final class TeleportServices {
 
     public AcceptTeleport acceptTeleport() {
         return acceptTeleport;
+    }
+
+    public ListPendingRequests listPendingRequests() {
+        return listPendingRequests;
     }
 
     public CaptureBack captureBack() {
@@ -143,6 +150,7 @@ public final class TeleportServices {
     public static final class Builder {
         private @org.jspecify.annotations.Nullable RequestTeleport requestTeleport;
         private @org.jspecify.annotations.Nullable AcceptTeleport acceptTeleport;
+        private @org.jspecify.annotations.Nullable ListPendingRequests listPendingRequests;
         private @org.jspecify.annotations.Nullable CaptureBack captureBack;
         private @org.jspecify.annotations.Nullable ResolveRtp resolveRtp;
         private @org.jspecify.annotations.Nullable ResolveSpawn resolveSpawn;
@@ -165,6 +173,11 @@ public final class TeleportServices {
 
         public Builder acceptTeleport(AcceptTeleport value) {
             this.acceptTeleport = value;
+            return this;
+        }
+
+        public Builder listPendingRequests(ListPendingRequests value) {
+            this.listPendingRequests = value;
             return this;
         }
 

@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalHud;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
+import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
@@ -122,6 +123,7 @@ public final class TeleportWiring {
                 .requestTeleport(
                         new RequestTeleport(requests, flags, notifier, kernel.events(), settings, jailGate, clock))
                 .acceptTeleport(new AcceptTeleport(requests, engine, notifier, kernel.events(), clock))
+                .listPendingRequests(new ListPendingRequests(requests, notifier))
                 .captureBack(new CaptureBack(backStore, engine, notifier, kernel.events(), clock))
                 .resolveRtp(new ResolveRtp(rtpQueue, kernel.worldLookup(), engine, notifier, settings))
                 .resolveSpawn(new ResolveSpawn(spawns(), kernel.worldLookup(), engine, notifier))
