@@ -80,6 +80,18 @@ final class TeleportCommandSurface {
                 // spawn
                 spec("spawn", "uxmessentials.spawn.use", DescribedCommand.of("spawn", "Teleport to spawn")),
                 spec("setspawn", "uxmessentials.spawn.set", DescribedCommand.of("setspawn", "Set the server spawn")),
+                spec(
+                        "setmainspawn",
+                        "uxmessentials.spawn.set",
+                        DescribedCommand.of("setmainspawn", "Set the global main spawn")),
+                spec(
+                        "removespawn",
+                        "uxmessentials.spawn.set",
+                        DescribedCommand.of("removespawn", "Clear this world's own spawn")),
+                spec(
+                        "mirrorspawn",
+                        "uxmessentials.spawn.set",
+                        DescribedCommand.of("mirrorspawn", "Redirect this world's spawn to another world")),
                 // admin direct tp
                 spec("tp", "uxmessentials.tp.use", DescribedCommand.of("tp", "Teleport to a player or coordinates")),
                 spec("tphere", "uxmessentials.tp.use", DescribedCommand.of("tphere", "Pull a player to you")),

@@ -74,6 +74,9 @@ public final class TeleportCommands {
                 // spawn
                 new SpawnCommand(s, m),
                 new SetSpawnCommand(s, m),
+                new SetMainSpawnCommand(s, m),
+                new RemoveSpawnCommand(s, m),
+                new MirrorSpawnCommand(s, m),
                 // admin direct tp
                 new AdminTpCommand(s, m, "tp", "uxmessentials.tp.use", "Teleport to a player", Pull.GO),
                 new AdminTpCommand(s, m, "tphere", "uxmessentials.tp.use", "Pull a player to you", Pull.BRING),

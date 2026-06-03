@@ -222,10 +222,10 @@ public final class PluginModule {
             ContextLinks links,
             Bus bus) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
-        // started. teleport is the first context to land and needs no database; homes builds its jOOQ
-        // repository over persistence.dsl() and delegates execution to the captured teleport engine.
+        // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
+        // its jOOQ repository the same way and delegates execution to the captured teleport engine.
         if (module.id().equals(ModuleId.of("teleport"))) {
-            wireTeleport(plugin, ctx, resources, links);
+            wireTeleport(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("homes"))) {
             wireHomes(ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("economy"))) {
@@ -252,8 +252,12 @@ public final class PluginModule {
     }
 
     private static void wireTeleport(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
-        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx);
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
+        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx, persistence);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

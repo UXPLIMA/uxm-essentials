@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.teleport.SpawnDirectories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -18,7 +20,6 @@ import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RequestExpiry
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.TeleportListeners;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.AsyncTeleportExecutor;
-import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryBackLocationStore;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryRequestRegistry;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.RtpWorldSettings;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.SafeSearchValidator;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalHud;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
@@ -36,6 +38,7 @@ import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
+import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import org.jspecify.annotations.NullMarked;
 
@@ -55,9 +58,10 @@ public final class TeleportWiring {
     private TeleportWiring() {}
 
     /** Build the teleport adapters and use cases from {@code ctx}, ready to register with the plugin. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx) {
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(persistence, "persistence");
         ConfigStore config = ctx.config();
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
@@ -68,8 +72,8 @@ public final class TeleportWiring {
         WarmupTracker warmupTracker = new WarmupTracker();
         // The jail gate forwards to NEVER until the moderation context lands and rebinds it (soft couple).
         MutableJailGate jailGate = new MutableJailGate();
-        TeleportServices services =
-                assemble(plugin, kernel, config, settings, notifier, warmupTracker, jailGate, clock, running);
+        TeleportServices services = assemble(
+                plugin, kernel, config, persistence, settings, notifier, warmupTracker, jailGate, clock, running);
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), running::get);
         return new Wired(
@@ -85,6 +89,7 @@ public final class TeleportWiring {
             Plugin plugin,
             KernelPorts kernel,
             ConfigStore config,
+            Persistence persistence,
             TeleportSettings settings,
             PlayerNotifier notifier,
             WarmupTracker warmupTracker,
@@ -127,7 +132,7 @@ public final class TeleportWiring {
                 .listPendingRequests(new ListPendingRequests(requests, notifier))
                 .captureBack(new CaptureBack(backStore, engine, notifier, kernel.events(), clock))
                 .resolveRtp(new ResolveRtp(rtpQueue, kernel.worldLookup(), engine, notifier, settings))
-                .resolveSpawn(new ResolveSpawn(spawns(), kernel.worldLookup(), engine, notifier))
+                .resolveSpawn(new ResolveSpawn(spawns(plugin, persistence), kernel.worldLookup(), engine, notifier))
                 .build();
     }
 
@@ -139,10 +144,11 @@ public final class TeleportWiring {
                 kernel.scheduler(), validator, RtpWorldSettings.from(config), kernel.log(), running::get);
     }
 
-    private static BukkitSpawnDirectory spawns() {
-        // Spawn-mirror rules would be parsed from teleport.conf here once the mirror config block lands;
-        // an empty set is the working default (no world redirects).
-        return new BukkitSpawnDirectory(List.of());
+    private static SpawnDirectory spawns(Plugin plugin, Persistence persistence) {
+        // The durable jOOQ store holds the per-world spawns, the main spawn, named spawns and mirror
+        // redirects; the decorator adds the vanilla world spawn as the bottom-of-chain last resort so
+        // /spawn answers on a fresh server before any /setspawn.
+        return new VanillaFallbackSpawnDirectory(SpawnDirectories.jooq(persistence), plugin.getServer());
     }
 
     private static List<Listener> listeners(TeleportServices services, ConfigStore config) {

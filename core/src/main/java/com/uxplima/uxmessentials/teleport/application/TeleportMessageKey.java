@@ -51,6 +51,12 @@ public enum TeleportMessageKey implements MessageKey {
     SPAWN_TELEPORTED("teleport.spawn.teleported"),
     SPAWN_SET("teleport.spawn.set"),
     SPAWN_UNRESOLVED("teleport.spawn.unresolved"),
+    SPAWN_MAIN_SET("teleport.spawn.main-set"),
+    SPAWN_REMOVED("teleport.spawn.removed"),
+    SPAWN_REMOVE_NONE("teleport.spawn.remove-none"),
+    SPAWN_MIRRORED("teleport.spawn.mirrored"),
+    SPAWN_MIRROR_UNKNOWN_WORLD("teleport.spawn.mirror-unknown-world"),
+    SPAWN_MIRROR_SELF("teleport.spawn.mirror-self"),
 
     // arrival HUD — the short title flashed on the screen when a teleport lands
     ARRIVED_TITLE("teleport.arrived.title"),

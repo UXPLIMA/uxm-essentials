@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.teleport.application;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,11 +18,13 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 
 /**
- * The {@code /spawn} and {@code /setspawn} use case. Spawn resolution folds a per-world {@link
- * SpawnMirror} (when present) so a {@code /spawn} issued in world A may resolve to world B's spawn, and
- * supports operator-defined named spawns ({@code /spawn <name>}). {@code /setspawn} writes through the
- * spawn directory. Resolution reads the live target spawn through the directory rather than a copied
- * location, so a moved target spawn is reflected immediately.
+ * The {@code /spawn} family use case: {@code /spawn}, {@code /setspawn}, plus the multi-spawn operator verbs
+ * {@code /setmainspawn} (the global default a world falls back to), {@code /removespawn} (drop a world's own
+ * spawn), and {@code /mirrorspawn} (redirect a world's {@code /spawn} to another world). Resolution folds a
+ * per-world {@link SpawnMirror} (when present) so a {@code /spawn} issued in world A may resolve to world B's
+ * spawn, then prefers that world's own spawn, then the main spawn, then the directory's bottom-of-chain
+ * default. All writes go through the spawn directory; resolution reads the live target spawn through it rather
+ * than a copied location, so a moved target spawn is reflected immediately.
  */
 public final class ResolveSpawn {
 
@@ -62,11 +65,54 @@ public final class ResolveSpawn {
         spawns.setNamedSpawn(Objects.requireNonNull(name, "name"), Objects.requireNonNull(position, "position"));
     }
 
-    /** The resolved default spawn position for a world, following a mirror when configured. */
+    /** {@code /setmainspawn}: set the global main spawn to {@code position} and confirm to {@code who}. */
+    public void setMain(PlayerRef who, Position position) {
+        Objects.requireNonNull(who, "who");
+        spawns.setMainSpawn(Objects.requireNonNull(position, "position"));
+        notifier.send(who, TeleportMessageKey.SPAWN_MAIN_SET);
+    }
+
+    /** {@code /removespawn}: drop {@code world}'s own spawn so it falls back to the main spawn; confirm. */
+    public void removeWorldSpawn(PlayerRef who, WorldRef world) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(world, "world");
+        boolean removed = spawns.removeDefaultSpawn(world);
+        notifier.send(who, removed ? TeleportMessageKey.SPAWN_REMOVED : TeleportMessageKey.SPAWN_REMOVE_NONE);
+    }
+
+    /**
+     * {@code /mirrorspawn <world>}: redirect {@code currentWorld}'s {@code /spawn} to {@code targetWorldName}'s
+     * spawn. Rejects an unknown target world and a self-mirror, notifying the actor in each case.
+     */
+    public void mirror(PlayerRef who, WorldRef currentWorld, String targetWorldName) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(currentWorld, "currentWorld");
+        Objects.requireNonNull(targetWorldName, "targetWorldName");
+        Optional<WorldRef> target = worlds.findByName(targetWorldName);
+        if (target.isEmpty()) {
+            notifier.send(who, TeleportMessageKey.SPAWN_MIRROR_UNKNOWN_WORLD, Map.of("world", targetWorldName));
+            return;
+        }
+        if (target.get().uid().equals(currentWorld.uid())) {
+            notifier.send(who, TeleportMessageKey.SPAWN_MIRROR_SELF);
+            return;
+        }
+        spawns.setMirror(new SpawnMirror(currentWorld.uid(), target.get().uid()));
+        notifier.send(
+                who,
+                TeleportMessageKey.SPAWN_MIRRORED,
+                Map.of("world", target.get().name()));
+    }
+
+    /**
+     * The resolved default spawn for a world: a mirror (when configured) redirects to the target world, then
+     * resolution prefers that world's own operator-set spawn, then the global main spawn, then the directory's
+     * bottom-of-chain default (which folds in the vanilla world spawn).
+     */
     public Optional<Position> resolveDefault(WorldRef world) {
         Objects.requireNonNull(world, "world");
         WorldRef effective = spawns.mirrorFor(world).flatMap(this::targetWorld).orElse(world);
-        return spawns.defaultSpawn(effective);
+        return spawns.operatorSpawn(effective).or(spawns::mainSpawn).or(() -> spawns.defaultSpawn(effective));
     }
 
     private Result<Unit, TeleportError> go(PlayerRef who, Optional<Position> spawn) {

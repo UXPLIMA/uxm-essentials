@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,9 +24,10 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryRequestRegistry;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemorySpawnDirectory;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
@@ -76,7 +76,7 @@ class TeleportCommandPathTest {
         TeleportSettings settings = new TeleportSettings(new ZeroWaitConfig());
         PlayerNotifier notifier = new PlayerNotifier(new KeyMessages(), new CapturingSink());
         requests = new InMemoryRequestRegistry(true);
-        BukkitSpawnDirectory spawns = new BukkitSpawnDirectory(List.of());
+        VanillaFallbackSpawnDirectory spawns = new VanillaFallbackSpawnDirectory(new InMemorySpawnDirectory(), server);
         // MockBukkit stubs Entity#teleportAsync (UnimplementedOperationException), so the recording
         // executor stands in for the entity hop; the real AsyncTeleportExecutor is exercised on a live
         // server. Every other adapter here — registry, spawn directory, PDC flags, world lookup — is real.

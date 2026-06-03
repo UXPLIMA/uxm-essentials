@@ -85,7 +85,7 @@ permissions:
     description: '/spawn <name> to teleport to a named spawn.'
     default: true
   uxmessentials.spawn.set:
-    description: '/setspawn to set the server spawn or a named spawn.'
+    description: '/setspawn, /setmainspawn, /removespawn and /mirrorspawn to define and manage spawns.'
     default: op
   uxmessentials.tp.use:
     description: '/tp, /tphere, /goto, /bring and /tprandomplayer (/tprp) direct staff teleport.'
