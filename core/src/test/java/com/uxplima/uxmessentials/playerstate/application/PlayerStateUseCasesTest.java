@@ -173,6 +173,14 @@ class PlayerStateUseCasesTest {
     }
 
     @Test
+    void glowReportsTheResultingState() {
+        ToggleGlow glow = new ToggleGlow(effects, notifier);
+
+        assertThat(glow.toggle(alice)).isTrue();
+        assertThat(glow.toggle(alice)).isFalse();
+    }
+
+    @Test
     void personalTimeAndWeatherApplyThroughTheEffectsPort() {
         new SetPersonalTime(effects, notifier)
                 .apply(alice, PersonalTime.parse("night").orElseThrow());
@@ -357,6 +365,7 @@ class PlayerStateUseCasesTest {
         private final List<UUID> cleared = new ArrayList<>();
         private final List<UUID> killed = new ArrayList<>();
         private final Map<UUID, Boolean> nightVision = new ConcurrentHashMap<>();
+        private final Map<UUID, Boolean> glowing = new ConcurrentHashMap<>();
         private final Map<UUID, PersonalTime> appliedTime = new ConcurrentHashMap<>();
         private final Map<UUID, PersonalWeather> appliedWeather = new ConcurrentHashMap<>();
         private final Map<UUID, Integer> currentExp = new ConcurrentHashMap<>();
@@ -397,6 +406,11 @@ class PlayerStateUseCasesTest {
         @Override
         public boolean toggleNightVision(PlayerRef who) {
             return nightVision.merge(who.uuid(), Boolean.TRUE, (old, ignored) -> !old);
+        }
+
+        @Override
+        public boolean toggleGlow(PlayerRef who) {
+            return glowing.merge(who.uuid(), Boolean.TRUE, (old, ignored) -> !old);
         }
 
         @Override

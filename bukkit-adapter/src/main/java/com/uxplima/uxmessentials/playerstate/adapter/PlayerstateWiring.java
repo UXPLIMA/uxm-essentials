@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
+import com.uxplima.uxmessentials.playerstate.application.ToggleGlow;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
 import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
 import com.uxplima.uxmessentials.playerstate.application.port.InventoryViewer;
@@ -111,6 +112,7 @@ public final class PlayerstateWiring {
                 new Suicide(effects, notifier),
                 new ListNearby(ports.nearby(), notifier),
                 new ToggleNightVision(effects, notifier),
+                new ToggleGlow(effects, notifier),
                 new SetPersonalTime(effects, notifier),
                 new SetPersonalWeather(effects, notifier),
                 new SetExperience(effects, notifier),

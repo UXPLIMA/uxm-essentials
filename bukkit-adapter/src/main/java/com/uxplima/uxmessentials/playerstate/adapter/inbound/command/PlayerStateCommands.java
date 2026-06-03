@@ -47,6 +47,7 @@ public final class PlayerStateCommands {
                 new SuicideCommand(services, messages),
                 new NearCommand(services, messages),
                 new NightVisionCommand(services, messages),
+                new GlowCommand(services, messages),
                 new PersonalTimeCommand(services, messages),
                 new PersonalWeatherCommand(services, messages),
                 new ExperienceCommand(services, messages),

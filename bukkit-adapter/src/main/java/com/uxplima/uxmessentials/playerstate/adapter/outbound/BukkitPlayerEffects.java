@@ -25,13 +25,13 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@link PlayerEffects} implementation: the apply-once and live-only verbs that act on the live player
- * without changing the persisted snapshot — heal, feed, extinguish, suicide, night-vision, and the per-player
- * time/weather overrides. Each resolves the live {@code Player} and runs on the player's owning region/entity
- * thread through the injected {@link Scheduler} port; an offline target is a silent no-op.
+ * without changing the persisted snapshot — heal, feed, extinguish, suicide, night-vision, glow, and the
+ * per-player time/weather overrides. Each resolves the live {@code Player} and runs on the player's owning
+ * region/entity thread through the injected {@link Scheduler} port; an offline target is a silent no-op.
  *
- * <p>{@link #toggleNightVision} reports the resulting on/off state synchronously off the snapshot the call
- * captures so the use case can render the right confirmation, while the effect mutation itself is hopped to
- * the entity thread.
+ * <p>{@link #toggleNightVision} and {@link #toggleGlow} report the resulting on/off state synchronously off the
+ * snapshot the call captures so the use case can render the right confirmation, while the effect mutation itself
+ * is hopped to the entity thread.
  */
 @NullMarked
 public final class BukkitPlayerEffects implements PlayerEffects {
@@ -92,6 +92,14 @@ public final class BukkitPlayerEffects implements PlayerEffects {
                         new PotionEffect(PotionEffectType.NIGHT_VISION, (int) INFINITE_TICKS, 0, false, false));
             }
         });
+        return willEnable;
+    }
+
+    @Override
+    public boolean toggleGlow(PlayerRef who) {
+        Player snapshot = Bukkit.getPlayer(who.uuid());
+        boolean willEnable = snapshot == null || !snapshot.isGlowing();
+        onEntity(who, player -> player.setGlowing(!player.isGlowing()));
         return willEnable;
     }
 

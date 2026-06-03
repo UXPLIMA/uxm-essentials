@@ -267,6 +267,9 @@ permissions:
   uxmessentials.nightvision.use:
     description: '/nightvision (/nv) to toggle a night-vision effect on yourself.'
     default: op
+  uxmessentials.glow.use:
+    description: '/glow to toggle a glowing outline on yourself.'
+    default: op
   uxmessentials.ptime.use:
     description: '/ptime <value|reset> to set a per-player client-side time.'
     default: op

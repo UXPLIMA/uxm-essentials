@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * Outbound port for the apply-once and live-only effects that carry no persisted snapshot flag — heal, feed,
- * extinguish, suicide, night-vision, and the per-player time/weather overrides. The adapter resolves the live
+ * extinguish, suicide, night-vision, glow, and the per-player time/weather overrides. The adapter resolves the live
  * {@code Player} and performs each on the player's owning region/entity thread via the {@code Scheduler}
  * port; an offline target is a silent no-op.
  *
@@ -39,6 +39,9 @@ public interface PlayerEffects {
 
     /** Toggle a permanent night-vision effect on {@code who}; returns the resulting on/off state. */
     boolean toggleNightVision(PlayerRef who);
+
+    /** Toggle a permanent glowing outline on {@code who}; returns the resulting on/off state. */
+    boolean toggleGlow(PlayerRef who);
 
     /** Apply {@code who}'s personal client-side time, or reset it when {@code time.reset()}. */
     void applyTime(PlayerRef who, PersonalTime time);

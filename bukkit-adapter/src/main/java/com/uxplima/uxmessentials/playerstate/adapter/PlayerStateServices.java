@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
+import com.uxplima.uxmessentials.playerstate.application.ToggleGlow;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
 import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -48,6 +49,7 @@ import org.jspecify.annotations.NullMarked;
  * @param suicide {@code /suicide}
  * @param listNearby {@code /near}
  * @param toggleNightVision {@code /nightvision} ({@code /nv})
+ * @param toggleGlow {@code /glow}
  * @param personalTime {@code /ptime}
  * @param personalWeather {@code /pweather}
  * @param experience {@code /exp} ({@code /xp})
@@ -75,6 +77,7 @@ public record PlayerStateServices(
         Suicide suicide,
         ListNearby listNearby,
         ToggleNightVision toggleNightVision,
+        ToggleGlow toggleGlow,
         SetPersonalTime personalTime,
         SetPersonalWeather personalWeather,
         SetExperience experience,
@@ -101,6 +104,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(suicide, "suicide");
         Objects.requireNonNull(listNearby, "listNearby");
         Objects.requireNonNull(toggleNightVision, "toggleNightVision");
+        Objects.requireNonNull(toggleGlow, "toggleGlow");
         Objects.requireNonNull(personalTime, "personalTime");
         Objects.requireNonNull(personalWeather, "personalWeather");
         Objects.requireNonNull(experience, "experience");

@@ -100,6 +100,11 @@ class ClearInventoryTest {
         }
 
         @Override
+        public boolean toggleGlow(PlayerRef who) {
+            return false;
+        }
+
+        @Override
         public void applyTime(PlayerRef who, PersonalTime time) {}
 
         @Override

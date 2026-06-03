@@ -48,6 +48,7 @@ final class PlayerstateCommandSurface {
                 spec("suicide", "uxmessentials.suicide.use", cmd("suicide", "Kill yourself")),
                 spec("near", "uxmessentials.near.use", cmd("near", "List nearby players")),
                 spec("nightvision", "uxmessentials.nightvision.use", cmd("nightvision", "Toggle night vision")),
+                spec("glow", "uxmessentials.glow.use", cmd("glow", "Toggle a glowing outline")),
                 spec("ptime", "uxmessentials.ptime.use", cmd("ptime", "Set your personal time")),
                 spec("pweather", "uxmessentials.pweather.use", cmd("pweather", "Set your personal weather")),
                 spec("exp", "uxmessentials.exp.use", cmd("exp", "Get or set experience")),

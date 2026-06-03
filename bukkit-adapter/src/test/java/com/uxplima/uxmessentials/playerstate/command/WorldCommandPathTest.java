@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
+import com.uxplima.uxmessentials.playerstate.application.ToggleGlow;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
 import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -81,6 +82,7 @@ class WorldCommandPathTest {
                 mock(Suicide.class),
                 mock(ListNearby.class),
                 mock(ToggleNightVision.class),
+                mock(ToggleGlow.class),
                 mock(SetPersonalTime.class),
                 mock(SetPersonalWeather.class),
                 mock(SetExperience.class),
