@@ -64,6 +64,18 @@ class CommandAliasDefaultsTest {
     }
 
     @Test
+    void augment_addsEssentialsXMuscleMemoryAliases() {
+        List<CommandDefinition> out = CommandAliasDefaults.augment(List.of(
+                def("feed", "feed"), def("back", "back"), def("afk", "afk"), def("god", "god"), def("near", "near")));
+
+        assertThat(out.get(0).defaultAliases()).contains("eat");
+        assertThat(out.get(1).defaultAliases()).contains("return");
+        assertThat(out.get(2).defaultAliases()).contains("away");
+        assertThat(out.get(3).defaultAliases()).contains("godmode");
+        assertThat(out.get(4).defaultAliases()).contains("nearby");
+    }
+
+    @Test
     void augment_isDeterministic() {
         List<CommandDefinition> first =
                 CommandAliasDefaults.augment(List.of(def("balance", "balance", "bal", "money")));

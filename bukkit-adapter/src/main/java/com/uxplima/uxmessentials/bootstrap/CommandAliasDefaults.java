@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
 
 /**
  * The curated muscle-memory aliases we ship turned on by default ({@code /m}, {@code /tell}, {@code /v},
- * {@code /gm}, {@code /h}, …). These augment each command's code-side defaults before the catalog
+ * {@code /gm}, {@code /h}, {@code /eat}, {@code /godmode}, …). These augment each command's code-side defaults before the catalog
  * resolves the operator's overrides, so the short forms people reach for from other plugins answer out
  * of the box without anyone editing {@code commands/<module>.conf}.
  *
@@ -28,16 +28,21 @@ public final class CommandAliasDefaults {
     // Keyed by commandId; values are the extra aliases to fold in. Only ids that exist as real top-level
     // command literals appear, and only aliases justified by the design spec's named list. Entries whose
     // alias already matches a code default (balance->money, eco->economy) are deduped on merge.
-    private static final Map<String, List<String>> EXTRA = Map.of(
-            "msg", List.of("m", "tell", "whisper", "w"),
-            "reply", List.of("r"),
-            "vanish", List.of("v"),
-            "balance", List.of("bal", "money"),
-            "eco", List.of("economy"),
-            "gamemode", List.of("gm"),
-            "home", List.of("h"),
-            "warp", List.of("wp"),
-            "kit", List.of("k"));
+    private static final Map<String, List<String>> EXTRA = Map.ofEntries(
+            Map.entry("msg", List.of("m", "tell", "whisper", "w")),
+            Map.entry("reply", List.of("r")),
+            Map.entry("vanish", List.of("v")),
+            Map.entry("balance", List.of("bal", "money")),
+            Map.entry("eco", List.of("economy")),
+            Map.entry("gamemode", List.of("gm")),
+            Map.entry("home", List.of("h")),
+            Map.entry("warp", List.of("wp")),
+            Map.entry("kit", List.of("k")),
+            Map.entry("feed", List.of("eat")),
+            Map.entry("back", List.of("return")),
+            Map.entry("afk", List.of("away")),
+            Map.entry("god", List.of("godmode")),
+            Map.entry("near", List.of("nearby")));
 
     // Real standalone commands that must keep their own literals; never emitted as an added alias.
     private static final Set<String> CONFLICT_TARGETS =
