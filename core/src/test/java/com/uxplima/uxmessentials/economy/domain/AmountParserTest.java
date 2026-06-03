@@ -57,6 +57,23 @@ class AmountParserTest {
         assertThat(result.orElseThrow().amount()).isEqualByComparingTo(new BigDecimal(expected));
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "1q, 1000000000000000",
+        "2Q, 2000000000000000",
+        "1.5q, 1500000000000000",
+    })
+    void quadrillionSuffixScalesByTenToTheFifteenth(String raw, String expected) {
+        // A 1e15 figure overshoots the COINS 1e12 ceiling, so assert the multiplier against a currency whose
+        // cap is high enough to see the unclamped value.
+        Currency highCap = Currencies.cappedCoins(2_000_000_000_000_000L);
+
+        Result<Money, AmountParseError> result = AmountParser.parse(raw, highCap);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(result.orElseThrow().amount()).isEqualByComparingTo(new BigDecimal(expected));
+    }
+
     @Test
     void plainDecimalIsNormalisedToTheCurrencyPrecision() {
         // A 4-digit fraction is unambiguously a decimal (not a thousands group), so it rounds half-up to the

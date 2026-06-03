@@ -8,7 +8,8 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 /**
  * Parses a human-typed amount token into an exact {@link Money} in a given {@link Currency}. Accepts the
  * shorthand operators reach for at the command line — a magnitude suffix ({@code k}=10^3, {@code m}=10^6,
- * {@code b}=10^9, {@code t}=10^12, case-insensitive) and thousands separators ({@code 1,000} or {@code 1.000})
+ * {@code b}=10^9, {@code t}=10^12, {@code q}=10^15, case-insensitive) and thousands separators ({@code 1,000}
+ * or {@code 1.000})
  * — while staying {@link BigDecimal}-exact throughout: the suffix multiply is a {@code BigDecimal} scale, never
  * a {@code double}, so {@code 1.5m} is exactly {@code 1500000} and rounding drift stays impossible (the economy
  * GLOSSARY invariant (b)).
@@ -32,6 +33,7 @@ public final class AmountParser {
     private static final BigDecimal MILLION = new BigDecimal("1000000");
     private static final BigDecimal BILLION = new BigDecimal("1000000000");
     private static final BigDecimal TRILLION = new BigDecimal("1000000000000");
+    private static final BigDecimal QUADRILLION = new BigDecimal("1000000000000000");
 
     private AmountParser() {}
 
@@ -76,6 +78,7 @@ public final class AmountParser {
             case 'm' -> MILLION;
             case 'b' -> BILLION;
             case 't' -> TRILLION;
+            case 'q' -> QUADRILLION;
             default -> null;
         };
     }
