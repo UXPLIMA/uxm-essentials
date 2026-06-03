@@ -97,7 +97,7 @@ permissions:
     description: '/tpoffline / /tpofflinehere to a player''s logout location.'
     default: op
   uxmessentials.tp.vertical:
-    description: '/top, /bottom, /jump, /up, /down vertical teleports.'
+    description: '/top, /bottom, /jump, /up, /down, /ascend, /descend vertical teleports.'
     default: op
   uxmessentials.tp.all:
     description: '/tpall to pull every online player to you.'

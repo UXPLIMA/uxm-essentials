@@ -9,30 +9,47 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@code /down} into the teleport context's command surface alongside its inverse {@code /up}.
- * EssentialsX ships the pair together; this guard fails if the vertical family ever loses {@code /down}
- * or wires it under a permission node other than the shared {@code uxmessentials.tp.vertical} the rest of
- * the vertical verbs already use, which would otherwise drift the permissions reference and paper-plugin.yml.
+ * Pins the vertical teleport family — {@code /down} plus the EssentialsX {@code /ascend} and
+ * {@code /descend} verbs — into the teleport context's command surface. EssentialsX ships these together;
+ * this guard fails if any of them ever drops out of the surface or wires under a permission node other than
+ * the shared {@code uxmessentials.tp.vertical} the rest of the vertical verbs already use, which would
+ * otherwise drift the permissions reference and paper-plugin.yml.
  */
 class VerticalSurfaceDriftTest {
 
-    private static CommandSpec downSpec() {
+    private static CommandSpec verticalSpec(String literal) {
         FeatureModule teleport = new DefaultModuleRegistry()
                 .byId(ModuleId.of("teleport"))
                 .orElseThrow(() -> new AssertionError("teleport module must be registered"));
         return teleport.commands().stream()
-                .filter(spec -> spec.literal().equals("down"))
+                .filter(spec -> spec.literal().equals(literal))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("teleport surface must expose a /down command"));
+                .orElseThrow(() -> new AssertionError("teleport surface must expose a /" + literal + " command"));
     }
 
     @Test
     void teleportSurfaceExposesDown() {
-        assertThat(downSpec().literal()).isEqualTo("down");
+        assertThat(verticalSpec("down").literal()).isEqualTo("down");
     }
 
     @Test
     void downReusesTheSharedVerticalPermission() {
-        assertThat(downSpec().permission()).isEqualTo("uxmessentials.tp.vertical");
+        assertThat(verticalSpec("down").permission()).isEqualTo("uxmessentials.tp.vertical");
+    }
+
+    @Test
+    void teleportSurfaceExposesAscend() {
+        assertThat(verticalSpec("ascend").literal()).isEqualTo("ascend");
+    }
+
+    @Test
+    void teleportSurfaceExposesDescend() {
+        assertThat(verticalSpec("descend").literal()).isEqualTo("descend");
+    }
+
+    @Test
+    void ascendDescendReuseTheSharedVerticalPermission() {
+        assertThat(verticalSpec("ascend").permission()).isEqualTo("uxmessentials.tp.vertical");
+        assertThat(verticalSpec("descend").permission()).isEqualTo("uxmessentials.tp.vertical");
     }
 }

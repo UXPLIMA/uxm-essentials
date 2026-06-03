@@ -29,10 +29,11 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The vertical / line-of-sight positional verbs — {@code /top}, {@code /bottom}, {@code /jump},
- * {@code /up}, {@code /down} — sharing one node builder and differing only by {@link Kind}. Each resolves
- * a destination from the player's column or line of sight on the region thread, then issues an instant hop
- * through the async executor. {@code /jump} and {@code /down} report "no target block" when nothing is in
- * sight (or no solid block lies below the player's feet).
+ * {@code /up}, {@code /down}, {@code /ascend}, {@code /descend} — sharing one node builder and differing
+ * only by {@link Kind}. Each resolves a destination from the player's column or line of sight on the region
+ * thread, then issues an instant hop through the async executor. {@code /jump}, {@code /down},
+ * {@code /ascend} and {@code /descend} report "no target block" when nothing suitable is in sight (no solid
+ * block below the feet, or no standable gap further up/down the column).
  */
 @NullMarked
 public final class VerticalCommand extends TeleportCommandSupport implements CommandRegistration {
@@ -46,7 +47,9 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
         BOTTOM,
         JUMP,
         UP,
-        DOWN
+        DOWN,
+        ASCEND,
+        DESCEND
     }
 
     private final String literal;
@@ -100,6 +103,8 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
             case UP -> Optional.of(at(origin, origin.getBlockY() + blocks));
             case JUMP -> jumpTarget(sender, origin);
             case DOWN -> downTarget(sender, origin);
+            case ASCEND -> ascendTarget(sender, origin);
+            case DESCEND -> descendTarget(sender, origin);
         };
     }
 
@@ -113,6 +118,37 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
             }
         }
         return Optional.empty();
+    }
+
+    private static Optional<Position> ascendTarget(Player sender, Location origin) {
+        World world = sender.getWorld();
+        int x = origin.getBlockX();
+        int z = origin.getBlockZ();
+        for (int y = origin.getBlockY() + 1; y <= world.getMaxHeight() - 2; y++) {
+            if (standable(world, x, y, z)) {
+                return Optional.of(at(origin, y + 1));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<Position> descendTarget(Player sender, Location origin) {
+        World world = sender.getWorld();
+        int x = origin.getBlockX();
+        int z = origin.getBlockZ();
+        for (int y = origin.getBlockY() - 2; y >= world.getMinHeight(); y--) {
+            if (standable(world, x, y, z)) {
+                return Optional.of(at(origin, y + 1));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** A solid floor at {@code y} with two air blocks above — a gap a player can stand in. */
+    private static boolean standable(World world, int x, int y, int z) {
+        return world.getBlockAt(x, y, z).getType().isSolid()
+                && world.getBlockAt(x, y + 1, z).getType().isAir()
+                && world.getBlockAt(x, y + 2, z).getType().isAir();
     }
 
     private static Position at(Location origin, int y) {
