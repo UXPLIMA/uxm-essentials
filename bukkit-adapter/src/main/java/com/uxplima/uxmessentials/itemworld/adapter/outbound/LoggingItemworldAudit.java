@@ -149,4 +149,12 @@ public final class LoggingItemworldAudit implements ItemworldAudit {
         }
         audit.info("event=itemworld_break actor={} block={} ok=true", actor.uuid(), blockType);
     }
+
+    @Override
+    public void grewTree(PlayerRef actor, String type) {
+        if (!config.auditEnabled("tree")) {
+            return;
+        }
+        audit.info("event=itemworld_tree actor={} type={} ok=true", actor.uuid(), type);
+    }
 }

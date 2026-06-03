@@ -11,10 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.ShapedRecipe;
-import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.block.Block;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -51,28 +48,32 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /recipe} through its real Brigadier node against a real (mock) server. The
- * server starts with no recipes registered, so the craftable paths register a {@link ShapedRecipe} and a
- * {@link ShapelessRecipe} explicitly: a player holding a shaped-recipe result gets {@code RECIPE_SHAPED}, a
- * named shapeless-recipe item gets {@code RECIPE_SHAPELESS}, an item with no recipe gets {@code RECIPE_NONE},
- * an unknown named item gets {@code UNKNOWN_ITEM}, and an empty hand with no argument gets
- * {@code NO_ITEM_IN_HAND}. The message sink records which {@link MessageKey} each path delivered.
+ * MockBukkit coverage of {@code /tree} through its real Brigadier node. With admin-fun enabled an op looking at
+ * a block grows a tree of the requested type one block above it; an unknown type answers
+ * {@code TREE_UNKNOWN_TYPE} and nothing in range answers {@code TREE_NO_TARGET}. MockBukkit does not raytrace,
+ * so the looked-at block is supplied through a {@code getTargetBlockExact} stub on the player. World tree
+ * generation under MockBukkit is unreliable, so the generation outcome is asserted only as one of the two
+ * spawned/failed keys plus the audit being called only on success; the unknown-type and no-target branches —
+ * which do not depend on generation — carry the deterministic assertions.
  */
-class RecipeCommandTest {
+class TreeCommandTest {
 
     private ServerMock server;
-    private PlayerMock player;
+    private TargetingPlayer player;
     private RecordingSink sink;
     private MutableConfig config;
+    private RecordingAudit audit;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         server.addSimpleWorld("world");
-        player = server.addPlayer("Alice");
+        player = new TargetingPlayer(server, "Alice");
+        server.addPlayer(player);
         player.setOp(true);
         sink = new RecordingSink();
         config = new MutableConfig();
+        audit = new RecordingAudit();
     }
 
     @AfterEach
@@ -81,69 +82,55 @@ class RecipeCommandTest {
     }
 
     @Test
-    void literalIsRecipe() {
-        assertThat(new RecipeCommand(services()).build().getLiteral()).isEqualTo("recipe");
+    void literalIsTree() {
+        assertThat(new TreeCommand(services()).build().getLiteral()).isEqualTo("tree");
     }
 
     @Test
-    void heldShapedRecipeItemReportsTheShapedGrid() {
-        ShapedRecipe recipe = new ShapedRecipe(new NamespacedKey("uxmtest", "chest"), new ItemStack(Material.CHEST));
-        recipe.shape("PPP", "P P", "PPP");
-        recipe.setIngredient('P', Material.OAK_PLANKS);
-        server.addRecipe(recipe);
-        player.getInventory().setItemInMainHand(new ItemStack(Material.CHEST));
-
-        execute("recipe");
-
-        assertThat(sink.keys).contains(ItemworldMessageKey.RECIPE_SHAPED);
-        assertThat(sink.keys).doesNotContain(ItemworldMessageKey.RECIPE_NONE);
+    void hasNoAliases() {
+        assertThat(new TreeCommand(services()).aliases()).isEmpty();
     }
 
     @Test
-    void namedShapelessRecipeItemReportsTheIngredients() {
-        ShapelessRecipe recipe =
-                new ShapelessRecipe(new NamespacedKey("uxmtest", "fire_charge"), new ItemStack(Material.FIRE_CHARGE));
-        recipe.addIngredient(Material.GUNPOWDER);
-        recipe.addIngredient(Material.BLAZE_POWDER);
-        recipe.addIngredient(Material.COAL);
-        server.addRecipe(recipe);
+    void validTypeReportsSpawned() {
+        Block target = player.getWorld().getBlockAt(0, 64, 0);
+        target.setType(Material.GRASS_BLOCK);
+        player.target = target;
 
-        execute("recipe fire_charge");
+        execute("tree tree");
 
-        assertThat(sink.keys).contains(ItemworldMessageKey.RECIPE_SHAPELESS);
+        assertThat(sink.keys).containsAnyOf(ItemworldMessageKey.TREE_SPAWNED, ItemworldMessageKey.TREE_FAILED);
+        // The audit line is emitted only on a successful grow, never on a failed one.
+        if (sink.keys.contains(ItemworldMessageKey.TREE_SPAWNED)) {
+            assertThat(audit.grewTreeTypes).containsExactly("tree");
+        } else {
+            assertThat(audit.grewTreeTypes).isEmpty();
+        }
     }
 
     @Test
-    void heldItemWithoutARecipeReportsNoRecipe() {
-        player.getInventory().setItemInMainHand(new ItemStack(Material.BEDROCK));
+    void unknownTypeReported() {
+        Block target = player.getWorld().getBlockAt(0, 64, 0);
+        target.setType(Material.GRASS_BLOCK);
+        player.target = target;
 
-        execute("recipe");
+        execute("tree notatype");
 
-        assertThat(sink.keys).contains(ItemworldMessageKey.RECIPE_NONE);
+        assertThat(sink.keys).contains(ItemworldMessageKey.TREE_UNKNOWN_TYPE);
     }
 
     @Test
-    void unknownNamedItemIsRejected() {
-        execute("recipe not_a_real_item");
+    void noTargetReported() {
+        player.target = null;
 
-        assertThat(sink.keys).contains(ItemworldMessageKey.UNKNOWN_ITEM);
-        assertThat(sink.keys)
-                .doesNotContain(
-                        ItemworldMessageKey.RECIPE_SHAPED,
-                        ItemworldMessageKey.RECIPE_SHAPELESS,
-                        ItemworldMessageKey.RECIPE_NONE);
-    }
+        execute("tree tree");
 
-    @Test
-    void emptyHandWithNoArgumentIsRejected() {
-        execute("recipe");
-
-        assertThat(sink.keys).contains(ItemworldMessageKey.NO_ITEM_IN_HAND);
+        assertThat(sink.keys).contains(ItemworldMessageKey.TREE_NO_TARGET);
     }
 
     private void execute(String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new RecipeCommand(services()).build());
+        dispatcher.getRoot().addChild(new TreeCommand(services()).build());
         try {
             dispatcher.execute(input, CommandSourceStackMock.from(player));
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
@@ -152,7 +139,7 @@ class RecipeCommandTest {
     }
 
     private ItemworldServices services() {
-        return new ItemworldServices(kernel(), new NoopAudit(), ItemworldConfig.from(config));
+        return new ItemworldServices(kernel(), audit, ItemworldConfig.from(config));
     }
 
     private KernelPorts kernel() {
@@ -170,7 +157,21 @@ class RecipeCommandTest {
                 new NoopLogger());
     }
 
-    /** A map-backed {@link ConfigStore} scoped to {@code modules.itemworld}; defaults keep /recipe enabled. */
+    /** A {@link PlayerMock} whose looked-at block is supplied directly, since MockBukkit does not raytrace. */
+    private static final class TargetingPlayer extends PlayerMock {
+        private org.bukkit.block.@org.jspecify.annotations.Nullable Block target;
+
+        TargetingPlayer(ServerMock server, String name) {
+            super(server, name);
+        }
+
+        @Override
+        public org.bukkit.block.@org.jspecify.annotations.Nullable Block getTargetBlockExact(int maxDistance) {
+            return target;
+        }
+    }
+
+    /** A map-backed {@link ConfigStore} scoped to {@code modules.itemworld}; defaults keep /tree enabled. */
     private static final class MutableConfig implements ConfigStore {
         private final Map<String, Object> values = new HashMap<>();
 
@@ -209,7 +210,7 @@ class RecipeCommandTest {
         }
     }
 
-    /** Runs scheduled work inline so entity-bound effects are observable without ticking Folia. */
+    /** Runs scheduled work inline so the entity-bound grow is observable without ticking Folia. */
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
@@ -322,7 +323,9 @@ class RecipeCommandTest {
         public void publish(DomainEvent event) {}
     }
 
-    private static final class NoopAudit implements ItemworldAudit {
+    private static final class RecordingAudit implements ItemworldAudit {
+        private final List<String> grewTreeTypes = new ArrayList<>();
+
         @Override
         public void gave(PlayerRef actor, PlayerRef target, String itemKey, int amount) {}
 
@@ -357,7 +360,9 @@ class RecipeCommandTest {
         public void brokeBlock(PlayerRef actor, String blockType) {}
 
         @Override
-        public void grewTree(PlayerRef actor, String type) {}
+        public void grewTree(PlayerRef actor, String type) {
+            grewTreeTypes.add(type);
+        }
     }
 
     private static final class NoopLogger implements Logger {

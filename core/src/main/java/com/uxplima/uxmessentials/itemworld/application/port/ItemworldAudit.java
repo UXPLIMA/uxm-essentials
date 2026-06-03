@@ -55,4 +55,7 @@ public interface ItemworldAudit {
 
     /** {@code event=itemworld_break} — a {@code /break} of the looked-at block, recorded with its type. */
     void brokeBlock(PlayerRef actor, String blockType);
+
+    /** {@code event=itemworld_tree} — a {@code /tree} of the given type, grown where the caller is looking. */
+    void grewTree(PlayerRef actor, String type);
 }

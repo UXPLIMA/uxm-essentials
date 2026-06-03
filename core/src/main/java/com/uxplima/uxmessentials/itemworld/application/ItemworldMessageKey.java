@@ -133,6 +133,11 @@ public enum ItemworldMessageKey implements MessageKey {
     // /break
     BREAK_DONE("itemworld.break.done"),
     BREAK_NO_TARGET("itemworld.break.no-target"),
+    // /tree
+    TREE_SPAWNED("itemworld.tree.spawned"),
+    TREE_FAILED("itemworld.tree.failed"),
+    TREE_NO_TARGET("itemworld.tree.no-target"),
+    TREE_UNKNOWN_TYPE("itemworld.tree.unknown-type"),
 
     // Shared validation failures surfaced at the adapter boundary before a domain call
     UNKNOWN_ITEM("itemworld.unknown-item"),

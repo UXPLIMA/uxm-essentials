@@ -212,6 +212,8 @@ final class ItemworldCommandSurface {
                 "kittycannon", "uxmessentials.kittycannon.use", SubFeatureGroup.ADMIN_FUN, "Launch an exploding cat"));
         verbs.add(new Verb(
                 "break", "uxmessentials.break.use", SubFeatureGroup.ADMIN_FUN, "Break the block you are looking at"));
+        verbs.add(new Verb(
+                "tree", "uxmessentials.tree.use", SubFeatureGroup.ADMIN_FUN, "Generate a tree where you are looking"));
         return List.copyOf(verbs);
     }
 

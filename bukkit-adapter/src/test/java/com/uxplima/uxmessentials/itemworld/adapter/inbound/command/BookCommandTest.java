@@ -330,6 +330,9 @@ class BookCommandTest {
 
         @Override
         public void brokeBlock(PlayerRef actor, String blockType) {}
+
+        @Override
+        public void grewTree(PlayerRef actor, String type) {}
     }
 
     private static final class NoopLogger implements Logger {
