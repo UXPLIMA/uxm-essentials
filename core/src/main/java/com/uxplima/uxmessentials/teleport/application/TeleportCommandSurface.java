@@ -67,6 +67,8 @@ final class TeleportCommandSurface {
                 // admin direct tp
                 spec("tp", "uxmessentials.tp.use", DescribedCommand.of("tp", "Teleport to a player or coordinates")),
                 spec("tphere", "uxmessentials.tp.use", DescribedCommand.of("tphere", "Pull a player to you")),
+                spec("goto", "uxmessentials.tp.use", DescribedCommand.of("goto", "Teleport to a player")),
+                spec("bring", "uxmessentials.tp.use", DescribedCommand.of("bring", "Pull a player to you")),
                 spec("tpo", "uxmessentials.tp.others", DescribedCommand.of("tpo", "Teleport overriding no-tp flags")),
                 spec(
                         "tpohere",

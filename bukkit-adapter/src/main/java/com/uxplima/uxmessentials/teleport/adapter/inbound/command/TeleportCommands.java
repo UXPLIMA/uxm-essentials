@@ -73,6 +73,8 @@ public final class TeleportCommands {
                 // admin direct tp
                 new AdminTpCommand(s, m, "tp", "uxmessentials.tp.use", "Teleport to a player", Pull.GO),
                 new AdminTpCommand(s, m, "tphere", "uxmessentials.tp.use", "Pull a player to you", Pull.BRING),
+                new AdminTpCommand(s, m, "goto", "uxmessentials.tp.use", "Teleport to a player", Pull.GO),
+                new AdminTpCommand(s, m, "bring", "uxmessentials.tp.use", "Pull a player to you", Pull.BRING),
                 new AdminTpCommand(s, m, "tpo", "uxmessentials.tp.others", "Teleport overriding no-tp flags", Pull.GO),
                 new AdminTpCommand(
                         s, m, "tpohere", "uxmessentials.tp.others", "Pull a player overriding flags", Pull.BRING),
