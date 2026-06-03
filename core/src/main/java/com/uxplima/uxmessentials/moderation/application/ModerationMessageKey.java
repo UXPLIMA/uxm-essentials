@@ -48,12 +48,14 @@ public enum ModerationMessageKey implements MessageKey {
     KICK_KICKED("moderation.kick.kicked"),
     KICKALL_APPLIED("moderation.kickall.applied"),
 
-    // /warn, /warns
+    // /warn, /warns, /unwarn
     WARN_APPLIED("moderation.warn.applied"),
     WARN_NOTIFY_TARGET("moderation.warn.notify-target"),
     WARNS_HEADER("moderation.warns.header"),
     WARNS_ENTRY("moderation.warns.entry"),
     WARNS_EMPTY("moderation.warns.empty"),
+    UNWARN_CLEARED("moderation.unwarn.cleared"),
+    UNWARN_NONE("moderation.unwarn.none"),
 
     // /banip, /unbanip
     BANIP_APPLIED("moderation.banip.applied"),

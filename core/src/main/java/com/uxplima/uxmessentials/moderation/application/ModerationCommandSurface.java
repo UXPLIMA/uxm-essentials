@@ -17,8 +17,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  *
  * <p>Every command is permission-gated and every state-mutating one is audit-logged in its use case;
  * {@code /tempmute} is the explicit-duration alias of {@code /mute}, {@code /kickall} shares the kick node,
- * {@code /warns} shares the warn node, {@code /jails} shares the jail node, {@code /unbanip} shares the banip
- * node, and {@code /unfreeze} shares the freeze node — matching the node table.
+ * {@code /warns} and {@code /unwarn} share the warn node, {@code /jails} shares the jail node, {@code /unbanip}
+ * shares the banip node, and {@code /unfreeze} shares the freeze node — matching the node table.
  */
 final class ModerationCommandSurface {
 
@@ -39,6 +39,7 @@ final class ModerationCommandSurface {
                 spec("kickall", "uxmessentials.moderation.kick", "Kick all non-exempt players"),
                 spec("warn", "uxmessentials.moderation.warn", "Warn a player"),
                 spec("warns", "uxmessentials.moderation.warn", "Review a player's warnings"),
+                spec("unwarn", "uxmessentials.moderation.warn", "Clear a player's warnings"),
                 spec("banip", "uxmessentials.moderation.banip", "Ban a player or IP by address"),
                 spec("unbanip", "uxmessentials.moderation.banip", "Lift an IP ban"),
                 spec("freeze", "uxmessentials.moderation.freeze", "Freeze a player in place"),

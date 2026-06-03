@@ -46,6 +46,9 @@ public interface ModerationAudit {
     /** {@code event=player_warn} — a {@code /warn}. */
     void warned(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason);
 
+    /** {@code event=player_unwarn} — an {@code /unwarn}, with the number of warnings cleared. */
+    void clearedWarns(PlayerRef actor, PlayerRef target, boolean ok, int count);
+
     /** {@code event=player_kick} — a {@code /kick} or one target of {@code /kickall}. */
     void kicked(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason);
 

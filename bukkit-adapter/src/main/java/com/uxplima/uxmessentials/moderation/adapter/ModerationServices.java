@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.ClearWarns;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
@@ -44,6 +45,7 @@ public final class ModerationServices {
     private final KickAll kickAll;
     private final IssueWarn warn;
     private final ReviewWarns reviewWarns;
+    private final ClearWarns clearWarns;
     private final ListJails listJails;
     private final BanIp banIp;
     private final UnbanIp unbanIp;
@@ -67,6 +69,7 @@ public final class ModerationServices {
         this.kickAll = Objects.requireNonNull(builder.kickAll, "kickAll");
         this.warn = Objects.requireNonNull(builder.warn, "warn");
         this.reviewWarns = Objects.requireNonNull(builder.reviewWarns, "reviewWarns");
+        this.clearWarns = Objects.requireNonNull(builder.clearWarns, "clearWarns");
         this.listJails = Objects.requireNonNull(builder.listJails, "listJails");
         this.banIp = Objects.requireNonNull(builder.banIp, "banIp");
         this.unbanIp = Objects.requireNonNull(builder.unbanIp, "unbanIp");
@@ -123,6 +126,10 @@ public final class ModerationServices {
         return reviewWarns;
     }
 
+    public ClearWarns clearWarns() {
+        return clearWarns;
+    }
+
     public ListJails listJails() {
         return listJails;
     }
@@ -177,6 +184,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable KickAll kickAll;
         private @org.jspecify.annotations.Nullable IssueWarn warn;
         private @org.jspecify.annotations.Nullable ReviewWarns reviewWarns;
+        private @org.jspecify.annotations.Nullable ClearWarns clearWarns;
         private @org.jspecify.annotations.Nullable ListJails listJails;
         private @org.jspecify.annotations.Nullable BanIp banIp;
         private @org.jspecify.annotations.Nullable UnbanIp unbanIp;
@@ -240,6 +248,11 @@ public final class ModerationServices {
 
         Builder reviewWarns(ReviewWarns value) {
             this.reviewWarns = value;
+            return this;
+        }
+
+        Builder clearWarns(ClearWarns value) {
+            this.clearWarns = value;
             return this;
         }
 

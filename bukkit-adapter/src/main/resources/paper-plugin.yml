@@ -409,7 +409,7 @@ permissions:
     description: '/kick <player> [reason]; /kickall [reason] to clear non-exempt players.'
     default: op
   uxmessentials.moderation.warn:
-    description: '/warn <player> [reason] and /warns <player> — issue and review warning history.'
+    description: '/warn <player> [reason], /warns <player> and /unwarn <player> — issue, review and clear warning history.'
     default: op
   uxmessentials.moderation.banip:
     description: '/banip <player|ip> [reason] / /unbanip <ip> — IP ban with stored-IP alt detection.'

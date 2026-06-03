@@ -116,6 +116,12 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
+    public int clearWarns(PlayerRef target) {
+        Objects.requireNonNull(target, "target");
+        return write(dsl -> ModerationWrites.clearWarns(dsl, target));
+    }
+
+    @Override
     public void saveIpBan(IpBan ban) {
         Objects.requireNonNull(ban, "ban");
         write(dsl -> ModerationWrites.saveIpBan(dsl, ban));

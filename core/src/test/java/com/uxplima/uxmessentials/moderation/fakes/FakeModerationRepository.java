@@ -83,6 +83,12 @@ public final class FakeModerationRepository implements ModerationRepository {
     }
 
     @Override
+    public int clearWarns(PlayerRef target) {
+        List<Warn> removed = warns.remove(target.uuid());
+        return removed == null ? 0 : removed.size();
+    }
+
+    @Override
     public void saveIpBan(IpBan ban) {
         ipBans.put(ban.ip(), ban);
     }

@@ -52,6 +52,7 @@ public final class ModerationCommands {
                 new KickCommand(services, messages, sink),
                 new KickallCommand(services, messages, sink),
                 new WarnCommand(services, messages, sink),
+                new UnwarnCommand(services, messages, sink),
                 target(
                         "warns",
                         "uxmessentials.moderation.warn",

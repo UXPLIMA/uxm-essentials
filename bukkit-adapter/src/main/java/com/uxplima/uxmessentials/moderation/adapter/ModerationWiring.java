@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.ClearWarns;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
@@ -122,6 +123,7 @@ public final class ModerationWiring {
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
                 .warn(new IssueWarn(repository, guard, notifier, audit, kernel.events(), clock))
                 .reviewWarns(new ReviewWarns(repository, notifier))
+                .clearWarns(new ClearWarns(repository, notifier, audit))
                 .listJails(new ListJails(jails, notifier))
                 .banIp(new BanIp(repository, notifier, audit, kernel.events(), clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit))

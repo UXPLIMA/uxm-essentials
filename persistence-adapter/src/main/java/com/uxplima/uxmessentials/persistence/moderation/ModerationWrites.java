@@ -121,6 +121,13 @@ final class ModerationWrites {
                 MODERATION_WARNS, MODERATION_WARNS.TARGET.eq(target.uuid().toString()));
     }
 
+    static int clearWarns(DSLContext dsl, PlayerRef target) {
+        String key = target.uuid().toString();
+        int removed = dsl.fetchCount(MODERATION_WARNS, MODERATION_WARNS.TARGET.eq(key));
+        dsl.deleteFrom(MODERATION_WARNS).where(MODERATION_WARNS.TARGET.eq(key)).execute();
+        return removed;
+    }
+
     private static long nextWarnId(DSLContext dsl) {
         Long maxId =
                 dsl.select(DSL.max(MODERATION_WARNS.ID)).from(MODERATION_WARNS).fetchOne(0, Long.class);

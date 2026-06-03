@@ -54,6 +54,9 @@ public interface ModerationRepository {
     /** {@code target}'s warning history, newest-first. */
     List<Warn> warns(PlayerRef target);
 
+    /** Remove all of {@code target}'s warnings; returns the number removed. */
+    int clearWarns(PlayerRef target);
+
     /** Upsert an IP ban (keyed by address); a re-ban of the same address overwrites. */
     void saveIpBan(IpBan ban);
 

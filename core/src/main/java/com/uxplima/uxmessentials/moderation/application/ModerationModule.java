@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The moderation bounded context as a first-class {@link FeatureModule}: it owns the DB-backed sanction state
  * (mute/jail/tempban/warn/ip-ban/seen) and the {@code /mute /unmute /tempmute /jail /unjail /tempban /kick
- * /kickall /warn /warns /banip /unbanip /freeze /unfreeze /seen /seenip} command surface
+ * /kickall /warn /warns /unwarn /banip /unbanip /freeze /unfreeze /seen /seenip} command surface
  * (docs/10-feature-modules.md §15.9). It <em>provides</em> two cross-context gates: the messaging context's
  * {@code MutePolicy} (a muted player cannot {@code /msg}) and the teleport context's {@code JailGate} (a
  * jailed player cannot {@code /home}/{@code /tpa}); both are bound when this module wires, and degrade to

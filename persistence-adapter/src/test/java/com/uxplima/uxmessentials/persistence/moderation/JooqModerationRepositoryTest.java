@@ -113,6 +113,16 @@ class JooqModerationRepositoryTest {
     }
 
     @Test
+    void clearWarnsRemovesEveryRowAndReportsTheCount() {
+        repository.appendWarn(alice, new Warn(STAFF, Optional.of("first"), T0));
+        repository.appendWarn(alice, new Warn(STAFF, Optional.of("second"), T0.plusSeconds(60)));
+
+        assertThat(repository.clearWarns(alice)).isEqualTo(2);
+        assertThat(repository.warns(alice)).isEmpty();
+        assertThat(repository.clearWarns(alice)).isZero();
+    }
+
+    @Test
     void ipBanRoundTripsTargetAndIsRemovable() {
         IpBan ban = new IpBan(
                 "203.0.113.7", Optional.empty(), Optional.of("evasion"), Optional.of(alice.uuid()), STAFF, T0);

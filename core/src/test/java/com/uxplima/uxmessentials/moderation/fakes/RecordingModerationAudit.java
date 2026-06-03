@@ -10,11 +10,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * A {@link ModerationAudit} that records each emitted line so a test can assert exactly one audit line per
- * action and read its {@code event}/{@code ok} fields. Each method appends one {@link Line}.
+ * action and read its {@code event}/{@code ok} fields. Each method appends one {@link Recorded} — a plain
+ * {@link Line} for the common case, or a {@link ClearLine} where the count matters.
  */
 public final class RecordingModerationAudit implements ModerationAudit {
 
-    public final List<Line> lines = new ArrayList<>();
+    public final List<Recorded> lines = new ArrayList<>();
 
     @Override
     public void muted(
@@ -59,6 +60,11 @@ public final class RecordingModerationAudit implements ModerationAudit {
     }
 
     @Override
+    public void clearedWarns(PlayerRef actor, PlayerRef target, boolean ok, int count) {
+        lines.add(new ClearLine("player_unwarn", ok, count));
+    }
+
+    @Override
     public void kicked(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {
         lines.add(new Line("player_kick", ok));
     }
@@ -94,6 +100,16 @@ public final class RecordingModerationAudit implements ModerationAudit {
         lines.add(new Line("alt_detected", true));
     }
 
+    /** A recorded audit line, keyed by its event name and ok flag so a test can match it. */
+    public sealed interface Recorded permits Line, ClearLine {
+        String event();
+
+        boolean ok();
+    }
+
     /** One recorded audit line: its event name and the ok flag. */
-    public record Line(String event, boolean ok) {}
+    public record Line(String event, boolean ok) implements Recorded {}
+
+    /** A recorded {@code /unwarn} line, carrying the number of warnings cleared. */
+    public record ClearLine(String event, boolean ok, int count) implements Recorded {}
 }
