@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
 
 /**
  * The curated muscle-memory aliases we ship turned on by default ({@code /m}, {@code /tell}, {@code /v},
- * {@code /gm}, {@code /h}, {@code /eat}, {@code /godmode}, …). These augment each command's code-side defaults before the catalog
+ * {@code /gm}, {@code /h}, {@code /eat}, {@code /godmode}, {@code /lore}, …). These augment each command's code-side defaults before the catalog
  * resolves the operator's overrides, so the short forms people reach for from other plugins answer out
  * of the box without anyone editing {@code commands/<module>.conf}.
  *
@@ -42,7 +42,11 @@ public final class CommandAliasDefaults {
             Map.entry("back", List.of("return")),
             Map.entry("afk", List.of("away")),
             Map.entry("god", List.of("godmode")),
-            Map.entry("near", List.of("nearby")));
+            Map.entry("near", List.of("nearby")),
+            Map.entry("itemlore", List.of("lore")),
+            Map.entry("itemname", List.of("iname")),
+            Map.entry("itemflag", List.of("iflag")),
+            Map.entry("itemdb", List.of("idb")));
 
     // Real standalone commands that must keep their own literals; never emitted as an added alias.
     private static final Set<String> CONFLICT_TARGETS =

@@ -76,6 +76,20 @@ class CommandAliasDefaultsTest {
     }
 
     @Test
+    void augment_addsItemworldShortAliases() {
+        List<CommandDefinition> out = CommandAliasDefaults.augment(List.of(
+                def("itemlore", "itemlore"),
+                def("itemname", "itemname"),
+                def("itemflag", "itemflag"),
+                def("itemdb", "itemdb")));
+
+        assertThat(out.get(0).defaultAliases()).contains("lore");
+        assertThat(out.get(1).defaultAliases()).contains("iname");
+        assertThat(out.get(2).defaultAliases()).contains("iflag");
+        assertThat(out.get(3).defaultAliases()).contains("idb");
+    }
+
+    @Test
     void augment_isDeterministic() {
         List<CommandDefinition> first =
                 CommandAliasDefaults.augment(List.of(def("balance", "balance", "bal", "money")));
