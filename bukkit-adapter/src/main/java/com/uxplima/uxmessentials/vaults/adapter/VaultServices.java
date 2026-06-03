@@ -8,7 +8,9 @@ import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
+import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
+import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -21,6 +23,8 @@ import org.jspecify.annotations.NullMarked;
  * @param listVaults the owned-vault listing
  * @param openAdminVault the audit-logged staff override
  * @param saveVault the write-through on close
+ * @param amountQuota the owner's vault-count cap, read by {@code /vault info}
+ * @param sizeQuota the owner's per-vault row count, read by {@code /vault info}
  * @param notifier player-facing feedback
  * @param view the inventory-holder GUI builder
  * @param kernel the shared outbound ports (scheduler, player lookup, events)
@@ -31,6 +35,8 @@ public record VaultServices(
         ListVaults listVaults,
         OpenAdminVault openAdminVault,
         SaveVault saveVault,
+        VaultAmountQuota amountQuota,
+        VaultSizeQuota sizeQuota,
         VaultNotifier notifier,
         VaultView view,
         KernelPorts kernel) {
@@ -40,6 +46,8 @@ public record VaultServices(
         Objects.requireNonNull(listVaults, "listVaults");
         Objects.requireNonNull(openAdminVault, "openAdminVault");
         Objects.requireNonNull(saveVault, "saveVault");
+        Objects.requireNonNull(amountQuota, "amountQuota");
+        Objects.requireNonNull(sizeQuota, "sizeQuota");
         Objects.requireNonNull(notifier, "notifier");
         Objects.requireNonNull(view, "view");
         Objects.requireNonNull(kernel, "kernel");

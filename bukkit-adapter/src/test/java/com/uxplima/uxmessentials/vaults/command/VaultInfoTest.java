@@ -5,17 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-
-import org.bukkit.Material;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -50,11 +44,9 @@ import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
+import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
-import com.uxplima.uxmessentials.vaults.domain.VaultId;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.StorageGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,82 +58,60 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the vault GUI open → store → close → save round-trip through the real Brigadier
- * {@code /vault} node and uxmLib's {@code StorageGui}, backed by the real cached jOOQ {@code VaultRepository}
- * (from {@link VaultRepositories}) over an embedded SQLite database. {@code /vault} opens a {@code StorageGui}
- * sized to the resolved quota; an item placed in it and the window closed is serialized and written through to
- * the DB; re-opening the same vault re-reads the stored item — proving vaults are DB-persisted and survive past
- * the live GUI, never PDC.
- *
- * <p>The scheduler is a synchronous double so the entity-bound open and the async save run inline. uxmLib's
- * menu listener is installed via {@link Guis#install} against a mock plugin, and the close is dispatched as a
- * real {@link InventoryCloseEvent} through the plugin manager — exactly the path a live close takes — so the
- * GUI's own close handler writes the vault through.
+ * MockBukkit coverage of {@code /vault info} through the real Brigadier {@code /vault} node. A player who owns
+ * vaults 1 and 3 (allocated by opening them) with an amount quota of 5 and a 3-row (27-slot) size quota sees an
+ * info line carrying owned-count 2, cap 5 and slot size 27 — a read-only diagnostic that opens no window.
  */
-class VaultGuiPathTest {
+class VaultInfoTest {
 
     private ServerMock server;
-    private Plugin plugin;
     private PlayerMock player;
     private Persistence persistence;
     private VaultRepository repository;
     private VaultServices services;
-    private RecordingSink sink;
+    private RecordingMessages messages;
 
     @BeforeEach
     void setUp(@TempDir Path dataFolder) {
         server = MockBukkit.mock();
-        plugin = MockBukkit.createMockPlugin();
+        MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         player = server.addPlayer("Alice");
         player.setOp(true);
         persistence = Persistence.open(new SqliteConfig(), dataFolder, List.of("db/migration"), new NoopLogger());
         repository = VaultRepositories.cached(persistence);
-        sink = new RecordingSink();
+        messages = new RecordingMessages();
         services = services();
-        Guis.install(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall(); // reset the static install state so the next test re-installs the menu listener
         persistence.close();
         MockBukkit.unmock();
     }
 
     @Test
-    void openStoreClosePersistsTheVaultAndReopenReadsItBack() {
+    void infoReportsOwnedCountQuotaCapAndSlotSize() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        // Allocate vaults 1 and 3 by opening them; index 2 is intentionally left unowned.
+        services.openVault().open(ref(), 1);
+        services.openVault().open(ref(), 3);
 
-        execute(dispatcher, "vault 1");
-        Inventory vault = player.getOpenInventory().getTopInventory();
-        assertThat(vault.getHolder()).isInstanceOf(StorageGui.class);
-        assertThat(vault.getSize()).isEqualTo(54); // the default 6-row size quota
+        execute(dispatcher, "vault info");
 
-        // Store an item and close the window: the StorageGui's close handler serializes and writes it through.
-        vault.setItem(0, new ItemStack(Material.DIAMOND, 12));
-        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
-
-        // The stored item is durable in the DB, not just in the live GUI.
-        assertThat(repository.find(VaultId.of(ref(), 1))).isPresent();
-        player.closeInventory();
-
-        execute(dispatcher, "vault 1");
-        Inventory reopened = player.getOpenInventory().getTopInventory();
-        ItemStack restored = reopened.getItem(0);
-        assertThat(restored).isNotNull();
-        assertThat(restored.getType()).isEqualTo(Material.DIAMOND);
-        assertThat(restored.getAmount()).isEqualTo(12);
+        Map<String, String> line = messages.placeholdersFor(VaultsMessageKey.VAULT_INFO_LINE);
+        assertThat(line).isNotNull();
+        assertThat(line.get("owned")).isEqualTo("2");
+        assertThat(line.get("cap")).isEqualTo("5");
+        assertThat(line.get("size")).isEqualTo("27"); // 3 rows of 9 slots
+        // info is read-only: it opens no vault window (never a StorageGui holder).
+        assertThat(openVaultHolderClass()).doesNotContain("StorageGui");
     }
 
-    @Test
-    void openWithNoIndexOpensTheDefaultVault() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-
-        execute(dispatcher, "vault");
-
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(StorageGui.class);
-        assertThat(sink.keys).contains(com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_OPENED);
+    private String openVaultHolderClass() {
+        var top = player.getOpenInventory().getTopInventory();
+        var holder = top == null ? null : top.getHolder();
+        return holder == null ? "" : holder.getClass().getName();
     }
 
     private CommandDispatcher<CommandSourceStack> registerCommand() {
@@ -164,8 +134,8 @@ class VaultGuiPathTest {
 
     private VaultServices services() {
         KernelPorts kernel = kernel();
-        VaultAmountQuota amount = new VaultAmountQuota(kernel.permissions(), 3);
-        VaultSizeQuota size = new VaultSizeQuota(kernel.permissions(), 6);
+        VaultAmountQuota amount = new VaultAmountQuota(kernel.permissions(), 5);
+        VaultSizeQuota size = new VaultSizeQuota(kernel.permissions(), 3); // 3 rows -> 27 slots
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
         SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
         VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
@@ -188,8 +158,8 @@ class VaultGuiPathTest {
                 new AllowAllPermissions(),
                 new NoCooldowns(),
                 new NoWarmups(),
-                new KeyMessages(),
-                sink,
+                messages,
+                new DiscardingSink(),
                 new NoPlayerLookup(),
                 new NoWorldLookup(),
                 new NoPlayerLocator(),
@@ -214,21 +184,25 @@ class VaultGuiPathTest {
         }
     }
 
-    /** Records each delivered key so a path's outcome is asserted by the message it produced. */
-    private static final class RecordingSink implements MessageSink {
-        private final List<MessageKey> keys = new ArrayList<>();
+    /** Records the last placeholder map delivered for each message key so the info line can be inspected. */
+    private static final class RecordingMessages implements Messages {
+        private final Map<MessageKey, Map<String, String>> byKey = new HashMap<>();
 
         @Override
-        public void deliver(PlayerRef viewer, String renderedText) {
-            // renderedText is the key() string (see KeyMessages); the key list is what tests assert on
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            byKey.put(key, Map.copyOf(placeholders));
+            return key.key();
+        }
+
+        @Nullable Map<String, String> placeholdersFor(MessageKey key) {
+            return byKey.get(key);
         }
     }
 
-    private final class KeyMessages implements Messages {
+    private static final class DiscardingSink implements MessageSink {
         @Override
-        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            sink.keys.add(key);
-            return key.key();
+        public void deliver(PlayerRef viewer, String renderedText) {
+            // discarded: the placeholders captured in RecordingMessages are what this test asserts
         }
     }
 

@@ -10,6 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationCommands;
+import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ChatLockListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ConnectionMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.DeathMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
@@ -67,6 +68,7 @@ public final class CommunicationWiring {
         BukkitInfoSender infoSender = new BukkitInfoSender(kernel.messageSink());
         CommunicationNotifier notifier = new CommunicationNotifier(kernel.messages(), kernel.messageSink());
         InfoRegistry registry = settings.infoRegistry();
+        ChatLock chatLock = new ChatLock();
 
         CommunicationServices services = assemble(kernel, settings, optOutStore, random, notifier);
         BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(kernel.messageSink(), optOutStore);
@@ -83,8 +85,9 @@ public final class CommunicationWiring {
                 notifier,
                 kernel.messages(),
                 broadcaster,
-                kernel.messageSink());
-        List<Listener> listeners = listeners(services, registry, infoSender, settings);
+                kernel.messageSink(),
+                chatLock);
+        List<Listener> listeners = listeners(services, registry, infoSender, settings, chatLock, notifier);
         return new Wired(commands, listeners, announcer, running);
     }
 
@@ -107,10 +110,13 @@ public final class CommunicationWiring {
             CommunicationServices services,
             InfoRegistry registry,
             BukkitInfoSender infoSender,
-            CommunicationSettings settings) {
+            CommunicationSettings settings,
+            ChatLock chatLock,
+            CommunicationNotifier notifier) {
         return List.of(
                 new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings),
-                new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings));
+                new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
+                new ChatLockListener(chatLock, notifier));
     }
 
     /**

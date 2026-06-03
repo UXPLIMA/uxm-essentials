@@ -114,7 +114,8 @@ class FeatureModuleRegistryDriftTest {
                         "unbreakable",
                         "disenchant",
                         "itemmodel",
-                        "editsign", // item utils
+                        "editsign",
+                        "iteminfo", // item utils
                         "anvil",
                         "workbench",
                         "enderchest",
@@ -146,10 +147,10 @@ class FeatureModuleRegistryDriftTest {
                         "tree",
                         "bigtree",
                         "nuke"); // admin-fun
-        // The full surface: 22 item-utils + 9 workstations + 2 cleanup + 3 powertool + 8 mob/entity
-        // + 7 time/weather + 7 admin-fun = 58 distinct literals, no verb dropped and none registered twice.
-        assertThat(itemworld.commands()).hasSize(58);
-        assertThat(literals).hasSize(58);
+        // The full surface: 23 item-utils + 9 workstations + 2 cleanup + 3 powertool + 8 mob/entity
+        // + 7 time/weather + 7 admin-fun = 59 distinct literals, no verb dropped and none registered twice.
+        assertThat(itemworld.commands()).hasSize(59);
+        assertThat(literals).hasSize(59);
         assertThat(itemworld.migrations()).isEmpty(); // itemworld is stateless: no persistence, no migration
     }
 
@@ -198,12 +199,12 @@ class FeatureModuleRegistryDriftTest {
                         .collect(Collectors.toSet());
         assertThat(on).contains("communication", "teleport", "vaults");
 
-        // Its static surface is the plugin's own /broadcast, /me, /broadcasttoggle, and /clearchat; the
-        // operator-configured info-page commands (/rules, /motd, …) are dynamic and not part of this fixed
+        // Its static surface is the plugin's own /broadcast, /me, /broadcasttoggle, /clearchat, and /togglechat;
+        // the operator-configured info-page commands (/rules, /motd, …) are dynamic and not part of this fixed
         // table. It persists nothing.
         Set<String> literals =
                 communication.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
-        assertThat(literals).containsExactlyInAnyOrder("broadcast", "me", "broadcasttoggle", "clearchat");
+        assertThat(literals).containsExactlyInAnyOrder("broadcast", "me", "broadcasttoggle", "clearchat", "togglechat");
         assertThat(communication.migrations()).isEmpty();
     }
 

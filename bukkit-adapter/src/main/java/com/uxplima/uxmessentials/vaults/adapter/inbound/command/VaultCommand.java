@@ -61,6 +61,7 @@ public final class VaultCommand implements CommandRegistration {
         return Commands.literal("vault")
                 .requires(src -> src.getSender().hasPermission(USE))
                 .executes(this::openDefaultOrList)
+                .then(Commands.literal("info").executes(this::info))
                 .then(Commands.argument("n", IntegerArgumentType.integer(1))
                         .executes(ctx -> openOwn(ctx, ctx.getArgument("n", Integer.class))))
                 .then(Commands.argument("player", StringArgumentType.word())
@@ -88,6 +89,21 @@ public final class VaultCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         return openOwn(ctx, owned.isEmpty() ? DEFAULT_INDEX : owned.get(0));
+    }
+
+    private int info(CommandContext<CommandSourceStack> ctx) {
+        Player player = playerOrReject(ctx);
+        if (player == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef viewer = BukkitRefs.toRef(player);
+        List<Integer> owned = services.listVaults().list(viewer).asValue().orElse(List.of());
+        notifier.showInfo(
+                viewer,
+                owned.size(),
+                services.amountQuota().resolve(viewer),
+                services.sizeQuota().resolve(viewer));
+        return Command.SINGLE_SUCCESS;
     }
 
     private int openOwn(CommandContext<CommandSourceStack> ctx, int index) {

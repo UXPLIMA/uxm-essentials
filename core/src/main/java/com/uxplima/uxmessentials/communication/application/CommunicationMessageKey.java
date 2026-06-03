@@ -32,6 +32,11 @@ public enum CommunicationMessageKey implements MessageKey {
     CLEARCHAT_CLEARED("communication.clearchat.cleared"),
     CLEARCHAT_BY("communication.clearchat.by"),
 
+    // /togglechat — the global chat lock toggle confirmations and the blocked notice a muted speaker sees.
+    CHAT_LOCK_ON("communication.chat-lock.on"),
+    CHAT_LOCK_OFF("communication.chat-lock.off"),
+    CHAT_LOCKED("communication.chat-lock.locked"),
+
     // /uxmess reload communication — the announcer schedule was reloaded.
     ANNOUNCER_RELOADED("communication.announcer-reloaded");
 

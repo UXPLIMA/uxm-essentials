@@ -53,7 +53,11 @@ final class CommunicationCommandSurface {
                 spec(
                         "clearchat",
                         "uxmessentials.communication.clearchat",
-                        command("clearchat", "Flush the chat for online players")));
+                        command("clearchat", "Flush the chat for online players")),
+                spec(
+                        "togglechat",
+                        "uxmessentials.communication.togglechat",
+                        command("togglechat", "Lock or unlock public chat for non-staff")));
     }
 
     /** One {@link CommandSpec} per configured info page, guarded by a per-page permission node. */

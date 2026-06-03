@@ -85,6 +85,9 @@ public enum ItemworldMessageKey implements MessageKey {
     EDITSIGN_OPENED("itemworld.editsign.opened"),
     EDITSIGN_NOT_A_SIGN("itemworld.editsign.not-a-sign"),
     EDITSIGN_NO_ACCESS("itemworld.editsign.no-access"),
+    // /iteminfo
+    ITEMINFO_HEADER("itemworld.iteminfo.header"),
+    ITEMINFO_LINE("itemworld.iteminfo.line"),
 
     // Virtual workstations — one opened line, parameterised by station name
     WORKSTATION_OPENED("itemworld.workstation.opened"),

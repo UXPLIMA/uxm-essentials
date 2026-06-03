@@ -39,30 +39,44 @@ public final class UseWarp {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
-    /** Teleport {@code who} to the warp {@code name}, gating access and cost first. */
+    /** Teleport {@code who} to the warp {@code name} themselves, gating access and cost first. */
     public Result<Unit, WarpError> use(PlayerRef who, WarpName name) {
-        Objects.requireNonNull(who, "who");
+        return useFor(who, who, name);
+    }
+
+    /**
+     * Send {@code recipient} to the warp {@code name}, triggered by {@code actor} (a staff send when the two
+     * differ). The access gate and the optional cost apply to the <em>recipient</em> — staff send another
+     * player only to a warp that player may use — and the recipient is the one teleported. On a cross-player
+     * success the actor is told the send went through; a self-send (actor == recipient) takes the usual
+     * teleporting path with no extra notice.
+     */
+    public Result<Unit, WarpError> useFor(PlayerRef actor, PlayerRef recipient, WarpName name) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(recipient, "recipient");
         Objects.requireNonNull(name, "name");
         Optional<Warp> warp = repository.find(name);
         if (warp.isEmpty()) {
-            notifier.send(who, WarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
+            notifier.send(actor, WarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
             return Result.err(WarpError.NOT_FOUND);
         }
-        return admitAndGo(who, warp.get());
+        return admitAndGo(actor, recipient, warp.get());
     }
 
-    private Result<Unit, WarpError> admitAndGo(PlayerRef who, Warp warp) {
-        Result<Unit, WarpError> admitted = access.admit(who, warp);
+    private Result<Unit, WarpError> admitAndGo(PlayerRef actor, PlayerRef recipient, Warp warp) {
+        Result<Unit, WarpError> admitted = access.admit(recipient, warp);
         if (admitted.isErr()) {
             WarpError error = admitted.errorOrThrow();
-            notifier.send(who, error.messageKey(), Map.of("warp", warp.name().value()));
+            notifier.send(actor, error.messageKey(), Map.of("warp", warp.name().value()));
             return admitted;
         }
-        notifier.send(
-                who,
-                WarpsMessageKey.WARP_TELEPORTING,
-                Map.of("warp", warp.name().value()));
-        teleporter.teleportTo(who, warp);
+        Map<String, String> placeholders = Map.of("warp", warp.name().value());
+        notifier.send(recipient, WarpsMessageKey.WARP_TELEPORTING, placeholders);
+        if (!actor.uuid().equals(recipient.uuid())) {
+            notifier.send(
+                    actor, WarpsMessageKey.WARP_SENT, Map.of("warp", warp.name().value(), "player", recipient.name()));
+        }
+        teleporter.teleportTo(recipient, warp);
         return Result.ok();
     }
 }

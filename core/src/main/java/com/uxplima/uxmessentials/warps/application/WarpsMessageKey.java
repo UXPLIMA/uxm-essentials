@@ -20,6 +20,7 @@ public enum WarpsMessageKey implements MessageKey {
 
     // teleport
     WARP_TELEPORTING("warp.teleporting"),
+    WARP_SENT("warp.sent"),
 
     // listing
     WARP_LIST_HEADER("warp.list.header"),

@@ -144,6 +144,9 @@ permissions:
   uxmessentials.warp.use:
     description: '/warp <name> to teleport to a server warp.'
     default: true
+  uxmessentials.warp.others:
+    description: '/warp <name> <player> to send another player to a warp.'
+    default: op
   uxmessentials.warp.list:
     description: '/warps to list the warps you may use.'
     default: true
@@ -525,6 +528,9 @@ permissions:
   uxmessentials.editsign.use:
     description: '/editsign — edit the sign you are looking at (respects build access).'
     default: op
+  uxmessentials.iteminfo.use:
+    description: '/iteminfo — inspect the metadata of the item in your hand.'
+    default: op
   uxmessentials.repair.itemworld:
     description: '/repair and /repairall in the itemworld surface (itemworld-owned; playerstate defers them).'
     default: op
@@ -661,3 +667,9 @@ permissions:
   uxmessentials.communication.clearchat.exempt:
     description: 'Keep your chat scrollback when staff run /clearchat.'
     default: false
+  uxmessentials.communication.togglechat:
+    description: '/togglechat (alias /mutechat) to lock or unlock public chat for non-staff.'
+    default: op
+  uxmessentials.communication.chat.bypass:
+    description: 'Keep chatting while public chat is locked by /togglechat.'
+    default: op

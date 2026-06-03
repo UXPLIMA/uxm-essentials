@@ -32,6 +32,9 @@ abstract class WarpCommandSupport {
     /** The catalog key for a console invoking a player-only command. */
     static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
+    /** The catalog key for a named target that could not be resolved to an online player. */
+    static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;
+
     final WarpServices services;
     final Messages messages;
 
@@ -51,9 +54,19 @@ abstract class WarpCommandSupport {
         return null;
     }
 
+    /** Tell {@code sender} the named target was not found, in their locale. */
+    final void unknownPlayer(CommandSender sender, String name) {
+        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                .deserialize(messages.resolve(refOf(sender), UNKNOWN_PLAYER, Map.of("player", name))));
+    }
+
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
+    }
+
+    private static PlayerRef refOf(CommandSender sender) {
+        return sender instanceof Player player ? BukkitRefs.toRef(player) : consoleRef(sender);
     }
 
     /**

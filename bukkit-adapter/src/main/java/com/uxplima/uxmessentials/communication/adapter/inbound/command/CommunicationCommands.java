@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
@@ -43,7 +44,8 @@ public final class CommunicationCommands {
             CommunicationNotifier notifier,
             Messages messages,
             BukkitAnnouncerBroadcaster broadcaster,
-            MessageSink sink) {
+            MessageSink sink,
+            ChatLock chatLock) {
         Objects.requireNonNull(optOut, "optOut");
         Objects.requireNonNull(registry, "registry");
         Objects.requireNonNull(infoSender, "infoSender");
@@ -51,11 +53,13 @@ public final class CommunicationCommands {
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(broadcaster, "broadcaster");
         Objects.requireNonNull(sink, "sink");
+        Objects.requireNonNull(chatLock, "chatLock");
         List<CommandRegistration> commands = new ArrayList<>();
         commands.add(new BroadcastCommand(broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastToggleCommand(optOut, messages));
         commands.add(new MeCommand(messages, notifier));
         commands.add(new ClearChatCommand(messages, notifier, sink));
+        commands.add(new ToggleChatCommand(chatLock, notifier, messages));
         for (InfoPage page : registry.all()) {
             commands.add(new InfoPageCommand(page.command(), registry, infoSender, notifier, messages));
         }

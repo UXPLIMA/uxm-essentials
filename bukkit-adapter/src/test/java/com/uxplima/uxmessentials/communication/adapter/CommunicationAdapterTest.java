@@ -142,7 +142,8 @@ class CommunicationAdapterTest {
             literals.add(command.build().getLiteral());
         }
         assertThat(literals)
-                .containsExactlyInAnyOrder("broadcast", "broadcasttoggle", "me", "clearchat", "rules", "motd");
+                .containsExactlyInAnyOrder(
+                        "broadcast", "broadcasttoggle", "me", "clearchat", "togglechat", "rules", "motd");
     }
 
     @Test
@@ -192,7 +193,14 @@ class CommunicationAdapterTest {
         InfoRegistry registry = settings.infoRegistry();
         BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(sink, optOutStore);
         return CommunicationCommands.all(
-                optOut, registry, new BukkitInfoSender(sink), notifier, sink, broadcaster, sink);
+                optOut,
+                registry,
+                new BukkitInfoSender(sink),
+                notifier,
+                sink,
+                broadcaster,
+                sink,
+                new com.uxplima.uxmessentials.communication.adapter.ChatLock());
     }
 
     private com.uxplima.uxmessentials.communication.application.port.RandomSource random() {

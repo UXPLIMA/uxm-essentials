@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
+import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
@@ -52,6 +53,7 @@ public final class ModerationServices {
     private final ListBans listBans;
     private final ListMutes listMutes;
     private final BanIp banIp;
+    private final TempBanIp tempBanIp;
     private final UnbanIp unbanIp;
     private final Freeze freeze;
     private final Seen seen;
@@ -78,6 +80,7 @@ public final class ModerationServices {
         this.listBans = Objects.requireNonNull(builder.listBans, "listBans");
         this.listMutes = Objects.requireNonNull(builder.listMutes, "listMutes");
         this.banIp = Objects.requireNonNull(builder.banIp, "banIp");
+        this.tempBanIp = Objects.requireNonNull(builder.tempBanIp, "tempBanIp");
         this.unbanIp = Objects.requireNonNull(builder.unbanIp, "unbanIp");
         this.freeze = Objects.requireNonNull(builder.freeze, "freeze");
         this.seen = Objects.requireNonNull(builder.seen, "seen");
@@ -152,6 +155,10 @@ public final class ModerationServices {
         return banIp;
     }
 
+    public TempBanIp tempBanIp() {
+        return tempBanIp;
+    }
+
     public UnbanIp unbanIp() {
         return unbanIp;
     }
@@ -203,6 +210,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable ListBans listBans;
         private @org.jspecify.annotations.Nullable ListMutes listMutes;
         private @org.jspecify.annotations.Nullable BanIp banIp;
+        private @org.jspecify.annotations.Nullable TempBanIp tempBanIp;
         private @org.jspecify.annotations.Nullable UnbanIp unbanIp;
         private @org.jspecify.annotations.Nullable Freeze freeze;
         private @org.jspecify.annotations.Nullable Seen seen;
@@ -289,6 +297,11 @@ public final class ModerationServices {
 
         Builder banIp(BanIp value) {
             this.banIp = value;
+            return this;
+        }
+
+        Builder tempBanIp(TempBanIp value) {
+            this.tempBanIp = value;
             return this;
         }
 

@@ -89,6 +89,8 @@ public final class VaultsWiring {
                 new ListVaults(repository),
                 new OpenAdminVault(repository, sizeQuota, audit, clock),
                 saveVault,
+                amountQuota,
+                sizeQuota,
                 notifier,
                 view,
                 kernel);

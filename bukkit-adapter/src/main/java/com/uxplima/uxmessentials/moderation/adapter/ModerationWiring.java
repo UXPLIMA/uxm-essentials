@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
+import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
@@ -130,6 +131,7 @@ public final class ModerationWiring {
                 .listBans(new ListBans(repository, kernel.playerLookup(), notifier, clock))
                 .listMutes(new ListMutes(repository, kernel.playerLookup(), notifier, clock))
                 .banIp(new BanIp(repository, notifier, audit, kernel.events(), clock))
+                .tempBanIp(new TempBanIp(repository, notifier, audit, kernel.events(), clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit))
                 .freeze(new Freeze(sanctionPort, guard, notifier, audit))
                 .seen(new Seen(repository, kernel.playerLookup(), notifier, clock))

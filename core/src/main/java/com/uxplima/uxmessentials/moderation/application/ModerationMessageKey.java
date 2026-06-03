@@ -67,8 +67,9 @@ public enum ModerationMessageKey implements MessageKey {
     UNWARN_CLEARED("moderation.unwarn.cleared"),
     UNWARN_NONE("moderation.unwarn.none"),
 
-    // /banip, /unbanip
+    // /banip, /tempbanip, /unbanip
     BANIP_APPLIED("moderation.banip.applied"),
+    TEMPBANIP_APPLIED("moderation.tempbanip.applied"),
     BANIP_ALTS_DETECTED("moderation.banip.alts-detected"),
     BANIP_KICK("moderation.banip.kick"),
     UNBANIP_APPLIED("moderation.unbanip.applied"),

@@ -131,6 +131,11 @@ final class ItemworldCommandSurface {
                 "uxmessentials.editsign.use",
                 SubFeatureGroup.ITEM_UTILS,
                 "Edit the sign you are looking at"));
+        verbs.add(new Verb(
+                "iteminfo",
+                "uxmessentials.iteminfo.use",
+                SubFeatureGroup.ITEM_UTILS,
+                "Inspect the item you are holding"));
         // Virtual workstations.
         verbs.add(new Verb(
                 "anvil", "uxmessentials.workstation.anvil", SubFeatureGroup.WORKSTATIONS, "Open a virtual anvil"));

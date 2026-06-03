@@ -24,6 +24,10 @@ public enum VaultsMessageKey implements MessageKey {
     VAULT_NONE_OWNED("vaults.none-owned"),
     VAULT_AMOUNT_EXCEEDED("vaults.amount-exceeded"),
 
+    // /vault info
+    VAULT_INFO_HEADER("vaults.info.header"),
+    VAULT_INFO_LINE("vaults.info.line"),
+
     // /vault <player> [n] (admin)
     VAULT_ADMIN_OPENED("vaults.admin.opened"),
     VAULT_ADMIN_UNKNOWN_TARGET("vaults.admin.unknown-target"),

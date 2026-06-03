@@ -9,6 +9,8 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
+import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 
 /**
  * Renders the vaults context's player-facing feedback by resolving a {@link VaultsMessageKey} in the viewer's
@@ -49,6 +51,22 @@ public final class VaultNotifier {
     /** Tell {@code viewer} they own no vaults yet. */
     public void noneOwned(PlayerRef viewer) {
         send(viewer, VaultsMessageKey.VAULT_NONE_OWNED, Map.of());
+    }
+
+    /**
+     * Report {@code viewer}'s vault usage: how many vaults they own against their count cap, and the slot size
+     * of each. The cap renders as the unlimited sentinel when the owner has no count limit. Read-only — this
+     * resolves nothing and opens nothing.
+     */
+    public void showInfo(PlayerRef viewer, int ownedCount, VaultAmount cap, VaultSize size) {
+        send(viewer, VaultsMessageKey.VAULT_INFO_HEADER, Map.of("owned", Integer.toString(ownedCount)));
+        send(
+                viewer,
+                VaultsMessageKey.VAULT_INFO_LINE,
+                Map.of(
+                        "owned", Integer.toString(ownedCount),
+                        "cap", cap.unlimited() ? "∞" : Integer.toString(cap.cap()),
+                        "size", Integer.toString(size.slots())));
     }
 
     /** Tell {@code viewer} the requested index exceeds their vault-count quota. */

@@ -59,6 +59,7 @@ public final class ItemworldGroupACommands {
         commands.add(new DisenchantCommand(services));
         commands.add(new ItemModelCommand(services));
         commands.add(new EditSignCommand(services));
+        commands.add(new ItemInfoCommand(services));
     }
 
     private static void addWorkstations(List<CommandRegistration> commands, ItemworldServices services) {
