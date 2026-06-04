@@ -39,4 +39,16 @@ public interface PlayerWarpRepository {
 
     /** Remove {@code owner}'s warp under {@code name}; a no-op when no such row exists. */
     void delete(PlayerRef owner, PlayerWarpName name);
+
+    /**
+     * The warps {@code owner} owns if they are already in memory, without touching the database. A cache
+     * decorator returns its cached set on a hit and an empty {@link Optional} on a miss; an undecorated store
+     * has nothing in memory and so returns empty. This exists for tick-thread callers that must never block
+     * on I/O — chiefly the {@code /pwarp}/{@code /delpwarp} name-argument suggesters, which complete only the
+     * warps a join-warmed cache already holds and suggest nothing on a cold miss rather than reaching the
+     * disk while the player types. Never loads; never blocks.
+     */
+    default Optional<List<PlayerWarp>> peekOwned(PlayerRef owner) {
+        return Optional.empty();
+    }
 }

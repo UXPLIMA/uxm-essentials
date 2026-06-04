@@ -98,6 +98,12 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
         cache.invalidate(owner.uuid());
     }
 
+    @Override
+    public Optional<List<PlayerWarp>> peekOwned(PlayerRef owner) {
+        Objects.requireNonNull(owner, "owner");
+        return cache.getIfPresent(owner.uuid()).map(byName -> List.copyOf(byName.values()));
+    }
+
     /** Drop every cached owner; call on a module reload. */
     public void invalidateAll() {
         cache.invalidateAll();

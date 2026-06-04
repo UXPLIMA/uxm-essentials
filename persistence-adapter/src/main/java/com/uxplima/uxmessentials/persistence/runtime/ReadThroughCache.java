@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.persistence.runtime;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -48,6 +49,15 @@ public final class ReadThroughCache<K, V> {
     /** The cached value for {@code key}, loading it from the backing query on a miss. */
     public V get(K key) {
         return cache.get(Objects.requireNonNull(key, "key"));
+    }
+
+    /**
+     * The cached value for {@code key} only if it is already in memory — never loads through to the backing
+     * query. A present {@link Optional} is a cache hit; an empty one is a miss. Tick-thread callers that must
+     * not block on I/O (the home/pwarp name suggesters) read through this rather than {@link #get}.
+     */
+    public Optional<V> getIfPresent(K key) {
+        return Optional.ofNullable(cache.getIfPresent(Objects.requireNonNull(key, "key")));
     }
 
     /** Drop {@code key} so the next read reloads it; call after a write that changed it. */

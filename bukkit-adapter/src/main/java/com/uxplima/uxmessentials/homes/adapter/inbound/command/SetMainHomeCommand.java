@@ -14,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
@@ -36,7 +37,9 @@ public final class SetMainHomeCommand extends HomeCommandSupport implements Comm
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("setmainhome")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("name", StringArgumentType.word()).executes(this::run))
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .suggests(CommandSuggestions.forPlayer(services::ownHomeNames))
+                        .executes(this::run))
                 .build();
     }
 

@@ -303,6 +303,7 @@ public final class PluginModule {
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
         HomesWiring.Wired wired = HomesWiring.wire(ctx, persistence, engine, bus, guiLayouts);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
     }
 
@@ -493,6 +494,7 @@ public final class PluginModule {
                 "playerwarps delegates teleport execution but the teleport engine is unavailable");
         PlayerwarpsWiring.Wired wired = PlayerwarpsWiring.wire(ctx, persistence, engine);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
     }
 
     private static void wireScoreboard(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {

@@ -163,7 +163,8 @@ class HomesMenuPathTest {
                 new SetMainHome(repository, mainHomes, notifier),
                 new HomeAdmin(repository, teleporter, notifier, new NoEvents()),
                 homeMenu,
-                new NoPlayerLookup());
+                new NoPlayerLookup(),
+                repository);
     }
 
     /** A main-home store that holds no choice, so plain {@code /home} keeps using the first-created home. */

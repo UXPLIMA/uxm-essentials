@@ -14,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -47,13 +48,17 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                         .requires(src -> src.getSender().hasPermission(PUBLIC_PERMISSION))
                         .then(Commands.literal("public")
                                 .then(Commands.argument("name", StringArgumentType.word())
+                                        .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
                                         .executes(this::makePublic)))
                         .then(Commands.literal("private")
                                 .then(Commands.argument("name", StringArgumentType.word())
+                                        .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
                                         .executes(this::makePrivate))))
                 .then(Commands.argument("name", StringArgumentType.word())
+                        .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
                         .executes(this::useOwn)
                         .then(Commands.argument("owner", StringArgumentType.word())
+                                .suggests(CommandSuggestions.onlinePlayers())
                                 .executes(this::useOther)))
                 .build();
     }

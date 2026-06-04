@@ -5,9 +5,11 @@ import java.util.List;
 import java.util.Objects;
 
 import org.bukkit.Material;
+import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommands;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenuView;
+import com.uxplima.uxmessentials.homes.adapter.inbound.listener.HomesJoinListener;
 import com.uxplima.uxmessentials.homes.adapter.outbound.TeleportHomeAdapter;
 import com.uxplima.uxmessentials.homes.application.DelHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
@@ -72,7 +74,8 @@ public final class HomesWiring {
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
         GuiLayout menuLayout = guiLayouts.load("homes", "homes-menu", GuiLayout.paginatedDefault(Material.RED_BED));
         HomeServices services = assemble(ctx, repository, mainHomes, notifier, quota, teleporter, menuLayout);
-        return new Wired(HomeCommands.all(services, kernel.messages()), repository, quota);
+        HomesJoinListener joinWarmer = new HomesJoinListener(repository, kernel.scheduler());
+        return new Wired(HomeCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
     }
 
     private static HomeServices assemble(
@@ -97,7 +100,8 @@ public final class HomesWiring {
                 new SetMainHome(repository, mainHomes, notifier),
                 new HomeAdmin(repository, teleporter, notifier, kernel.events()),
                 homeMenu,
-                kernel.playerLookup());
+                kernel.playerLookup(),
+                repository);
     }
 
     private static int defaultLimit(ModuleContext ctx) {
@@ -112,13 +116,16 @@ public final class HomesWiring {
      * and the cache expires.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param listeners the join cache-warmer the plugin registers
      * @param repository the home store the {@code homes_count} placeholder reads
      * @param quota the home-limit reducer the {@code homes_limit}/{@code homes_left} placeholders read
      */
-    public record Wired(List<CommandRegistration> commands, HomeRepository repository, HomeQuota quota) {
+    public record Wired(
+            List<CommandRegistration> commands, List<Listener> listeners, HomeRepository repository, HomeQuota quota) {
 
         public Wired {
             commands = List.copyOf(commands);
+            listeners = List.copyOf(listeners);
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(quota, "quota");
         }

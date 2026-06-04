@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
@@ -89,6 +91,11 @@ public final class HomeSync {
         public void delete(PlayerRef owner, HomeName name) {
             delegate.delete(owner, name);
             announce(owner);
+        }
+
+        @Override
+        public Optional<List<Home>> peek(PlayerRef owner) {
+            return delegate.peek(owner);
         }
 
         private void announce(PlayerRef owner) {

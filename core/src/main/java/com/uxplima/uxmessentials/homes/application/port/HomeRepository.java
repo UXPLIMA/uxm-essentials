@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.homes.application.port;
 
+import java.util.List;
+import java.util.Optional;
+
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
@@ -31,4 +34,16 @@ public interface HomeRepository {
 
     /** Remove the owner's home under {@code name}; a no-op when no such row exists. */
     void delete(PlayerRef owner, HomeName name);
+
+    /**
+     * The owner's homes if they are already in memory, without touching the database. A cache decorator
+     * returns its cached set on a hit and an empty {@link Optional} on a miss; an undecorated store has
+     * nothing in memory and so returns empty. This exists for tick-thread callers that must never block on
+     * I/O — chiefly the {@code /home}/{@code /delhome}/… name-argument suggesters, which complete only the
+     * homes a join-warmed cache already holds and suggest nothing on a cold miss rather than reaching the
+     * disk while the player types. Never loads; never blocks.
+     */
+    default Optional<List<Home>> peek(PlayerRef owner) {
+        return Optional.empty();
+    }
 }

@@ -14,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -41,6 +42,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::runDefault)
                 .then(Commands.argument("name", StringArgumentType.greedyString())
+                        .suggests(CommandSuggestions.forPlayer(services::ownHomeNames))
                         .executes(this::runNamed))
                 .build();
     }

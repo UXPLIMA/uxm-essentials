@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerwarps.adapter;
 
+import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
@@ -7,7 +8,10 @@ import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -22,6 +26,8 @@ import org.jspecify.annotations.NullMarked;
  * @param listPlayerWarps {@code /pwarps [player]}
  * @param visibility {@code /pwarp public|private <name>}
  * @param players name → ref resolution for the {@code [owner]} / {@code [player]} cross-owner forms
+ * @param repository the warp store, held only so the name-argument suggesters can peek an owner's warps
+ *     without blocking (a join-warmed cache hit completes the names; a cold miss suggests nothing)
  */
 @NullMarked
 public record PlayerWarpServices(
@@ -30,7 +36,8 @@ public record PlayerWarpServices(
         UsePlayerWarp usePlayerWarp,
         ListPlayerWarps listPlayerWarps,
         SetPlayerWarpVisibility visibility,
-        PlayerLookup players) {
+        PlayerLookup players,
+        PlayerWarpRepository repository) {
 
     public PlayerWarpServices {
         Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
@@ -39,5 +46,19 @@ public record PlayerWarpServices(
         Objects.requireNonNull(listPlayerWarps, "listPlayerWarps");
         Objects.requireNonNull(visibility, "visibility");
         Objects.requireNonNull(players, "players");
+        Objects.requireNonNull(repository, "repository");
+    }
+
+    /**
+     * The names of the warps {@code owner} owns if they are already cached, for the name-argument suggesters.
+     * Reads only the non-blocking repository peek, so a cold cache (no join-warm yet) yields an empty list and
+     * the suggester offers nothing rather than reaching the disk on the tick thread.
+     */
+    public List<String> ownWarpNames(PlayerRef owner) {
+        Objects.requireNonNull(owner, "owner");
+        return repository.peekOwned(owner).orElseGet(List::of).stream()
+                .map(PlayerWarp::name)
+                .map(name -> name.value())
+                .toList();
     }
 }

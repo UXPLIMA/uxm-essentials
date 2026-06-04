@@ -4,9 +4,12 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 
+import org.bukkit.event.Listener;
+
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommands;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
@@ -52,7 +55,8 @@ public final class PlayerwarpsWiring {
         PlayerWarpTeleporter teleporter = new TeleportPlayerWarpAdapter(teleportEngine);
         PlayerWarpQuota quota = new PlayerWarpQuota(kernel.permissions(), defaultLimit(ctx));
         PlayerWarpServices services = assemble(kernel, repository, notifier, teleporter, quota);
-        return new Wired(PlayerWarpCommands.all(services, kernel.messages()));
+        PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
+        return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer));
     }
 
     private static PlayerWarpServices assemble(
@@ -68,7 +72,8 @@ public final class PlayerwarpsWiring {
                 new UsePlayerWarp(repository, teleporter, notifier),
                 new ListPlayerWarps(repository, notifier),
                 new SetPlayerWarpVisibility(repository, notifier),
-                kernel.playerLookup());
+                kernel.playerLookup(),
+                repository);
     }
 
     private static int defaultLimit(ModuleContext ctx) {
@@ -81,11 +86,13 @@ public final class PlayerwarpsWiring {
      * drain on stop — the module's {@code stop()} clears its own bookkeeping and the cache expires.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param listeners the join cache-warmer the plugin registers
      */
-    public record Wired(List<CommandRegistration> commands) {
+    public record Wired(List<CommandRegistration> commands, List<Listener> listeners) {
 
         public Wired {
             commands = List.copyOf(commands);
+            listeners = List.copyOf(listeners);
         }
     }
 }

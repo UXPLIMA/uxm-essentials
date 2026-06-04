@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.persistence.homes;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
@@ -68,6 +70,12 @@ public final class CachedHomeRepository implements HomeRepository {
     public void delete(PlayerRef owner, HomeName name) {
         delegate.delete(owner, name);
         cache.invalidate(Objects.requireNonNull(owner, "owner").uuid());
+    }
+
+    @Override
+    public Optional<List<Home>> peek(PlayerRef owner) {
+        Objects.requireNonNull(owner, "owner");
+        return cache.getIfPresent(owner.uuid()).map(HomeSet::all);
     }
 
     /** Drop every cached owner; call on a module reload. */
