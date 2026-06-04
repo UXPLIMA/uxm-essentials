@@ -10,8 +10,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -68,7 +66,7 @@ public final class DepthCommand extends PlayerstateCommandSupport implements Com
                 ? PlayerstateMessageKey.DEPTH_ABOVE
                 : delta < 0 ? PlayerstateMessageKey.DEPTH_BELOW : PlayerstateMessageKey.DEPTH_AT;
         Map<String, String> placeholders = Map.of("blocks", String.valueOf(Math.abs(delta)));
-        player.sendMessage(MiniMessage.miniMessage().deserialize(messages.resolve(ref(player), key, placeholders)));
+        feedback.send(player, key, placeholders);
         return Command.SINGLE_SUCCESS;
     }
 }

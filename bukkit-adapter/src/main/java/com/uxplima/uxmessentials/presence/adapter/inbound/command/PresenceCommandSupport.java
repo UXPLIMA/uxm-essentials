@@ -8,10 +8,9 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -33,11 +32,11 @@ abstract class PresenceCommandSupport {
     private static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
     final PresenceServices services;
-    final Messages messages;
+    final CommandFeedback feedback;
 
     PresenceCommandSupport(PresenceServices services, Messages messages) {
         this.services = Objects.requireNonNull(services, "services");
-        this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
@@ -46,17 +45,12 @@ abstract class PresenceCommandSupport {
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(
-                MiniMessage.miniMessage().deserialize(messages.resolve(consoleRef(sender), PLAYERS_ONLY, Map.of())));
+        feedback.send(sender, PLAYERS_ONLY, Map.of());
         return null;
     }
 
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
     }
 }

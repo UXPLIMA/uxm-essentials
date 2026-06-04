@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.context.CommandContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -35,18 +36,12 @@ final class TeleportSenders {
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(consoleRef(sender), PLAYERS_ONLY, java.util.Map.of())));
+        new CommandFeedback(messages).send(sender, PLAYERS_ONLY, java.util.Map.of());
         return null;
     }
 
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef refOf(Player player) {
         return BukkitRefs.toRef(player);
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        // The console has no uuid; a synthetic ref carries only the locale-neutral en fallback path.
-        return new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
     }
 }

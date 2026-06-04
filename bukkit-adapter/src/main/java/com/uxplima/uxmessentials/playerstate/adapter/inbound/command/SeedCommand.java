@@ -8,8 +8,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -63,8 +61,7 @@ public final class SeedCommand extends PlayerstateCommandSupport implements Comm
         }
         long seed = player.getWorld().getSeed();
         Map<String, String> placeholders = Map.of("seed", Long.toString(seed));
-        player.sendMessage(MiniMessage.miniMessage()
-                .deserialize(messages.resolve(ref(player), PlayerstateMessageKey.SEED_SHOW, placeholders)));
+        feedback.send(player, PlayerstateMessageKey.SEED_SHOW, placeholders);
         return Command.SINGLE_SUCCESS;
     }
 }

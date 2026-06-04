@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.scoreboard.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -11,14 +10,13 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -45,14 +43,14 @@ public final class ScoreboardCommand
     private final ToggleScoreboard toggle;
     private final ScoreboardRenderer renderer;
     private final Scheduler scheduler;
-    private final Messages messages;
+    private final CommandFeedback feedback;
 
     public ScoreboardCommand(
             ToggleScoreboard toggle, ScoreboardRenderer renderer, Scheduler scheduler, Messages messages) {
         this.toggle = Objects.requireNonNull(toggle, "toggle");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     @Override
@@ -97,13 +95,7 @@ public final class ScoreboardCommand
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(MiniMessage.miniMessage()
-                .deserialize(
-                        messages.resolve(consoleRef(sender), ScoreboardMessageKey.SCOREBOARD_PLAYERS_ONLY, Map.of())));
+        feedback.send(sender, ScoreboardMessageKey.SCOREBOARD_PLAYERS_ONLY, Map.of());
         return null;
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

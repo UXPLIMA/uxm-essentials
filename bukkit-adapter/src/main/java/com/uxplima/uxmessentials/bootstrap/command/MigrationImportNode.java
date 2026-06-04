@@ -9,7 +9,7 @@ import org.bukkit.command.CommandSender;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -46,6 +46,13 @@ public final class MigrationImportNode {
     private static final String DISABLED =
             "The migration module is disabled — enable it in modules.conf for a cutover.";
 
+    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    private static final String HEADER = "<gradient:#4aa3ff:#9b6bff>";
+    private static final String HEADER_END = "</gradient>";
+    private static final String BODY = "<#aeb8c4>";
+    private static final String SUCCESS = "<#57e389>";
+    private static final String ERROR = "<#ff6b6b>";
+
     private final MigrationImportService service;
 
     public MigrationImportNode(MigrationImportService service) {
@@ -79,33 +86,33 @@ public final class MigrationImportNode {
     }
 
     private int runUsage(CommandContext<CommandSourceStack> ctx) {
-        reply(ctx, NO_SOURCE + joinedBuiltIds());
+        reply(ctx, BODY, NO_SOURCE + joinedBuiltIds());
         return Command.SINGLE_SUCCESS;
     }
 
     private int runList(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        sender.sendMessage(Component.text(LIST_HEADER));
+        sender.sendMessage(MINI_MESSAGE.deserialize(HEADER + escape(LIST_HEADER) + HEADER_END));
         for (SourceDescriptor descriptor : service.builtSources()) {
-            sender.sendMessage(Component.text(describe(descriptor)));
+            sender.sendMessage(MINI_MESSAGE.deserialize(BODY + escape(describe(descriptor))));
         }
         return Command.SINGLE_SUCCESS;
     }
 
     private int dispatch(CommandContext<CommandSourceStack> ctx, ImportMode mode) {
         if (!service.enabled()) {
-            reply(ctx, DISABLED);
+            reply(ctx, ERROR, DISABLED);
             return 0;
         }
         String raw = ctx.getArgument("source", String.class);
         Optional<SourceId> resolved = service.resolve(raw);
         if (resolved.isEmpty()) {
-            reply(ctx, UNKNOWN_SOURCE + raw + ". Built sources: " + joinedBuiltIds());
+            reply(ctx, ERROR, UNKNOWN_SOURCE + raw + ". Built sources: " + joinedBuiltIds());
             return 0;
         }
         String actor = ctx.getSource().getSender().getName();
         service.dispatch(actor, resolved.get(), mode);
-        reply(ctx, STARTED + resolved.get().value() + (mode.isDryRun() ? DRY_PREFIX : ""));
+        reply(ctx, SUCCESS, STARTED + resolved.get().value() + (mode.isDryRun() ? DRY_PREFIX : ""));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -120,7 +127,11 @@ public final class MigrationImportNode {
         return String.join(", ", ids);
     }
 
-    private static void reply(CommandContext<CommandSourceStack> ctx, String message) {
-        ctx.getSource().getSender().sendMessage(Component.text(message));
+    private static void reply(CommandContext<CommandSourceStack> ctx, String palette, String message) {
+        ctx.getSource().getSender().sendMessage(MINI_MESSAGE.deserialize(palette + escape(message)));
+    }
+
+    private static String escape(String text) {
+        return MINI_MESSAGE.escapeTags(text);
     }
 }

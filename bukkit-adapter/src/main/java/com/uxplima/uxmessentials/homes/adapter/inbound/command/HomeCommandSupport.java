@@ -9,6 +9,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -30,11 +31,11 @@ abstract class HomeCommandSupport {
     static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
     final HomeServices services;
-    final Messages messages;
+    final CommandFeedback feedback;
 
     HomeCommandSupport(HomeServices services, Messages messages) {
         this.services = Objects.requireNonNull(services, "services");
-        this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
@@ -43,8 +44,7 @@ abstract class HomeCommandSupport {
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(consoleRef(sender), PLAYERS_ONLY, java.util.Map.of())));
+        feedback.send(sender, PLAYERS_ONLY, java.util.Map.of());
         return null;
     }
 
@@ -60,9 +60,5 @@ abstract class HomeCommandSupport {
      */
     static com.uxplima.uxmessentials.shared.domain.Position position(Player player) {
         return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
     }
 }

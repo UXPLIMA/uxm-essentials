@@ -111,9 +111,7 @@ public final class HomeAdminCommand extends HomeCommandSupport implements Comman
     }
 
     private void sendUnknown(Player sender, String name) {
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(
-                        ref(sender), HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name))));
+        feedback.send(sender, HomesMessageKey.HOME_ADMIN_TARGET_UNKNOWN, Map.of("player", name));
     }
 
     private static HomeName nameArg(CommandContext<CommandSourceStack> ctx) {

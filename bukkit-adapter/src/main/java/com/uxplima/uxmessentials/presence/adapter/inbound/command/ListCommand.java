@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.bukkit.Bukkit;
@@ -13,8 +12,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -23,7 +20,6 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -66,9 +62,8 @@ public final class ListCommand extends PresenceCommandSupport implements Command
         CommandSender sender = ctx.getSource().getSender();
         List<String> names = collectVisibleNames(sender);
         String joined = String.join(", ", names);
-        PlayerRef viewer = viewerRef(sender);
         Map<String, String> placeholders = Map.of("count", String.valueOf(names.size()), "players", joined);
-        sender.sendMessage(MiniMessage.miniMessage().deserialize(messages.resolve(viewer, LIST_PLAYERS, placeholders)));
+        feedback.send(sender, LIST_PLAYERS, placeholders);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -80,12 +75,5 @@ public final class ListCommand extends PresenceCommandSupport implements Command
                 .map(Player::getName)
                 .sorted(Comparator.naturalOrder())
                 .collect(Collectors.toList());
-    }
-
-    private static PlayerRef viewerRef(CommandSender sender) {
-        if (sender instanceof Player player) {
-            return ref(player);
-        }
-        return new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

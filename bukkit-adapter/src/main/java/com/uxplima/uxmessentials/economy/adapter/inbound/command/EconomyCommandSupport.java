@@ -3,14 +3,11 @@ package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
-
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
@@ -20,6 +17,7 @@ import com.uxplima.uxmessentials.economy.domain.AmountParser;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -45,11 +43,11 @@ abstract class EconomyCommandSupport {
     static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
     final EconomyServices services;
-    final Messages messages;
+    final CommandFeedback feedback;
 
     EconomyCommandSupport(EconomyServices services, Messages messages) {
         this.services = Objects.requireNonNull(services, "services");
-        this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
@@ -102,7 +100,7 @@ abstract class EconomyCommandSupport {
 
     /** Send a console-only catalog message to a non-player sender. */
     final void sendConsole(CommandSender sender, MessageKey key) {
-        sender.sendMessage(MiniMessage.miniMessage().deserialize(messages.resolve(consoleRef(sender), key, Map.of())));
+        feedback.send(sender, key, Map.of());
     }
 
     /** Tell {@code viewer} the named currency is not configured, listing the valid ids. */
@@ -127,9 +125,5 @@ abstract class EconomyCommandSupport {
         } catch (IllegalArgumentException absent) {
             return false;
         }
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

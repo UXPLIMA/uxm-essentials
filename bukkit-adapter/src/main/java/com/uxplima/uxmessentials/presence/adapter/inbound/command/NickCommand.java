@@ -87,7 +87,7 @@ public final class NickCommand extends PresenceCommandSupport implements Command
         String nick = StringArgumentType.getString(ctx, "value");
         Optional<PlayerRef> target = onlineByName(targetName);
         if (target.isEmpty()) {
-            reportUnknown(sender, actor, targetName);
+            reportUnknown(sender, targetName);
             return Command.SINGLE_SUCCESS;
         }
         if (nick.equalsIgnoreCase(OFF)) {
@@ -98,9 +98,8 @@ public final class NickCommand extends PresenceCommandSupport implements Command
         return Command.SINGLE_SUCCESS;
     }
 
-    private void reportUnknown(Player sender, PlayerRef actor, String name) {
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(actor, PresenceMessageKey.NICK_TARGET_UNKNOWN, Map.of("player", name))));
+    private void reportUnknown(Player sender, String name) {
+        feedback.send(sender, PresenceMessageKey.NICK_TARGET_UNKNOWN, Map.of("player", name));
     }
 
     private static Optional<PlayerRef> onlineByName(String name) {

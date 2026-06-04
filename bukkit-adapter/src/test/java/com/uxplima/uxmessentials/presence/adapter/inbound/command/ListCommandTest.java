@@ -121,6 +121,9 @@ class ListCommandTest {
     private static final class EchoMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            if (key.key().equals("prefix")) {
+                return "";
+            }
             assertThat(key).isEqualTo(PresenceMessageKey.LIST_PLAYERS);
             return "count=" + placeholders.get("count") + " players=" + placeholders.get("players");
         }

@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.warps.adapter.inbound.command;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -10,6 +9,7 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.context.CommandContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -36,11 +36,11 @@ abstract class WarpCommandSupport {
     static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;
 
     final WarpServices services;
-    final Messages messages;
+    final CommandFeedback feedback;
 
     WarpCommandSupport(WarpServices services, Messages messages) {
         this.services = Objects.requireNonNull(services, "services");
-        this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
@@ -49,24 +49,18 @@ abstract class WarpCommandSupport {
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(consoleRef(sender), PLAYERS_ONLY, Map.of())));
+        feedback.send(sender, PLAYERS_ONLY, Map.of());
         return null;
     }
 
     /** Tell {@code sender} the named target was not found, in their locale. */
     final void unknownPlayer(CommandSender sender, String name) {
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(refOf(sender), UNKNOWN_PLAYER, Map.of("player", name))));
+        feedback.send(sender, UNKNOWN_PLAYER, Map.of("player", name));
     }
 
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
-    }
-
-    private static PlayerRef refOf(CommandSender sender) {
-        return sender instanceof Player player ? BukkitRefs.toRef(player) : consoleRef(sender);
     }
 
     /**
@@ -76,9 +70,5 @@ abstract class WarpCommandSupport {
      */
     static Position position(Player player) {
         return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

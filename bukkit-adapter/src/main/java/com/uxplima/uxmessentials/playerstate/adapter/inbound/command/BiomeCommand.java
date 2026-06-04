@@ -10,8 +10,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -71,8 +69,7 @@ public final class BiomeCommand extends PlayerstateCommandSupport implements Com
                 .getKey()
                 .replace('_', ' ');
         Map<String, String> placeholders = Map.of("biome", name);
-        player.sendMessage(MiniMessage.miniMessage()
-                .deserialize(messages.resolve(ref(player), PlayerstateMessageKey.BIOME_SHOW, placeholders)));
+        feedback.send(player, PlayerstateMessageKey.BIOME_SHOW, placeholders);
         return Command.SINGLE_SUCCESS;
     }
 }

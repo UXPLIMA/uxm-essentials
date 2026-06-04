@@ -8,7 +8,7 @@ import org.bukkit.command.CommandSender;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -54,6 +54,13 @@ public final class UxmessCommand implements CommandRegistration {
     private static final String STATE_ENABLED = " — enabled";
     private static final String STATE_DISABLED = " — disabled";
 
+    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    private static final String HEADER = "<gradient:#4aa3ff:#9b6bff>";
+    private static final String HEADER_END = "</gradient>";
+    private static final String BODY = "<#aeb8c4>";
+    private static final String SUCCESS = "<#57e389>";
+    private static final String ERROR = "<#ff6b6b>";
+
     private final ModuleRegistry registry;
     private final ConfigStore config;
     private final MigrationImportNode importNode;
@@ -95,31 +102,30 @@ public final class UxmessCommand implements CommandRegistration {
 
     private int runStatus(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        sender.sendMessage(Component.text(STATUS_HEADER));
+        sendHeader(sender, STATUS_HEADER);
         List<FeatureModule> modules = registry.all();
         if (modules.isEmpty()) {
-            sender.sendMessage(Component.text(STATUS_NO_MODULES));
+            sendBody(sender, STATUS_NO_MODULES);
             return Command.SINGLE_SUCCESS;
         }
         for (FeatureModule module : modules) {
-            String state = module.enabled(config) ? STATE_ENABLED : STATE_DISABLED;
-            sender.sendMessage(Component.text(module.id().value() + state));
+            sendModuleLine(sender, module);
         }
         return Command.SINGLE_SUCCESS;
     }
 
     private int runHelp(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        sender.sendMessage(Component.text(HELP_HEADER));
-        sender.sendMessage(Component.text(HELP_STATUS));
-        sender.sendMessage(Component.text(HELP_HELP));
-        sender.sendMessage(Component.text(HELP_RELOAD));
-        sender.sendMessage(Component.text(HELP_IMPORT));
+        sendHeader(sender, HELP_HEADER);
+        sendBody(sender, HELP_STATUS);
+        sendBody(sender, HELP_HELP);
+        sendBody(sender, HELP_RELOAD);
+        sendBody(sender, HELP_IMPORT);
         return Command.SINGLE_SUCCESS;
     }
 
     private int runReloadAll(CommandContext<CommandSourceStack> ctx) {
-        ctx.getSource().getSender().sendMessage(Component.text(RELOAD_ALL));
+        sendBody(ctx.getSource().getSender(), RELOAD_ALL);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -128,11 +134,35 @@ public final class UxmessCommand implements CommandRegistration {
         String requested = ctx.getArgument("module", String.class);
         FeatureModule module = resolve(requested);
         if (module == null) {
-            sender.sendMessage(Component.text(RELOAD_UNKNOWN + requested));
+            send(sender, ERROR, RELOAD_UNKNOWN + requested);
             return 0;
         }
-        sender.sendMessage(Component.text(RELOAD_ONE + module.id().value()));
+        send(sender, SUCCESS, RELOAD_ONE + module.id().value());
         return Command.SINGLE_SUCCESS;
+    }
+
+    private void sendModuleLine(CommandSender sender, FeatureModule module) {
+        boolean on = module.enabled(config);
+        String state = on ? STATE_ENABLED : STATE_DISABLED;
+        String colour = on ? SUCCESS : ERROR;
+        sender.sendMessage(MINI_MESSAGE.deserialize(BODY + escape(module.id().value()) + colour + escape(state)));
+    }
+
+    private static void sendHeader(CommandSender sender, String text) {
+        sender.sendMessage(MINI_MESSAGE.deserialize(HEADER + escape(text) + HEADER_END));
+    }
+
+    private static void sendBody(CommandSender sender, String text) {
+        send(sender, BODY, text);
+    }
+
+    /** Render plain operator text under a palette colour, escaping any markup-like characters in it. */
+    private static void send(CommandSender sender, String palette, String text) {
+        sender.sendMessage(MINI_MESSAGE.deserialize(palette + escape(text)));
+    }
+
+    private static String escape(String text) {
+        return MINI_MESSAGE.escapeTags(text);
     }
 
     private @Nullable FeatureModule resolve(String requested) {

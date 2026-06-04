@@ -8,8 +8,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -56,8 +54,7 @@ public final class PersonalTimeCommand extends PlayerstateCommandSupport impleme
         }
         Optional<PersonalTime> time = PersonalTime.parse(ctx.getArgument("value", String.class));
         if (time.isEmpty()) {
-            sender.sendMessage(MiniMessage.miniMessage()
-                    .deserialize(messages.resolve(ref(sender), PlayerstateMessageKey.PTIME_INVALID, Map.of())));
+            feedback.send(sender, PlayerstateMessageKey.PTIME_INVALID, Map.of());
             return 0;
         }
         services.personalTime().apply(ref(sender), time.get());

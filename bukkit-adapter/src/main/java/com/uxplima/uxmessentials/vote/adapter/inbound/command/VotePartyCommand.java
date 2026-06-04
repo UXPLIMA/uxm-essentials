@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.vote.adapter.inbound.command;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -10,11 +9,10 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -39,9 +37,11 @@ public final class VotePartyCommand implements CommandRegistration {
     private static final String PERMISSION = "uxmessentials.voteparty.use";
 
     private final VoteServices services;
+    private final CommandFeedback feedback;
 
     public VotePartyCommand(VoteServices services) {
         this.services = Objects.requireNonNull(services, "services");
+        this.feedback = new CommandFeedback(services.messages());
     }
 
     @Override
@@ -72,13 +72,7 @@ public final class VotePartyCommand implements CommandRegistration {
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(MiniMessage.miniMessage()
-                .deserialize(
-                        services.messages().resolve(consoleRef(sender), VoteMessageKey.VOTE_PLAYERS_ONLY, Map.of())));
+        feedback.send(sender, VoteMessageKey.VOTE_PLAYERS_ONLY, Map.of());
         return null;
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

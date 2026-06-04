@@ -15,6 +15,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -52,12 +53,14 @@ public final class LangCommand implements CommandRegistration {
     private final LocaleCatalog catalog;
     private final Messages messages;
     private final MessageSink sink;
+    private final CommandFeedback feedback;
 
     public LangCommand(LocaleStore overrides, LocaleCatalog catalog, Messages messages, MessageSink sink) {
         this.overrides = Objects.requireNonNull(overrides, "overrides");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.feedback = new CommandFeedback(messages);
     }
 
     @Override
@@ -156,9 +159,7 @@ public final class LangCommand implements CommandRegistration {
         // A console has no client locale and no PDC to store an override; reply directly rather than
         // through the entity-scheduler sink (which no-ops for a non-player), mirroring the feature
         // commands' players-only path.
-        PlayerRef consoleRef = new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(consoleRef, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of())));
+        feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of());
         return null;
     }
 }

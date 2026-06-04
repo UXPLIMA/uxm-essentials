@@ -3,17 +3,15 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -46,10 +44,12 @@ abstract class PlayerstateCommandSupport {
 
     final PlayerStateServices services;
     final Messages messages;
+    final CommandFeedback feedback;
 
     PlayerstateCommandSupport(PlayerStateServices services, Messages messages) {
         this.services = Objects.requireNonNull(services, "services");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(messages);
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
@@ -98,12 +98,6 @@ abstract class PlayerstateCommandSupport {
     }
 
     private void reply(CommandSender sender, MessageKey key, Map<String, String> placeholders) {
-        sender.sendMessage(MiniMessage.miniMessage().deserialize(messages.resolve(refOf(sender), key, placeholders)));
-    }
-
-    private static PlayerRef refOf(CommandSender sender) {
-        return sender instanceof Player player
-                ? BukkitRefs.toRef(player)
-                : new PlayerRef(new UUID(0L, 0L), sender.getName());
+        feedback.send(sender, key, placeholders);
     }
 }

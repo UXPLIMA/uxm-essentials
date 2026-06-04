@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.vote.adapter.inbound.command;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -11,11 +10,10 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -42,9 +40,11 @@ public final class VoteCommand implements CommandRegistration {
     private static final String TEST_PERMISSION = "uxmessentials.vote.testreward";
 
     private final VoteServices services;
+    private final CommandFeedback feedback;
 
     public VoteCommand(VoteServices services) {
         this.services = Objects.requireNonNull(services, "services");
+        this.feedback = new CommandFeedback(services.messages());
     }
 
     @Override
@@ -79,15 +79,8 @@ public final class VoteCommand implements CommandRegistration {
         }
         PlayerRef who = BukkitRefs.toRef(sender);
         services.scheduler().async(() -> services.handleVote().handle(new Vote(who, "test", Instant.now())));
-        deliverTestConfirmation(ctx, who);
+        feedback.send(sender, VoteMessageKey.VOTE_TESTREWARD, Map.of());
         return Command.SINGLE_SUCCESS;
-    }
-
-    private void deliverTestConfirmation(CommandContext<CommandSourceStack> ctx, PlayerRef who) {
-        ctx.getSource()
-                .getSender()
-                .sendMessage(MiniMessage.miniMessage()
-                        .deserialize(services.messages().resolve(who, VoteMessageKey.VOTE_TESTREWARD, Map.of())));
     }
 
     private @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
@@ -95,13 +88,7 @@ public final class VoteCommand implements CommandRegistration {
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(MiniMessage.miniMessage()
-                .deserialize(
-                        services.messages().resolve(consoleRef(sender), VoteMessageKey.VOTE_PLAYERS_ONLY, Map.of())));
+        feedback.send(sender, VoteMessageKey.VOTE_PLAYERS_ONLY, Map.of());
         return null;
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

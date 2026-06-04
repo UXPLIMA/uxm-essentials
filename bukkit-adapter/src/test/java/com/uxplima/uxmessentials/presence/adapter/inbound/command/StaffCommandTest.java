@@ -124,6 +124,9 @@ class StaffCommandTest {
     private static final class EchoMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            if (key.key().equals("prefix")) {
+                return "";
+            }
             assertThat(key).isIn(PresenceMessageKey.STAFF_LIST, PresenceMessageKey.STAFF_EMPTY);
             if (key == PresenceMessageKey.STAFF_EMPTY) {
                 return "empty";

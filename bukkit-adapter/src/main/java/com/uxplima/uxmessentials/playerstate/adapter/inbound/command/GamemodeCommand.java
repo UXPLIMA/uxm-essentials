@@ -8,8 +8,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -61,8 +59,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
         }
         Optional<GameModeRef> mode = GameModeRef.parse(ctx.getArgument("mode", String.class));
         if (mode.isEmpty()) {
-            sender.sendMessage(MiniMessage.miniMessage()
-                    .deserialize(messages.resolve(ref(sender), PlayerstateMessageKey.GAMEMODE_INVALID, Map.of())));
+            feedback.send(sender, PlayerstateMessageKey.GAMEMODE_INVALID, Map.of());
             return 0;
         }
         Optional<PlayerRef> target = resolveTarget(ctx, sender);

@@ -13,6 +13,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -45,11 +46,13 @@ abstract class MessagingCommandSupport {
     final MessagingServices services;
     final Messages messages;
     final MessageSink sink;
+    final CommandFeedback feedback;
 
     MessagingCommandSupport(MessagingServices services, Messages messages, MessageSink sink) {
         this.services = Objects.requireNonNull(services, "services");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.feedback = new CommandFeedback(messages);
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
@@ -58,8 +61,7 @@ abstract class MessagingCommandSupport {
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(consoleRef(sender), PLAYERS_ONLY, Map.of())));
+        feedback.send(sender, PLAYERS_ONLY, Map.of());
         return null;
     }
 
@@ -93,9 +95,5 @@ abstract class MessagingCommandSupport {
     /** Render {@code key} for {@code viewer} with {@code placeholders} and deliver it through the sink. */
     final void notify(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         sink.deliver(viewer, messages.resolve(viewer, key, placeholders));
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
     }
 }

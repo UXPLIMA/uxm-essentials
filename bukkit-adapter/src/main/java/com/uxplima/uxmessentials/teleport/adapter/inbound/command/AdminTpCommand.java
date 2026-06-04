@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -12,19 +13,24 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The staff direct-teleport verbs — {@code /tp}, {@code /tphere}, {@code /tpo}, {@code /tpohere} — handled
@@ -62,12 +68,27 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
         this.pull = Objects.requireNonNull(pull, "pull");
     }
 
+    /** The node for the coordinate form of {@code /tp x y z [world]}, gated by the position node. */
+    private static final String POSITION_PERMISSION = "uxmessentials.tp.position";
+
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        return Commands.literal(literal)
+        var root = Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(permission))
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::run))
-                .build();
+                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::run));
+        // The coordinate form mirrors /tppos and only makes sense for the GO variants (/tp, /tpo) —
+        // moving the actor to a raw point — so /tphere and /tpohere keep the player-only argument.
+        if (pull == Pull.GO) {
+            root.then(Commands.argument("x", DoubleArgumentType.doubleArg())
+                    .requires(src -> src.getSender().hasPermission(POSITION_PERMISSION))
+                    .then(Commands.argument("y", DoubleArgumentType.doubleArg())
+                            .then(Commands.argument("z", DoubleArgumentType.doubleArg())
+                                    .executes(ctx -> runPosition(ctx, null))
+                                    .then(Commands.argument("world", StringArgumentType.word())
+                                            .executes(ctx ->
+                                                    runPosition(ctx, ctx.getArgument("world", String.class)))))));
+        }
+        return root.build();
     }
 
     @Override
@@ -99,6 +120,37 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
 
     private void hop(PlayerRef who, Position to) {
         services.executor().teleport(who, Destination.at(to), TeleportKind.ADMIN);
+    }
+
+    private int runPosition(CommandContext<CommandSourceStack> ctx, @Nullable String worldName) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        Optional<WorldRef> world = targetWorld(sender, worldName);
+        if (world.isEmpty()) {
+            services.notifier().send(ref(sender), TeleportMessageKey.SPAWN_UNRESOLVED);
+            return 0;
+        }
+        org.bukkit.Location facing = TeleportRefs.location(sender);
+        Position to = new Position(
+                world.get(),
+                ctx.getArgument("x", Double.class),
+                ctx.getArgument("y", Double.class),
+                ctx.getArgument("z", Double.class),
+                facing.getYaw(),
+                facing.getPitch());
+        hop(ref(sender), to);
+        services.notifier().send(ref(sender), TeleportMessageKey.TP_DONE);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private Optional<WorldRef> targetWorld(Player sender, @Nullable String worldName) {
+        if (worldName == null) {
+            return Optional.of(BukkitRefs.toRef(sender.getWorld()));
+        }
+        World world = org.bukkit.Bukkit.getWorld(worldName);
+        return world == null ? Optional.empty() : Optional.of(BukkitRefs.toRef(world));
     }
 
     private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {

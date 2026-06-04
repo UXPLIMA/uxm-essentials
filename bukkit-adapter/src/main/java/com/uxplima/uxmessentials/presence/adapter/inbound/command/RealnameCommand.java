@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -11,7 +10,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.mojang.brigadier.Command;
@@ -21,9 +19,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -67,14 +63,13 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
     private int run(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String query = StringArgumentType.getString(ctx, "player");
-        PlayerRef viewer = viewerRef(sender);
         Player match = findVisibleMatch(sender, query);
         if (match == null) {
-            reply(sender, viewer, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query));
+            feedback.send(sender, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query));
             return Command.SINGLE_SUCCESS;
         }
         String display = PLAIN.serialize(match.displayName());
-        reply(sender, viewer, PresenceMessageKey.REALNAME_RESULT, Map.of("display", display, "name", match.getName()));
+        feedback.send(sender, PresenceMessageKey.REALNAME_RESULT, Map.of("display", display, "name", match.getName()));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -91,16 +86,5 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
             }
         }
         return null;
-    }
-
-    private void reply(CommandSender sender, PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        sender.sendMessage(MiniMessage.miniMessage().deserialize(messages.resolve(viewer, key, placeholders)));
-    }
-
-    private static PlayerRef viewerRef(CommandSender sender) {
-        if (sender instanceof Player player) {
-            return ref(player);
-        }
-        return new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

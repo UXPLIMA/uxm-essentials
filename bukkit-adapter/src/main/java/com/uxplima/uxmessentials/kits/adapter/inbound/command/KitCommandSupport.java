@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.kits.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -14,6 +13,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -39,11 +39,11 @@ abstract class KitCommandSupport {
     static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;
 
     final KitServices services;
-    final Messages messages;
+    final CommandFeedback feedback;
 
     KitCommandSupport(KitServices services, Messages messages) {
         this.services = Objects.requireNonNull(services, "services");
-        this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
@@ -52,15 +52,13 @@ abstract class KitCommandSupport {
         if (sender instanceof Player player) {
             return player;
         }
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(consoleRef(sender), PLAYERS_ONLY, Map.of())));
+        feedback.send(sender, PLAYERS_ONLY, Map.of());
         return null;
     }
 
     /** Tell {@code sender} the named target was not found, in their locale. */
     final void unknownPlayer(CommandSender sender, String name) {
-        sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                .deserialize(messages.resolve(refOf(sender), UNKNOWN_PLAYER, Map.of("player", name))));
+        feedback.send(sender, UNKNOWN_PLAYER, Map.of("player", name));
     }
 
     /** A {@link PlayerRef} for the live player. */
@@ -71,13 +69,5 @@ abstract class KitCommandSupport {
     /** The non-empty stacks in {@code player}'s main inventory, serialized into the kit's item list. */
     static List<KitItem> inventoryItems(Player player) {
         return KitItemCodec.encodeAll(player.getInventory().getContents());
-    }
-
-    private static PlayerRef refOf(CommandSender sender) {
-        return sender instanceof Player player ? BukkitRefs.toRef(player) : consoleRef(sender);
-    }
-
-    private static PlayerRef consoleRef(CommandSender sender) {
-        return new PlayerRef(new UUID(0L, 0L), sender.getName());
     }
 }

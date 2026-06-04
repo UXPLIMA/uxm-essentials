@@ -17,9 +17,12 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * so a player can see what a kit grants before spending its cooldown (or its cost). An id no kit exists under
  * is refused with {@link KitError#NOT_FOUND}.
  *
- * <p>This never grants anything and never touches the claim/cooldown state — it is a pure read. The
- * resolved definition is returned so the adapter can render the stacks' display names; the textual feedback
- * is pushed through the notifier so all text resolves from {@link KitsMessageKey}.
+ * <p>This never grants anything and never touches the claim/cooldown state — it is a pure read. On a
+ * missing kit the not-found feedback is pushed through the notifier so it resolves from
+ * {@link KitError}. On a hit the resolved definition is returned so the adapter can render the header and
+ * one entry per stack: the per-item line needs the stack's material/display name, which lives in the
+ * opaque {@code KitItem} payload the kernel must not parse, so only the adapter — holding the item codec —
+ * can render those lines.
  */
 public final class ShowKit {
 
@@ -40,19 +43,6 @@ public final class ShowKit {
             notifier.send(viewer, KitError.NOT_FOUND.messageKey(), Map.of("kit", id.value()));
             return Result.err(KitError.NOT_FOUND);
         }
-        KitDefinition definition = kit.get();
-        notifier.send(
-                viewer,
-                KitsMessageKey.KIT_PREVIEW_HEADER,
-                Map.of("kit", definition.id().value()));
-        for (int i = 0; i < definition.items().size(); i++) {
-            notifier.send(
-                    viewer,
-                    KitsMessageKey.KIT_PREVIEW_ENTRY,
-                    Map.of(
-                            "amount", Integer.toString(definition.items().get(i).amount()),
-                            "slot", Integer.toString(i + 1)));
-        }
-        return Result.ok(definition);
+        return Result.ok(kit.get());
     }
 }

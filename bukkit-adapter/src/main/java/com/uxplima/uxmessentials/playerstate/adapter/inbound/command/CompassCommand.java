@@ -10,8 +10,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -84,8 +82,7 @@ public final class CompassCommand extends PlayerstateCommandSupport implements C
         int eighth = Math.round(yaw / 45f) & 7;
         String direction = messages.resolve(ref(player), DIRECTIONS[eighth], Map.of());
         Map<String, String> placeholders = Map.of("direction", direction, "degrees", String.valueOf(Math.round(yaw)));
-        String line = messages.resolve(ref(player), PlayerstateMessageKey.COMPASS_SHOW, placeholders);
-        player.sendMessage(MiniMessage.miniMessage().deserialize(line));
+        feedback.send(player, PlayerstateMessageKey.COMPASS_SHOW, placeholders);
         return Command.SINGLE_SUCCESS;
     }
 }
