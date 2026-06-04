@@ -12,11 +12,13 @@ import java.util.stream.Collectors;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
+import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.holograms.adapter.HologramsWiring;
@@ -269,6 +271,8 @@ public final class PluginModule {
             wireScoreboard(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources);
+        } else if (module.id().equals(ModuleId.of("discordlink"))) {
+            wireDiscordlink(plugin, ctx, persistence, resources);
         }
     }
 
@@ -518,6 +522,26 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
+    }
+
+    private static void wireDiscordlink(
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // discordlink builds its un-cached jOOQ store over persistence.dsl() (the discord_link_pending and
+        // discord_links tables ship in the persistence V16 baseline, always applied) and the /discordlink and
+        // /discordunlink commands. It registers its ConfirmLink seam into the ServicesManager so the optional
+        // Discord bridge — a separate jar with no compile-time link to this one — can redeem a /link code through
+        // the same use case; the registration is dropped on disable so a reload re-exposes it cleanly. The bridge
+        // looks the service up once its gateway is ready and forwards nothing while it is absent.
+        DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence);
+        wired.commands().forEach(resources::addCommand);
+        plugin.getServer()
+                .getServicesManager()
+                .register(
+                        DiscordLinkConfirmation.class,
+                        wired.confirmation(),
+                        plugin,
+                        org.bukkit.plugin.ServicePriority.Normal);
+        resources.onClose(() -> plugin.getServer().getServicesManager().unregister(wired.confirmation()));
     }
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */

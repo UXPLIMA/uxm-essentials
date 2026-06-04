@@ -5,10 +5,12 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.exceptions.InvalidTokenException;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
@@ -62,6 +64,19 @@ public final class JdaDiscordGateway implements DiscordGateway {
             return;
         }
         channel.sendMessage(message).queue();
+    }
+
+    @Override
+    public void enableLinking(DiscordLinkConfirmation confirmation) {
+        Objects.requireNonNull(confirmation, "confirmation");
+        JDA jda = client.get();
+        if (jda == null) {
+            return;
+        }
+        jda.addEventListener(new LinkSlashListener(confirmation));
+        jda.upsertCommand(LinkSlashListener.COMMAND_NAME, "Link your Discord account to your Minecraft account")
+                .addOption(OptionType.STRING, LinkSlashListener.CODE_OPTION, "The code from /discordlink in game", true)
+                .queue();
     }
 
     @Override

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
+import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
@@ -52,7 +53,8 @@ public final class MessageKeyCatalog {
             HologramsMessageKey.values(),
             PlayerwarpsMessageKey.values(),
             ScoreboardMessageKey.values(),
-            VoteMessageKey.values());
+            VoteMessageKey.values(),
+            DiscordlinkMessageKey.values());
 
     private MessageKeyCatalog() {}
 

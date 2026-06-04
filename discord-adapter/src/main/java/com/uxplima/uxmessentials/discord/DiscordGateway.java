@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.discord;
 
+import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
+
 /**
  * Thin abstraction over the Discord client. The bridge talks to Discord exclusively through this port so the
  * notification forwarder can be unit-tested against a fake implementation with no live JDA connection (a real
@@ -27,6 +29,17 @@ public interface DiscordGateway {
      * path. The send itself is asynchronous — this method returns without waiting for the REST round-trip.
      */
     void sendToChannel(String channelId, String message);
+
+    /**
+     * Register the inbound {@code /link} slash command and a handler that redeems a code through the given
+     * host confirmation seam. Called once after {@link #connect(String)} succeeds, only when the host exposes a
+     * {@link DiscordLinkConfirmation} via the {@code ServicesManager}; the outbound send path is untouched and
+     * needs no extra gateway intent (slash interactions arrive regardless of the message intents). A default
+     * no-op keeps the contract testable against a fake gateway that has no live JDA to register a command on.
+     */
+    default void enableLinking(DiscordLinkConfirmation confirmation) {
+        // No-op by default: a fake gateway records the call without a live JDA; the JDA impl overrides this.
+    }
 
     /** Whether the gateway currently holds a ready connection. */
     boolean isConnected();

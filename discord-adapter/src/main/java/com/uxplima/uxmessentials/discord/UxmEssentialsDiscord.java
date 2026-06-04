@@ -9,6 +9,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurateException;
 
@@ -81,6 +82,7 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
             NotificationForwarder live = new NotificationForwarder(gateway, config);
             forwarder.set(live);
             startSubscription(config, live);
+            enableLinking();
             getLogger()
                     .info("discord bridge connected; mirroring "
                             + config.channels().size() + " channel(s)");
@@ -110,6 +112,29 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
     private @Nullable NotificationSource lookupSource() {
         RegisteredServiceProvider<NotificationSource> rsp =
                 getServer().getServicesManager().getRegistration(NotificationSource.class);
+        return rsp != null ? rsp.getProvider() : null;
+    }
+
+    /**
+     * Register the {@code /link} slash command behind the host's confirmation seam, looked up via {@code
+     * ServicesManager} (no compile-time link to the host jar). When the host exposes no confirmation — it is
+     * older than the bridge, or the discordlink module is disabled — linking stays dormant: the bridge runs the
+     * outbound notice mirror unchanged and logs why, exactly like the notification-source dormant path.
+     */
+    private void enableLinking() {
+        DiscordLinkConfirmation confirmation = lookupConfirmation();
+        if (confirmation == null) {
+            getLogger()
+                    .info("discord bridge connected but the host exposes no link confirmation — /link is "
+                            + "dormant (is uxmEssentials installed with the discordlink module enabled?)");
+            return;
+        }
+        gateway.enableLinking(confirmation);
+    }
+
+    private @Nullable DiscordLinkConfirmation lookupConfirmation() {
+        RegisteredServiceProvider<DiscordLinkConfirmation> rsp =
+                getServer().getServicesManager().getRegistration(DiscordLinkConfirmation.class);
         return rsp != null ? rsp.getProvider() : null;
     }
 

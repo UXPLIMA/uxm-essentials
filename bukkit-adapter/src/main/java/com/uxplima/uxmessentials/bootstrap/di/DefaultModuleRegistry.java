@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationModule;
+import com.uxplima.uxmessentials.discordlink.application.DiscordlinkModule;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.holograms.application.HologramsModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
@@ -103,6 +104,12 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // event ports, plus a console-dispatch port), and like the steady-state features it ships ENABLED but
         // inert until rewards/links are authored, so it lands last after scoreboard.
         delegate.register(new VoteModule());
+        // discordlink is the 17th context — Discord account linking (/discordlink in game, /link in the bridge).
+        // It carries no hard dependency edge (its only collaborators are the shared persistence DSL, messages,
+        // and the player lookup), and the host exposes its ConfirmLink use case through the ServicesManager so the
+        // optional Discord jar can redeem a code with no compile-time link. Like the steady-state features it ships
+        // ENABLED, so it lands last after vote.
+        delegate.register(new DiscordlinkModule());
         // The shared kernel is not a module and never appears here.
     }
 

@@ -64,6 +64,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("playerwarps"))).isPresent();
         assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
         assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -81,7 +82,8 @@ class FeatureModuleRegistryDriftTest {
                         "holograms",
                         "playerwarps",
                         "scoreboard",
-                        "vote");
+                        "vote",
+                        "discordlink");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -315,14 +317,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void voteIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+    void voteShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule vote =
                 registry.byId(ModuleId.of("vote")).orElseThrow(() -> new AssertionError("vote is not registered"));
 
-        // vote is the 16th context — a Votifier-bridged vote-rewards and vote-party feature — registered last
-        // after the fifteen prior modules.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("vote");
+        // vote is the 16th context — a Votifier-bridged vote-rewards and vote-party feature. The later
+        // discordlink context now lands last, so vote must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
 
         // It ships ENABLED (a steady-state feature, inert until rewards/links are authored): with no modules.conf
         // override it is on, and disabling exactly vote removes only it while every sibling stays on.
@@ -343,6 +345,39 @@ class FeatureModuleRegistryDriftTest {
                 vote.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactlyInAnyOrder("vote", "voteparty");
         assertThat(vote.migrations()).isEmpty();
+    }
+
+    @Test
+    void discordlinkIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule discordlink = registry.byId(ModuleId.of("discordlink"))
+                .orElseThrow(() -> new AssertionError("discordlink is not registered"));
+
+        // discordlink is the 17th context — Discord account linking — registered last after the sixteen prior
+        // modules.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("discordlink");
+
+        // It ships ENABLED (a steady-state feature): with no modules.conf override it is on, and disabling exactly
+        // discordlink removes only it while every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("discordlink", "teleport", "economy", "vote");
+        Set<String> off =
+                registry.enabledModules(new FixedConfig(Map.of("modules.discordlink.enabled", false))).stream()
+                        .map(m -> m.id().value())
+                        .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("discordlink");
+        assertThat(off).contains("teleport", "economy", "vote");
+
+        // Enabled, discordlink contributes exactly /discordlink and /discordunlink (/discordlink status is a
+        // subcommand, not a literal) and owns no extra Flyway location (its discord_links and
+        // discord_link_pending tables are in the persistence V16 baseline, always applied), so it declares no
+        // MigrationSet of its own.
+        Set<String> literals =
+                discordlink.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactlyInAnyOrder("discordlink", "discordunlink");
+        assertThat(discordlink.migrations()).isEmpty();
     }
 
     @Test
