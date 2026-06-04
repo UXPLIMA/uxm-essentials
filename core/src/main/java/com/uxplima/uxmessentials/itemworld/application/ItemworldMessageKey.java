@@ -95,8 +95,9 @@ public enum ItemworldMessageKey implements MessageKey {
     ITEMINFO_HEADER("itemworld.iteminfo.header"),
     ITEMINFO_LINE("itemworld.iteminfo.line"),
 
-    // Virtual workstations — one opened line, parameterised by station name
+    // Virtual workstations — one opened line, parameterised by station name; the others form names the target
     WORKSTATION_OPENED("itemworld.workstation.opened"),
+    WORKSTATION_OPENED_FOR("itemworld.workstation.opened-for"),
 
     // Cleanup — /disposal
     DISPOSAL_OPENED("itemworld.disposal.opened"),

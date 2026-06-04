@@ -564,6 +564,9 @@ permissions:
     description: '/repair and /repairall in the itemworld surface (itemworld-owned; playerstate defers them).'
     default: op
   # Virtual workstations sub-feature group.
+  uxmessentials.workstation.others:
+    description: 'Open any virtual workstation on another player with the [player] target form.'
+    default: op
   uxmessentials.workstation.anvil:
     description: '/anvil — open a virtual anvil.'
     default: op
