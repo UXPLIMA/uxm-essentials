@@ -40,6 +40,8 @@ public enum KitsMessageKey implements MessageKey {
     KIT_CREATED("kit.created"),
     KIT_DELETED("kit.deleted"),
     KIT_EDIT_OPENED("kit.edit.opened"),
+    KIT_EDITOR_GUI_TITLE("kit.editor.gui-title"),
+    KIT_EDITOR_SAVED("kit.editor.saved"),
 
     // reset (/kitreset)
     KIT_RESET("kit.reset"),

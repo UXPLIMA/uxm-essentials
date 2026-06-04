@@ -62,6 +62,31 @@ final class KitGuiLayout {
         }
     }
 
+    /**
+     * Seed {@code menu} for editing: place {@code items} at one item per slot in definition order, clearing the
+     * remaining slots to air so the editor can place new items there. Unlike {@link #seed} there is no filler —
+     * every slot of an editor window is editable, and an empty slot is genuinely empty, which is what lets
+     * {@link #encode} read the window's final state as the kit's new contents.
+     */
+    static void seedEditable(Inventory menu, List<KitItem> items) {
+        Objects.requireNonNull(menu, "menu");
+        Objects.requireNonNull(items, "items");
+        int size = menu.getSize();
+        for (int slot = 0; slot < size; slot++) {
+            menu.setItem(slot, slot < items.size() ? KitItemCodec.decode(items.get(slot)) : null);
+        }
+    }
+
+    /**
+     * Encode an editor window's non-empty slots back into kit items, dropping empty and air slots so a kit
+     * defined from a partially-filled window stores no blanks. The slot order is preserved, so the round-trip
+     * {@code seedEditable → edit → encode} keeps each remaining item at the next free index.
+     */
+    static List<KitItem> encode(Inventory menu) {
+        Objects.requireNonNull(menu, "menu");
+        return KitItemCodec.encodeAll(menu.getContents());
+    }
+
     /** The gray-glass filler with no name, padding the slots a kit's items do not fill. */
     static ItemStack filler() {
         return ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)

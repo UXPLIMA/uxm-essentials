@@ -19,10 +19,11 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * one-time flag, permission flag, and cost. An id no kit exists under is refused with
  * {@link KitError#NOT_FOUND} — editing is for curated kits, creating a new one is {@code /createkit}.
  *
- * <p>The richer GUI editor (drag-and-drop slot editing) is out of scope for v1 (§15.5); this use case is the
- * stable seam that surface grows into without touching the gate or the storage. {@link #open} is the read
- * half ({@code /kiteditor <name>} with no further argument), confirming the kit exists and returning it for
- * the adapter to present.
+ * <p>The richer GUI editor (drag-and-drop slot editing) builds on the same seam: {@link #open} is the read
+ * half (confirming the kit exists and returning it for the adapter to present in a window), and {@link #save}
+ * is the write half the editor calls on close, overwriting the kit's items from the window contents the adapter
+ * encoded while preserving every other kit setting. The chat-driven {@link #redefine} keeps the legacy
+ * live-inventory re-define for the {@code /kiteditor <name> save} subcommand.
  */
 public final class KitEditor {
 
@@ -66,6 +67,30 @@ public final class KitEditor {
         notifier.send(
                 actor,
                 KitsMessageKey.KIT_EDIT_OPENED,
+                Map.of("kit", replacement.id().value()));
+        return Result.ok();
+    }
+
+    /**
+     * Persist {@code replacement} as the kit's new state on a GUI editor close and confirm the save. The
+     * adapter builds {@code replacement} from the editor window's non-empty slots, preserving the kit's id,
+     * cooldown, one-time flag, permission flag, and cost. A kit deleted while the window was open is refused
+     * with {@link KitError#NOT_FOUND} so a stale window never resurrects it.
+     */
+    public Result<Unit, KitError> save(PlayerRef actor, KitDefinition replacement) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(replacement, "replacement");
+        if (!repository.exists(replacement.id())) {
+            notifier.send(
+                    actor,
+                    KitError.NOT_FOUND.messageKey(),
+                    Map.of("kit", replacement.id().value()));
+            return Result.err(KitError.NOT_FOUND);
+        }
+        repository.save(replacement);
+        notifier.send(
+                actor,
+                KitsMessageKey.KIT_EDITOR_SAVED,
                 Map.of("kit", replacement.id().value()));
         return Result.ok();
     }

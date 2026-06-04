@@ -11,6 +11,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommands;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorListener;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
@@ -90,8 +92,8 @@ public final class KitsWiring {
                 kernel.messages(),
                 () -> ListDisplayMode.from(ctx.config()),
                 () -> ListDisplayMode.from(ctx.config(), SHOWKIT_DISPLAY_KEY));
-        List<Listener> listeners = List.of(new KitPreviewListener());
-        return new Wired(commands, listeners, repository);
+        List<Listener> listeners = List.of(new KitPreviewListener(), new KitEditorListener(services.kitEditorView()));
+        return new Wired(commands, listeners, services.kitEditorView(), repository);
     }
 
     private static KitServices assemble(
@@ -107,36 +109,50 @@ public final class KitsWiring {
         ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, kernel.events(), clock);
         KitMenuView kitMenu = new KitMenuView(kernel.messages(), kernel.scheduler(), claimKit, menuLayout);
         KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler());
+        KitEditor kitEditor = new KitEditor(repository, notifier);
+        KitEditorView kitEditorView = new KitEditorView(kernel.messages(), kitEditor, kernel.scheduler());
         return new KitServices(
                 claimKit,
                 new ListKits(repository, kernel.permissions(), claims, notifier),
                 new ShowKit(repository, notifier),
                 new CreateKit(repository, notifier),
                 new DelKit(repository, notifier),
-                new KitEditor(repository, notifier),
+                kitEditor,
                 new KitReset(repository, claims, notifier),
                 kitMenu,
                 kitPreview,
+                kitEditorView,
                 kernel.playerLookup());
     }
 
     /**
      * Everything the kits module contributes once wired: the Brigadier commands, the Bukkit listeners (the
-     * read-only {@code /showkit} preview menu's click/drag guard), plus the {@link KitRepository} the
-     * {@code kit_cooldown_<id>} placeholder resolves a kit's cooldown tier against. The kits context holds no
-     * repeating scheduled work and no in-memory store beyond the config-backed catalog, so there is nothing to
-     * drain on stop — the module's {@code stop()} clears its own bookkeeping.
+     * read-only {@code /showkit} preview guard and the {@code /kiteditor} window's save-on-close handler), the
+     * {@link KitEditorView} held so {@link #stop()} can flush every still-open editor on disable, plus the
+     * {@link KitRepository} the {@code kit_cooldown_<id>} placeholder resolves a kit's cooldown tier against.
+     * The kit catalog is config-backed, so the only durable-while-open state is the set of open editor windows.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
+     * @param kitEditorView the editor window, held so {@code stop()} flushes every still-open edit
      * @param repository the kit catalog the cooldown placeholder reads
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, KitRepository repository) {
+    public record Wired(
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            KitEditorView kitEditorView,
+            KitRepository repository) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(kitEditorView, "kitEditorView");
             Objects.requireNonNull(repository, "repository");
+        }
+
+        /** Save every still-open {@code /kiteditor} window back to its kit. Called on module stop. */
+        public void stop() {
+            kitEditorView.flushAll();
         }
     }
 }

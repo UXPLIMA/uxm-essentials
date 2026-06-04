@@ -351,6 +351,7 @@ public final class PluginModule {
         KitsWiring.Wired wired = KitsWiring.wire(plugin, ctx, Optional.ofNullable(links.kitEconomy), guiLayouts);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::stop);
         links.placeholders.kits(
                 new KitCooldownPlaceholders(wired.repository(), ctx.kernel().cooldowns()));
     }

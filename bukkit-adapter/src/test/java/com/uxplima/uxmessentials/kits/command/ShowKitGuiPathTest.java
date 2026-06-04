@@ -25,6 +25,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.ShowKitCommand;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
@@ -164,16 +165,19 @@ class ShowKitGuiPathTest {
         KitMenuView kitMenu =
                 new KitMenuView(messages, new SyncScheduler(), claimKit, GuiLayout.paginatedDefault(Material.CHEST));
         KitPreviewView kitPreview = new KitPreviewView(messages, new SyncScheduler());
+        KitEditor kitEditor = new KitEditor(repository, notifier);
+        KitEditorView kitEditorView = new KitEditorView(messages, kitEditor, new SyncScheduler());
         return new KitServices(
                 claimKit,
                 new ListKits(repository, permissions, claims, notifier),
                 new ShowKit(repository, notifier),
                 new CreateKit(repository, notifier),
                 new DelKit(repository, notifier),
-                new KitEditor(repository, notifier),
+                kitEditor,
                 new KitReset(repository, claims, notifier),
                 kitMenu,
                 kitPreview,
+                kitEditorView,
                 new NoPlayerLookup());
     }
 

@@ -19,11 +19,14 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /kiteditor <name> [save]} ({@code uxmessentials.kit.edit}): open a kit for editing or overwrite its
- * contents. With no trailing literal it confirms the kit exists and presents it (the v1 surface); with
- * {@code save} it overwrites the kit's items from the staff member's current inventory, keeping the kit's
- * cooldown, one-time flag, permission flag, and cost. The resolution and persist are the
- * {@link com.uxplima.uxmessentials.kits.application.KitEditor} use case's job.
+ * {@code /kiteditor <name> [save]} ({@code uxmessentials.kit.edit}): edit a kit's contents. With no trailing
+ * literal it opens the editable GUI window seeded with the kit's current stacks; the staff member rearranges,
+ * adds, or removes items and the window's final contents are saved back to the kit on close (the kit's cooldown,
+ * one-time flag, permission flag, and cost are preserved). The legacy {@code save} subcommand still overwrites
+ * the kit's items from the staff member's current inventory in one shot, for an operator who prefers the
+ * inventory-snapshot flow. The resolution and persist are the
+ * {@link com.uxplima.uxmessentials.kits.application.KitEditor} use case's job; the window is opened on the
+ * editor's entity thread by {@link com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView}.
  */
 @NullMarked
 public final class KitEditorCommand extends KitCommandSupport implements CommandRegistration {
@@ -54,7 +57,9 @@ public final class KitEditorCommand extends KitCommandSupport implements Command
         if (sender == null) {
             return 0;
         }
-        services.kitEditor().open(ref(sender), KitId.of(ctx.getArgument("name", String.class)));
+        KitId id = KitId.of(ctx.getArgument("name", String.class));
+        services.kitEditor().open(ref(sender), id).asValue().ifPresent(kit -> services.kitEditorView()
+                .open(sender, ref(sender), kit));
         return Command.SINGLE_SUCCESS;
     }
 

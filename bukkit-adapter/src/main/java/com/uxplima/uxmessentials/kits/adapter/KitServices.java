@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.kits.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
@@ -30,6 +31,7 @@ import org.jspecify.annotations.NullMarked;
  * @param kitReset {@code /kitreset}
  * @param kitMenu the read-only {@code /kits} browse menu the bare {@code /kits} command opens
  * @param kitPreview the read-only {@code /showkit} preview menu the GUI preview path opens
+ * @param kitEditorView the editable {@code /kiteditor} window the GUI editor path opens
  * @param players name → ref resolution for the {@code /kit <name> <player>} and {@code /kitreset} targets
  */
 @NullMarked
@@ -43,6 +45,7 @@ public record KitServices(
         KitReset kitReset,
         KitMenuView kitMenu,
         KitPreviewView kitPreview,
+        KitEditorView kitEditorView,
         PlayerLookup players) {
 
     public KitServices {
@@ -55,6 +58,7 @@ public record KitServices(
         Objects.requireNonNull(kitReset, "kitReset");
         Objects.requireNonNull(kitMenu, "kitMenu");
         Objects.requireNonNull(kitPreview, "kitPreview");
+        Objects.requireNonNull(kitEditorView, "kitEditorView");
         Objects.requireNonNull(players, "players");
     }
 }
