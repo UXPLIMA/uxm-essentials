@@ -1,14 +1,19 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
@@ -18,6 +23,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -72,6 +78,23 @@ abstract class EconomyCommandSupport {
     /** The default currency — the one every command resolves to when {@code [currency]} is omitted. */
     final Currency defaultCurrency() {
         return services.currencies().defaultCurrency();
+    }
+
+    /**
+     * A {@code currency} string argument that completes against the configured currency ids. The registry is
+     * in-memory, so the suggestion lookup is non-blocking; the value is still resolved through {@link #currency}
+     * at execution, so an unknown id remains an error rather than a silent default.
+     */
+    final RequiredArgumentBuilder<CommandSourceStack, String> currencyArgument() {
+        return Commands.argument("currency", StringArgumentType.word())
+                .suggests(CommandSuggestions.fromStrings(this::currencyIds));
+    }
+
+    private List<String> currencyIds() {
+        return services.currencies().ids().stream()
+                .map(CurrencyId::value)
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     /**

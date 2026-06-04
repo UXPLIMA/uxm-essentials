@@ -10,13 +10,13 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -63,7 +63,7 @@ public final class ExperienceCommand extends PlayerstateCommandSupport implement
     private LiteralArgumentBuilder<CommandSourceStack> plainVerb(String literal, ExperienceChange change) {
         return Commands.literal(literal)
                 .executes(ctx -> run(ctx, change))
-                .then(Commands.argument("player", StringArgumentType.word()).executes(ctx -> run(ctx, change)));
+                .then(CommandSuggestions.playerArgument("player").executes(ctx -> run(ctx, change)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> amountVerb(String literal, ExperienceChange.Op op) {
@@ -72,7 +72,7 @@ public final class ExperienceCommand extends PlayerstateCommandSupport implement
                         .executes(ctx -> runAmount(ctx, op, ExperienceChange.Unit.POINTS))
                         .then(unitNode(op, ExperienceChange.Unit.LEVELS, "levels"))
                         .then(unitNode(op, ExperienceChange.Unit.POINTS, "points"))
-                        .then(Commands.argument("player", StringArgumentType.word())
+                        .then(CommandSuggestions.playerArgument("player")
                                 .executes(ctx -> runAmount(ctx, op, ExperienceChange.Unit.POINTS))));
     }
 
@@ -80,7 +80,7 @@ public final class ExperienceCommand extends PlayerstateCommandSupport implement
             ExperienceChange.Op op, ExperienceChange.Unit unit, String literal) {
         return Commands.literal(literal)
                 .executes(ctx -> runAmount(ctx, op, unit))
-                .then(Commands.argument("player", StringArgumentType.word()).executes(ctx -> runAmount(ctx, op, unit)));
+                .then(CommandSuggestions.playerArgument("player").executes(ctx -> runAmount(ctx, op, unit)));
     }
 
     private int runAmount(CommandContext<CommandSourceStack> ctx, ExperienceChange.Op op, ExperienceChange.Unit unit) {

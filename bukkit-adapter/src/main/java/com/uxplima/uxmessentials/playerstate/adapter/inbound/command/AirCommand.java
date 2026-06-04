@@ -9,12 +9,12 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -40,8 +40,7 @@ public final class AirCommand extends PlayerstateCommandSupport implements Comma
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("seconds", IntegerArgumentType.integer(0))
                         .executes(this::set)
-                        .then(Commands.argument("player", StringArgumentType.word())
-                                .executes(this::set)))
+                        .then(CommandSuggestions.playerArgument("player").executes(this::set)))
                 .build();
     }
 

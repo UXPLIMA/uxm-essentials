@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -45,7 +46,7 @@ public final class LightningCommand extends ItemworldCommandSupport implements C
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(ctx -> run(ctx, Optional.empty()))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx -> run(ctx, Optional.of(StringArgumentType.getString(ctx, "player")))))
                 .build();
     }

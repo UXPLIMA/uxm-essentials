@@ -8,11 +8,11 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -37,7 +37,7 @@ public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implement
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pwarps")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("player", StringArgumentType.word()).executes(this::listOther))
+                .then(CommandSuggestions.playerArgument("player").executes(this::listOther))
                 .executes(this::listOwn)
                 .build();
     }

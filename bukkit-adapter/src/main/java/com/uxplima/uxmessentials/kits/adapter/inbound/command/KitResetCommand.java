@@ -15,6 +15,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -39,7 +40,7 @@ public final class KitResetCommand extends KitCommandSupport implements CommandR
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("kitreset")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .executes(this::resetAll)
                         .then(Commands.argument("kit", StringArgumentType.word())
                                 .executes(this::resetOne)))

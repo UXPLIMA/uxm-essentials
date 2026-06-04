@@ -44,8 +44,7 @@ public final class PayAllCommand extends EconomyCommandSupport implements Comman
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("amount", StringArgumentType.word())
                         .executes(this::run)
-                        .then(Commands.argument("currency", StringArgumentType.word())
-                                .executes(this::run)))
+                        .then(currencyArgument().executes(this::run)))
                 .build();
     }
 

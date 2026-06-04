@@ -19,6 +19,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -46,7 +47,7 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("realname")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("player", StringArgumentType.word()).executes(this::run))
+                .then(CommandSuggestions.playerArgument("player").executes(this::run))
                 .build();
     }
 

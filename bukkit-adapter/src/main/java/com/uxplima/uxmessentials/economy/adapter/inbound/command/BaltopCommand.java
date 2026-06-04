@@ -10,7 +10,6 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
@@ -44,7 +43,7 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::runDefault)
                 .then(Commands.argument("page", IntegerArgumentType.integer(1)).executes(this::runDefaultPage))
-                .then(Commands.argument("currency", StringArgumentType.word())
+                .then(currencyArgument()
                         .executes(this::runCurrency)
                         .then(Commands.argument("page", IntegerArgumentType.integer(1))
                                 .executes(this::runCurrencyPage)))

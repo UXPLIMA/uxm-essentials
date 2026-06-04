@@ -9,12 +9,12 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -42,10 +42,9 @@ public final class BalanceCommand extends EconomyCommandSupport implements Comma
         return Commands.literal("balance")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::runOwn)
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .executes(this::runOther)
-                        .then(Commands.argument("currency", StringArgumentType.word())
-                                .executes(this::runOther)))
+                        .then(currencyArgument().executes(this::runOther)))
                 .build();
     }
 

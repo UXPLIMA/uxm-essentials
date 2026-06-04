@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -66,20 +67,18 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     private LiteralArgumentBuilder<CommandSourceStack> targetVerb(String literal, String node) {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(BASE + "." + node))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("amount", StringArgumentType.word())
                                 .executes(ctx -> runTarget(ctx, literal))
-                                .then(Commands.argument("currency", StringArgumentType.word())
-                                        .executes(ctx -> runTarget(ctx, literal)))));
+                                .then(currencyArgument().executes(ctx -> runTarget(ctx, literal)))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> resetVerb() {
         return Commands.literal("reset")
                 .requires(src -> src.getSender().hasPermission(BASE + ".set"))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx -> runReset(ctx))
-                        .then(Commands.argument("currency", StringArgumentType.word())
-                                .executes(ctx -> runReset(ctx))));
+                        .then(currencyArgument().executes(ctx -> runReset(ctx))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> bulkAmountVerb(String literal, String node) {
@@ -87,8 +86,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .requires(src -> src.getSender().hasPermission(BASE + "." + node))
                 .then(Commands.argument("amount", StringArgumentType.word())
                         .executes(ctx -> runBulk(ctx, literal))
-                        .then(Commands.argument("currency", StringArgumentType.word())
-                                .executes(ctx -> runBulk(ctx, literal))));
+                        .then(currencyArgument().executes(ctx -> runBulk(ctx, literal))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> resetAllVerb() {
@@ -96,8 +94,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .requires(src -> src.getSender().hasPermission(BASE + ".bulk"))
                 .then(Commands.literal("--confirm")
                         .executes(ctx -> runResetAll(ctx))
-                        .then(Commands.argument("currency", StringArgumentType.word())
-                                .executes(ctx -> runResetAll(ctx))));
+                        .then(currencyArgument().executes(ctx -> runResetAll(ctx))));
     }
 
     private int runTarget(CommandContext<CommandSourceStack> ctx, String verb) {

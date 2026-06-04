@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -42,7 +43,7 @@ public final class BanipCommand extends ModerationCommandSupport implements Comm
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("banip")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("target", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("target")
                         .executes(ctx -> run(ctx, Optional.empty()))
                         .then(Commands.argument("reason", StringArgumentType.greedyString())
                                 .executes(ctx -> run(ctx, optionalReason(ctx)))))

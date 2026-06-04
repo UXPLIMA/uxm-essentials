@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -43,11 +44,10 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pay")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("amount", StringArgumentType.word())
                                 .executes(this::run)
-                                .then(Commands.argument("currency", StringArgumentType.word())
-                                        .executes(this::run))))
+                                .then(currencyArgument().executes(this::run))))
                 .build();
     }
 

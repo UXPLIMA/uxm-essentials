@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -42,8 +43,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("mode", StringArgumentType.word())
                         .executes(this::setMode)
-                        .then(Commands.argument("player", StringArgumentType.word())
-                                .executes(this::setMode)))
+                        .then(CommandSuggestions.playerArgument("player").executes(this::setMode)))
                 .build();
     }
 

@@ -7,10 +7,10 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
@@ -45,7 +45,7 @@ public final class TpOfflineCommand extends TeleportCommandSupport implements Co
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("player", StringArgumentType.word()).executes(this::run))
+                .then(CommandSuggestions.playerArgument("player").executes(this::run))
                 .build();
     }
 

@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -42,7 +43,7 @@ public final class HomeAdminCommand extends HomeCommandSupport implements Comman
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("homeadmin")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.literal("list").executes(this::runList))
                         .then(withName(Commands.literal("del"), this::runDelete))
                         .then(withName(Commands.literal("tp"), this::runTeleport)))

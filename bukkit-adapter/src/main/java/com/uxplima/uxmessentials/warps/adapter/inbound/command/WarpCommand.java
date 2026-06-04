@@ -12,6 +12,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
@@ -43,7 +44,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("name", StringArgumentType.word())
                         .executes(this::run)
-                        .then(Commands.argument("player", StringArgumentType.word())
+                        .then(CommandSuggestions.playerArgument("player")
                                 .requires(src -> src.getSender().hasPermission(OTHERS_PERMISSION))
                                 .executes(this::sendOther)))
                 .build();

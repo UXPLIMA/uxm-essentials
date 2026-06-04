@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.itemworld.domain.AmountSpec;
 import com.uxplima.uxmessentials.itemworld.domain.ItemQuery;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -51,7 +52,7 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("item", StringArgumentType.word())
                                 .executes(ctx -> run(ctx, 1))
                                 .then(Commands.argument("amount", IntegerArgumentType.integer(1))

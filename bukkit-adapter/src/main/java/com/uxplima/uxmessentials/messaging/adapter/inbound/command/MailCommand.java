@@ -14,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -44,7 +45,7 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
                 .then(Commands.literal("read").executes(this::read))
                 .then(Commands.literal("clear").executes(this::clear))
                 .then(Commands.literal("send")
-                        .then(Commands.argument("player", StringArgumentType.word())
+                        .then(CommandSuggestions.playerArgument("player")
                                 .then(Commands.argument("text", StringArgumentType.greedyString())
                                         .executes(this::send))))
                 .build();

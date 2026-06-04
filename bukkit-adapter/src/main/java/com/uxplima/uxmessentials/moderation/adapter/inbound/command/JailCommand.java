@@ -11,6 +11,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -36,7 +37,7 @@ public final class JailCommand extends ModerationCommandSupport implements Comma
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("jail")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("jail", StringArgumentType.word())
                                 .executes(ctx -> run(ctx, "", Optional.empty()))
                                 .then(Commands.argument("duration", StringArgumentType.word())
