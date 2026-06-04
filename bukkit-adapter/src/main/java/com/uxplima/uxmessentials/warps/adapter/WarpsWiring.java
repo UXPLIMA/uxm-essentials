@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.CachedWarpRepository;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
@@ -91,7 +92,7 @@ public final class WarpsWiring {
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine);
         GuiLayout menuLayout = guiLayouts.load("warps", "warps-menu", GuiLayout.paginatedDefault(Material.ENDER_PEARL));
         WarpServices services = assemble(kernel, repository, notifier, teleporter, economy, menuLayout);
-        return new Wired(WarpCommands.all(services, kernel.messages()));
+        return new Wired(WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config())));
     }
 
     private static WarpServices assemble(

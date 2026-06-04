@@ -138,7 +138,13 @@ class HomeMenuClickTest {
 
     private CommandDispatcher<CommandSourceStack> registerCommand() {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new HomesCommand(services, new KeyMessages()).build());
+        dispatcher
+                .getRoot()
+                .addChild(new HomesCommand(
+                                services,
+                                new KeyMessages(),
+                                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI)
+                        .build());
         return dispatcher;
     }
 

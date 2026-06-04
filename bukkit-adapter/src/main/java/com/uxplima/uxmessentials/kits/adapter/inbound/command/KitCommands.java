@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.kits.adapter.inbound.command;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
@@ -19,10 +21,11 @@ public final class KitCommands {
     private KitCommands() {}
 
     /** Every kits command, in surface order. */
-    public static List<CommandRegistration> all(KitServices services, Messages messages) {
+    public static List<CommandRegistration> all(
+            KitServices services, Messages messages, Supplier<ListDisplayMode> displayMode) {
         return List.of(
                 new KitCommand(services, messages),
-                new KitsCommand(services, messages),
+                new KitsCommand(services, messages, displayMode),
                 new ShowKitCommand(services, messages),
                 new CreateKitCommand(services, messages),
                 new DelKitCommand(services, messages),

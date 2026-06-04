@@ -95,7 +95,8 @@ class WarpsMenuPathTest {
 
     @Test
     void bareWarpsOpensPaginatedMenuWithOneIconPerUsableWarp() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
         execute(dispatcher, "warps");
 
@@ -107,11 +108,24 @@ class WarpsMenuPathTest {
 
     @Test
     void warpsListDrivesTheChatPath() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
         execute(dispatcher, "warps list");
 
         assertThat(sink.keys).contains(WarpsMessageKey.WARP_LIST_HEADER);
+    }
+
+    @Test
+    void bareWarpsInChatModeListsInChatAndOpensNoInventory() {
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.CHAT);
+
+        execute(dispatcher, "warps");
+
+        assertThat(sink.keys).contains(WarpsMessageKey.WARP_LIST_HEADER);
+        // Chat mode opens no inventory at all, so the player has no top inventory to hold a menu.
+        assertThat(player.getOpenInventory().getTopInventory()).isNull();
     }
 
     /** Non-air icons in the content rows (slots 0..44), excluding the reserved bottom-row nav buttons. */
@@ -126,9 +140,10 @@ class WarpsMenuPathTest {
         return count;
     }
 
-    private CommandDispatcher<CommandSourceStack> registerCommand() {
+    private CommandDispatcher<CommandSourceStack> registerCommand(
+            com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new WarpsCommand(services, new KeyMessages()).build());
+        dispatcher.getRoot().addChild(new WarpsCommand(services, new KeyMessages(), () -> mode).build());
         return dispatcher;
     }
 

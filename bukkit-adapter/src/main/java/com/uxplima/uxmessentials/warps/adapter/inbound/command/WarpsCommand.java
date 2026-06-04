@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.warps.adapter.inbound.command;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -12,6 +14,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
@@ -24,14 +27,22 @@ import org.jspecify.annotations.NullMarked;
  * chat list. Both paths share the {@link com.uxplima.uxmessentials.warps.application.ListWarps} filter so they
  * never disagree. A console source has no inventory, so bare {@code /warps} falls back to the chat list. The
  * base {@code uxmessentials.warp.list} node guards the command.
+ *
+ * <p>The bare-command presentation is operator-selectable through {@code list-display} ({@code gui} | {@code
+ * chat}, default {@code gui}). In {@code chat} mode the bare command routes to the same chat path as
+ * {@code /warps list} and never opens an inventory. The mode is read live from {@code displayMode} on each
+ * invocation so {@code /uxmess reload warps} takes effect without a restart.
  */
 @NullMarked
 public final class WarpsCommand extends WarpCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.warp.list";
 
-    public WarpsCommand(WarpServices services, Messages messages) {
+    private final Supplier<ListDisplayMode> displayMode;
+
+    public WarpsCommand(WarpServices services, Messages messages, Supplier<ListDisplayMode> displayMode) {
         super(services, messages);
+        this.displayMode = Objects.requireNonNull(displayMode, "displayMode");
     }
 
     @Override
@@ -52,6 +63,10 @@ public final class WarpsCommand extends WarpCommandSupport implements CommandReg
         CommandSender sender = ctx.getSource().getSender();
         if (!(sender instanceof Player player)) {
             // A console has no inventory to open a menu in; show the chat list instead.
+            return runList(ctx);
+        }
+        if (displayMode.get() == ListDisplayMode.CHAT) {
+            // Operator chose command/chat-only output: the bare command behaves like /warps list.
             return runList(ctx);
         }
         PlayerRef viewer = ref(player);

@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -80,7 +81,8 @@ public final class KitsWiring {
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
         GuiLayout menuLayout = guiLayouts.load("kits", "kits-menu", GuiLayout.paginatedDefault(Material.CHEST));
         KitServices services = assemble(kernel, repository, claims, granter, notifier, economy, menuLayout);
-        return new Wired(KitCommands.all(services, kernel.messages()), repository);
+        return new Wired(
+                KitCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config())), repository);
     }
 
     private static KitServices assemble(

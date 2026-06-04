@@ -97,7 +97,8 @@ class HomesMenuPathTest {
 
     @Test
     void bareHomesOpensPaginatedMenuWithOneIconPerHome() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
         execute(dispatcher, "homes");
 
@@ -109,11 +110,24 @@ class HomesMenuPathTest {
 
     @Test
     void homesListDrivesTheChatPath() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
         execute(dispatcher, "homes list");
 
         assertThat(sink.keys).contains(HomesMessageKey.HOME_LIST_HEADER);
+    }
+
+    @Test
+    void bareHomesInChatModeListsInChatAndOpensNoInventory() {
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.CHAT);
+
+        execute(dispatcher, "homes");
+
+        assertThat(sink.keys).contains(HomesMessageKey.HOME_LIST_HEADER);
+        // Chat mode opens no inventory at all, so the player has no top inventory to hold a menu.
+        assertThat(player.getOpenInventory().getTopInventory()).isNull();
     }
 
     /** Non-air icons in the content rows (slots 0..44), excluding the reserved bottom-row nav buttons. */
@@ -128,9 +142,10 @@ class HomesMenuPathTest {
         return count;
     }
 
-    private CommandDispatcher<CommandSourceStack> registerCommand() {
+    private CommandDispatcher<CommandSourceStack> registerCommand(
+            com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new HomesCommand(services, new KeyMessages()).build());
+        dispatcher.getRoot().addChild(new HomesCommand(services, new KeyMessages(), () -> mode).build());
         return dispatcher;
     }
 

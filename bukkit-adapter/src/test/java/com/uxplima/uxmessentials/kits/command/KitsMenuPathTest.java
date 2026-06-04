@@ -98,7 +98,8 @@ class KitsMenuPathTest {
 
     @Test
     void bareKitsOpensAPaginatedMenuWithOneIconPerAvailableKit() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
         execute(dispatcher, "kits");
 
@@ -110,11 +111,24 @@ class KitsMenuPathTest {
 
     @Test
     void kitsListDrivesTheChatPath() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
         execute(dispatcher, "kits list");
 
         assertThat(sink.keys).contains(KitsMessageKey.KIT_LIST_HEADER);
+    }
+
+    @Test
+    void bareKitsInChatModeListsInChatAndOpensNoInventory() {
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.CHAT);
+
+        execute(dispatcher, "kits");
+
+        assertThat(sink.keys).contains(KitsMessageKey.KIT_LIST_HEADER);
+        // Chat mode opens no inventory at all, so the player has no top inventory to hold a menu.
+        assertThat(player.getOpenInventory().getTopInventory()).isNull();
     }
 
     /** Non-air icons in the content rows (slots 0..44), excluding the reserved bottom-row nav buttons. */
@@ -129,9 +143,10 @@ class KitsMenuPathTest {
         return count;
     }
 
-    private CommandDispatcher<CommandSourceStack> registerCommand() {
+    private CommandDispatcher<CommandSourceStack> registerCommand(
+            com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new KitsCommand(services, new KeyMessages()).build());
+        dispatcher.getRoot().addChild(new KitsCommand(services, new KeyMessages(), () -> mode).build());
         return dispatcher;
     }
 

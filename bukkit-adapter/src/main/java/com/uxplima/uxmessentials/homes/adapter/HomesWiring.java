@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.persistence.homes.CachedHomeRepository;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
@@ -75,7 +76,11 @@ public final class HomesWiring {
         GuiLayout menuLayout = guiLayouts.load("homes", "homes-menu", GuiLayout.paginatedDefault(Material.RED_BED));
         HomeServices services = assemble(ctx, repository, mainHomes, notifier, quota, teleporter, menuLayout);
         HomesJoinListener joinWarmer = new HomesJoinListener(repository, kernel.scheduler());
-        return new Wired(HomeCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
+        return new Wired(
+                HomeCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config())),
+                List.of(joinWarmer),
+                repository,
+                quota);
     }
 
     private static HomeServices assemble(

@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.warps.adapter.inbound.command;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
 import org.jspecify.annotations.NullMarked;
@@ -19,12 +21,13 @@ public final class WarpCommands {
     private WarpCommands() {}
 
     /** Every warps command, in surface order. */
-    public static List<CommandRegistration> all(WarpServices services, Messages messages) {
+    public static List<CommandRegistration> all(
+            WarpServices services, Messages messages, Supplier<ListDisplayMode> displayMode) {
         return List.of(
                 new WarpCommand(services, messages),
                 new SetWarpCommand(services, messages),
                 new DelWarpCommand(services, messages),
-                new WarpsCommand(services, messages),
+                new WarpsCommand(services, messages, displayMode),
                 new WarpInfoCommand(services, messages),
                 new MoveWarpCommand(services, messages));
     }
