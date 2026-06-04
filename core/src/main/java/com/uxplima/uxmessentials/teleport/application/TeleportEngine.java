@@ -79,7 +79,7 @@ public final class TeleportEngine {
             notifier.send(mover, TeleportMessageKey.JAILED);
             return Result.err(TeleportError.JAILED);
         }
-        Result<Unit, Duration> gate = cooldowns.check(mover, cooldownKind());
+        Result<Unit, Duration> gate = cooldowns.check(mover, cooldownKind(kind));
         if (gate.isErr()) {
             notifyCooldown(mover, gate.errorOrThrow());
             return Result.err(TeleportError.ON_COOLDOWN);
@@ -105,7 +105,7 @@ public final class TeleportEngine {
     private void onWarmupComplete(PlayerRef mover, Destination destination, TeleportKind kind) {
         executor.teleport(mover, destination, kind);
         if (settings.cooldownStartPhase() == CooldownStartPhase.TELEPORT) {
-            cooldowns.stamp(mover, cooldownKind());
+            cooldowns.stamp(mover, cooldownKind(kind));
         }
     }
 
@@ -114,10 +114,14 @@ public final class TeleportEngine {
         events.publish(new WarmupCancelled(mover, kind, WarmupCancelReason.ABORTED));
     }
 
-    /** Stamp the cooldown for an earlier phase ({@code request}/{@code accept}) when configured. */
+    /**
+     * Stamp the cooldown for an earlier phase ({@code request}/{@code accept}) when configured. This is the
+     * {@code tpa} path, so the kind is {@link TeleportKind#REQUEST}; tpa carries no per-verb override and
+     * stamps under the shared {@code tp} scope, matching its prior single-cooldown behaviour.
+     */
     public void stampForPhase(PlayerRef mover, CooldownStartPhase atPhase) {
         if (settings.cooldownStartPhase() == atPhase && atPhase != CooldownStartPhase.TELEPORT) {
-            cooldowns.stamp(mover, cooldownKind());
+            cooldowns.stamp(mover, cooldownKind(TeleportKind.REQUEST));
         }
     }
 
@@ -126,8 +130,24 @@ public final class TeleportEngine {
         notifier.send(mover, TeleportMessageKey.COOLDOWN_ACTIVE, Map.of("seconds", Long.toString(seconds)));
     }
 
-    private CooldownKind cooldownKind() {
-        return new CooldownKind(FEATURE, settings.defaultCooldownSeconds(), mapPhase(settings.cooldownStartPhase()));
+    /**
+     * The cooldown identity for {@code kind}. The tier-node space stays {@code tp} so every verb still
+     * resolves the shared {@code uxmessentials.tp.cooldown.<n>} permission tiers. A verb whose config
+     * override is set ({@code cooldowns.<verb> >= 0}) gets its own stamp scope ({@code tp.<verb>}) so it
+     * rate-limits independently, with the override as its fallback default; a verb left at {@code -1}
+     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour.
+     */
+    private CooldownKind cooldownKind(TeleportKind kind) {
+        long override = settings.verbCooldownOverrideSeconds(kind);
+        Cooldowns.CooldownStartPhase phase = mapPhase(settings.cooldownStartPhase());
+        if (override < 0) {
+            return new CooldownKind(FEATURE, settings.defaultCooldownSeconds(), phase);
+        }
+        return CooldownKind.scoped(FEATURE, FEATURE + "." + verbScope(kind), override, phase);
+    }
+
+    private static String verbScope(TeleportKind kind) {
+        return kind.name().toLowerCase(java.util.Locale.ROOT);
     }
 
     private static Cooldowns.CooldownStartPhase mapPhase(CooldownStartPhase phase) {

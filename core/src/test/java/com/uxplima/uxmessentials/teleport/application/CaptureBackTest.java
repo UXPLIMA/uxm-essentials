@@ -70,7 +70,7 @@ class CaptureBackTest {
 
     @Test
     void deathBackWithNoCaptureDeclines() {
-        captureBack.backToDeath(WHO, true);
+        captureBack.backToDeath(WHO, true, 0L);
 
         assertThat(notifier.keys).containsExactly("teleport.deathback.none");
         assertThat(executor.hops).isZero();
@@ -80,7 +80,7 @@ class CaptureBackTest {
     void deathBackIgnoresATeleportCapture() {
         store.capture(WHO, BackLocation.beforeTeleport(TELEPORT_POINT, T0));
 
-        captureBack.backToDeath(WHO, true);
+        captureBack.backToDeath(WHO, true, 0L);
 
         assertThat(notifier.keys).containsExactly("teleport.deathback.none");
         assertThat(executor.hops).isZero();
@@ -90,7 +90,7 @@ class CaptureBackTest {
     void deathBackToADeathCaptureIsDeniedWithoutTheGate() {
         store.capture(WHO, BackLocation.atDeath(DEATH_POINT, T0));
 
-        captureBack.backToDeath(WHO, false);
+        captureBack.backToDeath(WHO, false, 0L);
 
         assertThat(notifier.keys).containsExactly("teleport.back.death-denied");
         assertThat(executor.hops).isZero();
@@ -100,11 +100,63 @@ class CaptureBackTest {
     void deathBackToADeathCaptureReturnsWithTheGate() {
         store.capture(WHO, BackLocation.atDeath(DEATH_POINT, T0));
 
-        Result<Unit, TeleportError> result = captureBack.backToDeath(WHO, true);
+        Result<Unit, TeleportError> result = captureBack.backToDeath(WHO, true, 0L);
 
         assertThat(result.isOk()).isTrue();
         assertThat(executor.hops).isEqualTo(1);
         assertThat(notifier.keys).contains("teleport.back.returned");
+    }
+
+    @Test
+    void backToADeathPointInsideTheDelayWindowIsRejected() {
+        store.capture(WHO, BackLocation.atDeath(DEATH_POINT, T0));
+        // Two seconds after the death, with a ten-second post-death delay configured.
+        CaptureBack delayed = captureBackAt(T0.plusSeconds(2));
+
+        Result<Unit, TeleportError> result = delayed.back(WHO, true, 10L);
+
+        assertThat(result.isErr()).isTrue();
+        assertThat(result.errorOrThrow()).isEqualTo(TeleportError.BACK_ON_DEATH_DELAY);
+        assertThat(executor.hops).isZero();
+        assertThat(notifier.keys).contains("teleport.back.death-delay");
+    }
+
+    @Test
+    void backToADeathPointAfterTheDelayWindowReturns() {
+        store.capture(WHO, BackLocation.atDeath(DEATH_POINT, T0));
+        // Eleven seconds after the death, past the ten-second post-death delay.
+        CaptureBack delayed = captureBackAt(T0.plusSeconds(11));
+
+        Result<Unit, TeleportError> result = delayed.back(WHO, true, 10L);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(executor.hops).isEqualTo(1);
+        assertThat(notifier.keys).contains("teleport.back.returned");
+    }
+
+    @Test
+    void backToATeleportPointIgnoresTheDeathDelay() {
+        store.capture(WHO, BackLocation.beforeTeleport(TELEPORT_POINT, T0));
+        // A teleport capture is never delay-gated, even right after it was taken.
+        CaptureBack delayed = captureBackAt(T0.plusSeconds(1));
+
+        Result<Unit, TeleportError> result = delayed.back(WHO, true, 10L);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(executor.hops).isEqualTo(1);
+    }
+
+    /** A {@link CaptureBack} whose clock reads {@code now}, sharing this test's store and executor. */
+    private CaptureBack captureBackAt(Instant now) {
+        TeleportEngine engine = new TeleportEngine(
+                new NoopCooldowns(),
+                new ImmediateWarmups(),
+                executor,
+                notifier.notifier(),
+                new NoopEvents(),
+                new TeleportSettings(new NoopConfig()),
+                JailGate.NEVER);
+        return new CaptureBack(store, engine, notifier.notifier(), new NoopEvents(), Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private static Clock clock() {

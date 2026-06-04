@@ -39,6 +39,7 @@ public enum TeleportMessageKey implements MessageKey {
     BACK_RETURNED("teleport.back.returned"),
     BACK_NONE("teleport.back.none"),
     BACK_DEATH_DENIED("teleport.back.death-denied"),
+    BACK_DEATH_DELAY("teleport.back.death-delay"),
     DEATHBACK_NONE("teleport.deathback.none"),
 
     // rtp

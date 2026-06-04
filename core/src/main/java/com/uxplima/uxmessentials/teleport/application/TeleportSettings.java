@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.teleport.domain.CooldownStartPhase;
 import com.uxplima.uxmessentials.teleport.domain.RespawnChain;
 import com.uxplima.uxmessentials.teleport.domain.SafeSearchPolicy;
 import com.uxplima.uxmessentials.teleport.domain.TeleportCauseCategory;
+import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.teleport.domain.WarmupCancelToggles;
 import com.uxplima.uxmessentials.teleport.domain.YBand;
 
@@ -63,6 +64,31 @@ public final class TeleportSettings {
         return Math.max(0, config.getInt("default-cooldown", 5));
     }
 
+    /**
+     * The per-verb cooldown override in seconds for {@code kind}, or {@code -1} to inherit. Read from
+     * {@code cooldowns.<verb>} (e.g. {@code cooldowns.back}); a verb the config never names returns {@code -1}.
+     * A non-negative value is that verb's fallback cooldown — the numbered {@code uxmessentials.tp.cooldown.<n>}
+     * tier still refines it via the min-reducer; {@code -1} keeps the shared {@link #defaultCooldownSeconds()}.
+     */
+    public long verbCooldownOverrideSeconds(TeleportKind kind) {
+        Objects.requireNonNull(kind, "kind");
+        return cooldownVerb(kind)
+                .map(verb -> config.getInt("cooldowns." + verb, -1))
+                .orElse(-1);
+    }
+
+    /** The config verb name for {@code kind} under {@code cooldowns.<verb>}, or empty for an unkeyed kind. */
+    private static java.util.Optional<String> cooldownVerb(TeleportKind kind) {
+        return switch (kind) {
+            case BACK -> java.util.Optional.of("back");
+            case HOME -> java.util.Optional.of("home");
+            case WARP -> java.util.Optional.of("warp");
+            case SPAWN -> java.util.Optional.of("spawn");
+            case RANDOM -> java.util.Optional.of("rtp");
+            case REQUEST, RESPAWN, ADMIN, POSITIONAL -> java.util.Optional.empty();
+        };
+    }
+
     /** The per-axis warmup cancel toggles; move-cancel defaults on, rotation, damage and interact off. */
     public WarmupCancelToggles cancelToggles() {
         return new WarmupCancelToggles(
@@ -106,6 +132,15 @@ public final class TeleportSettings {
     /** Whether {@code /back} may return to a death location at all (also gated per-player by permission). */
     public boolean backOnDeathEnabled() {
         return config.getBoolean("back.on-death", true);
+    }
+
+    /**
+     * The minimum wait in seconds after a death before {@code /back} may return to the death point; {@code 0}
+     * (the default) disables the delay. The death point is still recorded immediately on death; only the
+     * {@code /back} return to it is held off until this window elapses ({@code back.death-delay-seconds}).
+     */
+    public long backDeathDelaySeconds() {
+        return Math.max(0, config.getInt("back.death-delay-seconds", 0));
     }
 
     /** The safe-search policy (excluded biomes, avoided blocks, Y band, claim-awareness) across worlds. */

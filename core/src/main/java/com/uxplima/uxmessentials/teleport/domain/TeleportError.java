@@ -40,6 +40,9 @@ public enum TeleportError {
     /** The captured {@code /back} location is a death point and death-back is not permitted. */
     BACK_ON_DEATH_DENIED(TeleportMessageKey.BACK_DEATH_DENIED),
 
+    /** The captured death point is too recent — the post-death {@code /back} delay has not elapsed. */
+    BACK_ON_DEATH_DELAY(TeleportMessageKey.BACK_DEATH_DELAY),
+
     /** The world has no random-teleport queue and no fallback world is configured. */
     RTP_WORLD_DISALLOWED(TeleportMessageKey.RTP_DISALLOWED),
 

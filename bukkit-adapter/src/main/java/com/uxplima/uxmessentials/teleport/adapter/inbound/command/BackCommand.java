@@ -51,7 +51,8 @@ public final class BackCommand extends TeleportCommandSupport implements Command
         }
         PlayerRef who = ref(sender);
         boolean deathBackAllowed = services.settings().backOnDeathEnabled() && sender.hasPermission(DEATH_BACK_NODE);
-        services.captureBack().back(who, deathBackAllowed);
+        long deathDelaySeconds = services.settings().backDeathDelaySeconds();
+        services.captureBack().back(who, deathBackAllowed, deathDelaySeconds);
         return Command.SINGLE_SUCCESS;
     }
 }

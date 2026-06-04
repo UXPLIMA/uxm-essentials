@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.teleport.application;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -60,9 +62,11 @@ public final class CaptureBack {
 
     /**
      * Return {@code who} to their captured location through the gated teleport machinery. Fails when no
-     * capture exists, or when the capture is a death point and {@code deathBackAllowed} is false.
+     * capture exists, when the capture is a death point and {@code deathBackAllowed} is false, or when the
+     * capture is a death point still inside the post-death delay ({@code deathDelaySeconds}); a teleport
+     * capture is never delay-gated.
      */
-    public Result<Unit, TeleportError> back(PlayerRef who, boolean deathBackAllowed) {
+    public Result<Unit, TeleportError> back(PlayerRef who, boolean deathBackAllowed, long deathDelaySeconds) {
         Objects.requireNonNull(who, "who");
         Optional<BackLocation> current = store.current(who);
         if (current.isEmpty()) {
@@ -74,6 +78,11 @@ public final class CaptureBack {
         if (target.isErr()) {
             notifier.send(who, TeleportMessageKey.BACK_DEATH_DENIED);
             return Result.err(target.errorOrThrow());
+        }
+        Optional<Long> wait = deathDelayRemaining(location, deathDelaySeconds);
+        if (wait.isPresent()) {
+            notifier.send(who, TeleportMessageKey.BACK_DEATH_DELAY, Map.of("seconds", Long.toString(wait.get())));
+            return Result.err(TeleportError.BACK_ON_DEATH_DELAY);
         }
         engine.launch(who, Destination.at(target.orElseThrow()), TeleportKind.BACK);
         notifier.send(who, TeleportMessageKey.BACK_RETURNED);
@@ -87,7 +96,7 @@ public final class CaptureBack {
      * death capture still honours the {@code deathBackAllowed} gate so the death-back permission governs both
      * commands the same way.
      */
-    public Result<Unit, TeleportError> backToDeath(PlayerRef who, boolean deathBackAllowed) {
+    public Result<Unit, TeleportError> backToDeath(PlayerRef who, boolean deathBackAllowed, long deathDelaySeconds) {
         Objects.requireNonNull(who, "who");
         Optional<BackLocation> current = store.current(who);
         if (current.isEmpty() || !current.get().requiresDeathBack()) {
@@ -100,9 +109,28 @@ public final class CaptureBack {
             notifier.send(who, TeleportMessageKey.BACK_DEATH_DENIED);
             return Result.err(target.errorOrThrow());
         }
+        Optional<Long> wait = deathDelayRemaining(location, deathDelaySeconds);
+        if (wait.isPresent()) {
+            notifier.send(who, TeleportMessageKey.BACK_DEATH_DELAY, Map.of("seconds", Long.toString(wait.get())));
+            return Result.err(TeleportError.BACK_ON_DEATH_DELAY);
+        }
         engine.launch(who, Destination.at(target.orElseThrow()), TeleportKind.BACK);
         notifier.send(who, TeleportMessageKey.BACK_RETURNED);
         return Result.ok();
+    }
+
+    /**
+     * The remaining whole seconds before a death capture clears the post-death delay, or empty when the
+     * return is allowed now: a teleport capture, a disabled delay ({@code deathDelaySeconds <= 0}), or a
+     * death capture whose window has already elapsed.
+     */
+    private Optional<Long> deathDelayRemaining(BackLocation location, long deathDelaySeconds) {
+        if (deathDelaySeconds <= 0 || !location.requiresDeathBack()) {
+            return Optional.empty();
+        }
+        long elapsed = Duration.between(location.capturedAt(), clock.instant()).toSeconds();
+        long remaining = deathDelaySeconds - elapsed;
+        return remaining > 0 ? Optional.of(remaining) : Optional.empty();
     }
 
     private void capture(PlayerRef who, BackLocation location) {
