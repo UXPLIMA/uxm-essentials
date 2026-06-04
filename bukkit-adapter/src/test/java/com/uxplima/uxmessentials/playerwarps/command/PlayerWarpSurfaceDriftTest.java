@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  * Pins each player-warps command literal to its base permission node. The four self-service commands are the
  * whole top-level surface; this guard fails if a literal drops out or wires under a node other than its
  * documented one, keeping the kernel surface in lockstep with {@code paper-plugin.yml}. The
- * {@code public}/{@code private} visibility toggles are subcommands of {@code /pwarp} (gated by
+ * {@code visibility public|private <name>} toggles are subcommands of {@code /pwarp} (gated by
  * {@code uxmessentials.pwarp.public}) rather than command literals, so they are not part of this table.
  */
 class PlayerWarpSurfaceDriftTest {

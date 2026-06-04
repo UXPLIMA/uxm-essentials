@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.discord;
 
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation.Outcome;
@@ -23,6 +25,8 @@ final class LinkSlashListener extends ListenerAdapter {
     static final String COMMAND_NAME = "link";
     static final String CODE_OPTION = "code";
 
+    private static final Logger LOG = Logger.getLogger(LinkSlashListener.class.getName());
+
     private final DiscordLinkConfirmation confirmation;
 
     LinkSlashListener(DiscordLinkConfirmation confirmation) {
@@ -40,9 +44,24 @@ final class LinkSlashListener extends ListenerAdapter {
             return;
         }
         event.deferReply(true).queue();
-        Outcome outcome =
-                confirmation.confirm(codeOption.getAsString(), event.getUser().getId());
-        event.getHook().sendMessage(reply(outcome)).queue();
+        event.getHook()
+                .sendMessage(redeem(codeOption.getAsString(), event.getUser().getId()))
+                .queue();
+    }
+
+    /**
+     * Redeem the code through the seam and pick the reply. The seam is contracted never to throw for a
+     * modelled outcome, but an unexpected runtime fault (a transient store error) must still resolve the
+     * deferred interaction rather than leave it hung — so it is logged with context and a generic ephemeral
+     * reply is returned instead of being rethrown back onto JDA's edge.
+     */
+    private String redeem(String code, String discordId) {
+        try {
+            return reply(confirmation.confirm(code, discordId));
+        } catch (RuntimeException failure) {
+            LOG.log(Level.WARNING, "failed to redeem /link code for discord user " + discordId, failure);
+            return "Something went wrong redeeming that code. Please try again in a moment.";
+        }
     }
 
     private static String reply(Outcome outcome) {

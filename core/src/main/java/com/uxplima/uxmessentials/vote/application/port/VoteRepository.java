@@ -24,6 +24,15 @@ public interface VoteRepository {
     /** Persist the accumulated vote-party count (the single global counter row). */
     void setPartyCount(int count);
 
+    /**
+     * Atomically add one to the global vote-party counter and return the post-increment value. The
+     * increment happens in the durable store in a single statement, so two votes that land concurrently
+     * each observe a distinct count and exactly one of them sees the threshold crossing — the
+     * read-then-write of {@link #partyCount()} plus {@link #setPartyCount(int)} cannot give that
+     * guarantee and is kept only for the reset and for the hot read.
+     */
+    int incrementAndGetPartyCount();
+
     /** Append a reward batch for an offline voter to that player's queue. */
     void enqueue(QueuedReward reward);
 

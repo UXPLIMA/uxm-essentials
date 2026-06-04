@@ -20,12 +20,14 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /pwarp <name> [owner]}: teleport to a player-warp. With no owner the sender warps to their own warp;
- * with an owner they warp to that player's warp, permitted only when it is public. The {@code public <name>}
- * and {@code private <name>} subtrees (gated by {@code uxmessentials.pwarp.public}) flip a warp's visibility.
- * The ownership/public gate, the visibility flip, and the delegated gated hop are the player-warps use cases'
- * job; this handler maps the arguments and resolves the optional owner. The {@code uxmessentials.pwarp.use}
- * node guards the command. The {@code public}/{@code private} literals are declared before the name argument
- * so they resolve as literals rather than warp names.
+ * with an owner they warp to that player's warp, permitted only when it is public, and the owner is resolved
+ * online-first then from the profile cache so a public warp stays reachable while its owner is offline. The
+ * {@code visibility public <name>} and {@code visibility private <name>} subtrees (gated by
+ * {@code uxmessentials.pwarp.public}) flip a warp's visibility. The ownership/public gate, the visibility flip,
+ * and the delegated gated hop are the player-warps use cases' job; this handler maps the arguments and resolves
+ * the owner. The {@code uxmessentials.pwarp.use} node guards the command. The visibility toggles live under the
+ * {@code visibility} literal so a warp named {@code public} or {@code private} is reachable through the bare
+ * {@code name} argument rather than being shadowed by a keyword.
  */
 @NullMarked
 public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements CommandRegistration {
@@ -41,14 +43,14 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pwarp")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.literal("public")
+                .then(Commands.literal("visibility")
                         .requires(src -> src.getSender().hasPermission(PUBLIC_PERMISSION))
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::makePublic)))
-                .then(Commands.literal("private")
-                        .requires(src -> src.getSender().hasPermission(PUBLIC_PERMISSION))
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::makePrivate)))
+                        .then(Commands.literal("public")
+                                .then(Commands.argument("name", StringArgumentType.word())
+                                        .executes(this::makePublic)))
+                        .then(Commands.literal("private")
+                                .then(Commands.argument("name", StringArgumentType.word())
+                                        .executes(this::makePrivate))))
                 .then(Commands.argument("name", StringArgumentType.word())
                         .executes(this::useOwn)
                         .then(Commands.argument("owner", StringArgumentType.word())
@@ -76,7 +78,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
             return 0;
         }
         String ownerName = ctx.getArgument("owner", String.class);
-        Optional<PlayerRef> owner = services.players().findOnlineByName(ownerName);
+        Optional<PlayerRef> owner = services.players().findByName(ownerName);
         if (owner.isEmpty()) {
             unknownPlayer(ctx.getSource().getSender(), ownerName);
             return 0;

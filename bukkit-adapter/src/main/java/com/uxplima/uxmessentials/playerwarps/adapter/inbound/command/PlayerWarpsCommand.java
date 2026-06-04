@@ -62,7 +62,7 @@ public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implement
             return 0;
         }
         String ownerName = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> owner = services.players().findOnlineByName(ownerName);
+        Optional<PlayerRef> owner = services.players().findByName(ownerName);
         if (owner.isEmpty()) {
             unknownPlayer(ctx.getSource().getSender(), ownerName);
             return 0;

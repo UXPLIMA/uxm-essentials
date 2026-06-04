@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.hologram.HologramManager;
 import com.uxplima.uxmlib.hologram.Holograms;
 import org.jspecify.annotations.NullMarked;
@@ -29,9 +30,12 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Spawning and despawning a display entity must run on the owning region thread (Folia), so every mutation
  * hops through the injected {@link Scheduler} port: {@code render} schedules onto the hologram's location, and
- * {@code despawn} reuses the tracked entity's known location. A render replaces any existing live entity for
+ * {@code despawn} reuses the {@link Position} the entity was spawned at (tracked alongside the live entity)
+ * rather than reading the live entity's location off-thread. A render replaces any existing live entity for
  * the same name (remove-then-spawn), so a line edit, a line count change, and a move all converge to "the
- * world matches the model". A world that is not loaded is skipped with a warning rather than throwing.
+ * world matches the model"; the old entity is always removed on its own region thread, which matters on a
+ * cross-world move where it lives in a different world from the new one. A world that is not loaded is
+ * skipped with a warning rather than throwing.
  */
 @NullMarked
 public final class HologramRenderer implements HologramView {
@@ -40,7 +44,7 @@ public final class HologramRenderer implements HologramView {
     private final Scheduler scheduler;
     private final Logger log;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
-    private final Map<String, com.uxplima.uxmlib.hologram.Hologram> live = new ConcurrentHashMap<>();
+    private final Map<String, Tracked> live = new ConcurrentHashMap<>();
 
     public HologramRenderer(HologramManager manager, Scheduler scheduler, Logger log) {
         this.manager = Objects.requireNonNull(manager, "manager");
@@ -65,36 +69,38 @@ public final class HologramRenderer implements HologramView {
 
     /** Despawn every tracked hologram now — call on module stop so no display entity is orphaned. */
     public void despawnAll() {
-        manager.removeAll();
+        for (Tracked tracked : live.values()) {
+            // Each entity is removed on its own region thread, derived from the position it was spawned at.
+            scheduler.onRegion(tracked.position(), () -> manager.remove(tracked.hologram()));
+        }
         live.clear();
     }
 
     @Override
     public void despawn(HologramName name) {
         Objects.requireNonNull(name, "name");
-        com.uxplima.uxmlib.hologram.Hologram existing = live.remove(name.value());
+        Tracked existing = live.remove(name.value());
         if (existing == null) {
             return;
         }
-        // The display entity must be removed on its own region thread; route through the entity's location.
-        scheduler.onRegion(toPosition(existing), () -> manager.remove(existing));
+        // The display entity must be removed on its own region thread; route through its spawn position.
+        scheduler.onRegion(existing.position(), () -> manager.remove(existing.hologram()));
     }
 
     private void spawnReplacing(Hologram hologram, Location at) {
-        com.uxplima.uxmlib.hologram.Hologram previous =
-                live.remove(hologram.name().value());
+        Tracked previous = live.remove(hologram.name().value());
         if (previous != null) {
-            manager.remove(previous);
+            // Despawn the old entity on its own region thread; on a cross-world move it lives in a
+            // different world from the new one, so it must not be removed inline on this region thread.
+            scheduler.onRegion(previous.position(), () -> manager.remove(previous.hologram()));
         }
         Holograms.Builder builder = Holograms.builder();
         for (HologramLine line : hologram.lines()) {
             builder.line(miniMessage.deserialize(line.value()));
         }
-        live.put(hologram.name().value(), manager.spawn(builder, at));
+        live.put(hologram.name().value(), new Tracked(manager.spawn(builder, at), hologram.location()));
     }
 
-    private static com.uxplima.uxmessentials.shared.domain.Position toPosition(
-            com.uxplima.uxmlib.hologram.Hologram hologram) {
-        return BukkitRefs.toPosition(hologram.entity().getLocation());
-    }
+    /** A live uxmLib hologram paired with the {@link Position} it was spawned at, so its owning region is known. */
+    private record Tracked(com.uxplima.uxmlib.hologram.Hologram hologram, Position position) {}
 }

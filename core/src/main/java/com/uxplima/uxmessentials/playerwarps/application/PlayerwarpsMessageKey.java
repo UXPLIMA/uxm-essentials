@@ -32,6 +32,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
 
     // listing another player's public warps
     PWARP_LIST_OTHER_HEADER("pwarp.list.other-header"),
+    PWARP_LIST_OTHER_ENTRY("pwarp.list.other-entry"),
     PWARP_LIST_OTHER_EMPTY("pwarp.list.other-empty"),
 
     // failures

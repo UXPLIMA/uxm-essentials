@@ -156,6 +156,11 @@ class VoteCommandPathTest {
         }
 
         @Override
+        public int incrementAndGetPartyCount() {
+            return ++count;
+        }
+
+        @Override
         public void enqueue(QueuedReward reward) {
             queue.computeIfAbsent(reward.player().uuid(), u -> new ArrayList<>())
                     .add(reward);

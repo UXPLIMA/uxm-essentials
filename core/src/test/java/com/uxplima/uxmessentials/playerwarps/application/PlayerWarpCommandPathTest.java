@@ -167,6 +167,21 @@ class PlayerWarpCommandPathTest {
     }
 
     @Test
+    void crossOwnerEntriesUseTheOtherOwnerEntryKeyCarryingTheOwner() {
+        setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
+        visibility().setPublic(alice, PlayerWarpName.of("base"));
+        RecordingSink sink = new RecordingSink();
+        PlayerWarpNotifier recording = new PlayerWarpNotifier(new KeyMessages(), sink);
+
+        new ListPlayerWarps(repository, recording).publicOf(bob, alice, "Alice");
+
+        // The cross-owner entry must resolve through the other-owner key (whose template runs /pwarp <warp>
+        // <owner>), never the own-list entry (which would click-run /pwarp <warp> and hit the viewer's warp).
+        assertThat(sink.delivered).contains(PlayerwarpsMessageKey.PWARP_LIST_OTHER_ENTRY.key());
+        assertThat(sink.delivered).doesNotContain(PlayerwarpsMessageKey.PWARP_LIST_ENTRY.key());
+    }
+
+    @Test
     void visibilityTogglesFlipThePublicFlag() {
         setWarp(10).set(alice, PlayerWarpName.of("base"), at(0, 0, 0));
 
@@ -299,6 +314,16 @@ class PlayerWarpCommandPathTest {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
             // discarded: feedback delivery is not under test here
+        }
+    }
+
+    /** A sink that records every rendered text it is handed, for asserting which message key was emitted. */
+    private static final class RecordingSink implements MessageSink {
+        private final List<String> delivered = new ArrayList<>();
+
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            delivered.add(renderedText);
         }
     }
 

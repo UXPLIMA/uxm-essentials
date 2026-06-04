@@ -45,6 +45,9 @@ final class DefaultResources {
             "modules/communication/announcer.conf",
             "modules/communication/info-pages.conf",
             "modules/vote/config.conf",
+            "modules/holograms/config.conf",
+            "modules/playerwarps/config.conf",
+            "modules/scoreboard/config.conf",
             "modules/migration/config.conf",
             "modules/kits/gui/kits-menu.conf",
             "modules/warps/gui/warps-menu.conf",
@@ -54,6 +57,11 @@ final class DefaultResources {
             "messages/messages_tr.conf");
 
     private DefaultResources() {}
+
+    /** The bundled default resource paths, exposed package-private for the first-run coverage drift guard. */
+    static List<String> files() {
+        return FILES;
+    }
 
     /** Copy each bundled default into {@code dataFolder}, skipping any the operator already has. */
     static void writeInto(Path dataFolder, Logger log) {

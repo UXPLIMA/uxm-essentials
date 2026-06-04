@@ -79,10 +79,11 @@ public final class HandleVote {
     }
 
     private boolean advanceCounter() {
+        // The increment is atomic in the repository, so exactly one concurrent vote observes the count that
+        // reaches the threshold — that single thread fires the party and resets the counter, the rest do not.
         VotePartyCounter counter =
-                new VotePartyCounter(repository.partyCount(), rewards.partyThreshold()).incremented();
+                new VotePartyCounter(repository.incrementAndGetPartyCount(), rewards.partyThreshold());
         if (!counter.isReached()) {
-            repository.setPartyCount(counter.count());
             return false;
         }
         fireParty(counter.threshold());

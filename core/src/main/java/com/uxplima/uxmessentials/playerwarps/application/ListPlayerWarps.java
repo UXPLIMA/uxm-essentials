@@ -72,7 +72,7 @@ public final class ListPlayerWarps {
         for (PlayerWarp warp : shown) {
             notifier.send(
                     viewer,
-                    PlayerwarpsMessageKey.PWARP_LIST_ENTRY,
+                    PlayerwarpsMessageKey.PWARP_LIST_OTHER_ENTRY,
                     Map.of("warp", warp.name().value(), "player", ownerName));
         }
         return shown;

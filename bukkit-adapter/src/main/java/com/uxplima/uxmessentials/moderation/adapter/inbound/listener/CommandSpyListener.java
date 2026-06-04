@@ -9,6 +9,8 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
+import net.kyori.adventure.text.minimessage.MiniMessage;
+
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.CommandSpyStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -25,9 +27,16 @@ import org.jspecify.annotations.NullMarked;
  * <p>Runs at {@link EventPriority#MONITOR} with {@code ignoreCancelled = true} so a command another listener
  * already cancelled (a muted-command block, a frozen player) is never echoed to spies. When no staff are
  * spying the listener short-circuits before resolving the runner, so an idle server pays nothing.
+ *
+ * <p>The runner's name and the command they typed are player-controlled and flow into a MiniMessage template
+ * downstream, so both are run through {@link MiniMessage#escapeTags} here before substitution — otherwise a
+ * player could type a command containing MiniMessage markup (including a clickable {@code run_command}) and
+ * have it rendered, and clicked, in staff chat.
  */
 @NullMarked
 public final class CommandSpyListener implements Listener {
+
+    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
     private final CommandSpyStore store;
     private final Messages messages;
@@ -47,7 +56,9 @@ public final class CommandSpyListener implements Listener {
         }
         Player runner = event.getPlayer();
         PlayerRef runnerRef = BukkitRefs.toRef(runner);
-        Map<String, String> placeholders = Map.of("player", runner.getName(), "command", event.getMessage());
+        Map<String, String> placeholders = Map.of(
+                "player", MINI_MESSAGE.escapeTags(runner.getName()),
+                "command", MINI_MESSAGE.escapeTags(event.getMessage()));
         for (PlayerRef spy : spies) {
             if (!spy.uuid().equals(runnerRef.uuid())) {
                 sink.deliver(spy, messages.resolve(spy, ModerationMessageKey.COMMANDSPY_OBSERVED, placeholders));

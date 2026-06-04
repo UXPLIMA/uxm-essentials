@@ -44,6 +44,14 @@ public final class CachedVoteRepository implements VoteRepository {
     }
 
     @Override
+    public int incrementAndGetPartyCount() {
+        int durable = delegate.incrementAndGetPartyCount();
+        // The durable store is the authority for the increment; the cache adopts whatever value it returned.
+        cachedCount.set(durable);
+        return durable;
+    }
+
+    @Override
     public void enqueue(QueuedReward reward) {
         delegate.enqueue(reward);
     }

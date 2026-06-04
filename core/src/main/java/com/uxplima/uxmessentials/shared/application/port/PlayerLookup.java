@@ -18,6 +18,16 @@ public interface PlayerLookup {
     /** The online player with this exact name, if one is connected. */
     Optional<PlayerRef> findOnlineByName(String name);
 
+    /**
+     * The player with this exact name, online first and otherwise a profile that has played before. Unlike
+     * {@link #findOnlineByName}, this resolves an offline owner so a public player-warp stays reachable while
+     * its owner is offline; a name the server has never seen resolves to empty. The default delegates to
+     * {@link #findOnlineByName} so a test fake stays online-only unless it overrides this.
+     */
+    default Optional<PlayerRef> findByName(String name) {
+        return findOnlineByName(name);
+    }
+
     /** The player with this UUID, online or resolvable from the profile cache. */
     Optional<PlayerRef> findByUuid(UUID uuid);
 

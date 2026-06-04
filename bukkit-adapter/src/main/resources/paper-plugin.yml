@@ -721,9 +721,9 @@ permissions:
     description: '/hologram to create, edit, move, list and delete native-Display holograms.'
     default: op
   # player-warps context (docs/permissions.md "Player Warps"). Player-owned warps keyed (owner, name): the
-  # base nodes default true (self-service), the visibility toggle gates /pwarp public|private, and the
-  # numbered quota node uxmessentials.pwarp.limit.<n> (optional <world> segment, highest <n> wins) is an open
-  # value space granted per player and is intentionally not enumerated here. uxmessentials.module.playerwarps
+  # base nodes default true (self-service), the visibility toggle gates /pwarp visibility public|private, and
+  # the numbered quota node uxmessentials.pwarp.limit.<n> (optional <world> segment, highest <n> wins) is an
+  # open value space granted per player, intentionally not enumerated here. uxmessentials.module.playerwarps
   # is the reload/inspect tier.
   uxmessentials.module.playerwarps:
     description: 'Hot-reload / inspect the playerwarps module (player-owned warps behind /pwarp).'
@@ -741,7 +741,7 @@ permissions:
     description: '/pwarps [player] to list your warps or a player''s public warps.'
     default: true
   uxmessentials.pwarp.public:
-    description: '/pwarp public|private <name> to toggle a player warp''s visibility.'
+    description: '/pwarp visibility public|private <name> to toggle a player warp''s visibility.'
     default: true
   # scoreboard context (docs/permissions.md "Scoreboard"). A per-player sidebar plus a tablist header/footer
   # rendered from operator MiniMessage content; the module ships disabled. uxmessentials.scoreboard.use is the

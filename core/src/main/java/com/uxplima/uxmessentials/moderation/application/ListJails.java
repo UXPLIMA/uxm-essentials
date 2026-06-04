@@ -8,10 +8,12 @@ import com.uxplima.uxmessentials.moderation.application.port.JailDirectory;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * {@code /jails}: list the named jails an operator configured in {@code moderation.conf}. A read-only query
- * against the config seam — without it an operator has to open the file by hand to learn which names
- * {@code /jail <player> <jail>} will accept. Renders a header with the count then one entry per name, or an
- * empty notice when no jails are configured. The directory hands the names back sorted.
+ * {@code /jails}: list the jails {@code /jail <player> <jail>} will accept — the named jails an operator
+ * configured in {@code moderation.conf} merged with the DB-backed jails defined in-game with {@code /setjail}.
+ * A read-only query against the directory seam — without it an operator has to inspect both sources by hand to
+ * learn the valid names. Renders a header with the count then one entry per name, or an empty notice when no
+ * jails exist. The directory hands the names back sorted; because it reads the DB-backed store the adapter
+ * runs this off the tick thread.
  */
 public final class ListJails {
 
