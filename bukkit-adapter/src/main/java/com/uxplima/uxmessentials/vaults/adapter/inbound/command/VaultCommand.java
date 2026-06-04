@@ -9,15 +9,16 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
@@ -32,7 +33,9 @@ import org.jspecify.annotations.Nullable;
  * no-argument form opens the player's default vault when they own one (or allocate the first within quota) and
  * lists their vault numbers when several exist; {@code <n>} opens the Nth; {@code <player> [n]} is the
  * audit-logged staff override, gated by {@code uxmessentials.vault.others} on that branch so a non-staff player
- * never sees it. The owner branch is gated by {@code uxmessentials.vault.use} on the root.
+ * never sees it. The owner is a selector argument (a name or {@code @p}/{@code @s}/{@code @r}), so the override
+ * accepts the same targeting as {@code /bring}; the target must resolve to an online player (the GUI opens on
+ * their entity). The owner branch is gated by {@code uxmessentials.vault.use} on the root.
  *
  * <p>This handler maps the Bukkit source to the kernel value objects and hands off to the use cases; the GUI
  * open is entity-bound, so it is scheduled on the viewer's region thread through the kernel {@code Scheduler}.
@@ -48,12 +51,10 @@ public final class VaultCommand implements CommandRegistration {
 
     private final VaultServices services;
     private final VaultNotifier notifier;
-    private final PlayerLookup players;
 
     public VaultCommand(VaultServices services) {
         this.services = Objects.requireNonNull(services, "services");
         this.notifier = services.notifier();
-        this.players = services.kernel().playerLookup();
     }
 
     @Override
@@ -64,7 +65,7 @@ public final class VaultCommand implements CommandRegistration {
                 .then(Commands.literal("info").executes(this::info))
                 .then(Commands.argument("n", IntegerArgumentType.integer(1))
                         .executes(ctx -> openOwn(ctx, ctx.getArgument("n", Integer.class))))
-                .then(CommandSuggestions.playerArgument("player")
+                .then(Commands.argument("player", ArgumentTypes.player())
                         .requires(src -> src.getSender().hasPermission(OTHERS))
                         .executes(ctx -> openOther(ctx, DEFAULT_INDEX))
                         .then(Commands.argument("idx", IntegerArgumentType.integer(1))
@@ -127,16 +128,38 @@ public final class VaultCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef actor = BukkitRefs.toRef(staff);
-        String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> owner = players.findOnlineByName(name);
-        if (owner.isEmpty()) {
-            notifier.unknownTarget(actor, name);
+        Optional<Player> resolved = resolveTarget(ctx, actor);
+        if (resolved.isEmpty()) {
             return Command.SINGLE_SUCCESS;
         }
-        Vault vault = services.openAdminVault().open(actor, owner.get(), index);
-        openWindow(staff, actor, owner.get(), vault);
-        notifier.adminOpened(actor, owner.get(), index);
+        PlayerRef owner = BukkitRefs.toRef(resolved.get());
+        Vault vault = services.openAdminVault().open(actor, owner, index);
+        openWindow(staff, actor, owner, vault);
+        notifier.adminOpened(actor, owner, index);
         return Command.SINGLE_SUCCESS;
+    }
+
+    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx, PlayerRef actor) {
+        try {
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+            List<Player> matched = resolver.resolve(ctx.getSource());
+            if (matched.isEmpty()) {
+                notifier.unknownTarget(actor, typedTarget(ctx));
+                return Optional.empty();
+            }
+            return Optional.of(matched.get(0));
+        } catch (CommandSyntaxException unmatched) {
+            notifier.unknownTarget(actor, typedTarget(ctx));
+            return Optional.empty();
+        }
+    }
+
+    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getNodes().stream()
+                .filter(node -> "player".equals(node.getNode().getName()))
+                .findFirst()
+                .map(node -> node.getRange().get(ctx.getInput()))
+                .orElse("");
     }
 
     private void openWindow(Player player, PlayerRef viewer, PlayerRef owner, Vault vault) {

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -8,8 +9,10 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -64,23 +67,22 @@ abstract class PlayerstateCommandSupport {
 
     /**
      * Resolve the optional {@code player} argument to a target. When the argument is absent the sender is the
-     * target; when present, the named player is resolved only if the sender holds {@link #OTHERS_PERMISSION}
-     * and is online — otherwise the matching rejection is sent and an empty result returned.
+     * target; when present (a name or an {@code @a}/{@code @p}/{@code @s}/{@code @r} selector), the resolved
+     * player is returned only if the sender holds {@link #OTHERS_PERMISSION} — otherwise the no-permission
+     * rejection is sent. A selector that matches no online player yields the unknown-player rejection. The
+     * argument is a {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#player()} selector, so a
+     * present value is always an online player; the first match is taken for a single-target verb.
      */
     final Optional<PlayerRef> resolveTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
-        if (!hasArgument(ctx, "player")) {
+        Optional<PlayerSelectorArgumentResolver> resolver = selector(ctx);
+        if (resolver.isEmpty()) {
             return Optional.of(BukkitRefs.toRef(sender));
         }
         if (!sender.hasPermission(OTHERS_PERMISSION)) {
             reply(sender, NO_PERMISSION, Map.of());
             return Optional.empty();
         }
-        String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findOnlineByName(name);
-        if (target.isEmpty()) {
-            reply(sender, UNKNOWN_PLAYER, Map.of("player", name));
-        }
-        return target;
+        return resolveSelector(resolver.get(), ctx, sender);
     }
 
     /** A {@link PlayerRef} for the live player. */
@@ -88,12 +90,37 @@ abstract class PlayerstateCommandSupport {
         return BukkitRefs.toRef(player);
     }
 
-    private boolean hasArgument(CommandContext<CommandSourceStack> ctx, String name) {
+    private Optional<PlayerRef> resolveSelector(
+            PlayerSelectorArgumentResolver resolver, CommandContext<CommandSourceStack> ctx, Player sender) {
         try {
-            ctx.getArgument(name, String.class);
-            return true;
+            List<Player> resolved = resolver.resolve(ctx.getSource());
+            if (resolved.isEmpty()) {
+                reply(sender, UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
+                return Optional.empty();
+            }
+            return Optional.of(BukkitRefs.toRef(resolved.get(0)));
+        } catch (CommandSyntaxException unmatched) {
+            // A name with no online player, or a selector that matched nothing — surfaced to the sender as the
+            // same unknown-player rejection the name path used, never as a raw Brigadier parse error.
+            reply(sender, UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
+            return Optional.empty();
+        }
+    }
+
+    /** The raw text the sender typed for the {@code player} argument, for the unknown-player rejection. */
+    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getNodes().stream()
+                .filter(node -> "player".equals(node.getNode().getName()))
+                .findFirst()
+                .map(node -> node.getRange().get(ctx.getInput()))
+                .orElse("");
+    }
+
+    private Optional<PlayerSelectorArgumentResolver> selector(CommandContext<CommandSourceStack> ctx) {
+        try {
+            return Optional.of(ctx.getArgument("player", PlayerSelectorArgumentResolver.class));
         } catch (IllegalArgumentException absent) {
-            return false;
+            return Optional.empty();
         }
     }
 

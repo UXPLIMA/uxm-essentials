@@ -3,16 +3,20 @@ package com.uxplima.uxmessentials.kits.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
@@ -65,6 +69,34 @@ abstract class KitCommandSupport {
         feedback.send(sender, UNKNOWN_PLAYER, Map.of("player", name));
     }
 
+    /**
+     * Resolve the {@code player} selector argument to the first matched online player, reporting unknown-player
+     * to {@code sender} when nothing matches. The argument is an
+     * {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#player()} selector, so a name,
+     * {@code @p}, {@code @s}, or {@code @r} all resolve here, and a match is always an online player (the PDC
+     * a kit stamp or give touches must be loaded).
+     */
+    final Optional<PlayerRef> resolveSelectorTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
+        try {
+            PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+            List<Player> resolved = resolver.resolve(ctx.getSource());
+            if (resolved.isEmpty()) {
+                unknownPlayer(sender, typedTarget(ctx));
+                return Optional.empty();
+            }
+            return Optional.of(ref(resolved.get(0)));
+        } catch (CommandSyntaxException unmatched) {
+            unknownPlayer(sender, typedTarget(ctx));
+            return Optional.empty();
+        }
+    }
+
+    /** A {@code player} selector argument, accepting a name or {@code @a}/{@code @p}/{@code @s}/{@code @r}. */
+    static RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> playerSelectorArgument(
+            String argName) {
+        return Commands.argument(argName, ArgumentTypes.player());
+    }
+
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
@@ -89,5 +121,14 @@ abstract class KitCommandSupport {
         return services.listKits().available(viewer).stream()
                 .map(kit -> kit.id().value())
                 .toList();
+    }
+
+    /** The raw text the sender typed for the {@code player} argument, for the unknown-player rejection. */
+    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getNodes().stream()
+                .filter(node -> "player".equals(node.getNode().getName()))
+                .findFirst()
+                .map(node -> node.getRange().get(ctx.getInput()))
+                .orElse("");
     }
 }

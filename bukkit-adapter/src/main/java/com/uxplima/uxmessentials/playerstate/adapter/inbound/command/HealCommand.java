@@ -6,13 +6,13 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -36,7 +36,7 @@ public final class HealCommand extends PlayerstateCommandSupport implements Comm
         return Commands.literal("heal")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::heal)
-                .then(CommandSuggestions.playerArgument("player").executes(this::heal))
+                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::heal))
                 .build();
     }
 

@@ -14,7 +14,6 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -39,7 +38,7 @@ public final class KitResetCommand extends KitCommandSupport implements CommandR
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("kitreset")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(CommandSuggestions.playerArgument("player")
+                .then(playerSelectorArgument("player")
                         .executes(this::resetAll)
                         .then(kitNameArgument("kit").executes(this::resetOne)))
                 .build();
@@ -53,7 +52,7 @@ public final class KitResetCommand extends KitCommandSupport implements CommandR
     private int resetAll(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         PlayerRef actor = actorRef(sender);
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
+        Optional<PlayerRef> target = resolveSelectorTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }
@@ -64,21 +63,12 @@ public final class KitResetCommand extends KitCommandSupport implements CommandR
     private int resetOne(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         PlayerRef actor = actorRef(sender);
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
+        Optional<PlayerRef> target = resolveSelectorTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }
         services.kitReset().reset(actor, target.get(), KitId.of(ctx.getArgument("kit", String.class)));
         return Command.SINGLE_SUCCESS;
-    }
-
-    private Optional<PlayerRef> resolveTarget(CommandContext<CommandSourceStack> ctx, CommandSender sender) {
-        String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findOnlineByName(name);
-        if (target.isEmpty()) {
-            unknownPlayer(sender, name);
-        }
-        return target;
     }
 
     private static PlayerRef actorRef(CommandSender sender) {

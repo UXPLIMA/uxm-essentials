@@ -13,7 +13,6 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -43,7 +42,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
                 .executes(this::list)
                 .then(kitNameArgument("name")
                         .executes(this::claimSelf)
-                        .then(CommandSuggestions.playerArgument("player")
+                        .then(playerSelectorArgument("player")
                                 .requires(src -> src.getSender().hasPermission(OTHERS_PERMISSION))
                                 .executes(this::give)))
                 .build();
@@ -77,10 +76,8 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         if (sender == null) {
             return 0;
         }
-        String targetName = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findOnlineByName(targetName);
+        Optional<PlayerRef> target = resolveSelectorTarget(ctx, ctx.getSource().getSender());
         if (target.isEmpty()) {
-            unknownPlayer(ctx.getSource().getSender(), targetName);
             return 0;
         }
         services.claimKit().claimFor(ref(sender), target.get(), KitId.of(ctx.getArgument("name", String.class)));

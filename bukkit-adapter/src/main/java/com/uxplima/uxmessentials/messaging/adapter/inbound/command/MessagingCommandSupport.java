@@ -30,9 +30,9 @@ import org.jspecify.annotations.Nullable;
  * {@code MessageDelivery}). Concrete command classes extend this so each stays focused on building its node
  * and mapping its arguments to one use-case call.
  *
- * <p>{@link #onlineVisibleTarget} is the vanish-aware target resolution {@code /msg} uses: a name that does
- * not resolve to an online player the sender can see is reported as offline, so a vanished target's presence
- * is never leaked — the same {@code canSee} seam the teleport context applies to {@code /tpa}.
+ * <p>{@link #visibleTarget} is the vanish-aware target gate {@code /msg} applies after a selector argument
+ * matches a player: a target the sender cannot see is reported as offline, so a vanished player's presence is
+ * never leaked — the same {@code canSee} seam the teleport context applies to {@code /tpa}.
  */
 @NullMarked
 abstract class MessagingCommandSupport {
@@ -80,16 +80,18 @@ abstract class MessagingCommandSupport {
     }
 
     /**
-     * Resolve {@code name} to an online player {@code sender} can see, notifying the sender (target-offline)
-     * on failure. A vanished target the sender cannot see is reported as offline, never as present.
+     * Apply the vanish gate to a {@code resolved} player a selector argument ({@code @p}, a name) already
+     * matched: a target {@code sender} cannot see is reported as offline (never as present), so the selector
+     * never leaks a hidden player's presence. The selector type guarantees the player is online, so only the
+     * visibility check remains.
      */
-    final Optional<PlayerRef> onlineVisibleTarget(PlayerRef sender, String name) {
-        Optional<PlayerRef> target = services.players().findOnlineByName(name);
-        if (target.isEmpty() || services.vanish().isHiddenFrom(sender, target.get())) {
-            notify(sender, MessagingMessageKey.MSG_TARGET_OFFLINE, Map.of("player", name));
+    final Optional<PlayerRef> visibleTarget(PlayerRef sender, Player resolved) {
+        PlayerRef target = ref(resolved);
+        if (services.vanish().isHiddenFrom(sender, target)) {
+            notify(sender, MessagingMessageKey.MSG_TARGET_OFFLINE, Map.of("player", resolved.getName()));
             return Optional.empty();
         }
-        return target;
+        return Optional.of(target);
     }
 
     /** Render {@code key} for {@code viewer} with {@code placeholders} and deliver it through the sink. */

@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
@@ -14,7 +15,6 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -45,7 +45,7 @@ public final class GamemodeAliasCommand extends PlayerstateCommandSupport implem
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::set)
-                .then(CommandSuggestions.playerArgument("player").executes(this::set))
+                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::set))
                 .build();
     }
 
