@@ -8,7 +8,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
@@ -41,7 +40,7 @@ public final class KitEditorCommand extends KitCommandSupport implements Command
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("kiteditor")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(kitNameArgument("name")
                         .executes(this::open)
                         .then(Commands.literal("save").executes(this::save)))
                 .build();
