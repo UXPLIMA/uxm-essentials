@@ -7,10 +7,13 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.Material;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommands;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitGranter;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.PdcKitClaims;
@@ -52,6 +55,7 @@ import org.jspecify.annotations.NullMarked;
 public final class KitsWiring {
 
     private static final String LEGACY_KITS_FILE = "kits.conf";
+    private static final String SHOWKIT_DISPLAY_KEY = "showkit-display";
 
     private KitsWiring() {}
 
@@ -81,8 +85,13 @@ public final class KitsWiring {
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
         GuiLayout menuLayout = guiLayouts.load("kits", "kits-menu", GuiLayout.paginatedDefault(Material.CHEST));
         KitServices services = assemble(kernel, repository, claims, granter, notifier, economy, menuLayout);
-        return new Wired(
-                KitCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config())), repository);
+        List<CommandRegistration> commands = KitCommands.all(
+                services,
+                kernel.messages(),
+                () -> ListDisplayMode.from(ctx.config()),
+                () -> ListDisplayMode.from(ctx.config(), SHOWKIT_DISPLAY_KEY));
+        List<Listener> listeners = List.of(new KitPreviewListener());
+        return new Wired(commands, listeners, repository);
     }
 
     private static KitServices assemble(
@@ -97,6 +106,7 @@ public final class KitsWiring {
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, kernel.events(), clock);
         KitMenuView kitMenu = new KitMenuView(kernel.messages(), kernel.scheduler(), claimKit, menuLayout);
+        KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler());
         return new KitServices(
                 claimKit,
                 new ListKits(repository, kernel.permissions(), claims, notifier),
@@ -106,22 +116,26 @@ public final class KitsWiring {
                 new KitEditor(repository, notifier),
                 new KitReset(repository, claims, notifier),
                 kitMenu,
+                kitPreview,
                 kernel.playerLookup());
     }
 
     /**
-     * Everything the kits module contributes once wired: the Brigadier commands plus the {@link
-     * KitRepository} the {@code kit_cooldown_<id>} placeholder resolves a kit's cooldown tier against. The
-     * kits context holds no repeating scheduled work and no in-memory store beyond the config-backed catalog,
-     * so there is nothing to drain on stop — the module's {@code stop()} clears its own bookkeeping.
+     * Everything the kits module contributes once wired: the Brigadier commands, the Bukkit listeners (the
+     * read-only {@code /showkit} preview menu's click/drag guard), plus the {@link KitRepository} the
+     * {@code kit_cooldown_<id>} placeholder resolves a kit's cooldown tier against. The kits context holds no
+     * repeating scheduled work and no in-memory store beyond the config-backed catalog, so there is nothing to
+     * drain on stop — the module's {@code stop()} clears its own bookkeeping.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param listeners the Bukkit listeners to register
      * @param repository the kit catalog the cooldown placeholder reads
      */
-    public record Wired(List<CommandRegistration> commands, KitRepository repository) {
+    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, KitRepository repository) {
 
         public Wired {
             commands = List.copyOf(commands);
+            listeners = List.copyOf(listeners);
             Objects.requireNonNull(repository, "repository");
         }
     }

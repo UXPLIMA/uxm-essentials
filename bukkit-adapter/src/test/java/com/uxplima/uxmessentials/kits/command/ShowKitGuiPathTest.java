@@ -17,15 +17,18 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
-import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitsCommand;
+import com.uxplima.uxmessentials.kits.adapter.inbound.command.ShowKitCommand;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
+import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
 import com.uxplima.uxmessentials.kits.application.DelKit;
@@ -42,7 +45,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
-import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -55,8 +58,6 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,21 +68,20 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage that a {@code /kits} menu icon click claims that kit through the same {@link ClaimKit}
- * use case the {@code /kit} command drives. The bare {@code /kits} node opens the paginated menu, then a
- * left-click on content slot 0 (the first kit, {@code starter}) is fired through the installed uxmLib menu
- * listener. Because the real {@link ClaimKit} sends {@code KIT_CLAIMED} for the granted kit, the test asserts
- * the click claimed exactly the clicked kit: the recording granter saw one grant and {@code KIT_CLAIMED}
- * carried {@code kit=starter}. A control click on an empty slot claims nothing.
+ * MockBukkit coverage of the {@code /showkit} GUI preview path through the real Brigadier {@code /showkit} node.
+ * In {@code gui} mode the command opens a read-only managed menu sized to fit the kit, with the kit's stacks laid
+ * out at their definition-order slots and every interaction cancelled by {@link KitPreviewListener}, so a player
+ * can inspect a kit's contents without taking anything. In {@code chat} mode the command opens no inventory and
+ * sends the chat preview lines instead. The scheduler is a synchronous double so the entity-bound open runs
+ * inline, mirroring the {@code /kits} menu path test.
  */
-class KitMenuClickTest {
+class ShowKitGuiPathTest {
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
     private KitServices services;
     private RecordingSink sink;
-    private RecordingGranter granter;
 
     @BeforeEach
     void setUp() {
@@ -90,61 +90,56 @@ class KitMenuClickTest {
         player = server.addPlayer("Alice");
         player.setOp(true);
         sink = new RecordingSink();
-        granter = new RecordingGranter();
         services = services();
-        Guis.install(plugin);
+        server.getPluginManager().registerEvents(new KitPreviewListener(), plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall(); // reset the static install state so the next test re-installs the menu listener
         MockBukkit.unmock();
     }
 
     @Test
-    void clickingAKitIconClaimsThatKit() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-        execute(dispatcher, "kits");
+    void guiModeOpensAReadOnlyMenuHoldingTheKitItems() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.GUI);
+
+        execute(dispatcher, "showkit starter");
+
         Inventory menu = player.getOpenInventory().getTopInventory();
-        assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
-
-        fireClick(0);
-
-        assertThat(granter.grants).hasSize(1);
-        assertThat(sink.deliveries).anySatisfy(delivery -> {
-            assertThat(delivery.key()).isEqualTo(KitsMessageKey.KIT_CLAIMED);
-            assertThat(delivery.placeholders()).containsEntry("kit", "starter");
-        });
+        assertThat(menu).isNotNull();
+        assertThat(menu.getItem(0)).isNotNull();
+        assertThat(menu.getItem(0).getType()).isEqualTo(Material.DIAMOND_SWORD);
+        assertThat(menu.getItem(1)).isNotNull();
+        assertThat(menu.getItem(1).getType()).isEqualTo(Material.GOLDEN_APPLE);
     }
 
     @Test
-    void clickingAnEmptySlotClaimsNothing() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-        execute(dispatcher, "kits");
-
-        fireClick(44); // a content row slot past the three kits, so nothing is bound there
-
-        assertThat(granter.grants).isEmpty();
-        assertThat(sink.keys).doesNotContain(KitsMessageKey.KIT_CLAIMED);
-    }
-
-    /** Left-click the given content slot of the open menu through the installed listener. */
-    private void fireClick(int slot) {
+    void everyClickInTheGuiPreviewIsCancelled() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.GUI);
+        execute(dispatcher, "showkit starter");
         InventoryView view = player.getOpenInventory();
-        InventoryClickEvent event = new InventoryClickEvent(
-                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
-        server.getPluginManager().callEvent(event);
+
+        InventoryClickEvent click = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, 0, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(click);
+
+        assertThat(click.isCancelled()).isTrue();
     }
 
-    private CommandDispatcher<CommandSourceStack> registerCommand() {
+    @Test
+    void chatModeSendsTheChatLinesAndOpensNothing() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.CHAT);
+
+        execute(dispatcher, "showkit starter");
+
+        assertThat(sink.keys).contains(KitsMessageKey.KIT_PREVIEW_HEADER);
+        assertThat(sink.keys).contains(KitsMessageKey.KIT_PREVIEW_ENTRY);
+        assertThat(player.getOpenInventory().getTopInventory()).isNull();
+    }
+
+    private CommandDispatcher<CommandSourceStack> registerCommand(ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher
-                .getRoot()
-                .addChild(new KitsCommand(
-                                services,
-                                new KeyMessages(),
-                                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI)
-                        .build());
+        dispatcher.getRoot().addChild(new ShowKitCommand(services, new KeyMessages(), () -> mode).build());
         return dispatcher;
     }
 
@@ -162,6 +157,7 @@ class KitMenuClickTest {
         KitClaimStore claims = new NoClaims();
         KitNotifier notifier = new KitNotifier(messages, sink);
         KitRepository repository = new FakeRepository();
+        KitGranter granter = (who, items) -> KitGranter.Grant.complete();
         KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock);
@@ -181,21 +177,23 @@ class KitMenuClickTest {
                 new NoPlayerLookup());
     }
 
-    /** Three free, repeatable, ungated, empty-item kits (the CHEST fallback icon dodges the item codec). */
+    /** A single kit named {@code starter} holding two real, codec-encoded stacks at slots 0 and 1. */
     private static final class FakeRepository implements KitRepository {
-        private final List<KitDefinition> kits = List.of(
-                KitDefinition.repeatable(KitId.of("starter"), List.<KitItem>of(), Duration.ofSeconds(60)),
-                KitDefinition.repeatable(KitId.of("daily"), List.<KitItem>of(), Duration.ofSeconds(120)),
-                KitDefinition.repeatable(KitId.of("vip"), List.<KitItem>of(), Duration.ofSeconds(30)));
+        private final KitDefinition starter = KitDefinition.repeatable(
+                KitId.of("starter"),
+                List.of(
+                        KitItemCodec.encode(new ItemStack(Material.DIAMOND_SWORD)),
+                        KitItemCodec.encode(new ItemStack(Material.GOLDEN_APPLE, 3))),
+                Duration.ofSeconds(60));
 
         @Override
         public Optional<KitDefinition> find(KitId id) {
-            return kits.stream().filter(kit -> kit.id().equals(id)).findFirst();
+            return id.equals(starter.id()) ? Optional.of(starter) : Optional.empty();
         }
 
         @Override
         public List<KitDefinition> all() {
-            return kits;
+            return List.of(starter);
         }
 
         @Override
@@ -208,17 +206,6 @@ class KitMenuClickTest {
 
         @Override
         public void delete(KitId id) {}
-    }
-
-    /** Records every grant so the test can prove a click drove exactly one claim. */
-    private static final class RecordingGranter implements KitGranter {
-        private final List<List<KitItem>> grants = new ArrayList<>();
-
-        @Override
-        public Grant grant(PlayerRef recipient, List<KitItem> items) {
-            grants.add(items);
-            return Grant.complete();
-        }
     }
 
     private static final class NoClaims implements KitClaimStore {
@@ -237,17 +224,13 @@ class KitMenuClickTest {
         public void resetAll(PlayerRef who) {}
     }
 
-    /** A resolved message: its key and the placeholders it carried, so a claim's target kit is assertable. */
-    private record Delivery(MessageKey key, Map<String, String> placeholders) {}
-
     /** Records each delivered key so a path's outcome is asserted by the message it produced. */
     private static final class RecordingSink implements MessageSink {
         private final List<MessageKey> keys = new ArrayList<>();
-        private final List<Delivery> deliveries = new ArrayList<>();
 
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
-            // renderedText is the key() string (see KeyMessages); the recorded keys/deliveries drive asserts
+            // renderedText is the key() string (see KeyMessages); the key list is what tests assert on
         }
     }
 
@@ -255,7 +238,6 @@ class KitMenuClickTest {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             sink.keys.add(key);
-            sink.deliveries.add(new Delivery(key, Map.copyOf(placeholders)));
             return key.key();
         }
     }

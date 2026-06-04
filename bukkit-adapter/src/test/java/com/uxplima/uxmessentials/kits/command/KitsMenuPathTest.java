@@ -21,6 +21,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitsCommand;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
 import com.uxplima.uxmessentials.kits.application.DelKit;
@@ -170,6 +171,7 @@ class KitsMenuPathTest {
         ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock);
         KitMenuView kitMenu =
                 new KitMenuView(messages, new SyncScheduler(), claimKit, GuiLayout.paginatedDefault(Material.CHEST));
+        KitPreviewView kitPreview = new KitPreviewView(messages, new SyncScheduler());
         return new KitServices(
                 claimKit,
                 new ListKits(repository, permissions, claims, notifier),
@@ -179,6 +181,7 @@ class KitsMenuPathTest {
                 new KitEditor(repository, notifier),
                 new KitReset(repository, claims, notifier),
                 kitMenu,
+                kitPreview,
                 new NoPlayerLookup());
     }
 

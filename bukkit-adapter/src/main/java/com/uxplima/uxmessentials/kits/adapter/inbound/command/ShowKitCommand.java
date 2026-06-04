@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.kits.adapter.inbound.command;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -24,13 +26,18 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /showkit <name>}: preview a kit's contents without claiming it ({@code uxmessentials.kit.preview}).
  * The {@link com.uxplima.uxmessentials.kits.application.ShowKit} use case resolves the kit (and answers a
- * missing id), then returns the definition; the header and one entry per stack are rendered here because the
+ * missing id), then returns the definition; the presentation is operator-selectable through
+ * {@code showkit-display} ({@code gui} | {@code chat}, default {@code gui}, read live so a module reload takes
+ * effect without a restart). In {@code gui} mode a player sees a read-only menu with the kit's stacks in their
+ * slots ({@link com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView}); in {@code chat} mode — and
+ * always for a console, which has no inventory — the header and one entry per stack are rendered here because the
  * per-item line needs the stack's display or material name, which is decoded from the opaque
  * {@link KitItem} payload with the same {@link KitItemCodec} the claim path uses — the kernel never parses it.
  */
@@ -40,8 +47,11 @@ public final class ShowKitCommand extends KitCommandSupport implements CommandRe
     private static final String PERMISSION = "uxmessentials.kit.preview";
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
-    public ShowKitCommand(KitServices services, Messages messages) {
+    private final Supplier<ListDisplayMode> displayMode;
+
+    public ShowKitCommand(KitServices services, Messages messages, Supplier<ListDisplayMode> displayMode) {
         super(services, messages);
+        this.displayMode = Objects.requireNonNull(displayMode, "displayMode");
     }
 
     @Override
@@ -63,8 +73,17 @@ public final class ShowKitCommand extends KitCommandSupport implements CommandRe
             return 0;
         }
         KitId id = KitId.of(ctx.getArgument("name", String.class));
-        services.showKit().show(ref(sender), id).asValue().ifPresent(definition -> renderPreview(sender, definition));
+        services.showKit().show(ref(sender), id).asValue().ifPresent(definition -> present(sender, definition));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** Open the GUI preview in {@code gui} mode, or print the chat preview in {@code chat} mode. */
+    private void present(Player sender, KitDefinition definition) {
+        if (displayMode.get() == ListDisplayMode.GUI) {
+            services.kitPreview().open(sender, ref(sender), definition);
+        } else {
+            renderPreview(sender, definition);
+        }
     }
 
     private void renderPreview(Player sender, KitDefinition definition) {

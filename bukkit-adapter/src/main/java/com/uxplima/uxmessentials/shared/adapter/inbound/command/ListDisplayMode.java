@@ -23,8 +23,18 @@ public enum ListDisplayMode {
 
     /** Resolve the mode named at {@code list-display} in {@code config}, defaulting to {@link #GUI}. */
     public static ListDisplayMode from(ConfigStore config) {
+        return from(config, CONFIG_KEY);
+    }
+
+    /**
+     * Resolve the mode named at {@code key} in {@code config}, defaulting to {@link #GUI}. The same {@code gui}
+     * | {@code chat} vocabulary is reused by sibling knobs such as the kits context's {@code showkit-display},
+     * which selects whether {@code /showkit} previews a kit in a GUI or in chat.
+     */
+    public static ListDisplayMode from(ConfigStore config, String key) {
         Objects.requireNonNull(config, "config");
-        String raw = config.getString(CONFIG_KEY, "gui").trim().toLowerCase(Locale.ROOT);
+        Objects.requireNonNull(key, "key");
+        String raw = config.getString(key, "gui").trim().toLowerCase(Locale.ROOT);
         return "chat".equals(raw) ? CHAT : GUI;
     }
 }

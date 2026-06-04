@@ -350,6 +350,7 @@ public final class PluginModule {
         // The per-kit cost charges through the economy bridge captured during economy wiring when present.
         KitsWiring.Wired wired = KitsWiring.wire(plugin, ctx, Optional.ofNullable(links.kitEconomy), guiLayouts);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
         links.placeholders.kits(
                 new KitCooldownPlaceholders(wired.repository(), ctx.kernel().cooldowns()));
     }

@@ -20,13 +20,20 @@ public final class KitCommands {
 
     private KitCommands() {}
 
-    /** Every kits command, in surface order. */
+    /**
+     * Every kits command, in surface order. {@code listDisplay} selects how bare {@code /kits} presents its
+     * entries (the browse menu or the chat list); {@code previewDisplay} selects how {@code /showkit} presents a
+     * kit (the read-only GUI or the chat contents). Both are read live so a module reload takes effect.
+     */
     public static List<CommandRegistration> all(
-            KitServices services, Messages messages, Supplier<ListDisplayMode> displayMode) {
+            KitServices services,
+            Messages messages,
+            Supplier<ListDisplayMode> listDisplay,
+            Supplier<ListDisplayMode> previewDisplay) {
         return List.of(
                 new KitCommand(services, messages),
-                new KitsCommand(services, messages, displayMode),
-                new ShowKitCommand(services, messages),
+                new KitsCommand(services, messages, listDisplay),
+                new ShowKitCommand(services, messages, previewDisplay),
                 new CreateKitCommand(services, messages),
                 new DelKitCommand(services, messages),
                 new KitEditorCommand(services, messages),

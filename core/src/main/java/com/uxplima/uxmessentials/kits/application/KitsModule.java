@@ -54,8 +54,8 @@ public final class KitsModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The kits context registers no Bukkit listener; a disabled or not-yet-adapted module registers
-        // none either.
+        // The read-only /showkit preview menu's click/drag guard is Bukkit-facing and is registered through the
+        // adapter wiring (KitsWiring) rather than this kernel-side factory list; a disabled module registers none.
         return List.of();
     }
 

@@ -34,6 +34,7 @@ public enum KitsMessageKey implements MessageKey {
     // preview (/showkit)
     KIT_PREVIEW_HEADER("kit.preview.header"),
     KIT_PREVIEW_ENTRY("kit.preview.entry"),
+    KIT_PREVIEW_GUI_TITLE("kit.preview.gui-title"),
 
     // authoring (/createkit /delkit /kiteditor)
     KIT_CREATED("kit.created"),
