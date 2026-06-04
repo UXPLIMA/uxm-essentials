@@ -1,16 +1,27 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
+import org.bukkit.Keyed;
+import org.bukkit.Material;
+import org.bukkit.Registry;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
@@ -119,5 +130,58 @@ abstract class ItemworldCommandSupport {
         return sender instanceof Player player
                 ? BukkitRefs.toRef(player)
                 : new PlayerRef(new java.util.UUID(0L, 0L), sender.getName());
+    }
+
+    /**
+     * An {@code item} string argument that completes against the obtainable item materials in the live
+     * registry, matching the {@code material.isItem()} gate the resolver applies, so a suggestion is never an
+     * unobtainable block-only id. The value still parses through {@code ItemQuery} at execution, so an
+     * arbitrary typed id keeps working.
+     */
+    static RequiredArgumentBuilder<CommandSourceStack, String> itemArgument() {
+        return Commands.argument("item", StringArgumentType.word())
+                .suggests(keyedSuggestions(() -> Registry.MATERIAL, Material::isItem));
+    }
+
+    /** A {@code type} string argument that completes against the spawnable entity types in the live registry. */
+    static RequiredArgumentBuilder<CommandSourceStack, String> mobTypeArgument() {
+        return Commands.argument("type", StringArgumentType.word())
+                .suggests(keyedSuggestions(
+                        () -> Registry.ENTITY_TYPE,
+                        type -> type != EntityType.UNKNOWN && type != EntityType.PLAYER && type.isSpawnable()));
+    }
+
+    /** An {@code effect} string argument that completes against the potion effect types in the live registry. */
+    static RequiredArgumentBuilder<CommandSourceStack, String> effectArgument() {
+        return Commands.argument("effect", StringArgumentType.word())
+                .suggests(keyedSuggestions(() -> Registry.EFFECT, effect -> true));
+    }
+
+    /**
+     * Build a suggestion provider over a Bukkit registry: each entry passing {@code accept} is offered by its
+     * key, prefix-filtered by the partial token. A {@code minecraft:} entry is offered by its bare path (the
+     * form the commands default the namespace for); any other namespace keeps its full {@code namespace:path}.
+     * The registry is read each keystroke on the tick thread — a non-blocking in-memory lookup.
+     */
+    private static <T extends Keyed> SuggestionProvider<CommandSourceStack> keyedSuggestions(
+            Supplier<? extends Iterable<T>> registry, Predicate<? super T> accept) {
+        return (ctx, builder) -> {
+            String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
+            for (T entry : registry.get()) {
+                if (!accept.test(entry)) {
+                    continue;
+                }
+                String suggestion = suggestionFor(entry);
+                if (prefix.isEmpty() || suggestion.startsWith(prefix)) {
+                    builder.suggest(suggestion);
+                }
+            }
+            return builder.buildFuture();
+        };
+    }
+
+    private static String suggestionFor(Keyed entry) {
+        var key = entry.getKey();
+        return "minecraft".equals(key.getNamespace()) ? key.getKey() : key.toString();
     }
 }

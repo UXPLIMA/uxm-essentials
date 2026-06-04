@@ -54,7 +54,7 @@ public final class PotionCommand extends ItemworldCommandSupport implements Comm
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("effect", StringArgumentType.word())
+                .then(effectArgument()
                         .executes(ctx -> apply(ctx, DEFAULT_DURATION_SECONDS, 0))
                         .then(Commands.argument("duration", IntegerArgumentType.integer(1, 1_000_000))
                                 .executes(ctx -> apply(ctx, IntegerArgumentType.getInteger(ctx, "duration"), 0))
