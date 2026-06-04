@@ -152,7 +152,14 @@ tasks.runServer {
     jvmArgs(
         "-Xmx4G",
         "-Djdk.tracePinnedThreads=full",
-        "-XX:+UnlockExperimentalVMOptions",
-        "-XX:+AllowEnhancedClassRedefinition",
     )
+    // Live hot-swap of changed classes without a server restart needs the JetBrains Runtime
+    // (DCEVM). On a stock JDK these options are unrecognised and abort the JVM at launch, so they
+    // are opt-in: run with -Photswap under a JBR toolchain to enable them.
+    if (providers.gradleProperty("hotswap").isPresent) {
+        jvmArgs(
+            "-XX:+UnlockExperimentalVMOptions",
+            "-XX:+AllowEnhancedClassRedefinition",
+        )
+    }
 }
