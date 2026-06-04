@@ -6,7 +6,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
@@ -33,7 +32,7 @@ public final class DelKitCommand extends KitCommandSupport implements CommandReg
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("delkit")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("name", StringArgumentType.word()).executes(this::run))
+                .then(kitNameArgument("name").executes(this::run))
                 .build();
     }
 

@@ -8,7 +8,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -42,7 +41,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("warp")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(warpNameArgument()
                         .executes(this::run)
                         .then(CommandSuggestions.playerArgument("player")
                                 .requires(src -> src.getSender().hasPermission(OTHERS_PERMISSION))

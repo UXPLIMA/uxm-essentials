@@ -6,7 +6,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -34,7 +33,7 @@ public final class DelWarpCommand extends WarpCommandSupport implements CommandR
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("delwarp")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("name", StringArgumentType.word()).executes(this::run))
+                .then(warpNameArgument().executes(this::run))
                 .build();
     }
 

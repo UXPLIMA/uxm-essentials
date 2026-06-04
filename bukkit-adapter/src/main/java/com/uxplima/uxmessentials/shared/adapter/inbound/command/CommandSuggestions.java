@@ -3,9 +3,11 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.command;
 import java.util.Collection;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -14,6 +16,8 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -64,6 +68,33 @@ public final class CommandSuggestions {
                 for (String value : current) {
                     if (value != null && matches(value, prefix)) {
                         builder.suggest(value);
+                    }
+                }
+            }
+            return builder.buildFuture();
+        };
+    }
+
+    /**
+     * Suggests a per-viewer list of names, prefix-filtered. The lookup receives the invoking player as a
+     * {@link PlayerRef} so a permission-filtered, viewer-scoped source (the warps/kits/pwarps a player may
+     * use, the homes they own) can be returned. A non-player source (console) yields no suggestions. The
+     * lookup runs on the tick thread per keystroke, so it must read only non-blocking in-memory state.
+     */
+    public static SuggestionProvider<CommandSourceStack> forPlayer(
+            Function<PlayerRef, ? extends Collection<String>> lookup) {
+        Objects.requireNonNull(lookup, "lookup");
+        return (ctx, builder) -> {
+            CommandSender sender = ctx.getSource().getSender();
+            if (!(sender instanceof Player player)) {
+                return builder.buildFuture();
+            }
+            String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
+            Collection<String> names = lookup.apply(BukkitRefs.toRef(player));
+            if (names != null) {
+                for (String name : names) {
+                    if (name != null && matches(name, prefix)) {
+                        builder.suggest(name);
                     }
                 }
             }

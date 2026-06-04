@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.warps.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -7,9 +8,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -61,6 +66,22 @@ abstract class WarpCommandSupport {
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
+    }
+
+    /**
+     * A {@code name} string argument that completes against the warps the invoking player may use. The warp
+     * repository is held in memory, so the per-keystroke lookup is non-blocking; the suggestion is the same
+     * permission-filtered set {@code /warps} renders, so a player never sees a warp they cannot teleport to.
+     */
+    final RequiredArgumentBuilder<CommandSourceStack, String> warpNameArgument() {
+        return Commands.argument("name", StringArgumentType.word())
+                .suggests(CommandSuggestions.forPlayer(this::usableWarpNames));
+    }
+
+    private List<String> usableWarpNames(PlayerRef viewer) {
+        return services.listWarps().available(viewer).stream()
+                .map(warp -> warp.name().value())
+                .toList();
     }
 
     /**

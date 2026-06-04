@@ -8,7 +8,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
@@ -42,7 +41,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         return Commands.literal("kit")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::list)
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(kitNameArgument("name")
                         .executes(this::claimSelf)
                         .then(CommandSuggestions.playerArgument("player")
                                 .requires(src -> src.getSender().hasPermission(OTHERS_PERMISSION))

@@ -8,12 +8,16 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -69,5 +73,21 @@ abstract class KitCommandSupport {
     /** The non-empty stacks in {@code player}'s main inventory, serialized into the kit's item list. */
     static List<KitItem> inventoryItems(Player player) {
         return KitItemCodec.encodeAll(player.getInventory().getContents());
+    }
+
+    /**
+     * A kit-id string argument (named {@code argName}) that completes against the kits the invoking player may
+     * claim. The kit catalog is held in memory, so the per-keystroke lookup is non-blocking; it is the same
+     * permission/consumed filter {@code /kits} renders, so a player never sees a kit they cannot take.
+     */
+    final RequiredArgumentBuilder<CommandSourceStack, String> kitNameArgument(String argName) {
+        return Commands.argument(argName, StringArgumentType.word())
+                .suggests(CommandSuggestions.forPlayer(this::claimableKitIds));
+    }
+
+    private List<String> claimableKitIds(PlayerRef viewer) {
+        return services.listKits().available(viewer).stream()
+                .map(kit -> kit.id().value())
+                .toList();
     }
 }

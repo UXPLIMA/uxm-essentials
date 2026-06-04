@@ -9,7 +9,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
@@ -42,8 +41,7 @@ public final class KitResetCommand extends KitCommandSupport implements CommandR
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(this::resetAll)
-                        .then(Commands.argument("kit", StringArgumentType.word())
-                                .executes(this::resetOne)))
+                        .then(kitNameArgument("kit").executes(this::resetOne)))
                 .build();
     }
 
