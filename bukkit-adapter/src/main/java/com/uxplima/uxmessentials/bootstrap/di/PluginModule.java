@@ -360,6 +360,7 @@ public final class PluginModule {
         PlayerstateWiring.Wired wired = PlayerstateWiring.wire(ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::stop);
     }
 
     private static void wireMessaging(

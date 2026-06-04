@@ -281,6 +281,9 @@ permissions:
   uxmessentials.invsee.use:
     description: '/invsee [player] to view a player''s inventory.'
     default: op
+  uxmessentials.invsee.modify:
+    description: 'Edit a player''s inventory through the /invsee menu (without this it is view-only).'
+    default: op
   uxmessentials.endersee.use:
     description: '/endersee [player] to view a player''s ender chest.'
     default: op

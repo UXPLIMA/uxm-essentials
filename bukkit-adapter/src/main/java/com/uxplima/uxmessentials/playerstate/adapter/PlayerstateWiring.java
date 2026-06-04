@@ -7,6 +7,8 @@ import java.util.Objects;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitNearbyPlayers;
@@ -76,7 +78,8 @@ public final class PlayerstateWiring {
         PlayerStateStore store = new InMemoryPlayerStateStore();
         StateReconciler reconciler = new BukkitStateReconciler(kernel.scheduler());
         PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler());
-        InventoryViewer inventoryViewer = new BukkitInventoryViewer(kernel.scheduler());
+        InvseeView invseeView = new InvseeView(kernel.messages(), kernel.scheduler());
+        InventoryViewer inventoryViewer = new BukkitInventoryViewer(kernel.scheduler(), invseeView);
         NearbyPlayers nearby = new BukkitNearbyPlayers();
         PlayerInfo info = new BukkitPlayerInfo();
         PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
@@ -84,8 +87,8 @@ public final class PlayerstateWiring {
         Ports ports = new Ports(store, reconciler, effects, inventoryViewer, nearby, info, notifier);
         PlayerStateServices services = assemble(kernel, config, clock, ports);
         List<CommandRegistration> commands = PlayerStateCommands.all(services, kernel.messages());
-        List<Listener> listeners = List.of(new PlayerStateListener(store, reconciler));
-        return new Wired(commands, listeners);
+        List<Listener> listeners = List.of(new PlayerStateListener(store, reconciler), new InvseeListener(invseeView));
+        return new Wired(commands, listeners, invseeView);
     }
 
     private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {
@@ -136,19 +139,26 @@ public final class PlayerstateWiring {
             PlayerStateNotifier notifier) {}
 
     /**
-     * Everything the playerstate module contributes once wired: the Brigadier commands and the
-     * join/quit/respawn listener. The context holds no repeating scheduled work; its only runtime state is the
-     * in-memory snapshot map, which is garbage-collected with the wiring on module stop — there is nothing to
-     * drain.
+     * Everything the playerstate module contributes once wired: the Brigadier commands and the listeners (the
+     * join/quit/respawn re-apply/reset listener and the {@code /invsee} menu's click/close listener). The
+     * context holds no repeating scheduled work; its only durable-while-open state is the set of open invsee
+     * menus, which {@link #stop()} reconciles back onto their targets before disable so no edit is lost.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
+     * @param invseeView the invsee menu, held so {@code stop()} flushes every still-open view
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners) {
+    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, InvseeView invseeView) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(invseeView, "invseeView");
+        }
+
+        /** Reconcile every still-open invsee menu back onto its target. Called on module stop. */
+        public void stop() {
+            invseeView.flushAll();
         }
     }
 }

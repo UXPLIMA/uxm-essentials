@@ -66,6 +66,7 @@ public enum PlayerstateMessageKey implements MessageKey {
 
     // /invsee
     INVSEE_OPENED("playerstate.invsee.opened"),
+    INVSEE_TITLE("playerstate.invsee.title"),
 
     // /endersee
     ENDERSEE_OPENED("playerstate.endersee.opened"),
