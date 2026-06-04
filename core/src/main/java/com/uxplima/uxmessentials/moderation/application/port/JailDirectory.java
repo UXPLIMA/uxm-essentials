@@ -19,4 +19,9 @@ public interface JailDirectory {
 
     /** The configured jail names, sorted, for {@code /jails} to list back to an operator. */
     java.util.List<String> names();
+
+    /** Non-blocking config-only jail names for tab-completion; the DB-backed union lives in {@link #names()}. */
+    default java.util.List<String> peekNames() {
+        return names();
+    }
 }

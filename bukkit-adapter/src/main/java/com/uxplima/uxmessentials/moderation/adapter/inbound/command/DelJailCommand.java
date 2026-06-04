@@ -9,6 +9,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
@@ -33,7 +34,10 @@ public final class DelJailCommand extends ModerationCommandSupport implements Co
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("deljail")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("name", StringArgumentType.word()).executes(this::run))
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .suggests(CommandSuggestions.fromStrings(
+                                () -> services.listJails().suggestionNames()))
+                        .executes(this::run))
                 .build();
     }
 

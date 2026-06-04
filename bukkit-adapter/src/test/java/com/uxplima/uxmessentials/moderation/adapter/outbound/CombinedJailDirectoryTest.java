@@ -50,6 +50,15 @@ class CombinedJailDirectoryTest {
     }
 
     @Test
+    void peekNamesReturnsOnlyConfigNamesWithoutTouchingTheStore() {
+        JailDirectory combined = new CombinedJailDirectory(config(Set.of("zeta", "shared"), Set.of()), throwingStore());
+
+        // peekNames must stay non-blocking for tab-completion: it reads the config seam only, never the
+        // DB-backed store, so a store that throws on names() proves the store is not consulted here.
+        assertThat(combined.peekNames()).containsExactly("shared", "zeta");
+    }
+
+    @Test
     void countdownModeComesFromTheConfig() {
         JailDirectory combined = new CombinedJailDirectory(config(Set.of("wall"), Set.of("wall")), store("storedjail"));
 
@@ -67,6 +76,16 @@ class CombinedJailDirectoryTest {
             store.save(new StoredJail(name, Position.of(WORLD, 0, 64, 0)));
         }
         return store;
+    }
+
+    /** A store whose name listing fails, standing in for the DB-backed source peekNames must not consult. */
+    private static JailLocationStore throwingStore() {
+        return new FixedStore() {
+            @Override
+            public List<String> names() {
+                throw new AssertionError("peekNames must not read the DB-backed store");
+            }
+        };
     }
 
     private static final class FixedConfig implements JailDirectory {
@@ -94,7 +113,7 @@ class CombinedJailDirectoryTest {
         }
     }
 
-    private static final class FixedStore implements JailLocationStore {
+    private static class FixedStore implements JailLocationStore {
         private final Map<String, StoredJail> byName = new HashMap<>();
 
         @Override

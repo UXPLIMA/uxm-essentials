@@ -48,7 +48,7 @@ public final class SetWorthCommand extends EconomyCommandSupport implements Comm
                 .then(Commands.argument("price", DoubleArgumentType.doubleArg(0))
                         .executes(ctx -> runHeld(ctx, DoubleArgumentType.getDouble(ctx, "price"))))
                 .then(Commands.literal("clear").executes(this::clearHeld))
-                .then(Commands.argument("item", StringArgumentType.word())
+                .then(itemArgument()
                         .then(Commands.argument("price", DoubleArgumentType.doubleArg(0))
                                 .executes(ctx -> runNamed(
                                         ctx,

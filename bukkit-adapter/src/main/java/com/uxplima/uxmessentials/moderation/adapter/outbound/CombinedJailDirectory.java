@@ -50,4 +50,11 @@ public final class CombinedJailDirectory implements JailDirectory {
         union.addAll(store.names());
         return union.stream().sorted().toList();
     }
+
+    @Override
+    public List<String> peekNames() {
+        // Config-only union deliberately, so tab-completion stays non-blocking; the DB-backed store.names()
+        // can hit the database and only the off-tick names() pays that cost.
+        return config.peekNames();
+    }
 }

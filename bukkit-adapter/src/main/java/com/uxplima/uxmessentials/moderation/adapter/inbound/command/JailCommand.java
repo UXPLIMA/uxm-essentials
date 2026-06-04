@@ -39,6 +39,8 @@ public final class JailCommand extends ModerationCommandSupport implements Comma
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("jail", StringArgumentType.word())
+                                .suggests(CommandSuggestions.fromStrings(
+                                        () -> services.listJails().suggestionNames()))
                                 .executes(ctx -> run(ctx, "", Optional.empty()))
                                 .then(Commands.argument("duration", StringArgumentType.word())
                                         .executes(ctx ->

@@ -42,8 +42,7 @@ public final class WorthCommand extends EconomyCommandSupport implements Command
         return Commands.literal("worth")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(ctx -> run(ctx, Optional.empty()))
-                .then(Commands.argument("item", StringArgumentType.word())
-                        .executes(ctx -> run(ctx, Optional.of(StringArgumentType.getString(ctx, "item")))))
+                .then(itemArgument().executes(ctx -> run(ctx, Optional.of(StringArgumentType.getString(ctx, "item")))))
                 .build();
     }
 

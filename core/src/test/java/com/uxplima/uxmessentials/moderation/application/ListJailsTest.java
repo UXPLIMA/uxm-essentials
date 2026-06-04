@@ -42,6 +42,14 @@ class ListJailsTest {
     }
 
     @Test
+    void suggestionNamesReturnsTheConfigNamesForTabCompletion() {
+        JailDirectory directory = new FixedNames(List.of("spawnjail", "mines"));
+        ListJails listJails = new ListJails(directory, notifier(new RecordingSink()));
+
+        assertThat(listJails.suggestionNames()).containsExactly("mines", "spawnjail");
+    }
+
+    @Test
     void anEmptyDirectorySendsTheEmptyNoticeAndNoEntries() {
         RecordingSink sink = new RecordingSink();
         JailDirectory directory = new FixedNames(List.of());

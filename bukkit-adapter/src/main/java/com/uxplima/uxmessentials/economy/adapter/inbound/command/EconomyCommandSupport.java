@@ -6,6 +6,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.bukkit.Material;
+import org.bukkit.Registry;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -93,6 +95,25 @@ abstract class EconomyCommandSupport {
     private List<String> currencyIds() {
         return services.currencies().ids().stream()
                 .map(CurrencyId::value)
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * An {@code item} string argument that completes against the obtainable item materials in the live registry,
+     * matching the {@code material.isItem()} gate {@code /item} applies. The registry is in-memory so the lookup
+     * is non-blocking; the value still resolves through the worth lookup at execution, so an arbitrary typed id
+     * keeps working.
+     */
+    final RequiredArgumentBuilder<CommandSourceStack, String> itemArgument() {
+        return Commands.argument("item", StringArgumentType.word())
+                .suggests(CommandSuggestions.fromStrings(EconomyCommandSupport::itemMaterialNames));
+    }
+
+    private static List<String> itemMaterialNames() {
+        return Registry.MATERIAL.stream()
+                .filter(Material::isItem)
+                .map(material -> material.key().value())
                 .sorted()
                 .collect(Collectors.toList());
     }

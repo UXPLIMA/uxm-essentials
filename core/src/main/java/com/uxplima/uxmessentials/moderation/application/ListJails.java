@@ -36,4 +36,12 @@ public final class ListJails {
         notifier.send(actor, ModerationMessageKey.JAILS_HEADER, Map.of("count", Integer.toString(names.size())));
         names.forEach(name -> notifier.send(actor, ModerationMessageKey.JAILS_ENTRY, Map.of("jail", name)));
     }
+
+    /**
+     * Config-only jail names for tab-completion. Reads the non-blocking config seam ({@code peekNames()}), not
+     * the DB-backed union {@link #list} renders, so it is safe to call on the tick thread per keystroke.
+     */
+    public List<String> suggestionNames() {
+        return directory.peekNames();
+    }
 }
