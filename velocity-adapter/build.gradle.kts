@@ -76,7 +76,7 @@ tasks.processResources {
     filesMatching("velocity-plugin.json") { expand(props) }
 }
 
-tasks.shadowJar { archiveBaseName.set("uxmessentials-velocity") }
+tasks.shadowJar { archiveBaseName.set("uxmEssentials-velocity") }
 
 spotless {
     java {

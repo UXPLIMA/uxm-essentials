@@ -43,8 +43,8 @@ re-worded or recoloured, and every command can be renamed, aliased or disabled f
 
 Optional companion jars:
 
-- `uxmessentials-velocity.jar` — proxy-side broker for cross-server homes/warps/economy sync.
-- `uxmessentials-discord.jar` — JDA bridge for audit/economy notices and `/discordlink`.
+- `uxmEssentials-velocity.jar` — proxy-side broker for cross-server homes/warps/economy sync.
+- `uxmEssentials-discord.jar` — JDA bridge for audit/economy notices and `/discordlink`.
 
 ## Configuration
 
