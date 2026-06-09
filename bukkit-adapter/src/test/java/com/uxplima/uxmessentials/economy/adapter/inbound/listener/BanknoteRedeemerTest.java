@@ -134,6 +134,23 @@ class BanknoteRedeemerTest {
     }
 
     @Test
+    void redeemThrows_restoresItem_andDoesNotReRegisterToken() {
+        UUID token = UUID.randomUUID();
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerRef owner = new PlayerRef(player.getUniqueId(), "Alice");
+        ItemStack note = banknote(token, "10", 1);
+        // The redeem throws before deleting the token row, so the token still exists: re-registering it would be
+        // a primary-key violation. The item is restored but the store is never touched again.
+        when(store.redeem(token)).thenThrow(new IllegalStateException("db down"));
+
+        redeemer.redeem(player, owner, note);
+
+        assertThat(note.getAmount()).isEqualTo(1);
+        verify(store, never()).register(any());
+        verify(economy, never()).credit(any(), any());
+    }
+
+    @Test
     void alreadyRedeemedToken_doesNotConsumeItem() {
         UUID token = UUID.randomUUID();
         PlayerMock player = server.addPlayer("Alice");

@@ -125,20 +125,24 @@ public final class BanknoteRedeemer {
                         owner, EconomyMessageKey.BANKNOTE_DEPOSITED, Map.of("amount", notifier.amount(note.money())));
                 return;
             }
-            restore(item, priorAmount, note);
+            restore(item, priorAmount, note, true);
             notifier.send(owner, EconomyMessageKey.BANKNOTE_INVALID);
         } catch (RuntimeException failure) {
             log.error("banknote redemption failed for " + owner.uuid(), failure);
-            restore(item, priorAmount, note);
+            // Re-register the token only when the redeem actually deleted it; if redeem threw before deleting, the
+            // row still exists and re-registering it would be a primary-key violation that masks the real cause.
+            restore(item, priorAmount, note, redeemed);
             if (!redeemed) {
                 notifier.send(owner, EconomyMessageKey.BANKNOTE_INVALID);
             }
         }
     }
 
-    private void restore(ItemStack item, int priorAmount, Banknote note) {
+    private void restore(ItemStack item, int priorAmount, Banknote note, boolean wasRedeemed) {
         item.setAmount(priorAmount);
-        banknoteStore.register(new Banknote(note.token(), note.money(), System.currentTimeMillis()));
+        if (wasRedeemed) {
+            banknoteStore.register(new Banknote(note.token(), note.money(), System.currentTimeMillis()));
+        }
     }
 
     private Optional<Banknote> parse(ItemStack item) {

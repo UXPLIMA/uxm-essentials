@@ -160,6 +160,8 @@ public final class WarpsWiring {
                 editorListener);
         return new Wired(commands, listeners, editorView, playerWarpHandle, teleportRegistry, () -> {
             teleportRegistry.clear();
+            // Drop any pending editor chat prompt so a leftover callback cannot fire after teardown.
+            promptListener.clear();
             if (redisSync != null) {
                 redisSync.stop();
             }

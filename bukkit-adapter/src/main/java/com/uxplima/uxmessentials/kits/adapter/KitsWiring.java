@@ -188,7 +188,15 @@ public final class KitsWiring {
             unsubscribe = () -> publisher.unsubscribe(subscriber);
         }
 
-        return new Wired(commands, listeners, services.kitEditorView(), repository, unsubscribe);
+        // On stop: unsubscribe the claim listener and drop any pending chat prompt so a leftover callback can
+        // never fire after teardown (mirrors the economy PromptRegistry teardown).
+        Runnable subscriptionCleanup = unsubscribe;
+        Runnable stopAction = () -> {
+            subscriptionCleanup.run();
+            promptListener.clear();
+        };
+
+        return new Wired(commands, listeners, services.kitEditorView(), repository, stopAction);
     }
 
     private static KitServices assemble(
@@ -246,27 +254,30 @@ public final class KitsWiring {
      * @param listeners the Bukkit listeners to register
      * @param kitEditorView the editor window, held so {@code stop()} flushes every still-open edit
      * @param repository the kit catalog the cooldown placeholder reads
-     * @param unsubscribe drops the KitClaimed domain-event subscription on stop so a reload leaks no listener
+     * @param stopAction drops the KitClaimed subscription and clears pending chat prompts on stop
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             KitEditorView kitEditorView,
             KitRepository repository,
-            Runnable unsubscribe) {
+            Runnable stopAction) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(kitEditorView, "kitEditorView");
             Objects.requireNonNull(repository, "repository");
-            Objects.requireNonNull(unsubscribe, "unsubscribe");
+            Objects.requireNonNull(stopAction, "stopAction");
         }
 
-        /** Save every still-open {@code /kiteditor} window back to its kit and drop the event subscription. */
+        /**
+         * Save every still-open {@code /kiteditor} window back to its kit, drop the KitClaimed subscription, and
+         * clear any pending chat prompt. Called on module stop.
+         */
         public void stop() {
             kitEditorView.flushAll();
-            unsubscribe.run();
+            stopAction.run();
         }
     }
 }

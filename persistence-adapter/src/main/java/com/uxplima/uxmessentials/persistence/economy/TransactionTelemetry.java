@@ -79,10 +79,16 @@ public final class TransactionTelemetry extends JooqRepository implements Transa
     }
 
     /**
-     * Seed the id counter from {@code MAX(id)} already in the table so ids never collide after a fast restart
-     * or when two servers share one database — the table's {@code id} is an app-supplied {@code BIGINT}
-     * primary key (portable across SQLite/MySQL/PostgreSQL), not an engine identity column, so the writer owns
-     * the sequence. An empty table seeds at 0; the first {@link #nextId()} returns 1.
+     * Seed the id counter from {@code MAX(id)} already in the table so ids continue past the highest existing
+     * row after a restart — the table's {@code id} is an app-supplied {@code BIGINT} primary key (portable
+     * across SQLite/MySQL/PostgreSQL), not an engine identity column, so this writer owns the sequence. An
+     * empty table seeds at 0; the first {@link #nextId()} returns 1.
+     *
+     * <p>This is a single-writer contract only. Seeding from {@code MAX(id)} is not collision-safe when two
+     * servers share one database: both would seed from the same maximum and then mint overlapping ids, so a
+     * batch insert on one would hit the primary key the other already wrote. The default SQLite backend is
+     * single-writer by design; a shared network backend that runs more than one writer must not point them at
+     * the same {@code transactions} table without a per-server id partition.
      */
     private void seedIds() {
         Long max = read(

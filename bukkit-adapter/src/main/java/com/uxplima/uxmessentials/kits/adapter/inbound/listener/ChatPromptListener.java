@@ -55,6 +55,11 @@ public final class ChatPromptListener implements Listener {
         activePrompts.put(player.getUniqueId(), callback);
     }
 
+    /** Drop every pending prompt; called on module stop so a leftover callback can never fire after teardown. */
+    public void clear() {
+        activePrompts.clear();
+    }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();

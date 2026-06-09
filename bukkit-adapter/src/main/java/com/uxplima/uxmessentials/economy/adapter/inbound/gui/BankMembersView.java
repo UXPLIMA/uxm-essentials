@@ -37,11 +37,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class BankMembersView {
 
-    // Add/back buttons in the reserved bottom row; rows, nav slots, content slots, and icons are externalised
-    // to modules/economy/gui/bank-members.conf.
-    private static final int ADD_SLOT = 49;
-    private static final int BACK_SLOT = 47;
-
     private final BankService bankService;
     private final BankChatPromptListener chatPromptListener;
     private final Scheduler scheduler;
@@ -129,10 +124,17 @@ public final class BankMembersView {
 
                 gui.set(layout.prevSlot(), GuiItem.previousPage(gui, prevItem));
 
+                // The action buttons sit in the reserved bottom row, derived from the configured row count so a
+                // menu shorter than six rows never indexes a slot past the inventory. back/add take the third and
+                // fifth bottom-row cells; the rest of the bottom row is filled, skipping the nav button slots.
+                int bottom = (layout.rows() - 1) * 9;
+                int backSlot = bottom + 2;
+                int addSlot = bottom + 4;
+
                 // Add Member button
                 if (freshBank.hasPermission(viewerRef, BankAction.ADD_MEMBER)) {
                     gui.set(
-                            ADD_SLOT,
+                            addSlot,
                             GuiItem.button(
                                     ItemBuilder.of(Material.EMERALD_BLOCK)
                                             .name(text(viewerRef, EconomyMessageKey.BANK_MEMBERS_GUI_ADD, Map.of()))
@@ -149,7 +151,7 @@ public final class BankMembersView {
 
                 // Go Back button
                 gui.set(
-                        BACK_SLOT,
+                        backSlot,
                         GuiItem.button(
                                 ItemBuilder.of(Material.BARRIER)
                                         .name(text(viewerRef, EconomyMessageKey.BANK_MEMBERS_GUI_BACK, Map.of()))
@@ -160,12 +162,16 @@ public final class BankMembersView {
 
                 gui.set(layout.nextSlot(), GuiItem.nextPage(gui, nextItem));
 
-                // Empty fillers on bottom row
+                // Empty fillers on the rest of the bottom row, skipping the nav/back/add cells already placed.
                 ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
                         .name(Component.empty())
                         .build();
-                for (int slot : List.of(46, 48, 50, 51, 52)) {
-                    gui.set(slot, GuiItem.display(filler));
+                java.util.Set<Integer> taken =
+                        java.util.Set.of(layout.prevSlot(), layout.nextSlot(), backSlot, addSlot);
+                for (int slot = bottom; slot < bottom + 9; slot++) {
+                    if (!taken.contains(slot)) {
+                        gui.set(slot, GuiItem.display(filler));
+                    }
                 }
 
                 gui.open(player);
