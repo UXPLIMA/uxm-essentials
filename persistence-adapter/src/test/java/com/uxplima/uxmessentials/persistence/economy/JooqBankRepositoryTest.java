@@ -18,11 +18,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankMember;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankRole;
-import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -88,12 +88,28 @@ class JooqBankRepositoryTest {
         newBank("beta", leader);
         wallets.credit(leader, coins(50));
 
-        Result<Unit, TransferError> result = banks.deposit("beta", leader, coins(200));
+        Result<Unit, BankError> result = banks.deposit("beta", leader, coins(200));
 
         assertThat(result.isErr()).isTrue();
-        assertThat(result.errorOrThrow()).isEqualTo(TransferError.INSUFFICIENT_FUNDS);
+        assertThat(result.errorOrThrow()).isEqualTo(BankError.INSUFFICIENT_FUNDS);
         assertThat(wallets.findByOwner(leader).orElseThrow().balanceOf(COINS)).isEqualTo(coins(50));
         assertThat(banks.findById("beta").orElseThrow().balance().amount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void depositIntoAMissingBankFailsAndLeavesTheWalletUntouched() {
+        PlayerRef leader = randomPlayer();
+        newBank("zeta", leader);
+        wallets.credit(leader, coins(500));
+        // Simulate a concurrent delete between the service's lookup and the repository move.
+        banks.delete("zeta");
+
+        Result<Unit, BankError> result = banks.deposit("zeta", leader, coins(200));
+
+        assertThat(result.isErr()).isTrue();
+        assertThat(result.errorOrThrow()).isEqualTo(BankError.NOT_FOUND);
+        // The bank-balance add matched no rows, so the whole transaction rolled back: the wallet is intact.
+        assertThat(wallets.findByOwner(leader).orElseThrow().balanceOf(COINS)).isEqualTo(coins(500));
     }
 
     @Test
@@ -116,10 +132,10 @@ class JooqBankRepositoryTest {
         wallets.credit(leader, coins(500));
         banks.deposit("delta", leader, coins(100));
 
-        Result<Unit, TransferError> result = banks.withdraw("delta", leader, coins(250));
+        Result<Unit, BankError> result = banks.withdraw("delta", leader, coins(250));
 
         assertThat(result.isErr()).isTrue();
-        assertThat(result.errorOrThrow()).isEqualTo(TransferError.INSUFFICIENT_FUNDS);
+        assertThat(result.errorOrThrow()).isEqualTo(BankError.INSUFFICIENT_BANK_FUNDS);
         assertThat(banks.findById("delta").orElseThrow().balance()).isEqualTo(coins(100));
         assertThat(wallets.findByOwner(leader).orElseThrow().balanceOf(COINS)).isEqualTo(coins(400));
     }
@@ -137,7 +153,7 @@ class JooqBankRepositoryTest {
         assertThat(banks.findById("epsilon").orElseThrow().balance().amount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
-    private AtomicInteger runConcurrently(int threads, java.util.function.Supplier<Result<Unit, TransferError>> task)
+    private AtomicInteger runConcurrently(int threads, java.util.function.Supplier<Result<Unit, BankError>> task)
             throws InterruptedException {
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         CountDownLatch start = new CountDownLatch(1);

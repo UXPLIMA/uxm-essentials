@@ -132,6 +132,7 @@ public final class JooqLoanRepository extends JooqRepository implements LoanRepo
         dsl.insertInto(ECONOMY_LOANS)
                 .set(ECONOMY_LOANS.ID, loan.id())
                 .set(ECONOMY_LOANS.PLAYER_UUID, loan.debtor().uuid().toString())
+                .set(ECONOMY_LOANS.PRINCIPAL, loan.principal().amount())
                 .set(ECONOMY_LOANS.AMOUNT, loan.remainingAmount().amount())
                 .set(ECONOMY_LOANS.CURRENCY, loan.principal().currency().id().value())
                 .set(ECONOMY_LOANS.INTEREST_RATE, loan.interestRate())
@@ -154,8 +155,9 @@ public final class JooqLoanRepository extends JooqRepository implements LoanRepo
                 .where(ECONOMY_CREDIT_SCORES.PLAYER_UUID.eq(player.uuid().toString()))
                 .fetchOptional()
                 .map(r -> new CreditScore(player, r.getScore(), r.getLastUpdated()))
-                // Default score is 500 out of 1000 for a player with no record yet.
-                .orElseGet(() -> new CreditScore(player, 500, System.currentTimeMillis())));
+                // A player with no record yet starts at 100, matching the economy_credit_scores.score column
+                // DEFAULT and the LoanPolicy score floor, so a fresh debtor's limit is the policy's lowest tier.
+                .orElseGet(() -> new CreditScore(player, 100, System.currentTimeMillis())));
     }
 
     @Override
@@ -183,6 +185,7 @@ public final class JooqLoanRepository extends JooqRepository implements LoanRepo
         Field<?>[] columns = {
             ECONOMY_LOANS.ID,
             ECONOMY_LOANS.PLAYER_UUID,
+            ECONOMY_LOANS.PRINCIPAL,
             ECONOMY_LOANS.AMOUNT,
             ECONOMY_LOANS.CURRENCY,
             ECONOMY_LOANS.INTEREST_RATE,
@@ -205,14 +208,16 @@ public final class JooqLoanRepository extends JooqRepository implements LoanRepo
                 .orElseThrow(() -> new IllegalStateException("unknown currency: " + currencyId));
 
         PlayerRef debtor = playerRef(row.get(ECONOMY_LOANS.PLAYER_UUID), row.get(ECONOMY_OWNERS.NAME));
-        // The stored amount column is the remaining balance; the principal is reconstructed from it.
+        // The amount column is the shrinking remaining balance; the principal is its own stored column, so the
+        // original loan size survives a restart while the remaining figure drops with each installment.
+        Money principal = Money.of(currency, row.get(ECONOMY_LOANS.PRINCIPAL));
         Money remaining = Money.of(currency, row.get(ECONOMY_LOANS.AMOUNT));
         Money installment = Money.of(currency, row.get(ECONOMY_LOANS.INSTALLMENT_AMOUNT));
 
         return new Loan(
                 row.get(ECONOMY_LOANS.ID),
                 debtor,
-                remaining,
+                principal,
                 remaining,
                 row.get(ECONOMY_LOANS.INTEREST_RATE),
                 row.get(ECONOMY_LOANS.REMAINING_INSTALLMENTS),

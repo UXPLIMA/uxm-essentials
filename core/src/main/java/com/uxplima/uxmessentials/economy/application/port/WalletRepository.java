@@ -53,6 +53,17 @@ public interface WalletRepository {
     /** Single-sided credit in one transaction, honouring the currency's {@code max-balance} clamp. */
     Result<Unit, TransferError> credit(PlayerRef owner, Money amount);
 
+    /**
+     * Atomic cross-currency conversion for one owner in a single transaction: the guarded debit of
+     * {@code debit} (the source currency) and the clamp-checked credit of {@code credit} (the target currency)
+     * commit together or not at all. Returns {@link TransferError#INSUFFICIENT_FUNDS} when the guarded debit
+     * changed no rows and {@link TransferError#BALANCE_MAX_EXCEEDED} when the credit would push the target
+     * balance past its {@code max-balance} — in either case nothing is mutated. This is the {@code /exchange}
+     * seam: it mirrors {@link #transfer} but moves between two currencies of the same owner, so a conversion can
+     * never debit one currency without crediting the other.
+     */
+    Result<Unit, TransferError> exchange(PlayerRef owner, Money debit, Money credit);
+
     /** The ranked rows for {@code currency}, descending by balance, bounded by {@code limit}; exempt owners excluded. */
     List<BaltopRow> top(Currency currency, int limit);
 }

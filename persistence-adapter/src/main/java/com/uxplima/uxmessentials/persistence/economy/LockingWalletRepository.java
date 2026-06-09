@@ -120,6 +120,19 @@ public final class LockingWalletRepository implements WalletRepository {
     }
 
     @Override
+    public Result<Unit, TransferError> exchange(PlayerRef owner, Money debit, Money credit) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(debit, "debit");
+        Objects.requireNonNull(credit, "credit");
+        markOwner(owner.uuid());
+        Result<Unit, TransferError> result = delegate.exchange(owner, debit, credit);
+        if (result.isOk()) {
+            broadcast(owner.uuid());
+        }
+        return result;
+    }
+
+    @Override
     public List<BaltopRow> top(Currency currency, int limit) {
         return delegate.top(currency, limit);
     }

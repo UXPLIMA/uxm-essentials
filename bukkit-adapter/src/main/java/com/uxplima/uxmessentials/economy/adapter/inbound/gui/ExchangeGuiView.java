@@ -273,17 +273,11 @@ public final class ExchangeGuiView {
             case INSUFFICIENT_FUNDS -> sendPrefixed(
                     player, viewerRef, EconomyMessageKey.EXCHANGE_INSUFFICIENT_FUNDS, Map.of());
             case LIMIT_EXCEEDED -> sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_LIMIT_EXCEEDED, Map.of());
+            case PROVIDER_UNSUPPORTED -> sendPrefixed(
+                    player, viewerRef, EconomyMessageKey.EXCHANGE_PROVIDER_UNSUPPORTED, Map.of());
             case FAILED -> {
                 com.uxplima.uxmessentials.economy.domain.TransferError err = result.error();
                 sendPrefixed(player, viewerRef, err != null ? err.messageKey() : EconomyMessageKey.PAY_ERROR, Map.of());
-            }
-            case ROLLBACK_FAILED -> {
-                player.getServer()
-                        .getLogger()
-                        .severe("exchange rollback failed for " + player.getUniqueId() + ": debited "
-                                + result.sourceAmount() + " " + source.id().value()
-                                + " could not be returned (cause=" + result.error() + ")");
-                sendPrefixed(player, viewerRef, EconomyMessageKey.PAY_ERROR, Map.of());
             }
         }
     }

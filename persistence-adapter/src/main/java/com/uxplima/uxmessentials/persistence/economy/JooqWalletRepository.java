@@ -138,6 +138,48 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
     }
 
     @Override
+    public Result<Unit, TransferError> exchange(PlayerRef owner, Money debit, Money credit) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(debit, "debit");
+        Objects.requireNonNull(credit, "credit");
+        // One transaction, mirroring transfer but across two currencies of the same owner: the guarded debit of
+        // the source and the clamp-checked credit of the target commit together or neither does. The guarded
+        // debit is atomic (a concurrent over-draw changes no rows). The clamp can only be evaluated after the
+        // debit has taken, so a clamp breach throws a rollback signal to undo the committed debit — a returned
+        // err would otherwise commit (the write helper only rolls back on a throw), leaving the source debited.
+        try {
+            return write(dsl -> {
+                if (guardedDebit(dsl, owner, debit) == 0) {
+                    return Result.err(TransferError.INSUFFICIENT_FUNDS);
+                }
+                BigDecimal max = credit.currency().max();
+                BigDecimal current = balanceWithin(dsl, owner, credit.currency());
+                if (current.add(credit.amount()).compareTo(max) > 0) {
+                    throw new RollbackSignal(TransferError.BALANCE_MAX_EXCEEDED);
+                }
+                creditRow(dsl, owner, credit);
+                return Result.ok();
+            });
+        } catch (RollbackSignal rolledBack) {
+            return Result.err(rolledBack.error);
+        }
+    }
+
+    /**
+     * Thrown from inside a {@link #write} unit of work to force a rollback of a mutation already applied in the
+     * same transaction (the write helper commits a normally-returned value and only rolls back on a throw). It
+     * is caught by the same method that started the transaction and turned back into a typed error result.
+     */
+    private static final class RollbackSignal extends RuntimeException {
+        private final transient TransferError error;
+
+        RollbackSignal(TransferError error) {
+            super(null, null, false, false);
+            this.error = error;
+        }
+    }
+
+    @Override
     public List<BaltopRow> top(Currency currency, int limit) {
         Objects.requireNonNull(currency, "currency");
         if (limit <= 0) {

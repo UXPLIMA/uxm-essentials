@@ -93,6 +93,13 @@ public final class CachedWalletRepository implements WalletRepository {
     }
 
     @Override
+    public Result<Unit, TransferError> exchange(PlayerRef owner, Money debit, Money credit) {
+        Result<Unit, TransferError> result = delegate.exchange(owner, debit, credit);
+        cache.invalidate(Objects.requireNonNull(owner, "owner").uuid());
+        return result;
+    }
+
+    @Override
     public List<BaltopRow> top(Currency currency, int limit) {
         return delegate.top(currency, limit);
     }

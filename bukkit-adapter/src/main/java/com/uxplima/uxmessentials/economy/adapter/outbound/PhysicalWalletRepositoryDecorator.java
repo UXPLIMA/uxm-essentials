@@ -179,6 +179,27 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
     }
 
     @Override
+    public Result<Unit, TransferError> exchange(PlayerRef owner, Money debit, Money credit) {
+        // The all-virtual case is the common one and the only atomic one: a single guarded debit + clamped
+        // credit in one DB transaction. When either leg is a physical (inventory) currency there is no shared
+        // transaction to enrol the inventory in, so the source is debited first and the target credited only if
+        // the debit took; a failed credit rolls the debit back, mirroring the physical transfer path.
+        if (!debit.currency().isPhysical() && !credit.currency().isPhysical()) {
+            return delegate.exchange(owner, debit, credit);
+        }
+        Result<Unit, TransferError> debited = debit(owner, debit);
+        if (debited.isErr()) {
+            return debited;
+        }
+        Result<Unit, TransferError> credited = credit(owner, credit);
+        if (credited.isErr()) {
+            credit(owner, debit);
+            return credited;
+        }
+        return Result.ok();
+    }
+
+    @Override
     public List<BaltopRow> top(Currency currency, int limit) {
         if (!currency.isPhysical()) {
             return delegate.top(currency, limit);

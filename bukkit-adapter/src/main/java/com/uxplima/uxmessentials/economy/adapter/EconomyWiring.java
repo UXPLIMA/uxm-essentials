@@ -342,7 +342,11 @@ public final class EconomyWiring {
         Currency defaultCurrency = currencies.defaultCurrency();
         Pay pay = new Pay(resolved, preferences, pending, notifier, clock);
 
-        ExchangeService exchangeService = new ExchangeService(resolved, settings.exchangeRegistry());
+        // Exchange is a native-ledger feature like loans and banks: the atomic two-currency move runs through the
+        // wallet repository this context owns, so it is available only when the resolved provider is the native
+        // ledger (a foreign economy holds balances we cannot move atomically here).
+        boolean nativeLedger = resolved instanceof NativeEconomyProvider;
+        ExchangeService exchangeService = new ExchangeService(repository, settings.exchangeRegistry(), nativeLedger);
 
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout logsLayout = guiLayouts.load(
                 "economy",
@@ -394,10 +398,9 @@ public final class EconomyWiring {
                 com.uxplima.uxmessentials.persistence.economy.WalletRepositories.backupManager(
                         persistence, repository, currencies, plugin.getDataFolder());
 
-        // Loans and banks are native-ledger features: their atomic wallet legs run through the wallet
-        // repository this context owns, so they are available only when the resolved provider is the native
-        // ledger (a foreign economy holds balances we cannot move atomically here).
-        boolean nativeLedger = resolved instanceof NativeEconomyProvider;
+        // Loans and banks are native-ledger features like exchange (gated above): their atomic wallet legs run
+        // through the wallet repository this context owns, so they are available only when the resolved provider
+        // is the native ledger (a foreign economy holds balances we cannot move atomically here).
         com.uxplima.uxmessentials.economy.application.BankService bankService =
                 new com.uxplima.uxmessentials.economy.application.BankService(
                         bankRepo, history, kernel.events(), clock, nativeLedger);

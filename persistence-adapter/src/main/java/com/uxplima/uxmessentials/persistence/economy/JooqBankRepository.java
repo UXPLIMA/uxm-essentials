@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.port.BankRepository;
+import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
@@ -19,7 +20,6 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankMember;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankRole;
-import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.EconomySharedBanksRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -131,36 +131,47 @@ public final class JooqBankRepository extends JooqRepository implements BankRepo
     }
 
     @Override
-    public Result<Unit, TransferError> deposit(String bankId, PlayerRef player, Money amount) {
+    public Result<Unit, BankError> deposit(String bankId, PlayerRef player, Money amount) {
         Objects.requireNonNull(bankId, "bankId");
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(amount, "amount");
         // The guarded wallet debit and the bank-balance add commit together: a debit short of funds changes no
-        // rows and the bank is left untouched.
-        return write(dsl -> {
-            if (WalletLegs.guardedDebit(dsl, player, amount) == 0) {
-                return Result.err(TransferError.INSUFFICIENT_FUNDS);
-            }
-            dsl.update(ECONOMY_SHARED_BANKS)
-                    .set(ECONOMY_SHARED_BANKS.BALANCE, ECONOMY_SHARED_BANKS.BALANCE.plus(amount.amount()))
-                    .where(ECONOMY_SHARED_BANKS.ID.eq(bankId))
-                    .execute();
-            return Result.ok();
-        });
+        // rows and the bank is left untouched. The bank add is guarded by its own row count — if the bank was
+        // deleted concurrently the UPDATE matches no rows. Because the debit has already taken by then, a
+        // returned err would commit it (the write helper only rolls back on a throw), so the no-rows case throws
+        // a rollback signal to undo the debit rather than debiting the player while the money vanishes.
+        try {
+            return write(dsl -> {
+                if (WalletLegs.guardedDebit(dsl, player, amount) == 0) {
+                    return Result.err(BankError.INSUFFICIENT_FUNDS);
+                }
+                int changed = dsl.update(ECONOMY_SHARED_BANKS)
+                        .set(ECONOMY_SHARED_BANKS.BALANCE, ECONOMY_SHARED_BANKS.BALANCE.plus(amount.amount()))
+                        .where(ECONOMY_SHARED_BANKS.ID.eq(bankId))
+                        .execute();
+                if (changed == 0) {
+                    throw new RollbackSignal(BankError.NOT_FOUND);
+                }
+                return Result.ok();
+            });
+        } catch (RollbackSignal rolledBack) {
+            return Result.err(rolledBack.error);
+        }
     }
 
     @Override
-    public Result<Unit, TransferError> withdraw(String bankId, PlayerRef player, Money amount) {
+    public Result<Unit, BankError> withdraw(String bankId, PlayerRef player, Money amount) {
         Objects.requireNonNull(bankId, "bankId");
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(amount, "amount");
         // The bank sufficiency is a guarded UPDATE … WHERE balance >= ?, so two concurrent withdrawals can never
         // both overdraw it. The clamp is checked read-only before any mutation, and the no-rows-changed guard
         // fires before the wallet credit, so no failure path ever returns after a committed change (the
-        // transaction only commits when this block returns ok).
+        // transaction only commits when this block returns ok). A no-rows-changed update covers both a bank short
+        // of funds and a bank deleted concurrently — neither can leave the wallet credited.
         return write(dsl -> {
             if (!WalletLegs.creditFitsClamp(dsl, player, amount)) {
-                return Result.err(TransferError.BALANCE_MAX_EXCEEDED);
+                return Result.err(BankError.BALANCE_MAX_EXCEEDED);
             }
             int changed = dsl.update(ECONOMY_SHARED_BANKS)
                     .set(ECONOMY_SHARED_BANKS.BALANCE, ECONOMY_SHARED_BANKS.BALANCE.minus(amount.amount()))
@@ -168,11 +179,25 @@ public final class JooqBankRepository extends JooqRepository implements BankRepo
                     .and(ECONOMY_SHARED_BANKS.BALANCE.ge(amount.amount()))
                     .execute();
             if (changed == 0) {
-                return Result.err(TransferError.INSUFFICIENT_FUNDS);
+                return Result.err(BankError.INSUFFICIENT_BANK_FUNDS);
             }
             WalletLegs.creditRow(dsl, player, amount, clock.millis());
             return Result.ok();
         });
+    }
+
+    /**
+     * Thrown from inside a {@link #write} unit of work to force a rollback of a mutation already applied in the
+     * same transaction (the write helper commits a normally-returned value and only rolls back on a throw).
+     * Caught by the method that started the transaction and turned back into a typed {@link BankError} result.
+     */
+    private static final class RollbackSignal extends RuntimeException {
+        private final transient BankError error;
+
+        RollbackSignal(BankError error) {
+            super(null, null, false, false);
+            this.error = error;
+        }
     }
 
     private List<BankMember> loadMembers(DSLContext dsl, String bankId) {

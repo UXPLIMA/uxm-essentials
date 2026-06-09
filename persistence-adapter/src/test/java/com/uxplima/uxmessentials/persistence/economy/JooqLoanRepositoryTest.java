@@ -126,6 +126,35 @@ class JooqLoanRepositoryTest {
     }
 
     @Test
+    void interestRateSurvivesReloadAtFullPrecision() {
+        PlayerRef debtor = randomPlayer();
+        // Eight fractional digits, the scale LoanPolicy.interestFor can produce; the old DECIMAL(5,2) truncated it.
+        BigDecimal rate = new BigDecimal("0.18666667");
+        Loan loan = new Loan(Loan.generateId(), debtor, coins(1000), coins(1180), rate, 4, coins(295), 0L, 1_000L);
+        loans.disburse(loan);
+
+        Loan reloaded = loans.findById(loan.id()).orElseThrow();
+
+        assertThat(reloaded.interestRate()).isEqualByComparingTo(rate);
+    }
+
+    @Test
+    void principalSurvivesReloadWhileRemainingShrinks() {
+        PlayerRef debtor = randomPlayer();
+        Loan loan = loanFor(debtor, 1000, 1200, 4);
+        loans.disburse(loan); // debtor holds 1000, owes 1200
+
+        Money installment = coins(300);
+        Loan updated = loan.afterPayment(installment).withNextPayment(2_000L);
+        loans.applyRepayment(debtor, installment, updated, updated.isFullyPaid());
+
+        Loan reloaded = loans.findById(loan.id()).orElseThrow();
+        // The principal is the original 1000 even though the remaining balance has dropped to 900.
+        assertThat(reloaded.principal()).isEqualTo(coins(1000));
+        assertThat(reloaded.remainingAmount()).isEqualTo(coins(900));
+    }
+
+    @Test
     void applyRepaymentShortOfFundsDebitsNothingAndLeavesTheLoanUntouched() {
         PlayerRef debtor = randomPlayer();
         Loan loan = loanFor(debtor, 100, 100, 4);

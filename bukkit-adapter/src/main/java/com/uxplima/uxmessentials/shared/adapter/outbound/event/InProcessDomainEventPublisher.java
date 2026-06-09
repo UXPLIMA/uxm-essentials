@@ -40,6 +40,15 @@ public final class InProcessDomainEventPublisher implements DomainEventPublisher
         subscribers.add(Objects.requireNonNull(subscriber, "subscriber"));
     }
 
+    /**
+     * Remove a previously {@link #subscribe(Consumer) subscribed} consumer so a module that subscribed during
+     * wiring can drop its listener on stop. Without this a per-reload subscribe would leak a stale listener that
+     * keeps firing against torn-down state. Removal is by identity, so the caller must hold the same instance.
+     */
+    public void unsubscribe(Consumer<DomainEvent> subscriber) {
+        subscribers.remove(Objects.requireNonNull(subscriber, "subscriber"));
+    }
+
     @Override
     public void publish(DomainEvent event) {
         Objects.requireNonNull(event, "event");

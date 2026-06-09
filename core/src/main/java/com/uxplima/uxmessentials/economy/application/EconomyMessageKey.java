@@ -146,6 +146,7 @@ public enum EconomyMessageKey implements MessageKey {
     EXCHANGE_RATE_NOT_FOUND("eco.exchange.rate-not-found"),
     EXCHANGE_INSUFFICIENT_FUNDS("eco.exchange.insufficient-funds"),
     EXCHANGE_LIMIT_EXCEEDED("eco.exchange.limit-exceeded"),
+    EXCHANGE_PROVIDER_UNSUPPORTED("eco.exchange.provider-unsupported"),
     EXCHANGE_INVALID_AMOUNT("eco.exchange.invalid-amount"),
     EXCHANGE_GUI_TITLE("eco.exchange.gui-title"),
     EXCHANGE_GUI_SOURCE_NAME("eco.exchange.gui-source-name"),

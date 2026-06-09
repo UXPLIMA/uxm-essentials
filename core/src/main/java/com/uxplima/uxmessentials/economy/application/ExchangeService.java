@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 
-import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
+import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRegistry;
@@ -15,17 +15,27 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * Service to orchestrate money conversions for players.
- * Debits the source wallet, credits the target wallet, and rolls back the debit atomically on failures.
+ * Orchestrates a player's currency conversions. The money move is a single atomic call into the
+ * {@link WalletRepository} — the guarded debit of the source currency and the clamp-checked credit of the
+ * target currency commit together or not at all — so a conversion can never debit one currency without
+ * crediting the other, exactly as a {@code /pay} can never debit a sender without crediting a receiver.
+ *
+ * <p>Exchange is a native-ledger feature: the atomic two-currency move runs through the wallet repository the
+ * economy context owns. When the active provider is a foreign economy (Treasury/Vault) the move cannot be
+ * applied atomically through that repository, so the feature is refused with
+ * {@link ExchangeOutcome#providerUnsupported()} rather than attempting a non-atomic debit-then-credit that
+ * could lose money, mirroring {@link LoanService} and {@link BankService}.
  */
 public final class ExchangeService {
 
-    private final EconomyProvider provider;
+    private final WalletRepository walletRepository;
     private final ExchangeRegistry exchangeRegistry;
+    private final boolean nativeLedger;
 
-    public ExchangeService(EconomyProvider provider, ExchangeRegistry exchangeRegistry) {
-        this.provider = Objects.requireNonNull(provider, "provider");
+    public ExchangeService(WalletRepository walletRepository, ExchangeRegistry exchangeRegistry, boolean nativeLedger) {
+        this.walletRepository = Objects.requireNonNull(walletRepository, "walletRepository");
         this.exchangeRegistry = Objects.requireNonNull(exchangeRegistry, "exchangeRegistry");
+        this.nativeLedger = nativeLedger;
     }
 
     public ExchangeRegistry registry() {
@@ -33,8 +43,10 @@ public final class ExchangeService {
     }
 
     /**
-     * Performs an exchange of currency for a player.
-     * Debit the source wallet first, then credit the target. If target credit fails, the debit is rolled back.
+     * Converts {@code sourceAmount} of {@code sourceCurrency} into {@code targetCurrency} for {@code player} in a
+     * single atomic transaction. Refuses without moving anything when the active provider is foreign, no rate is
+     * configured, the amount is non-positive, the target rounds to zero, the source is short, or the target
+     * would exceed its max balance.
      */
     public ExchangeOutcome exchange(
             PlayerRef player, BigDecimal sourceAmount, Currency sourceCurrency, Currency targetCurrency) {
@@ -43,6 +55,9 @@ public final class ExchangeService {
         Objects.requireNonNull(sourceCurrency, "sourceCurrency");
         Objects.requireNonNull(targetCurrency, "targetCurrency");
 
+        if (!nativeLedger) {
+            return ExchangeOutcome.providerUnsupported();
+        }
         if (sourceAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return ExchangeOutcome.failed(TransferError.BELOW_MINIMUM);
         }
@@ -60,35 +75,16 @@ public final class ExchangeService {
         }
         BigDecimal targetAmount = targetOpt.get();
 
-        // Debit the source wallet
-        Money debitMoney = Money.of(sourceCurrency, sourceAmount);
-        Result<Unit, TransferError> debitResult = provider.debit(player, debitMoney);
-
-        if (debitResult.isErr()) {
-            TransferError err = debitResult.errorOrThrow();
-            if (err == TransferError.INSUFFICIENT_FUNDS) {
-                return ExchangeOutcome.insufficientFunds();
-            }
-            return ExchangeOutcome.failed(err);
-        }
-
-        // Credit the target wallet
-        Money creditMoney = Money.of(targetCurrency, targetAmount);
-        Result<Unit, TransferError> creditResult = provider.credit(player, creditMoney);
-
-        if (creditResult.isErr()) {
-            TransferError err = creditResult.errorOrThrow();
-            // Rollback the debit since the credit failed (e.g., balance max exceeded)
-            Result<Unit, TransferError> rollbackResult = provider.credit(player, debitMoney);
-            if (rollbackResult.isErr()) {
-                // The debit applied but neither the credit nor the rollback did: money was lost. Surface this
-                // as its own outcome so the adapter logs it for operator correction (core cannot log itself).
-                return ExchangeOutcome.rollbackFailed(sourceAmount, rollbackResult.errorOrThrow());
-            }
-            if (err == TransferError.BALANCE_MAX_EXCEEDED) {
-                return ExchangeOutcome.limitExceeded();
-            }
-            return ExchangeOutcome.failed(err);
+        Money debit = Money.of(sourceCurrency, sourceAmount);
+        Money credit = Money.of(targetCurrency, targetAmount);
+        Result<Unit, TransferError> moved = walletRepository.exchange(player, debit, credit);
+        if (moved.isErr()) {
+            TransferError err = moved.errorOrThrow();
+            return switch (err) {
+                case INSUFFICIENT_FUNDS -> ExchangeOutcome.insufficientFunds();
+                case BALANCE_MAX_EXCEEDED -> ExchangeOutcome.limitExceeded();
+                default -> ExchangeOutcome.failed(err);
+            };
         }
 
         return ExchangeOutcome.success(sourceAmount, targetAmount);

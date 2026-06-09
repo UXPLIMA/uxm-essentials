@@ -107,6 +107,16 @@ public final class WalletSync {
         }
 
         @Override
+        public Result<Unit, TransferError> exchange(PlayerRef owner, Money debit, Money credit) {
+            Result<Unit, TransferError> result = delegate.exchange(owner, debit, credit);
+            if (result.isOk()) {
+                announce(owner, debit.currency());
+                announce(owner, credit.currency());
+            }
+            return result;
+        }
+
+        @Override
         public List<BaltopRow> top(Currency currency, int limit) {
             return delegate.top(currency, limit);
         }

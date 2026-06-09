@@ -15,7 +15,6 @@ import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankAction;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankMember;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankRole;
-import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.event.BankDeposited;
 import com.uxplima.uxmessentials.economy.domain.event.BankWithdrawn;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -88,9 +87,9 @@ public final class BankService {
             return Result.err(BankError.NO_PERMISSION);
         }
 
-        Result<Unit, TransferError> moved = bankRepository.deposit(bankId, player, amount);
+        Result<Unit, BankError> moved = bankRepository.deposit(bankId, player, amount);
         if (moved.isErr()) {
-            return Result.err(depositError(moved.errorOrThrow()));
+            return Result.err(moved.errorOrThrow());
         }
         history.recordTransfer(player.uuid().toString(), bankId, amount, EconomyReason.BANK_DEPOSIT, clock.millis());
         events.publish(new BankDeposited(bankId, player, amount, bank.balance().plus(amount)));
@@ -115,9 +114,9 @@ public final class BankService {
             return Result.err(BankError.NO_PERMISSION);
         }
 
-        Result<Unit, TransferError> moved = bankRepository.withdraw(bankId, player, amount);
+        Result<Unit, BankError> moved = bankRepository.withdraw(bankId, player, amount);
         if (moved.isErr()) {
-            return Result.err(withdrawError(moved.errorOrThrow()));
+            return Result.err(moved.errorOrThrow());
         }
         history.recordTransfer(bankId, player.uuid().toString(), amount, EconomyReason.BANK_WITHDRAW, clock.millis());
         events.publish(new BankWithdrawn(bankId, player, amount, bank.balance().minus(amount)));
@@ -182,20 +181,5 @@ public final class BankService {
     public Optional<SharedBank> getBank(String id) {
         Objects.requireNonNull(id, "id");
         return bankRepository.findById(id);
-    }
-
-    private static BankError depositError(TransferError error) {
-        return switch (error) {
-            case BALANCE_MAX_EXCEEDED -> BankError.BALANCE_MAX_EXCEEDED;
-            default -> BankError.INSUFFICIENT_FUNDS;
-        };
-    }
-
-    private static BankError withdrawError(TransferError error) {
-        return switch (error) {
-            case INSUFFICIENT_FUNDS -> BankError.INSUFFICIENT_BANK_FUNDS;
-            case BALANCE_MAX_EXCEEDED -> BankError.BALANCE_MAX_EXCEEDED;
-            default -> BankError.INSUFFICIENT_BANK_FUNDS;
-        };
     }
 }

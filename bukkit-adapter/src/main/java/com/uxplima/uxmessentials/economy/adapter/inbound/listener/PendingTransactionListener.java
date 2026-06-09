@@ -65,28 +65,35 @@ public final class PendingTransactionListener implements Listener {
                 }
 
                 for (Map.Entry<String, BigDecimal> entry : totals.entrySet()) {
-                    String currencyId = entry.getKey();
-                    BigDecimal amount = entry.getValue();
-
-                    Optional<Currency> matchedCurrency = economy.currencies().stream()
-                            .filter(c -> c.id().value().equalsIgnoreCase(currencyId))
-                            .findFirst();
-
-                    if (matchedCurrency.isPresent()) {
-                        Currency currency = matchedCurrency.get();
-                        Money money = Money.of(currency, amount);
-
-                        // Directly credit player (decorated economy provider will route to inventory)
-                        economy.credit(ref, money);
-
-                        // Notify player
-                        notifier.send(
-                                ref,
-                                EconomyMessageKey.PHYSICAL_PENDING_RECEIVED,
-                                Map.of("amount", notifier.amount(money)));
-                    }
+                    applyQueuedCredit(ref, entry.getKey(), entry.getValue());
                 }
             });
         });
+    }
+
+    /**
+     * Apply one currency's queued total. The rows were already taken off the queue by {@code getAndClearPending}
+     * (an atomic delete), so the only safe way to honour "no silent loss" is to re-queue anything that does not
+     * actually land: an unknown currency (config changed since it was queued) and a credit the provider rejects
+     * (e.g. a full inventory for a physical currency) are both put back so the next join retries them, and the
+     * player is notified only once the credit succeeds.
+     */
+    void applyQueuedCredit(PlayerRef ref, String currencyId, BigDecimal amount) {
+        Optional<Currency> matchedCurrency = economy.currencies().stream()
+                .filter(c -> c.id().value().equalsIgnoreCase(currencyId))
+                .findFirst();
+        if (matchedCurrency.isEmpty()) {
+            // Unknown currency: leave it queued rather than dropping the (physical) money it represents.
+            pendingRepo.queueCredit(ref.uuid(), currencyId, amount);
+            return;
+        }
+        Currency currency = matchedCurrency.get();
+        Money money = Money.of(currency, amount);
+        if (economy.credit(ref, money).isErr()) {
+            // The credit could not land (e.g. inventory full). Re-queue so the money is never lost.
+            pendingRepo.queueCredit(ref.uuid(), currencyId, amount);
+            return;
+        }
+        notifier.send(ref, EconomyMessageKey.PHYSICAL_PENDING_RECEIVED, Map.of("amount", notifier.amount(money)));
     }
 }

@@ -38,16 +38,23 @@ CREATE TABLE economy_bank_members (
         REFERENCES economy_shared_banks (id)
 );
 
--- An outstanding player loan: principal/remaining are money, the interest rate is
--- a small fixed-point percentage, and the installment schedule is tracked by a
--- remaining count and the next-payment instant. The debtor foreign-keys to
--- economy_owners so a loan cannot reference a never-materialised owner.
+-- An outstanding player loan: principal and remaining (the amount column) are
+-- money, the interest rate is a fixed-point fraction, and the installment schedule
+-- is tracked by a remaining count and the next-payment instant. The debtor
+-- foreign-keys to economy_owners so a loan cannot reference a never-materialised
+-- owner. The principal is stored alongside the shrinking remaining balance so a
+-- dashboard shows the original loan size after a restart, not the residual.
+-- interest_rate is DECIMAL(12,8): LoanPolicy.interestFor derives the rate as a
+-- fraction with up to eight fractional digits (a 6-dp score fraction times the
+-- configured span), so a narrower scale would truncate it and the rate shown after
+-- a reload would disagree with the rate the loan actually charges.
 CREATE TABLE economy_loans (
     id                     VARCHAR(36)    NOT NULL,
     player_uuid            VARCHAR(36)    NOT NULL,
+    principal              DECIMAL(20, 4) NOT NULL,
     amount                 DECIMAL(20, 4) NOT NULL,
     currency               VARCHAR(32)    NOT NULL,
-    interest_rate          DECIMAL(5, 2)  NOT NULL,
+    interest_rate          DECIMAL(12, 8) NOT NULL,
     remaining_installments INT            NOT NULL,
     installment_amount     DECIMAL(20, 4) NOT NULL,
     taken_at               BIGINT         NOT NULL,

@@ -98,6 +98,55 @@ class JooqWalletRepositoryTest {
     }
 
     @Test
+    void exchangeMovesBothCurrencyLegsAtomically() {
+        JooqWalletRepository multi = new JooqWalletRepository(
+                persistence.dsl(), EconomyTestSupport.MULTI, Clock.fixed(java.time.Instant.EPOCH, ZoneOffset.UTC));
+        PlayerRef owner = randomPlayer();
+        multi.credit(owner, coins(100));
+
+        Result<Unit, TransferError> result = multi.exchange(owner, coins(40), EconomyTestSupport.gems(3));
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(multi.findByOwner(owner).orElseThrow().balanceOf(COINS)).isEqualTo(coins(60));
+        assertThat(multi.findByOwner(owner).orElseThrow().balanceOf(EconomyTestSupport.GEMS))
+                .isEqualTo(EconomyTestSupport.gems(3));
+    }
+
+    @Test
+    void exchangeShortSourceCreditsNothing() {
+        JooqWalletRepository multi = new JooqWalletRepository(
+                persistence.dsl(), EconomyTestSupport.MULTI, Clock.fixed(java.time.Instant.EPOCH, ZoneOffset.UTC));
+        PlayerRef owner = randomPlayer();
+        multi.credit(owner, coins(20));
+
+        Result<Unit, TransferError> result = multi.exchange(owner, coins(50), EconomyTestSupport.gems(3));
+
+        assertThat(result.isErr()).isTrue();
+        assertThat(result.errorOrThrow()).isEqualTo(TransferError.INSUFFICIENT_FUNDS);
+        // The guarded debit changed no rows, so the target gems leg never ran and the source is untouched.
+        assertThat(multi.findByOwner(owner).orElseThrow().balanceOf(COINS)).isEqualTo(coins(20));
+        assertThat(multi.findByOwner(owner).orElseThrow().balanceOf(EconomyTestSupport.GEMS))
+                .isEqualTo(EconomyTestSupport.gems(0));
+    }
+
+    @Test
+    void exchangePastTargetMaxLeavesSourceUntouched() {
+        JooqWalletRepository multi = new JooqWalletRepository(
+                persistence.dsl(), EconomyTestSupport.MULTI, Clock.fixed(java.time.Instant.EPOCH, ZoneOffset.UTC));
+        PlayerRef owner = randomPlayer();
+        multi.credit(owner, coins(500));
+
+        // Crediting 150 gems would exceed the gems max of 100: the whole transaction rolls back, source intact.
+        Result<Unit, TransferError> result = multi.exchange(owner, coins(150), EconomyTestSupport.gems(150));
+
+        assertThat(result.isErr()).isTrue();
+        assertThat(result.errorOrThrow()).isEqualTo(TransferError.BALANCE_MAX_EXCEEDED);
+        assertThat(multi.findByOwner(owner).orElseThrow().balanceOf(COINS)).isEqualTo(coins(500));
+        assertThat(multi.findByOwner(owner).orElseThrow().balanceOf(EconomyTestSupport.GEMS))
+                .isEqualTo(EconomyTestSupport.gems(0));
+    }
+
+    @Test
     void transferToANeverJoinedTargetUpsertsTheOwnerRow() {
         PlayerRef from = randomPlayer();
         PlayerRef neverJoined = randomPlayer();

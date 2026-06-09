@@ -173,16 +173,22 @@ public final class KitsWiring {
                 promptListener,
                 new KitsJoinListener(repository, granter, access));
 
+        // The kit-claim listener bridges the KitClaimed domain event; the subscription handle is held so stop()
+        // can unsubscribe it. Without that a per-reload subscribe would leak a stale listener that keeps firing
+        // against torn-down state.
         KitClaimListener claimListener = new KitClaimListener(plugin, repository, kernel.scheduler(), kernel.log());
+        Runnable unsubscribe = () -> {};
         if (kernel.events() instanceof InProcessDomainEventPublisher publisher) {
-            publisher.subscribe(event -> {
+            java.util.function.Consumer<com.uxplima.uxmessentials.shared.domain.DomainEvent> subscriber = event -> {
                 if (event instanceof com.uxplima.uxmessentials.kits.domain.event.KitClaimed claimed) {
                     claimListener.onClaim(claimed);
                 }
-            });
+            };
+            publisher.subscribe(subscriber);
+            unsubscribe = () -> publisher.unsubscribe(subscriber);
         }
 
-        return new Wired(commands, listeners, services.kitEditorView(), repository);
+        return new Wired(commands, listeners, services.kitEditorView(), repository, unsubscribe);
     }
 
     private static KitServices assemble(
@@ -240,23 +246,27 @@ public final class KitsWiring {
      * @param listeners the Bukkit listeners to register
      * @param kitEditorView the editor window, held so {@code stop()} flushes every still-open edit
      * @param repository the kit catalog the cooldown placeholder reads
+     * @param unsubscribe drops the KitClaimed domain-event subscription on stop so a reload leaks no listener
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             KitEditorView kitEditorView,
-            KitRepository repository) {
+            KitRepository repository,
+            Runnable unsubscribe) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(kitEditorView, "kitEditorView");
             Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(unsubscribe, "unsubscribe");
         }
 
-        /** Save every still-open {@code /kiteditor} window back to its kit. Called on module stop. */
+        /** Save every still-open {@code /kiteditor} window back to its kit and drop the event subscription. */
         public void stop() {
             kitEditorView.flushAll();
+            unsubscribe.run();
         }
     }
 }

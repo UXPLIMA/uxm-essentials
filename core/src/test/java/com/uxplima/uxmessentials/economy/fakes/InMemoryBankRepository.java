@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.port.BankRepository;
+import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
@@ -57,31 +58,28 @@ public final class InMemoryBankRepository implements BankRepository {
     }
 
     @Override
-    public Result<Unit, TransferError> deposit(String bankId, PlayerRef player, Money amount) {
+    public Result<Unit, BankError> deposit(String bankId, PlayerRef player, Money amount) {
         SharedBank bank = byId.get(bankId);
         if (bank == null) {
-            return Result.err(TransferError.INSUFFICIENT_FUNDS);
+            return Result.err(BankError.NOT_FOUND);
         }
         Result<Unit, TransferError> debited = wallets.debit(player, amount);
         if (debited.isErr()) {
-            return debited;
+            return Result.err(BankError.INSUFFICIENT_FUNDS);
         }
         byId.put(bankId, bank.withBalance(bank.balance().plus(amount)));
         return Result.ok();
     }
 
     @Override
-    public Result<Unit, TransferError> withdraw(String bankId, PlayerRef player, Money amount) {
+    public Result<Unit, BankError> withdraw(String bankId, PlayerRef player, Money amount) {
         SharedBank bank = byId.get(bankId);
-        if (bank == null) {
-            return Result.err(TransferError.INSUFFICIENT_FUNDS);
-        }
-        if (bank.balance().isLessThan(amount)) {
-            return Result.err(TransferError.INSUFFICIENT_FUNDS);
+        if (bank == null || bank.balance().isLessThan(amount)) {
+            return Result.err(BankError.INSUFFICIENT_BANK_FUNDS);
         }
         Result<Unit, TransferError> credited = wallets.credit(player, amount);
         if (credited.isErr()) {
-            return credited;
+            return Result.err(BankError.BALANCE_MAX_EXCEEDED);
         }
         byId.put(bankId, bank.withBalance(bank.balance().minus(amount)));
         return Result.ok();

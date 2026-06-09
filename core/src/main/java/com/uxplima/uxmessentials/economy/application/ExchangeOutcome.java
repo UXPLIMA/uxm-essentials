@@ -18,12 +18,11 @@ public record ExchangeOutcome(
         FAILED,
 
         /**
-         * The source debit applied but the target credit failed AND the compensating credit (the rollback)
-         * also failed — so the source amount was debited with nothing credited back. This is a money-losing
-         * fault the operator must correct, surfaced as its own status so the adapter can log it (the core
-         * layer cannot reach SLF4J).
+         * The active economy provider is foreign (Treasury/Vault), so the atomic two-currency move cannot be
+         * applied through the native ledger and the feature is refused without moving anything — the same
+         * gating loans and banks use.
          */
-        ROLLBACK_FAILED
+        PROVIDER_UNSUPPORTED
     }
 
     public static ExchangeOutcome success(BigDecimal sourceAmount, BigDecimal targetAmount) {
@@ -48,12 +47,8 @@ public record ExchangeOutcome(
         return new ExchangeOutcome(Status.FAILED, BigDecimal.ZERO, BigDecimal.ZERO, error);
     }
 
-    /**
-     * The debit applied but neither the target credit nor the compensating rollback did — the source
-     * {@code debited} amount is lost until an operator corrects it. The error carried is the rollback's, so
-     * the adapter can log exactly why the compensation failed.
-     */
-    public static ExchangeOutcome rollbackFailed(BigDecimal debited, TransferError rollbackError) {
-        return new ExchangeOutcome(Status.ROLLBACK_FAILED, debited, BigDecimal.ZERO, rollbackError);
+    /** The active provider is foreign, so the native-ledger exchange cannot run; nothing was moved. */
+    public static ExchangeOutcome providerUnsupported() {
+        return new ExchangeOutcome(Status.PROVIDER_UNSUPPORTED, BigDecimal.ZERO, BigDecimal.ZERO, null);
     }
 }

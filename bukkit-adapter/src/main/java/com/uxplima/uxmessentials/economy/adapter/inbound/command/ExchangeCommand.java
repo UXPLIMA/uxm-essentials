@@ -157,20 +157,16 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
                 String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_LIMIT_EXCEEDED, Map.of());
                 player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
             }
+            case PROVIDER_UNSUPPORTED -> {
+                String errorMsg =
+                        messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_PROVIDER_UNSUPPORTED, Map.of());
+                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
+            }
             case FAILED -> {
                 com.uxplima.uxmessentials.economy.domain.TransferError err = result.error();
                 com.uxplima.uxmessentials.economy.application.EconomyMessageKey key =
                         err != null ? err.messageKey() : EconomyMessageKey.PAY_ERROR;
                 String errorMsg = messages.resolve(viewerRef, key, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
-            case ROLLBACK_FAILED -> {
-                player.getServer()
-                        .getLogger()
-                        .severe("exchange rollback failed for " + player.getUniqueId() + ": debited "
-                                + result.sourceAmount() + " " + source.id().value()
-                                + " could not be returned (cause=" + result.error() + ")");
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.PAY_ERROR, Map.of());
                 player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
             }
         }

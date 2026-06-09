@@ -112,6 +112,29 @@ public final class InMemoryWalletRepository implements WalletRepository {
     }
 
     @Override
+    public Result<Unit, TransferError> exchange(PlayerRef owner, Money debit, Money credit) {
+        guard.lock();
+        try {
+            Key fromKey = new Key(owner, debit.currency());
+            BigDecimal have = balances.getOrDefault(fromKey, BigDecimal.ZERO);
+            if (have.compareTo(debit.amount()) < 0) {
+                return Result.err(TransferError.INSUFFICIENT_FUNDS);
+            }
+            Key toKey = new Key(owner, credit.currency());
+            BigDecimal target = balances.getOrDefault(toKey, BigDecimal.ZERO);
+            if (target.add(credit.amount()).compareTo(credit.currency().max()) > 0) {
+                return Result.err(TransferError.BALANCE_MAX_EXCEEDED);
+            }
+            balances.put(fromKey, have.subtract(debit.amount()));
+            owners.putIfAbsent(owner, owner.name());
+            balances.put(toKey, target.add(credit.amount()));
+            return Result.ok();
+        } finally {
+            guard.unlock();
+        }
+    }
+
+    @Override
     public List<BaltopRow> top(Currency currency, int limit) {
         List<BaltopRow> rows = new ArrayList<>();
         for (Map.Entry<Key, BigDecimal> entry : balances.entrySet()) {

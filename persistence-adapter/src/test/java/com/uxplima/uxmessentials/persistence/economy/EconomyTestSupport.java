@@ -28,13 +28,28 @@ final class EconomyTestSupport {
             .max(new BigDecimal("1000000000000"))
             .build();
 
+    /** A second virtual currency for the cross-currency exchange round-trip, precision 0 with a tight max. */
+    static final Currency GEMS = Currency.builder(CurrencyId.of("gems"))
+            .symbol("✦")
+            .plural("gems")
+            .precision(0)
+            .max(new BigDecimal("100"))
+            .build();
+
     /** The closed registry the native ledger resolves currency ids through. */
     static final CurrencyRegistry CURRENCIES = CurrencyRegistry.single(COINS);
+
+    /** A two-currency registry for the cross-currency exchange test. */
+    static final CurrencyRegistry MULTI = CurrencyRegistry.of(List.of(COINS, GEMS), COINS.id());
 
     private EconomyTestSupport() {}
 
     static Money coins(long amount) {
         return Money.of(COINS, amount);
+    }
+
+    static Money gems(long amount) {
+        return Money.of(GEMS, amount);
     }
 
     static PlayerRef randomPlayer() {
