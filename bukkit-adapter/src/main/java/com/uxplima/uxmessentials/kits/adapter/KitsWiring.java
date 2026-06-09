@@ -24,8 +24,8 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.listener.ChatPromptListener;
-import com.uxplima.uxmessentials.kits.adapter.inbound.listener.KitClaimListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.listener.KitsJoinListener;
+import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitActionRunner;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitGranter;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitCategoryRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitReset;
 import com.uxplima.uxmessentials.kits.application.ListKits;
 import com.uxplima.uxmessentials.kits.application.ShowKit;
+import com.uxplima.uxmessentials.kits.application.port.KitActionRunner;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
@@ -49,7 +50,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
-import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -100,6 +100,7 @@ public final class KitsWiring {
         KitCategoryRepository categoryRepository = ConfigurateKitCategoryRepository.load(categoriesDir, kernel.log());
         KitClaimStore claims = new PdcKitClaims(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
+        KitActionRunner actionRunner = new BukkitKitActionRunner(kernel.scheduler(), kernel.log());
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
         GuiLayout menuLayout = guiLayouts.load("kits", "kits-menu", GuiLayout.paginatedDefault(Material.CHEST));
         GuiLayout managerLayout = guiLayouts.load(
@@ -146,6 +147,7 @@ public final class KitsWiring {
                 access,
                 claims,
                 granter,
+                actionRunner,
                 notifier,
                 economy,
                 menuLayout,
@@ -179,28 +181,13 @@ public final class KitsWiring {
                 promptListener,
                 new KitsJoinListener(repository, granter, access));
 
-        // The kit-claim listener bridges the KitClaimed domain event; the subscription handle is held so stop()
-        // can unsubscribe it. Without that a per-reload subscribe would leak a stale listener that keeps firing
-        // against torn-down state.
-        KitClaimListener claimListener = new KitClaimListener(plugin, repository, kernel.scheduler(), kernel.log());
-        Runnable unsubscribe = () -> {};
-        if (kernel.events() instanceof InProcessDomainEventPublisher publisher) {
-            java.util.function.Consumer<com.uxplima.uxmessentials.shared.domain.DomainEvent> subscriber = event -> {
-                if (event instanceof com.uxplima.uxmessentials.kits.domain.event.KitClaimed claimed) {
-                    claimListener.onClaim(claimed);
-                }
-            };
-            publisher.subscribe(subscriber);
-            unsubscribe = () -> publisher.unsubscribe(subscriber);
-        }
+        // The kit's claim/deny effects (sound, particles, title, firework, commands, the wait-ticks delay) now run
+        // through the KitActionRunner inside ClaimKit, ordered around the item grant — so there is no longer a
+        // KitClaimed event subscriber to run them reactively after the fact, and none to unsubscribe on stop.
 
-        // On stop: unsubscribe the claim listener and drop any pending chat prompt so a leftover callback can
-        // never fire after teardown (mirrors the economy PromptRegistry teardown).
-        Runnable subscriptionCleanup = unsubscribe;
-        Runnable stopAction = () -> {
-            subscriptionCleanup.run();
-            promptListener.clear();
-        };
+        // On stop: drop any pending chat prompt so a leftover callback can never fire after teardown (mirrors the
+        // economy PromptRegistry teardown).
+        Runnable stopAction = promptListener::clear;
 
         return new Wired(commands, listeners, services.kitEditorView(), repository, stopAction);
     }
@@ -212,6 +199,7 @@ public final class KitsWiring {
             KitAccess access,
             KitClaimStore claims,
             KitGranter granter,
+            KitActionRunner actionRunner,
             KitNotifier notifier,
             Optional<KitEconomy> economy,
             GuiLayout menuLayout,
@@ -223,7 +211,8 @@ public final class KitsWiring {
             KitCategoryParentSelectorView categoryParentSelectorView,
             KitCreateChooserView kitCreateChooserView) {
         Clock clock = Clock.systemUTC();
-        ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, kernel.events(), clock, economy);
+        ClaimKit claimKit = new ClaimKit(
+                repository, access, granter, notifier, kernel.events(), clock, economy, Optional.of(actionRunner));
         KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler(), previewLayout);
         KitMenuView kitMenu = new KitMenuView(
                 kernel.messages(),
@@ -267,7 +256,7 @@ public final class KitsWiring {
      * @param listeners the Bukkit listeners to register
      * @param kitEditorView the editor window, held so {@code stop()} flushes every still-open edit
      * @param repository the kit catalog the cooldown placeholder reads
-     * @param stopAction drops the KitClaimed subscription and clears pending chat prompts on stop
+     * @param stopAction clears any pending chat prompt on stop
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -285,8 +274,8 @@ public final class KitsWiring {
         }
 
         /**
-         * Save every still-open {@code /kiteditor} window back to its kit, drop the KitClaimed subscription, and
-         * clear any pending chat prompt. Called on module stop.
+         * Save every still-open {@code /kiteditor} window back to its kit and clear any pending chat prompt.
+         * Called on module stop.
          */
         public void stop() {
             kitEditorView.flushAll();
