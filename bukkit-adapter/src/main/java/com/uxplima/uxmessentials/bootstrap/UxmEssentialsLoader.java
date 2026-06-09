@@ -4,6 +4,7 @@ import io.papermc.paper.plugin.loader.PluginClasspathBuilder;
 import io.papermc.paper.plugin.loader.PluginLoader;
 import io.papermc.paper.plugin.loader.library.impl.MavenLibraryResolver;
 
+import com.uxplima.uxmessentials.loader.LoaderDependencies;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.graph.Dependency;
 import org.eclipse.aether.repository.RemoteRepository;
@@ -20,12 +21,10 @@ public final class UxmEssentialsLoader implements PluginLoader {
     public void classloader(PluginClasspathBuilder classpath) {
         MavenLibraryResolver resolver = new MavenLibraryResolver();
 
-        resolver.addRepository(new RemoteRepository.Builder(
-                        "paper-central", "default", MavenLibraryResolver.MAVEN_CENTRAL_DEFAULT_MIRROR)
-                .build());
-        resolver.addRepository(new RemoteRepository.Builder(
-                        "paper-public", "default", "https://repo.papermc.io/repository/maven-public/")
-                .build());
+        for (LoaderDependencies.Repository repo :
+                LoaderDependencies.repositories(MavenLibraryResolver.MAVEN_CENTRAL_DEFAULT_MIRROR)) {
+            resolver.addRepository(new RemoteRepository.Builder(repo.id(), "default", repo.url()).build());
+        }
 
         resolver.addDependency(new Dependency(new DefaultArtifact("com.zaxxer:HikariCP:6.2.1"), null));
         resolver.addDependency(new Dependency(new DefaultArtifact("org.xerial:sqlite-jdbc:3.49.1.0"), null));
@@ -38,8 +37,10 @@ public final class UxmEssentialsLoader implements PluginLoader {
         resolver.addDependency(new Dependency(new DefaultArtifact("org.jooq:jooq:3.19.16"), null));
         resolver.addDependency(
                 new Dependency(new DefaultArtifact("com.github.ben-manes.caffeine:caffeine:3.1.8"), null));
-        resolver.addDependency(new Dependency(new DefaultArtifact("org.spongepowered:configurate-hocon:4.1.2"), null));
-        resolver.addDependency(new Dependency(new DefaultArtifact("org.spongepowered:configurate-yaml:4.1.2"), null));
+        resolver.addDependency(new Dependency(new DefaultArtifact(LoaderDependencies.configurateHocon()), null));
+        resolver.addDependency(new Dependency(
+                new DefaultArtifact("org.spongepowered:configurate-yaml:" + LoaderDependencies.CONFIGURATE_VERSION),
+                null));
         resolver.addDependency(new Dependency(new DefaultArtifact("redis.clients:jedis:5.1.0"), null));
         resolver.addDependency(new Dependency(new DefaultArtifact("com.google.code.gson:gson:2.11.0"), null));
 
