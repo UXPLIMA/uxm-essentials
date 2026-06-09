@@ -15,7 +15,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
-import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -24,7 +23,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
-import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
 import com.uxplima.uxmlib.item.ItemBuilder;
@@ -102,28 +100,8 @@ public final class WarpEditorView {
 
     private void populateFrom(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
         iconOption(inventory, warp, viewer);
-        option(
-                inventory,
-                viewer,
-                layout.lockSlot(),
-                layout.lockMaterial(),
-                WarpsMessageKey.WARP_EDITOR_LOCK_NAME,
-                List.of(text(
-                        viewer,
-                        WarpsMessageKey.WARP_EDITOR_LOCK_LORE_CURRENT,
-                        Map.of("state", lockState(viewer, warp.isLocked())))),
-                WarpsMessageKey.WARP_EDITOR_LOCK_LORE_PROMPT);
-        option(
-                inventory,
-                viewer,
-                layout.passwordSlot(),
-                layout.passwordMaterial(),
-                WarpsMessageKey.WARP_EDITOR_PASSWORD_NAME,
-                List.of(text(
-                        viewer,
-                        WarpsMessageKey.WARP_EDITOR_PASSWORD_LORE_CURRENT,
-                        Map.of("password", warp.password().orElse(none(viewer))))),
-                WarpsMessageKey.WARP_EDITOR_PASSWORD_LORE_PROMPT);
+        lockOption(inventory, warp, viewer);
+        passwordOption(inventory, warp, viewer);
         option(
                 inventory,
                 viewer,
@@ -132,38 +110,8 @@ public final class WarpEditorView {
                 WarpsMessageKey.WARP_EDITOR_WELCOME_NAME,
                 welcomeLines(warp, viewer),
                 WarpsMessageKey.WARP_EDITOR_WELCOME_LORE_PROMPT);
-        option(
-                inventory,
-                viewer,
-                layout.soundsSlot(),
-                layout.soundsMaterial(),
-                WarpsMessageKey.WARP_EDITOR_SOUNDS_NAME,
-                List.of(
-                        text(
-                                viewer,
-                                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_DEPARTURE,
-                                Map.of("sound", warp.departureSound().orElse(none(viewer)))),
-                        text(
-                                viewer,
-                                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_ARRIVAL,
-                                Map.of("sound", warp.arrivalSound().orElse(none(viewer))))),
-                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_PROMPT);
-        option(
-                inventory,
-                viewer,
-                layout.particlesSlot(),
-                layout.particlesMaterial(),
-                WarpsMessageKey.WARP_EDITOR_PARTICLES_NAME,
-                List.of(
-                        text(
-                                viewer,
-                                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_DEPARTURE,
-                                Map.of("particle", warp.departureParticle().orElse(none(viewer)))),
-                        text(
-                                viewer,
-                                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_ARRIVAL,
-                                Map.of("particle", warp.arrivalParticle().orElse(none(viewer))))),
-                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_PROMPT);
+        soundsOption(inventory, warp, viewer);
+        particlesOption(inventory, warp, viewer);
         durationOption(
                 inventory,
                 viewer,
@@ -187,6 +135,72 @@ public final class WarpEditorView {
                 ItemBuilder.of(Material.BARRIER)
                         .name(text(viewer, WarpsMessageKey.WARP_EDITOR_CLOSE))
                         .build());
+    }
+
+    private void lockOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
+        option(
+                inventory,
+                viewer,
+                layout.lockSlot(),
+                layout.lockMaterial(),
+                WarpsMessageKey.WARP_EDITOR_LOCK_NAME,
+                List.of(text(
+                        viewer,
+                        WarpsMessageKey.WARP_EDITOR_LOCK_LORE_CURRENT,
+                        Map.of("state", lockState(viewer, warp.isLocked())))),
+                WarpsMessageKey.WARP_EDITOR_LOCK_LORE_PROMPT);
+    }
+
+    private void passwordOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
+        option(
+                inventory,
+                viewer,
+                layout.passwordSlot(),
+                layout.passwordMaterial(),
+                WarpsMessageKey.WARP_EDITOR_PASSWORD_NAME,
+                List.of(text(
+                        viewer,
+                        WarpsMessageKey.WARP_EDITOR_PASSWORD_LORE_CURRENT,
+                        Map.of("password", warp.password().orElse(none(viewer))))),
+                WarpsMessageKey.WARP_EDITOR_PASSWORD_LORE_PROMPT);
+    }
+
+    private void soundsOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
+        option(
+                inventory,
+                viewer,
+                layout.soundsSlot(),
+                layout.soundsMaterial(),
+                WarpsMessageKey.WARP_EDITOR_SOUNDS_NAME,
+                List.of(
+                        text(
+                                viewer,
+                                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_DEPARTURE,
+                                Map.of("sound", warp.departureSound().orElse(none(viewer)))),
+                        text(
+                                viewer,
+                                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_ARRIVAL,
+                                Map.of("sound", warp.arrivalSound().orElse(none(viewer))))),
+                WarpsMessageKey.WARP_EDITOR_SOUNDS_LORE_PROMPT);
+    }
+
+    private void particlesOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
+        option(
+                inventory,
+                viewer,
+                layout.particlesSlot(),
+                layout.particlesMaterial(),
+                WarpsMessageKey.WARP_EDITOR_PARTICLES_NAME,
+                List.of(
+                        text(
+                                viewer,
+                                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_DEPARTURE,
+                                Map.of("particle", warp.departureParticle().orElse(none(viewer)))),
+                        text(
+                                viewer,
+                                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_ARRIVAL,
+                                Map.of("particle", warp.arrivalParticle().orElse(none(viewer))))),
+                WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_PROMPT);
     }
 
     /** The icon material option: the current material plus the set/clear prompt, parsed-material icon. */
@@ -259,56 +273,6 @@ public final class WarpEditorView {
         inventory.setItem(
                 slot,
                 ItemBuilder.of(material).name(text(viewer, nameKey)).lore(lore).build());
-    }
-
-    /**
-     * The display-only projection the editor renders. Server warps and player warps carry the same editable
-     * surface but share no Java supertype, so the editor reads either into this record and renders it once,
-     * instead of duplicating the whole population method per type.
-     */
-    private record WarpDisplay(
-            Optional<String> iconMaterial,
-            boolean locked,
-            Optional<String> password,
-            List<WelcomeMessage> welcomeMessages,
-            Optional<String> departureSound,
-            Optional<String> arrivalSound,
-            Optional<String> departureParticle,
-            Optional<String> arrivalParticle,
-            Optional<Double> warmupOverrideSeconds,
-            Optional<Double> cooldownOverrideSeconds) {
-
-        boolean isLocked() {
-            return locked;
-        }
-
-        static WarpDisplay of(Warp w) {
-            return new WarpDisplay(
-                    w.iconMaterial(),
-                    w.isLocked(),
-                    w.password(),
-                    w.welcomeMessages(),
-                    w.departureSound(),
-                    w.arrivalSound(),
-                    w.departureParticle(),
-                    w.arrivalParticle(),
-                    w.warmupOverrideSeconds(),
-                    w.cooldownOverrideSeconds());
-        }
-
-        static WarpDisplay of(PlayerWarp w) {
-            return new WarpDisplay(
-                    w.iconMaterial(),
-                    w.isLocked(),
-                    w.password(),
-                    w.welcomeMessages(),
-                    w.departureSound(),
-                    w.arrivalSound(),
-                    w.departureParticle(),
-                    w.arrivalParticle(),
-                    w.warmupOverrideSeconds(),
-                    w.cooldownOverrideSeconds());
-        }
     }
 
     private String none(PlayerRef viewer) {
