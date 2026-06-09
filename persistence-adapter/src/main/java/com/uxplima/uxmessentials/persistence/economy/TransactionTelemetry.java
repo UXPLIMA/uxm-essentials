@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.jooq.InsertValuesStep8;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -36,13 +37,22 @@ import org.jspecify.annotations.Nullable;
  * an audit review can {@code GROUP BY} them.
  *
  * <p>This is the ledger, separate from the operator audit channel. The buffer drains synchronously on
- * {@link #stop()} so a clean shutdown never strands history.
+ * {@link #stop()} so a clean shutdown never strands history. A transient batch-flush failure re-enqueues the
+ * drained rows (bounded by {@link #MAX_RETAINED}) so the next window retries them rather than dropping a
+ * whole telemetry window.
  */
 @NullMarked
 public final class TransactionTelemetry extends JooqRepository implements TransactionHistory {
 
+    /**
+     * Cap on how many rows a failed flush may re-enqueue. A persistent outage would otherwise let the buffer
+     * grow without bound; past this watermark the oldest rows are dropped (logged) to protect heap, accepting
+     * that an extended outage loses the deepest history rather than OOM-ing the server.
+     */
+    private static final int MAX_RETAINED = 100_000;
+
     private final Queue<Row> buffer = new ConcurrentLinkedQueue<>();
-    private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() * 1_000L);
+    private final AtomicLong ids = new AtomicLong();
     private final Scheduler scheduler;
     private final Logger log;
     private final Duration interval;
@@ -63,8 +73,21 @@ public final class TransactionTelemetry extends JooqRepository implements Transa
         if (running) {
             return;
         }
+        seedIds();
         running = true;
         scheduleNext();
+    }
+
+    /**
+     * Seed the id counter from {@code MAX(id)} already in the table so ids never collide after a fast restart
+     * or when two servers share one database — the table's {@code id} is an app-supplied {@code BIGINT}
+     * primary key (portable across SQLite/MySQL/PostgreSQL), not an engine identity column, so the writer owns
+     * the sequence. An empty table seeds at 0; the first {@link #nextId()} returns 1.
+     */
+    private void seedIds() {
+        Long max = read(
+                dsl -> dsl.select(DSL.max(TRANSACTIONS.ID)).from(TRANSACTIONS).fetchOne(0, Long.class));
+        ids.set(max == null ? 0L : max);
     }
 
     /** Record a single-sided credit to {@code owner}. */
@@ -159,7 +182,35 @@ public final class TransactionTelemetry extends JooqRepository implements Transa
                 return null;
             });
         } catch (RuntimeException cause) {
-            log.warn("transaction telemetry batch of {} rows failed to flush", drained.size());
+            requeue(drained);
+        }
+    }
+
+    /**
+     * Put the drained rows back so the next window retries them — a transient DB blip must not silently lose a
+     * telemetry window (these rows are the audit ledger). Bounded by {@link #MAX_RETAINED}: once the buffer is
+     * at the watermark the overflow is dropped and logged, trading the deepest history for heap safety under a
+     * sustained outage. Re-add is to the tail; rows carry their own {@code ts}, and queries order by it.
+     */
+    private void requeue(List<Row> drained) {
+        int dropped = 0;
+        for (Row row : drained) {
+            if (buffer.size() >= MAX_RETAINED) {
+                dropped++;
+                continue;
+            }
+            buffer.add(row);
+        }
+        if (dropped > 0) {
+            log.warn(
+                    "transaction telemetry batch failed to flush; re-enqueued {} rows, dropped {} over the {} cap",
+                    drained.size() - dropped,
+                    dropped,
+                    MAX_RETAINED);
+        } else {
+            log.warn(
+                    "transaction telemetry batch failed to flush; re-enqueued {} rows for the next window",
+                    drained.size());
         }
     }
 
