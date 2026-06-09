@@ -38,8 +38,6 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class TransactionsHistoryView {
 
-    private static final DateTimeFormatter FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
     // The close button sits in the reserved bottom row; rows, nav slots, content slots, and icons are
     // externalised to modules/economy/gui/transaction-logs.conf.
     private static final int CLOSE_SLOT = 49;
@@ -49,14 +47,19 @@ public final class TransactionsHistoryView {
     private final Scheduler scheduler;
     private final Messages messages;
     private final GuiLayout layout;
+    private final DateTimeFormatter formatter;
     private final MiniMessage miniMessage;
 
     public TransactionsHistoryView(
-            TransactionHistory history, Scheduler scheduler, Messages messages, GuiLayout layout) {
+            TransactionHistory history, Scheduler scheduler, Messages messages, GuiLayout layout, ZoneId timeZone) {
         this.history = Objects.requireNonNull(history, "history");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.layout = Objects.requireNonNull(layout, "layout");
+        // The render zone is configured (default UTC), not the host's default, so a record reads the same on
+        // every server in a network. The formatter is built once here, never on the GUI-open hot path.
+        this.formatter =
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(Objects.requireNonNull(timeZone, "timeZone"));
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -139,7 +142,7 @@ public final class TransactionsHistoryView {
                         text(
                                 viewer,
                                 EconomyMessageKey.HISTORY_GUI_LORE_DATE,
-                                Map.of("date", FORMATTER.format(record.timestamp()))),
+                                Map.of("date", formatter.format(record.timestamp()))),
                         text(viewer, EconomyMessageKey.HISTORY_GUI_LORE_FROM, Map.of("from", sender)),
                         text(viewer, EconomyMessageKey.HISTORY_GUI_LORE_TO, Map.of("to", receiver)),
                         text(viewer, EconomyMessageKey.HISTORY_GUI_LORE_AMOUNT, Map.of("amount", amountText)),

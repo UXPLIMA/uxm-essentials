@@ -61,7 +61,7 @@ public final class LoanGuiView {
         this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.icons = new LoanIcons(messages, currencies);
+        this.icons = new LoanIcons(loanService, messages, currencies);
         this.requestFlow = new LoanRequestFlow(
                 loanService, currencies, chatPromptListener, scheduler, messages, icons, this::open);
         this.miniMessage = MiniMessage.miniMessage();

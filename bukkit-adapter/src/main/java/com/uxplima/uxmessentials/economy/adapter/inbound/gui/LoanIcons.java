@@ -15,6 +15,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.economy.application.LoanService;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
@@ -31,20 +32,23 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 final class LoanIcons {
 
+    private final LoanService loanService;
     private final Messages messages;
     private final CurrencyRegistry currencies;
     private final MiniMessage miniMessage;
 
-    LoanIcons(Messages messages, CurrencyRegistry currencies) {
+    LoanIcons(LoanService loanService, Messages messages, CurrencyRegistry currencies) {
+        this.loanService = Objects.requireNonNull(loanService, "loanService");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
     ItemStack profile(PlayerRef viewer, Loan.CreditScore creditScore) {
-        BigDecimal scorePct =
-                BigDecimal.valueOf(creditScore.score()).divide(BigDecimal.valueOf(1000), 4, RoundingMode.HALF_UP);
-        BigDecimal currentInterest = BigDecimal.valueOf(22).subtract(scorePct.multiply(BigDecimal.valueOf(20)));
+        // The limit and interest come from the service's policy-driven quote, never recomputed here, so the
+        // dashboard always shows what a real loan at this credit score actually charges.
+        LoanService.LoanQuote quote = loanService.quote(creditScore.score());
+        BigDecimal interestPct = quote.interestRate().multiply(BigDecimal.valueOf(100));
 
         List<Component> lore = new ArrayList<>();
         lore.add(text(
@@ -52,19 +56,15 @@ final class LoanIcons {
         lore.add(text(
                 viewer,
                 EconomyMessageKey.LOAN_GUI_PROFILE_INTEREST,
-                Map.of("rate", currentInterest.setScale(1, RoundingMode.HALF_UP).toPlainString())));
+                Map.of("rate", interestPct.setScale(1, RoundingMode.HALF_UP).toPlainString())));
         lore.add(Component.empty());
         lore.add(text(viewer, EconomyMessageKey.LOAN_GUI_PROFILE_LIMITS_HEADER, Map.of()));
+        String limit = quote.limit().setScale(0, RoundingMode.HALF_UP).toPlainString();
         for (Currency c : currencies.all()) {
-            BigDecimal maxLimit = BigDecimal.valueOf(creditScore.score()).multiply(BigDecimal.valueOf(1000));
             lore.add(text(
                     viewer,
                     EconomyMessageKey.LOAN_GUI_PROFILE_LIMIT_ROW,
-                    Map.of(
-                            "currency",
-                            c.id().value(),
-                            "limit",
-                            maxLimit.setScale(0, RoundingMode.HALF_UP).toPlainString())));
+                    Map.of("currency", c.id().value(), "limit", limit)));
         }
         return ItemBuilder.of(Material.SUNFLOWER)
                 .name(text(viewer, EconomyMessageKey.LOAN_GUI_PROFILE_NAME, Map.of()))
@@ -147,17 +147,7 @@ final class LoanIcons {
     }
 
     private Material currencyMaterial(Currency c) {
-        String id = c.id().value().toLowerCase(java.util.Locale.ROOT);
-        if (id.equals("coins") || id.equals("coin")) {
-            return Material.GOLD_INGOT;
-        }
-        if (id.equals("gems") || id.equals("gem")) {
-            return Material.EMERALD;
-        }
-        if (id.equals("tokens") || id.equals("token")) {
-            return Material.IRON_INGOT;
-        }
-        return Material.PAPER;
+        return CurrencyIcons.materialFor(c, Material.PAPER);
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {

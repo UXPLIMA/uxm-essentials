@@ -35,6 +35,7 @@ public final class Currency {
     private final @Nullable BigDecimal confirmThreshold;
     private final boolean physical;
     private final java.util.List<Denomination> denominations;
+    private final @Nullable String iconMaterial;
 
     private Currency(Builder builder) {
         this.id = builder.id;
@@ -50,6 +51,7 @@ public final class Currency {
                 builder.confirmThreshold == null ? null : scale(builder.confirmThreshold, builder.precision);
         this.physical = builder.physical;
         this.denominations = java.util.List.copyOf(builder.denominations);
+        this.iconMaterial = builder.iconMaterial;
         if (this.min.compareTo(this.max) > 0) {
             throw new IllegalArgumentException("min-balance must not exceed max-balance for currency " + id);
         }
@@ -124,6 +126,15 @@ public final class Currency {
         return denominations;
     }
 
+    /**
+     * The operator-configured icon-material name for this currency in GUIs (e.g. {@code GOLD_INGOT}), or empty
+     * when none is set. Held as a plain name here — the domain stays free of Bukkit's {@code Material}; the
+     * adapter resolves and validates it once when it builds an icon, falling back to a sensible default.
+     */
+    public java.util.Optional<String> iconMaterial() {
+        return java.util.Optional.ofNullable(iconMaterial);
+    }
+
     /** Scale a raw amount to this currency's precision, half-up, so a stored figure never carries extra digits. */
     public BigDecimal normalize(BigDecimal amount) {
         return scale(Objects.requireNonNull(amount, "amount"), precision);
@@ -163,6 +174,7 @@ public final class Currency {
         private @Nullable BigDecimal confirmThreshold;
         private boolean physical = false;
         private final java.util.List<Denomination> denominations = new java.util.ArrayList<>();
+        private @Nullable String iconMaterial;
 
         private Builder(CurrencyId id) {
             this.id = id;
@@ -226,6 +238,12 @@ public final class Currency {
         public Builder denominations(java.util.List<Denomination> denominations) {
             this.denominations.clear();
             this.denominations.addAll(Objects.requireNonNull(denominations, "denominations"));
+            return this;
+        }
+
+        /** Set the GUI icon-material name; a {@code null} or blank (the default) leaves the icon to the view's default. */
+        public Builder iconMaterial(@Nullable String iconMaterial) {
+            this.iconMaterial = iconMaterial == null || iconMaterial.isBlank() ? null : iconMaterial.strip();
             return this;
         }
 

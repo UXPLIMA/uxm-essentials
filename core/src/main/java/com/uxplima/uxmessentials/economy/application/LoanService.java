@@ -154,6 +154,28 @@ public final class LoanService {
         return loanRepository.getCreditScore(player);
     }
 
+    /**
+     * The read-only loan terms a debtor of {@code creditScore} qualifies for, computed from the same
+     * {@link LoanPolicy} {@link #takeLoan} and {@link #buildLoan} use. The dashboard renders these figures so
+     * the displayed limit and interest never disagree with what a loan actually charges once an operator tunes
+     * the policy — the GUI does no loan math of its own.
+     */
+    public LoanQuote quote(int creditScore) {
+        return new LoanQuote(policy.limitFor(creditScore), policy.interestFor(creditScore));
+    }
+
+    /**
+     * A debtor's qualifying loan terms at a given credit score: the maximum principal and the annual-style
+     * interest rate (a fraction, e.g. {@code 0.22} for 22%). Derived from the {@link LoanPolicy}, so a view
+     * that renders it shows exactly the economics a real loan uses.
+     */
+    public record LoanQuote(BigDecimal limit, BigDecimal interestRate) {
+        public LoanQuote {
+            Objects.requireNonNull(limit, "limit");
+            Objects.requireNonNull(interestRate, "interestRate");
+        }
+    }
+
     private Loan buildLoan(PlayerRef debtor, Money principal, int installments, int creditScore) {
         BigDecimal interestRate = policy.interestFor(creditScore);
         BigDecimal totalRepayable = principal.amount().multiply(BigDecimal.ONE.add(interestRate));

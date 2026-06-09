@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.economy.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -132,6 +133,37 @@ class LoanServiceTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(LoanError.INSUFFICIENT_FUNDS);
         assertThat(loans.findById(loan.id()).orElseThrow().remainingAmount()).isEqualTo(loan.remainingAmount());
+    }
+
+    @Test
+    void quoteReportsTheSameLimitAndInterestThePolicyDrivesALoanWith() {
+        LoanPolicy policy = LoanPolicy.defaults();
+        // The default score is 500: limit = 500 * 1000, interest = the policy band at score 500.
+        LoanService.LoanQuote quote = service.quote(500);
+
+        assertThat(quote.limit()).isEqualByComparingTo(policy.limitFor(500));
+        assertThat(quote.interestRate()).isEqualByComparingTo(policy.interestFor(500));
+    }
+
+    @Test
+    void quoteTracksATunedPolicySoTheGuiNeverDisagreesWithTheService() {
+        LoanPolicy tuned = new LoanPolicy(
+                new BigDecimal("250"),
+                new BigDecimal("0.40"),
+                new BigDecimal("0.30"),
+                java.time.Duration.ofHours(12),
+                25,
+                10,
+                -50,
+                0,
+                1000);
+        LoanService tunedService =
+                new LoanService(loans, tuned, events, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC), true);
+
+        LoanService.LoanQuote quote = tunedService.quote(800);
+
+        assertThat(quote.limit()).isEqualByComparingTo(tuned.limitFor(800));
+        assertThat(quote.interestRate()).isEqualByComparingTo(tuned.interestFor(800));
     }
 
     @Test

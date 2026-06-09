@@ -349,8 +349,8 @@ public final class EconomyWiring {
                 "transaction-logs",
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.paginatedDefault(
                         org.bukkit.Material.PAPER));
-        TransactionsHistoryView historyView =
-                new TransactionsHistoryView(history, kernel.scheduler(), kernel.messages(), logsLayout);
+        TransactionsHistoryView historyView = new TransactionsHistoryView(
+                history, kernel.scheduler(), kernel.messages(), logsLayout, settings.historyTimeZone());
         PayConfirmationView payConfirmationView = new PayConfirmationView(pay, kernel.scheduler(), kernel.messages());
         BaltopGuiView baltopGuiView = new BaltopGuiView(snapshots, kernel.scheduler(), notifier, kernel.messages());
         WalletGuiView walletGuiView = new WalletGuiView(

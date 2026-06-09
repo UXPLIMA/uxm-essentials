@@ -23,7 +23,6 @@ import com.uxplima.uxmessentials.economy.application.ExchangeOutcome;
 import com.uxplima.uxmessentials.economy.application.ExchangeService;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
-import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -91,7 +90,7 @@ public final class ExchangeGuiView {
                 SimpleGui gui = Guis.gui().title(titleText).rows(3).build();
 
                 // 1. Source Currency Item (Slot 11)
-                ItemStack sourceItem = ItemBuilder.of(currencyMaterial(source.id()))
+                ItemStack sourceItem = ItemBuilder.of(currencyMaterial(source))
                         .name(text(
                                 viewerRef,
                                 EconomyMessageKey.EXCHANGE_GUI_SOURCE_NAME,
@@ -118,7 +117,7 @@ public final class ExchangeGuiView {
                 }));
 
                 // 2. Target Currency Item (Slot 15)
-                ItemStack targetItem = ItemBuilder.of(currencyMaterial(target.id()))
+                ItemStack targetItem = ItemBuilder.of(currencyMaterial(target))
                         .name(text(
                                 viewerRef,
                                 EconomyMessageKey.EXCHANGE_GUI_TARGET_NAME,
@@ -315,13 +314,8 @@ public final class ExchangeGuiView {
         }
     }
 
-    private Material currencyMaterial(CurrencyId id) {
-        return switch (id.value().toLowerCase(java.util.Locale.ROOT)) {
-            case "coins" -> Material.GOLD_NUGGET;
-            case "gems" -> Material.EMERALD;
-            case "tokens" -> Material.AMETHYST_SHARD;
-            default -> Material.PAPER;
-        };
+    private Material currencyMaterial(Currency currency) {
+        return CurrencyIcons.materialFor(currency, Material.PAPER);
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {

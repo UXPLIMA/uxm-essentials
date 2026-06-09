@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.economy.domain;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Value object representing the conversion rule from a source currency to a target currency.
@@ -45,16 +46,19 @@ public final class ExchangeRate {
     }
 
     /**
-     * Calculates the amount of target currency received for a given amount of source currency,
-     * applying the rate and subtracting the fee.
+     * Calculates the amount of target currency received for a given amount of source currency, applying the
+     * rate and subtracting the fee. Returns empty when the computed target rounds to zero at the target
+     * precision: a source amount that small would debit the source wallet and credit nothing back, so the
+     * caller must refuse the move ("amount too small") rather than burn money.
      */
-    public BigDecimal calculateTargetAmount(BigDecimal sourceAmount, int targetPrecision) {
+    public Optional<BigDecimal> calculateTargetAmount(BigDecimal sourceAmount, int targetPrecision) {
         Objects.requireNonNull(sourceAmount, "sourceAmount");
         BigDecimal gross = sourceAmount.multiply(rate);
         if (feePercent.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal fee = gross.multiply(feePercent);
             gross = gross.subtract(fee);
         }
-        return gross.setScale(targetPrecision, RoundingMode.HALF_UP);
+        BigDecimal target = gross.setScale(targetPrecision, RoundingMode.HALF_UP);
+        return target.signum() <= 0 ? Optional.empty() : Optional.of(target);
     }
 }

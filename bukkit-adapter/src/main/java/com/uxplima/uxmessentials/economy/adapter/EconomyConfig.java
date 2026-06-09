@@ -61,7 +61,8 @@ public final class EconomyConfig {
                     .starting(decimal("currencies." + key + ".starting", "wallet.starting-balance", "0"))
                     .min(decimal("currencies." + key + ".min-balance", "wallet.min-balance", "0"))
                     .max(decimal("currencies." + key + ".max-balance", "wallet.max-balance", "1000000000000"))
-                    .minPay(decimal("currencies." + key + ".min-pay", "pay.min-pay", "0.01"));
+                    .minPay(decimal("currencies." + key + ".min-pay", "pay.min-pay", "0.01"))
+                    .iconMaterial(config.getString("currencies." + key + ".icon-material", ""));
             BigDecimal confirm = optionalConfirmThreshold(id);
             if (confirm != null) {
                 builder.confirmThreshold(confirm);
@@ -385,6 +386,21 @@ public final class EconomyConfig {
     /** Whether the multi-currency /wallet GUI is enabled. */
     public boolean walletGuiEnabled() {
         return config.getBoolean("wallet.gui-enabled", true);
+    }
+
+    /**
+     * The time zone the transaction-history GUI formats timestamps in. Defaults to UTC so a record reads the
+     * same on every server in a network rather than drifting with each host's {@code ZoneId.systemDefault()};
+     * an operator sets {@code gui.timezone} to a zone id (e.g. {@code Europe/Istanbul}) to render in local time.
+     * An unknown zone id falls back to UTC.
+     */
+    public java.time.ZoneId historyTimeZone() {
+        String raw = config.getString("gui.timezone", "UTC").strip();
+        try {
+            return java.time.ZoneId.of(raw.isEmpty() ? "UTC" : raw);
+        } catch (java.time.DateTimeException unknownZone) {
+            return java.time.ZoneOffset.UTC;
+        }
     }
 
     public record CommandCost(BigDecimal amount, String currencyId) {}

@@ -53,7 +53,12 @@ public final class ExchangeService {
         }
 
         ExchangeRate rate = rateOpt.get();
-        BigDecimal targetAmount = rate.calculateTargetAmount(sourceAmount, targetCurrency.precision());
+        Optional<BigDecimal> targetOpt = rate.calculateTargetAmount(sourceAmount, targetCurrency.precision());
+        if (targetOpt.isEmpty()) {
+            // The source is so small the target rounds to zero — refuse rather than debit for nothing.
+            return ExchangeOutcome.failed(TransferError.BELOW_MINIMUM);
+        }
+        BigDecimal targetAmount = targetOpt.get();
 
         // Debit the source wallet
         Money debitMoney = Money.of(sourceCurrency, sourceAmount);
