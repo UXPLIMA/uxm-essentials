@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
+import com.uxplima.uxmessentials.kits.application.port.RequirementEvaluator;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
@@ -19,13 +20,17 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * The claim gate a {@code /kit} passes before the items are granted, applying the claim rules in one place
  * so {@link ClaimKit} stays a thin orchestrator. The order is deliberate: the per-kit permission first
  * (cheapest, and the most informative refusal), then the one-time stamp (a consumed one-time kit is a
- * permanent no), then the cooldown (a repeatable kit's rate limit), and only last the charge — so a kit the
- * player cannot afford is never charged and an over-cooldown kit never burns their money.
+ * permanent no), then the cooldown (a repeatable kit's rate limit), then the placeholder requirements, and
+ * only last the charge — so a kit whose requirements the player fails is never charged and an over-cooldown
+ * kit never burns their money.
  *
- * <p>This is where the economy <em>soft coupling</em> lives. The economy provider is an {@link Optional}
- * injected at wiring time: when it is absent, a kit's recorded cost is ignored and the kit is claimable for
- * free; when it is present, the cost is charged through the narrow {@link KitEconomy} seam after every other
- * gate passes. The kits context therefore never hard-depends on the economy context.
+ * <p>This is where the economy and requirement <em>soft couplings</em> live. Each is an {@link Optional}
+ * injected at wiring time. When the economy provider is absent, a kit's recorded cost is ignored and the kit is
+ * claimable for free; when present, the cost is charged through the narrow {@link KitEconomy} seam after every
+ * other gate passes. When the {@link RequirementEvaluator} is absent (PlaceholderAPI not installed), a kit with
+ * no requirements is claimable but a kit that <em>declares</em> requirements fails closed — its conditions
+ * cannot be checked, so it cannot be claimed. The kits context therefore never hard-depends on the economy
+ * context or on any placeholder engine.
  *
  * <p>The cooldown resolves through the shared {@link Cooldowns} port against the {@code kit} tier node
  * ({@code uxmessentials.kit.cooldown.<seconds>}, lowest wins) while keying its stamp per kit id, so each kit
@@ -40,12 +45,23 @@ public final class KitAccess {
     private final Cooldowns cooldowns;
     private final KitClaimStore claims;
     private final Optional<KitEconomy> economy;
+    private final Optional<RequirementEvaluator> requirements;
 
     public KitAccess(Permissions permissions, Cooldowns cooldowns, KitClaimStore claims, Optional<KitEconomy> economy) {
+        this(permissions, cooldowns, claims, economy, Optional.empty());
+    }
+
+    public KitAccess(
+            Permissions permissions,
+            Cooldowns cooldowns,
+            KitClaimStore claims,
+            Optional<KitEconomy> economy,
+            Optional<RequirementEvaluator> requirements) {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.claims = Objects.requireNonNull(claims, "claims");
         this.economy = Objects.requireNonNull(economy, "economy");
+        this.requirements = Objects.requireNonNull(requirements, "requirements");
     }
 
     /**
@@ -66,7 +82,34 @@ public final class KitAccess {
         if (cooldowns.check(who, cooldownKind(who, kit)).isErr()) {
             return Result.err(KitError.ON_COOLDOWN);
         }
+        if (!meetsRequirements(who, kit)) {
+            return Result.err(KitError.REQUIREMENTS_NOT_MET);
+        }
         return charge(who, kit);
+    }
+
+    /**
+     * Whether {@code who} satisfies {@code kit}'s claim requirements. A kit with no requirements always passes.
+     * A kit that declares requirements passes only when an evaluator is present and every condition holds —
+     * with no evaluator wired (PlaceholderAPI absent) it <em>fails closed</em>, because the conditions cannot
+     * be checked. Used by the gate and by the menu renderer to pick the requirements-not-met display state.
+     */
+    public boolean meetsRequirements(PlayerRef who, KitDefinition kit) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kit, "kit");
+        if (!kit.hasRequirements()) {
+            return true;
+        }
+        return requirements
+                .map(evaluator -> evaluator.passesAll(who, kit.requirements()))
+                .orElse(false);
+    }
+
+    /** Whether {@code who} individually satisfies {@code requirement}; fails closed when no evaluator is wired. */
+    public boolean meetsRequirement(PlayerRef who, com.uxplima.uxmessentials.kits.domain.KitRequirement requirement) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(requirement, "requirement");
+        return requirements.map(evaluator -> evaluator.passes(who, requirement)).orElse(false);
     }
 
     /** Start the cooldown clock and record the one-time stamp after a successful grant. */

@@ -42,6 +42,10 @@ import java.util.Optional;
  * @param variants per-rank variants, ordered best-first; empty for today's single-variant behaviour
  * @param preview whether the browse menu may open a read-only preview of this kit (default on)
  * @param closeOnClaim whether a successful browse-menu claim closes the menu instead of refreshing it
+ * @param requirements opaque claim conditions (placeholder comparisons) evaluated before the cost; empty for none
+ * @param requirementsMaterial display material shown in the browse menu when the viewer fails requirements
+ * @param requirementsName display name shown in the browse menu when the viewer fails requirements
+ * @param requirementsLore display lore shown in the browse menu when the viewer fails requirements
  */
 public record KitDefinition(
         KitId id,
@@ -78,7 +82,11 @@ public record KitDefinition(
         Optional<String> customPermission,
         List<KitVariant> variants,
         boolean preview,
-        boolean closeOnClaim) {
+        boolean closeOnClaim,
+        List<KitRequirement> requirements,
+        Optional<String> requirementsMaterial,
+        Optional<String> requirementsName,
+        List<String> requirementsLore) {
 
     public KitDefinition {
         Objects.requireNonNull(id, "id");
@@ -109,6 +117,10 @@ public record KitDefinition(
         Objects.requireNonNull(unaffordableLore, "unaffordableLore");
         Objects.requireNonNull(customPermission, "customPermission");
         Objects.requireNonNull(variants, "variants");
+        Objects.requireNonNull(requirements, "requirements");
+        Objects.requireNonNull(requirementsMaterial, "requirementsMaterial");
+        Objects.requireNonNull(requirementsName, "requirementsName");
+        Objects.requireNonNull(requirementsLore, "requirementsLore");
         if (cooldown.isNegative()) {
             throw new IllegalArgumentException("kit cooldown must not be negative: " + cooldown);
         }
@@ -121,6 +133,8 @@ public record KitDefinition(
         claimedLore = List.copyOf(claimedLore);
         unaffordableLore = List.copyOf(unaffordableLore);
         variants = List.copyOf(variants);
+        requirements = List.copyOf(requirements);
+        requirementsLore = List.copyOf(requirementsLore);
     }
 
     public KitDefinition(
@@ -190,7 +204,11 @@ public record KitDefinition(
                 Optional.empty(),
                 List.of(),
                 true,
-                false);
+                false,
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                List.of());
     }
 
     public KitDefinition(
@@ -475,6 +493,12 @@ public record KitDefinition(
         return copy(b -> b.variants = value);
     }
 
+    /** A copy of this kit with its claim requirements set to {@code value}, every other setting preserved. */
+    public KitDefinition withRequirements(List<KitRequirement> value) {
+        Objects.requireNonNull(value, "value");
+        return copy(b -> b.requirements = value);
+    }
+
     private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {
         KitDefinitionFields fields = new KitDefinitionFields(this);
         mutator.accept(fields);
@@ -502,6 +526,11 @@ public record KitDefinition(
     /** True when the kit sets a cost the economy gate should charge (a non-free price). */
     public boolean hasCost() {
         return !cost.isFree();
+    }
+
+    /** True when the kit carries claim requirements the gate must evaluate before charging. */
+    public boolean hasRequirements() {
+        return !requirements.isEmpty();
     }
 
     /** The cooldown in whole seconds, the unit the {@code Cooldowns} port resolves tiers in. */

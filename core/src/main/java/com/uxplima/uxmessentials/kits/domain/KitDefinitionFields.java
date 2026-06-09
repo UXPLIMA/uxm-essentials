@@ -49,6 +49,10 @@ final class KitDefinitionFields {
     List<KitVariant> variants;
     boolean preview;
     boolean closeOnClaim;
+    List<KitRequirement> requirements;
+    Optional<String> requirementsMaterial;
+    Optional<String> requirementsName;
+    List<String> requirementsLore;
 
     KitDefinitionFields(KitDefinition k) {
         this.id = k.id();
@@ -86,6 +90,10 @@ final class KitDefinitionFields {
         this.variants = k.variants();
         this.preview = k.preview();
         this.closeOnClaim = k.closeOnClaim();
+        this.requirements = k.requirements();
+        this.requirementsMaterial = k.requirementsMaterial();
+        this.requirementsName = k.requirementsName();
+        this.requirementsLore = k.requirementsLore();
     }
 
     KitDefinition build() {
@@ -124,6 +132,10 @@ final class KitDefinitionFields {
                 customPermission,
                 variants,
                 preview,
-                closeOnClaim);
+                closeOnClaim,
+                requirements,
+                requirementsMaterial,
+                requirementsName,
+                requirementsLore);
     }
 }

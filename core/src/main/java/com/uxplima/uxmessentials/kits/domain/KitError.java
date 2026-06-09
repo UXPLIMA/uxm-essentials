@@ -28,6 +28,9 @@ public enum KitError {
     /** A one-time kit the player has already consumed. */
     ALREADY_CLAIMED(KitsMessageKey.KIT_ALREADY_CLAIMED),
 
+    /** The player does not satisfy one or more of the kit's claim requirements (placeholder conditions). */
+    REQUIREMENTS_NOT_MET(KitsMessageKey.KIT_REQUIREMENTS_NOT_MET),
+
     /** The player cannot pay the kit's cost (only reachable when an economy provider is present). */
     CANNOT_AFFORD(KitsMessageKey.KIT_CANNOT_AFFORD),
 

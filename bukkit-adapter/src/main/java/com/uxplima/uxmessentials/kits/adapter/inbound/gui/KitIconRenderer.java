@@ -123,6 +123,7 @@ final class KitIconRenderer {
         NO_PERMISSION,
         CLAIMED,
         ON_COOLDOWN,
+        REQUIREMENTS,
         UNAFFORDABLE,
         NORMAL
     }
@@ -137,6 +138,10 @@ final class KitIconRenderer {
         if (access.isOnCooldown(viewer, kit)) {
             return DisplayState.ON_COOLDOWN;
         }
+        // Requirements are gated after the cooldown and before the cost, so the icon mirrors that order.
+        if (!access.meetsRequirements(viewer, kit)) {
+            return DisplayState.REQUIREMENTS;
+        }
         if (!access.canAfford(viewer, kit)) {
             return DisplayState.UNAFFORDABLE;
         }
@@ -149,6 +154,7 @@ final class KitIconRenderer {
                     case NO_PERMISSION -> kit.noPermissionName();
                     case CLAIMED -> kit.claimedName();
                     case ON_COOLDOWN -> kit.cooldownName();
+                    case REQUIREMENTS -> kit.requirementsName();
                     case UNAFFORDABLE -> kit.unaffordableName();
                     case NORMAL -> kit.displayName();
                 };
@@ -166,6 +172,7 @@ final class KitIconRenderer {
                     case NO_PERMISSION -> kit.noPermissionMaterial();
                     case CLAIMED -> kit.claimedMaterial();
                     case ON_COOLDOWN -> kit.cooldownMaterial();
+                    case REQUIREMENTS -> kit.requirementsMaterial();
                     case UNAFFORDABLE -> kit.unaffordableMaterial();
                     case NORMAL -> kit.displayMaterial();
                 };
@@ -195,6 +202,7 @@ final class KitIconRenderer {
                     case NO_PERMISSION -> kit.noPermissionLore();
                     case CLAIMED -> kit.claimedLore();
                     case ON_COOLDOWN -> kit.cooldownLore();
+                    case REQUIREMENTS -> kit.requirementsLore();
                     case UNAFFORDABLE -> kit.unaffordableLore();
                     case NORMAL -> List.of();
                 };
@@ -207,6 +215,10 @@ final class KitIconRenderer {
                 lines.add(miniMessage.deserialize(processPlaceholders(viewer, kit, line)));
             }
         }
+
+        // One ✔/✘ status line per requirement, evaluated for the viewer. The PlaceholderAPI resolution behind
+        // access.meetsRequirement runs on the icon-build thread (the viewer's entity thread), never off it.
+        appendRequirementStatus(viewer, kit, lines);
 
         // Only append default status lore lines if we did not use a state override lore
         if (!hasOverride) {
@@ -232,6 +244,23 @@ final class KitIconRenderer {
             lines.add(text(viewer, KitsMessageKey.KIT_MENU_PREVIEW_HINT, Map.of()));
         }
         return lines;
+    }
+
+    /**
+     * Append one status line per claim requirement, each carrying a ✔ (met) or ✘ (unmet) symbol and the raw
+     * condition text. The per-requirement verdict comes from {@link KitAccess#meetsRequirement}, whose
+     * PlaceholderAPI lookup runs on the same (viewer entity / region) thread the icon is built on, so this never
+     * touches PlaceholderAPI off-thread. With no evaluator wired every condition reads as unmet (fail-closed).
+     */
+    private void appendRequirementStatus(PlayerRef viewer, KitDefinition kit, List<Component> lines) {
+        if (!kit.hasRequirements()) {
+            return;
+        }
+        for (com.uxplima.uxmessentials.kits.domain.KitRequirement requirement : kit.requirements()) {
+            boolean met = access.meetsRequirement(viewer, requirement);
+            KitsMessageKey key = met ? KitsMessageKey.KIT_REQUIREMENT_MET : KitsMessageKey.KIT_REQUIREMENT_UNMET;
+            lines.add(text(viewer, key, Map.of("condition", requirement.asText())));
+        }
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {

@@ -59,9 +59,14 @@ public enum KitsMessageKey implements MessageKey {
     KIT_NO_PERMISSION("kit.no-permission"),
     KIT_ON_COOLDOWN("kit.on-cooldown"),
     KIT_ALREADY_CLAIMED("kit.already-claimed"),
+    KIT_REQUIREMENTS_NOT_MET("kit.requirements-not-met"),
     KIT_CANNOT_AFFORD("kit.cannot-afford"),
     KIT_INVENTORY_FULL("kit.inventory-full"),
     KIT_CLAIM_CANCELLED("kit.claim-cancelled"),
+
+    // requirement status-symbol lore (browse menu / preview icon)
+    KIT_REQUIREMENT_MET("kit.requirement.met"),
+    KIT_REQUIREMENT_UNMET("kit.requirement.unmet"),
 
     // kit manager GUI (/kiteditor)
     KIT_EDITOR_MANAGER_TITLE("kit.editor.manager-title"),

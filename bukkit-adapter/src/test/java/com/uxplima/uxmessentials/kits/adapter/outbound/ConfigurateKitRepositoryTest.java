@@ -240,6 +240,61 @@ class ConfigurateKitRepositoryTest {
     }
 
     @Test
+    void readsRequirementsAndSkipsMalformedEntries(@TempDir Path root) throws Exception {
+        Path dir = kitsDir(root);
+        Files.createDirectories(dir);
+        Files.writeString(
+                dir.resolve("ranked.conf"),
+                """
+                cooldown = 0
+                items = []
+                requirements = [
+                  "%player_level% >= 10",
+                  "%essentials_playtime_seconds% >= 3600",
+                  "no operator here"
+                ]
+                requirements-material = "BARRIER"
+                requirements-name = "<red>Locked"
+                requirements-lore = [ "Level up to unlock" ]
+                """);
+
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        KitDefinition ranked = repository.find(KitId.of("ranked")).orElseThrow();
+
+        assertThat(ranked.requirements()).hasSize(2); // the malformed third entry is skipped, not fatal
+        assertThat(ranked.requirements().get(0).left()).isEqualTo("%player_level%");
+        assertThat(ranked.requirements().get(0).operator())
+                .isEqualTo(com.uxplima.uxmessentials.kits.domain.RequirementOperator.GTE);
+        assertThat(ranked.requirements().get(0).right()).isEqualTo("10");
+        assertThat(ranked.requirementsMaterial()).contains("BARRIER");
+        assertThat(ranked.requirementsName()).contains("<red>Locked");
+        assertThat(ranked.requirementsLore()).containsExactly("Level up to unlock");
+    }
+
+    @Test
+    void roundTripsRequirementsAndTheirDisplayState(@TempDir Path root) {
+        Path dir = kitsDir(root);
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+
+        KitDefinition ranked = KitDefinition.repeatable(
+                        KitId.of("ranked"), List.of(KitItem.of("AAAA", 1)), Duration.ofSeconds(60))
+                .withRequirements(List.of(
+                        new com.uxplima.uxmessentials.kits.domain.KitRequirement(
+                                "%player_level%", com.uxplima.uxmessentials.kits.domain.RequirementOperator.GTE, "10"),
+                        new com.uxplima.uxmessentials.kits.domain.KitRequirement(
+                                "%rank%", com.uxplima.uxmessentials.kits.domain.RequirementOperator.EQ, "vip")));
+        repository.save(ranked);
+
+        KitDefinition loaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP)
+                .find(KitId.of("ranked"))
+                .orElseThrow();
+
+        assertThat(loaded.requirements()).hasSize(2);
+        assertThat(loaded.requirements().get(0).asText()).isEqualTo("%player_level% >= 10");
+        assertThat(loaded.requirements().get(1).asText()).isEqualTo("%rank% == vip");
+    }
+
+    @Test
     void savesAndLoadsStateBasedOverrides(@TempDir Path root) {
         Path dir = kitsDir(root);
         KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);

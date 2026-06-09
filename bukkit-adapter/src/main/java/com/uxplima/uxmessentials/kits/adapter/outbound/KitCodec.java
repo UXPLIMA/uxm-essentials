@@ -25,7 +25,19 @@ import org.spongepowered.configurate.ConfigurationNode;
  * permission = false    # require uxmessentials.kit.<id>
  * cost = 0              # claim price; charged only when economy is wired
  * items = [ "<base64>", { data = "<base64>", amount = 16 } ]
+ * requirements = [      # placeholder claim conditions; evaluated through PlaceholderAPI before the cost
+ *   "%player_level% >= 10",
+ *   "%essentials_playtime_seconds% >= 3600"
+ * ]
+ * requirements-material = "BARRIER"   # browse-menu icon shown when the viewer fails the requirements
+ * requirements-name = "<red>Locked"   # browse-menu name for that state
+ * requirements-lore = [ "<gray>Level up to unlock" ]  # browse-menu lore for that state
  * }</pre>
+ *
+ * <p>Each {@code requirements} entry is split into a {@code KitRequirement(left, operator, right)} on the first
+ * of the operators {@code == != >= <= > <}; spacing is tolerated and a malformed entry (no operator or a blank
+ * side) is skipped rather than failing the kit. The operands stay opaque raw strings here — the adapter never
+ * resolves the placeholders; the {@code RequirementEvaluator} does, on the claim/render thread.
  *
  * The same codec also reads each entry of the previous {@code kits.conf} monolith — a {@code kits { <id> {
  * ... } }} tree — which the repository imports once on first load and splits into per-file kits. An item is
@@ -134,6 +146,14 @@ final class KitCodec {
             boolean preview = node.node("preview").getBoolean(true);
             boolean closeOnClaim = node.node("close-on-claim").getBoolean(false);
 
+            List<com.uxplima.uxmessentials.kits.domain.KitRequirement> requirements =
+                    readRequirements(node.node("requirements"));
+            Optional<String> requirementsMaterial =
+                    Optional.ofNullable(node.node("requirements-material").getString());
+            Optional<String> requirementsName =
+                    Optional.ofNullable(node.node("requirements-name").getString());
+            List<String> requirementsLore = strings(node.node("requirements-lore"));
+
             return Optional.of(new KitDefinition(
                     kitId,
                     items,
@@ -169,7 +189,11 @@ final class KitCodec {
                     customPermission,
                     variants,
                     preview,
-                    closeOnClaim));
+                    closeOnClaim,
+                    requirements,
+                    requirementsMaterial,
+                    requirementsName,
+                    requirementsLore));
         } catch (RuntimeException malformed) {
             return Optional.empty();
         }
@@ -217,6 +241,12 @@ final class KitCodec {
         node.node("unaffordable-name").set(definition.unaffordableName().orElse(null));
         node.node("unaffordable-lore")
                 .set(definition.unaffordableLore().isEmpty() ? null : definition.unaffordableLore());
+
+        writeRequirements(node.node("requirements"), definition.requirements());
+        node.node("requirements-material").set(definition.requirementsMaterial().orElse(null));
+        node.node("requirements-name").set(definition.requirementsName().orElse(null));
+        node.node("requirements-lore")
+                .set(definition.requirementsLore().isEmpty() ? null : definition.requirementsLore());
 
         node.node("permission-cooldowns").set(null);
         if (!definition.permissionCooldowns().isEmpty()) {
@@ -306,6 +336,22 @@ final class KitCodec {
                 : Optional.of(child.node("slot").getInt());
     }
 
+    private static List<com.uxplima.uxmessentials.kits.domain.KitRequirement> readRequirements(ConfigurationNode node) {
+        if (node.virtual() || !node.isList()) {
+            return List.of();
+        }
+        List<com.uxplima.uxmessentials.kits.domain.KitRequirement> requirements = new ArrayList<>();
+        for (ConfigurationNode child : node.childrenList()) {
+            String entry = child.getString();
+            if (entry == null || entry.isBlank()) {
+                continue;
+            }
+            // A malformed entry (no recognised operator or a blank side) is skipped, not fatal.
+            com.uxplima.uxmessentials.kits.domain.KitRequirement.parse(entry).ifPresent(requirements::add);
+        }
+        return List.copyOf(requirements);
+    }
+
     private static List<com.uxplima.uxmessentials.kits.domain.KitVariant> readVariants(ConfigurationNode node) {
         if (node.virtual() || !node.isMap()) {
             return List.of();
@@ -355,6 +401,20 @@ final class KitCodec {
             }
             writeItems(child.node("items"), variant.items());
         }
+    }
+
+    private static void writeRequirements(
+            ConfigurationNode node, List<com.uxplima.uxmessentials.kits.domain.KitRequirement> requirements)
+            throws ConfigurateException {
+        if (requirements.isEmpty()) {
+            node.set(null);
+            return;
+        }
+        node.setList(
+                String.class,
+                requirements.stream()
+                        .map(com.uxplima.uxmessentials.kits.domain.KitRequirement::asText)
+                        .toList());
     }
 
     private static void writeItems(ConfigurationNode node, List<KitItem> items) throws ConfigurateException {

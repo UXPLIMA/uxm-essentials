@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.listener.KitsJoinListener;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitGranter;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitCategoryRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
+import com.uxplima.uxmessentials.kits.adapter.outbound.PapiRequirementEvaluator;
 import com.uxplima.uxmessentials.kits.adapter.outbound.PdcKitClaims;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
@@ -132,7 +133,12 @@ public final class KitsWiring {
                 new KitCategoryParentSelectorView(kernel.messages(), categoryRepository, kernel.scheduler());
         KitCreateChooserView kitCreateChooserView = new KitCreateChooserView(kernel.messages(), kernel.scheduler());
 
-        KitAccess access = new KitAccess(kernel.permissions(), kernel.cooldowns(), claims, economy);
+        // The placeholder requirement evaluator soft-couples to PlaceholderAPI exactly like the economy bridge:
+        // present only when PlaceholderAPI is installed, otherwise empty, in which case a kit that declares
+        // requirements fails closed (KitAccess cannot check its conditions, so it cannot be claimed).
+        Optional<com.uxplima.uxmessentials.kits.application.port.RequirementEvaluator> requirements =
+                PapiRequirementEvaluator.isPresent() ? Optional.of(new PapiRequirementEvaluator()) : Optional.empty();
+        KitAccess access = new KitAccess(kernel.permissions(), kernel.cooldowns(), claims, economy, requirements);
         KitServices services = assemble(
                 kernel,
                 repository,
