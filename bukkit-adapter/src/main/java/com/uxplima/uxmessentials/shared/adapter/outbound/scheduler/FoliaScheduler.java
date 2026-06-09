@@ -60,6 +60,33 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     }
 
     @Override
+    public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(task, "task");
+        Objects.requireNonNull(retired, "retired");
+        Player bukkit = Bukkit.getPlayer(player.uuid());
+        if (bukkit == null || !bukkit.isOnline()) {
+            retired.run(); // no live entity to schedule on; tell the caller now instead of dropping it
+            return;
+        }
+        // The entity scheduler runs the retired callback if the entity is removed before the task fires,
+        // so a caller waiting on a result is released with its fallback rather than left to time out.
+        bukkit.getScheduler().execute(plugin, task, retired, 1L);
+    }
+
+    @Override
+    public boolean onGlobalThread() {
+        return Bukkit.isGlobalTickThread();
+    }
+
+    @Override
+    public boolean ownsEntity(PlayerRef player) {
+        Objects.requireNonNull(player, "player");
+        Player bukkit = Bukkit.getPlayer(player.uuid());
+        return bukkit != null && bukkit.isOnline() && Bukkit.isOwnedByCurrentRegion(bukkit);
+    }
+
+    @Override
     public void async(Runnable task) {
         Objects.requireNonNull(task, "task");
         Bukkit.getAsyncScheduler().runNow(plugin, ignored -> task.run());

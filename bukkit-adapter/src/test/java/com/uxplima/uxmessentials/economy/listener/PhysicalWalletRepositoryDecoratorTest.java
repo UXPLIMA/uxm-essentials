@@ -6,10 +6,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.*;
 
 import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitInventoryCalculations;
 import com.uxplima.uxmessentials.economy.adapter.outbound.PhysicalWalletRepositoryDecorator;
+import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -72,7 +74,11 @@ class PhysicalWalletRepositoryDecoratorTest {
         return mock(Logger.class);
     }
 
-    /** A scheduler that runs marshalled inventory/roster work inline so the synchronous decorator can be tested. */
+    /**
+     * A scheduler that reports the calling thread as the owner of every region, so the decorator runs its
+     * physical-currency work inline (the deadlock-free path) rather than scheduling and blocking. This is the
+     * realistic shape when an inventory read happens on the main/region thread itself.
+     */
     private static final class InlineScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
@@ -87,6 +93,63 @@ class PhysicalWalletRepositoryDecoratorTest {
         @Override
         public void onEntity(PlayerRef player, Runnable task) {
             task.run();
+        }
+
+        @Override
+        public boolean onGlobalThread() {
+            return true;
+        }
+
+        @Override
+        public boolean ownsEntity(PlayerRef player) {
+            return true;
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(java.time.Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /**
+     * A scheduler that never owns the calling thread and drops every entity task as retired, mirroring an entity
+     * that logs off before its work runs. The decorator must release its bounded wait via the retired callback
+     * with the fallback rather than hang to the timeout. Global work still runs so unrelated paths complete.
+     */
+    private static final class RetiredEntityScheduler implements Scheduler {
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            // fire-and-forget no-op, matching the Folia scheduler when the entity is gone
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+            retired.run();
+        }
+
+        @Override
+        public boolean onGlobalThread() {
+            return false;
+        }
+
+        @Override
+        public boolean ownsEntity(PlayerRef player) {
+            return false;
         }
 
         @Override
@@ -247,5 +310,70 @@ class PhysicalWalletRepositoryDecoratorTest {
 
         verify(calculations).debit(eq(sender), eq(amount));
         verify(pendingRepo).queueCredit(eq(offlineUuid), eq("gems"), eq(BigDecimal.valueOf(15)));
+    }
+
+    @Test
+    void testTop_OnOwningThread_RunsInlineWithoutTimeout() {
+        PlayerMock rich = server.addPlayer("Rich");
+        PlayerMock poor = server.addPlayer("Poor");
+        when(calculations.getBalance(eq(rich), eq(gems))).thenReturn(BigDecimal.valueOf(80));
+        when(calculations.getBalance(eq(poor), eq(gems))).thenReturn(BigDecimal.valueOf(20));
+
+        // Inline-on-owning-thread must complete well under the 5s marshalling timeout — a scheduled-and-blocked
+        // call from the owning thread would deadlock and only return after timing out.
+        List<BaltopRow> rows = assertReturnsBefore(Duration.ofSeconds(2), () -> decorator.top(gems, 10));
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).balance().amount()).isEqualByComparingTo(BigDecimal.valueOf(80));
+        assertThat(rows.get(1).balance().amount()).isEqualByComparingTo(BigDecimal.valueOf(20));
+    }
+
+    @Test
+    void testFindByOwner_OnOwningThread_ReadsInventoryInlineWithoutTimeout() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerRef ref = new PlayerRef(player.getUniqueId(), "Alice");
+        when(delegate.findByOwner(eq(ref))).thenReturn(Optional.of(Wallet.empty(ref)));
+        when(calculations.getBalance(eq(player), eq(gems))).thenReturn(BigDecimal.valueOf(42));
+
+        Optional<Wallet> walletOpt = assertReturnsBefore(Duration.ofSeconds(2), () -> decorator.findByOwner(ref));
+
+        assertThat(walletOpt).isPresent();
+        assertThat(walletOpt.get().balanceOf(gems).amount()).isEqualByComparingTo(BigDecimal.valueOf(42));
+    }
+
+    @Test
+    void testDebit_EntityRetiredMidFlight_ReturnsOfflineFallbackWithoutHanging() {
+        PlayerMock player = server.addPlayer("Alice");
+        PlayerRef ref = new PlayerRef(player.getUniqueId(), "Alice");
+        Money amount = Money.of(gems, BigDecimal.valueOf(10));
+
+        // The player is online when the decorator checks, but the scheduler reports the entity retired before
+        // the task can run; the retired callback must complete the wait with the offline fallback immediately.
+        PhysicalWalletRepositoryDecorator retiringDecorator = new PhysicalWalletRepositoryDecorator(
+                delegate,
+                pendingRepo,
+                calculations,
+                registry,
+                new RetiredEntityScheduler(),
+                new ServerPlayerLookup(),
+                log());
+
+        Result<Unit, TransferError> result =
+                assertReturnsBefore(Duration.ofSeconds(2), () -> retiringDecorator.debit(ref, amount));
+
+        assertThat(result.isErr()).isTrue();
+        assertThat(result.errorOrThrow()).isEqualTo(TransferError.PLAYER_OFFLINE);
+        verify(calculations, never()).debit(any(), any());
+    }
+
+    /** Run {@code call} and assert it returns within {@code budget}; the bug surfaced as a 5s blocking timeout. */
+    private static <T> T assertReturnsBefore(Duration budget, java.util.function.Supplier<T> call) {
+        long start = System.nanoTime();
+        T value = call.get();
+        long elapsedMillis = (System.nanoTime() - start) / 1_000_000L;
+        assertThat(elapsedMillis)
+                .as("call should return inline/fast, not block to the marshalling timeout")
+                .isLessThan(budget.toMillis());
+        return value;
     }
 }

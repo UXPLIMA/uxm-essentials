@@ -42,6 +42,43 @@ public interface Scheduler {
      */
     void onEntity(PlayerRef player, Runnable task);
 
+    /**
+     * Run on the region thread owning {@code player}'s entity, invoking {@code retired} instead of
+     * {@code task} if the entity is retired before the task can run (the player logs off or the
+     * region unloads). A caller that blocks on the result of {@code task} needs this branch so it can
+     * complete with a fallback rather than wait forever for a task the scheduler has silently dropped;
+     * the plain {@link #onEntity(PlayerRef, Runnable)} keeps its fire-and-forget no-op semantics.
+     *
+     * <p>The default ignores {@code retired} and delegates to {@link #onEntity(PlayerRef, Runnable)},
+     * so a scheduler that cannot observe retirement keeps the old behaviour; the Folia adapter overrides
+     * it to wire the entity scheduler's retired callback through.
+     */
+    default void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+        onEntity(player, task);
+    }
+
+    /**
+     * Whether the calling thread already owns the global region — i.e. {@link #onGlobal} work would
+     * run on this very thread. A caller that marshals onto the global region and then blocks on the
+     * result must check this first: scheduling and blocking from the global thread itself deadlocks,
+     * because the scheduled task cannot run until the blocked caller returns.
+     *
+     * <p>The default returns {@code false} (assume off the owning thread, so the caller schedules as
+     * before); the Folia adapter answers from the live region-ownership check.
+     */
+    default boolean onGlobalThread() {
+        return false;
+    }
+
+    /**
+     * Whether the calling thread already owns {@code player}'s entity region — i.e. {@link #onEntity}
+     * work for this player would run on this very thread. Same deadlock guard as {@link #onGlobalThread}
+     * for the per-entity case; defaults to {@code false} for the same reason.
+     */
+    default boolean ownsEntity(PlayerRef player) {
+        return false;
+    }
+
     /** Run off any tick thread. The task must not touch the Bukkit API. */
     void async(Runnable task);
 

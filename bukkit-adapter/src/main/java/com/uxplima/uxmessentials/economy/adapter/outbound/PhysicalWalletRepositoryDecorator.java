@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
@@ -31,9 +32,12 @@ import org.jspecify.annotations.NullMarked;
  * in the player's live inventory, so every read or mutation here touches the Bukkit inventory/world API and must
  * run on that player's region (entity) thread — Folia forbids the off-thread inventory access the previous
  * version performed. The repository contract is synchronous, so each physical branch marshals its inventory work
- * onto the holder's entity thread through the injected {@link Scheduler} and waits for the result; these methods
- * are only ever called off the tick thread (the provider runs them async), so the bounded wait is the standard
- * anti-corruption bridge, never a main-thread block.
+ * onto the holder's entity thread (or the global region thread for a baltop scan) through the injected
+ * {@link Scheduler} and waits for the result. When the caller already owns the target thread the work runs
+ * inline rather than scheduling onto itself and blocking — that self-schedule-and-wait is a deadlock, and was
+ * the cause of the {@code /baltop} marshalling timeouts. Off the owning thread the bounded wait is the standard
+ * anti-corruption bridge; the entity branch passes a retired callback so a player who logs off mid-flight
+ * releases the wait immediately instead of letting it run to the timeout.
  *
  * <p>Online players read/write their active inventory; an offline player's credit is queued in the pending
  * transactions table and an offline debit/transfer is refused, exactly as before. The {@link PlayerLookup} port
@@ -43,6 +47,10 @@ import org.jspecify.annotations.NullMarked;
 public final class PhysicalWalletRepositoryDecorator implements WalletRepository {
 
     private static final Duration MARSHAL_TIMEOUT = Duration.ofSeconds(5);
+    // A genuine marshalling timeout is now almost impossible (inline-on-owning-thread plus the retired
+    // callback remove both deadlock causes), so log one only at most this often to avoid console spam if
+    // something truly pathological keeps a tick thread wedged.
+    private static final long WARN_THROTTLE_MILLIS = Duration.ofMinutes(1).toMillis();
 
     private final WalletRepository delegate;
     private final PendingTransactionRepository pendingRepo;
@@ -51,6 +59,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
     private final Scheduler scheduler;
     private final PlayerLookup players;
     private final Logger log;
+    private final AtomicLong lastTimeoutWarnAt = new AtomicLong(Long.MIN_VALUE);
 
     public PhysicalWalletRepositoryDecorator(
             WalletRepository delegate,
@@ -223,44 +232,75 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
         return rows.size() > limit ? new ArrayList<>(rows.subList(0, limit)) : rows;
     }
 
-    /** Run {@code work} on {@code owner}'s entity thread and wait for its result, falling back on a miss. */
+    /**
+     * Run {@code work} on {@code owner}'s entity thread and wait for its result, falling back on a miss.
+     * When this thread already owns the entity's region the work runs inline — scheduling and then
+     * blocking on the entity's own thread would deadlock, since the scheduled task cannot start until
+     * this caller returns. Otherwise the work is scheduled with a retired callback so an entity that
+     * logs off before the task fires completes the future with the fallback instead of hanging until
+     * the timeout.
+     */
     private <T> T onEntity(PlayerRef owner, java.util.function.Function<Player, T> work, T fallback) {
-        CompletableFuture<T> future = new CompletableFuture<>();
-        scheduler.onEntity(owner, () -> {
+        if (scheduler.ownsEntity(owner)) {
             Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
-            if (player == null || !player.isOnline()) {
-                future.complete(fallback);
-                return;
-            }
-            try {
-                future.complete(work.apply(player));
-            } catch (RuntimeException failure) {
-                future.completeExceptionally(failure);
-            }
-        });
+            return player == null || !player.isOnline() ? fallback : work.apply(player);
+        }
+        CompletableFuture<T> future = new CompletableFuture<>();
+        scheduler.onEntity(
+                owner,
+                () -> {
+                    Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+                    if (player == null || !player.isOnline()) {
+                        future.complete(fallback);
+                        return;
+                    }
+                    try {
+                        future.complete(work.apply(player));
+                    } catch (RuntimeException failure) {
+                        future.completeExceptionally(failure);
+                    }
+                },
+                () -> future.complete(fallback));
         return await(future, fallback);
     }
 
     /** Run a side-effecting {@code work} on {@code owner}'s entity thread and wait for it to finish. */
     private void onEntityVoid(PlayerRef owner, java.util.function.Consumer<Player> work) {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-        scheduler.onEntity(owner, () -> {
+        if (scheduler.ownsEntity(owner)) {
             Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
-            if (player == null || !player.isOnline()) {
-                future.complete(Boolean.FALSE);
-                return;
-            }
-            try {
+            if (player != null && player.isOnline()) {
                 work.accept(player);
-                future.complete(Boolean.TRUE);
-            } catch (RuntimeException failure) {
-                future.completeExceptionally(failure);
             }
-        });
+            return;
+        }
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        scheduler.onEntity(
+                owner,
+                () -> {
+                    Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+                    if (player == null || !player.isOnline()) {
+                        future.complete(Boolean.FALSE);
+                        return;
+                    }
+                    try {
+                        work.accept(player);
+                        future.complete(Boolean.TRUE);
+                    } catch (RuntimeException failure) {
+                        future.completeExceptionally(failure);
+                    }
+                },
+                () -> future.complete(Boolean.FALSE));
         await(future, Boolean.FALSE);
     }
 
+    /**
+     * Run {@code work} on the global region thread and wait for its result. When this thread already
+     * owns the global region the work runs inline, for the same deadlock reason as {@link #onEntity}.
+     */
     private <T> T onGlobal(Supplier<T> work, T fallback) {
+        if (scheduler.onGlobalThread()) {
+            return work.get();
+        }
         CompletableFuture<T> future = new CompletableFuture<>();
         scheduler.onGlobal(() -> {
             try {
@@ -279,11 +319,20 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             Thread.currentThread().interrupt();
             return fallback;
         } catch (TimeoutException timeout) {
-            log.warn("physical wallet inventory marshalling timed out after {}ms", MARSHAL_TIMEOUT.toMillis());
+            warnTimeout();
             return fallback;
         } catch (java.util.concurrent.ExecutionException failure) {
             log.error("physical wallet inventory work failed", failure);
             return fallback;
+        }
+    }
+
+    /** Log a marshalling timeout at most once per throttle window so a stuck tick thread cannot spam the log. */
+    private void warnTimeout() {
+        long now = System.currentTimeMillis();
+        long previous = lastTimeoutWarnAt.get();
+        if (now - previous >= WARN_THROTTLE_MILLIS && lastTimeoutWarnAt.compareAndSet(previous, now)) {
+            log.warn("physical wallet inventory marshalling timed out after {}ms", MARSHAL_TIMEOUT.toMillis());
         }
     }
 }
