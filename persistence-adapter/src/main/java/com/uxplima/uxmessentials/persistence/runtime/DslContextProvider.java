@@ -27,6 +27,22 @@ public final class DslContextProvider {
     public static DSLContext create(DataSource dataSource, SQLDialect dialect) {
         Objects.requireNonNull(dataSource, "dataSource");
         Objects.requireNonNull(dialect, "dialect");
+        silenceJooqBanner();
         return DSL.using(dataSource, dialect);
+    }
+
+    /**
+     * Suppress jOOQ's startup ASCII logo and "tip of the day" lines, which it prints to the server console
+     * the first time a configuration initialises. They are pure noise in a plugin log. jOOQ reads these as
+     * JVM system properties when it would log; set them before the first {@link DSL#using} call. An operator
+     * who has set either property keeps their choice.
+     */
+    private static void silenceJooqBanner() {
+        if (System.getProperty("org.jooq.no-logo") == null) {
+            System.setProperty("org.jooq.no-logo", "true");
+        }
+        if (System.getProperty("org.jooq.no-tips") == null) {
+            System.setProperty("org.jooq.no-tips", "true");
+        }
     }
 }
