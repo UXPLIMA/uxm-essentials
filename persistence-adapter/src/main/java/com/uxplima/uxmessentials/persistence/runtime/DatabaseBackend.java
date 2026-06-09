@@ -22,8 +22,13 @@ public enum DatabaseBackend {
     /** Embedded file database; the default. Single-writer — WAL, write pool sized 1. */
     SQLITE("sqlite", "org.sqlite.JDBC", SQLDialect.SQLITE, true),
 
-    /** MySQL/MariaDB over the network. The MariaDB driver speaks both wire protocols. */
-    MARIADB("mariadb", "org.mariadb.jdbc.Driver", SQLDialect.MARIADB, false),
+    /**
+     * MySQL/MariaDB over the network. The MariaDB driver speaks both wire protocols, and the MYSQL
+     * jOOQ dialect renders SQL valid on both — crucially it emits {@code LIMIT}, whereas the MARIADB
+     * dialect emits the standard {@code FETCH NEXT … ROWS ONLY} that MariaDB 10.6+ accepts but a real
+     * MySQL 8 rejects. Using MYSQL keeps the one network backend correct against either server.
+     */
+    MARIADB("mariadb", "org.mariadb.jdbc.Driver", SQLDialect.MYSQL, false),
 
     /** PostgreSQL over the network. */
     POSTGRES("postgresql", "org.postgresql.Driver", SQLDialect.POSTGRES, false);
