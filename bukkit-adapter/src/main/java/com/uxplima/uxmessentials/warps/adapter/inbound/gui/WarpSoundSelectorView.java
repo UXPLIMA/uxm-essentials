@@ -13,6 +13,7 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -25,22 +26,47 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class WarpSoundSelectorView {
 
-    /** The 27-slot (three-row) selector chest, with the option grid, custom-input, back and remove buttons. */
-    static final int SIZE = 27;
-
-    static final int OPTION_LIMIT = 18;
-    static final int CUSTOM_SLOT = 18;
-    static final int BACK_SLOT = 22;
-    static final int REMOVE_SLOT = 26;
-
     private final Messages messages;
     private final Scheduler scheduler;
+    private final FixedMenuLayout layout;
     private final MiniMessage miniMessage;
 
-    public WarpSoundSelectorView(Messages messages, Scheduler scheduler) {
+    public WarpSoundSelectorView(Messages messages, Scheduler scheduler, FixedMenuLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = MiniMessage.miniMessage();
+    }
+
+    /** The shipped geometry: the option grid limit plus the custom/back/remove buttons, externalised to conf. */
+    public static FixedMenuLayout defaultLayout() {
+        return FixedMenuLayout.builder(3, Material.GRAY_STAINED_GLASS_PANE)
+                .slotOnly("option-limit", 18)
+                .element("custom", 18, Material.ANVIL)
+                .element("back", 22, Material.BARRIER)
+                .element("remove", 26, Material.LAVA_BUCKET)
+                .build();
+    }
+
+    /** The three-row chest's slot count: the configured row count times the nine slots per row. */
+    private int size() {
+        return layout.rows() * 9;
+    }
+
+    int optionLimit() {
+        return layout.slot("option-limit");
+    }
+
+    int customSlot() {
+        return layout.slot("custom");
+    }
+
+    int backSlot() {
+        return layout.slot("back");
+    }
+
+    int removeSlot() {
+        return layout.slot("remove");
     }
 
     public void open(
@@ -50,7 +76,7 @@ public final class WarpSoundSelectorView {
             WarpsMessageKey titleKey = isDeparture
                     ? WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_TITLE_DEPARTURE
                     : WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_TITLE_ARRIVAL;
-            Inventory inventory = Bukkit.createInventory(holder, SIZE, text(viewer, titleKey));
+            Inventory inventory = Bukkit.createInventory(holder, size(), text(viewer, titleKey));
             holder.attach(inventory);
             populate(inventory, viewer);
             player.openInventory(inventory);
@@ -58,15 +84,15 @@ public final class WarpSoundSelectorView {
     }
 
     private void populate(Inventory inventory, PlayerRef viewer) {
-        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
-                .build();
-        for (int i = 0; i < SIZE; i++) {
+        ItemStack filler =
+                ItemBuilder.of(layout.fillerMaterial()).name(Component.empty()).build();
+        int size = size();
+        for (int i = 0; i < size; i++) {
             inventory.setItem(i, filler);
         }
 
         List<SoundOption> options = getOptions();
-        for (int i = 0; i < Math.min(options.size(), OPTION_LIMIT); i++) {
+        for (int i = 0; i < Math.min(options.size(), optionLimit()); i++) {
             SoundOption opt = options.get(i);
             inventory.setItem(
                     i,
@@ -83,21 +109,21 @@ public final class WarpSoundSelectorView {
         }
 
         inventory.setItem(
-                CUSTOM_SLOT,
-                ItemBuilder.of(Material.ANVIL)
+                customSlot(),
+                ItemBuilder.of(layout.material("custom"))
                         .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_CUSTOM_NAME))
                         .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_CUSTOM_LORE)))
                         .build());
 
         inventory.setItem(
-                BACK_SLOT,
-                ItemBuilder.of(Material.BARRIER)
+                backSlot(),
+                ItemBuilder.of(layout.material("back"))
                         .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK))
                         .build());
 
         inventory.setItem(
-                REMOVE_SLOT,
-                ItemBuilder.of(Material.LAVA_BUCKET)
+                removeSlot(),
+                ItemBuilder.of(layout.material("remove"))
                         .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_REMOVE_NAME))
                         .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_REMOVE_LORE)))
                         .build());

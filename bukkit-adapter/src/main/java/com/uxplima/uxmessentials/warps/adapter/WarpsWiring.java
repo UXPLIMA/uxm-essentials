@@ -115,6 +115,18 @@ public final class WarpsWiring {
         GuiLayout menuLayout = guiLayouts.load("warps", "warps-menu", GuiLayout.paginatedDefault(Material.ENDER_PEARL));
         WarpEditorLayout editorLayout =
                 guiLayouts.loadWarpEditor("warps", "warps-editor", WarpEditorLayout.defaultLayout());
+        var soundLayout = guiLayouts.loadFixedMenu(
+                "warps",
+                "warps-sound-selector",
+                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView.defaultLayout());
+        var particleLayout = guiLayouts.loadFixedMenu(
+                "warps",
+                "warps-particle-selector",
+                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView.defaultLayout());
+        var welcomeLayout = guiLayouts.loadFixedMenu(
+                "warps",
+                "warps-welcome",
+                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView.defaultLayout());
 
         var promptListener =
                 new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpChatPromptListener(kernel.messages());
@@ -122,11 +134,11 @@ public final class WarpsWiring {
         var editorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView(
                 kernel.messages(), kernel.scheduler(), repository, editorLayout, playerWarpHandle);
         var soundSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView(
-                kernel.messages(), kernel.scheduler());
+                kernel.messages(), kernel.scheduler(), soundLayout);
         var particleSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView(
-                kernel.messages(), kernel.scheduler());
+                kernel.messages(), kernel.scheduler(), particleLayout);
         var welcomeMessagesView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView(
-                kernel.messages(), kernel.scheduler(), repository, editorView);
+                kernel.messages(), kernel.scheduler(), repository, editorView, welcomeLayout);
         var editorListener = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener(
                 editorView,
                 repository,

@@ -18,6 +18,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -34,34 +35,63 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class WarpWelcomeMessagesView {
 
-    /** The 27-slot (three-row) chest: the message grid, plus add, back and clear-all buttons. */
-    static final int SIZE = 27;
-
-    static final int MESSAGE_LIMIT = 18;
-    static final int ADD_SLOT = 18;
-    static final int BACK_SLOT = 22;
-    static final int CLEAR_SLOT = 26;
-
     private final Messages messages;
     private final Scheduler scheduler;
     private final WarpRepository warpRepository;
     private final WarpEditorView editorView;
+    private final FixedMenuLayout layout;
     private final MiniMessage miniMessage;
 
     public WarpWelcomeMessagesView(
-            Messages messages, Scheduler scheduler, WarpRepository warpRepository, WarpEditorView editorView) {
+            Messages messages,
+            Scheduler scheduler,
+            WarpRepository warpRepository,
+            WarpEditorView editorView,
+            FixedMenuLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.warpRepository = Objects.requireNonNull(warpRepository, "warpRepository");
         this.editorView = Objects.requireNonNull(editorView, "editorView");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = MiniMessage.miniMessage();
+    }
+
+    /** The shipped geometry: the message grid limit plus the add/back/clear buttons, externalised to conf. */
+    public static FixedMenuLayout defaultLayout() {
+        return FixedMenuLayout.builder(3, Material.GRAY_STAINED_GLASS_PANE)
+                .slotOnly("message-limit", 18)
+                .element("add", 18, Material.WRITABLE_BOOK)
+                .element("back", 22, Material.BARRIER)
+                .element("clear", 26, Material.LAVA_BUCKET)
+                .build();
+    }
+
+    /** The three-row chest's slot count: the configured row count times the nine slots per row. */
+    private int size() {
+        return layout.rows() * 9;
+    }
+
+    int messageLimit() {
+        return layout.slot("message-limit");
+    }
+
+    int addSlot() {
+        return layout.slot("add");
+    }
+
+    int backSlot() {
+        return layout.slot("back");
+    }
+
+    int clearSlot() {
+        return layout.slot("clear");
     }
 
     public void open(Player player, PlayerRef viewer, String warpName, @Nullable PlayerRef warpOwner) {
         scheduler.onEntity(viewer, () -> {
             WarpWelcomeMessagesHolder holder = new WarpWelcomeMessagesHolder(viewer, warpName, warpOwner);
             Inventory inventory = Bukkit.createInventory(
-                    holder, SIZE, text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_MANAGER_TITLE));
+                    holder, size(), text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_MANAGER_TITLE));
             holder.attach(inventory);
             populate(inventory, holder);
             player.openInventory(inventory);
@@ -69,10 +99,10 @@ public final class WarpWelcomeMessagesView {
     }
 
     public void populate(Inventory inventory, WarpWelcomeMessagesHolder holder) {
-        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
-                .build();
-        for (int i = 0; i < SIZE; i++) {
+        ItemStack filler =
+                ItemBuilder.of(layout.fillerMaterial()).name(Component.empty()).build();
+        int size = size();
+        for (int i = 0; i < size; i++) {
             inventory.setItem(i, filler);
         }
 
@@ -90,7 +120,7 @@ public final class WarpWelcomeMessagesView {
             opt.ifPresent(w -> welcomeMessages.addAll(w.welcomeMessages()));
         }
 
-        for (int i = 0; i < Math.min(welcomeMessages.size(), MESSAGE_LIMIT); i++) {
+        for (int i = 0; i < Math.min(welcomeMessages.size(), messageLimit()); i++) {
             WelcomeMessage msg = welcomeMessages.get(i);
             Material mat = materialFor(msg.type());
 
@@ -118,21 +148,21 @@ public final class WarpWelcomeMessagesView {
         }
 
         inventory.setItem(
-                ADD_SLOT,
-                ItemBuilder.of(Material.WRITABLE_BOOK)
+                addSlot(),
+                ItemBuilder.of(layout.material("add"))
                         .name(text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_MANAGER_ADD_NAME))
                         .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_MANAGER_ADD_LORE)))
                         .build());
 
         inventory.setItem(
-                BACK_SLOT,
-                ItemBuilder.of(Material.BARRIER)
+                backSlot(),
+                ItemBuilder.of(layout.material("back"))
                         .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK))
                         .build());
 
         inventory.setItem(
-                CLEAR_SLOT,
-                ItemBuilder.of(Material.LAVA_BUCKET)
+                clearSlot(),
+                ItemBuilder.of(layout.material("clear"))
                         .name(text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_MANAGER_CLEAR_NAME))
                         .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_MANAGER_CLEAR_LORE)))
                         .build());

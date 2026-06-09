@@ -270,18 +270,18 @@ public final class WarpEditorListener implements Listener {
         @Nullable PlayerRef owner = holder.warpOwner();
         boolean isDeparture = holder.isDeparture();
 
-        if (slot == WarpSoundSelectorView.BACK_SLOT) {
+        if (slot == soundSelectorView.backSlot()) {
             editorView.open(player, viewer, name, owner);
             return;
         }
 
-        if (slot == WarpSoundSelectorView.REMOVE_SLOT) {
+        if (slot == soundSelectorView.removeSlot()) {
             saveSound(holder, Optional.empty());
             editorView.open(player, viewer, name, owner);
             return;
         }
 
-        if (slot == WarpSoundSelectorView.CUSTOM_SLOT) {
+        if (slot == soundSelectorView.customSlot()) {
             player.closeInventory();
             MessageKey promptKey = isDeparture
                     ? WarpsMessageKey.WARP_EDITOR_SOUND_DEPARTURE_PROMPT
@@ -293,7 +293,7 @@ public final class WarpEditorListener implements Listener {
             return;
         }
 
-        if (slot >= 0 && slot < WarpSoundSelectorView.OPTION_LIMIT) {
+        if (slot >= 0 && slot < soundSelectorView.optionLimit()) {
             List<WarpSoundSelectorView.SoundOption> options = soundSelectorView.getOptions();
             if (slot < options.size()) {
                 WarpSoundSelectorView.SoundOption opt = options.get(slot);
@@ -321,18 +321,18 @@ public final class WarpEditorListener implements Listener {
         @Nullable PlayerRef owner = holder.warpOwner();
         boolean isDeparture = holder.isDeparture();
 
-        if (slot == WarpParticleSelectorView.BACK_SLOT) {
+        if (slot == particleSelectorView.backSlot()) {
             editorView.open(player, viewer, name, owner);
             return;
         }
 
-        if (slot == WarpParticleSelectorView.REMOVE_SLOT) {
+        if (slot == particleSelectorView.removeSlot()) {
             saveParticle(holder, Optional.empty());
             editorView.open(player, viewer, name, owner);
             return;
         }
 
-        if (slot == WarpParticleSelectorView.CUSTOM_SLOT) {
+        if (slot == particleSelectorView.customSlot()) {
             player.closeInventory();
             MessageKey promptKey = isDeparture
                     ? WarpsMessageKey.WARP_EDITOR_PARTICLE_DEPARTURE_PROMPT
@@ -344,7 +344,7 @@ public final class WarpEditorListener implements Listener {
             return;
         }
 
-        if (slot >= 0 && slot < WarpParticleSelectorView.OPTION_LIMIT) {
+        if (slot >= 0 && slot < particleSelectorView.optionLimit()) {
             List<WarpParticleSelectorView.ParticleOption> options = particleSelectorView.getOptions();
             if (slot < options.size()) {
                 WarpParticleSelectorView.ParticleOption opt = options.get(slot);
@@ -372,7 +372,7 @@ public final class WarpEditorListener implements Listener {
         PlayerRef viewer = holder.viewer();
         @Nullable PlayerRef owner = holder.warpOwner();
 
-        if (slot == WarpWelcomeMessagesView.BACK_SLOT) {
+        if (slot == welcomeMessagesView.backSlot()) {
             editorView.open(player, viewer, name, owner);
             return;
         }
@@ -380,13 +380,13 @@ public final class WarpEditorListener implements Listener {
         EditableWarp warp = loadEditable(name, owner);
         List<WelcomeMessage> currentMsgs = warp == null ? new ArrayList<>() : new ArrayList<>(warp.welcomeMessages());
 
-        if (slot == WarpWelcomeMessagesView.CLEAR_SLOT) {
+        if (slot == welcomeMessagesView.clearSlot()) {
             saveWelcomeMessages(holder, List.of());
             welcomeMessagesView.open(player, viewer, name, owner);
             return;
         }
 
-        if (slot == WarpWelcomeMessagesView.ADD_SLOT) {
+        if (slot == welcomeMessagesView.addSlot()) {
             player.closeInventory();
             promptListener.prompt(player, text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT), input -> {
                 List<WelcomeMessage> updatedList = new ArrayList<>(currentMsgs);
