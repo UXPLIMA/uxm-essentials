@@ -351,12 +351,33 @@ public final class EconomyWiring {
                         org.bukkit.Material.PAPER));
         TransactionsHistoryView historyView = new TransactionsHistoryView(
                 history, kernel.scheduler(), kernel.messages(), logsLayout, settings.historyTimeZone());
-        PayConfirmationView payConfirmationView = new PayConfirmationView(pay, kernel.scheduler(), kernel.messages());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout payConfirmLayout =
+                guiLayouts.loadFixedMenu("economy", "pay-confirm", PayConfirmationView.defaultLayout());
+        PayConfirmationView payConfirmationView =
+                new PayConfirmationView(pay, kernel.scheduler(), kernel.messages(), payConfirmLayout);
         BaltopGuiView baltopGuiView = new BaltopGuiView(snapshots, kernel.scheduler(), notifier, kernel.messages());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout walletLayout =
+                guiLayouts.loadFixedMenu("economy", "wallet", WalletGuiView.defaultLayout());
         WalletGuiView walletGuiView = new WalletGuiView(
-                plugin, resolved, kernel.scheduler(), notifier, kernel.messages(), historyView, kernel.log());
+                plugin,
+                resolved,
+                kernel.scheduler(),
+                notifier,
+                kernel.messages(),
+                historyView,
+                walletLayout,
+                kernel.log());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout exchangeLayout =
+                guiLayouts.loadFixedMenu("economy", "exchange", ExchangeGuiView.defaultLayout());
         ExchangeGuiView exchangeView = new ExchangeGuiView(
-                plugin, resolved, exchangeService, kernel.scheduler(), notifier, kernel.messages(), chatPromptListener);
+                plugin,
+                resolved,
+                exchangeService,
+                kernel.scheduler(),
+                notifier,
+                kernel.messages(),
+                chatPromptListener,
+                exchangeLayout);
 
         com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore =
                 com.uxplima.uxmessentials.persistence.economy.WalletRepositories.banknoteStore(persistence);
@@ -417,8 +438,16 @@ public final class EconomyWiring {
                 kernel.messages(),
                 navigation,
                 bankListLayout);
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout bankActionsLayout =
+                guiLayouts.loadFixedMenu("economy", "bank-actions", BankActionsView.defaultLayout());
         BankActionsView bankActionsView = new BankActionsView(
-                bankService, bankChatPromptListener, kernel.scheduler(), kernel.messages(), historyView, navigation);
+                bankService,
+                bankChatPromptListener,
+                kernel.scheduler(),
+                kernel.messages(),
+                historyView,
+                navigation,
+                bankActionsLayout);
         BankMembersView bankMembersView = new BankMembersView(
                 bankService,
                 bankChatPromptListener,
@@ -429,8 +458,10 @@ public final class EconomyWiring {
                 bankMembersLayout);
         navigationHolder.set(new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation(
                 bankGuiView, bankActionsView, bankMembersView));
-        LoanGuiView loanGuiView =
-                new LoanGuiView(loanService, currencies, loanChatPromptListener, kernel.scheduler(), kernel.messages());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout loanLayout =
+                guiLayouts.loadFixedMenu("economy", "loan-dashboard", LoanGuiView.defaultLayout());
+        LoanGuiView loanGuiView = new LoanGuiView(
+                loanService, currencies, loanChatPromptListener, kernel.scheduler(), kernel.messages(), loanLayout);
 
         return new EconomyServices(
                 new Balance(resolved, notifier),

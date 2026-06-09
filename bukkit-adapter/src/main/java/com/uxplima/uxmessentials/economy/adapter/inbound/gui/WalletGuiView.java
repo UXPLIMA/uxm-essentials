@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -45,6 +46,7 @@ public final class WalletGuiView {
     private final EconomyNotifier notifier;
     private final Messages messages;
     private final TransactionsHistoryView historyView;
+    private final FixedMenuLayout layout;
     private final Logger log;
     private final MiniMessage miniMessage;
     private final NamespacedKey valueKey;
@@ -57,6 +59,7 @@ public final class WalletGuiView {
             EconomyNotifier notifier,
             Messages messages,
             TransactionsHistoryView historyView,
+            FixedMenuLayout layout,
             Logger log) {
         Objects.requireNonNull(plugin, "plugin");
         this.economyProvider = Objects.requireNonNull(economyProvider, "economyProvider");
@@ -64,11 +67,22 @@ public final class WalletGuiView {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.historyView = Objects.requireNonNull(historyView, "historyView");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.log = Objects.requireNonNull(log, "log");
         this.miniMessage = MiniMessage.miniMessage();
         // Created once here, never on the GUI-open hot path (CLAUDE.md NamespacedKey rule).
         this.valueKey = new NamespacedKey(plugin, "banknote_value");
         this.currencyKey = new NamespacedKey(plugin, "banknote_currency");
+    }
+
+    /** The shipped geometry: virtual balance, banknotes, history, and close, externalised to wallet.conf. */
+    public static FixedMenuLayout defaultLayout() {
+        return FixedMenuLayout.builder(3, Material.GRAY_STAINED_GLASS_PANE)
+                .element("balance", 11, Material.GOLD_INGOT)
+                .element("banknotes", 13, Material.PAPER)
+                .element("history", 15, Material.BOOK)
+                .element("close", 22, Material.BARRIER)
+                .build();
     }
 
     /**
@@ -79,70 +93,82 @@ public final class WalletGuiView {
      */
     public void open(Player viewer, Currency currency) {
         PlayerRef viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
-
-        // Read balance off-tick
+        // Read balance and tally banknotes off-tick, then render on the viewer's entity thread.
         scheduler.async(() -> {
             Money balance = economyProvider.balance(viewerRef, currency);
             BigDecimal banknotesValue = calculateBanknotesValue(viewer, currency);
-
-            scheduler.onEntity(viewerRef, () -> {
-                Component titleText = text(viewerRef, EconomyMessageKey.WALLET_GUI_TITLE, Map.of());
-
-                SimpleGui gui = Guis.gui().title(titleText).rows(3).build();
-
-                // 1. Virtual Balance Icon (Slot 11)
-                ItemStack balanceItem = ItemBuilder.of(Material.GOLD_INGOT)
-                        .name(text(viewerRef, EconomyMessageKey.WALLET_GUI_BALANCE_NAME, Map.of()))
-                        .lore(List.of(text(
-                                viewerRef,
-                                EconomyMessageKey.WALLET_GUI_BALANCE_LORE,
-                                Map.of("amount", notifier.amount(balance)))))
-                        .build();
-                gui.set(11, GuiItem.display(balanceItem));
-
-                // 2. Physical Banknotes Icon (Slot 13)
-                ItemStack banknotesItem = ItemBuilder.of(Material.PAPER)
-                        .name(text(viewerRef, EconomyMessageKey.WALLET_GUI_BANKNOTES_NAME, Map.of()))
-                        .lore(textLoreLines(
-                                viewerRef,
-                                EconomyMessageKey.WALLET_GUI_BANKNOTES_LORE,
-                                Map.of("amount", notifier.amount(Money.of(currency, banknotesValue)))))
-                        .build();
-                gui.set(13, GuiItem.display(banknotesItem));
-
-                // 3. Transaction History Icon (Slot 15)
-                ItemStack historyItem = ItemBuilder.of(Material.BOOK)
-                        .name(text(viewerRef, EconomyMessageKey.WALLET_GUI_HISTORY_NAME, Map.of()))
-                        .lore(List.of(text(viewerRef, EconomyMessageKey.WALLET_GUI_HISTORY_LORE, Map.of())))
-                        .build();
-                gui.set(15, GuiItem.button(historyItem, event -> {
-                    scheduler.onEntity(viewerRef, () -> {
-                        gui.close(viewer);
-                        historyView.open(viewer, viewer.getUniqueId(), viewer.getName());
-                    });
-                }));
-
-                // 4. Close Button (Slot 22)
-                ItemStack closeItem = ItemBuilder.of(Material.BARRIER)
-                        .name(text(viewerRef, EconomyMessageKey.BALTOP_GUI_CLOSE, Map.of()))
-                        .build();
-                gui.set(22, GuiItem.button(closeItem, event -> {
-                    scheduler.onEntity(viewerRef, () -> gui.close(viewer));
-                }));
-
-                // Fillers
-                ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                        .name(Component.empty())
-                        .build();
-                for (int slot = 0; slot < 27; slot++) {
-                    if (slot != 11 && slot != 13 && slot != 15 && slot != 22) {
-                        gui.set(slot, GuiItem.display(filler));
-                    }
-                }
-
-                gui.open(viewer);
-            });
+            scheduler.onEntity(viewerRef, () -> render(viewer, viewerRef, currency, balance, banknotesValue));
         });
+    }
+
+    private void render(
+            Player viewer, PlayerRef viewerRef, Currency currency, Money balance, BigDecimal banknotesValue) {
+        Component titleText = text(viewerRef, EconomyMessageKey.WALLET_GUI_TITLE, Map.of());
+        SimpleGui gui = Guis.gui().title(titleText).rows(layout.rows()).build();
+        fillBackground(gui);
+        placeBalance(gui, viewerRef, balance);
+        placeBanknotes(gui, viewerRef, currency, banknotesValue);
+        placeHistory(gui, viewer, viewerRef);
+        placeClose(gui, viewer, viewerRef);
+        gui.open(viewer);
+    }
+
+    private void placeBalance(SimpleGui gui, PlayerRef viewerRef, Money balance) {
+        ItemStack balanceItem = ItemBuilder.of(layout.material("balance"))
+                .name(text(viewerRef, EconomyMessageKey.WALLET_GUI_BALANCE_NAME, Map.of()))
+                .lore(List.of(text(
+                        viewerRef,
+                        EconomyMessageKey.WALLET_GUI_BALANCE_LORE,
+                        Map.of("amount", notifier.amount(balance)))))
+                .build();
+        gui.set(layout.slot("balance"), GuiItem.display(balanceItem));
+    }
+
+    private void placeBanknotes(SimpleGui gui, PlayerRef viewerRef, Currency currency, BigDecimal banknotesValue) {
+        ItemStack banknotesItem = ItemBuilder.of(layout.material("banknotes"))
+                .name(text(viewerRef, EconomyMessageKey.WALLET_GUI_BANKNOTES_NAME, Map.of()))
+                .lore(textLoreLines(
+                        viewerRef,
+                        EconomyMessageKey.WALLET_GUI_BANKNOTES_LORE,
+                        Map.of("amount", notifier.amount(Money.of(currency, banknotesValue)))))
+                .build();
+        gui.set(layout.slot("banknotes"), GuiItem.display(banknotesItem));
+    }
+
+    private void placeHistory(SimpleGui gui, Player viewer, PlayerRef viewerRef) {
+        ItemStack historyItem = ItemBuilder.of(layout.material("history"))
+                .name(text(viewerRef, EconomyMessageKey.WALLET_GUI_HISTORY_NAME, Map.of()))
+                .lore(List.of(text(viewerRef, EconomyMessageKey.WALLET_GUI_HISTORY_LORE, Map.of())))
+                .build();
+        gui.set(
+                layout.slot("history"),
+                GuiItem.button(
+                        historyItem,
+                        event -> scheduler.onEntity(viewerRef, () -> {
+                            gui.close(viewer);
+                            historyView.open(viewer, viewer.getUniqueId(), viewer.getName());
+                        })));
+    }
+
+    private void placeClose(SimpleGui gui, Player viewer, PlayerRef viewerRef) {
+        ItemStack closeItem = ItemBuilder.of(layout.material("close"))
+                .name(text(viewerRef, EconomyMessageKey.BALTOP_GUI_CLOSE, Map.of()))
+                .build();
+        gui.set(
+                layout.slot("close"),
+                GuiItem.button(closeItem, event -> scheduler.onEntity(viewerRef, () -> gui.close(viewer))));
+    }
+
+    private void fillBackground(SimpleGui gui) {
+        ItemStack filler =
+                ItemBuilder.of(layout.fillerMaterial()).name(Component.empty()).build();
+        int size = layout.rows() * 9;
+        java.util.Set<Integer> occupied = new java.util.HashSet<>(layout.slots().values());
+        for (int slot = 0; slot < size; slot++) {
+            if (!occupied.contains(slot)) {
+                gui.set(slot, GuiItem.display(filler));
+            }
+        }
     }
 
     private BigDecimal calculateBanknotesValue(Player player, Currency currency) {

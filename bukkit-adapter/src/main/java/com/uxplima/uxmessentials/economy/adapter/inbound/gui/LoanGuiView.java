@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -48,6 +49,7 @@ public final class LoanGuiView {
     private final Messages messages;
     private final LoanIcons icons;
     private final LoanRequestFlow requestFlow;
+    private final FixedMenuLayout layout;
     private final MiniMessage miniMessage;
 
     public LoanGuiView(
@@ -55,16 +57,29 @@ public final class LoanGuiView {
             CurrencyRegistry currencies,
             LoanChatPromptListener chatPromptListener,
             Scheduler scheduler,
-            Messages messages) {
+            Messages messages,
+            FixedMenuLayout layout) {
         this.loanService = Objects.requireNonNull(loanService, "loanService");
         Objects.requireNonNull(currencies, "currencies");
         this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.icons = new LoanIcons(loanService, messages, currencies);
         this.requestFlow = new LoanRequestFlow(
                 loanService, currencies, chatPromptListener, scheduler, messages, icons, this::open);
         this.miniMessage = MiniMessage.miniMessage();
+    }
+
+    /** The shipped geometry: profile, active-loan strip, request, and close, externalised to loan-dashboard.conf. */
+    public static FixedMenuLayout defaultLayout() {
+        return FixedMenuLayout.builder(3, Material.GRAY_STAINED_GLASS_PANE)
+                .slotOnly("profile", 4)
+                .slotOnly("loan-first", 10)
+                .slotOnly("loan-last", 16)
+                .element("request", 20, Material.EMERALD_BLOCK)
+                .element("close", 22, Material.BARRIER)
+                .build();
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
@@ -86,21 +101,28 @@ public final class LoanGuiView {
             Player player, PlayerRef viewerRef, Loan.CreditScore creditScore, List<Loan> activeLoans) {
         SimpleGui gui = Guis.gui()
                 .title(text(viewerRef, EconomyMessageKey.LOAN_GUI_TITLE, Map.of()))
-                .rows(3)
+                .rows(layout.rows())
                 .build();
 
-        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
-                .build();
-        for (int i = 0; i < 27; i++) {
+        ItemStack filler =
+                ItemBuilder.of(layout.fillerMaterial()).name(Component.empty()).build();
+        for (int i = 0; i < layout.rows() * 9; i++) {
             gui.set(i, GuiItem.display(filler));
         }
 
-        gui.set(4, GuiItem.display(icons.profile(viewerRef, creditScore)));
+        gui.set(layout.slot("profile"), GuiItem.display(icons.profile(viewerRef, creditScore)));
+        placeActiveLoans(gui, player, viewerRef, activeLoans);
+        placeRequest(gui, player, viewerRef);
+        placeClose(gui, player, viewerRef);
 
-        int slotIndex = 10;
+        gui.open(player);
+    }
+
+    private void placeActiveLoans(SimpleGui gui, Player player, PlayerRef viewerRef, List<Loan> activeLoans) {
+        int slotIndex = layout.slot("loan-first");
+        int lastSlot = layout.slot("loan-last");
         for (Loan loan : activeLoans) {
-            if (slotIndex > 16) {
+            if (slotIndex > lastSlot) {
                 break;
             }
             gui.set(
@@ -119,8 +141,10 @@ public final class LoanGuiView {
                             })));
             slotIndex++;
         }
+    }
 
-        ItemStack requestItem = ItemBuilder.of(Material.EMERALD_BLOCK)
+    private void placeRequest(SimpleGui gui, Player player, PlayerRef viewerRef) {
+        ItemStack requestItem = ItemBuilder.of(layout.material("request"))
                 .name(text(viewerRef, EconomyMessageKey.LOAN_GUI_REQUEST_NAME, Map.of()))
                 .lore(List.of(
                         text(viewerRef, EconomyMessageKey.LOAN_GUI_REQUEST_LORE, Map.of()),
@@ -128,20 +152,22 @@ public final class LoanGuiView {
                         text(viewerRef, EconomyMessageKey.LOAN_GUI_REQUEST_HINT, Map.of())))
                 .build();
         gui.set(
-                20,
+                layout.slot("request"),
                 GuiItem.button(
                         requestItem,
                         event -> scheduler.onEntity(viewerRef, () -> {
                             gui.close(player);
                             requestFlow.openCurrencySelector(player);
                         })));
+    }
 
-        ItemStack closeItem = ItemBuilder.of(Material.BARRIER)
+    private void placeClose(SimpleGui gui, Player player, PlayerRef viewerRef) {
+        ItemStack closeItem = ItemBuilder.of(layout.material("close"))
                 .name(text(viewerRef, EconomyMessageKey.LOAN_GUI_CLOSE, Map.of()))
                 .build();
-        gui.set(22, GuiItem.button(closeItem, event -> scheduler.onEntity(viewerRef, () -> gui.close(player))));
-
-        gui.open(player);
+        gui.set(
+                layout.slot("close"),
+                GuiItem.button(closeItem, event -> scheduler.onEntity(viewerRef, () -> gui.close(player))));
     }
 
     private void promptCustomRepayment(Player player, Loan loan) {

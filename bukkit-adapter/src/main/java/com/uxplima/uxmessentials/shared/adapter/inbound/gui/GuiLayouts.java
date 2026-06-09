@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.bukkit.Material;
@@ -113,6 +114,61 @@ public final class GuiLayouts {
             slots.add(child.getInt());
         }
         return slots;
+    }
+
+    /**
+     * Resolve a fixed-action menu layout, overriding the {@code codeDefault}'s rows, filler, and per-element
+     * slot/material from the conf where present. Resolution mirrors {@link #load}; a missing file or unparsable
+     * key falls back to the code default so a typo never stops a menu opening.
+     */
+    public FixedMenuLayout loadFixedMenu(String module, String name, FixedMenuLayout codeDefault) {
+        Objects.requireNonNull(module, "module");
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(codeDefault, "codeDefault");
+        Path onDisk =
+                dataFolder.resolve("modules").resolve(module).resolve("gui").resolve(name + ".conf");
+        if (Files.isRegularFile(onDisk)) {
+            return parseFixedMenu(
+                    HoconConfigurationLoader.builder().path(onDisk).build(), onDisk.toString(), codeDefault);
+        }
+        String resource = "modules/" + module + "/gui/" + name + ".conf";
+        if (getClass().getClassLoader().getResource(resource) == null) {
+            return codeDefault;
+        }
+        return parseFixedMenu(
+                HoconConfigurationLoader.builder()
+                        .source(() -> openReader(resource))
+                        .build(),
+                resource,
+                codeDefault);
+    }
+
+    private FixedMenuLayout parseFixedMenu(
+            HoconConfigurationLoader loader, String origin, FixedMenuLayout codeDefault) {
+        ConfigurationNode root;
+        try {
+            root = loader.load();
+        } catch (ConfigurateException failure) {
+            log.error("failed to load fixed-menu gui layout " + origin, failure);
+            return codeDefault;
+        }
+        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
+        Material filler = material(root.node("filler-material").getString(), codeDefault.fillerMaterial());
+        FixedMenuLayout.Builder builder = FixedMenuLayout.builder(rows, filler);
+        ConfigurationNode slotsNode = root.node("slots");
+        ConfigurationNode materialsNode = root.node("materials");
+        for (Map.Entry<String, Integer> entry : codeDefault.slots().entrySet()) {
+            String element = entry.getKey();
+            int slot = slotsNode.node(element).getInt(entry.getValue());
+            Material defaultMaterial = codeDefault.materials().get(element);
+            if (defaultMaterial == null) {
+                builder.slotOnly(element, slot);
+            } else {
+                builder.element(
+                        element, slot, material(materialsNode.node(element).getString(), defaultMaterial));
+            }
+        }
+        return builder.build();
     }
 
     public WarpEditorLayout loadWarpEditor(String module, String name, WarpEditorLayout codeDefault) {

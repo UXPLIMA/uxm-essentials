@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.economy.domain.AmountParser;
 import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -48,6 +49,7 @@ public final class BankActionsView {
     private final Messages messages;
     private final TransactionsHistoryView historyView;
     private final Supplier<BankNavigation> navigation;
+    private final FixedMenuLayout layout;
     private final MiniMessage miniMessage;
 
     public BankActionsView(
@@ -56,14 +58,27 @@ public final class BankActionsView {
             Scheduler scheduler,
             Messages messages,
             TransactionsHistoryView historyView,
-            Supplier<BankNavigation> navigation) {
+            Supplier<BankNavigation> navigation,
+            FixedMenuLayout layout) {
         this.bankService = Objects.requireNonNull(bankService, "bankService");
         this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.historyView = Objects.requireNonNull(historyView, "historyView");
         this.navigation = Objects.requireNonNull(navigation, "navigation");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = MiniMessage.miniMessage();
+    }
+
+    /** The shipped geometry: deposit, withdraw, members, logs, and back, externalised to bank-actions.conf. */
+    public static FixedMenuLayout defaultLayout() {
+        return FixedMenuLayout.builder(3, Material.GRAY_STAINED_GLASS_PANE)
+                .element("deposit", 10, Material.GOLD_INGOT)
+                .element("withdraw", 12, Material.IRON_INGOT)
+                .element("members", 14, Material.PLAYER_HEAD)
+                .element("logs", 16, Material.BOOK)
+                .element("back", 22, Material.BARRIER)
+                .build();
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
@@ -74,89 +89,106 @@ public final class BankActionsView {
 
     public void open(Player player, SharedBank bank) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-
         SimpleGui gui = Guis.gui()
                 .title(text(viewerRef, EconomyMessageKey.BANK_ACTIONS_GUI_TITLE, Map.of("bank", bank.name())))
-                .rows(3)
+                .rows(layout.rows())
                 .build();
 
-        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
-                .build();
-        for (int i = 0; i < 27; i++) {
-            gui.set(i, GuiItem.display(filler));
-        }
-
-        gui.set(10, GuiItem.button(actionIcon(viewerRef, Material.GOLD_INGOT, "deposit"), event -> {
-            scheduler.onEntity(viewerRef, () -> {
-                gui.close(player);
-                promptDeposit(player, bank);
-            });
-        }));
-        gui.set(12, GuiItem.button(actionIcon(viewerRef, Material.IRON_INGOT, "withdraw"), event -> {
-            scheduler.onEntity(viewerRef, () -> {
-                gui.close(player);
-                promptWithdraw(player, bank);
-            });
-        }));
-        gui.set(
-                14,
-                GuiItem.button(
-                        actionIcon(viewerRef, Material.PLAYER_HEAD, "members"),
-                        event -> scheduler.onEntity(
-                                viewerRef,
-                                () -> navigation.get().bankMembersView().open(player, bank))));
-        gui.set(
-                16,
-                GuiItem.button(
-                        actionIcon(viewerRef, Material.BOOK, "logs"),
-                        event -> scheduler.onEntity(viewerRef, () -> {
-                            gui.close(player);
-                            historyView.openForBank(player, bank.id(), bank.name());
-                        })));
-
-        ItemStack backItem = ItemBuilder.of(Material.BARRIER)
-                .name(text(viewerRef, EconomyMessageKey.BANK_ACTIONS_GUI_BACK, Map.of()))
-                .build();
-        gui.set(
-                22,
-                GuiItem.button(
-                        backItem,
-                        event -> scheduler.onEntity(
-                                viewerRef, () -> navigation.get().bankGuiView().open(player))));
+        fillBackground(gui);
+        placeActions(gui, player, viewerRef, bank);
+        placeBack(gui, player, viewerRef);
 
         gui.open(player);
     }
 
-    private ItemStack actionIcon(PlayerRef viewer, Material material, String action) {
-        EconomyMessageKey nameKey;
-        EconomyMessageKey loreKey;
-        EconomyMessageKey hintKey;
-        switch (action) {
-            case "deposit" -> {
-                nameKey = EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_NAME;
-                loreKey = EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_LORE;
-                hintKey = EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_HINT;
-            }
-            case "withdraw" -> {
-                nameKey = EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_NAME;
-                loreKey = EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_LORE;
-                hintKey = EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_HINT;
-            }
-            case "members" -> {
-                nameKey = EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_NAME;
-                loreKey = EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_LORE;
-                hintKey = EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_HINT;
-            }
-            default -> {
-                nameKey = EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_NAME;
-                loreKey = EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_LORE;
-                hintKey = EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_HINT;
-            }
+    private void fillBackground(SimpleGui gui) {
+        ItemStack filler =
+                ItemBuilder.of(layout.fillerMaterial()).name(Component.empty()).build();
+        for (int i = 0; i < layout.rows() * 9; i++) {
+            gui.set(i, GuiItem.display(filler));
         }
-        return ItemBuilder.of(material)
-                .name(text(viewer, nameKey, Map.of()))
-                .lore(List.of(text(viewer, loreKey, Map.of()), Component.empty(), text(viewer, hintKey, Map.of())))
+    }
+
+    private void placeActions(SimpleGui gui, Player player, PlayerRef viewerRef, SharedBank bank) {
+        placeMoneyActions(gui, player, viewerRef, bank);
+        placeNavActions(gui, player, viewerRef, bank);
+    }
+
+    private void placeMoneyActions(SimpleGui gui, Player player, PlayerRef viewerRef, SharedBank bank) {
+        gui.set(
+                layout.slot("deposit"),
+                GuiItem.button(
+                        actionIcon(viewerRef, "deposit"),
+                        event -> scheduler.onEntity(viewerRef, () -> {
+                            gui.close(player);
+                            promptDeposit(player, bank);
+                        })));
+        gui.set(
+                layout.slot("withdraw"),
+                GuiItem.button(
+                        actionIcon(viewerRef, "withdraw"),
+                        event -> scheduler.onEntity(viewerRef, () -> {
+                            gui.close(player);
+                            promptWithdraw(player, bank);
+                        })));
+    }
+
+    private void placeNavActions(SimpleGui gui, Player player, PlayerRef viewerRef, SharedBank bank) {
+        gui.set(
+                layout.slot("members"),
+                GuiItem.button(
+                        actionIcon(viewerRef, "members"),
+                        event -> scheduler.onEntity(
+                                viewerRef,
+                                () -> navigation.get().bankMembersView().open(player, bank))));
+        gui.set(
+                layout.slot("logs"),
+                GuiItem.button(
+                        actionIcon(viewerRef, "logs"),
+                        event -> scheduler.onEntity(viewerRef, () -> {
+                            gui.close(player);
+                            historyView.openForBank(player, bank.id(), bank.name());
+                        })));
+    }
+
+    private void placeBack(SimpleGui gui, Player player, PlayerRef viewerRef) {
+        ItemStack backItem = ItemBuilder.of(layout.material("back"))
+                .name(text(viewerRef, EconomyMessageKey.BANK_ACTIONS_GUI_BACK, Map.of()))
+                .build();
+        gui.set(
+                layout.slot("back"),
+                GuiItem.button(
+                        backItem,
+                        event -> scheduler.onEntity(
+                                viewerRef, () -> navigation.get().bankGuiView().open(player))));
+    }
+
+    private record ActionKeys(EconomyMessageKey name, EconomyMessageKey lore, EconomyMessageKey hint) {}
+
+    private ItemStack actionIcon(PlayerRef viewer, String action) {
+        ActionKeys keys =
+                switch (action) {
+                    case "deposit" -> new ActionKeys(
+                            EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_NAME,
+                            EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_LORE,
+                            EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_HINT);
+                    case "withdraw" -> new ActionKeys(
+                            EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_NAME,
+                            EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_LORE,
+                            EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_HINT);
+                    case "members" -> new ActionKeys(
+                            EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_NAME,
+                            EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_LORE,
+                            EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_HINT);
+                    default -> new ActionKeys(
+                            EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_NAME,
+                            EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_LORE,
+                            EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_HINT);
+                };
+        return ItemBuilder.of(layout.material(action))
+                .name(text(viewer, keys.name(), Map.of()))
+                .lore(List.of(
+                        text(viewer, keys.lore(), Map.of()), Component.empty(), text(viewer, keys.hint(), Map.of())))
                 .build();
     }
 

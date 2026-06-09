@@ -15,7 +15,6 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
-import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
@@ -25,13 +24,13 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
 import com.uxplima.uxmlib.gui.item.GuiItem;
-import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -46,6 +45,8 @@ public final class ExchangeGuiView {
     private final EconomyNotifier notifier;
     private final Messages messages;
     private final ExchangeChatPromptListener chatPromptListener;
+    private final FixedMenuLayout layout;
+    private final ExchangeIcons icons;
     private final MiniMessage miniMessage;
 
     public ExchangeGuiView(
@@ -55,14 +56,32 @@ public final class ExchangeGuiView {
             Scheduler scheduler,
             EconomyNotifier notifier,
             Messages messages,
-            ExchangeChatPromptListener chatPromptListener) {
+            ExchangeChatPromptListener chatPromptListener,
+            FixedMenuLayout layout) {
         this.economyProvider = Objects.requireNonNull(economyProvider, "economyProvider");
         this.exchangeService = Objects.requireNonNull(exchangeService, "exchangeService");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
+        this.layout = Objects.requireNonNull(layout, "layout");
+        this.icons = new ExchangeIcons(messages, notifier, layout);
         this.miniMessage = MiniMessage.miniMessage();
+    }
+
+    /**
+     * The shipped geometry: source/target currency pickers, the info-convert button, and close, externalised
+     * to exchange.conf. The source/target icons use the per-currency icon-material, so only their slots are
+     * configured here, never their materials.
+     */
+    public static FixedMenuLayout defaultLayout() {
+        return FixedMenuLayout.builder(3, Material.GRAY_STAINED_GLASS_PANE)
+                .slotOnly("source", 11)
+                .element("info", 13, Material.SUNFLOWER)
+                .slotOnly("target", 15)
+                .element("no-rate", 13, Material.BARRIER)
+                .element("close", 22, Material.BARRIER)
+                .build();
     }
 
     /** Opens the exchange GUI for the player using the default source and target currencies. */
@@ -85,156 +104,128 @@ public final class ExchangeGuiView {
             Money targetBalance = economyProvider.balance(viewerRef, target);
 
             scheduler.onEntity(viewerRef, () -> {
-                Component titleText = text(viewerRef, EconomyMessageKey.EXCHANGE_GUI_TITLE, Map.of());
+                Component titleText = miniMessage.deserialize(
+                        messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_GUI_TITLE, Map.of()));
+                SimpleGui gui = Guis.gui().title(titleText).rows(layout.rows()).build();
 
-                SimpleGui gui = Guis.gui().title(titleText).rows(3).build();
-
-                // 1. Source Currency Item (Slot 11)
-                ItemStack sourceItem = ItemBuilder.of(currencyMaterial(source))
-                        .name(text(
-                                viewerRef,
-                                EconomyMessageKey.EXCHANGE_GUI_SOURCE_NAME,
-                                Map.of("currency", source.plural())))
-                        .lore(textLoreLines(
-                                viewerRef,
-                                EconomyMessageKey.EXCHANGE_GUI_SOURCE_LORE,
-                                Map.of("balance", notifier.amount(sourceBalance))))
-                        .build();
-
-                gui.set(11, GuiItem.button(sourceItem, event -> {
-                    scheduler.onEntity(viewerRef, () -> {
-                        List<Currency> list = new ArrayList<>(economyProvider.currencies());
-                        if (list.size() < 2) return;
-                        int idx = list.indexOf(source);
-                        int nextIdx = (idx + 1) % list.size();
-                        Currency nextSource = list.get(nextIdx);
-                        if (nextSource.equals(target)) {
-                            nextIdx = (nextIdx + 1) % list.size();
-                            nextSource = list.get(nextIdx);
-                        }
-                        open(viewer, nextSource, target);
-                    });
-                }));
-
-                // 2. Target Currency Item (Slot 15)
-                ItemStack targetItem = ItemBuilder.of(currencyMaterial(target))
-                        .name(text(
-                                viewerRef,
-                                EconomyMessageKey.EXCHANGE_GUI_TARGET_NAME,
-                                Map.of("currency", target.plural())))
-                        .lore(textLoreLines(
-                                viewerRef,
-                                EconomyMessageKey.EXCHANGE_GUI_TARGET_LORE,
-                                Map.of("balance", notifier.amount(targetBalance))))
-                        .build();
-
-                gui.set(15, GuiItem.button(targetItem, event -> {
-                    scheduler.onEntity(viewerRef, () -> {
-                        List<Currency> list = new ArrayList<>(economyProvider.currencies());
-                        if (list.size() < 2) return;
-                        int idx = list.indexOf(target);
-                        int nextIdx = (idx + 1) % list.size();
-                        Currency nextTarget = list.get(nextIdx);
-                        if (nextTarget.equals(source)) {
-                            nextIdx = (nextIdx + 1) % list.size();
-                            nextTarget = list.get(nextIdx);
-                        }
-                        open(viewer, source, nextTarget);
-                    });
-                }));
-
-                // 3. Info/Convert Button (Slot 13)
-                Optional<ExchangeRate> rateOpt = exchangeService.registry().findRate(source.id(), target.id());
-                ItemStack infoItem;
-                if (rateOpt.isPresent()) {
-                    ExchangeRate rate = rateOpt.get();
-                    String rateStr = rate.rate().toPlainString();
-                    String feeStr = rate.feePercent()
-                            .multiply(BigDecimal.valueOf(100))
-                            .stripTrailingZeros()
-                            .toPlainString();
-
-                    infoItem = ItemBuilder.of(Material.SUNFLOWER)
-                            .name(text(viewerRef, EconomyMessageKey.EXCHANGE_GUI_INFO_NAME, Map.of()))
-                            .lore(textLoreLines(
-                                    viewerRef,
-                                    EconomyMessageKey.EXCHANGE_GUI_INFO_LORE,
-                                    Map.of(
-                                            "source",
-                                            source.plural(),
-                                            "target",
-                                            target.plural(),
-                                            "rate",
-                                            rateStr,
-                                            "fee",
-                                            feeStr)))
-                            .build();
-                } else {
-                    infoItem = ItemBuilder.of(Material.BARRIER)
-                            .name(text(viewerRef, EconomyMessageKey.EXCHANGE_GUI_NO_RATE_NAME, Map.of()))
-                            .lore(List.of(text(
-                                    viewerRef,
-                                    EconomyMessageKey.EXCHANGE_GUI_NO_RATE_LORE,
-                                    Map.of("source", source.plural(), "target", target.plural()))))
-                            .build();
-                }
-
-                gui.set(13, GuiItem.button(infoItem, event -> {
-                    if (rateOpt.isEmpty()) {
-                        return;
-                    }
-                    if (event.isRightClick() && event.isShiftClick()) {
-                        scheduler.onEntity(viewerRef, () -> {
-                            gui.close(viewer);
-                            promptCustomAmount(viewer, source, target);
-                        });
-                        return;
-                    }
-
-                    BigDecimal amountToConvert = BigDecimal.ZERO;
-                    if (event.isLeftClick() && !event.isShiftClick()) {
-                        amountToConvert = BigDecimal.valueOf(10);
-                    } else if (event.isRightClick() && !event.isShiftClick()) {
-                        amountToConvert = BigDecimal.valueOf(100);
-                    } else if (event.isLeftClick() && event.isShiftClick()) {
-                        amountToConvert = BigDecimal.valueOf(1000);
-                    }
-
-                    if (amountToConvert.compareTo(BigDecimal.ZERO) <= 0) {
-                        return;
-                    }
-
-                    BigDecimal finalAmount = amountToConvert;
-                    scheduler.async(() -> {
-                        ExchangeOutcome result = exchangeService.exchange(viewerRef, finalAmount, source, target);
-                        scheduler.onEntity(viewerRef, () -> {
-                            handleExchangeResult(viewer, result, source, target);
-                            open(viewer, source, target);
-                        });
-                    });
-                }));
-
-                // 4. Close Button (Slot 22)
-                ItemStack closeItem = ItemBuilder.of(Material.BARRIER)
-                        .name(text(viewerRef, EconomyMessageKey.BALTOP_GUI_CLOSE, Map.of()))
-                        .build();
-                gui.set(22, GuiItem.button(closeItem, event -> {
-                    scheduler.onEntity(viewerRef, () -> gui.close(viewer));
-                }));
-
-                // Fillers
-                ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                        .name(Component.empty())
-                        .build();
-                for (int slot = 0; slot < 27; slot++) {
-                    if (slot != 11 && slot != 13 && slot != 15 && slot != 22) {
-                        gui.set(slot, GuiItem.display(filler));
-                    }
-                }
+                fillBackground(gui);
+                placeCurrency(gui, viewer, viewerRef, source, target, sourceBalance, true);
+                placeCurrency(gui, viewer, viewerRef, source, target, targetBalance, false);
+                placeInfo(gui, viewer, viewerRef, source, target);
+                placeClose(gui, viewer, viewerRef);
 
                 gui.open(viewer);
             });
         });
+    }
+
+    private void fillBackground(SimpleGui gui) {
+        ItemStack filler = icons.filler();
+        java.util.Set<Integer> occupied = new java.util.HashSet<>(layout.slots().values());
+        for (int slot = 0; slot < layout.rows() * 9; slot++) {
+            if (!occupied.contains(slot)) {
+                gui.set(slot, GuiItem.display(filler));
+            }
+        }
+    }
+
+    private void placeCurrency(
+            SimpleGui gui,
+            Player viewer,
+            PlayerRef viewerRef,
+            Currency source,
+            Currency target,
+            Money balance,
+            boolean isSource) {
+        Currency shown = isSource ? source : target;
+        ItemStack item = icons.currency(viewerRef, shown, balance, isSource);
+        gui.set(
+                layout.slot(isSource ? "source" : "target"),
+                GuiItem.button(
+                        item,
+                        event -> scheduler.onEntity(viewerRef, () -> cycleCurrency(viewer, source, target, isSource))));
+    }
+
+    /** Advance the source or target to the next currency, skipping the other side so they never coincide. */
+    private void cycleCurrency(Player viewer, Currency source, Currency target, boolean cyclingSource) {
+        List<Currency> list = new ArrayList<>(economyProvider.currencies());
+        if (list.size() < 2) {
+            return;
+        }
+        Currency pinned = cyclingSource ? target : source;
+        Currency current = cyclingSource ? source : target;
+        int nextIdx = (list.indexOf(current) + 1) % list.size();
+        Currency next = list.get(nextIdx);
+        if (next.equals(pinned)) {
+            next = list.get((nextIdx + 1) % list.size());
+        }
+        if (cyclingSource) {
+            open(viewer, next, target);
+        } else {
+            open(viewer, source, next);
+        }
+    }
+
+    private void placeInfo(SimpleGui gui, Player viewer, PlayerRef viewerRef, Currency source, Currency target) {
+        Optional<ExchangeRate> rateOpt = exchangeService.registry().findRate(source.id(), target.id());
+        ItemStack infoItem = rateOpt.isPresent()
+                ? icons.rate(viewerRef, source, target, rateOpt.get())
+                : icons.noRate(viewerRef, source, target);
+        gui.set(
+                layout.slot("info"),
+                GuiItem.button(infoItem, event -> onInfoClick(gui, viewer, viewerRef, source, target, rateOpt, event)));
+    }
+
+    private void onInfoClick(
+            SimpleGui gui,
+            Player viewer,
+            PlayerRef viewerRef,
+            Currency source,
+            Currency target,
+            Optional<ExchangeRate> rateOpt,
+            org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (rateOpt.isEmpty()) {
+            return;
+        }
+        if (event.isRightClick() && event.isShiftClick()) {
+            scheduler.onEntity(viewerRef, () -> {
+                gui.close(viewer);
+                promptCustomAmount(viewer, source, target);
+            });
+            return;
+        }
+        BigDecimal amountToConvert = quickAmount(event);
+        if (amountToConvert.signum() <= 0) {
+            return;
+        }
+        scheduler.async(() -> {
+            ExchangeOutcome result = exchangeService.exchange(viewerRef, amountToConvert, source, target);
+            scheduler.onEntity(viewerRef, () -> {
+                handleExchangeResult(viewer, result, source, target);
+                open(viewer, source, target);
+            });
+        });
+    }
+
+    /** The quick-convert amount a left/right/shift click maps to; zero for an unmapped combination. */
+    private static BigDecimal quickAmount(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (event.isLeftClick() && !event.isShiftClick()) {
+            return BigDecimal.valueOf(10);
+        }
+        if (event.isRightClick() && !event.isShiftClick()) {
+            return BigDecimal.valueOf(100);
+        }
+        if (event.isLeftClick() && event.isShiftClick()) {
+            return BigDecimal.valueOf(1000);
+        }
+        return BigDecimal.ZERO;
+    }
+
+    private void placeClose(SimpleGui gui, Player viewer, PlayerRef viewerRef) {
+        gui.set(
+                layout.slot("close"),
+                GuiItem.button(
+                        icons.close(viewerRef), event -> scheduler.onEntity(viewerRef, () -> gui.close(viewer))));
     }
 
     private void promptCustomAmount(Player player, Currency source, Currency target) {
@@ -270,37 +261,21 @@ public final class ExchangeGuiView {
 
     private void handleExchangeResult(Player player, ExchangeOutcome result, Currency source, Currency target) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        String prefixStr = messages.resolve(viewerRef, () -> "prefix", Map.of());
-        Component prefix = miniMessage.deserialize(prefixStr);
-
         switch (result.status()) {
-            case SUCCESS -> {
-                String successMsg = messages.resolve(
-                        viewerRef,
-                        EconomyMessageKey.EXCHANGE_SUCCESS,
-                        Map.of(
-                                "source-amount", notifier.amount(Money.of(source, result.sourceAmount())),
-                                "target-amount", notifier.amount(Money.of(target, result.targetAmount()))));
-                player.sendMessage(prefix.append(miniMessage.deserialize(successMsg)));
-            }
-            case RATE_NOT_FOUND -> {
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_RATE_NOT_FOUND, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
-            case INSUFFICIENT_FUNDS -> {
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_INSUFFICIENT_FUNDS, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
-            case LIMIT_EXCEEDED -> {
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_LIMIT_EXCEEDED, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
+            case SUCCESS -> sendPrefixed(
+                    player,
+                    viewerRef,
+                    EconomyMessageKey.EXCHANGE_SUCCESS,
+                    Map.of(
+                            "source-amount", notifier.amount(Money.of(source, result.sourceAmount())),
+                            "target-amount", notifier.amount(Money.of(target, result.targetAmount()))));
+            case RATE_NOT_FOUND -> sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_RATE_NOT_FOUND, Map.of());
+            case INSUFFICIENT_FUNDS -> sendPrefixed(
+                    player, viewerRef, EconomyMessageKey.EXCHANGE_INSUFFICIENT_FUNDS, Map.of());
+            case LIMIT_EXCEEDED -> sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_LIMIT_EXCEEDED, Map.of());
             case FAILED -> {
                 com.uxplima.uxmessentials.economy.domain.TransferError err = result.error();
-                com.uxplima.uxmessentials.economy.application.EconomyMessageKey key =
-                        err != null ? err.messageKey() : EconomyMessageKey.PAY_ERROR;
-                String errorMsg = messages.resolve(viewerRef, key, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
+                sendPrefixed(player, viewerRef, err != null ? err.messageKey() : EconomyMessageKey.PAY_ERROR, Map.of());
             }
             case ROLLBACK_FAILED -> {
                 player.getServer()
@@ -308,27 +283,15 @@ public final class ExchangeGuiView {
                         .severe("exchange rollback failed for " + player.getUniqueId() + ": debited "
                                 + result.sourceAmount() + " " + source.id().value()
                                 + " could not be returned (cause=" + result.error() + ")");
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.PAY_ERROR, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
+                sendPrefixed(player, viewerRef, EconomyMessageKey.PAY_ERROR, Map.of());
             }
         }
     }
 
-    private Material currencyMaterial(Currency currency) {
-        return CurrencyIcons.materialFor(currency, Material.PAPER);
-    }
-
-    private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
-    }
-
-    private List<Component> textLoreLines(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        String rawText = messages.resolve(viewer, key, placeholders);
-        Iterable<String> lines = Splitter.on('\n').split(rawText);
-        List<Component> list = new ArrayList<>();
-        for (String line : lines) {
-            list.add(miniMessage.deserialize(line));
-        }
-        return list;
+    /** Send {@code key} prefixed with the catalog's {@code prefix}, the pattern every exchange reply uses. */
+    private void sendPrefixed(
+            Player player, PlayerRef viewerRef, EconomyMessageKey key, Map<String, String> placeholders) {
+        Component prefix = miniMessage.deserialize(messages.resolve(viewerRef, () -> "prefix", Map.of()));
+        player.sendMessage(prefix.append(miniMessage.deserialize(messages.resolve(viewerRef, key, placeholders))));
     }
 }
