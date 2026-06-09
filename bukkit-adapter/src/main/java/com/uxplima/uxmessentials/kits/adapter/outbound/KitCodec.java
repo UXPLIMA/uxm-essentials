@@ -126,6 +126,14 @@ final class KitCodec {
                 }
             }
 
+            String rawCustomPermission = node.node("permission-node").getString("");
+            Optional<String> customPermission = rawCustomPermission == null || rawCustomPermission.isBlank()
+                    ? Optional.empty()
+                    : Optional.of(rawCustomPermission.strip());
+            List<com.uxplima.uxmessentials.kits.domain.KitVariant> variants = readVariants(node.node("variants"));
+            boolean preview = node.node("preview").getBoolean(true);
+            boolean closeOnClaim = node.node("close-on-claim").getBoolean(false);
+
             return Optional.of(new KitDefinition(
                     kitId,
                     items,
@@ -157,7 +165,11 @@ final class KitCodec {
                     claimedLore,
                     unaffordableMaterial,
                     unaffordableName,
-                    unaffordableLore));
+                    unaffordableLore,
+                    customPermission,
+                    variants,
+                    preview,
+                    closeOnClaim));
         } catch (RuntimeException malformed) {
             return Optional.empty();
         }
@@ -181,6 +193,11 @@ final class KitCodec {
         }
         node.node("claim-money").set(definition.claimMoney().toPlainString() + " " + definition.claimMoneyCurrency());
         node.node("priority").set(definition.priority());
+
+        node.node("permission-node").set(definition.customPermission().orElse(null));
+        node.node("preview").set(definition.preview() ? null : false);
+        node.node("close-on-claim").set(definition.closeOnClaim() ? true : null);
+        writeVariants(node.node("variants"), definition.variants());
 
         node.node("no-permission-material")
                 .set(definition.noPermissionMaterial().orElse(null));
@@ -241,16 +258,7 @@ final class KitCodec {
             node.node("particles").set(null);
         }
 
-        ConfigurationNode items = node.node("items");
-        items.set(null);
-        for (KitItem item : definition.items()) {
-            ConfigurationNode child = items.appendListNode();
-            child.node("data").set(item.data());
-            child.node("amount").set(item.amount());
-            if (item.slot().isPresent()) {
-                child.node("slot").set(item.slot().get());
-            }
-        }
+        writeItems(node.node("items"), definition.items());
     }
 
     private static List<String> strings(ConfigurationNode node) {
@@ -275,17 +283,94 @@ final class KitCodec {
         return items;
     }
 
+    /** The inventory slot the off-hand maps to in a {@code PlayerInventory}; {@code offhand = true} is its alias. */
+    private static final int OFF_HAND_SLOT = 40;
+
     private static Optional<KitItem> readItem(ConfigurationNode child) {
         if (child.isMap()) {
             String data = child.node("data").getString("");
             int amount = Math.max(1, child.node("amount").getInt(1));
-            Optional<Integer> slot = child.node("slot").virtual()
-                    ? Optional.empty()
-                    : Optional.of(child.node("slot").getInt());
+            Optional<Integer> slot = readSlot(child);
             return data.isBlank() ? Optional.empty() : Optional.of(KitItem.of(data, amount, slot));
         }
         String raw = child.getString("");
         return raw.isBlank() ? Optional.empty() : Optional.of(KitItem.of(raw, 1, Optional.empty()));
+    }
+
+    private static Optional<Integer> readSlot(ConfigurationNode child) {
+        if (child.node("offhand").getBoolean(false)) {
+            return Optional.of(OFF_HAND_SLOT);
+        }
+        return child.node("slot").virtual()
+                ? Optional.empty()
+                : Optional.of(child.node("slot").getInt());
+    }
+
+    private static List<com.uxplima.uxmessentials.kits.domain.KitVariant> readVariants(ConfigurationNode node) {
+        if (node.virtual() || !node.isMap()) {
+            return List.of();
+        }
+        List<com.uxplima.uxmessentials.kits.domain.KitVariant> variants = new ArrayList<>();
+        for (java.util.Map.Entry<Object, ? extends ConfigurationNode> entry :
+                node.childrenMap().entrySet()) {
+            readVariant(entry.getValue()).ifPresent(variants::add);
+        }
+        return List.copyOf(variants);
+    }
+
+    private static Optional<com.uxplima.uxmessentials.kits.domain.KitVariant> readVariant(ConfigurationNode node) {
+        String permission = node.node("permission").getString("");
+        if (permission == null || permission.isBlank()) {
+            return Optional.empty();
+        }
+        List<KitItem> items = readItems(node.node("items"));
+        if (items.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<Duration> cooldown = node.node("cooldown").virtual()
+                ? Optional.empty()
+                : Optional.of(
+                        Duration.ofSeconds(Math.max(0L, node.node("cooldown").getLong(0L))));
+        Optional<KitCost> cost =
+                node.node("cost").virtual() ? Optional.empty() : Optional.of(readCost(node.node("cost")));
+        return Optional.of(
+                new com.uxplima.uxmessentials.kits.domain.KitVariant(permission.strip(), items, cooldown, cost));
+    }
+
+    private static void writeVariants(
+            ConfigurationNode node, List<com.uxplima.uxmessentials.kits.domain.KitVariant> variants)
+            throws ConfigurateException {
+        node.set(null);
+        int index = 0;
+        for (com.uxplima.uxmessentials.kits.domain.KitVariant variant : variants) {
+            ConfigurationNode child = node.node("tier" + index++);
+            child.node("permission").set(variant.permission());
+            if (variant.cooldown().isPresent()) {
+                child.node("cooldown").set(variant.cooldown().get().toSeconds());
+            }
+            if (variant.cost().isPresent()) {
+                child.node("cost")
+                        .set(variant.cost().get().amount().toPlainString() + " "
+                                + variant.cost().get().currencyId());
+            }
+            writeItems(child.node("items"), variant.items());
+        }
+    }
+
+    private static void writeItems(ConfigurationNode node, List<KitItem> items) throws ConfigurateException {
+        node.set(null);
+        for (KitItem item : items) {
+            ConfigurationNode child = node.appendListNode();
+            child.node("data").set(item.data());
+            child.node("amount").set(item.amount());
+            if (item.slot().isPresent()) {
+                if (item.slot().get() == OFF_HAND_SLOT) {
+                    child.node("offhand").set(true);
+                } else {
+                    child.node("slot").set(item.slot().get());
+                }
+            }
+        }
     }
 
     private static KitCost readCost(ConfigurationNode node) {

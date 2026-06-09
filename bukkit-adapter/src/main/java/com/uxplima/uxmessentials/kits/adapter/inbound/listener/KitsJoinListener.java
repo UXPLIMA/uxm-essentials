@@ -42,7 +42,7 @@ public final class KitsJoinListener implements Listener {
         PlayerRef who = BukkitRefs.toRef(player);
         for (KitDefinition kit : repository.all()) {
             if (kit.firstJoin()) {
-                granter.grant(who, kit);
+                granter.grant(who, access.resolveVariant(who, kit));
                 if (kit.isOneTime()) {
                     access.recordClaim(who, kit);
                 }

@@ -98,6 +98,7 @@ class KitsJoinListenerTest {
 
         KitGranter granter = mock(KitGranter.class);
         KitAccess access = mock(KitAccess.class);
+        when(access.resolveVariant(who, firstJoinKit)).thenReturn(firstJoinKit);
 
         KitsJoinListener listener = new KitsJoinListener(repository, granter, access);
 
@@ -145,6 +146,7 @@ class KitsJoinListenerTest {
 
         KitGranter granter = mock(KitGranter.class);
         KitAccess access = mock(KitAccess.class);
+        when(access.resolveVariant(who, oneTimeFirstJoinKit)).thenReturn(oneTimeFirstJoinKit);
 
         KitsJoinListener listener = new KitsJoinListener(repository, granter, access);
 

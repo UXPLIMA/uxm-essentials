@@ -149,6 +149,31 @@ class KitDefinitionTest {
     }
 
     @Test
+    void customPermissionOverridesTheDefaultPerKitNode() {
+        KitDefinition base = KitDefinition.repeatable(KitId.of("vip"), items(), Duration.ZERO);
+        assertThat(base.permissionNode()).isEqualTo("uxmessentials.kit.vip");
+
+        KitDefinition shared = base.withCustomPermission(java.util.Optional.of("myserver.vip.kit"));
+        assertThat(shared.permissionNode()).isEqualTo("myserver.vip.kit");
+    }
+
+    @Test
+    void previewDefaultsOnAndCloseOnClaimDefaultsOff() {
+        KitDefinition kit = KitDefinition.repeatable(KitId.of("starter"), items(), Duration.ZERO);
+
+        assertThat(kit.preview()).isTrue();
+        assertThat(kit.closeOnClaim()).isFalse();
+        assertThat(kit.withPreview(false).preview()).isFalse();
+        assertThat(kit.withCloseOnClaim(true).closeOnClaim()).isTrue();
+    }
+
+    @Test
+    void aVariantRejectsBlankPermissionAndEmptyItems() {
+        assertThatThrownBy(() -> KitVariant.of("  ", items())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KitVariant.of("node", List.of())).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void kitClaimedCarriesItsRecipientAndActor() {
         PlayerRef recipient = new PlayerRef(UUID.randomUUID(), "Alice");
         PlayerRef actor = new PlayerRef(UUID.randomUUID(), "Operator");

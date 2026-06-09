@@ -65,7 +65,7 @@ public final class ListKits {
     }
 
     private boolean claimable(PlayerRef viewer, KitDefinition kit) {
-        if (kit.requiresPermission() && !permissions.has(viewer, kit.id().permissionNode())) {
+        if (kit.requiresPermission() && !permissions.has(viewer, kit.permissionNode())) {
             return false;
         }
         return !(kit.isOneTime() && claims.hasClaimed(viewer, kit.id()));

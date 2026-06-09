@@ -75,7 +75,8 @@ final class KitIconRenderer {
         return ItemBuilder.of(mat).name(name).lore(loreLines).build();
     }
 
-    ItemStack icon(PlayerRef viewer, KitDefinition kit) {
+    ItemStack icon(PlayerRef viewer, KitDefinition base) {
+        KitDefinition kit = access.resolveVariant(viewer, base);
         return ItemBuilder.of(resolveMaterial(viewer, kit))
                 .name(resolveName(viewer, kit))
                 .lore(resolveLore(viewer, kit))

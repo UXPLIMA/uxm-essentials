@@ -79,11 +79,12 @@ public final class ClaimKit {
             sendFailure(actor, kit, admitted.errorOrThrow());
             return admitted;
         }
-        if (!granter.preGrant(recipient, kit)) {
+        KitDefinition granted = access.resolveVariant(recipient, kit);
+        if (!granter.preGrant(recipient, granted)) {
             sendFailure(actor, kit, KitError.CANCELLED);
             return Result.err(KitError.CANCELLED);
         }
-        granter.grant(recipient, kit);
+        granter.grant(recipient, granted);
         access.recordClaim(recipient, kit);
         if (economy.isPresent() && kit.claimMoney().compareTo(java.math.BigDecimal.ZERO) > 0) {
             economy.get().deposit(recipient, kit.claimMoney(), kit.claimMoneyCurrency());

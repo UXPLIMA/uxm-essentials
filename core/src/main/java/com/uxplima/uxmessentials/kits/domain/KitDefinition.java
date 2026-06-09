@@ -16,8 +16,15 @@ import java.util.Optional;
  * <seconds>} node; the {@code Cooldowns} port resolves the effective wait per claim against it. The
  * {@code oneTime} flag is enforced by a persisted claim stamp (PDC), independent of the cooldown clock: a
  * one-time kit is consumed forever after the first claim, a repeatable kit is merely rate-limited by its
- * cooldown. The {@code permission} flag, when set, requires {@link KitId#permissionNode()} on top of the
- * base {@code uxmessentials.kit.use} command node.
+ * cooldown. The {@code permission} flag, when set, requires {@link #permissionNode()} on top of the base
+ * {@code uxmessentials.kit.use} command node; {@code customPermission}, when present, is consulted in place
+ * of the default per-kit node so several kits can share one permission.
+ *
+ * <p>A kit may carry per-rank {@link KitVariant variants}: at claim, list, and preview time the best variant
+ * whose permission the viewer holds replaces the base items (and optionally the cooldown and cost), so one
+ * {@code /kit daily} can hand richer loot to higher ranks. The {@code preview} flag lets the browse menu open
+ * a read-only preview of the kit on right-click (default on; disable it for mystery kits); {@code closeOnClaim}
+ * closes the browse menu after a successful claim instead of refreshing it.
  *
  * @param id the kit's canonical id
  * @param items the stacks the kit grants, in definition order
@@ -31,6 +38,10 @@ import java.util.Optional;
  * @param commands commands to execute on successful claim
  * @param sound sound to play on successful claim
  * @param particles particles to spawn on successful claim
+ * @param customPermission a permission node to gate the kit with in place of {@code uxmessentials.kit.<id>}
+ * @param variants per-rank variants, ordered best-first; empty for today's single-variant behaviour
+ * @param preview whether the browse menu may open a read-only preview of this kit (default on)
+ * @param closeOnClaim whether a successful browse-menu claim closes the menu instead of refreshing it
  */
 public record KitDefinition(
         KitId id,
@@ -63,7 +74,11 @@ public record KitDefinition(
         List<String> claimedLore,
         Optional<String> unaffordableMaterial,
         Optional<String> unaffordableName,
-        List<String> unaffordableLore) {
+        List<String> unaffordableLore,
+        Optional<String> customPermission,
+        List<KitVariant> variants,
+        boolean preview,
+        boolean closeOnClaim) {
 
     public KitDefinition {
         Objects.requireNonNull(id, "id");
@@ -92,6 +107,8 @@ public record KitDefinition(
         Objects.requireNonNull(unaffordableMaterial, "unaffordableMaterial");
         Objects.requireNonNull(unaffordableName, "unaffordableName");
         Objects.requireNonNull(unaffordableLore, "unaffordableLore");
+        Objects.requireNonNull(customPermission, "customPermission");
+        Objects.requireNonNull(variants, "variants");
         if (cooldown.isNegative()) {
             throw new IllegalArgumentException("kit cooldown must not be negative: " + cooldown);
         }
@@ -103,6 +120,77 @@ public record KitDefinition(
         cooldownLore = List.copyOf(cooldownLore);
         claimedLore = List.copyOf(claimedLore);
         unaffordableLore = List.copyOf(unaffordableLore);
+        variants = List.copyOf(variants);
+    }
+
+    public KitDefinition(
+            KitId id,
+            List<KitItem> items,
+            Duration cooldown,
+            boolean oneTime,
+            boolean permission,
+            KitCost cost,
+            Optional<String> displayName,
+            Optional<String> displayMaterial,
+            List<String> displayLore,
+            List<String> commands,
+            Optional<String> sound,
+            Optional<String> particles,
+            boolean firstJoin,
+            boolean autoEquip,
+            Optional<String> categoryId,
+            java.math.BigDecimal claimMoney,
+            String claimMoneyCurrency,
+            java.util.Map<String, Duration> permissionCooldowns,
+            int priority,
+            Optional<String> noPermissionMaterial,
+            Optional<String> noPermissionName,
+            List<String> noPermissionLore,
+            Optional<String> cooldownMaterial,
+            Optional<String> cooldownName,
+            List<String> cooldownLore,
+            Optional<String> claimedMaterial,
+            Optional<String> claimedName,
+            List<String> claimedLore,
+            Optional<String> unaffordableMaterial,
+            Optional<String> unaffordableName,
+            List<String> unaffordableLore) {
+        this(
+                id,
+                items,
+                cooldown,
+                oneTime,
+                permission,
+                cost,
+                displayName,
+                displayMaterial,
+                displayLore,
+                commands,
+                sound,
+                particles,
+                firstJoin,
+                autoEquip,
+                categoryId,
+                claimMoney,
+                claimMoneyCurrency,
+                permissionCooldowns,
+                priority,
+                noPermissionMaterial,
+                noPermissionName,
+                noPermissionLore,
+                cooldownMaterial,
+                cooldownName,
+                cooldownLore,
+                claimedMaterial,
+                claimedName,
+                claimedLore,
+                unaffordableMaterial,
+                unaffordableName,
+                unaffordableLore,
+                Optional.empty(),
+                List.of(),
+                true,
+                false);
     }
 
     public KitDefinition(
@@ -197,19 +285,7 @@ public record KitDefinition(
                 claimMoney,
                 "default",
                 permissionCooldowns,
-                priority,
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of(),
-                Optional.empty(),
-                Optional.empty(),
-                List.of());
+                priority);
     }
 
     public KitDefinition(
@@ -306,8 +382,9 @@ public record KitDefinition(
     /**
      * A copy of this kit with its {@code items} swapped for {@code newItems} and every other setting —
      * cooldown, one-time, permission, cost, every display override, commands, sound, particles, first-join,
-     * auto-equip, category, claim money, per-permission cooldowns and priority — carried through unchanged.
-     * The item editor uses this so editing a kit's stacks never silently wipes its other configuration.
+     * auto-equip, category, claim money, per-permission cooldowns, priority, custom permission, variants,
+     * preview, and close-on-claim — carried through unchanged. The item editor uses this so editing a kit's
+     * stacks never silently wipes its other configuration.
      */
     public KitDefinition withItems(List<KitItem> newItems) {
         Objects.requireNonNull(newItems, "newItems");
@@ -376,114 +453,32 @@ public record KitDefinition(
         return copy(b -> b.categoryId = value);
     }
 
-    private KitDefinition copy(java.util.function.Consumer<Fields> mutator) {
-        Fields fields = new Fields(this);
-        mutator.accept(fields);
-        return fields.build();
+    /** A copy of this kit with its preview flag set to {@code value}, every other setting preserved. */
+    public KitDefinition withPreview(boolean value) {
+        return copy(b -> b.preview = value);
     }
 
-    /** A mutable carrier used only to express single-field copies; never escapes {@link #copy}. */
-    private static final class Fields {
-        private KitId id;
-        private List<KitItem> items;
-        private Duration cooldown;
-        private boolean oneTime;
-        private boolean permission;
-        private KitCost cost;
-        private Optional<String> displayName;
-        private Optional<String> displayMaterial;
-        private List<String> displayLore;
-        private List<String> commands;
-        private Optional<String> sound;
-        private Optional<String> particles;
-        private boolean firstJoin;
-        private boolean autoEquip;
-        private Optional<String> categoryId;
-        private java.math.BigDecimal claimMoney;
-        private String claimMoneyCurrency;
-        private java.util.Map<String, Duration> permissionCooldowns;
-        private int priority;
-        private Optional<String> noPermissionMaterial;
-        private Optional<String> noPermissionName;
-        private List<String> noPermissionLore;
-        private Optional<String> cooldownMaterial;
-        private Optional<String> cooldownName;
-        private List<String> cooldownLore;
-        private Optional<String> claimedMaterial;
-        private Optional<String> claimedName;
-        private List<String> claimedLore;
-        private Optional<String> unaffordableMaterial;
-        private Optional<String> unaffordableName;
-        private List<String> unaffordableLore;
+    /** A copy of this kit with its close-on-claim flag set to {@code value}, every other setting preserved. */
+    public KitDefinition withCloseOnClaim(boolean value) {
+        return copy(b -> b.closeOnClaim = value);
+    }
 
-        private Fields(KitDefinition k) {
-            this.id = k.id;
-            this.items = k.items;
-            this.cooldown = k.cooldown;
-            this.oneTime = k.oneTime;
-            this.permission = k.permission;
-            this.cost = k.cost;
-            this.displayName = k.displayName;
-            this.displayMaterial = k.displayMaterial;
-            this.displayLore = k.displayLore;
-            this.commands = k.commands;
-            this.sound = k.sound;
-            this.particles = k.particles;
-            this.firstJoin = k.firstJoin;
-            this.autoEquip = k.autoEquip;
-            this.categoryId = k.categoryId;
-            this.claimMoney = k.claimMoney;
-            this.claimMoneyCurrency = k.claimMoneyCurrency;
-            this.permissionCooldowns = k.permissionCooldowns;
-            this.priority = k.priority;
-            this.noPermissionMaterial = k.noPermissionMaterial;
-            this.noPermissionName = k.noPermissionName;
-            this.noPermissionLore = k.noPermissionLore;
-            this.cooldownMaterial = k.cooldownMaterial;
-            this.cooldownName = k.cooldownName;
-            this.cooldownLore = k.cooldownLore;
-            this.claimedMaterial = k.claimedMaterial;
-            this.claimedName = k.claimedName;
-            this.claimedLore = k.claimedLore;
-            this.unaffordableMaterial = k.unaffordableMaterial;
-            this.unaffordableName = k.unaffordableName;
-            this.unaffordableLore = k.unaffordableLore;
-        }
+    /** A copy of this kit with its custom permission set to {@code value}, every other setting preserved. */
+    public KitDefinition withCustomPermission(Optional<String> value) {
+        Objects.requireNonNull(value, "value");
+        return copy(b -> b.customPermission = value);
+    }
 
-        private KitDefinition build() {
-            return new KitDefinition(
-                    id,
-                    items,
-                    cooldown,
-                    oneTime,
-                    permission,
-                    cost,
-                    displayName,
-                    displayMaterial,
-                    displayLore,
-                    commands,
-                    sound,
-                    particles,
-                    firstJoin,
-                    autoEquip,
-                    categoryId,
-                    claimMoney,
-                    claimMoneyCurrency,
-                    permissionCooldowns,
-                    priority,
-                    noPermissionMaterial,
-                    noPermissionName,
-                    noPermissionLore,
-                    cooldownMaterial,
-                    cooldownName,
-                    cooldownLore,
-                    claimedMaterial,
-                    claimedName,
-                    claimedLore,
-                    unaffordableMaterial,
-                    unaffordableName,
-                    unaffordableLore);
-        }
+    /** A copy of this kit with its variants set to {@code value}, every other setting preserved. */
+    public KitDefinition withVariants(List<KitVariant> value) {
+        Objects.requireNonNull(value, "value");
+        return copy(b -> b.variants = value);
+    }
+
+    private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {
+        KitDefinitionFields fields = new KitDefinitionFields(this);
+        mutator.accept(fields);
+        return fields.build();
     }
 
     /** True when claiming this kit consumes it forever (a one-time kit). */
@@ -491,9 +486,17 @@ public record KitDefinition(
         return oneTime;
     }
 
-    /** True when this kit requires the per-kit permission node beyond the base command node. */
+    /** True when this kit requires a permission node beyond the base command node. */
     public boolean requiresPermission() {
         return permission;
+    }
+
+    /**
+     * The permission node that gates this kit: the kit's {@code customPermission} when set, else the default
+     * per-kit node {@code uxmessentials.kit.<id>}. Resolved here so several kits can share one permission.
+     */
+    public String permissionNode() {
+        return customPermission.orElseGet(() -> id.permissionNode());
     }
 
     /** True when the kit sets a cost the economy gate should charge (a non-free price). */

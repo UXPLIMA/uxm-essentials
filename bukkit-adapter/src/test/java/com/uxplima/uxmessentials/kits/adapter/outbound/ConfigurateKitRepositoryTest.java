@@ -179,6 +179,67 @@ class ConfigurateKitRepositoryTest {
     }
 
     @Test
+    void readsVariantsCustomPermissionPreviewAndOffhand(@TempDir Path root) throws Exception {
+        Path dir = kitsDir(root);
+        Files.createDirectories(dir);
+        Files.writeString(
+                dir.resolve("daily.conf"),
+                """
+                cooldown = 3600
+                permission = true
+                permission-node = "myserver.shared.kit"
+                preview = false
+                close-on-claim = true
+                items = [ { data = "AAAA", offhand = true } ]
+                variants {
+                  vip { permission = "uxmessentials.kit.tier.vip", cooldown = 1800, items = [ "VVVV" ] }
+                  mvp { permission = "uxmessentials.kit.tier.mvp", cooldown = 900, items = [ "MMMM" ] }
+                }
+                """);
+
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        KitDefinition daily = repository.find(KitId.of("daily")).orElseThrow();
+
+        assertThat(daily.permissionNode()).isEqualTo("myserver.shared.kit");
+        assertThat(daily.preview()).isFalse();
+        assertThat(daily.closeOnClaim()).isTrue();
+        assertThat(daily.items()).hasSize(1);
+        assertThat(daily.items().get(0).slot()).contains(40); // offhand alias
+        assertThat(daily.variants())
+                .extracting(v -> v.permission())
+                .containsExactly("uxmessentials.kit.tier.vip", "uxmessentials.kit.tier.mvp");
+        assertThat(daily.variants().get(0).cooldown()).contains(Duration.ofMinutes(30));
+    }
+
+    @Test
+    void roundTripsVariantsAndOffhand(@TempDir Path root) {
+        Path dir = kitsDir(root);
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+
+        KitDefinition daily = KitDefinition.repeatable(
+                        KitId.of("daily"),
+                        List.of(KitItem.of("AAAA", 1, java.util.Optional.of(40))),
+                        Duration.ofSeconds(60))
+                .withCustomPermission(java.util.Optional.of("myserver.shared.kit"))
+                .withPreview(false)
+                .withCloseOnClaim(true)
+                .withVariants(List.of(com.uxplima.uxmessentials.kits.domain.KitVariant.of(
+                        "uxmessentials.kit.tier.vip", List.of(KitItem.of("VVVV", 2)))));
+        repository.save(daily);
+
+        KitDefinition loaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP)
+                .find(KitId.of("daily"))
+                .orElseThrow();
+
+        assertThat(loaded.permissionNode()).isEqualTo("myserver.shared.kit");
+        assertThat(loaded.preview()).isFalse();
+        assertThat(loaded.closeOnClaim()).isTrue();
+        assertThat(loaded.items().get(0).slot()).contains(40);
+        assertThat(loaded.variants()).hasSize(1);
+        assertThat(loaded.variants().get(0).items()).containsExactly(KitItem.of("VVVV", 2));
+    }
+
+    @Test
     void savesAndLoadsStateBasedOverrides(@TempDir Path root) {
         Path dir = kitsDir(root);
         KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);

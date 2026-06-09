@@ -57,7 +57,7 @@ public final class KitAccess {
     public Result<Unit, KitError> admit(PlayerRef who, KitDefinition kit) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kit, "kit");
-        if (kit.requiresPermission() && !permissions.has(who, kit.id().permissionNode())) {
+        if (kit.requiresPermission() && !permissions.has(who, kit.permissionNode())) {
             return Result.err(KitError.NO_PERMISSION);
         }
         if (kit.isOneTime() && claims.hasClaimed(who, kit.id()) && !permissions.has(who, COOLDOWN_BYPASS_NODE)) {
@@ -83,11 +83,12 @@ public final class KitAccess {
     }
 
     private Result<Unit, KitError> charge(PlayerRef who, KitDefinition kit) {
-        if (!kit.hasCost() || economy.isEmpty()) {
+        com.uxplima.uxmessentials.kits.domain.KitCost cost = effectiveCost(who, kit);
+        if (cost.isFree() || economy.isEmpty()) {
             return Result.ok();
         }
         KitEconomy provider = economy.get();
-        if (!provider.withdraw(who, kit.cost().amount(), kit.cost().currencyId())) {
+        if (!provider.withdraw(who, cost.amount(), cost.currencyId())) {
             return Result.err(KitError.CANNOT_AFFORD);
         }
         return Result.ok();
@@ -99,7 +100,40 @@ public final class KitAccess {
     }
 
     public boolean hasPermission(PlayerRef who, KitDefinition kit) {
-        return !kit.requiresPermission() || permissions.has(who, kit.id().permissionNode());
+        return !kit.requiresPermission() || permissions.has(who, kit.permissionNode());
+    }
+
+    /**
+     * Resolve the variant of {@code kit} that applies to {@code who}: the first variant, in definition order
+     * (best-first), whose permission the viewer holds, or the base kit when they hold none. Used at claim,
+     * list, and preview time so the items granted and the icon shown reflect the viewer's rank. The returned
+     * definition carries the resolved variant's items and — when the variant overrides them — its cooldown
+     * and cost, with every other setting inherited from the base kit.
+     */
+    public KitDefinition resolveVariant(PlayerRef who, KitDefinition kit) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kit, "kit");
+        for (com.uxplima.uxmessentials.kits.domain.KitVariant variant : kit.variants()) {
+            if (permissions.has(who, variant.permission())) {
+                return applyVariant(kit, variant);
+            }
+        }
+        return kit;
+    }
+
+    private KitDefinition applyVariant(KitDefinition kit, com.uxplima.uxmessentials.kits.domain.KitVariant variant) {
+        KitDefinition resolved = kit.withItems(variant.items());
+        if (variant.cooldown().isPresent()) {
+            resolved = resolved.withCooldown(variant.cooldown().get());
+        }
+        if (variant.cost().isPresent()) {
+            resolved = resolved.withCost(variant.cost().get());
+        }
+        return resolved;
+    }
+
+    private com.uxplima.uxmessentials.kits.domain.KitCost effectiveCost(PlayerRef who, KitDefinition kit) {
+        return resolveVariant(who, kit).cost();
     }
 
     public boolean hasClaimedOneTime(PlayerRef who, KitDefinition kit) {
@@ -111,14 +145,15 @@ public final class KitAccess {
     }
 
     public boolean canAfford(PlayerRef who, KitDefinition kit) {
-        if (!kit.hasCost() || economy.isEmpty()) {
+        com.uxplima.uxmessentials.kits.domain.KitCost cost = effectiveCost(who, kit);
+        if (cost.isFree() || economy.isEmpty()) {
             return true;
         }
-        return economy.get().canAfford(who, kit.cost().amount(), kit.cost().currencyId());
+        return economy.get().canAfford(who, cost.amount(), cost.currencyId());
     }
 
     private long resolveCooldownSeconds(PlayerRef who, KitDefinition kit) {
-        long shortest = kit.cooldownSeconds();
+        long shortest = resolveVariant(who, kit).cooldownSeconds();
         if (kit.permissionCooldowns().isEmpty()) {
             return shortest;
         }
