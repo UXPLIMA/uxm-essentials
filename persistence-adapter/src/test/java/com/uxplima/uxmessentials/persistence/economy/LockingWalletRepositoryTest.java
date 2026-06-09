@@ -15,6 +15,8 @@ import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -26,9 +28,18 @@ import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class LockingWalletRepositoryTest {
+
+    private final ExecutorService contention = Executors.newSingleThreadExecutor();
+
+    @AfterEach
+    void shutdownContentionPool() throws InterruptedException {
+        contention.shutdownNow();
+        contention.awaitTermination(5, TimeUnit.SECONDS);
+    }
 
     @Test
     void stripedLockProvidesMutualExclusionOnSameOwner() throws Exception {
@@ -45,7 +56,7 @@ class LockingWalletRepositoryTest {
 
         lock1.lock();
         try {
-            Thread t = new Thread(() -> {
+            contention.execute(() -> {
                 acquired.countDown();
                 try {
                     if (lock2.tryLock(100, TimeUnit.MILLISECONDS)) {
@@ -60,7 +71,6 @@ class LockingWalletRepositoryTest {
                 }
                 done.countDown();
             });
-            t.start();
             assertThat(acquired.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(done.await(200, TimeUnit.MILLISECONDS)).isTrue();
             assertThat(secondAcquired.get()).isFalse();
@@ -91,7 +101,7 @@ class LockingWalletRepositoryTest {
 
         lock1.lock();
         try {
-            Thread t = new Thread(() -> {
+            contention.execute(() -> {
                 acquired.countDown();
                 try {
                     if (lock2.tryLock(5, TimeUnit.SECONDS)) {
@@ -106,7 +116,6 @@ class LockingWalletRepositoryTest {
                 }
                 done.countDown();
             });
-            t.start();
             assertThat(acquired.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(done.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(secondAcquired.get()).isTrue();
