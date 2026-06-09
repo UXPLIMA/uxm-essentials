@@ -163,15 +163,17 @@ class ShowKitGuiPathTest {
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit =
                 new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock, Optional.empty());
+        KitPreviewView kitPreview = new KitPreviewView(
+                messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
         KitMenuView kitMenu = new KitMenuView(
                 messages,
+                notifier,
                 new SyncScheduler(),
                 claimKit,
                 new StubKitCategoryRepository(),
                 access,
+                kitPreview,
                 GuiLayout.paginatedDefault(Material.CHEST));
-        KitPreviewView kitPreview = new KitPreviewView(
-                messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(messages, kitEditor, new SyncScheduler());
         return new KitServices(

@@ -15,6 +15,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.KitAccess;
 import com.uxplima.uxmessentials.kits.application.KitNotifier;
@@ -114,8 +115,17 @@ class KitMenuLayoutTest {
         ClaimKit claimKit = new ClaimKit(
                 repository, access, granter, notifier, new NoEvents(), Clock.systemUTC(), Optional.empty());
 
+        KitPreviewView kitPreview = new KitPreviewView(
+                messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
         KitMenuView view = new KitMenuView(
-                messages, new SyncScheduler(), claimKit, new StubKitCategoryRepository(), access, layout);
+                messages,
+                notifier,
+                new SyncScheduler(),
+                claimKit,
+                new StubKitCategoryRepository(),
+                access,
+                kitPreview,
+                layout);
         PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
         view.open(player, viewer, kits());
         return (PaginatedGui) player.getOpenInventory().getTopInventory().getHolder();

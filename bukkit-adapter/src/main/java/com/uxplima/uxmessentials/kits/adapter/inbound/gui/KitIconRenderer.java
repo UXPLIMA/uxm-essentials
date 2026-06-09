@@ -228,6 +228,9 @@ final class KitIconRenderer {
                     KitsMessageKey.KIT_MENU_LORE_CLAIMABLE,
                     Map.of("kit", kit.id().value())));
         }
+        if (kit.preview()) {
+            lines.add(text(viewer, KitsMessageKey.KIT_MENU_PREVIEW_HINT, Map.of()));
+        }
         return lines;
     }
 

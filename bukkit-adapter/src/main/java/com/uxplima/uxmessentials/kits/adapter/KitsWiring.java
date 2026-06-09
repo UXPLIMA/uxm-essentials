@@ -218,9 +218,16 @@ public final class KitsWiring {
             KitCreateChooserView kitCreateChooserView) {
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, kernel.events(), clock, economy);
-        KitMenuView kitMenu = new KitMenuView(
-                kernel.messages(), kernel.scheduler(), claimKit, categoryRepository, access, menuLayout);
         KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler(), previewLayout);
+        KitMenuView kitMenu = new KitMenuView(
+                kernel.messages(),
+                notifier,
+                kernel.scheduler(),
+                claimKit,
+                categoryRepository,
+                access,
+                kitPreview,
+                menuLayout);
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(kernel.messages(), kitEditor, kernel.scheduler());
         return new KitServices(

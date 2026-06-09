@@ -28,6 +28,8 @@ public enum KitsMessageKey implements MessageKey {
     KIT_MENU_LORE_ONETIME("kit.menu.lore.one-time"),
     KIT_MENU_LORE_COST("kit.menu.lore.cost"),
     KIT_MENU_LORE_CLAIMABLE("kit.menu.lore.claimable"),
+    KIT_MENU_PREVIEW_HINT("kit.menu.preview-hint"),
+    KIT_MENU_PREVIEW_DENIED("kit.menu.preview-denied"),
     KIT_MENU_PREV("kit.menu.prev"),
     KIT_MENU_NEXT("kit.menu.next"),
     KIT_MENU_BACK("kit.menu.back"),

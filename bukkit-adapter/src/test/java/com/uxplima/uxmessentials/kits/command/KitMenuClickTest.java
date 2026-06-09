@@ -129,11 +129,45 @@ class KitMenuClickTest {
         assertThat(sink.keys).doesNotContain(KitsMessageKey.KIT_CLAIMED);
     }
 
+    @Test
+    void rightClickingAKitIconOpensThePreviewWithoutClaiming() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        execute(dispatcher, "kits");
+
+        fireClick(0, ClickType.RIGHT); // starter — preview is enabled by default
+
+        assertThat(granter.grants).isEmpty();
+        assertThat(sink.keys).doesNotContain(KitsMessageKey.KIT_CLAIMED);
+        assertThat(player.getOpenInventory()
+                        .getTopInventory()
+                        .getHolder()
+                        .getClass()
+                        .getSimpleName())
+                .isEqualTo("KitPreviewHolder");
+    }
+
+    @Test
+    void rightClickingAPreviewDisabledKitDoesNotOpenThePreview() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        execute(dispatcher, "kits");
+
+        fireClick(3, ClickType.RIGHT); // mystery — preview disabled, so the browse menu stays open
+
+        assertThat(granter.grants).isEmpty();
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(sink.keys).contains(KitsMessageKey.KIT_MENU_PREVIEW_DENIED);
+    }
+
     /** Left-click the given content slot of the open menu through the installed listener. */
     private void fireClick(int slot) {
+        fireClick(slot, ClickType.LEFT);
+    }
+
+    /** Fire a click of the given type on a content slot of the open menu through the installed listener. */
+    private void fireClick(int slot, ClickType type) {
         InventoryView view = player.getOpenInventory();
-        InventoryClickEvent event = new InventoryClickEvent(
-                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        InventoryClickEvent event =
+                new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, slot, type, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
     }
 
@@ -167,15 +201,17 @@ class KitMenuClickTest {
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit =
                 new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock, Optional.empty());
+        KitPreviewView kitPreview = new KitPreviewView(
+                messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
         KitMenuView kitMenu = new KitMenuView(
                 messages,
+                notifier,
                 new SyncScheduler(),
                 claimKit,
                 new StubKitCategoryRepository(),
                 access,
+                kitPreview,
                 GuiLayout.paginatedDefault(Material.CHEST));
-        KitPreviewView kitPreview = new KitPreviewView(
-                messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(messages, kitEditor, new SyncScheduler());
         return new KitServices(
@@ -192,12 +228,14 @@ class KitMenuClickTest {
                 new NoPlayerLookup());
     }
 
-    /** Three free, repeatable, ungated, empty-item kits (the CHEST fallback icon dodges the item codec). */
+    /** Four free, repeatable, ungated, empty-item kits (the CHEST fallback icon dodges the item codec). */
     private static final class FakeRepository implements KitRepository {
         private final List<KitDefinition> kits = List.of(
                 KitDefinition.repeatable(KitId.of("starter"), List.<KitItem>of(), Duration.ofSeconds(60)),
                 KitDefinition.repeatable(KitId.of("daily"), List.<KitItem>of(), Duration.ofSeconds(120)),
-                KitDefinition.repeatable(KitId.of("vip"), List.<KitItem>of(), Duration.ofSeconds(30)));
+                KitDefinition.repeatable(KitId.of("vip"), List.<KitItem>of(), Duration.ofSeconds(30)),
+                KitDefinition.repeatable(KitId.of("mystery"), List.<KitItem>of(), Duration.ofSeconds(45))
+                        .withPreview(false));
 
         @Override
         public Optional<KitDefinition> find(KitId id) {
