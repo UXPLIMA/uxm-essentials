@@ -53,6 +53,8 @@ final class KitDefinitionFields {
     Optional<String> requirementsMaterial;
     Optional<String> requirementsName;
     List<String> requirementsLore;
+    List<KitAction> claimActions;
+    List<KitAction> denyActions;
 
     KitDefinitionFields(KitDefinition k) {
         this.id = k.id();
@@ -94,6 +96,8 @@ final class KitDefinitionFields {
         this.requirementsMaterial = k.requirementsMaterial();
         this.requirementsName = k.requirementsName();
         this.requirementsLore = k.requirementsLore();
+        this.claimActions = k.claimActions();
+        this.denyActions = k.denyActions();
     }
 
     KitDefinition build() {
@@ -136,6 +140,8 @@ final class KitDefinitionFields {
                 requirements,
                 requirementsMaterial,
                 requirementsName,
-                requirementsLore);
+                requirementsLore,
+                claimActions,
+                denyActions);
     }
 }

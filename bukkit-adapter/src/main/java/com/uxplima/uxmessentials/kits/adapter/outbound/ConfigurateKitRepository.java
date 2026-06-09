@@ -171,7 +171,7 @@ public final class ConfigurateKitRepository implements KitRepository {
         try {
             ConfigurationNode root =
                     HoconConfigurationLoader.builder().path(file).build().load();
-            Optional<KitDefinition> kit = KitCodec.read(id, root);
+            Optional<KitDefinition> kit = KitCodec.read(id, root, log);
             if (kit.isEmpty()) {
                 log.warn("skipping malformed kit file: " + file);
             }
@@ -188,7 +188,7 @@ public final class ConfigurateKitRepository implements KitRepository {
         }
         try {
             Files.createDirectories(dir);
-            int split = splitMonolith(dir, legacyMonolith);
+            int split = splitMonolith(dir, legacyMonolith, log);
             Files.move(legacyMonolith, legacyMonolith.resolveSibling(legacyMonolith.getFileName() + ".migrated"));
             log.info("split legacy kits.conf into {} per-kit file(s) under " + dir, split);
         } catch (IOException failure) {
@@ -196,7 +196,7 @@ public final class ConfigurateKitRepository implements KitRepository {
         }
     }
 
-    private static int splitMonolith(Path dir, Path legacyMonolith) throws IOException {
+    private static int splitMonolith(Path dir, Path legacyMonolith, Logger log) throws IOException {
         ConfigurationNode kitsNode = HoconConfigurationLoader.builder()
                 .path(legacyMonolith)
                 .build()
@@ -206,7 +206,7 @@ public final class ConfigurateKitRepository implements KitRepository {
         for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                 kitsNode.childrenMap().entrySet()) {
             String id = String.valueOf(entry.getKey());
-            Optional<KitDefinition> kit = KitCodec.read(id, entry.getValue());
+            Optional<KitDefinition> kit = KitCodec.read(id, entry.getValue(), log);
             if (kit.isPresent()) {
                 CommentedConfigurationNode root = CommentedConfigurationNode.root();
                 KitCodec.write(root, kit.get());

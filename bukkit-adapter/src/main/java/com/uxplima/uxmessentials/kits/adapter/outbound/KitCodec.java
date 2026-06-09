@@ -6,10 +6,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.kits.domain.KitAction;
+import com.uxplima.uxmessentials.kits.domain.KitActionType;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.ConfigurationNode;
@@ -51,7 +54,7 @@ final class KitCodec {
     private KitCodec() {}
 
     /** Parse the node {@code node} for id {@code id} into a definition, or empty when it is malformed. */
-    static Optional<KitDefinition> read(String id, ConfigurationNode node) {
+    static Optional<KitDefinition> read(String id, ConfigurationNode node, Logger log) {
         try {
             KitId kitId = KitId.of(id);
             List<KitItem> items = readItems(node.node("items"));
@@ -154,6 +157,9 @@ final class KitCodec {
                     Optional.ofNullable(node.node("requirements-name").getString());
             List<String> requirementsLore = strings(node.node("requirements-lore"));
 
+            List<KitAction> claimActions = readClaimActions(id, node, commands, sound, particles, log);
+            List<KitAction> denyActions = readActions(node.node("deny-actions"));
+
             return Optional.of(new KitDefinition(
                     kitId,
                     items,
@@ -193,7 +199,9 @@ final class KitCodec {
                     requirements,
                     requirementsMaterial,
                     requirementsName,
-                    requirementsLore));
+                    requirementsLore,
+                    claimActions,
+                    denyActions));
         } catch (RuntimeException malformed) {
             return Optional.empty();
         }
@@ -272,23 +280,61 @@ final class KitCodec {
         } else {
             node.node("display-lore").set(null);
         }
-        if (!definition.commands().isEmpty()) {
-            node.node("commands").set(definition.commands());
-        } else {
-            node.node("commands").set(null);
-        }
-        if (definition.sound().isPresent()) {
-            node.node("sound").set(definition.sound().get());
-        } else {
-            node.node("sound").set(null);
-        }
-        if (definition.particles().isPresent()) {
-            node.node("particles").set(definition.particles().get());
-        } else {
-            node.node("particles").set(null);
-        }
+
+        writeClaimAndDenyActions(node, definition);
 
         writeItems(node.node("items"), definition.items());
+    }
+
+    /**
+     * Write the typed action engine. A kit whose claim actions are exactly the mapping of its legacy
+     * {@code commands}/{@code sound}/{@code particles} keys is written back in the legacy shape — so a kit the
+     * GUI editor only ever touched through its command list round-trips unchanged and editor edits persist. Any
+     * other claim actions (an authored {@code claim-actions} block) and any deny actions are written in the new
+     * {@code claim-actions}/{@code deny-actions} shape, and the legacy keys are then cleared so the two never
+     * both appear. Re-reading either shape yields the identical kit.
+     */
+    private static void writeClaimAndDenyActions(ConfigurationNode node, KitDefinition definition)
+            throws ConfigurateException {
+        node.node("commands").set(null);
+        node.node("sound").set(null);
+        node.node("particles").set(null);
+        node.node("claim-actions").set(null);
+        node.node("deny-actions").set(null);
+        if (isLegacyShape(definition)) {
+            writeLegacyClaimKeys(node, definition);
+        } else if (definition.hasClaimActions()) {
+            writeActions(node.node("claim-actions"), definition.claimActions());
+        }
+        if (definition.hasDenyActions()) {
+            writeActions(node.node("deny-actions"), definition.denyActions());
+        }
+    }
+
+    /** Whether a kit's claim actions are exactly the mapping of its legacy keys (so it writes the legacy shape). */
+    private static boolean isLegacyShape(KitDefinition definition) {
+        return definition
+                .claimActions()
+                .equals(mapLegacyClaimActions(definition.commands(), definition.sound(), definition.particles()));
+    }
+
+    /** Write the legacy {@code commands}/{@code sound}/{@code particles} keys for a kit still in the old shape. */
+    private static void writeLegacyClaimKeys(ConfigurationNode node, KitDefinition definition)
+            throws ConfigurateException {
+        if (!definition.commands().isEmpty()) {
+            node.node("commands").set(definition.commands());
+        }
+        definition.sound().ifPresent(value -> setQuietly(node.node("sound"), value));
+        definition.particles().ifPresent(value -> setQuietly(node.node("particles"), value));
+    }
+
+    private static void setQuietly(ConfigurationNode node, String value) {
+        try {
+            node.set(value);
+        } catch (ConfigurateException unreachable) {
+            // A scalar String set on a leaf node cannot fail; rethrow so a future change surfaces loudly.
+            throw new IllegalStateException("failed to write kit action key", unreachable);
+        }
     }
 
     private static List<String> strings(ConfigurationNode node) {
@@ -350,6 +396,79 @@ final class KitCodec {
             com.uxplima.uxmessentials.kits.domain.KitRequirement.parse(entry).ifPresent(requirements::add);
         }
         return List.copyOf(requirements);
+    }
+
+    /**
+     * Resolve a kit's effective claim actions. The new {@code claim-actions} block, when present, wins outright:
+     * it is the typed, ordered action engine that supersedes the flat {@code commands}/{@code sound}/{@code
+     * particles} keys, and when both are present the legacy keys are ignored with a one-line warn. When no new
+     * block is authored the legacy keys are mapped into actions so an unmodified kit behaves exactly as before —
+     * {@code commands} become {@code CONSOLE_COMMAND} actions in order, then {@code sound} a {@code SOUND} action,
+     * then {@code particles} a {@code PARTICLE} action.
+     */
+    private static List<KitAction> readClaimActions(
+            String id,
+            ConfigurationNode node,
+            List<String> commands,
+            Optional<String> sound,
+            Optional<String> particles,
+            Logger log) {
+        ConfigurationNode claimNode = node.node("claim-actions");
+        boolean hasNewBlock = !claimNode.virtual() && claimNode.isList();
+        boolean hasLegacy = !commands.isEmpty() || sound.isPresent() || particles.isPresent();
+        if (hasNewBlock) {
+            if (hasLegacy) {
+                log.warn("kit " + id + ": claim-actions present, ignoring legacy commands/sound/particles keys");
+            }
+            return readActions(claimNode);
+        }
+        return mapLegacyClaimActions(commands, sound, particles);
+    }
+
+    /** Map the legacy {@code commands}/{@code sound}/{@code particles} keys into ordered claim actions. */
+    private static List<KitAction> mapLegacyClaimActions(
+            List<String> commands, Optional<String> sound, Optional<String> particles) {
+        List<KitAction> mapped = new ArrayList<>();
+        for (String command : commands) {
+            mapped.add(KitAction.of(KitActionType.CONSOLE_COMMAND, command));
+        }
+        sound.ifPresent(value -> mapped.add(KitAction.of(KitActionType.SOUND, value)));
+        particles.ifPresent(value -> mapped.add(KitAction.of(KitActionType.PARTICLE, value)));
+        return List.copyOf(mapped);
+    }
+
+    /** Read an ordered {@code claim-actions}/{@code deny-actions} list; a malformed entry is skipped, not fatal. */
+    private static List<KitAction> readActions(ConfigurationNode node) {
+        if (node.virtual() || !node.isList()) {
+            return List.of();
+        }
+        List<KitAction> actions = new ArrayList<>();
+        for (ConfigurationNode child : node.childrenList()) {
+            readAction(child).ifPresent(actions::add);
+        }
+        return List.copyOf(actions);
+    }
+
+    private static Optional<KitAction> readAction(ConfigurationNode child) {
+        String type = child.node("type").getString("");
+        String value = child.node("value").getString("");
+        if (type == null || type.isBlank() || value == null) {
+            return Optional.empty();
+        }
+        boolean beforeItems = child.node("before-items").getBoolean(false);
+        boolean countAsItem = child.node("count-as-item").getBoolean(false);
+        return KitAction.parse(type, value, beforeItems, countAsItem);
+    }
+
+    private static void writeActions(ConfigurationNode node, List<KitAction> actions) throws ConfigurateException {
+        node.set(null);
+        for (KitAction action : actions) {
+            ConfigurationNode child = node.appendListNode();
+            child.node("type").set(action.type().token());
+            child.node("value").set(action.value());
+            child.node("before-items").set(action.beforeItems() ? true : null);
+            child.node("count-as-item").set(action.countAsItem() ? true : null);
+        }
     }
 
     private static List<com.uxplima.uxmessentials.kits.domain.KitVariant> readVariants(ConfigurationNode node) {

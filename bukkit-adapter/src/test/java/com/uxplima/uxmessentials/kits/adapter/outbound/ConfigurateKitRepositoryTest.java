@@ -295,6 +295,165 @@ class ConfigurateKitRepositoryTest {
     }
 
     @Test
+    void readsTypedClaimAndDenyActionsInOrder(@TempDir Path root) throws Exception {
+        Path dir = kitsDir(root);
+        Files.createDirectories(dir);
+        Files.writeString(
+                dir.resolve("vote.conf"),
+                """
+                cooldown = 0
+                items = []
+                claim-actions = [
+                  { type = broadcast, value = "<gold>{player} claimed the kit!", before-items = true }
+                  { type = sound, value = "ENTITY_PLAYER_LEVELUP;1;1" }
+                  { type = title, value = "0;40;10;<green>Kit claimed;<gray>Enjoy!" }
+                  { type = console-command, value = "crate give {player} vote 1", count-as-item = true }
+                  { type = wait-ticks, value = "20" }
+                  { type = firework, value = "colors:RED,BLUE type:BALL_LARGE power:1" }
+                ]
+                deny-actions = [ { type = sound, value = "ENTITY_VILLAGER_NO;1;1" } ]
+                """);
+
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        KitDefinition vote = repository.find(KitId.of("vote")).orElseThrow();
+
+        assertThat(vote.claimActions())
+                .extracting(a -> a.type())
+                .containsExactly(
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.BROADCAST,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.SOUND,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.TITLE,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.CONSOLE_COMMAND,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.WAIT_TICKS,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.FIREWORK);
+        assertThat(vote.claimActions().get(0).beforeItems()).isTrue();
+        assertThat(vote.claimActions().get(3).countAsItem()).isTrue();
+        assertThat(vote.denyActions()).singleElement().satisfies(a -> assertThat(a.type())
+                .isEqualTo(com.uxplima.uxmessentials.kits.domain.KitActionType.SOUND));
+    }
+
+    @Test
+    void legacyCommandsSoundParticlesMapIntoClaimActions(@TempDir Path root) throws Exception {
+        Path dir = kitsDir(root);
+        Files.createDirectories(dir);
+        Files.writeString(
+                dir.resolve("old.conf"),
+                """
+                cooldown = 0
+                items = []
+                commands = [ "say hi {player}", "give {player} dirt 1" ]
+                sound = "ENTITY_PLAYER_LEVELUP"
+                particles = "FLAME"
+                """);
+
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        KitDefinition old = repository.find(KitId.of("old")).orElseThrow();
+
+        // An unmodified legacy kit's effects now run through the mapped claim actions, in command-then-sound-then-
+        // particle order, so the player sees exactly the same behaviour as before the action engine landed.
+        assertThat(old.claimActions())
+                .extracting(a -> a.type())
+                .containsExactly(
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.CONSOLE_COMMAND,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.CONSOLE_COMMAND,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.SOUND,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.PARTICLE);
+        assertThat(old.claimActions().get(0).value()).isEqualTo("say hi {player}");
+        assertThat(old.claimActions().get(2).value()).isEqualTo("ENTITY_PLAYER_LEVELUP");
+        assertThat(old.claimActions().get(3).value()).isEqualTo("FLAME");
+        // The legacy fields are still carried so the GUI command editor keeps working.
+        assertThat(old.commands()).containsExactly("say hi {player}", "give {player} dirt 1");
+        assertThat(old.sound()).contains("ENTITY_PLAYER_LEVELUP");
+        assertThat(old.particles()).contains("FLAME");
+    }
+
+    @Test
+    void aLegacyKitRoundTripsUnchanged(@TempDir Path root) throws Exception {
+        Path dir = kitsDir(root);
+        Files.createDirectories(dir);
+        Files.writeString(
+                dir.resolve("old.conf"),
+                """
+                cooldown = 0
+                items = []
+                commands = [ "say hi {player}" ]
+                sound = "ENTITY_PLAYER_LEVELUP"
+                """);
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        repository.save(repository.find(KitId.of("old")).orElseThrow()); // rewrite through the codec
+
+        KitDefinition reloaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP)
+                .find(KitId.of("old"))
+                .orElseThrow();
+
+        // A kit only ever in the legacy shape is written back as legacy keys, so re-reading yields the same kit.
+        assertThat(reloaded.commands()).containsExactly("say hi {player}");
+        assertThat(reloaded.sound()).contains("ENTITY_PLAYER_LEVELUP");
+        assertThat(reloaded.claimActions())
+                .extracting(a -> a.type())
+                .containsExactly(
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.CONSOLE_COMMAND,
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.SOUND);
+    }
+
+    @Test
+    void theNewActionBlockWinsOverLegacyKeysWhenBothPresent(@TempDir Path root) throws Exception {
+        Path dir = kitsDir(root);
+        Files.createDirectories(dir);
+        Files.writeString(
+                dir.resolve("both.conf"),
+                """
+                cooldown = 0
+                items = []
+                commands = [ "legacy command" ]
+                claim-actions = [ { type = message, value = "new action" } ]
+                """);
+
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        KitDefinition both = repository.find(KitId.of("both")).orElseThrow();
+
+        assertThat(both.claimActions()).singleElement().satisfies(a -> {
+            assertThat(a.type()).isEqualTo(com.uxplima.uxmessentials.kits.domain.KitActionType.MESSAGE);
+            assertThat(a.value()).isEqualTo("new action");
+        });
+    }
+
+    @Test
+    void roundTripsTypedClaimAndDenyActions(@TempDir Path root) {
+        Path dir = kitsDir(root);
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+
+        KitDefinition vote = KitDefinition.repeatable(
+                        KitId.of("vote"), List.of(KitItem.of("AAAA", 1)), Duration.ofSeconds(60))
+                .withClaimActions(List.of(
+                        new com.uxplima.uxmessentials.kits.domain.KitAction(
+                                com.uxplima.uxmessentials.kits.domain.KitActionType.BROADCAST,
+                                "<gold>{player} claimed!",
+                                true,
+                                false),
+                        new com.uxplima.uxmessentials.kits.domain.KitAction(
+                                com.uxplima.uxmessentials.kits.domain.KitActionType.CONSOLE_COMMAND,
+                                "crate give {player} vote 1",
+                                false,
+                                true)))
+                .withDenyActions(List.of(new com.uxplima.uxmessentials.kits.domain.KitAction(
+                        com.uxplima.uxmessentials.kits.domain.KitActionType.SOUND,
+                        "ENTITY_VILLAGER_NO;1;1",
+                        false,
+                        false)));
+        repository.save(vote);
+
+        KitDefinition loaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP)
+                .find(KitId.of("vote"))
+                .orElseThrow();
+
+        assertThat(loaded.claimActions()).isEqualTo(vote.claimActions());
+        assertThat(loaded.denyActions()).isEqualTo(vote.denyActions());
+        assertThat(loaded.claimActions().get(0).beforeItems()).isTrue();
+        assertThat(loaded.claimActions().get(1).countAsItem()).isTrue();
+    }
+
+    @Test
     void savesAndLoadsStateBasedOverrides(@TempDir Path root) {
         Path dir = kitsDir(root);
         KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);

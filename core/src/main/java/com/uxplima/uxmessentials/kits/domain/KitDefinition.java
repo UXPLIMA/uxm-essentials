@@ -46,6 +46,8 @@ import java.util.Optional;
  * @param requirementsMaterial display material shown in the browse menu when the viewer fails requirements
  * @param requirementsName display name shown in the browse menu when the viewer fails requirements
  * @param requirementsLore display lore shown in the browse menu when the viewer fails requirements
+ * @param claimActions ordered typed actions run on a successful claim (before/after the item grant); empty for none
+ * @param denyActions ordered typed actions run when a claim is refused by any gate; empty for none
  */
 public record KitDefinition(
         KitId id,
@@ -86,7 +88,9 @@ public record KitDefinition(
         List<KitRequirement> requirements,
         Optional<String> requirementsMaterial,
         Optional<String> requirementsName,
-        List<String> requirementsLore) {
+        List<String> requirementsLore,
+        List<KitAction> claimActions,
+        List<KitAction> denyActions) {
 
     public KitDefinition {
         Objects.requireNonNull(id, "id");
@@ -121,6 +125,8 @@ public record KitDefinition(
         Objects.requireNonNull(requirementsMaterial, "requirementsMaterial");
         Objects.requireNonNull(requirementsName, "requirementsName");
         Objects.requireNonNull(requirementsLore, "requirementsLore");
+        Objects.requireNonNull(claimActions, "claimActions");
+        Objects.requireNonNull(denyActions, "denyActions");
         if (cooldown.isNegative()) {
             throw new IllegalArgumentException("kit cooldown must not be negative: " + cooldown);
         }
@@ -135,6 +141,8 @@ public record KitDefinition(
         variants = List.copyOf(variants);
         requirements = List.copyOf(requirements);
         requirementsLore = List.copyOf(requirementsLore);
+        claimActions = List.copyOf(claimActions);
+        denyActions = List.copyOf(denyActions);
     }
 
     public KitDefinition(
@@ -208,6 +216,8 @@ public record KitDefinition(
                 List.of(),
                 Optional.empty(),
                 Optional.empty(),
+                List.of(),
+                List.of(),
                 List.of());
     }
 
@@ -401,8 +411,8 @@ public record KitDefinition(
      * A copy of this kit with its {@code items} swapped for {@code newItems} and every other setting —
      * cooldown, one-time, permission, cost, every display override, commands, sound, particles, first-join,
      * auto-equip, category, claim money, per-permission cooldowns, priority, custom permission, variants,
-     * preview, and close-on-claim — carried through unchanged. The item editor uses this so editing a kit's
-     * stacks never silently wipes its other configuration.
+     * preview, close-on-claim, requirements, and the claim/deny actions — carried through unchanged. The item
+     * editor uses this so editing a kit's stacks never silently wipes its other configuration.
      */
     public KitDefinition withItems(List<KitItem> newItems) {
         Objects.requireNonNull(newItems, "newItems");
@@ -499,6 +509,18 @@ public record KitDefinition(
         return copy(b -> b.requirements = value);
     }
 
+    /** A copy of this kit with its claim actions set to {@code value}, every other setting preserved. */
+    public KitDefinition withClaimActions(List<KitAction> value) {
+        Objects.requireNonNull(value, "value");
+        return copy(b -> b.claimActions = value);
+    }
+
+    /** A copy of this kit with its deny actions set to {@code value}, every other setting preserved. */
+    public KitDefinition withDenyActions(List<KitAction> value) {
+        Objects.requireNonNull(value, "value");
+        return copy(b -> b.denyActions = value);
+    }
+
     private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {
         KitDefinitionFields fields = new KitDefinitionFields(this);
         mutator.accept(fields);
@@ -531,6 +553,16 @@ public record KitDefinition(
     /** True when the kit carries claim requirements the gate must evaluate before charging. */
     public boolean hasRequirements() {
         return !requirements.isEmpty();
+    }
+
+    /** True when the kit runs any action on a successful claim. */
+    public boolean hasClaimActions() {
+        return !claimActions.isEmpty();
+    }
+
+    /** True when the kit runs any action when a claim is refused. */
+    public boolean hasDenyActions() {
+        return !denyActions.isEmpty();
     }
 
     /** The cooldown in whole seconds, the unit the {@code Cooldowns} port resolves tiers in. */
