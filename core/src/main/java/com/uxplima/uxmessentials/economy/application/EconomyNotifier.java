@@ -53,4 +53,18 @@ public final class EconomyNotifier {
     public String amount(Money money) {
         return MoneyFormat.withSymbol(money, amountFormat);
     }
+
+    /**
+     * Render several per-currency totals as one comma-joined {@code {amount}} value, so a {@code /sellall} that
+     * paid out in more than one currency reports each currency's proceeds in a single line. A single-element
+     * collection renders identically to {@link #amount(Money)}.
+     */
+    public String amounts(java.util.Collection<Money> amounts) {
+        Objects.requireNonNull(amounts, "amounts");
+        java.util.List<String> rendered = new java.util.ArrayList<>();
+        for (Money money : amounts) {
+            rendered.add(MoneyFormat.withSymbol(money, amountFormat));
+        }
+        return String.join(", ", rendered);
+    }
 }

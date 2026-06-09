@@ -40,7 +40,17 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_NAME_TAKEN("pwarp.name-taken"),
     PWARP_LIMIT_REACHED("pwarp.limit-reached"),
     PWARP_NOT_PUBLIC("pwarp.not-public"),
-    PWARP_NONE("pwarp.none");
+    PWARP_NONE("pwarp.none"),
+    PWARP_UNSAFE("pwarp.unsafe"),
+    PWARP_LOCKED("pwarp.locked"),
+    PWARP_WRONG_PASSWORD("pwarp.wrong-password"),
+    PWARP_PASSWORD_SET("pwarp.password-set"),
+    PWARP_PASSWORD_CLEARED("pwarp.password-cleared"),
+    PWARP_LOCK_TOGGLED("pwarp.lock-toggled"),
+    PWARP_WORLD_BLACKLISTED("pwarp.world-blacklisted"),
+    PWARP_RATED("pwarp.rated"),
+    PWARP_RATING("pwarp.rating"),
+    PWARP_RATING_INVALID("pwarp.rating-invalid");
 
     private final String key;
 

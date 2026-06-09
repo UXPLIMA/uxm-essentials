@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.teleport.domain;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,31 +11,34 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Where a teleport will land, resolved to a fixed {@link Position} by the time the flow commits.
- *
- * <p>This is the teleport context's own noun for a landing point — deliberately distinct from the
- * {@code homes} context's {@code Home} and the {@code warps} context's {@code Warp}, which delegate
- * <em>execution</em> here but keep their own aggregates. A destination optionally remembers the
- * follow target it was anchored to (a {@code /tpa}'s requester following the acceptor, a {@code /top}
- * resolving above the mover) so the adapter can re-read a live location at the moment of the hop rather
- * than teleport to a stale snapshot.
- *
- * @param position the resolved landing position
- * @param followTarget the player whose live location supersedes {@link #position} at hop time, if any
+ * Supports optional warmup/cooldown overrides passed by specific triggers (like warps).
  */
-public record Destination(Position position, @Nullable PlayerRef followTarget) {
+public record Destination(
+        Position position,
+        @Nullable PlayerRef followTarget,
+        Optional<Duration> warmupOverride,
+        Optional<Duration> cooldownOverride) {
 
     public Destination {
         Objects.requireNonNull(position, "position");
+        Objects.requireNonNull(warmupOverride, "warmupOverride");
+        Objects.requireNonNull(cooldownOverride, "cooldownOverride");
     }
 
     /** A fixed-coordinate destination with no live follow target. */
     public static Destination at(Position position) {
-        return new Destination(position, null);
+        return new Destination(position, null, Optional.empty(), Optional.empty());
+    }
+
+    /** A fixed-coordinate destination with custom warmup and cooldown overrides. */
+    public static Destination at(
+            Position position, Optional<Duration> warmupOverride, Optional<Duration> cooldownOverride) {
+        return new Destination(position, null, warmupOverride, cooldownOverride);
     }
 
     /** A destination that tracks {@code target}'s live location, seeded with their last-known position. */
     public static Destination following(PlayerRef target, Position seed) {
-        return new Destination(seed, Objects.requireNonNull(target, "target"));
+        return new Destination(seed, Objects.requireNonNull(target, "target"), Optional.empty(), Optional.empty());
     }
 
     /** The follow target whose live location supersedes the seed, when this destination tracks one. */

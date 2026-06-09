@@ -51,4 +51,10 @@ public interface PlayerWarpRepository {
     default Optional<List<PlayerWarp>> peekOwned(PlayerRef owner) {
         return Optional.empty();
     }
+
+    /** Save/update a player's rating for a player warp. */
+    void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating);
+
+    /** Get the average rating for a player warp, or 0.0 if not rated. */
+    double averageRating(PlayerRef owner, PlayerWarpName name);
 }

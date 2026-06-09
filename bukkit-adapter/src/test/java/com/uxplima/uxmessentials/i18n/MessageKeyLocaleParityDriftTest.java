@@ -102,7 +102,9 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(SharedMessageKey.values(), List.of("command", "cooldown", "warmup", "common", "lang")),
                 Map.entry(TeleportMessageKey.values(), List.of("teleport", "tpa", "back", "rtp", "spawn")),
                 Map.entry(HomesMessageKey.values(), List.of("home")),
-                Map.entry(EconomyMessageKey.values(), List.of("wallet", "pay", "currency", "baltop", "eco")),
+                Map.entry(
+                        EconomyMessageKey.values(),
+                        List.of("wallet", "pay", "currency", "baltop", "eco", "loan", "bank")),
                 Map.entry(WarpsMessageKey.values(), List.of("warp")),
                 Map.entry(KitsMessageKey.values(), List.of("kit")),
                 Map.entry(PlayerstateMessageKey.values(), List.of("playerstate")),

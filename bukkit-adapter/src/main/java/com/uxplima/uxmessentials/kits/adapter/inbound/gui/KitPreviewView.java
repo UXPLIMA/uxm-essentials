@@ -12,6 +12,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -35,11 +36,13 @@ public final class KitPreviewView {
 
     private final Messages messages;
     private final Scheduler scheduler;
+    private final GuiLayout layout;
     private final MiniMessage miniMessage;
 
-    public KitPreviewView(Messages messages, Scheduler scheduler) {
+    public KitPreviewView(Messages messages, Scheduler scheduler, GuiLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -57,11 +60,12 @@ public final class KitPreviewView {
     }
 
     private void openResolved(Player player, PlayerRef viewer, KitDefinition kit) {
-        int rows = KitGuiLayout.rowsFor(kit.items().size());
+        int minRows = KitGuiLayout.rowsFor(kit.items().size());
+        int rows = Math.min(KitGuiLayout.MAX_ROWS, Math.max(layout.rows(), minRows));
         KitPreviewHolder holder = new KitPreviewHolder();
         Inventory menu = Bukkit.createInventory(holder, rows * KitGuiLayout.SLOTS_PER_ROW, title(viewer, kit));
         holder.attach(menu);
-        KitGuiLayout.seed(menu, kit.items());
+        KitGuiLayout.seed(menu, kit.items(), layout.fallbackIcon());
         player.openInventory(menu);
     }
 

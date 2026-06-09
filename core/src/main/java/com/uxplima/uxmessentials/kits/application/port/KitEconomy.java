@@ -18,13 +18,18 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface KitEconomy {
 
-    /** True when {@code who} can afford {@code amount} in the default currency. */
-    boolean canAfford(PlayerRef who, BigDecimal amount);
+    /** True when {@code who} can afford {@code amount} in the specified currency. */
+    boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId);
 
     /**
-     * Withdraw {@code amount} from {@code who}'s balance, returning {@code true} on success and
-     * {@code false} when the balance was insufficient (or the account could not be charged). The
-     * implementation does this atomically so a concurrent spend cannot double-charge.
+     * Withdraw {@code amount} of {@code currencyId} from {@code who}'s balance, returning {@code true} on success and
+     * {@code false} when the balance was insufficient.
      */
-    boolean withdraw(PlayerRef who, BigDecimal amount);
+    boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId);
+
+    /**
+     * Credit {@code amount} of {@code currencyId} to {@code who}'s balance, returning {@code true} on success and
+     * {@code false} when the deposit fails.
+     */
+    boolean deposit(PlayerRef who, BigDecimal amount, String currencyId);
 }

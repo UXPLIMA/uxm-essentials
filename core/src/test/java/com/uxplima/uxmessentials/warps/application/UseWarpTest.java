@@ -93,7 +93,7 @@ class UseWarpTest {
 
     private UseWarp useWarp() {
         WarpAccess access = new WarpAccess(permissions, Optional.empty());
-        return new UseWarp(repository, access, teleporter, notifier);
+        return new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
     }
 
     private Warp warp(String name) {
@@ -126,6 +126,14 @@ class UseWarpTest {
         @Override
         public void delete(WarpName name) {
             byName.remove(name.value());
+        }
+
+        @Override
+        public void rate(WarpName name, java.util.UUID player, double rating) {}
+
+        @Override
+        public double averageRating(WarpName name) {
+            return 0.0;
         }
     }
 

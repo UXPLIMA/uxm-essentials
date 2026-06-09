@@ -31,7 +31,13 @@ public enum TransferError {
     BALANCE_MAX_EXCEEDED(EconomyMessageKey.BALANCE_MAX_EXCEEDED),
 
     /** The named currency exists in config but the active provider cannot hold it (e.g. legacy Vault). */
-    CURRENCY_UNSUPPORTED(EconomyMessageKey.CURRENCY_UNSUPPORTED);
+    CURRENCY_UNSUPPORTED(EconomyMessageKey.CURRENCY_UNSUPPORTED),
+
+    /** The recipient's inventory is full and the physical items cannot be credited. */
+    PHYSICAL_INVENTORY_FULL(EconomyMessageKey.PHYSICAL_INVENTORY_FULL),
+
+    /** The target player is offline and a physical transaction requires them to be online. */
+    PLAYER_OFFLINE(EconomyMessageKey.PHYSICAL_PLAYER_OFFLINE);
 
     private final EconomyMessageKey messageKey;
 

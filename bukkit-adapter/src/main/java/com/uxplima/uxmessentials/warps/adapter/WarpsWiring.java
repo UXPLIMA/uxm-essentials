@@ -9,11 +9,13 @@ import org.bukkit.Material;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.CachedWarpRepository;
+import com.uxplima.uxmessentials.persistence.warps.RedisWarpSync;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -33,6 +35,8 @@ import com.uxplima.uxmessentials.warps.application.WarpNotifier;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
+import com.uxplima.uxmessentials.warps.domain.Warp;
+import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -88,11 +92,113 @@ public final class WarpsWiring {
         CachedWarpRepository cached = WarpRepositories.cachedConcrete(persistence);
         bus.registry().register(WarpSync.listener(cached));
         WarpRepository repository = WarpSync.repository(cached, bus.publisher());
+
+        // Wire Redis Pub/Sub syncing if enabled
+        boolean redisEnabled = ctx.config().getBoolean("redis.enabled", false);
+        final @org.jspecify.annotations.Nullable RedisWarpSync redisSync;
+        if (redisEnabled) {
+            String redisHost = ctx.config().getString("redis.host", "localhost");
+            int redisPort = ctx.config().getInt("redis.port", 6379);
+            String redisPassword = ctx.config().getString("redis.password", "");
+            String redisChannel = ctx.config().getString("redis.channel", "uxmessentials:warps");
+            redisSync = new RedisWarpSync(
+                    cached, redisHost, redisPort, redisPassword, redisChannel, kernel.scheduler(), kernel.log());
+            redisSync.start();
+            repository = new RedisBroadcastingRepository(repository, redisSync);
+        } else {
+            redisSync = null;
+        }
+
         WarpNotifier notifier = new WarpNotifier(kernel.messages(), kernel.messageSink());
-        WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine);
+        WarpTeleportRegistry teleportRegistry = new WarpTeleportRegistry();
+        WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry);
         GuiLayout menuLayout = guiLayouts.load("warps", "warps-menu", GuiLayout.paginatedDefault(Material.ENDER_PEARL));
-        WarpServices services = assemble(kernel, repository, notifier, teleporter, economy, menuLayout);
-        return new Wired(WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config())));
+        WarpEditorLayout editorLayout =
+                guiLayouts.loadWarpEditor("warps", "warps-editor", WarpEditorLayout.defaultLayout());
+
+        var promptListener =
+                new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpChatPromptListener(kernel.messages());
+        var playerWarpHandle = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle();
+        var editorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView(
+                kernel.messages(), kernel.scheduler(), repository, editorLayout, playerWarpHandle);
+        var soundSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView(
+                kernel.messages(), kernel.scheduler());
+        var particleSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView(
+                kernel.messages(), kernel.scheduler());
+        var welcomeMessagesView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView(
+                kernel.messages(), kernel.scheduler(), repository, editorView);
+        var editorListener = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener(
+                editorView,
+                repository,
+                promptListener,
+                kernel.messages(),
+                soundSelectorView,
+                particleSelectorView,
+                welcomeMessagesView);
+
+        WarpServices services =
+                assemble(kernel, repository, notifier, teleporter, economy, menuLayout, editorView, ctx);
+        var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
+        var listeners = List.<org.bukkit.event.Listener>of(
+                new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpArrivalNotificationListener(
+                        kernel.scheduler(), ctx.config(), teleportRegistry),
+                new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpSignListener(
+                        repository, services.useWarp(), kernel.permissions(), ctx.config(), kernel.messages()),
+                promptListener,
+                editorListener);
+        return new Wired(commands, listeners, editorView, playerWarpHandle, teleportRegistry, () -> {
+            teleportRegistry.clear();
+            if (redisSync != null) {
+                redisSync.stop();
+            }
+        });
+    }
+
+    private static final class RedisBroadcastingRepository implements WarpRepository {
+        private final WarpRepository delegate;
+        private final RedisWarpSync redisSync;
+
+        RedisBroadcastingRepository(WarpRepository delegate, RedisWarpSync redisSync) {
+            this.delegate = delegate;
+            this.redisSync = redisSync;
+        }
+
+        @Override
+        public Optional<Warp> find(WarpName name) {
+            return delegate.find(name);
+        }
+
+        @Override
+        public List<Warp> all() {
+            return delegate.all();
+        }
+
+        @Override
+        public boolean exists(WarpName name) {
+            return delegate.exists(name);
+        }
+
+        @Override
+        public void save(Warp warp) {
+            delegate.save(warp);
+            redisSync.publish(warp.name().value());
+        }
+
+        @Override
+        public void delete(WarpName name) {
+            delegate.delete(name);
+            redisSync.publish(name.value());
+        }
+
+        @Override
+        public void rate(WarpName name, java.util.UUID player, double rating) {
+            delegate.rate(name, player, rating);
+        }
+
+        @Override
+        public double averageRating(WarpName name) {
+            return delegate.averageRating(name);
+        }
     }
 
     private static WarpServices assemble(
@@ -101,33 +207,66 @@ public final class WarpsWiring {
             WarpNotifier notifier,
             WarpTeleporter teleporter,
             Optional<WarpEconomy> economy,
-            GuiLayout menuLayout) {
+            GuiLayout menuLayout,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView editorView,
+            com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx) {
         WarpAccess access = new WarpAccess(kernel.permissions(), economy);
         Clock clock = Clock.systemUTC();
-        UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier);
+        UseWarp useWarp = new UseWarp(
+                repository,
+                access,
+                teleporter,
+                notifier,
+                new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
+                kernel.permissions());
         WarpMenuView warpMenu = new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp, menuLayout);
         return new WarpServices(
                 useWarp,
-                new SetWarp(repository, notifier, kernel.events(), clock),
+                new SetWarp(
+                        repository,
+                        notifier,
+                        kernel.events(),
+                        clock,
+                        ctx.config().getStringList("world-blacklist", List.of())),
                 new DelWarp(repository, notifier, kernel.events()),
                 new ListWarps(repository, kernel.permissions(), notifier),
                 new WarpInfo(repository, notifier),
                 new MoveWarp(repository, notifier),
                 warpMenu,
-                kernel.playerLookup());
+                kernel.playerLookup(),
+                repository,
+                editorView);
     }
 
     /**
-     * Everything the warps module contributes once wired: the Brigadier commands. The warps context holds
-     * no repeating scheduled work and no in-memory store beyond the repository cache, so there is nothing
-     * to drain on stop — the module's {@code stop()} clears its own bookkeeping and the cache expires.
+     * Everything the warps module contributes once wired: the Brigadier commands and listeners.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param listeners the listeners to register
+     * @param editorView the warp editor view player-warps re-uses for its own editor entry, or {@code null}
+     * @param playerWarpHandle the late-bound handle player-warps binds its repository into for the editor
+     * @param teleportRegistry the warp-arrival notification handoff player-warps shares so its hops also notify
+     * @param stopAction cleanup action on shutdown
      */
-    public record Wired(List<CommandRegistration> commands) {
+    public record Wired(
+            List<CommandRegistration> commands,
+            List<org.bukkit.event.Listener> listeners,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
+                    editorView,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle playerWarpHandle,
+            WarpTeleportRegistry teleportRegistry,
+            Runnable stopAction) {
 
         public Wired {
             commands = List.copyOf(commands);
+            listeners = List.copyOf(listeners);
+            Objects.requireNonNull(playerWarpHandle, "playerWarpHandle");
+            Objects.requireNonNull(teleportRegistry, "teleportRegistry");
+            Objects.requireNonNull(stopAction, "stopAction");
+        }
+
+        public void stop() {
+            stopAction.run();
         }
     }
 }

@@ -115,8 +115,9 @@ class WarpMenuLayoutTest {
         WarpNotifier notifier = new WarpNotifier(messages, new NoSink());
         WarpRepository repository = new FakeRepository();
         WarpTeleporter teleporter = (who, warp) -> {};
-        WarpAccess access = new WarpAccess(new AllowAllPermissions(), Optional.<WarpEconomy>empty());
-        return new UseWarp(repository, access, teleporter, notifier);
+        Permissions permissions = new AllowAllPermissions();
+        WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
+        return new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
     }
 
     private static final class FakeRepository implements WarpRepository {
@@ -140,6 +141,14 @@ class WarpMenuLayoutTest {
 
         @Override
         public void delete(WarpName name) {}
+
+        @Override
+        public void rate(WarpName name, java.util.UUID player, double rating) {}
+
+        @Override
+        public double averageRating(WarpName name) {
+            return 0.0;
+        }
     }
 
     private static final class NoSink implements MessageSink {

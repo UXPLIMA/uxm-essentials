@@ -115,6 +115,84 @@ public final class GuiLayouts {
         return slots;
     }
 
+    public WarpEditorLayout loadWarpEditor(String module, String name, WarpEditorLayout codeDefault) {
+        Objects.requireNonNull(module, "module");
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(codeDefault, "codeDefault");
+        Path onDisk =
+                dataFolder.resolve("modules").resolve(module).resolve("gui").resolve(name + ".conf");
+        if (Files.isRegularFile(onDisk)) {
+            return parseWarpEditor(
+                    HoconConfigurationLoader.builder().path(onDisk).build(), onDisk.toString(), codeDefault);
+        }
+        String resource = "modules/" + module + "/gui/" + name + ".conf";
+        if (getClass().getClassLoader().getResource(resource) == null) {
+            return codeDefault;
+        }
+        try {
+            return parseWarpEditor(
+                    HoconConfigurationLoader.builder()
+                            .source(() -> openReader(resource))
+                            .build(),
+                    resource,
+                    codeDefault);
+        } catch (Exception e) {
+            log.error("failed to open resource gui layout " + resource, e);
+            return codeDefault;
+        }
+    }
+
+    private WarpEditorLayout parseWarpEditor(
+            HoconConfigurationLoader loader, String origin, WarpEditorLayout codeDefault) {
+        ConfigurationNode root;
+        try {
+            root = loader.load();
+        } catch (ConfigurateException failure) {
+            log.error("failed to load warp editor gui layout " + origin, failure);
+            return codeDefault;
+        }
+        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
+        int iconSlot = root.node("icon-slot").getInt(codeDefault.iconSlot());
+        int lockSlot = root.node("lock-slot").getInt(codeDefault.lockSlot());
+        int passwordSlot = root.node("password-slot").getInt(codeDefault.passwordSlot());
+        int welcomeSlot = root.node("welcome-slot").getInt(codeDefault.welcomeSlot());
+        int soundsSlot = root.node("sounds-slot").getInt(codeDefault.soundsSlot());
+        int particlesSlot = root.node("particles-slot").getInt(codeDefault.particlesSlot());
+        int warmupSlot = root.node("warmup-slot").getInt(codeDefault.warmupSlot());
+        int cooldownSlot = root.node("cooldown-slot").getInt(codeDefault.cooldownSlot());
+        int closeSlot = root.node("close-slot").getInt(codeDefault.closeSlot());
+
+        Material lockMaterial = material(root.node("lock-material").getString(), codeDefault.lockMaterial());
+        Material passwordMaterial =
+                material(root.node("password-material").getString(), codeDefault.passwordMaterial());
+        Material welcomeMaterial = material(root.node("welcome-material").getString(), codeDefault.welcomeMaterial());
+        Material soundsMaterial = material(root.node("sounds-material").getString(), codeDefault.soundsMaterial());
+        Material particlesMaterial =
+                material(root.node("particles-material").getString(), codeDefault.particlesMaterial());
+        Material warmupMaterial = material(root.node("warmup-material").getString(), codeDefault.warmupMaterial());
+        Material cooldownMaterial =
+                material(root.node("cooldown-material").getString(), codeDefault.cooldownMaterial());
+
+        return new WarpEditorLayout(
+                rows,
+                iconSlot,
+                lockSlot,
+                passwordSlot,
+                welcomeSlot,
+                soundsSlot,
+                particlesSlot,
+                warmupSlot,
+                cooldownSlot,
+                closeSlot,
+                lockMaterial,
+                passwordMaterial,
+                welcomeMaterial,
+                soundsMaterial,
+                particlesMaterial,
+                warmupMaterial,
+                cooldownMaterial);
+    }
+
     private BufferedReader openReader(String resource) throws java.io.IOException {
         InputStream in = getClass().getClassLoader().getResourceAsStream(resource);
         if (in == null) {

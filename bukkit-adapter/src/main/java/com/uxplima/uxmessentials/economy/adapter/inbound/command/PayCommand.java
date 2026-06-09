@@ -71,16 +71,20 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
             return Command.SINGLE_SUCCESS;
         }
         String targetName = ctx.getArgument("player", String.class);
-        offTick(() -> resolveAndPay(ref(sender), targetName, money.get()));
+        offTick(() -> resolveAndPay(sender, ref(sender), targetName, money.get()));
         return Command.SINGLE_SUCCESS;
     }
 
-    private void resolveAndPay(PlayerRef from, String targetName, Money amount) {
+    private void resolveAndPay(Player sender, PlayerRef from, String targetName, Money amount) {
         Optional<PlayerRef> target = services.players().findOnlineByName(targetName);
         if (target.isEmpty()) {
             rejectUnknownTarget(from, targetName);
             return;
         }
-        services.pay().pay(from, target.get(), amount);
+        com.uxplima.uxmessentials.economy.application.PayOutcome outcome =
+                services.pay().pay(from, target.get(), amount);
+        if (outcome.kind() == com.uxplima.uxmessentials.economy.application.PayOutcome.Kind.STAGED) {
+            services.payConfirmationView().open(sender, target.get(), amount);
+        }
     }
 }

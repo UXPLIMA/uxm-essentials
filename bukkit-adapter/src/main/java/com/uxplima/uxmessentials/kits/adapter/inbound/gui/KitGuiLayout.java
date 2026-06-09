@@ -48,32 +48,67 @@ final class KitGuiLayout {
      * with filler. An item whose index falls past the menu's capacity (a kit larger than 54 stacks) is dropped
      * from the view; the menu can never advertise a slot the chest does not have.
      */
-    static void seed(Inventory menu, List<KitItem> items) {
+    static void seed(Inventory menu, List<KitItem> items, Material fillerMaterial) {
         Objects.requireNonNull(menu, "menu");
         Objects.requireNonNull(items, "items");
+        Objects.requireNonNull(fillerMaterial, "fillerMaterial");
         int size = menu.getSize();
-        ItemStack pane = filler();
+        ItemStack pane = ItemBuilder.of(fillerMaterial).name(Component.empty()).build();
         for (int slot = 0; slot < size; slot++) {
-            if (slot < items.size()) {
-                menu.setItem(slot, KitItemCodec.decode(items.get(slot)));
+            menu.setItem(slot, pane.clone());
+        }
+        int fallbackSlot = 0;
+        for (KitItem item : items) {
+            ItemStack decoded = KitItemCodec.decode(item);
+            if (item.slot().isPresent()) {
+                int targetSlot = item.slot().get();
+                if (targetSlot >= 0 && targetSlot < size) {
+                    menu.setItem(targetSlot, decoded);
+                }
             } else {
-                menu.setItem(slot, pane.clone());
+                while (fallbackSlot < size) {
+                    ItemStack current = menu.getItem(fallbackSlot);
+                    if (current != null && current.getType() == fillerMaterial) {
+                        break;
+                    }
+                    fallbackSlot++;
+                }
+                if (fallbackSlot < size) {
+                    menu.setItem(fallbackSlot, decoded);
+                    fallbackSlot++;
+                }
             }
         }
     }
 
     /**
-     * Seed {@code menu} for editing: place {@code items} at one item per slot in definition order, clearing the
-     * remaining slots to air so the editor can place new items there. Unlike {@link #seed} there is no filler —
-     * every slot of an editor window is editable, and an empty slot is genuinely empty, which is what lets
-     * {@link #encode} read the window's final state as the kit's new contents.
+     * Seed {@code menu} for editing: place {@code items} at their specified slots, fallback to the next empty
+     * slot if not specified, clearing all other slots to air. Unlike {@link #seed} there is no filler.
      */
     static void seedEditable(Inventory menu, List<KitItem> items) {
         Objects.requireNonNull(menu, "menu");
         Objects.requireNonNull(items, "items");
         int size = menu.getSize();
         for (int slot = 0; slot < size; slot++) {
-            menu.setItem(slot, slot < items.size() ? KitItemCodec.decode(items.get(slot)) : null);
+            menu.setItem(slot, null);
+        }
+        int fallbackSlot = 0;
+        for (KitItem item : items) {
+            ItemStack decoded = KitItemCodec.decode(item);
+            if (item.slot().isPresent()) {
+                int targetSlot = item.slot().get();
+                if (targetSlot >= 0 && targetSlot < size) {
+                    menu.setItem(targetSlot, decoded);
+                }
+            } else {
+                while (fallbackSlot < size && menu.getItem(fallbackSlot) != null) {
+                    fallbackSlot++;
+                }
+                if (fallbackSlot < size) {
+                    menu.setItem(fallbackSlot, decoded);
+                    fallbackSlot++;
+                }
+            }
         }
     }
 
@@ -85,12 +120,5 @@ final class KitGuiLayout {
     static List<KitItem> encode(Inventory menu) {
         Objects.requireNonNull(menu, "menu");
         return KitItemCodec.encodeAll(menu.getContents());
-    }
-
-    /** The gray-glass filler with no name, padding the slots a kit's items do not fill. */
-    static ItemStack filler() {
-        return ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
-                .build();
     }
 }

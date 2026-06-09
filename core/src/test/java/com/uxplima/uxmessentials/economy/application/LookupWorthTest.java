@@ -31,7 +31,7 @@ class LookupWorthTest {
 
     private LookupWorth lookupWith(WorthTable table) {
         EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), sink);
-        return new LookupWorth(table, notifier, Currencies.COINS);
+        return new LookupWorth(table, notifier, Currencies.COINS, java.util.List.of(Currencies.COINS));
     }
 
     @Test
@@ -45,7 +45,7 @@ class LookupWorthTest {
 
     @Test
     void singleItemReportsItsUnitWorth() {
-        LookupWorth lookup = lookupWith(new WorthTable(Map.of("diamond", new BigDecimal("10"))));
+        LookupWorth lookup = lookupWith(new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins"))));
 
         lookup.report(viewer, "diamond", 1);
 
@@ -54,7 +54,7 @@ class LookupWorthTest {
 
     @Test
     void stackReportsTheStackTotal() {
-        LookupWorth lookup = lookupWith(new WorthTable(Map.of("diamond", new BigDecimal("10"))));
+        LookupWorth lookup = lookupWith(new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins"))));
 
         lookup.report(viewer, "diamond", 4);
 

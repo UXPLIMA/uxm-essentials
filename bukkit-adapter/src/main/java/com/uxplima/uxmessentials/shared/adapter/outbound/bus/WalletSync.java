@@ -35,7 +35,7 @@ public final class WalletSync {
     private WalletSync() {}
 
     /** A {@link WalletRepository} that broadcasts a {@link BalanceChanged} after every local balance write. */
-    public static WalletRepository repository(CachedWalletRepository delegate, BusPublisher bus) {
+    public static WalletRepository repository(WalletRepository delegate, BusPublisher bus) {
         Objects.requireNonNull(delegate, "delegate");
         Objects.requireNonNull(bus, "bus");
         return new Broadcasting(delegate, bus);

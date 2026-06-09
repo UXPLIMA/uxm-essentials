@@ -20,24 +20,34 @@ public final class LookupWorth {
 
     private final WorthSource worth;
     private final EconomyNotifier notifier;
-    private final Currency currency;
+    private final Currency defaultCurrency;
+    private final java.util.Collection<Currency> currencies;
 
-    public LookupWorth(WorthSource worth, EconomyNotifier notifier, Currency currency) {
+    public LookupWorth(
+            WorthSource worth,
+            EconomyNotifier notifier,
+            Currency defaultCurrency,
+            java.util.Collection<Currency> currencies) {
         this.worth = Objects.requireNonNull(worth, "worth");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
-        this.currency = Objects.requireNonNull(currency, "currency");
+        this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+        this.currencies = java.util.List.copyOf(currencies);
     }
 
     /** Report the worth of {@code amount} of {@code material} to {@code viewer}. */
     public void report(PlayerRef viewer, String material, int amount) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(material, "material");
-        Optional<BigDecimal> unit = worth.unitPrice(material);
+        Optional<Worth> unit = worth.unitPrice(material);
         if (unit.isEmpty()) {
             notifier.send(viewer, EconomyMessageKey.WORTH_NOT_SELLABLE, Map.of("item", material));
             return;
         }
-        Money unitWorth = Money.of(currency, unit.get());
+        Currency itemCurrency = currencies.stream()
+                .filter(c -> c.id().value().equalsIgnoreCase(unit.get().currencyId()))
+                .findFirst()
+                .orElse(defaultCurrency);
+        Money unitWorth = Money.of(itemCurrency, unit.get().amount());
         if (amount <= 1) {
             notifier.send(
                     viewer,
@@ -45,7 +55,7 @@ public final class LookupWorth {
                     Map.of("item", material, "amount", notifier.amount(unitWorth)));
             return;
         }
-        Money stackWorth = Money.of(currency, unit.get().multiply(BigDecimal.valueOf(amount)));
+        Money stackWorth = Money.of(itemCurrency, unit.get().amount().multiply(BigDecimal.valueOf(amount)));
         notifier.send(
                 viewer,
                 EconomyMessageKey.WORTH_RESULT_STACK,

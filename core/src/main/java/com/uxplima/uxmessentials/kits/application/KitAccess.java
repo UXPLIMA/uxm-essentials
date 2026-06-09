@@ -63,7 +63,7 @@ public final class KitAccess {
         if (kit.isOneTime() && claims.hasClaimed(who, kit.id()) && !permissions.has(who, COOLDOWN_BYPASS_NODE)) {
             return Result.err(KitError.ALREADY_CLAIMED);
         }
-        if (cooldowns.check(who, cooldownKind(kit)).isErr()) {
+        if (cooldowns.check(who, cooldownKind(who, kit)).isErr()) {
             return Result.err(KitError.ON_COOLDOWN);
         }
         return charge(who, kit);
@@ -71,7 +71,7 @@ public final class KitAccess {
 
     /** Start the cooldown clock and record the one-time stamp after a successful grant. */
     public void recordClaim(PlayerRef who, KitDefinition kit) {
-        cooldowns.stamp(who, cooldownKind(kit));
+        cooldowns.stamp(who, cooldownKind(who, kit));
         if (kit.isOneTime()) {
             claims.markClaimed(who, kit.id());
         }
@@ -79,7 +79,7 @@ public final class KitAccess {
 
     /** The remaining cooldown for {@code who} on {@code kit}; ok when ready. */
     public Result<Unit, java.time.Duration> remaining(PlayerRef who, KitDefinition kit) {
-        return cooldowns.check(who, cooldownKind(kit));
+        return cooldowns.check(who, cooldownKind(who, kit));
     }
 
     private Result<Unit, KitError> charge(PlayerRef who, KitDefinition kit) {
@@ -87,14 +87,51 @@ public final class KitAccess {
             return Result.ok();
         }
         KitEconomy provider = economy.get();
-        if (!provider.withdraw(who, kit.cost().amount())) {
+        if (!provider.withdraw(who, kit.cost().amount(), kit.cost().currencyId())) {
             return Result.err(KitError.CANNOT_AFFORD);
         }
         return Result.ok();
     }
 
-    private static CooldownKind cooldownKind(KitDefinition kit) {
-        return CooldownKind.scoped(
-                "kit", "kit." + kit.id().value(), kit.cooldownSeconds(), CooldownStartPhase.TELEPORT);
+    private CooldownKind cooldownKind(PlayerRef who, KitDefinition kit) {
+        long seconds = resolveCooldownSeconds(who, kit);
+        return CooldownKind.scoped("kit", "kit." + kit.id().value(), seconds, CooldownStartPhase.TELEPORT);
+    }
+
+    public boolean hasPermission(PlayerRef who, KitDefinition kit) {
+        return !kit.requiresPermission() || permissions.has(who, kit.id().permissionNode());
+    }
+
+    public boolean hasClaimedOneTime(PlayerRef who, KitDefinition kit) {
+        return kit.isOneTime() && claims.hasClaimed(who, kit.id()) && !permissions.has(who, COOLDOWN_BYPASS_NODE);
+    }
+
+    public boolean isOnCooldown(PlayerRef who, KitDefinition kit) {
+        return cooldowns.check(who, cooldownKind(who, kit)).isErr();
+    }
+
+    public boolean canAfford(PlayerRef who, KitDefinition kit) {
+        if (!kit.hasCost() || economy.isEmpty()) {
+            return true;
+        }
+        return economy.get().canAfford(who, kit.cost().amount(), kit.cost().currencyId());
+    }
+
+    private long resolveCooldownSeconds(PlayerRef who, KitDefinition kit) {
+        long shortest = kit.cooldownSeconds();
+        if (kit.permissionCooldowns().isEmpty()) {
+            return shortest;
+        }
+        for (java.util.Map.Entry<String, java.time.Duration> entry :
+                kit.permissionCooldowns().entrySet()) {
+            String group = entry.getKey();
+            if (permissions.has(who, "uxmessentials.kit.cooldown." + group)) {
+                long durationSecs = entry.getValue().toSeconds();
+                if (durationSecs < shortest) {
+                    shortest = durationSecs;
+                }
+            }
+        }
+        return shortest;
     }
 }

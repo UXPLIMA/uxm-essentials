@@ -23,7 +23,19 @@ public enum WarpError {
     NO_PERMISSION(WarpsMessageKey.WARP_NO_PERMISSION),
 
     /** The player cannot pay the warp's cost (only reachable when an economy provider is present). */
-    CANNOT_AFFORD(WarpsMessageKey.WARP_CANNOT_AFFORD);
+    CANNOT_AFFORD(WarpsMessageKey.WARP_CANNOT_AFFORD),
+
+    /** The warp destination is physically unsafe (lava, void, suffocation). */
+    UNSAFE_LOCATION(WarpsMessageKey.WARP_UNSAFE),
+
+    /** The warp is locked. */
+    LOCKED(WarpsMessageKey.WARP_LOCKED),
+
+    /** The player entered the wrong password. */
+    WRONG_PASSWORD(WarpsMessageKey.WARP_WRONG_PASSWORD),
+
+    /** The warp cannot be created in this world because it is blacklisted. */
+    WORLD_BLACKLISTED(WarpsMessageKey.WARP_WORLD_BLACKLISTED);
 
     private final WarpsMessageKey messageKey;
 

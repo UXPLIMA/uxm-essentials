@@ -18,14 +18,15 @@ import java.util.Optional;
 public interface WorthSource {
 
     /** The unit price for {@code material}, or empty when the material has no worth. */
-    Optional<BigDecimal> unitPrice(String material);
+    Optional<Worth> unitPrice(String material);
 
     /** The value of {@code amount} of {@code material}, or empty when the material has no worth. */
-    default Optional<BigDecimal> stackValue(String material, int amount) {
+    default Optional<Worth> stackValue(String material, int amount) {
         Objects.requireNonNull(material, "material");
         if (amount < 0) {
             throw new IllegalArgumentException("amount must not be negative: " + amount);
         }
-        return unitPrice(material).map(price -> price.multiply(BigDecimal.valueOf(amount)));
+        return unitPrice(material)
+                .map(worth -> Worth.of(worth.amount().multiply(BigDecimal.valueOf(amount)), worth.currencyId()));
     }
 }

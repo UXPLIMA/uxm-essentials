@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.playerwarps;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpRatings.PLAYER_WARP_RATINGS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 
 import java.util.List;
@@ -96,6 +97,42 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
                 .execute());
     }
 
+    @Override
+    public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(player, "player");
+        write(dsl -> {
+            dsl.insertInto(PLAYER_WARP_RATINGS)
+                    .set(PLAYER_WARP_RATINGS.OWNER_UUID, owner.uuid().toString())
+                    .set(PLAYER_WARP_RATINGS.WARP_NAME, name.value())
+                    .set(PLAYER_WARP_RATINGS.PLAYER_UUID, player.toString())
+                    .set(PLAYER_WARP_RATINGS.RATING, rating)
+                    .onConflict(
+                            PLAYER_WARP_RATINGS.OWNER_UUID,
+                            PLAYER_WARP_RATINGS.WARP_NAME,
+                            PLAYER_WARP_RATINGS.PLAYER_UUID)
+                    .doUpdate()
+                    .set(PLAYER_WARP_RATINGS.RATING, rating)
+                    .execute();
+            return null;
+        });
+    }
+
+    @Override
+    public double averageRating(PlayerRef owner, PlayerWarpName name) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(name, "name");
+        return read(dsl -> {
+            java.math.BigDecimal val = dsl.select(org.jooq.impl.DSL.avg(PLAYER_WARP_RATINGS.RATING))
+                    .from(PLAYER_WARP_RATINGS)
+                    .where(PLAYER_WARP_RATINGS.OWNER_UUID.eq(owner.uuid().toString()))
+                    .and(PLAYER_WARP_RATINGS.WARP_NAME.eq(name.value()))
+                    .fetchOneInto(java.math.BigDecimal.class);
+            return val == null ? 0.0 : val.doubleValue();
+        });
+    }
+
     private static void upsert(DSLContext dsl, PlayerWarp warp) {
         PlayerWarpsRecord record = dsl.newRecord(PLAYER_WARPS);
         PlayerWarpRows.apply(record, warp);
@@ -111,6 +148,18 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
                 .set(PLAYER_WARPS.YAW, record.getYaw())
                 .set(PLAYER_WARPS.PITCH, record.getPitch())
                 .set(PLAYER_WARPS.IS_PUBLIC, record.getIsPublic())
+                .set(PLAYER_WARPS.VISITORS, record.getVisitors())
+                .set(PLAYER_WARPS.PASSWORD, record.getPassword())
+                .set(PLAYER_WARPS.IS_LOCKED, record.getIsLocked())
+                .set(PLAYER_WARPS.WELCOME_MESSAGE, record.getWelcomeMessage())
+                .set(PLAYER_WARPS.WELCOME_MESSAGE_TYPE, record.getWelcomeMessageType())
+                .set(PLAYER_WARPS.DEPARTURE_SOUND, record.getDepartureSound())
+                .set(PLAYER_WARPS.ARRIVAL_SOUND, record.getArrivalSound())
+                .set(PLAYER_WARPS.DEPARTURE_PARTICLE, record.getDepartureParticle())
+                .set(PLAYER_WARPS.ARRIVAL_PARTICLE, record.getArrivalParticle())
+                .set(PLAYER_WARPS.WARMUP_SECONDS, record.getWarmupSeconds())
+                .set(PLAYER_WARPS.COOLDOWN_SECONDS, record.getCooldownSeconds())
+                .set(PLAYER_WARPS.ICON_MATERIAL, record.getIconMaterial())
                 .execute();
     }
 }

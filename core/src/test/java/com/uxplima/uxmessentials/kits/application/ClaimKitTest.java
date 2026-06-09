@@ -180,7 +180,7 @@ class ClaimKitTest {
 
     private ClaimKit claimKit(Optional<KitEconomy> economy) {
         KitAccess access = new KitAccess(permissions, cooldowns, claims, economy);
-        return new ClaimKit(repository, access, granter, notifier, events, Clock.system(ZoneOffset.UTC));
+        return new ClaimKit(repository, access, granter, notifier, events, Clock.system(ZoneOffset.UTC), economy);
     }
 
     private static KitDefinition repeatable(String id, Duration cooldown) {
@@ -288,7 +288,7 @@ class ClaimKitTest {
         private int grants;
 
         @Override
-        public Grant grant(PlayerRef recipient, List<KitItem> items) {
+        public Grant grant(PlayerRef recipient, KitDefinition kit) {
             grants++;
             return Grant.complete();
         }
@@ -298,22 +298,29 @@ class ClaimKitTest {
     private static final class RecordingEconomy implements KitEconomy {
         private final boolean solvent;
         private BigDecimal charged = BigDecimal.ZERO;
+        private BigDecimal credited = BigDecimal.ZERO;
 
         RecordingEconomy(boolean solvent) {
             this.solvent = solvent;
         }
 
         @Override
-        public boolean canAfford(PlayerRef who, BigDecimal amount) {
+        public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
             return solvent;
         }
 
         @Override
-        public boolean withdraw(PlayerRef who, BigDecimal amount) {
+        public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
             if (!solvent) {
                 return false;
             }
             charged = charged.add(amount);
+            return true;
+        }
+
+        @Override
+        public boolean deposit(PlayerRef who, BigDecimal amount, String currencyId) {
+            credited = credited.add(amount);
             return true;
         }
     }

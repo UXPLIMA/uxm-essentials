@@ -32,4 +32,9 @@ public final class CapturingSink implements MessageSink {
     public boolean delivered(String keyPrefix) {
         return sent.stream().anyMatch(s -> s.text().startsWith(keyPrefix));
     }
+
+    /** How many deliveries so far whose text starts with {@code keyPrefix}. */
+    public long count(String keyPrefix) {
+        return sent.stream().filter(s -> s.text().startsWith(keyPrefix)).count();
+    }
 }

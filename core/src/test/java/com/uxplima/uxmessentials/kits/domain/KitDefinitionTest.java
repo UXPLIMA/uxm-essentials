@@ -78,6 +78,77 @@ class KitDefinitionTest {
     }
 
     @Test
+    void withItemsSwapsTheStacksAndPreservesEveryOtherSetting() {
+        KitDefinition original = new KitDefinition(
+                KitId.of("vip"),
+                List.of(KitItem.of("old", 1)),
+                Duration.ofSeconds(120),
+                true,
+                true,
+                KitCost.of(new BigDecimal("250")),
+                java.util.Optional.of("<gold>VIP Kit"),
+                java.util.Optional.of("DIAMOND"),
+                List.of("line-one", "line-two"),
+                List.of("say claimed", "give @s bread"),
+                java.util.Optional.of("entity.player.levelup"),
+                java.util.Optional.of("FLAME"),
+                true,
+                true,
+                java.util.Optional.of("premium"),
+                new BigDecimal("99"),
+                "coins",
+                java.util.Map.of("uxmessentials.kit.cooldown.30", Duration.ofSeconds(30)),
+                7,
+                java.util.Optional.of("BARRIER"),
+                java.util.Optional.of("<red>No permission"),
+                List.of("locked"),
+                java.util.Optional.of("CLOCK"),
+                java.util.Optional.of("<yellow>On cooldown"),
+                List.of("wait"),
+                java.util.Optional.of("STRUCTURE_VOID"),
+                java.util.Optional.of("<gray>Claimed"),
+                List.of("done"),
+                java.util.Optional.of("RED_WOOL"),
+                java.util.Optional.of("<red>Too poor"),
+                List.of("need money"));
+
+        List<KitItem> newItems = List.of(KitItem.of("new", 5), KitItem.of("second", 2));
+        KitDefinition edited = original.withItems(newItems);
+
+        assertThat(edited.items()).isEqualTo(newItems);
+        assertThat(edited.id()).isEqualTo(original.id());
+        assertThat(edited.cooldown()).isEqualTo(original.cooldown());
+        assertThat(edited.oneTime()).isEqualTo(original.oneTime());
+        assertThat(edited.permission()).isEqualTo(original.permission());
+        assertThat(edited.cost()).isEqualTo(original.cost());
+        assertThat(edited.displayName()).isEqualTo(original.displayName());
+        assertThat(edited.displayMaterial()).isEqualTo(original.displayMaterial());
+        assertThat(edited.displayLore()).isEqualTo(original.displayLore());
+        assertThat(edited.commands()).isEqualTo(original.commands());
+        assertThat(edited.sound()).isEqualTo(original.sound());
+        assertThat(edited.particles()).isEqualTo(original.particles());
+        assertThat(edited.firstJoin()).isEqualTo(original.firstJoin());
+        assertThat(edited.autoEquip()).isEqualTo(original.autoEquip());
+        assertThat(edited.categoryId()).isEqualTo(original.categoryId());
+        assertThat(edited.claimMoney()).isEqualTo(original.claimMoney());
+        assertThat(edited.claimMoneyCurrency()).isEqualTo(original.claimMoneyCurrency());
+        assertThat(edited.permissionCooldowns()).isEqualTo(original.permissionCooldowns());
+        assertThat(edited.priority()).isEqualTo(original.priority());
+        assertThat(edited.noPermissionMaterial()).isEqualTo(original.noPermissionMaterial());
+        assertThat(edited.noPermissionName()).isEqualTo(original.noPermissionName());
+        assertThat(edited.noPermissionLore()).isEqualTo(original.noPermissionLore());
+        assertThat(edited.cooldownMaterial()).isEqualTo(original.cooldownMaterial());
+        assertThat(edited.cooldownName()).isEqualTo(original.cooldownName());
+        assertThat(edited.cooldownLore()).isEqualTo(original.cooldownLore());
+        assertThat(edited.claimedMaterial()).isEqualTo(original.claimedMaterial());
+        assertThat(edited.claimedName()).isEqualTo(original.claimedName());
+        assertThat(edited.claimedLore()).isEqualTo(original.claimedLore());
+        assertThat(edited.unaffordableMaterial()).isEqualTo(original.unaffordableMaterial());
+        assertThat(edited.unaffordableName()).isEqualTo(original.unaffordableName());
+        assertThat(edited.unaffordableLore()).isEqualTo(original.unaffordableLore());
+    }
+
+    @Test
     void kitClaimedCarriesItsRecipientAndActor() {
         PlayerRef recipient = new PlayerRef(UUID.randomUUID(), "Alice");
         PlayerRef actor = new PlayerRef(UUID.randomUUID(), "Operator");

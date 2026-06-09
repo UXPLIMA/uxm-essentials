@@ -15,9 +15,10 @@ dependencies {
     implementation(project(":core"))
     api(project(":api"))
 
-    implementation(libs.configurate.yaml) // EssentialsX userdata/warps/kits YAML — adapter-only
+    compileOnly(libs.configurate.yaml) // EssentialsX userdata/warps/kits YAML — adapter-only
     compileOnly(libs.slf4j.api)
 
     testImplementation(libs.jqwik)
+    testImplementation(libs.configurate.yaml)
     testImplementation(libs.configurate.hocon) // config-version ladder fixtures
 }

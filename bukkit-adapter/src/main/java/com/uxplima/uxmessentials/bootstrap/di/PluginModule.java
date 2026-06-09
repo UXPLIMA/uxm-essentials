@@ -316,6 +316,7 @@ public final class PluginModule {
             Bus bus) {
         EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence, bus);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
         wired.start();
         resources.onClose(wired::stop);
         // Captured for warps and kits, which land after economy and charge a recorded cost through it.
@@ -336,7 +337,12 @@ public final class PluginModule {
                 links.teleportEngine, "warps delegates teleport execution but the teleport engine is unavailable");
         WarpsWiring.Wired wired =
                 WarpsWiring.wire(ctx, persistence, engine, Optional.ofNullable(links.warpEconomy), bus, guiLayouts);
+        links.warpEditorView = wired.editorView();
+        links.warpPlayerWarpHandle = wired.playerWarpHandle();
+        links.warpTeleportRegistry = wired.teleportRegistry();
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::stop);
     }
 
     private static void wireKits(
@@ -495,7 +501,8 @@ public final class PluginModule {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine,
                 "playerwarps delegates teleport execution but the teleport engine is unavailable");
-        PlayerwarpsWiring.Wired wired = PlayerwarpsWiring.wire(ctx, persistence, engine);
+        PlayerwarpsWiring.Wired wired = PlayerwarpsWiring.wire(
+                ctx, persistence, engine, links.warpEditorView, links.warpPlayerWarpHandle, links.warpTeleportRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
     }
@@ -556,6 +563,12 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
+        private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
+                warpEditorView;
+        private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
+                warpPlayerWarpHandle;
+        private com.uxplima.uxmessentials.warps.adapter.@org.jspecify.annotations.Nullable WarpTeleportRegistry
+                warpTeleportRegistry;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
     }

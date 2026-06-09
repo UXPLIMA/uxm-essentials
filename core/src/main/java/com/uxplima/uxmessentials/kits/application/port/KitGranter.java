@@ -1,8 +1,6 @@
 package com.uxplima.uxmessentials.kits.application.port;
 
-import java.util.List;
-
-import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -18,11 +16,19 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public interface KitGranter {
 
     /**
-     * Grant {@code items} to {@code recipient}. Returns the outcome so the claim use case can warn when the
+     * Called before the grant is executed to check if any external event cancels it.
+     * Returns true if the grant should proceed, false if it should be cancelled.
+     */
+    default boolean preGrant(PlayerRef recipient, KitDefinition kit) {
+        return true;
+    }
+
+    /**
+     * Grant kit {@code kit} to {@code recipient}. Returns the outcome so the claim use case can warn when the
      * inventory could not hold everything; a {@code false} {@code fitInInventory} still means the items were
      * delivered (overflow dropped at the player's feet), not that the claim failed.
      */
-    Grant grant(PlayerRef recipient, List<KitItem> items);
+    Grant grant(PlayerRef recipient, KitDefinition kit);
 
     /**
      * The result of a grant.

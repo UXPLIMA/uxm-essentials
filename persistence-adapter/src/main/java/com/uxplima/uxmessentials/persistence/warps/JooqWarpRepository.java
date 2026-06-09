@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.warps;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.WarpRatings.WARP_RATINGS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Warps.WARPS;
 
 import java.util.List;
@@ -63,6 +64,35 @@ public final class JooqWarpRepository extends JooqRepository implements WarpRepo
         write(dsl -> dsl.deleteFrom(WARPS).where(WARPS.NAME.eq(name.value())).execute());
     }
 
+    @Override
+    public void rate(WarpName name, java.util.UUID player, double rating) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(player, "player");
+        write(dsl -> {
+            dsl.insertInto(WARP_RATINGS)
+                    .set(WARP_RATINGS.WARP_NAME, name.value())
+                    .set(WARP_RATINGS.PLAYER_UUID, player.toString())
+                    .set(WARP_RATINGS.RATING, rating)
+                    .onConflict(WARP_RATINGS.WARP_NAME, WARP_RATINGS.PLAYER_UUID)
+                    .doUpdate()
+                    .set(WARP_RATINGS.RATING, rating)
+                    .execute();
+            return null;
+        });
+    }
+
+    @Override
+    public double averageRating(WarpName name) {
+        Objects.requireNonNull(name, "name");
+        return read(dsl -> {
+            java.math.BigDecimal val = dsl.select(org.jooq.impl.DSL.avg(WARP_RATINGS.RATING))
+                    .from(WARP_RATINGS)
+                    .where(WARP_RATINGS.WARP_NAME.eq(name.value()))
+                    .fetchOneInto(java.math.BigDecimal.class);
+            return val == null ? 0.0 : val.doubleValue();
+        });
+    }
+
     private static void upsert(DSLContext dsl, Warp warp) {
         WarpsRecord record = dsl.newRecord(WARPS);
         WarpRows.apply(record, warp);
@@ -79,7 +109,20 @@ public final class JooqWarpRepository extends JooqRepository implements WarpRepo
                 .set(WARPS.PITCH, record.getPitch())
                 .set(WARPS.OWNER, record.getOwner())
                 .set(WARPS.COST, record.getCost())
+                .set(WARPS.COST_CURRENCY, record.getCostCurrency())
                 .set(WARPS.REQUIRED_PERMISSION, record.getRequiredPermission())
+                .set(WARPS.VISITORS, record.getVisitors())
+                .set(WARPS.PASSWORD, record.getPassword())
+                .set(WARPS.IS_LOCKED, record.getIsLocked())
+                .set(WARPS.WELCOME_MESSAGE, record.getWelcomeMessage())
+                .set(WARPS.WELCOME_MESSAGE_TYPE, record.getWelcomeMessageType())
+                .set(WARPS.DEPARTURE_SOUND, record.getDepartureSound())
+                .set(WARPS.ARRIVAL_SOUND, record.getArrivalSound())
+                .set(WARPS.DEPARTURE_PARTICLE, record.getDepartureParticle())
+                .set(WARPS.ARRIVAL_PARTICLE, record.getArrivalParticle())
+                .set(WARPS.WARMUP_SECONDS, record.getWarmupSeconds())
+                .set(WARPS.COOLDOWN_SECONDS, record.getCooldownSeconds())
+                .set(WARPS.ICON_MATERIAL, record.getIconMaterial())
                 .execute();
     }
 }

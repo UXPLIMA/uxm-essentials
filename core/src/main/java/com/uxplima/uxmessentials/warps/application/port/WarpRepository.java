@@ -33,4 +33,10 @@ public interface WarpRepository {
 
     /** Remove the warp under {@code name}; a no-op when no such row exists. */
     void delete(WarpName name);
+
+    /** Save/update a player's rating for a warp. */
+    void rate(WarpName name, java.util.UUID player, double rating);
+
+    /** Get the average rating for a warp, or 0.0 if not rated. */
+    double averageRating(WarpName name);
 }

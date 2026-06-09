@@ -32,9 +32,14 @@ public final class KitItemCodec {
     public static List<KitItem> encodeAll(ItemStack[] contents) {
         Objects.requireNonNull(contents, "contents");
         List<KitItem> items = new ArrayList<>();
-        for (ItemStack stack : contents) {
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack stack = contents[i];
             if (stack != null && !stack.getType().isAir()) {
-                items.add(encode(stack));
+                if (i >= 0 && i <= 40) {
+                    items.add(encode(stack, i));
+                } else {
+                    items.add(encode(stack));
+                }
             }
         }
         return List.copyOf(items);
@@ -45,6 +50,13 @@ public final class KitItemCodec {
         Objects.requireNonNull(stack, "stack");
         String data = Base64.getEncoder().encodeToString(stack.serializeAsBytes());
         return KitItem.of(data, stack.getAmount());
+    }
+
+    /** Encode a single non-air {@code stack} into a {@link KitItem} carrying its amount, serialized form, and slot. */
+    public static KitItem encode(ItemStack stack, int slot) {
+        Objects.requireNonNull(stack, "stack");
+        String data = Base64.getEncoder().encodeToString(stack.serializeAsBytes());
+        return KitItem.of(data, stack.getAmount(), java.util.Optional.of(slot));
     }
 
     /**

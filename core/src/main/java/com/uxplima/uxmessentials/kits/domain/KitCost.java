@@ -16,20 +16,26 @@ import java.util.Objects;
  *
  * @param amount the price to claim the kit; {@code BigDecimal.ZERO} for a free kit
  */
-public record KitCost(BigDecimal amount) {
+public record KitCost(BigDecimal amount, String currencyId) {
 
-    private static final KitCost FREE = new KitCost(BigDecimal.ZERO);
+    private static final KitCost FREE = new KitCost(BigDecimal.ZERO, "default");
 
     public KitCost {
         Objects.requireNonNull(amount, "amount");
+        Objects.requireNonNull(currencyId, "currencyId");
         if (amount.signum() < 0) {
             throw new IllegalArgumentException("kit cost must not be negative: " + amount);
         }
     }
 
-    /** A concrete, non-negative price. */
+    /** A concrete, non-negative price in default currency. */
     public static KitCost of(BigDecimal amount) {
-        return new KitCost(amount);
+        return new KitCost(amount, "default");
+    }
+
+    /** A concrete, non-negative price with a custom currency ID. */
+    public static KitCost of(BigDecimal amount, String currencyId) {
+        return new KitCost(amount, currencyId);
     }
 
     /** The "no charge" cost — a kit anyone may claim without paying. */

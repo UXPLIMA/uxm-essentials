@@ -33,6 +33,8 @@ public final class Currency {
     private final BigDecimal starting;
     private final BigDecimal minPay;
     private final @Nullable BigDecimal confirmThreshold;
+    private final boolean physical;
+    private final java.util.List<Denomination> denominations;
 
     private Currency(Builder builder) {
         this.id = builder.id;
@@ -46,6 +48,8 @@ public final class Currency {
         this.minPay = scale(builder.minPay, builder.precision);
         this.confirmThreshold =
                 builder.confirmThreshold == null ? null : scale(builder.confirmThreshold, builder.precision);
+        this.physical = builder.physical;
+        this.denominations = java.util.List.copyOf(builder.denominations);
         if (this.min.compareTo(this.max) > 0) {
             throw new IllegalArgumentException("min-balance must not exceed max-balance for currency " + id);
         }
@@ -110,6 +114,16 @@ public final class Currency {
         return confirmThreshold != null && amount.compareTo(confirmThreshold) > 0;
     }
 
+    /** True when this currency is physical (inventory-backed) instead of virtual. */
+    public boolean isPhysical() {
+        return physical;
+    }
+
+    /** The list of denominations (coins/items representing values) configured for this currency. */
+    public java.util.List<Denomination> denominations() {
+        return denominations;
+    }
+
     /** Scale a raw amount to this currency's precision, half-up, so a stored figure never carries extra digits. */
     public BigDecimal normalize(BigDecimal amount) {
         return scale(Objects.requireNonNull(amount, "amount"), precision);
@@ -147,6 +161,8 @@ public final class Currency {
         private BigDecimal starting = BigDecimal.ZERO;
         private BigDecimal minPay = new BigDecimal("0.01");
         private @Nullable BigDecimal confirmThreshold;
+        private boolean physical = false;
+        private final java.util.List<Denomination> denominations = new java.util.ArrayList<>();
 
         private Builder(CurrencyId id) {
             this.id = id;
@@ -199,6 +215,17 @@ public final class Currency {
         /** Set the {@code /payconfirm} threshold; a {@code null} (the default) disables confirmation. */
         public Builder confirmThreshold(BigDecimal confirmThreshold) {
             this.confirmThreshold = confirmThreshold;
+            return this;
+        }
+
+        public Builder physical(boolean physical) {
+            this.physical = physical;
+            return this;
+        }
+
+        public Builder denominations(java.util.List<Denomination> denominations) {
+            this.denominations.clear();
+            this.denominations.addAll(Objects.requireNonNull(denominations, "denominations"));
             return this;
         }
 

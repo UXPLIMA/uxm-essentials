@@ -160,18 +160,20 @@ class WarpMenuClickTest {
         WarpRepository repository = new FakeRepository();
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         Clock clock = Clock.systemUTC();
-        UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier);
+        UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
         WarpMenuView warpMenu = new WarpMenuView(
                 messages, new SyncScheduler(), useWarp, GuiLayout.paginatedDefault(Material.ENDER_PEARL));
         return new WarpServices(
                 useWarp,
-                new SetWarp(repository, notifier, new NoEvents(), clock),
+                new SetWarp(repository, notifier, new NoEvents(), clock, List.of()),
                 new DelWarp(repository, notifier, new NoEvents()),
                 new ListWarps(repository, permissions, notifier),
                 new WarpInfo(repository, notifier),
                 new MoveWarp(repository, notifier),
                 warpMenu,
-                new NoPlayerLookup());
+                new NoPlayerLookup(),
+                repository,
+                null);
     }
 
     /** Three free, ungated, owner-attributed warps. */
@@ -208,6 +210,14 @@ class WarpMenuClickTest {
 
         @Override
         public void delete(WarpName name) {}
+
+        @Override
+        public void rate(WarpName name, java.util.UUID player, double rating) {}
+
+        @Override
+        public double averageRating(WarpName name) {
+            return 0.0;
+        }
     }
 
     /** Records every hop so the test can prove a click drove exactly one teleport for the bound warp. */

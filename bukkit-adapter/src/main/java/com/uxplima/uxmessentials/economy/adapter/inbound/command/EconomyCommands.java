@@ -1,7 +1,11 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.economy.adapter.EconomyConfig;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -21,18 +25,46 @@ public final class EconomyCommands {
     private EconomyCommands() {}
 
     /** Every economy command, in surface order. */
-    public static List<CommandRegistration> all(EconomyServices services, Messages messages) {
-        return List.of(
-                new BalanceCommand(services, messages),
-                new PayCommand(services, messages),
-                new PayConfirmCommand(services, messages),
-                new PayAllCommand(services, messages),
-                new PayToggleCommand(services, messages),
-                new BaltopCommand(services, messages),
-                new WorthCommand(services, messages),
-                new SellCommand(services, messages),
-                new SellAllCommand(services, messages),
-                new SetWorthCommand(services, messages),
-                new EcoCommand(services, messages));
+    public static List<CommandRegistration> all(
+            Plugin plugin, EconomyConfig config, EconomyServices services, Messages messages) {
+        List<CommandRegistration> list = new ArrayList<>();
+
+        list.add(new BalanceCommand(services, messages));
+        list.add(new PayCommand(services, messages));
+        list.add(new PayConfirmCommand(services, messages));
+        list.add(new PayAllCommand(services, messages));
+        list.add(new PayToggleCommand(services, messages));
+        list.add(new BaltopCommand(services, messages));
+        list.add(new EcoCommand(services, messages));
+
+        if (config.worthEnabled()) {
+            list.add(new WorthCommand(services, messages));
+            list.add(new SellCommand(services, messages));
+            list.add(new SellAllCommand(services, messages));
+            list.add(new SetWorthCommand(services, messages));
+        }
+
+        if (config.banknotesEnabled()) {
+            list.add(new WithdrawCommand(plugin, services, messages));
+            list.add(new DepositCommand(services, messages));
+        }
+
+        if (config.bankEnabled()) {
+            list.add(new BankCommand(plugin, services, messages));
+        }
+
+        if (config.loansEnabled()) {
+            list.add(new LoanCommand(plugin, services, messages));
+        }
+
+        if (config.walletGuiEnabled()) {
+            list.add(new WalletCommand(services, messages));
+        }
+
+        if (config.exchangeEnabled()) {
+            list.add(new ExchangeCommand(services, messages));
+        }
+
+        return List.copyOf(list);
     }
 }

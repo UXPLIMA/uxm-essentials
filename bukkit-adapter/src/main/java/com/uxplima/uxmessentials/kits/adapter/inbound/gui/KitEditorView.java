@@ -102,9 +102,7 @@ public final class KitEditorView {
 
     private void persist(KitEditorHolder holder) {
         List<KitItem> items = KitGuiLayout.encode(holder.getInventory());
-        KitDefinition original = holder.kit();
-        KitDefinition replacement = new KitDefinition(
-                original.id(), items, original.cooldown(), original.oneTime(), original.permission(), original.cost());
+        KitDefinition replacement = holder.kit().withItems(items);
         scheduler.async(() -> kitEditor.save(holder.editor(), replacement));
     }
 

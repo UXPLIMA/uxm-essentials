@@ -48,6 +48,18 @@ public enum EconomyReason {
     /** The starting balance credited to a freshly opened wallet on first join. */
     STARTING_BALANCE,
 
+    /** A shared bank account deposit transaction. */
+    BANK_DEPOSIT,
+
+    /** A shared bank account withdrawal transaction. */
+    BANK_WITHDRAW,
+
+    /** The principal credited to a debtor's wallet when a loan is disbursed. */
+    LOAN_DISBURSE,
+
+    /** An installment debited from a debtor's wallet when a loan is repaid. */
+    LOAN_REPAY,
+
     /** No reason was declared at the call site — logs a warning in dev builds. */
     UNSPECIFIED
 }

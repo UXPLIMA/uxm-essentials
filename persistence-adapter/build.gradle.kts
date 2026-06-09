@@ -16,11 +16,20 @@ dependencies {
     implementation(project(":core"))
     api(project(":api"))
 
-    implementation(libs.bundles.db) // Hikari + SQLite + Flyway + jOOQ (default backend)
-    implementation(libs.bundles.db.mysql) // MySQL/MariaDB driver — activated via modules.conf
-    implementation(libs.bundles.db.pg) // PostgreSQL driver — activated via modules.conf
-    implementation(libs.caffeine)
+    compileOnly(libs.jedis)
+    compileOnly(libs.bundles.db) // Hikari + SQLite + Flyway + jOOQ (default backend)
+    compileOnly(libs.bundles.db.mysql) // MySQL/MariaDB driver — activated via modules.conf
+    compileOnly(libs.bundles.db.pg) // PostgreSQL driver — activated via modules.conf
+    compileOnly(libs.caffeine)
+    compileOnly(libs.gson)
     compileOnly(libs.slf4j.api)
+
+    testImplementation(libs.jedis)
+    testImplementation(libs.bundles.db)
+    testImplementation(libs.bundles.db.mysql)
+    testImplementation(libs.bundles.db.pg)
+    testImplementation(libs.caffeine)
+    testImplementation(libs.gson)
 
     // The code generator parses the DDL through jOOQ's meta-extensions DDLDatabase.
     // It is needed only on the codegen classpath, never at runtime.

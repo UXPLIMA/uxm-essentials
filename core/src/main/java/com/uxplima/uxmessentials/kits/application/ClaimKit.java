@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
@@ -35,6 +36,7 @@ public final class ClaimKit {
     private final KitNotifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final Optional<KitEconomy> economy;
 
     public ClaimKit(
             KitRepository repository,
@@ -42,13 +44,15 @@ public final class ClaimKit {
             KitGranter granter,
             KitNotifier notifier,
             DomainEventPublisher events,
-            Clock clock) {
+            Clock clock,
+            Optional<KitEconomy> economy) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
         this.granter = Objects.requireNonNull(granter, "granter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.economy = Objects.requireNonNull(economy, "economy");
     }
 
     /** Claim the kit {@code id} for {@code who} themselves. */
@@ -75,8 +79,15 @@ public final class ClaimKit {
             sendFailure(actor, kit, admitted.errorOrThrow());
             return admitted;
         }
-        granter.grant(recipient, kit.items());
+        if (!granter.preGrant(recipient, kit)) {
+            sendFailure(actor, kit, KitError.CANCELLED);
+            return Result.err(KitError.CANCELLED);
+        }
+        granter.grant(recipient, kit);
         access.recordClaim(recipient, kit);
+        if (economy.isPresent() && kit.claimMoney().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            economy.get().deposit(recipient, kit.claimMoney(), kit.claimMoneyCurrency());
+        }
         events.publish(new KitClaimed(kit.id(), recipient, actor, clock.instant()));
         notifier.send(
                 recipient, KitsMessageKey.KIT_CLAIMED, Map.of("kit", kit.id().value()));

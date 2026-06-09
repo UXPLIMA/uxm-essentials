@@ -15,25 +15,25 @@ class WorthTableTest {
 
     @Test
     void unknownMaterialHasNoPrice() {
-        WorthTable table = new WorthTable(Map.of("diamond", new BigDecimal("10")));
+        WorthTable table = new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins")));
         assertThat(table.unitPrice("emerald")).isEmpty();
     }
 
     @Test
     void knownMaterialResolvesItsUnitPrice() {
-        WorthTable table = new WorthTable(Map.of("diamond", new BigDecimal("10")));
-        assertThat(table.unitPrice("diamond")).contains(new BigDecimal("10"));
+        WorthTable table = new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins")));
+        assertThat(table.unitPrice("diamond")).contains(Worth.of(new BigDecimal("10"), "coins"));
     }
 
     @Test
     void lookupIsCaseInsensitive() {
-        WorthTable table = new WorthTable(Map.of("diamond", new BigDecimal("10")));
-        assertThat(table.unitPrice("DIAMOND")).contains(new BigDecimal("10"));
+        WorthTable table = new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins")));
+        assertThat(table.unitPrice("DIAMOND")).contains(Worth.of(new BigDecimal("10"), "coins"));
     }
 
     @Test
     void stackValueScalesByAmount() {
-        WorthTable table = new WorthTable(Map.of("diamond", new BigDecimal("10")));
-        assertThat(table.stackValue("diamond", 4)).contains(new BigDecimal("40"));
+        WorthTable table = new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins")));
+        assertThat(table.stackValue("diamond", 4)).contains(Worth.of(new BigDecimal("40"), "coins"));
     }
 }

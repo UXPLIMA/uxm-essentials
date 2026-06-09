@@ -16,20 +16,26 @@ import java.util.Objects;
  *
  * @param amount the price to use the warp; {@code BigDecimal.ZERO} for a free warp
  */
-public record WarpCost(BigDecimal amount) {
+public record WarpCost(BigDecimal amount, String currencyId) {
 
-    private static final WarpCost FREE = new WarpCost(BigDecimal.ZERO);
+    private static final WarpCost FREE = new WarpCost(BigDecimal.ZERO, "default");
 
     public WarpCost {
         Objects.requireNonNull(amount, "amount");
+        Objects.requireNonNull(currencyId, "currencyId");
         if (amount.signum() < 0) {
             throw new IllegalArgumentException("warp cost must not be negative: " + amount);
         }
     }
 
-    /** A concrete, non-negative price. */
+    /** A concrete, non-negative price in default currency. */
     public static WarpCost of(BigDecimal amount) {
-        return new WarpCost(amount);
+        return new WarpCost(amount, "default");
+    }
+
+    /** A concrete, non-negative price with a custom currency ID. */
+    public static WarpCost of(BigDecimal amount, String currencyId) {
+        return new WarpCost(amount, currencyId);
     }
 
     /** The "no charge" cost — a warp anyone may use without paying. */

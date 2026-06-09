@@ -100,7 +100,15 @@ public final class WarpMenuView {
     }
 
     private ItemStack icon(PlayerRef viewer, Warp warp) {
-        return ItemBuilder.of(layout.fallbackIcon())
+        org.bukkit.Material material = layout.fallbackIcon();
+        if (warp.iconMaterial().isPresent()) {
+            org.bukkit.Material parsed =
+                    org.bukkit.Material.matchMaterial(warp.iconMaterial().get());
+            if (parsed != null && parsed != org.bukkit.Material.AIR) {
+                material = parsed;
+            }
+        }
+        return ItemBuilder.of(material)
                 .name(text(
                         viewer,
                         WarpsMessageKey.WARP_MENU_ENTRY_NAME,

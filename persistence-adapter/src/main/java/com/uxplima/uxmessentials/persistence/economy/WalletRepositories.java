@@ -110,4 +110,49 @@ public final class WalletRepositories {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqWorthOverrideStore(persistence.dsl());
     }
+
+    /** The jOOQ-backed pending transaction repository. */
+    public static com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository
+            pendingTransactionRepository(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqPendingTransactionRepository(persistence.dsl());
+    }
+
+    /** The jOOQ-backed banknote store. */
+    public static com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore(
+            Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqBanknoteStore(persistence.dsl());
+    }
+
+    /** The jOOQ-backed bank repository. */
+    public static com.uxplima.uxmessentials.economy.application.port.BankRepository bankRepository(
+            Persistence persistence, CurrencyRegistry currencies, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(currencies, "currencies");
+        Objects.requireNonNull(clock, "clock");
+        return new JooqBankRepository(persistence.dsl(), currencies, clock);
+    }
+
+    /** The jOOQ-backed loan repository. */
+    public static com.uxplima.uxmessentials.economy.application.port.LoanRepository loanRepository(
+            Persistence persistence, CurrencyRegistry currencies, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(currencies, "currencies");
+        Objects.requireNonNull(clock, "clock");
+        return new JooqLoanRepository(persistence.dsl(), currencies, clock);
+    }
+
+    /** The jOOQ-backed economy backup manager. */
+    public static EconomyBackupManager backupManager(
+            Persistence persistence,
+            WalletRepository walletRepository,
+            CurrencyRegistry currencies,
+            java.io.File dataFolder) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(walletRepository, "walletRepository");
+        Objects.requireNonNull(currencies, "currencies");
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        return new EconomyBackupManager(persistence.dsl(), walletRepository, currencies, dataFolder);
+    }
 }

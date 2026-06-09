@@ -202,11 +202,11 @@ class PlayerWarpCommandPathTest {
 
     private SetPlayerWarp setWarp(int limit) {
         PlayerWarpQuota quota = new PlayerWarpQuota(new StubPermissions(limit), limit);
-        return new SetPlayerWarp(repository, quota, notifier, events, Clock.system(ZoneOffset.UTC));
+        return new SetPlayerWarp(repository, quota, notifier, events, Clock.system(ZoneOffset.UTC), List.of());
     }
 
     private UsePlayerWarp usePwarp() {
-        return new UsePlayerWarp(repository, teleporter, notifier);
+        return new UsePlayerWarp(repository, teleporter, notifier, pos -> true, new StubPermissions(10));
     }
 
     private SetPlayerWarpVisibility visibility() {
@@ -261,6 +261,14 @@ class PlayerWarpCommandPathTest {
         @Override
         public void delete(PlayerRef owner, PlayerWarpName name) {
             set(owner).remove(name.value());
+        }
+
+        @Override
+        public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {}
+
+        @Override
+        public double averageRating(PlayerRef owner, PlayerWarpName name) {
+            return 0.0;
         }
 
         private Map<String, PlayerWarp> set(PlayerRef owner) {

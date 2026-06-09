@@ -104,7 +104,18 @@ class KitMenuLayoutTest {
     }
 
     private PaginatedGui openAndReturn(GuiLayout layout) {
-        KitMenuView view = new KitMenuView(new KeyMessages(), new SyncScheduler(), claimKit(), layout);
+        Messages messages = new KeyMessages();
+        Permissions permissions = new AllowAllPermissions();
+        KitClaimStore claims = new NoClaims();
+        KitNotifier notifier = new KitNotifier(messages, new NoSink());
+        KitRepository repository = new FakeRepository();
+        KitGranter granter = (who, kit) -> KitGranter.Grant.complete();
+        KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
+        ClaimKit claimKit = new ClaimKit(
+                repository, access, granter, notifier, new NoEvents(), Clock.systemUTC(), Optional.empty());
+
+        KitMenuView view = new KitMenuView(
+                messages, new SyncScheduler(), claimKit, new StubKitCategoryRepository(), access, layout);
         PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
         view.open(player, viewer, kits());
         return (PaginatedGui) player.getOpenInventory().getTopInventory().getHolder();
@@ -116,17 +127,6 @@ class KitMenuLayoutTest {
 
     private static List<KitDefinition> kits() {
         return List.of(KitDefinition.repeatable(KitId.of("starter"), List.<KitItem>of(), Duration.ofSeconds(60)));
-    }
-
-    private ClaimKit claimKit() {
-        Messages messages = new KeyMessages();
-        Permissions permissions = new AllowAllPermissions();
-        KitClaimStore claims = new NoClaims();
-        KitNotifier notifier = new KitNotifier(messages, new NoSink());
-        KitRepository repository = new FakeRepository();
-        KitGranter granter = (who, items) -> KitGranter.Grant.complete();
-        KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
-        return new ClaimKit(repository, access, granter, notifier, new NoEvents(), Clock.systemUTC());
     }
 
     private static final class FakeRepository implements KitRepository {

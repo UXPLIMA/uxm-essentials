@@ -177,4 +177,64 @@ class ConfigurateKitRepositoryTest {
             throw new RuntimeException(failure);
         }
     }
+
+    @Test
+    void savesAndLoadsStateBasedOverrides(@TempDir Path root) {
+        Path dir = kitsDir(root);
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+
+        KitDefinition custom = new KitDefinition(
+                KitId.of("custom"),
+                List.of(KitItem.of("AAAA", 1)),
+                Duration.ofSeconds(10),
+                false,
+                false,
+                com.uxplima.uxmessentials.kits.domain.KitCost.free(),
+                java.util.Optional.empty(),
+                java.util.Optional.empty(),
+                List.of(),
+                List.of(),
+                java.util.Optional.empty(),
+                java.util.Optional.empty(),
+                false,
+                false,
+                java.util.Optional.empty(),
+                java.math.BigDecimal.ZERO,
+                "default",
+                java.util.Map.of(),
+                0,
+                java.util.Optional.of("BARRIER"),
+                java.util.Optional.of("<red>No Perm"),
+                List.of("Lore line 1"),
+                java.util.Optional.of("CLOCK"),
+                java.util.Optional.of("<yellow>Cooldown"),
+                List.of("Cooldown lore"),
+                java.util.Optional.of("MINECART"),
+                java.util.Optional.of("<red>Claimed"),
+                List.of("Claimed lore"),
+                java.util.Optional.of("GOLD_NUGGET"),
+                java.util.Optional.of("<red>Cannot Afford"),
+                List.of("Price is %cost%"));
+
+        repository.save(custom);
+
+        KitRepository reloaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        KitDefinition loaded = reloaded.find(KitId.of("custom")).orElseThrow();
+
+        assertThat(loaded.noPermissionMaterial()).contains("BARRIER");
+        assertThat(loaded.noPermissionName()).contains("<red>No Perm");
+        assertThat(loaded.noPermissionLore()).containsExactly("Lore line 1");
+
+        assertThat(loaded.cooldownMaterial()).contains("CLOCK");
+        assertThat(loaded.cooldownName()).contains("<yellow>Cooldown");
+        assertThat(loaded.cooldownLore()).containsExactly("Cooldown lore");
+
+        assertThat(loaded.claimedMaterial()).contains("MINECART");
+        assertThat(loaded.claimedName()).contains("<red>Claimed");
+        assertThat(loaded.claimedLore()).containsExactly("Claimed lore");
+
+        assertThat(loaded.unaffordableMaterial()).contains("GOLD_NUGGET");
+        assertThat(loaded.unaffordableName()).contains("<red>Cannot Afford");
+        assertThat(loaded.unaffordableLore()).containsExactly("Price is %cost%");
+    }
 }

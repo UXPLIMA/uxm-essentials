@@ -6,7 +6,9 @@ plugins {
 // The optional Discord bridge (docs/09-deployment.md Path C). It is its own Paper
 // plugin jar (uxmessentials-discord) that consumes the host plugin's ports/events
 // through Bukkit's ServicesManager — there is no compile-time link to :bukkit-adapter.
-// JDA is the only backend, shaded and relocated; opus-java is excluded because the
+// JDA is the only backend. It is not shaded into the jar: the thin plugin jar declares
+// JDA compileOnly and UxmDiscordLoader downloads it from Maven Central at boot via the
+// paper-plugin.yml loader directive. opus-java is dropped at the loader level because the
 // bridge only posts text and never touches voice.
 
 dependencies {
@@ -14,13 +16,12 @@ dependencies {
     api(project(":api"))
     compileOnly(libs.paper.api)
 
-    implementation(libs.jda) {
-        // Voice/opus is dead weight for a text-only bridge — drop the native codec.
-        exclude(group = "club.minnced", module = "opus-java")
-    }
-    implementation(libs.bundles.configs)
+    compileOnly(libs.jda)
+    compileOnly(libs.bundles.configs)
 
     testImplementation(libs.bundles.testing)
+    testImplementation(libs.jda)
+    testImplementation(libs.bundles.configs)
 }
 
 tasks.processResources {
@@ -32,10 +33,6 @@ tasks.processResources {
 tasks.shadowJar {
     archiveBaseName.set("uxmessentials-discord")
     archiveClassifier.set("")
-    // Single per-plugin namespace so two plugins shading JDA at different versions
-    // do not clash on the classpath (docs/04-build.md §16).
-    relocate("net.dv8tion.jda", "com.uxplima.uxmessentials.libs.jda")
-    relocate("org.spongepowered.configurate", "com.uxplima.uxmessentials.libs.configurate")
     mergeServiceFiles()
 }
 

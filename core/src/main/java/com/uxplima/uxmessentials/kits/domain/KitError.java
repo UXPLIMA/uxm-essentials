@@ -29,7 +29,10 @@ public enum KitError {
     ALREADY_CLAIMED(KitsMessageKey.KIT_ALREADY_CLAIMED),
 
     /** The player cannot pay the kit's cost (only reachable when an economy provider is present). */
-    CANNOT_AFFORD(KitsMessageKey.KIT_CANNOT_AFFORD);
+    CANNOT_AFFORD(KitsMessageKey.KIT_CANNOT_AFFORD),
+
+    /** The claim was cancelled by an external plugin event. */
+    CANCELLED(KitsMessageKey.KIT_CLAIM_CANCELLED);
 
     private final KitsMessageKey messageKey;
 

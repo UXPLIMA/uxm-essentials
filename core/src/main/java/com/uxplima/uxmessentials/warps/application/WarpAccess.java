@@ -62,7 +62,7 @@ public final class WarpAccess {
             return Result.ok();
         }
         WarpEconomy provider = economy.get();
-        if (!provider.withdraw(who, warp.cost().amount())) {
+        if (!provider.withdraw(who, warp.cost().amount(), warp.cost().currencyId())) {
             return Result.err(WarpError.CANNOT_AFFORD);
         }
         return Result.ok();

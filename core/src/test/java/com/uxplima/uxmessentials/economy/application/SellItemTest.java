@@ -44,7 +44,7 @@ class SellItemTest {
         Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
         NativeEconomyProvider provider = new NativeEconomyProvider(repo, registry, clock);
         EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), sink);
-        return new SellItem(provider, worth, notifier, Currencies.COINS);
+        return new SellItem(provider, worth, notifier, Currencies.COINS, registry.all());
     }
 
     @Test
@@ -60,7 +60,7 @@ class SellItemTest {
 
     @Test
     void pricedStackCreditsTheStackValue() {
-        SellItem sell = sellWith(new WorthTable(Map.of("diamond", new BigDecimal("10"))));
+        SellItem sell = sellWith(new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins"))));
 
         SellOutcome outcome = sell.sell(seller, "diamond", 4);
 
@@ -75,8 +75,8 @@ class SellItemTest {
     void anOverridePriceChangesTheProceeds() {
         InMemoryWorthOverrideStore overrides = new InMemoryWorthOverrideStore();
         overrides.set("diamond", new BigDecimal("25"));
-        WorthSource worth =
-                new CombiningWorthSource(overrides, new WorthTable(Map.of("diamond", new BigDecimal("10"))));
+        WorthSource worth = new CombiningWorthSource(
+                overrides, new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins"))), "coins");
         SellItem sell = sellWith(worth);
 
         SellOutcome outcome = sell.sell(seller, "diamond", 4);
@@ -86,7 +86,7 @@ class SellItemTest {
 
     @Test
     void sellingZeroIsNothingToSell() {
-        SellItem sell = sellWith(new WorthTable(Map.of("diamond", new BigDecimal("10"))));
+        SellItem sell = sellWith(new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins"))));
 
         SellOutcome outcome = sell.sell(seller, "diamond", 0);
 

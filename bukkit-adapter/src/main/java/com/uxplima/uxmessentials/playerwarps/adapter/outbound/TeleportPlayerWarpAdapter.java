@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -26,15 +27,20 @@ import org.jspecify.annotations.NullMarked;
 public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
 
     private final TeleportEngine engine;
+    private final WarpTeleportRegistry registry;
 
-    public TeleportPlayerWarpAdapter(TeleportEngine engine) {
+    public TeleportPlayerWarpAdapter(TeleportEngine engine, WarpTeleportRegistry registry) {
         this.engine = Objects.requireNonNull(engine, "engine");
+        this.registry = Objects.requireNonNull(registry, "registry");
     }
 
     @Override
     public void teleportTo(PlayerRef who, PlayerWarp warp) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
-        engine.launch(who, Destination.at(warp.location()), TeleportKind.WARP);
+        registry.register(who.uuid(), warp);
+        var warmup = warp.warmupOverrideSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
+        var cooldown = warp.cooldownOverrideSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
+        engine.launch(who, Destination.at(warp.location(), warmup, cooldown), TeleportKind.WARP);
     }
 }

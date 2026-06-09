@@ -109,6 +109,50 @@ public final class TeleportSettings {
         return config.getBoolean("arrival-title", true);
     }
 
+    /** The list of arrival messages configured for a specific teleport kind. */
+    public List<String> getArrivalMessages(TeleportKind kind) {
+        Objects.requireNonNull(kind, "kind");
+        String key = configKey(kind);
+
+        // Check if the old configuration map structure is present:
+        // arrival-messages.home.type and arrival-messages.home.message
+        String oldType =
+                config.getString("arrival-messages." + key + ".type", "").trim();
+        if (!oldType.isEmpty()) {
+            boolean enabled = config.getBoolean("arrival-messages." + key + ".enabled", true);
+            if (!enabled) {
+                return List.of();
+            }
+            String message = config.getString("arrival-messages." + key + ".message", "teleport.arrived.title")
+                    .trim();
+            return List.of(oldType.toUpperCase(java.util.Locale.ROOT) + ";" + message);
+        }
+
+        List<String> defaultMsgs = defaultMessages(kind);
+        return config.getStringList("arrival-messages." + key, defaultMsgs);
+    }
+
+    private static String configKey(TeleportKind kind) {
+        return switch (kind) {
+            case REQUEST -> "request";
+            case BACK -> "back";
+            case RANDOM -> "rtp";
+            case SPAWN -> "spawn";
+            case HOME -> "home";
+            case WARP -> "warp";
+            case RESPAWN -> "respawn";
+            case ADMIN -> "admin";
+            case POSITIONAL -> "positional";
+        };
+    }
+
+    private static List<String> defaultMessages(TeleportKind kind) {
+        return switch (kind) {
+            case HOME, SPAWN, RANDOM, BACK, REQUEST, POSITIONAL -> List.of("TITLE;teleport.arrived.title;150;700;300");
+            case WARP, RESPAWN, ADMIN -> List.of();
+        };
+    }
+
     /** The vanilla teleport causes that must not overwrite a player's {@code /back} point. */
     public BackCapturePolicy backCapturePolicy() {
         List<String> raw = config.getStringList("back.ignored-causes", List.of("ender_pearl", "chorus_fruit"));

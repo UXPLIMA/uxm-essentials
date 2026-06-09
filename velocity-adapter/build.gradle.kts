@@ -77,3 +77,9 @@ tasks.processResources {
 }
 
 tasks.shadowJar { archiveBaseName.set("uxmessentials-velocity") }
+
+spotless {
+    java {
+        targetExclude("build/generated-src/**", "build/generated/**")
+    }
+}

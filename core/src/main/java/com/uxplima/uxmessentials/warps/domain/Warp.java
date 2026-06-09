@@ -9,23 +9,8 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 
 /**
  * One server-wide warp: a {@link WarpName}, the {@link Position} it points at, the owner who created it,
- * the moment it was created, and two optional gates — a {@link WarpCost} charged through the economy
- * context when one is present, and a {@code requiredPermission} node a player must hold to use it beyond the
- * implicit {@code uxmessentials.warp.use.<warp>} node. A warp is a value object: re-anchoring (a move)
- * produces a new instance rather than mutating in place.
- *
- * <p>The position carries its own {@link com.uxplima.uxmessentials.shared.domain.WorldRef}, so the warp's
- * world is read from {@code location().world()} rather than held separately. Execution of the teleport to
- * this position is the teleport context's job; this aggregate never moves a player. Both gates are
- * optional and data-driven — a warp opts into a cost or an extra permission at creation; the common warp
- * is free and ungated.
- *
- * @param name the warp's canonical, server-unique name
- * @param location where the warp points
- * @param owner the player who created the warp (attribution, shown by {@code /warpinfo})
- * @param createdAt when the warp was first created (preserved across a move)
- * @param cost the price to use the warp; {@link WarpCost#free()} when there is no charge
- * @param requiredPermission an extra permission node required to use the warp, if the warp sets one
+ * the moment it was created, and optional gates/custom settings (cost, permission, password, locked state,
+ * welcome message, custom sound and particle effects, cooldown/warmup overrides, and a custom icon).
  */
 public record Warp(
         WarpName name,
@@ -33,7 +18,18 @@ public record Warp(
         PlayerRef owner,
         Instant createdAt,
         WarpCost cost,
-        Optional<String> requiredPermission) {
+        Optional<String> requiredPermission,
+        long visitors,
+        Optional<String> password,
+        boolean isLocked,
+        java.util.List<WelcomeMessage> welcomeMessages,
+        Optional<String> departureSound,
+        Optional<String> arrivalSound,
+        Optional<String> departureParticle,
+        Optional<String> arrivalParticle,
+        Optional<Double> warmupOverrideSeconds,
+        Optional<Double> cooldownOverrideSeconds,
+        Optional<String> iconMaterial) {
 
     public Warp {
         Objects.requireNonNull(name, "name");
@@ -42,17 +38,99 @@ public record Warp(
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(cost, "cost");
         Objects.requireNonNull(requiredPermission, "requiredPermission");
+        Objects.requireNonNull(password, "password");
+        Objects.requireNonNull(welcomeMessages, "welcomeMessages");
+        Objects.requireNonNull(departureSound, "departureSound");
+        Objects.requireNonNull(arrivalSound, "arrivalSound");
+        Objects.requireNonNull(departureParticle, "departureParticle");
+        Objects.requireNonNull(arrivalParticle, "arrivalParticle");
+        Objects.requireNonNull(warmupOverrideSeconds, "warmupOverrideSeconds");
+        Objects.requireNonNull(cooldownOverrideSeconds, "cooldownOverrideSeconds");
+        Objects.requireNonNull(iconMaterial, "iconMaterial");
+    }
+
+    public Warp(
+            WarpName name,
+            Position location,
+            PlayerRef owner,
+            Instant createdAt,
+            WarpCost cost,
+            Optional<String> requiredPermission) {
+        this(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                0L,
+                Optional.empty(),
+                false,
+                java.util.List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty());
+    }
+
+    public Warp(
+            WarpName name,
+            Position location,
+            PlayerRef owner,
+            Instant createdAt,
+            WarpCost cost,
+            Optional<String> requiredPermission,
+            long visitors,
+            Optional<String> password,
+            boolean isLocked) {
+        this(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                java.util.List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty());
     }
 
     /** A new free, ungated warp created now at {@code location}. */
     public static Warp create(WarpName name, Position location, PlayerRef owner, Instant createdAt) {
-        return new Warp(name, location, owner, createdAt, WarpCost.free(), Optional.empty());
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                WarpCost.free(),
+                Optional.empty(),
+                0L,
+                Optional.empty(),
+                false,
+                java.util.List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty());
     }
 
     /**
      * A new warp created now with an optional cost and an optional extra permission gate. A blank
-     * permission is treated as "no extra gate" so an absent config value never produces an unsatisfiable
-     * node.
+     * permission is treated as "no extra gate".
      */
     public static Warp create(
             WarpName name,
@@ -61,13 +139,298 @@ public record Warp(
             Instant createdAt,
             WarpCost cost,
             Optional<String> requiredPermission) {
-        return new Warp(name, location, owner, createdAt, cost, normalisePermission(requiredPermission));
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                normalisePermission(requiredPermission),
+                0L,
+                Optional.empty(),
+                false,
+                java.util.List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty());
     }
 
     /** A copy re-anchored to {@code newLocation}, keeping the name, owner, gates, and original creation time. */
     public Warp movedTo(Position newLocation) {
         return new Warp(
-                name, Objects.requireNonNull(newLocation, "newLocation"), owner, createdAt, cost, requiredPermission);
+                name,
+                Objects.requireNonNull(newLocation, "newLocation"),
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withCost(WarpCost newCost) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                Objects.requireNonNull(newCost, "newCost"),
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp incrementedVisitors() {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors + 1,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withPassword(Optional<String> newPassword) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                normalisePermission(newPassword),
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withLocked(boolean locked) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                locked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withWelcomeMessages(java.util.List<WelcomeMessage> messages) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                Objects.requireNonNull(messages),
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withDepartureSound(Optional<String> sound) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                sound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withArrivalSound(Optional<String> sound) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                sound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withDepartureParticle(Optional<String> particle) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                particle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withArrivalParticle(Optional<String> particle) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                particle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withWarmupOverride(Optional<Double> seconds) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                seconds,
+                cooldownOverrideSeconds,
+                iconMaterial);
+    }
+
+    public Warp withCooldownOverride(Optional<Double> seconds) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                seconds,
+                iconMaterial);
+    }
+
+    public Warp withIconMaterial(Optional<String> material) {
+        return new Warp(
+                name,
+                location,
+                owner,
+                createdAt,
+                cost,
+                requiredPermission,
+                visitors,
+                password,
+                isLocked,
+                welcomeMessages,
+                departureSound,
+                arrivalSound,
+                departureParticle,
+                arrivalParticle,
+                warmupOverrideSeconds,
+                cooldownOverrideSeconds,
+                material);
     }
 
     /** True when the warp sets a cost the economy gate should charge (a non-free price). */

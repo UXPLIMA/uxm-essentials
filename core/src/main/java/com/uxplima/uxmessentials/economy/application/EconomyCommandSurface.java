@@ -63,6 +63,26 @@ final class EconomyCommandSurface {
                         "uxmessentials.economy.sell",
                         EconomyCommand.of("sellall", List.of(), "Sell every sellable item in your inventory")),
                 spec(
+                        "withdraw",
+                        "uxmessentials.economy.withdraw",
+                        EconomyCommand.of("withdraw", List.of(), "Withdraw virtual balance into a physical check")),
+                spec(
+                        "deposit",
+                        "uxmessentials.economy.deposit",
+                        EconomyCommand.of("deposit", List.of(), "Deposit physical banknotes into virtual balance")),
+                spec(
+                        "bank",
+                        "uxmessentials.economy.bank",
+                        EconomyCommand.of("bank", List.of(), "Shared bank accounts management")),
+                spec(
+                        "loan",
+                        "uxmessentials.economy.loan",
+                        EconomyCommand.of("loan", List.of(), "Debtor loans and credit rating")),
+                spec(
+                        "wallet",
+                        "uxmessentials.economy.wallet",
+                        EconomyCommand.of("wallet", List.of(), "Show balances across all currencies")),
+                spec(
                         "setworth",
                         "uxmessentials.economy.setworth",
                         EconomyCommand.of("setworth", List.of(), "Set an item's sell worth")),

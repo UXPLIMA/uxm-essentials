@@ -27,23 +27,35 @@ dependencies {
     // without PlaceholderAPI installed.
     compileOnly(libs.placeholderapi)
 
-    implementation(libs.bundles.configs)
+    compileOnly(libs.bundles.configs)
     implementation(libs.bstats.bukkit)
 
     // uxmLib GUI toolkit (dogfood) — consumed from mavenLocal; pulls uxmlib-item + uxmlib-common
-    // transitively (configurate is already shaded here, same 4.1.2). Shaded + relocated below.
-    implementation("com.uxplima.uxmlib:uxmlib-gui:0.1.0-SNAPSHOT")
+    // transitively. Configurate is loaded at runtime via Paper library loader.
+    implementation("com.uxplima.uxmlib:uxmlib-gui:0.1.0-SNAPSHOT") {
+        exclude(group = "org.spongepowered")
+    }
     // uxmLib HUD toolkit (dogfood) — Titles for the teleport arrival banner. Pulls uxmlib-common only.
-    implementation("com.uxplima.uxmlib:uxmlib-hud:0.1.0-SNAPSHOT")
+    implementation("com.uxplima.uxmlib:uxmlib-hud:0.1.0-SNAPSHOT") {
+        exclude(group = "org.spongepowered")
+    }
     // uxmLib integration toolkit (dogfood) — native-Display holograms for the holograms context.
-    implementation("com.uxplima.uxmlib:uxmlib-integration:0.1.0-SNAPSHOT")
+    implementation("com.uxplima.uxmlib:uxmlib-integration:0.1.0-SNAPSHOT") {
+        exclude(group = "org.spongepowered")
+    }
 
     testImplementation(libs.mockbukkit)
     testImplementation(libs.archunit.junit)
-    // MockBukkit drives the real Paper API; the test source set needs it (and Adventure) on its
-    // classpath since the production set declares them compileOnly.
     testImplementation(libs.paper.api)
     testImplementation(libs.bundles.adventure)
+    testImplementation(libs.bundles.configs)
+    testImplementation(libs.bundles.db)
+    testImplementation(libs.bundles.db.mysql)
+    testImplementation(libs.bundles.db.pg)
+    testImplementation(libs.caffeine)
+    testImplementation(libs.gson)
+    testImplementation(libs.jedis)
+    testImplementation(libs.configurate.yaml)
 }
 
 // Locale catalogs live in a dedicated source set so they have their own
@@ -99,6 +111,7 @@ val jmh by tasks.registering(JavaExec::class) {
 }
 
 tasks.shadowJar {
+    archiveBaseName.set("uxmEssentials")
     archiveClassifier.set("")
     // Shade with relocation — see docs/04-build.md §16. Use a single per-plugin
     // namespace (`com.uxplima.uxmessentials.libs.<lib>`) so two plugins shading
@@ -106,34 +119,15 @@ tasks.shadowJar {
     // NOT relocate Adventure / Kyori — Paper bundles them; relocating breaks
     // runtime symbol lookup.
     relocate("org.bstats", "com.uxplima.uxmessentials.libs.bstats")
-    relocate("com.zaxxer.hikari", "com.uxplima.uxmessentials.libs.hikari")
-    // Do NOT relocate org.sqlite — sqlite-jdbc's native (JNI) bindings reference
-    // `org.sqlite.core.NativeDB` by literal class name, which relocation cannot rewrite,
-    // so a relocated driver fails with ClassNotFoundException at first connection. The
-    // driver is safe un-relocated inside Paper's isolated per-plugin classloader.
-    relocate("org.mariadb.jdbc", "com.uxplima.uxmessentials.libs.mariadb")
-    relocate("org.postgresql", "com.uxplima.uxmessentials.libs.postgresql")
-    relocate("org.flywaydb", "com.uxplima.uxmessentials.libs.flyway")
-    relocate("org.jooq", "com.uxplima.uxmessentials.libs.jooq")
-    relocate("com.github.benmanes.caffeine", "com.uxplima.uxmessentials.libs.caffeine")
-    relocate("org.spongepowered.configurate", "com.uxplima.uxmessentials.libs.configurate")
     // uxmLib (dogfood) — relocate into our per-plugin namespace so two plugins shading it cannot clash.
     relocate("com.uxplima.uxmlib", "com.uxplima.uxmessentials.libs.uxmlib")
     mergeServiceFiles()
     minimize {
-        // bStats and Configurate use reflection / service loading the minimizer
-        // can't see; never the JDBC drivers (loaded reflectively by Hikari).
+        // bStats uses reflection / service loading the minimizer can't see.
         exclude(dependency("org.bstats:.*:.*"))
-        exclude(dependency("org.spongepowered:.*:.*"))
         // uxmLib uses reflection (Brigadier/registry/MiniMessage) + a GuiListener the minimizer can't
         // trace from the few entry points the adapter touches; keep its modules whole.
         exclude(dependency("com.uxplima.uxmlib:.*:.*"))
-        exclude(dependency("org.xerial:.*:.*"))
-        exclude(dependency("org.mariadb.jdbc:.*:.*"))
-        exclude(dependency("org.postgresql:.*:.*"))
-        // Flyway discovers DatabaseTypes (SQLite/H2/MySQL/Postgres) via a ServiceLoader Plugin file;
-        // the minimizer can't see those reflective references, so keep the whole module.
-        exclude(dependency("org.flywaydb:.*:.*"))
         // The persistence adapter is the API surface the feature contexts build on — the generated
         // jOOQ tables/records and the repository/transaction/cache bases must survive even before a
         // consuming context references them, so keep the whole module out of dead-code elimination.

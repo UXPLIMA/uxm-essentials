@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.economy.application;
 
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -19,14 +18,14 @@ import java.util.Optional;
  */
 public final class WorthTable implements WorthSource {
 
-    private final Map<String, BigDecimal> prices;
+    private final Map<String, Worth> prices;
 
-    public WorthTable(Map<String, BigDecimal> prices) {
+    public WorthTable(Map<String, Worth> prices) {
         Objects.requireNonNull(prices, "prices");
-        Map<String, BigDecimal> normalized = new HashMap<>();
-        prices.forEach((material, price) -> normalized.put(
+        Map<String, Worth> normalized = new HashMap<>();
+        prices.forEach((material, worth) -> normalized.put(
                 Objects.requireNonNull(material, "material").toLowerCase(Locale.ROOT),
-                Objects.requireNonNull(price, "price")));
+                Objects.requireNonNull(worth, "worth")));
         this.prices = Map.copyOf(normalized);
     }
 
@@ -37,17 +36,8 @@ public final class WorthTable implements WorthSource {
 
     /** The configured unit price for {@code material}, or empty when the material has no worth. */
     @Override
-    public Optional<BigDecimal> unitPrice(String material) {
+    public Optional<Worth> unitPrice(String material) {
         Objects.requireNonNull(material, "material");
         return Optional.ofNullable(prices.get(material.toLowerCase(Locale.ROOT)));
-    }
-
-    /** The value of {@code amount} of {@code material}, or empty when the material has no worth. */
-    @Override
-    public Optional<BigDecimal> stackValue(String material, int amount) {
-        if (amount < 0) {
-            throw new IllegalArgumentException("amount must not be negative: " + amount);
-        }
-        return unitPrice(material).map(price -> price.multiply(BigDecimal.valueOf(amount)));
     }
 }

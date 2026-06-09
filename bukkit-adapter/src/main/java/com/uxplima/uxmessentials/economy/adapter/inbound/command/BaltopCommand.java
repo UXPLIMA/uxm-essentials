@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.bukkit.entity.Player;
@@ -13,11 +14,11 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
+import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -42,6 +43,9 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
         return Commands.literal("baltop")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::runDefault)
+                .then(Commands.literal("refresh")
+                        .requires(src -> src.getSender().hasPermission("uxmessentials.economy.admin"))
+                        .executes(this::runRefresh))
                 .then(Commands.argument("page", IntegerArgumentType.integer(1)).executes(this::runDefaultPage))
                 .then(currencyArgument()
                         .executes(this::runCurrency)
@@ -60,6 +64,14 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
         return "View the top balances.";
     }
 
+    private int runRefresh(CommandContext<CommandSourceStack> ctx) {
+        offTick(() -> {
+            services.baltopSnapshots().refreshAll();
+            feedback.send(ctx.getSource().getSender(), EconomyMessageKey.BALTOP_REFRESHED, Map.of());
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
     private int runDefault(CommandContext<CommandSourceStack> ctx) {
         return show(ctx, defaultCurrency(), 1);
     }
@@ -76,6 +88,8 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
         return showResolved(ctx, ctx.getArgument("page", Integer.class));
     }
 
+    // The page argument is accepted for command-shape symmetry; the GUI view paginates itself, so it is unused here.
+    @SuppressWarnings("unused")
     private int showResolved(CommandContext<CommandSourceStack> ctx, int page) {
         Player sender = player(ctx);
         if (sender == null) {
@@ -87,17 +101,18 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
             rejectUnknownCurrency(ref(sender));
             return Command.SINGLE_SUCCESS;
         }
-        offTick(() -> services.balTop().show(ref(sender), currency.get(), page));
+        services.baltopView().open(sender, currency.get());
         return Command.SINGLE_SUCCESS;
     }
 
+    // The page argument is accepted for command-shape symmetry; the GUI view paginates itself, so it is unused here.
+    @SuppressWarnings("unused")
     private int show(CommandContext<CommandSourceStack> ctx, Currency currency, int page) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        PlayerRef viewer = ref(sender);
-        offTick(() -> services.balTop().show(viewer, currency, page));
+        services.baltopView().open(sender, currency);
         return Command.SINGLE_SUCCESS;
     }
 }

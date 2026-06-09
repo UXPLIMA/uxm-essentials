@@ -19,23 +19,26 @@ class CombiningWorthSourceTest {
     void overrideBeatsConfig() {
         InMemoryWorthOverrideStore overrides = new InMemoryWorthOverrideStore();
         overrides.set("diamond", new BigDecimal("25"));
-        WorthTable config = new WorthTable(Map.of("diamond", new BigDecimal("10")));
-        CombiningWorthSource worth = new CombiningWorthSource(overrides, config);
+        WorthTable config = new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins")));
+        CombiningWorthSource worth = new CombiningWorthSource(overrides, config, "coins");
 
-        assertThat(worth.unitPrice("diamond")).contains(new BigDecimal("25"));
+        assertThat(worth.unitPrice("diamond")).contains(Worth.of(new BigDecimal("25"), "coins"));
     }
 
     @Test
     void fallsBackToConfigWhenNoOverride() {
         CombiningWorthSource worth = new CombiningWorthSource(
-                new InMemoryWorthOverrideStore(), new WorthTable(Map.of("diamond", new BigDecimal("10"))));
+                new InMemoryWorthOverrideStore(),
+                new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins"))),
+                "coins");
 
-        assertThat(worth.unitPrice("diamond")).contains(new BigDecimal("10"));
+        assertThat(worth.unitPrice("diamond")).contains(Worth.of(new BigDecimal("10"), "coins"));
     }
 
     @Test
     void unpricedInBothSourcesIsEmpty() {
-        CombiningWorthSource worth = new CombiningWorthSource(new InMemoryWorthOverrideStore(), WorthTable.empty());
+        CombiningWorthSource worth =
+                new CombiningWorthSource(new InMemoryWorthOverrideStore(), WorthTable.empty(), "coins");
 
         assertThat(worth.unitPrice("emerald")).isEmpty();
     }
@@ -44,8 +47,8 @@ class CombiningWorthSourceTest {
     void stackValueScalesTheResolvedUnitPrice() {
         InMemoryWorthOverrideStore overrides = new InMemoryWorthOverrideStore();
         overrides.set("diamond", new BigDecimal("25"));
-        CombiningWorthSource worth = new CombiningWorthSource(overrides, WorthTable.empty());
+        CombiningWorthSource worth = new CombiningWorthSource(overrides, WorthTable.empty(), "coins");
 
-        assertThat(worth.stackValue("diamond", 4)).contains(new BigDecimal("100"));
+        assertThat(worth.stackValue("diamond", 4)).contains(Worth.of(new BigDecimal("100"), "coins"));
     }
 }

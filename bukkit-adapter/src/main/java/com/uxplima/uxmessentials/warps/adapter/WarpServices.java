@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.warps.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
@@ -10,6 +11,7 @@ import com.uxplima.uxmessentials.warps.application.MoveWarp;
 import com.uxplima.uxmessentials.warps.application.SetWarp;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpInfo;
+import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -26,6 +28,7 @@ import org.jspecify.annotations.NullMarked;
  * @param moveWarp {@code /movewarp}
  * @param warpMenu the read-only {@code /warps} browse menu the bare {@code /warps} command opens
  * @param players name → ref resolution, available for future owner-attribution forms
+ * @param editorView the warp edit chest GUI
  */
 @NullMarked
 public record WarpServices(
@@ -36,7 +39,9 @@ public record WarpServices(
         WarpInfo warpInfo,
         MoveWarp moveWarp,
         WarpMenuView warpMenu,
-        PlayerLookup players) {
+        PlayerLookup players,
+        WarpRepository repository,
+        @org.jspecify.annotations.Nullable WarpEditorView editorView) {
 
     public WarpServices {
         Objects.requireNonNull(useWarp, "useWarp");
@@ -47,5 +52,6 @@ public record WarpServices(
         Objects.requireNonNull(moveWarp, "moveWarp");
         Objects.requireNonNull(warpMenu, "warpMenu");
         Objects.requireNonNull(players, "players");
+        Objects.requireNonNull(repository, "repository");
     }
 }

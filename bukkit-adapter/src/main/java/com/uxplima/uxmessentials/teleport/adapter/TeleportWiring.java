@@ -100,7 +100,7 @@ public final class TeleportWiring {
         InMemoryRequestRegistry requests = new InMemoryRequestRegistry(settings.singleRequestDisplace());
         PdcTeleportFlags flags = new PdcTeleportFlags(plugin);
         TeleportArrivalHud arrivalHud =
-                new TeleportArrivalHud(kernel.messages(), plugin.getServer(), settings::arrivalTitle);
+                new TeleportArrivalHud(kernel.messages(), plugin.getServer(), settings, kernel.scheduler());
         TeleportExecutor executor = new AsyncTeleportExecutor(
                 kernel.scheduler(),
                 backStore,

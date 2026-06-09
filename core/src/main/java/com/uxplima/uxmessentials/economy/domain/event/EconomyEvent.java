@@ -15,4 +15,11 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
  * balance changes without importing this package. Names are past tense — an event records something that
  * already happened, never an imperative command.
  */
-public sealed interface EconomyEvent extends DomainEvent permits WalletCredited, WalletDebited, WalletRejected {}
+public sealed interface EconomyEvent extends DomainEvent
+        permits WalletCredited,
+                WalletDebited,
+                WalletRejected,
+                LoanDisbursed,
+                LoanRepaid,
+                BankDeposited,
+                BankWithdrawn {}

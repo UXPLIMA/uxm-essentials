@@ -78,7 +78,7 @@ abstract class WarpCommandSupport {
                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames));
     }
 
-    private List<String> usableWarpNames(PlayerRef viewer) {
+    final List<String> usableWarpNames(PlayerRef viewer) {
         return services.listWarps().available(viewer).stream()
                 .map(warp -> warp.name().value())
                 .toList();

@@ -25,13 +25,20 @@ public final class SellItem {
     private final EconomyProvider economy;
     private final WorthSource worth;
     private final EconomyNotifier notifier;
-    private final Currency currency;
+    private final Currency defaultCurrency;
+    private final java.util.Collection<Currency> currencies;
 
-    public SellItem(EconomyProvider economy, WorthSource worth, EconomyNotifier notifier, Currency currency) {
+    public SellItem(
+            EconomyProvider economy,
+            WorthSource worth,
+            EconomyNotifier notifier,
+            Currency defaultCurrency,
+            java.util.Collection<Currency> currencies) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.worth = Objects.requireNonNull(worth, "worth");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
-        this.currency = Objects.requireNonNull(currency, "currency");
+        this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+        this.currencies = java.util.List.copyOf(currencies);
     }
 
     /** Sell {@code amount} of {@code material} for {@code seller}, crediting the worth when priced. */
@@ -42,12 +49,16 @@ public final class SellItem {
             notifier.send(seller, EconomyMessageKey.SELL_NOTHING_TO_SELL);
             return SellOutcome.refused();
         }
-        Optional<BigDecimal> unit = worth.unitPrice(material);
+        Optional<Worth> unit = worth.unitPrice(material);
         if (unit.isEmpty()) {
             notifier.send(seller, EconomyMessageKey.SELL_NOT_SELLABLE, Map.of("item", material));
             return SellOutcome.refused();
         }
-        Money proceeds = Money.of(currency, unit.get().multiply(BigDecimal.valueOf(amount)));
+        Currency itemCurrency = currencies.stream()
+                .filter(c -> c.id().value().equalsIgnoreCase(unit.get().currencyId()))
+                .findFirst()
+                .orElse(defaultCurrency);
+        Money proceeds = Money.of(itemCurrency, unit.get().amount().multiply(BigDecimal.valueOf(amount)));
         Result<Unit, TransferError> credited = economy.credit(seller, proceeds);
         if (credited.isErr()) {
             notifier.send(seller, credited.errorOrThrow().messageKey());

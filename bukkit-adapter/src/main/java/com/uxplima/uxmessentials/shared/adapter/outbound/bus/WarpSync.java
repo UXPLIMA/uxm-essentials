@@ -90,6 +90,16 @@ public final class WarpSync {
             announce(name);
         }
 
+        @Override
+        public void rate(WarpName name, java.util.UUID player, double rating) {
+            delegate.rate(name, player, rating);
+        }
+
+        @Override
+        public double averageRating(WarpName name) {
+            return delegate.averageRating(name);
+        }
+
         private void announce(WarpName name) {
             bus.publish(new WarpChanged(bus.serverId(), name.value()));
         }

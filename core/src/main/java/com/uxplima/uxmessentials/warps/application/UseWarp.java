@@ -4,10 +4,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpError;
@@ -31,17 +33,31 @@ public final class UseWarp {
     private final WarpAccess access;
     private final WarpTeleporter teleporter;
     private final WarpNotifier notifier;
+    private final WarpSafetyChecker safetyChecker;
+    private final Permissions permissions;
 
-    public UseWarp(WarpRepository repository, WarpAccess access, WarpTeleporter teleporter, WarpNotifier notifier) {
+    public UseWarp(
+            WarpRepository repository,
+            WarpAccess access,
+            WarpTeleporter teleporter,
+            WarpNotifier notifier,
+            WarpSafetyChecker safetyChecker,
+            Permissions permissions) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.safetyChecker = Objects.requireNonNull(safetyChecker, "safetyChecker");
+        this.permissions = Objects.requireNonNull(permissions, "permissions");
     }
 
     /** Teleport {@code who} to the warp {@code name} themselves, gating access and cost first. */
     public Result<Unit, WarpError> use(PlayerRef who, WarpName name) {
-        return useFor(who, who, name);
+        return useFor(who, who, name, Optional.empty());
+    }
+
+    public Result<Unit, WarpError> use(PlayerRef who, WarpName name, String password) {
+        return useFor(who, who, name, Optional.of(password));
     }
 
     /**
@@ -52,6 +68,11 @@ public final class UseWarp {
      * teleporting path with no extra notice.
      */
     public Result<Unit, WarpError> useFor(PlayerRef actor, PlayerRef recipient, WarpName name) {
+        return useFor(actor, recipient, name, Optional.empty());
+    }
+
+    public Result<Unit, WarpError> useFor(
+            PlayerRef actor, PlayerRef recipient, WarpName name, Optional<String> password) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(recipient, "recipient");
         Objects.requireNonNull(name, "name");
@@ -60,23 +81,60 @@ public final class UseWarp {
             notifier.send(actor, WarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
             return Result.err(WarpError.NOT_FOUND);
         }
-        return admitAndGo(actor, recipient, warp.get());
+        return admitAndGo(actor, recipient, warp.get(), password);
     }
 
-    private Result<Unit, WarpError> admitAndGo(PlayerRef actor, PlayerRef recipient, Warp warp) {
+    private Result<Unit, WarpError> admitAndGo(
+            PlayerRef actor, PlayerRef recipient, Warp warp, Optional<String> enteredPassword) {
         Result<Unit, WarpError> admitted = access.admit(recipient, warp);
         if (admitted.isErr()) {
             WarpError error = admitted.errorOrThrow();
             notifier.send(actor, error.messageKey(), Map.of("warp", warp.name().value()));
             return admitted;
         }
+
+        // Lock check
+        if (warp.isLocked() && !permissions.has(recipient, "uxmessentials.warp.bypass.lock")) {
+            notifier.send(
+                    actor,
+                    WarpError.LOCKED.messageKey(),
+                    Map.of("warp", warp.name().value()));
+            return Result.err(WarpError.LOCKED);
+        }
+
+        // Password check
+        if (warp.password().isPresent() && !permissions.has(recipient, "uxmessentials.warp.bypass.password")) {
+            String required = warp.password().get();
+            if (enteredPassword.isEmpty() || !enteredPassword.get().equals(required)) {
+                notifier.send(
+                        actor,
+                        WarpError.WRONG_PASSWORD.messageKey(),
+                        Map.of("warp", warp.name().value()));
+                return Result.err(WarpError.WRONG_PASSWORD);
+            }
+        }
+
+        // Safety check
+        if (!safetyChecker.isSafe(warp.location()) && !permissions.has(recipient, "uxmessentials.warp.bypass.safety")) {
+            notifier.send(
+                    actor,
+                    WarpError.UNSAFE_LOCATION.messageKey(),
+                    Map.of("warp", warp.name().value()));
+            return Result.err(WarpError.UNSAFE_LOCATION);
+        }
+
         Map<String, String> placeholders = Map.of("warp", warp.name().value());
         notifier.send(recipient, WarpsMessageKey.WARP_TELEPORTING, placeholders);
         if (!actor.uuid().equals(recipient.uuid())) {
             notifier.send(
                     actor, WarpsMessageKey.WARP_SENT, Map.of("warp", warp.name().value(), "player", recipient.name()));
         }
-        teleporter.teleportTo(recipient, warp);
+
+        // Increment visitor counter
+        Warp updated = warp.incrementedVisitors();
+        repository.save(updated);
+
+        teleporter.teleportTo(recipient, updated);
         return Result.ok();
     }
 }

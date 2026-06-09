@@ -73,6 +73,16 @@ public final class CachedWarpRepository implements WarpRepository {
         cache.invalidate(ALL_KEY);
     }
 
+    @Override
+    public void rate(WarpName name, java.util.UUID player, double rating) {
+        delegate.rate(name, player, rating);
+    }
+
+    @Override
+    public double averageRating(WarpName name) {
+        return delegate.averageRating(name);
+    }
+
     /** Drop the cached set; call on a module reload. */
     public void invalidateAll() {
         cache.invalidateAll();

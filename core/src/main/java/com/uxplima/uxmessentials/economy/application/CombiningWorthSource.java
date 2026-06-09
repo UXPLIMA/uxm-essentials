@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.economy.application;
 
-import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -20,15 +19,20 @@ public final class CombiningWorthSource implements WorthSource {
 
     private final WorthOverrideStore overrides;
     private final WorthTable config;
+    private final String defaultCurrencyId;
 
-    public CombiningWorthSource(WorthOverrideStore overrides, WorthTable config) {
+    public CombiningWorthSource(WorthOverrideStore overrides, WorthTable config, String defaultCurrencyId) {
         this.overrides = Objects.requireNonNull(overrides, "overrides");
         this.config = Objects.requireNonNull(config, "config");
+        this.defaultCurrencyId = Objects.requireNonNull(defaultCurrencyId, "defaultCurrencyId");
     }
 
     @Override
-    public Optional<BigDecimal> unitPrice(String material) {
+    public Optional<Worth> unitPrice(String material) {
         Objects.requireNonNull(material, "material");
-        return overrides.find(material).or(() -> config.unitPrice(material));
+        return overrides
+                .find(material)
+                .map(amount -> Worth.of(amount, defaultCurrencyId))
+                .or(() -> config.unitPrice(material));
     }
 }

@@ -24,25 +24,60 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        getLogger().info("╔══════════════════════════════════════════════════════════╗");
+        getLogger().info("║                                                          ║");
+        getLogger().info("║   ██╗   ██╗██╗  ██╗███╗   ███╗                           ║");
+        getLogger().info("║   ██║   ██║╚██╗██╔╝████╗ ████║                           ║");
+        getLogger().info("║   ██║   ██║ ╚███╔╝ ██╔████╔██║                           ║");
+        getLogger().info("║   ██║   ██║ ██╔██╗ ██║╚██╔╝██║                           ║");
+        getLogger().info("║   ╚██████╔╝██╔╝ ██╗██║ ╚═╝ ██║                           ║");
+        getLogger().info("║    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝                           ║");
+        getLogger().info("║                                                          ║");
+        getLogger().info("║   Essentials v" + getPluginMeta().getVersion() + "                                      ║");
+        getLogger().info("║   Author: uxplima                                        ║");
+        getLogger().info("║                                                          ║");
+        getLogger().info("╚══════════════════════════════════════════════════════════╝");
+
+        long startTime = System.currentTimeMillis();
+
+        getLogger().info("[1/4] Writing default resources...");
         // First-run side effect: drop the editable default config files next to the database so an
         // operator has something to configure. Existing files are never overwritten (see DefaultResources).
         DefaultResources.writeInto(getDataFolder().toPath(), getLogger());
+
+        getLogger().info("[2/4] Wiring core modules and persistence...");
         CloseableResources wired = PluginModule.wire(this);
         this.resources = wired;
+
+        getLogger().info("[3/4] Registering command handlers...");
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             var registrar = event.registrar();
             wired.commands()
                     .forEach(command -> registrar.register(command.build(), command.description(), command.aliases()));
         });
+
+        getLogger().info("[4/4] Registering listener hooks...");
         wired.listeners().forEach(listener -> getServer().getPluginManager().registerEvents(listener, this));
+
+        // Initialize bStats Metrics
+        int pluginId = 31811;
+        new org.bstats.bukkit.Metrics(this, pluginId);
+
+        long loadTime = System.currentTimeMillis() - startTime;
+        getLogger().info("╔══════════════════════════════════════════════════════════╗");
+        getLogger().info("║  UxmEssentials enabled successfully in " + loadTime + "ms!          ║");
+        getLogger().info("╚══════════════════════════════════════════════════════════╝");
     }
 
     @Override
     public void onDisable() {
+        getLogger().info("Disabling UxmEssentials...");
         CloseableResources wired = this.resources;
         if (wired != null) {
+            getLogger().info("Closing active modules and dependencies...");
             wired.close(); // stops every started module in reverse wiring order
             this.resources = null;
         }
+        getLogger().info("UxmEssentials has been disabled!");
     }
 }

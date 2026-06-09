@@ -76,4 +76,9 @@ public interface ConfigStore {
         }
         return new ScopedConfigStore(this, prefix);
     }
+
+    /** Returns the child keys of the map at {@code path}, or an empty list if not a map/absent. */
+    default List<String> getKeys(String path) {
+        return List.of();
+    }
 }

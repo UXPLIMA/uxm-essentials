@@ -104,6 +104,16 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
         return cache.getIfPresent(owner.uuid()).map(byName -> List.copyOf(byName.values()));
     }
 
+    @Override
+    public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {
+        delegate.rate(owner, name, player, rating);
+    }
+
+    @Override
+    public double averageRating(PlayerRef owner, PlayerWarpName name) {
+        return delegate.averageRating(owner, name);
+    }
+
     /** Drop every cached owner; call on a module reload. */
     public void invalidateAll() {
         cache.invalidateAll();

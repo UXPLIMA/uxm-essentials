@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -28,6 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * @param players name → ref resolution for the {@code [owner]} / {@code [player]} cross-owner forms
  * @param repository the warp store, held only so the name-argument suggesters can peek an owner's warps
  *     without blocking (a join-warmed cache hit completes the names; a cold miss suggests nothing)
+ * @param editorView the warp settings editor GUI
  */
 @NullMarked
 public record PlayerWarpServices(
@@ -37,7 +39,8 @@ public record PlayerWarpServices(
         ListPlayerWarps listPlayerWarps,
         SetPlayerWarpVisibility visibility,
         PlayerLookup players,
-        PlayerWarpRepository repository) {
+        PlayerWarpRepository repository,
+        @org.jspecify.annotations.Nullable WarpEditorView editorView) {
 
     public PlayerWarpServices {
         Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");

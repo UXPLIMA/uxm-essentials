@@ -63,4 +63,9 @@ final class ScopedConfigStore implements ConfigStore {
         Objects.requireNonNull(nested, "nested");
         return nested.isEmpty() ? this : new ScopedConfigStore(delegate, absolute(nested));
     }
+
+    @Override
+    public List<String> getKeys(String path) {
+        return delegate.getKeys(absolute(path));
+    }
 }

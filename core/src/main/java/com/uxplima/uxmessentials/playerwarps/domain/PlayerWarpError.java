@@ -23,7 +23,19 @@ public enum PlayerWarpError {
     NONE_SET(PlayerwarpsMessageKey.PWARP_NONE),
 
     /** A non-owner tried to use a warp that is still private. */
-    NOT_PUBLIC(PlayerwarpsMessageKey.PWARP_NOT_PUBLIC);
+    NOT_PUBLIC(PlayerwarpsMessageKey.PWARP_NOT_PUBLIC),
+
+    /** The warp destination is physically unsafe (lava, void, suffocation). */
+    UNSAFE_LOCATION(PlayerwarpsMessageKey.PWARP_UNSAFE),
+
+    /** The warp is locked. */
+    LOCKED(PlayerwarpsMessageKey.PWARP_LOCKED),
+
+    /** The player entered the wrong password. */
+    WRONG_PASSWORD(PlayerwarpsMessageKey.PWARP_WRONG_PASSWORD),
+
+    /** The warp cannot be created in this world because it is blacklisted. */
+    WORLD_BLACKLISTED(PlayerwarpsMessageKey.PWARP_WORLD_BLACKLISTED);
 
     private final PlayerwarpsMessageKey messageKey;
 

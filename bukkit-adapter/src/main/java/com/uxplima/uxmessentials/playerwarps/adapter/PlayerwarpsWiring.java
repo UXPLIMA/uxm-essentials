@@ -44,17 +44,37 @@ public final class PlayerwarpsWiring {
 
     private PlayerwarpsWiring() {}
 
-    /** Build the player-warps adapters and use cases over the kernel ports and the teleport engine. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine) {
+    /**
+     * Build the player-warps adapters and use cases over the kernel ports and the teleport engine. The warp
+     * arrival-notification registry is shared from the warps module so a player-warp hop fires the same welcome
+     * effects; when warps is disabled it is {@code null} and player-warps falls back to a private throwaway
+     * registry (no listener consumes it, exactly as before this was injected).
+     */
+    public static Wired wire(
+            ModuleContext ctx,
+            Persistence persistence,
+            TeleportEngine teleportEngine,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
+                    editorView,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
+                    playerWarpHandle,
+            com.uxplima.uxmessentials.warps.adapter.@org.jspecify.annotations.Nullable WarpTeleportRegistry
+                    teleportRegistry) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         KernelPorts kernel = ctx.kernel();
         PlayerWarpRepository repository = PlayerWarpRepositories.cached(persistence);
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(kernel.messages(), kernel.messageSink());
-        PlayerWarpTeleporter teleporter = new TeleportPlayerWarpAdapter(teleportEngine);
+        com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry registry = teleportRegistry != null
+                ? teleportRegistry
+                : new com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry();
+        PlayerWarpTeleporter teleporter = new TeleportPlayerWarpAdapter(teleportEngine, registry);
         PlayerWarpQuota quota = new PlayerWarpQuota(kernel.permissions(), defaultLimit(ctx));
-        PlayerWarpServices services = assemble(kernel, repository, notifier, teleporter, quota);
+        if (playerWarpHandle != null) {
+            playerWarpHandle.bind(repository);
+        }
+        PlayerWarpServices services = assemble(kernel, repository, notifier, teleporter, quota, editorView, ctx);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer));
     }
@@ -64,16 +84,31 @@ public final class PlayerwarpsWiring {
             PlayerWarpRepository repository,
             PlayerWarpNotifier notifier,
             PlayerWarpTeleporter teleporter,
-            PlayerWarpQuota quota) {
+            PlayerWarpQuota quota,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
+                    editorView,
+            com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx) {
         Clock clock = Clock.systemUTC();
         return new PlayerWarpServices(
-                new SetPlayerWarp(repository, quota, notifier, kernel.events(), clock),
+                new SetPlayerWarp(
+                        repository,
+                        quota,
+                        notifier,
+                        kernel.events(),
+                        clock,
+                        ctx.config().getStringList("world-blacklist", List.of())),
                 new DelPlayerWarp(repository, notifier, kernel.events()),
-                new UsePlayerWarp(repository, teleporter, notifier),
+                new UsePlayerWarp(
+                        repository,
+                        teleporter,
+                        notifier,
+                        new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
+                        kernel.permissions()),
                 new ListPlayerWarps(repository, notifier),
                 new SetPlayerWarpVisibility(repository, notifier),
                 kernel.playerLookup(),
-                repository);
+                repository,
+                editorView);
     }
 
     private static int defaultLimit(ModuleContext ctx) {

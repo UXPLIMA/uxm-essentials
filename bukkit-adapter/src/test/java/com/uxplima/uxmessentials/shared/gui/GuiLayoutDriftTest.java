@@ -22,6 +22,9 @@ class GuiLayoutDriftTest {
         assertRows("warps", "warps-menu", 6);
         assertRows("homes", "homes-menu", 6);
         assertRows("itemworld", "disposal", 6);
+        assertRows("kits", "kits-manager", 6);
+        assertRows("kits", "kits-settings", 3);
+        assertRows("kits", "kits-preview", 6);
     }
 
     @Test
@@ -30,7 +33,13 @@ class GuiLayoutDriftTest {
         // appear is a config key that would carry player text — a "title"/"lore"/"name" assignment or a
         // MessageKey reference. Player text stays in the message catalog, asserted by the locale-parity guard.
         for (String[] menu : new String[][] {
-            {"kits", "kits-menu"}, {"warps", "warps-menu"}, {"homes", "homes-menu"}, {"itemworld", "disposal"}
+            {"kits", "kits-menu"},
+            {"warps", "warps-menu"},
+            {"homes", "homes-menu"},
+            {"itemworld", "disposal"},
+            {"kits", "kits-manager"},
+            {"kits", "kits-settings"},
+            {"kits", "kits-preview"}
         }) {
             String body = read(menu[0], menu[1]);
             assertThat(stripComments(body))

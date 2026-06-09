@@ -20,13 +20,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface WarpEconomy {
 
-    /** True when {@code who} can afford {@code amount} in the default currency. */
-    boolean canAfford(PlayerRef who, BigDecimal amount);
+    /** True when {@code who} can afford {@code amount} in the specified currency. */
+    boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId);
 
     /**
-     * Withdraw {@code amount} from {@code who}'s balance, returning {@code true} on success and
-     * {@code false} when the balance was insufficient (or the account could not be charged). The
-     * implementation is responsible for doing this atomically so a concurrent spend cannot double-charge.
+     * Withdraw {@code amount} of {@code currencyId} from {@code who}'s balance, returning {@code true} on success and
+     * {@code false} when the balance was insufficient.
      */
-    boolean withdraw(PlayerRef who, BigDecimal amount);
+    boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId);
 }

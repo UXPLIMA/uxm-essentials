@@ -33,12 +33,19 @@ public final class SetWarp {
     private final WarpNotifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final java.util.List<String> worldBlacklist;
 
-    public SetWarp(WarpRepository repository, WarpNotifier notifier, DomainEventPublisher events, Clock clock) {
+    public SetWarp(
+            WarpRepository repository,
+            WarpNotifier notifier,
+            DomainEventPublisher events,
+            Clock clock,
+            java.util.List<String> worldBlacklist) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
     }
 
     /** Create or move the warp {@code name} to {@code at}, free and ungated. */
@@ -54,6 +61,15 @@ public final class SetWarp {
         Objects.requireNonNull(at, "at");
         Objects.requireNonNull(cost, "cost");
         Objects.requireNonNull(requiredPermission, "requiredPermission");
+
+        if (worldBlacklist.contains(at.world().name())) {
+            notifier.send(
+                    owner,
+                    WarpError.WORLD_BLACKLISTED.messageKey(),
+                    Map.of("world", at.world().name()));
+            return Result.err(WarpError.WORLD_BLACKLISTED);
+        }
+
         Optional<Warp> existing = repository.find(name);
         return existing.isPresent()
                 ? reanchor(owner, existing.get(), at)

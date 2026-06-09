@@ -11,12 +11,23 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommands;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreateChooserView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.listener.ChatPromptListener;
+import com.uxplima.uxmessentials.kits.adapter.inbound.listener.KitClaimListener;
+import com.uxplima.uxmessentials.kits.adapter.inbound.listener.KitsJoinListener;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitGranter;
+import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitCategoryRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.PdcKitClaims;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
@@ -28,6 +39,7 @@ import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitReset;
 import com.uxplima.uxmessentials.kits.application.ListKits;
 import com.uxplima.uxmessentials.kits.application.ShowKit;
+import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
@@ -36,6 +48,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -82,33 +95,118 @@ public final class KitsWiring {
         Path kitsDir = dataFolder.resolve("modules").resolve("kits").resolve("kits");
         Path legacy = dataFolder.resolve(LEGACY_KITS_FILE);
         KitRepository repository = ConfigurateKitRepository.load(kitsDir, legacy, kernel.log());
+        Path categoriesDir = dataFolder.resolve("modules").resolve("kits").resolve("categories");
+        KitCategoryRepository categoryRepository = ConfigurateKitCategoryRepository.load(categoriesDir, kernel.log());
         KitClaimStore claims = new PdcKitClaims(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
         GuiLayout menuLayout = guiLayouts.load("kits", "kits-menu", GuiLayout.paginatedDefault(Material.CHEST));
-        KitServices services = assemble(kernel, repository, claims, granter, notifier, economy, menuLayout);
+        GuiLayout managerLayout = guiLayouts.load(
+                "kits",
+                "kits-manager",
+                new GuiLayout(6, Material.GRAY_STAINED_GLASS_PANE, Material.ARROW, 49, 53, List.of()));
+        GuiLayout settingsLayout = guiLayouts.load(
+                "kits",
+                "kits-settings",
+                new GuiLayout(
+                        3,
+                        Material.GRAY_STAINED_GLASS_PANE,
+                        Material.ARROW,
+                        26,
+                        22,
+                        List.of(0, 2, 4, 6, 8, 10, 12, 14, 16, 22, 18, 20, 24)));
+        GuiLayout previewLayout = guiLayouts.load(
+                "kits",
+                "kits-preview",
+                new GuiLayout(6, Material.GRAY_STAINED_GLASS_PANE, Material.ARROW, 0, 1, List.of()));
+
+        KitManagerView kitManagerView =
+                new KitManagerView(kernel.messages(), repository, kernel.scheduler(), managerLayout);
+        KitCategoryManagerView categoryManagerView =
+                new KitCategoryManagerView(kernel.messages(), categoryRepository, kernel.scheduler());
+        KitCategorySettingsView categorySettingsView =
+                new KitCategorySettingsView(kernel.messages(), kernel.scheduler());
+        KitCategorySelectorView categorySelectorView =
+                new KitCategorySelectorView(kernel.messages(), categoryRepository, kernel.scheduler());
+        KitCategoryParentSelectorView categoryParentSelectorView =
+                new KitCategoryParentSelectorView(kernel.messages(), categoryRepository, kernel.scheduler());
+        KitCreateChooserView kitCreateChooserView = new KitCreateChooserView(kernel.messages(), kernel.scheduler());
+
+        KitAccess access = new KitAccess(kernel.permissions(), kernel.cooldowns(), claims, economy);
+        KitServices services = assemble(
+                kernel,
+                repository,
+                categoryRepository,
+                access,
+                claims,
+                granter,
+                notifier,
+                economy,
+                menuLayout,
+                previewLayout,
+                kitManagerView,
+                categoryManagerView,
+                categorySettingsView,
+                categorySelectorView,
+                categoryParentSelectorView,
+                kitCreateChooserView);
+
         List<CommandRegistration> commands = KitCommands.all(
                 services,
                 kernel.messages(),
                 () -> ListDisplayMode.from(ctx.config()),
                 () -> ListDisplayMode.from(ctx.config(), SHOWKIT_DISPLAY_KEY));
-        List<Listener> listeners = List.of(new KitPreviewListener(), new KitEditorListener(services.kitEditorView()));
+
+        ChatPromptListener promptListener = new ChatPromptListener(kernel.messages());
+        KitSettingsView settingsView = new KitSettingsView(kernel.messages(), kernel.scheduler(), settingsLayout);
+
+        List<Listener> listeners = List.of(
+                new KitPreviewListener(),
+                new KitEditorListener(
+                        services.kitEditorView(),
+                        services,
+                        repository,
+                        categoryRepository,
+                        settingsView,
+                        promptListener,
+                        kernel.messages()),
+                promptListener,
+                new KitsJoinListener(repository, granter, access));
+
+        KitClaimListener claimListener = new KitClaimListener(plugin, repository, kernel.scheduler(), kernel.log());
+        if (kernel.events() instanceof InProcessDomainEventPublisher publisher) {
+            publisher.subscribe(event -> {
+                if (event instanceof com.uxplima.uxmessentials.kits.domain.event.KitClaimed claimed) {
+                    claimListener.onClaim(claimed);
+                }
+            });
+        }
+
         return new Wired(commands, listeners, services.kitEditorView(), repository);
     }
 
     private static KitServices assemble(
             KernelPorts kernel,
             KitRepository repository,
+            KitCategoryRepository categoryRepository,
+            KitAccess access,
             KitClaimStore claims,
             KitGranter granter,
             KitNotifier notifier,
             Optional<KitEconomy> economy,
-            GuiLayout menuLayout) {
-        KitAccess access = new KitAccess(kernel.permissions(), kernel.cooldowns(), claims, economy);
+            GuiLayout menuLayout,
+            GuiLayout previewLayout,
+            KitManagerView kitManagerView,
+            KitCategoryManagerView categoryManagerView,
+            KitCategorySettingsView categorySettingsView,
+            KitCategorySelectorView categorySelectorView,
+            KitCategoryParentSelectorView categoryParentSelectorView,
+            KitCreateChooserView kitCreateChooserView) {
         Clock clock = Clock.systemUTC();
-        ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, kernel.events(), clock);
-        KitMenuView kitMenu = new KitMenuView(kernel.messages(), kernel.scheduler(), claimKit, menuLayout);
-        KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler());
+        ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, kernel.events(), clock, economy);
+        KitMenuView kitMenu = new KitMenuView(
+                kernel.messages(), kernel.scheduler(), claimKit, categoryRepository, access, menuLayout);
+        KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler(), previewLayout);
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(kernel.messages(), kitEditor, kernel.scheduler());
         return new KitServices(
@@ -122,7 +220,13 @@ public final class KitsWiring {
                 kitMenu,
                 kitPreview,
                 kitEditorView,
-                kernel.playerLookup());
+                kitManagerView,
+                kernel.playerLookup(),
+                categoryManagerView,
+                categorySettingsView,
+                categorySelectorView,
+                categoryParentSelectorView,
+                kitCreateChooserView);
     }
 
     /**

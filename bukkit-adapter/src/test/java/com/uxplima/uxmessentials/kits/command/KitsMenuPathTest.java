@@ -166,13 +166,20 @@ class KitsMenuPathTest {
         KitClaimStore claims = new NoClaims();
         KitNotifier notifier = new KitNotifier(messages, sink);
         KitRepository repository = new FakeRepository();
-        KitGranter granter = (who, items) -> KitGranter.Grant.complete();
+        KitGranter granter = (who, kit) -> KitGranter.Grant.complete();
         KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
         Clock clock = Clock.systemUTC();
-        ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock);
-        KitMenuView kitMenu =
-                new KitMenuView(messages, new SyncScheduler(), claimKit, GuiLayout.paginatedDefault(Material.CHEST));
-        KitPreviewView kitPreview = new KitPreviewView(messages, new SyncScheduler());
+        ClaimKit claimKit =
+                new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock, Optional.empty());
+        KitMenuView kitMenu = new KitMenuView(
+                messages,
+                new SyncScheduler(),
+                claimKit,
+                new StubKitCategoryRepository(),
+                access,
+                GuiLayout.paginatedDefault(Material.CHEST));
+        KitPreviewView kitPreview = new KitPreviewView(
+                messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(messages, kitEditor, new SyncScheduler());
         return new KitServices(

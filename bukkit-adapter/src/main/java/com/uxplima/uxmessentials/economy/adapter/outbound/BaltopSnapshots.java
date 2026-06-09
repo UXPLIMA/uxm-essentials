@@ -84,7 +84,7 @@ public final class BaltopSnapshots {
         return rows.size() <= limit ? rows : List.copyOf(rows.subList(0, limit));
     }
 
-    private void refreshAll() {
+    public void refreshAll() {
         for (Map.Entry<Currency, AtomicReference<List<BaltopRow>>> entry : snapshots.entrySet()) {
             entry.getValue().set(buildSnapshot(entry.getKey()));
         }

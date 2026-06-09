@@ -12,6 +12,7 @@ jooq           = "3.19.16"
 caffeine       = "3.1.8"
 configurate    = "4.1.2"
 bstats         = "3.0.2"
+gson           = "2.11.0"
 jspecify       = "1.0.0"
 slf4j          = "2.0.16"
 
@@ -24,6 +25,7 @@ mariadb-jdbc   = "3.5.3"        # org.mariadb.jdbc:mariadb-java-client — Maven
 velocity       = "3.4.0"
 luckperms      = "5.5"
 jda            = "5.6.1"
+jedis          = "5.1.0"        # redis.clients:jedis — Maven Central (cross-server warp/wallet sync)
 
 # economy provider integrations (see docs/11-economy-integration.md, docs/adr/0004)
 treasury       = "1.2.0"        # me.lokka30:treasury-api — CodeMC repo, NOT Maven Central (verified 2026-05-30)
@@ -72,12 +74,14 @@ caffeine          = { module = "com.github.ben-manes.caffeine:caffeine",        
 configurate-hocon = { module = "org.spongepowered:configurate-hocon",            version.ref = "configurate" }
 configurate-yaml  = { module = "org.spongepowered:configurate-yaml",             version.ref = "configurate" }
 bstats-bukkit     = { module = "org.bstats:bstats-bukkit",                       version.ref = "bstats" }
+gson              = { module = "com.google.code.gson:gson",                      version.ref = "gson" }
 jspecify          = { module = "org.jspecify:jspecify",                          version.ref = "jspecify" }
 slf4j-api         = { module = "org.slf4j:slf4j-api",                            version.ref = "slf4j" }
 
 velocity-api      = { module = "com.velocitypowered:velocity-api",               version.ref = "velocity" }
 luckperms-api     = { module = "net.luckperms:api",                              version.ref = "luckperms" }
 jda               = { module = "net.dv8tion:JDA",                                version.ref = "jda" }
+jedis             = { module = "redis.clients:jedis",                            version.ref = "jedis" }
 
 # economy provider APIs — compileOnly soft-depends (see §9 + §16)
 treasury-api      = { module = "me.lokka30:treasury-api",                        version.ref = "treasury" }

@@ -109,16 +109,292 @@ class KitClaimStoreTest {
         PlayerMock alice = server.addPlayer("Alice");
         KitGranter granter = new BukkitKitGranter(new NoopLogger());
         List<KitItem> items = List.of(KitItemCodec.encode(new ItemStack(Material.IRON_INGOT, 5)));
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("test"),
+                        items,
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
 
-        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), items);
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
 
         assertThat(grant.fitInInventory()).isTrue();
         assertThat(alice.getInventory().contains(Material.IRON_INGOT, 5)).isTrue();
     }
 
+    @Test
+    void autoEquipTruePutsArmorAndOffhandItemsInEquipmentSlots() {
+        PlayerMock alice = server.addPlayer("Alice");
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+
+        // Prepare a kit with helmet, chestplate, and shield (offhand)
+        List<KitItem> items = List.of(
+                KitItemCodec.encode(new ItemStack(Material.IRON_HELMET, 1)),
+                KitItemCodec.encode(new ItemStack(Material.DIAMOND_CHESTPLATE, 1)),
+                KitItemCodec.encode(new ItemStack(Material.SHIELD, 1)));
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("auto-equip-on"),
+                        items,
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free(),
+                        java.util.Optional.empty(),
+                        java.util.Optional.empty(),
+                        List.of(),
+                        List.of(),
+                        java.util.Optional.empty(),
+                        java.util.Optional.empty(),
+                        false,
+                        true // autoEquip = true
+                        );
+
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
+
+        assertThat(grant.fitInInventory()).isTrue();
+        // The items should be in their respective equipment slots, not in standard inventory slots
+        assertThat(alice.getInventory().getHelmet()).isNotNull();
+        assertThat(alice.getInventory().getHelmet().getType()).isEqualTo(Material.IRON_HELMET);
+        assertThat(alice.getInventory().getChestplate()).isNotNull();
+        assertThat(alice.getInventory().getChestplate().getType()).isEqualTo(Material.DIAMOND_CHESTPLATE);
+        assertThat(alice.getInventory().getItemInOffHand()).isNotNull();
+        assertThat(alice.getInventory().getItemInOffHand().getType()).isEqualTo(Material.SHIELD);
+    }
+
+    @Test
+    void autoEquipFalseKeepsEquipmentSlotsEmptyAndPutsItemsInNormalInventory() {
+        PlayerMock alice = server.addPlayer("Alice");
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+
+        // Prepare a kit with helmet, chestplate, and shield (offhand)
+        List<KitItem> items = List.of(
+                KitItemCodec.encode(new ItemStack(Material.IRON_HELMET, 1)),
+                KitItemCodec.encode(new ItemStack(Material.DIAMOND_CHESTPLATE, 1)),
+                KitItemCodec.encode(new ItemStack(Material.SHIELD, 1)));
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("auto-equip-off"),
+                        items,
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free(),
+                        java.util.Optional.empty(),
+                        java.util.Optional.empty(),
+                        List.of(),
+                        List.of(),
+                        java.util.Optional.empty(),
+                        java.util.Optional.empty(),
+                        false,
+                        false // autoEquip = false
+                        );
+
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
+
+        assertThat(grant.fitInInventory()).isTrue();
+        // The equipment slots must remain empty
+        assertThat(isSlotEmpty(alice.getInventory().getHelmet())).isTrue();
+        assertThat(isSlotEmpty(alice.getInventory().getChestplate())).isTrue();
+        assertThat(isSlotEmpty(alice.getInventory().getItemInOffHand())).isTrue();
+        // The items must be in the general inventory
+        assertThat(alice.getInventory().contains(Material.IRON_HELMET)).isTrue();
+        assertThat(alice.getInventory().contains(Material.DIAMOND_CHESTPLATE)).isTrue();
+        assertThat(alice.getInventory().contains(Material.SHIELD)).isTrue();
+    }
+
+    private boolean isSlotEmpty(ItemStack stack) {
+        return stack == null || stack.getType() == Material.AIR;
+    }
+
     private PlayerRef ref(String name) {
         PlayerMock player = server.addPlayer(name);
         return BukkitRefs.toRef(player);
+    }
+
+    @Test
+    void grantSpecificSlotsRestoresToSlots() {
+        PlayerMock alice = server.addPlayer("Alice");
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+
+        // Create a kit item with a specific slot (slot 4)
+        KitItem item = KitItemCodec.encode(new ItemStack(Material.GOLD_INGOT, 3), 4);
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("slot-test"),
+                        List.of(item),
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
+
+        assertThat(grant.fitInInventory()).isTrue();
+        assertThat(alice.getInventory().getItem(4)).isNotNull();
+        assertThat(alice.getInventory().getItem(4).getType()).isEqualTo(Material.GOLD_INGOT);
+        assertThat(alice.getInventory().getItem(4).getAmount()).isEqualTo(3);
+    }
+
+    @Test
+    void grantOccupiedSpecificSlotFallsBack() {
+        PlayerMock alice = server.addPlayer("Alice");
+        alice.getInventory().setItem(4, new ItemStack(Material.COAL, 1));
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+
+        KitItem item = KitItemCodec.encode(new ItemStack(Material.GOLD_INGOT, 3), 4);
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("slot-test-fallback"),
+                        List.of(item),
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
+
+        assertThat(grant.fitInInventory()).isTrue();
+        // Slot 4 should still be coal
+        assertThat(alice.getInventory().getItem(4).getType()).isEqualTo(Material.COAL);
+        // Gold ingot should fallback to another slot
+        assertThat(alice.getInventory().contains(Material.GOLD_INGOT, 3)).isTrue();
+    }
+
+    @Test
+    void oversizedStacksBypassedWithPermission() {
+        PlayerMock alice = server.addPlayer("Alice");
+        alice.addAttachment(plugin, "uxmessentials.oversizedstacks", true);
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+
+        ItemStack oversized = new ItemStack(Material.COOKIE, 100);
+        KitItem item = KitItemCodec.encode(oversized);
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("oversized-test"),
+                        List.of(item),
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
+
+        assertThat(grant.fitInInventory()).isTrue();
+        // It should have been added as a single stack of 100
+        boolean foundOversized = false;
+        for (ItemStack invItem : alice.getInventory().getContents()) {
+            if (invItem != null && invItem.getType() == Material.COOKIE && invItem.getAmount() == 100) {
+                foundOversized = true;
+                break;
+            }
+        }
+        assertThat(foundOversized).isTrue();
+    }
+
+    @Test
+    void oversizedStacksSplitWithoutPermission() {
+        PlayerMock alice = server.addPlayer("Alice");
+        // No permission added
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+
+        ItemStack oversized = new ItemStack(Material.COOKIE, 100);
+        KitItem item = KitItemCodec.encode(oversized);
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("oversized-test-no-perm"),
+                        List.of(item),
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
+
+        assertThat(grant.fitInInventory()).isTrue();
+        // It should not have been added as a single stack of 100; it should be split into 64 and 36
+        boolean foundOversized = false;
+        int count64 = 0;
+        int count36 = 0;
+        for (ItemStack invItem : alice.getInventory().getContents()) {
+            if (invItem != null && invItem.getType() == Material.COOKIE) {
+                if (invItem.getAmount() == 100) {
+                    foundOversized = true;
+                } else if (invItem.getAmount() == 64) {
+                    count64++;
+                } else if (invItem.getAmount() == 36) {
+                    count36++;
+                }
+            }
+        }
+        assertThat(foundOversized).isFalse();
+        assertThat(count64).isEqualTo(1);
+        assertThat(count36).isEqualTo(1);
+    }
+
+    @Test
+    void eventsAreFiredAndCanBeCancelled() {
+        PlayerMock alice = server.addPlayer("Alice");
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kitCancel =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("cancel-me"),
+                        List.of(),
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kitAllow =
+                new com.uxplima.uxmessentials.kits.domain.KitDefinition(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("allow-me"),
+                        List.of(),
+                        java.time.Duration.ZERO,
+                        false,
+                        false,
+                        com.uxplima.uxmessentials.kits.domain.KitCost.free());
+
+        // Register event cancellation listener
+        server.getPluginManager()
+                .registerEvents(
+                        new org.bukkit.event.Listener() {
+                            @org.bukkit.event.EventHandler
+                            @SuppressWarnings("UnusedMethod")
+                            public void onPreClaim(
+                                    com.uxplima.uxmessentials.kits.adapter.inbound.event.KitPreClaimEvent event) {
+                                if (event.getKit().id().value().equals("cancel-me")) {
+                                    event.setCancelled(true);
+                                }
+                            }
+                        },
+                        plugin);
+
+        // Check preGrant
+        assertThat(granter.preGrant(BukkitRefs.toRef(alice), kitCancel)).isFalse();
+        assertThat(granter.preGrant(BukkitRefs.toRef(alice), kitAllow)).isTrue();
+
+        // Track claim event firing
+        java.util.concurrent.atomic.AtomicBoolean claimEventFired =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        server.getPluginManager()
+                .registerEvents(
+                        new org.bukkit.event.Listener() {
+                            @org.bukkit.event.EventHandler
+                            @SuppressWarnings("UnusedMethod")
+                            public void onClaim(
+                                    com.uxplima.uxmessentials.kits.adapter.inbound.event.KitClaimEvent event) {
+                                if (event.getKit().id().value().equals("allow-me")) {
+                                    claimEventFired.set(true);
+                                }
+                            }
+                        },
+                        plugin);
+
+        granter.grant(BukkitRefs.toRef(alice), kitAllow);
+        assertThat(claimEventFired.get()).isTrue();
     }
 
     /** A logger that discards every line. */

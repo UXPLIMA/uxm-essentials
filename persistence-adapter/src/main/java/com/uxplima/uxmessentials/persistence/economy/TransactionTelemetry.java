@@ -1,16 +1,21 @@
 package com.uxplima.uxmessentials.persistence.economy;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomyOwners.ECONOMY_OWNERS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Transactions.TRANSACTIONS;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
+import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -34,7 +39,7 @@ import org.jspecify.annotations.Nullable;
  * {@link #stop()} so a clean shutdown never strands history.
  */
 @NullMarked
-public final class TransactionTelemetry extends JooqRepository {
+public final class TransactionTelemetry extends JooqRepository implements TransactionHistory {
 
     private final Queue<Row> buffer = new ConcurrentLinkedQueue<>();
     private final AtomicLong ids = new AtomicLong(System.currentTimeMillis() * 1_000L);
@@ -77,7 +82,72 @@ public final class TransactionTelemetry extends JooqRepository {
         buffer.add(Row.transfer(nextId(), at, from, to, amount, reason));
     }
 
+    @Override
+    public void recordTransfer(String fromId, String toId, Money amount, EconomyReason reason, long at) {
+        buffer.add(new Row(
+                nextId(),
+                at,
+                fromId,
+                toId,
+                amount.currency().id().value(),
+                amount.amount(),
+                "TRANSFER",
+                reason.name()));
+    }
+
+    @Override
+    public void recordCredit(String ownerId, Money amount, EconomyReason reason, long at) {
+        buffer.add(new Row(
+                nextId(), at, null, ownerId, amount.currency().id().value(), amount.amount(), "CREDIT", reason.name()));
+    }
+
+    @Override
+    public void recordDebit(String ownerId, Money amount, EconomyReason reason, long at) {
+        buffer.add(new Row(
+                nextId(), at, ownerId, null, amount.currency().id().value(), amount.amount(), "DEBIT", reason.name()));
+    }
+
+    @Override
+    public List<HistoryRecord> queryBankTransactions(String bankId, int limit, int offset) {
+        var fromOwners = ECONOMY_OWNERS.as("from_owners");
+        var toOwners = ECONOMY_OWNERS.as("to_owners");
+        return read(dsl -> dsl.select(
+                        TRANSACTIONS.ID,
+                        TRANSACTIONS.TS,
+                        TRANSACTIONS.FROM_OWNER,
+                        fromOwners.NAME,
+                        TRANSACTIONS.TO_OWNER,
+                        toOwners.NAME,
+                        TRANSACTIONS.CURRENCY,
+                        TRANSACTIONS.AMOUNT,
+                        TRANSACTIONS.TYPE,
+                        TRANSACTIONS.REASON)
+                .from(TRANSACTIONS)
+                .leftJoin(fromOwners)
+                .on(TRANSACTIONS.FROM_OWNER.eq(fromOwners.OWNER))
+                .leftJoin(toOwners)
+                .on(TRANSACTIONS.TO_OWNER.eq(toOwners.OWNER))
+                .where(TRANSACTIONS.FROM_OWNER.eq(bankId))
+                .or(TRANSACTIONS.TO_OWNER.eq(bankId))
+                .orderBy(TRANSACTIONS.TS.desc())
+                .limit(limit)
+                .offset(offset)
+                .fetch()
+                .map(record -> new HistoryRecord(
+                        record.get(TRANSACTIONS.ID),
+                        Instant.ofEpochMilli(record.get(TRANSACTIONS.TS)),
+                        record.get(TRANSACTIONS.FROM_OWNER),
+                        record.get(fromOwners.NAME),
+                        record.get(TRANSACTIONS.TO_OWNER),
+                        record.get(toOwners.NAME),
+                        record.get(TRANSACTIONS.CURRENCY),
+                        record.get(TRANSACTIONS.AMOUNT),
+                        record.get(TRANSACTIONS.TYPE),
+                        record.get(TRANSACTIONS.REASON))));
+    }
+
     /** Write every buffered row as one batch {@code INSERT}. Runs off-tick on the flush loop. */
+    @Override
     public void flush() {
         List<Row> drained = drain();
         if (drained.isEmpty()) {
@@ -91,6 +161,83 @@ public final class TransactionTelemetry extends JooqRepository {
         } catch (RuntimeException cause) {
             log.warn("transaction telemetry batch of {} rows failed to flush", drained.size());
         }
+    }
+
+    @Override
+    public List<HistoryRecord> queryTransactions(UUID playerUuid, int limit, int offset) {
+        String uuidStr = playerUuid.toString();
+        var fromOwners = ECONOMY_OWNERS.as("from_owners");
+        var toOwners = ECONOMY_OWNERS.as("to_owners");
+        return read(dsl -> dsl.select(
+                        TRANSACTIONS.ID,
+                        TRANSACTIONS.TS,
+                        TRANSACTIONS.FROM_OWNER,
+                        fromOwners.NAME,
+                        TRANSACTIONS.TO_OWNER,
+                        toOwners.NAME,
+                        TRANSACTIONS.CURRENCY,
+                        TRANSACTIONS.AMOUNT,
+                        TRANSACTIONS.TYPE,
+                        TRANSACTIONS.REASON)
+                .from(TRANSACTIONS)
+                .leftJoin(fromOwners)
+                .on(TRANSACTIONS.FROM_OWNER.eq(fromOwners.OWNER))
+                .leftJoin(toOwners)
+                .on(TRANSACTIONS.TO_OWNER.eq(toOwners.OWNER))
+                .where(TRANSACTIONS.FROM_OWNER.eq(uuidStr))
+                .or(TRANSACTIONS.TO_OWNER.eq(uuidStr))
+                .orderBy(TRANSACTIONS.TS.desc())
+                .limit(limit)
+                .offset(offset)
+                .fetch()
+                .map(record -> new HistoryRecord(
+                        record.get(TRANSACTIONS.ID),
+                        Instant.ofEpochMilli(record.get(TRANSACTIONS.TS)),
+                        record.get(TRANSACTIONS.FROM_OWNER),
+                        record.get(fromOwners.NAME),
+                        record.get(TRANSACTIONS.TO_OWNER),
+                        record.get(toOwners.NAME),
+                        record.get(TRANSACTIONS.CURRENCY),
+                        record.get(TRANSACTIONS.AMOUNT),
+                        record.get(TRANSACTIONS.TYPE),
+                        record.get(TRANSACTIONS.REASON))));
+    }
+
+    @Override
+    public List<HistoryRecord> queryGlobalTransactions(int limit, int offset) {
+        var fromOwners = ECONOMY_OWNERS.as("from_owners");
+        var toOwners = ECONOMY_OWNERS.as("to_owners");
+        return read(dsl -> dsl.select(
+                        TRANSACTIONS.ID,
+                        TRANSACTIONS.TS,
+                        TRANSACTIONS.FROM_OWNER,
+                        fromOwners.NAME,
+                        TRANSACTIONS.TO_OWNER,
+                        toOwners.NAME,
+                        TRANSACTIONS.CURRENCY,
+                        TRANSACTIONS.AMOUNT,
+                        TRANSACTIONS.TYPE,
+                        TRANSACTIONS.REASON)
+                .from(TRANSACTIONS)
+                .leftJoin(fromOwners)
+                .on(TRANSACTIONS.FROM_OWNER.eq(fromOwners.OWNER))
+                .leftJoin(toOwners)
+                .on(TRANSACTIONS.TO_OWNER.eq(toOwners.OWNER))
+                .orderBy(TRANSACTIONS.TS.desc())
+                .limit(limit)
+                .offset(offset)
+                .fetch()
+                .map(record -> new HistoryRecord(
+                        record.get(TRANSACTIONS.ID),
+                        Instant.ofEpochMilli(record.get(TRANSACTIONS.TS)),
+                        record.get(TRANSACTIONS.FROM_OWNER),
+                        record.get(fromOwners.NAME),
+                        record.get(TRANSACTIONS.TO_OWNER),
+                        record.get(toOwners.NAME),
+                        record.get(TRANSACTIONS.CURRENCY),
+                        record.get(TRANSACTIONS.AMOUNT),
+                        record.get(TRANSACTIONS.TYPE),
+                        record.get(TRANSACTIONS.REASON))));
     }
 
     /** Drain synchronously and stop the loop. Called on module stop and before a reload swap. */

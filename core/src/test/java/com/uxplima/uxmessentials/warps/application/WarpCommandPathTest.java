@@ -62,7 +62,7 @@ class WarpCommandPathTest {
         permissions = new StubPermissions();
         notifier = new WarpNotifier(new KeyMessages(), new CapturingSink());
         events = new CapturingEvents();
-        setWarp = new SetWarp(repository, notifier, events, Clock.system(ZoneOffset.UTC));
+        setWarp = new SetWarp(repository, notifier, events, Clock.system(ZoneOffset.UTC), List.of());
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
         operator = new PlayerRef(UUID.randomUUID(), "Operator");
     }
@@ -167,7 +167,7 @@ class WarpCommandPathTest {
 
     private UseWarp useWarp(Optional<WarpEconomy> economy) {
         WarpAccess access = new WarpAccess(permissions, economy);
-        return new UseWarp(repository, access, teleporter, notifier);
+        return new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
     }
 
     private Warp priced(String name, BigDecimal amount) {
@@ -212,6 +212,14 @@ class WarpCommandPathTest {
         public void delete(WarpName name) {
             byName.remove(name.value());
         }
+
+        @Override
+        public void rate(WarpName name, java.util.UUID player, double rating) {}
+
+        @Override
+        public double averageRating(WarpName name) {
+            return 0.0;
+        }
     }
 
     private static final class RecordingTeleporter implements WarpTeleporter {
@@ -239,12 +247,12 @@ class WarpCommandPathTest {
         }
 
         @Override
-        public boolean canAfford(PlayerRef who, BigDecimal amount) {
+        public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
             return solvent;
         }
 
         @Override
-        public boolean withdraw(PlayerRef who, BigDecimal amount) {
+        public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
             if (!solvent) {
                 return false;
             }

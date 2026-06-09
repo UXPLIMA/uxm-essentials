@@ -36,18 +36,21 @@ public final class SetPlayerWarp {
     private final PlayerWarpNotifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final java.util.List<String> worldBlacklist;
 
     public SetPlayerWarp(
             PlayerWarpRepository repository,
             PlayerWarpQuota quota,
             PlayerWarpNotifier notifier,
             DomainEventPublisher events,
-            Clock clock) {
+            Clock clock,
+            java.util.List<String> worldBlacklist) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.quota = Objects.requireNonNull(quota, "quota");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
     }
 
     /** Create or re-anchor {@code owner}'s warp {@code name} at {@code at}. */
@@ -55,6 +58,15 @@ public final class SetPlayerWarp {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(at, "at");
+
+        if (worldBlacklist.contains(at.world().name())) {
+            notifier.send(
+                    owner,
+                    PlayerWarpError.WORLD_BLACKLISTED.messageKey(),
+                    Map.of("world", at.world().name()));
+            return Result.err(PlayerWarpError.WORLD_BLACKLISTED);
+        }
+
         Optional<PlayerWarp> existing = repository.find(owner, name);
         return existing.isPresent() ? reanchor(owner, existing.get(), at) : create(owner, name, at);
     }

@@ -100,6 +100,32 @@ public final class EcoAdmin {
         return Result.ok();
     }
 
+    /** {@code /eco give-random <target> <min> <max> [currency]}: credit {@code target} by a random amount in range {@code [min, max]}. */
+    public Result<Money, TransferError> giveRandomRange(PlayerRef actor, PlayerRef target, Money min, Money max) {
+        validate(actor, target, min);
+        Objects.requireNonNull(max, "max");
+        if (!min.currency().equals(max.currency())) {
+            throw new IllegalArgumentException("currencies must match");
+        }
+        if (min.amount().compareTo(max.amount()) > 0) {
+            throw new IllegalArgumentException("min must be less than or equal to max");
+        }
+
+        Money amount = randomInRange(min, max);
+
+        repository.ensureOwner(target);
+        Result<Unit, TransferError> result = economy.credit(target, amount);
+        if (result.isErr()) {
+            return Result.err(result.errorOrThrow());
+        }
+        audit.adminMutation(actor, target, amount, EconomyReason.ADMIN_GIVE);
+        notifier.send(
+                actor,
+                EconomyMessageKey.ECO_ADMIN_GIVEN,
+                Map.of("player", target.name(), "amount", notifier.amount(amount)));
+        return Result.ok(amount);
+    }
+
     /** {@code /eco resetall [currency] --confirm}: reset every wallet in {@code targets} to {@code starting}. */
     public int resetAll(PlayerRef actor, List<PlayerRef> targets, Currency currency) {
         Money starting = Money.of(currency, currency.starting());
@@ -113,6 +139,21 @@ public final class EcoAdmin {
         audit.bulkMutation(actor, starting, affected, EconomyReason.ADMIN_RESETALL);
         notifier.send(actor, EconomyMessageKey.ECO_ADMIN_RESETALL, Map.of("count", Integer.toString(affected)));
         return affected;
+    }
+
+    /**
+     * A random amount in {@code [min, max]}, computed in {@link java.math.BigDecimal} so no money figure ever
+     * passes through a {@code double}. The only floating-point value is the {@code [0,1)} fraction the RNG
+     * yields; it scales the exact decimal range, and the result is normalised to the currency's precision.
+     */
+    private static Money randomInRange(Money min, Money max) {
+        Currency currency = min.currency();
+        java.math.BigDecimal range = max.amount().subtract(min.amount());
+        double fraction = java.util.concurrent.ThreadLocalRandom.current().nextDouble();
+        java.math.BigDecimal offset = range.multiply(java.math.BigDecimal.valueOf(fraction));
+        java.math.BigDecimal value =
+                min.amount().add(offset).setScale(currency.precision(), java.math.RoundingMode.HALF_UP);
+        return Money.of(currency, value);
     }
 
     private Result<Unit, TransferError> single(

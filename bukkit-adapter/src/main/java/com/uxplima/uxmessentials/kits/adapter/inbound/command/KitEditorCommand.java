@@ -11,6 +11,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -40,6 +41,7 @@ public final class KitEditorCommand extends KitCommandSupport implements Command
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("kiteditor")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(this::openManager)
                 .then(kitNameArgument("name")
                         .executes(this::open)
                         .then(Commands.literal("save").executes(this::save)))
@@ -49,6 +51,18 @@ public final class KitEditorCommand extends KitCommandSupport implements Command
     @Override
     public String description() {
         return "Edit a kit's contents.";
+    }
+
+    private int openManager(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        KitManagerView managerView = services.kitManagerView();
+        if (managerView != null) {
+            managerView.open(sender, ref(sender));
+        }
+        return Command.SINGLE_SUCCESS;
     }
 
     private int open(CommandContext<CommandSourceStack> ctx) {

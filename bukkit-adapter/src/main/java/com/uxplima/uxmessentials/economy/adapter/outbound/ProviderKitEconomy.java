@@ -33,16 +33,37 @@ public final class ProviderKitEconomy implements KitEconomy {
     }
 
     @Override
-    public boolean canAfford(PlayerRef who, BigDecimal amount) {
+    public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
-        return !economy.balance(who, currency).isLessThan(Money.of(currency, amount));
+        Currency target = resolve(currencyId);
+        return !economy.balance(who, target).isLessThan(Money.of(target, amount));
     }
 
     @Override
-    public boolean withdraw(PlayerRef who, BigDecimal amount) {
+    public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
-        return economy.debit(who, Money.of(currency, amount)).isOk();
+        Currency target = resolve(currencyId);
+        return economy.debit(who, Money.of(target, amount)).isOk();
+    }
+
+    @Override
+    public boolean deposit(PlayerRef who, BigDecimal amount, String currencyId) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(amount, "amount");
+        Currency target = resolve(currencyId);
+        return economy.credit(who, Money.of(target, amount)).isOk();
+    }
+
+    private Currency resolve(String currencyId) {
+        Objects.requireNonNull(currencyId, "currencyId");
+        if (currencyId.equalsIgnoreCase("default")) {
+            return currency;
+        }
+        return economy.currencies().stream()
+                .filter(c -> c.id().value().equalsIgnoreCase(currencyId))
+                .findFirst()
+                .orElse(currency);
     }
 }

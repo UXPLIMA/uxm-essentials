@@ -114,6 +114,21 @@ public final class ConfigurateConfigStore implements ConfigStore {
         tree.set(merged(rootFile, modulesDir, log));
     }
 
+    @Override
+    public List<String> getKeys(String path) {
+        ConfigurationNode node = at(path);
+        if (node.virtual() || !node.isMap()) {
+            return List.of();
+        }
+        List<String> keys = new ArrayList<>();
+        for (Object key : node.childrenMap().keySet()) {
+            if (key != null) {
+                keys.add(key.toString());
+            }
+        }
+        return List.copyOf(keys);
+    }
+
     private ConfigurationNode at(String path) {
         Objects.requireNonNull(path, "path");
         Object[] segments = path.split("\\.");

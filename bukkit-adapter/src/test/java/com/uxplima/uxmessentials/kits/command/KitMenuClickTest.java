@@ -165,10 +165,17 @@ class KitMenuClickTest {
         KitRepository repository = new FakeRepository();
         KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
         Clock clock = Clock.systemUTC();
-        ClaimKit claimKit = new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock);
-        KitMenuView kitMenu =
-                new KitMenuView(messages, new SyncScheduler(), claimKit, GuiLayout.paginatedDefault(Material.CHEST));
-        KitPreviewView kitPreview = new KitPreviewView(messages, new SyncScheduler());
+        ClaimKit claimKit =
+                new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock, Optional.empty());
+        KitMenuView kitMenu = new KitMenuView(
+                messages,
+                new SyncScheduler(),
+                claimKit,
+                new StubKitCategoryRepository(),
+                access,
+                GuiLayout.paginatedDefault(Material.CHEST));
+        KitPreviewView kitPreview = new KitPreviewView(
+                messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(messages, kitEditor, new SyncScheduler());
         return new KitServices(
@@ -219,8 +226,8 @@ class KitMenuClickTest {
         private final List<List<KitItem>> grants = new ArrayList<>();
 
         @Override
-        public Grant grant(PlayerRef recipient, List<KitItem> items) {
-            grants.add(items);
+        public Grant grant(PlayerRef recipient, KitDefinition kit) {
+            grants.add(kit.items());
             return Grant.complete();
         }
     }

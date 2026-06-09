@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.teleport.adapter.outbound;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BooleanSupplier;
 
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
@@ -12,19 +11,20 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmlib.hud.Titles;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Flashes a short on-screen title when a player-initiated teleport lands, through uxmLib's {@link Titles}. The
- * text is the locale-resolved {@link TeleportMessageKey#ARRIVED_TITLE} — never an inline literal — and the
- * banner is brief (a sub-second stay) so it reads as a confirmation rather than a take-over. Gated by the
- * {@code teleport.arrival-title} toggle, and skipped for the kinds a player did not ask for (a death respawn
- * and a staff {@code /tp} on someone), so only the deliberate hops (home, warp, spawn, tpa, rtp, back) flash.
+ * Flashes a short on-screen title or other configurable message types (BossBar, Chat, ActionBar, Subtitle)
+ * when a player-initiated teleport lands, through uxmLib's {@link Titles}. The message can be custom or
+ * resolved from the message catalog. Gated by the {@code teleport.arrival-title} toggle and configured
+ * per-verb under {@code arrival-messages}.
  *
  * <p>{@link #arrived} touches the live player, so the caller must invoke it on the player's region thread —
  * the teleport executor does, from its arrival callback.
@@ -32,40 +32,149 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class TeleportArrivalHud {
 
-    private static final Duration FADE_IN = Duration.ofMillis(150L);
-    private static final Duration STAY = Duration.ofMillis(700L);
-    private static final Duration FADE_OUT = Duration.ofMillis(300L);
-
     private final Messages messages;
     private final MiniMessage miniMessage;
     private final Server server;
     private final Titles titles;
-    private final BooleanSupplier enabled;
+    private final TeleportSettings settings;
+    private final Scheduler scheduler;
 
-    public TeleportArrivalHud(Messages messages, Server server, BooleanSupplier enabled) {
+    public TeleportArrivalHud(Messages messages, Server server, TeleportSettings settings, Scheduler scheduler) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.server = Objects.requireNonNull(server, "server");
-        this.enabled = Objects.requireNonNull(enabled, "enabled");
+        this.settings = Objects.requireNonNull(settings, "settings");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.miniMessage = MiniMessage.miniMessage();
         this.titles = new Titles();
     }
 
-    /** Show the arrival title to {@code who} for a {@code kind} teleport, if enabled and the kind announces. */
+    /** Show the arrival messages/titles to {@code who} for a {@code kind} teleport if enabled. */
     public void arrived(PlayerRef who, TeleportKind kind) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kind, "kind");
-        if (!enabled.getAsBoolean() || !announces(kind)) {
+        if (!settings.arrivalTitle()) {
             return;
         }
         @Nullable Player player = server.getPlayer(who.uuid());
         if (player == null || !player.isOnline()) {
             return;
         }
-        Component title = miniMessage.deserialize(messages.resolve(who, TeleportMessageKey.ARRIVED_TITLE, Map.of()));
-        titles.show(player, title, Component.empty(), FADE_IN, STAY, FADE_OUT);
+
+        Component titleComp = Component.empty();
+        Component subtitleComp = Component.empty();
+        boolean hasTitle = false;
+        boolean hasSubtitle = false;
+        int titleFadeIn = 150;
+        int titleStay = 700;
+        int titleFadeOut = 300;
+
+        java.util.List<String> tokens = settings.getArrivalMessages(kind);
+        for (String token : tokens) {
+            if (token == null || token.isBlank()) {
+                continue;
+            }
+            ArrivalMessage msg = parse(token);
+            if (msg.message().isBlank()) {
+                continue;
+            }
+
+            Component component;
+            if (msg.message().equals(TeleportMessageKey.ARRIVED_TITLE.key())) {
+                component = miniMessage.deserialize(messages.resolve(who, TeleportMessageKey.ARRIVED_TITLE, Map.of()));
+            } else if (msg.message().contains(".")
+                    && !msg.message().contains(" ")
+                    && !msg.message().contains("<")) {
+                component = miniMessage.deserialize(messages.resolve(who, msg::message, Map.of()));
+            } else {
+                component = miniMessage.deserialize(msg.message());
+            }
+
+            switch (msg.type()) {
+                case "TITLE" -> {
+                    titleComp = component;
+                    hasTitle = true;
+                    titleFadeIn = msg.fadeInMs();
+                    titleStay = msg.stayMs();
+                    titleFadeOut = msg.fadeOutMs();
+                }
+                case "SUBTITLE" -> {
+                    subtitleComp = component;
+                    hasSubtitle = true;
+                    if (!hasTitle) {
+                        titleFadeIn = msg.fadeInMs();
+                        titleStay = msg.stayMs();
+                        titleFadeOut = msg.fadeOutMs();
+                    }
+                }
+                case "ACTION_BAR" -> player.sendActionBar(component);
+                case "CHAT" -> player.sendMessage(component);
+                case "BOSS_BAR" -> {
+                    net.kyori.adventure.bossbar.BossBar bar = net.kyori.adventure.bossbar.BossBar.bossBar(
+                            component,
+                            1.0f,
+                            net.kyori.adventure.bossbar.BossBar.Color.PURPLE,
+                            net.kyori.adventure.bossbar.BossBar.Overlay.PROGRESS);
+                    player.showBossBar(bar);
+                    scheduler.asyncAfter(Duration.ofSeconds(msg.durationSecs()), () -> {
+                        scheduler.onEntity(who, () -> {
+                            Player live = server.getPlayer(who.uuid());
+                            if (live != null && live.isOnline()) {
+                                live.hideBossBar(bar);
+                            }
+                        });
+                    });
+                }
+                default -> player.sendMessage(component);
+            }
+        }
+
+        if (hasTitle || hasSubtitle) {
+            titles.show(
+                    player,
+                    titleComp,
+                    subtitleComp,
+                    Duration.ofMillis(titleFadeIn),
+                    Duration.ofMillis(titleStay),
+                    Duration.ofMillis(titleFadeOut));
+        }
     }
 
-    private static boolean announces(TeleportKind kind) {
-        return kind != TeleportKind.RESPAWN && kind != TeleportKind.ADMIN;
+    private static int parseIntOrDefault(String value, int defaultValue) {
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException expected) {
+            // Ignored, fallback to default value
+            return defaultValue;
+        }
     }
+
+    private static ArrivalMessage parse(String token) {
+        String[] parts = token.split(";", -1);
+        String type = parts[0].trim().toUpperCase(java.util.Locale.ROOT);
+        String message = parts.length > 1 ? parts[1] : "";
+        int fadeIn = 150;
+        int stay = 700;
+        int fadeOut = 300;
+        int duration = 3;
+
+        if (type.equals("TITLE") || type.equals("SUBTITLE")) {
+            if (parts.length > 2) {
+                fadeIn = parseIntOrDefault(parts[2], fadeIn);
+            }
+            if (parts.length > 3) {
+                stay = parseIntOrDefault(parts[3], stay);
+            }
+            if (parts.length > 4) {
+                fadeOut = parseIntOrDefault(parts[4], fadeOut);
+            }
+        } else if (type.equals("BOSS_BAR")) {
+            if (parts.length > 2) {
+                duration = parseIntOrDefault(parts[2], duration);
+            }
+        }
+        return new ArrivalMessage(type, message, fadeIn, stay, fadeOut, duration);
+    }
+
+    private record ArrivalMessage(
+            String type, String message, int fadeInMs, int stayMs, int fadeOutMs, int durationSecs) {}
 }

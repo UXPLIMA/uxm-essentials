@@ -112,6 +112,33 @@ class EcoAdminTest {
     }
 
     @Test
+    void giveRandomRangeCreditsAnExactAmountWithinTheRange() {
+        Money min = Money.of(Currencies.COINS, 10);
+        Money max = Money.of(Currencies.COINS, 100);
+
+        for (int i = 0; i < 200; i++) {
+            PlayerRef who = new PlayerRef(UUID.randomUUID(), "T" + i);
+            Money credited = admin.giveRandomRange(operator, who, min, max).orElseThrow();
+
+            assertThat(credited.amount()).isGreaterThanOrEqualTo(min.amount());
+            assertThat(credited.amount()).isLessThanOrEqualTo(max.amount());
+            // The credited figure is normalised to the currency precision (no double drift).
+            assertThat(credited.amount().scale()).isEqualTo(Currencies.COINS.precision());
+            assertThat(repo.findByOwner(who).orElseThrow().balanceOf(Currencies.COINS))
+                    .isEqualTo(credited);
+        }
+    }
+
+    @Test
+    void giveRandomRangeWithEqualBoundsCreditsExactlyThatAmount() {
+        Money exact = Money.of(Currencies.COINS, 42);
+
+        Money credited = admin.giveRandomRange(operator, target, exact, exact).orElseThrow();
+
+        assertThat(credited).isEqualTo(exact);
+    }
+
+    @Test
     void giveToNeverJoinedTargetMaterialisesTheirRow() {
         PlayerRef ghost = new PlayerRef(UUID.randomUUID(), "Ghost");
 

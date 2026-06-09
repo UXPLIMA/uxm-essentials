@@ -8,12 +8,29 @@ import java.util.Optional;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.command.EconomyCommands;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankMembersView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.ExchangeGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmationView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BankChatPromptListener;
+import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteListener;
+import com.uxplima.uxmessentials.economy.adapter.inbound.listener.CommandCostListener;
+import com.uxplima.uxmessentials.economy.adapter.inbound.listener.LoanChatPromptListener;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
+import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitInventoryCalculations;
 import com.uxplima.uxmessentials.economy.adapter.outbound.EconomyProviderRegistrar;
+import com.uxplima.uxmessentials.economy.adapter.outbound.LoanRepaymentTask;
 import com.uxplima.uxmessentials.economy.adapter.outbound.LoggingEconomyAudit;
 import com.uxplima.uxmessentials.economy.adapter.outbound.PermissionBaltopExemption;
+import com.uxplima.uxmessentials.economy.adapter.outbound.PhysicalWalletRepositoryDecorator;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderKitEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderWarpEconomy;
+import com.uxplima.uxmessentials.economy.adapter.outbound.SalaryTask;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SchedulerPendingPayRegistry;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SnapshotBaltopProvider;
 import com.uxplima.uxmessentials.economy.application.AmountFormat;
@@ -22,6 +39,7 @@ import com.uxplima.uxmessentials.economy.application.Balance;
 import com.uxplima.uxmessentials.economy.application.CombiningWorthSource;
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
+import com.uxplima.uxmessentials.economy.application.ExchangeService;
 import com.uxplima.uxmessentials.economy.application.LookupWorth;
 import com.uxplima.uxmessentials.economy.application.NativeEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.Pay;
@@ -37,12 +55,16 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
 import com.uxplima.uxmessentials.economy.application.port.PendingPayRegistry;
+import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.application.port.WorthOverrideStore;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
+import com.uxplima.uxmessentials.persistence.economy.LockingWalletRepository;
+import com.uxplima.uxmessentials.persistence.economy.RedisWalletSync;
+import com.uxplima.uxmessentials.persistence.economy.StripedLock;
 import com.uxplima.uxmessentials.persistence.economy.WalletLedger;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -85,19 +107,65 @@ public final class EconomyWiring {
         Clock clock = Clock.systemUTC();
 
         // The cached repository is the offline-read accelerator and the cache the bus invalidates on a remote
-        // change; the broadcasting decorator wraps it so this backend's balance writes notify peers. The ledger
-        // (settle writer + telemetry) is built over the wrapped repository so a coalesced settle also announces.
+        // change; the broadcasting decorator wraps it so this backend's balance writes notify peers.
         CachedWalletRepository cached = WalletRepositories.cachedConcrete(persistence, currencies, clock);
         bus.registry().register(WalletSync.listener(cached));
+
+        // Cross-server invalidation: the optional Redis sync drops a peer's cached owner; the in-house bus
+        // (WalletSync, below) does the same over its own transport. Both are pure cache-invalidation paths —
+        // money safety is the jOOQ guarded UPDATE, never a JVM or Redis lock.
+        StripedLock stripedLock = new StripedLock(256);
+        boolean redisEnabled = ctx.config().getBoolean("redis.enabled", false);
+        final @org.jspecify.annotations.Nullable RedisWalletSync redisSync;
+        if (redisEnabled) {
+            String redisHost = ctx.config().getString("redis.host", "localhost");
+            int redisPort = ctx.config().getInt("redis.port", 6379);
+            String redisPassword = ctx.config().getString("redis.password", "");
+            String redisChannel = ctx.config().getString("redis.channel", "uxmessentials:economy");
+            redisSync = new RedisWalletSync(
+                    cached, redisHost, redisPort, redisPassword, redisChannel, kernel.scheduler(), kernel.log());
+            redisSync.start();
+        } else {
+            redisSync = null;
+        }
+
+        // Decorator chain: JooqWalletRepository -> CachedWalletRepository -> locking (Redis-invalidation
+        // broadcaster) -> in-house bus WalletSync broadcaster. The locking layer broadcasts the Redis
+        // invalidate; the bus layer broadcasts the in-house frame. Neither holds a lock across any I/O.
+        WalletRepository locking = new LockingWalletRepository(cached, stripedLock, redisSync);
+        WalletRepository repository = WalletSync.repository(locking, bus.publisher());
+
         WalletLedger ledger = WalletRepositories.ledgerOver(
-                WalletSync.repository(cached, bus.publisher()),
+                repository,
                 persistence,
                 kernel.scheduler(),
                 kernel.log(),
                 settings.writeDebounce(),
                 settings.batchFlush());
-        EconomyProvider resolved = resolveProvider(plugin, kernel, settings, currencies, ledger.repository(), clock);
-        return assemble(plugin, ctx, persistence, settings, currencies, ledger, resolved);
+
+        PendingTransactionRepository pendingRepo = WalletRepositories.pendingTransactionRepository(persistence);
+        BukkitInventoryCalculations calculations = new BukkitInventoryCalculations();
+        WalletRepository decoratedRepository = new PhysicalWalletRepositoryDecorator(
+                ledger.repository(),
+                pendingRepo,
+                calculations,
+                currencies,
+                kernel.scheduler(),
+                kernel.playerLookup(),
+                kernel.log());
+
+        EconomyProvider resolved = resolveProvider(plugin, kernel, settings, currencies, decoratedRepository, clock);
+        return assemble(
+                plugin,
+                ctx,
+                persistence,
+                settings,
+                currencies,
+                ledger,
+                resolved,
+                redisSync,
+                decoratedRepository,
+                pendingRepo);
     }
 
     private static EconomyProvider resolveProvider(
@@ -129,18 +197,97 @@ public final class EconomyWiring {
             EconomyConfig settings,
             CurrencyRegistry currencies,
             WalletLedger ledger,
-            EconomyProvider resolved) {
+            EconomyProvider resolved,
+            @org.jspecify.annotations.Nullable RedisWalletSync redisSync,
+            WalletRepository repository,
+            PendingTransactionRepository pendingRepo) {
         KernelPorts kernel = ctx.kernel();
         BaltopExemption exemption = new PermissionBaltopExemption(kernel.permissions(), settings.baltopExemptNode());
         BaltopSnapshots snapshots = new BaltopSnapshots(
                 resolved, exemption, kernel.scheduler(), settings.baltopCacheTtl(), settings.baltopCapacity());
-        EconomyServices services =
-                useCases(persistence, kernel, settings, currencies, ledger.repository(), resolved, snapshots);
-        List<CommandRegistration> commands = EconomyCommands.all(services, kernel.messages());
+
+        com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener chatPromptListener =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener(
+                        kernel.messages());
+
+        BankChatPromptListener bankChatPromptListener = new BankChatPromptListener(kernel.messages());
+        LoanChatPromptListener loanChatPromptListener = new LoanChatPromptListener(kernel.messages());
+
+        // GUI geometry is operator-editable in modules/economy/gui/*.conf; titles and labels stay in the catalog.
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts guiLayouts =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(
+                        plugin.getDataFolder().toPath(), kernel.log());
+
+        EconomyServices services = useCases(
+                plugin,
+                persistence,
+                kernel,
+                settings,
+                currencies,
+                repository,
+                resolved,
+                snapshots,
+                ledger.telemetry(),
+                chatPromptListener,
+                bankChatPromptListener,
+                loanChatPromptListener,
+                guiLayouts);
+        List<CommandRegistration> commands = EconomyCommands.all(plugin, settings, services, kernel.messages());
         WarpEconomy warpEconomy = new ProviderWarpEconomy(resolved, currencies.defaultCurrency());
         KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency());
+
+        java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
+        listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
+                resolved, pendingRepo, services.notifier(), kernel.scheduler()));
+
+        if (settings.commandCostsEnabled()) {
+            listenersList.add(new CommandCostListener(
+                    resolved, settings.commandCosts(), currencies.defaultCurrency(), services.notifier()));
+        }
+        if (settings.banknotesEnabled()) {
+            listenersList.add(new BanknoteListener(services.banknoteRedeemer()));
+        }
+        if (settings.exchangeEnabled()) {
+            listenersList.add(chatPromptListener);
+        }
+        if (settings.bankEnabled()) {
+            listenersList.add(bankChatPromptListener);
+        }
+        if (settings.loansEnabled()) {
+            listenersList.add(loanChatPromptListener);
+        }
+        List<org.bukkit.event.Listener> listeners = List.copyOf(listenersList);
+
+        com.uxplima.uxmessentials.economy.adapter.outbound.SalaryTask salaryTask =
+                new com.uxplima.uxmessentials.economy.adapter.outbound.SalaryTask(
+                        plugin,
+                        kernel.scheduler(),
+                        resolved,
+                        kernel.permissions(),
+                        services.notifier(),
+                        currencies.defaultCurrency(),
+                        settings.salaryEnabled(),
+                        settings.salaryInterval(),
+                        settings.salaryDefaultAmount());
+
+        com.uxplima.uxmessentials.economy.adapter.outbound.LoanRepaymentTask loanRepaymentTask =
+                new com.uxplima.uxmessentials.economy.adapter.outbound.LoanRepaymentTask(
+                        kernel.scheduler(),
+                        services.loanService(),
+                        kernel.log(),
+                        settings.loansEnabled(),
+                        settings.loanSweepInterval());
+
+        // Clears every pending chat prompt on stop so a leftover callback can never fire after teardown.
+        Runnable promptCleanup = () -> {
+            chatPromptListener.clear();
+            bankChatPromptListener.clear();
+            loanChatPromptListener.clear();
+        };
+
         return new Wired(
                 commands,
+                listeners,
                 warpEconomy,
                 kitEconomy,
                 ledger,
@@ -149,20 +296,40 @@ public final class EconomyWiring {
                 plugin,
                 settings.registerProvider(),
                 currencies.defaultCurrency(),
-                settings.amountFormat());
+                settings.amountFormat(),
+                redisSync,
+                salaryTask,
+                loanRepaymentTask,
+                promptCleanup);
     }
 
     private static EconomyServices useCases(
+            Plugin plugin,
             Persistence persistence,
             KernelPorts kernel,
             EconomyConfig settings,
             CurrencyRegistry currencies,
             WalletRepository repository,
             EconomyProvider resolved,
-            BaltopSnapshots snapshots) {
+            BaltopSnapshots snapshots,
+            com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
+            com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener chatPromptListener,
+            BankChatPromptListener bankChatPromptListener,
+            LoanChatPromptListener loanChatPromptListener,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts guiLayouts) {
         EconomyNotifier notifier =
                 new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat());
-        EconomyAudit audit = new LoggingEconomyAudit(kernel.log());
+
+        EconomyAudit baseAudit = new LoggingEconomyAudit(kernel.log());
+        EconomyAudit audit = new com.uxplima.uxmessentials.economy.adapter.outbound.FraudDetector(
+                baseAudit,
+                kernel.log(),
+                settings.fraudEnabled(),
+                settings.fraudWebhookUrl(),
+                settings.fraudSingleLimit(),
+                settings.fraudVelocitySeconds(),
+                settings.fraudVelocityLimit());
+
         PayPreferences preferences = WalletRepositories.payPreferences(persistence, settings.payToggleDefault());
         PendingPayRegistry pending =
                 new SchedulerPendingPayRegistry(kernel.scheduler(), kernel.log(), settings.confirmTimeout());
@@ -170,25 +337,133 @@ public final class EconomyWiring {
         EconomyProvider baltopProvider = new SnapshotBaltopProvider(resolved, snapshots);
         WorthTable configWorth = settings.worthTable();
         WorthOverrideStore worthOverrides = WalletRepositories.worthOverrideStore(persistence);
-        WorthSource worth = new CombiningWorthSource(worthOverrides, configWorth);
+        WorthSource worth = new CombiningWorthSource(
+                worthOverrides, configWorth, currencies.defaultCurrency().id().value());
         Currency defaultCurrency = currencies.defaultCurrency();
         Pay pay = new Pay(resolved, preferences, pending, notifier, clock);
+
+        ExchangeService exchangeService = new ExchangeService(resolved, settings.exchangeRegistry());
+
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout logsLayout = guiLayouts.load(
+                "economy",
+                "transaction-logs",
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.paginatedDefault(
+                        org.bukkit.Material.PAPER));
+        TransactionsHistoryView historyView =
+                new TransactionsHistoryView(history, kernel.scheduler(), kernel.messages(), logsLayout);
+        PayConfirmationView payConfirmationView = new PayConfirmationView(pay, kernel.scheduler(), kernel.messages());
+        BaltopGuiView baltopGuiView = new BaltopGuiView(snapshots, kernel.scheduler(), notifier, kernel.messages());
+        WalletGuiView walletGuiView = new WalletGuiView(
+                plugin, resolved, kernel.scheduler(), notifier, kernel.messages(), historyView, kernel.log());
+        ExchangeGuiView exchangeView = new ExchangeGuiView(
+                plugin, resolved, exchangeService, kernel.scheduler(), notifier, kernel.messages(), chatPromptListener);
+
+        com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore =
+                com.uxplima.uxmessentials.persistence.economy.WalletRepositories.banknoteStore(persistence);
+        com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteRedeemer banknoteRedeemer =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteRedeemer(
+                        plugin, resolved, notifier, banknoteStore, kernel.log());
+        com.uxplima.uxmessentials.economy.application.port.BankRepository bankRepo =
+                com.uxplima.uxmessentials.persistence.economy.WalletRepositories.bankRepository(
+                        persistence, currencies, clock);
+        com.uxplima.uxmessentials.economy.application.port.LoanRepository loanRepo =
+                com.uxplima.uxmessentials.persistence.economy.WalletRepositories.loanRepository(
+                        persistence, currencies, clock);
+        com.uxplima.uxmessentials.persistence.economy.EconomyBackupManager backupManager =
+                com.uxplima.uxmessentials.persistence.economy.WalletRepositories.backupManager(
+                        persistence, repository, currencies, plugin.getDataFolder());
+
+        // Loans and banks are native-ledger features: their atomic wallet legs run through the wallet
+        // repository this context owns, so they are available only when the resolved provider is the native
+        // ledger (a foreign economy holds balances we cannot move atomically here).
+        boolean nativeLedger = resolved instanceof NativeEconomyProvider;
+        com.uxplima.uxmessentials.economy.application.BankService bankService =
+                new com.uxplima.uxmessentials.economy.application.BankService(
+                        bankRepo, history, kernel.events(), clock, nativeLedger);
+        com.uxplima.uxmessentials.economy.application.LoanService loanService =
+                new com.uxplima.uxmessentials.economy.application.LoanService(
+                        loanRepo, settings.loanPolicy(), kernel.events(), clock, nativeLedger);
+
+        com.uxplima.uxmessentials.economy.application.port.EconomyMigrator migrator =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.command.BukkitEconomyMigrator(
+                        plugin, resolved, defaultCurrency);
+
+        // The three bank menus open each other, so they cannot all be constructed before the navigation router
+        // that links them. A holder supplies the router once it is built; each view holds the supplier as a
+        // final field and dereferences it only on a click, keeping the cross-links constructor-injected and
+        // non-null (no post-construction setters).
+        java.util.concurrent.atomic.AtomicReference<
+                        com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation>
+                navigationHolder = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.function.Supplier<com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation> navigation =
+                () -> Objects.requireNonNull(navigationHolder.get(), "bank navigation not yet wired");
+
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout bankListLayout = guiLayouts.load(
+                "economy",
+                "bank-list",
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.paginatedDefault(
+                        org.bukkit.Material.CHEST));
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout bankMembersLayout = guiLayouts.load(
+                "economy",
+                "bank-members",
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.paginatedDefault(
+                        org.bukkit.Material.PLAYER_HEAD));
+
+        BankGuiView bankGuiView = new BankGuiView(
+                bankService,
+                currencies,
+                bankChatPromptListener,
+                kernel.scheduler(),
+                kernel.messages(),
+                navigation,
+                bankListLayout);
+        BankActionsView bankActionsView = new BankActionsView(
+                bankService, bankChatPromptListener, kernel.scheduler(), kernel.messages(), historyView, navigation);
+        BankMembersView bankMembersView = new BankMembersView(
+                bankService,
+                bankChatPromptListener,
+                kernel.scheduler(),
+                kernel.playerLookup(),
+                kernel.messages(),
+                navigation,
+                bankMembersLayout);
+        navigationHolder.set(new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation(
+                bankGuiView, bankActionsView, bankMembersView));
+        LoanGuiView loanGuiView =
+                new LoanGuiView(loanService, currencies, loanChatPromptListener, kernel.scheduler(), kernel.messages());
+
         return new EconomyServices(
                 new Balance(resolved, notifier),
                 pay,
                 new PayAll(pay, notifier),
                 new PayToggle(preferences, notifier),
                 new BalTop(baltopProvider, notifier, settings.baltopPageSize()),
-                new LookupWorth(worth, notifier, defaultCurrency),
-                new SellItem(resolved, worth, notifier, defaultCurrency),
-                new SellAll(resolved, worth, notifier, defaultCurrency),
+                new LookupWorth(worth, notifier, defaultCurrency, currencies.all()),
+                new SellItem(resolved, worth, notifier, defaultCurrency, currencies.all()),
+                new SellAll(resolved, worth, notifier, defaultCurrency, currencies.all()),
                 new SetWorth(worthOverrides, notifier, audit, defaultCurrency),
                 new EcoAdmin(resolved, repository, audit, notifier),
+                exchangeService,
                 currencies,
                 snapshots,
                 kernel.scheduler(),
                 kernel.playerLookup(),
-                notifier);
+                notifier,
+                history,
+                historyView,
+                payConfirmationView,
+                baltopGuiView,
+                walletGuiView,
+                exchangeView,
+                resolved,
+                banknoteStore,
+                banknoteRedeemer,
+                bankService,
+                loanService,
+                backupManager,
+                migrator,
+                bankGuiView,
+                loanGuiView);
     }
 
     /**
@@ -209,6 +484,7 @@ public final class EconomyWiring {
      */
     public record Wired(
             List<CommandRegistration> commands,
+            List<org.bukkit.event.Listener> listeners,
             WarpEconomy warpEconomy,
             KitEconomy kitEconomy,
             WalletLedger ledger,
@@ -217,10 +493,15 @@ public final class EconomyWiring {
             Plugin plugin,
             boolean registered,
             Currency defaultCurrency,
-            AmountFormat amountFormat) {
+            AmountFormat amountFormat,
+            @org.jspecify.annotations.Nullable RedisWalletSync redisSync,
+            @org.jspecify.annotations.Nullable SalaryTask salaryTask,
+            @org.jspecify.annotations.Nullable LoanRepaymentTask loanRepaymentTask,
+            Runnable promptCleanup) {
 
         public Wired {
             commands = List.copyOf(commands);
+            listeners = List.copyOf(listeners);
             Objects.requireNonNull(warpEconomy, "warpEconomy");
             Objects.requireNonNull(kitEconomy, "kitEconomy");
             Objects.requireNonNull(ledger, "ledger");
@@ -229,16 +510,33 @@ public final class EconomyWiring {
             Objects.requireNonNull(plugin, "plugin");
             Objects.requireNonNull(defaultCurrency, "defaultCurrency");
             Objects.requireNonNull(amountFormat, "amountFormat");
+            Objects.requireNonNull(promptCleanup, "promptCleanup");
         }
 
         /** Arm the settle, telemetry, and baltop-refresh loops. Called once after the module starts. */
         public void start() {
             ledger.start();
             snapshots.start();
+            if (salaryTask != null) {
+                salaryTask.start();
+            }
+            if (loanRepaymentTask != null) {
+                loanRepaymentTask.start();
+            }
         }
 
         /** Drain the queues, stop the loops, and drop this plugin's provider registration. */
         public void stop() {
+            promptCleanup.run();
+            if (loanRepaymentTask != null) {
+                loanRepaymentTask.stop();
+            }
+            if (salaryTask != null) {
+                salaryTask.stop();
+            }
+            if (redisSync != null) {
+                redisSync.stop();
+            }
             snapshots.stop();
             ledger.stop();
             if (registered) {

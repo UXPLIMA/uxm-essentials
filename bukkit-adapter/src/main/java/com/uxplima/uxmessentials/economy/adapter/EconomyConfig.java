@@ -10,10 +10,14 @@ import java.util.Objects;
 import org.bukkit.plugin.ServicePriority;
 
 import com.uxplima.uxmessentials.economy.application.AmountFormat;
+import com.uxplima.uxmessentials.economy.application.Worth;
 import com.uxplima.uxmessentials.economy.application.WorthTable;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.economy.domain.Denomination;
+import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
+import com.uxplima.uxmessentials.economy.domain.ExchangeRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
@@ -39,23 +43,78 @@ public final class EconomyConfig {
         this.config = Objects.requireNonNull(config, "config");
     }
 
-    /** Build the closed currency registry; ships a single configured default out of the box. */
+    /** Build the closed currency registry by loading all configured currencies. */
     public CurrencyRegistry currencies() {
         CurrencyId defaultId = CurrencyId.of(config.getString("wallet.default-currency", "coins"));
-        Currency.Builder builder = Currency.builder(defaultId)
-                .symbol(config.getString("currencies." + defaultId.value() + ".symbol", "$"))
-                .plural(config.getString("currencies." + defaultId.value() + ".plural", defaultId.value()))
-                .format(config.getString("currencies." + defaultId.value() + ".format", "#,##0.00"))
-                .precision(config.getInt("currencies." + defaultId.value() + ".precision", 2))
-                .starting(decimal("currencies." + defaultId.value() + ".starting", "wallet.starting-balance", "0"))
-                .min(decimal("currencies." + defaultId.value() + ".min-balance", "wallet.min-balance", "0"))
-                .max(decimal("currencies." + defaultId.value() + ".max-balance", "wallet.max-balance", "1000000000000"))
-                .minPay(decimal("currencies." + defaultId.value() + ".min-pay", "pay.min-pay", "0.01"));
-        BigDecimal confirm = optionalConfirmThreshold(defaultId);
-        if (confirm != null) {
-            builder.confirmThreshold(confirm);
+        List<String> keys = config.getKeys("currencies");
+        if (keys.isEmpty()) {
+            keys = List.of(defaultId.value());
         }
-        return CurrencyRegistry.single(builder.build());
+        List<Currency> list = new java.util.ArrayList<>();
+        for (String key : keys) {
+            CurrencyId id = CurrencyId.of(key);
+            Currency.Builder builder = Currency.builder(id)
+                    .symbol(config.getString("currencies." + key + ".symbol", "$"))
+                    .plural(config.getString("currencies." + key + ".plural", key))
+                    .format(config.getString("currencies." + key + ".format", "#,##0.00"))
+                    .precision(config.getInt("currencies." + key + ".precision", 2))
+                    .starting(decimal("currencies." + key + ".starting", "wallet.starting-balance", "0"))
+                    .min(decimal("currencies." + key + ".min-balance", "wallet.min-balance", "0"))
+                    .max(decimal("currencies." + key + ".max-balance", "wallet.max-balance", "1000000000000"))
+                    .minPay(decimal("currencies." + key + ".min-pay", "pay.min-pay", "0.01"));
+            BigDecimal confirm = optionalConfirmThreshold(id);
+            if (confirm != null) {
+                builder.confirmThreshold(confirm);
+            }
+
+            boolean physical = config.getBoolean("currencies." + key + ".physical", false);
+            builder.physical(physical);
+
+            if (physical) {
+                java.util.List<Denomination> denominations = new java.util.ArrayList<>();
+                for (String denomKey : config.getKeys("currencies." + key + ".denominations")) {
+                    String pathPrefix = "currencies." + key + ".denominations." + denomKey;
+                    BigDecimal val = new BigDecimal(
+                            config.getString(pathPrefix + ".value", "1").strip());
+                    String material = config.getString(pathPrefix + ".material", "EMERALD");
+                    String displayName = config.getString(pathPrefix + ".display-name", denomKey);
+                    int customModelDataVal = config.getInt(pathPrefix + ".custom-model-data", -1);
+                    Integer customModelData = customModelDataVal >= 0 ? customModelDataVal : null;
+
+                    denominations.add(new Denomination(val, material, displayName, customModelData));
+                }
+                builder.denominations(denominations);
+            }
+
+            list.add(builder.build());
+        }
+        return CurrencyRegistry.of(list, defaultId);
+    }
+
+    /** Parses all active exchange rates configured under the exchange.rates section. */
+    public ExchangeRegistry exchangeRegistry() {
+        List<ExchangeRate> rates = new java.util.ArrayList<>();
+        for (String token : config.getStringList("exchange.rates", List.of())) {
+            parseExchangeRate(token).ifPresent(rates::add);
+        }
+        return new ExchangeRegistry(rates);
+    }
+
+    private static java.util.Optional<ExchangeRate> parseExchangeRate(String token) {
+        List<String> parts = com.google.common.base.Splitter.on(':').splitToList(token);
+        if (parts.size() < 3 || parts.size() > 4) {
+            return java.util.Optional.empty();
+        }
+        try {
+            CurrencyId source = CurrencyId.of(parts.get(0).strip());
+            CurrencyId target = CurrencyId.of(parts.get(1).strip());
+            BigDecimal rate = new BigDecimal(parts.get(2).strip());
+            BigDecimal feePercent =
+                    parts.size() == 4 ? new BigDecimal(parts.get(3).strip()) : BigDecimal.ZERO;
+            return java.util.Optional.of(new ExchangeRate(source, target, rate, feePercent));
+        } catch (Exception ignored) {
+            return java.util.Optional.empty();
+        }
     }
 
     /**
@@ -65,14 +124,15 @@ public final class EconomyConfig {
      * every material reads as not-sellable.
      */
     public WorthTable worthTable() {
-        Map<String, BigDecimal> prices = new HashMap<>();
+        String defaultCurrency = config.getString("wallet.default-currency", "coins");
+        Map<String, Worth> prices = new HashMap<>();
         for (String token : config.getStringList("worth.items", List.of())) {
-            parseWorth(token).ifPresent(entry -> prices.put(entry.material(), entry.price()));
+            parseWorth(token, defaultCurrency).ifPresent(entry -> prices.put(entry.material(), entry.worth()));
         }
         return new WorthTable(prices);
     }
 
-    private static java.util.Optional<WorthEntry> parseWorth(String token) {
+    private static java.util.Optional<WorthEntry> parseWorth(String token, String defaultCurrency) {
         int split = token.lastIndexOf(':');
         if (split <= 0 || split == token.length() - 1) {
             return java.util.Optional.empty();
@@ -82,16 +142,26 @@ public final class EconomyConfig {
             return java.util.Optional.empty();
         }
         try {
-            BigDecimal price = new BigDecimal(token.substring(split + 1).strip());
-            return price.signum() <= 0
-                    ? java.util.Optional.empty()
-                    : java.util.Optional.of(new WorthEntry(material, price));
-        } catch (NumberFormatException notANumber) {
+            String worthPart = token.substring(split + 1).strip();
+            java.util.List<String> parts = com.google.common.base.Splitter.on(' ')
+                    .omitEmptyStrings()
+                    .trimResults()
+                    .splitToList(worthPart);
+            if (parts.isEmpty()) {
+                return java.util.Optional.empty();
+            }
+            BigDecimal amount = new BigDecimal(parts.get(0));
+            if (amount.signum() <= 0) {
+                return java.util.Optional.empty();
+            }
+            String currency = parts.size() > 1 ? parts.get(1).toLowerCase(java.util.Locale.ROOT) : defaultCurrency;
+            return java.util.Optional.of(new WorthEntry(material, Worth.of(amount, currency)));
+        } catch (Exception notANumber) {
             return java.util.Optional.empty();
         }
     }
 
-    private record WorthEntry(String material, BigDecimal price) {}
+    private record WorthEntry(String material, Worth worth) {}
 
     /** The {@code ServicePriority} the native provider registers at; {@code Normal} unless raised on purpose. */
     public ServicePriority registerPriority() {
@@ -184,5 +254,173 @@ public final class EconomyConfig {
     private static String capitalise(String value) {
         String trimmed = value.strip();
         return trimmed.isEmpty() ? trimmed : Character.toUpperCase(trimmed.charAt(0)) + trimmed.substring(1);
+    }
+
+    /** Whether banknotes (/withdraw, /deposit) are enabled. */
+    public boolean banknotesEnabled() {
+        return config.getBoolean("banknotes.enabled", true);
+    }
+
+    /** Whether virtual bank accounts (/bank) are enabled. */
+    public boolean bankEnabled() {
+        return config.getBoolean("bank.enabled", true);
+    }
+
+    /** Whether the loan and debt system (/loan) is enabled. */
+    public boolean loansEnabled() {
+        return config.getBoolean("loans.enabled", true);
+    }
+
+    /** How often the background sweep applies due auto-repayments; floored at one minute. */
+    public Duration loanSweepInterval() {
+        return Duration.ofSeconds(Math.max(60L, config.getLong("loans.auto-repay-sweep-seconds", 600L)));
+    }
+
+    /**
+     * The operator-tunable loan economics. Every decimal is built from its configured string so no figure
+     * passes through a {@code double}; a malformed entry falls back to the shipped default for that field.
+     */
+    public com.uxplima.uxmessentials.economy.application.LoanPolicy loanPolicy() {
+        com.uxplima.uxmessentials.economy.application.LoanPolicy defaults =
+                com.uxplima.uxmessentials.economy.application.LoanPolicy.defaults();
+        BigDecimal limitMultiplier = bigDecimal("loans.limit-multiplier", defaults.limitMultiplier());
+        BigDecimal interestMax = bigDecimal("loans.interest-max", defaults.interestMax());
+        BigDecimal interestSpan = bigDecimal("loans.interest-span", defaults.interestSpan());
+        long cycleHours = Math.max(1L, config.getLong("loans.installment-cycle-hours", 24L));
+        int onTimeManual = config.getInt("loans.score-on-time-manual", defaults.onTimeManualDelta());
+        int onTimeAuto = config.getInt("loans.score-on-time-auto", defaults.onTimeAutoDelta());
+        int missed = config.getInt("loans.score-missed", defaults.missedDelta());
+        int scoreFloor = Math.max(0, config.getInt("loans.score-floor", defaults.scoreFloor()));
+        int scoreCeiling = Math.max(scoreFloor, config.getInt("loans.score-ceiling", defaults.scoreCeiling()));
+        return new com.uxplima.uxmessentials.economy.application.LoanPolicy(
+                limitMultiplier,
+                interestMax,
+                interestSpan,
+                java.time.Duration.ofHours(cycleHours),
+                onTimeManual,
+                onTimeAuto,
+                missed,
+                scoreFloor,
+                scoreCeiling);
+    }
+
+    private BigDecimal bigDecimal(String path, BigDecimal fallback) {
+        String raw = config.getString(path, "").strip();
+        if (raw.isEmpty()) {
+            return fallback;
+        }
+        try {
+            return new BigDecimal(raw);
+        } catch (NumberFormatException notANumber) {
+            return fallback;
+        }
+    }
+
+    /** Whether the currency exchange system (/exchange) is enabled. */
+    public boolean exchangeEnabled() {
+        return config.getBoolean("exchange.enabled", true);
+    }
+
+    /** Whether item worth and selling (/worth, /sell, /sellall, /setworth) is enabled. */
+    public boolean worthEnabled() {
+        return config.getBoolean("worth.enabled", true);
+    }
+
+    /** Whether command costs are enabled. */
+    public boolean commandCostsEnabled() {
+        return config.getBoolean("command-costs-enabled", true);
+    }
+
+    /** Whether the salary task is enabled. */
+    public boolean salaryEnabled() {
+        return config.getBoolean("salary.enabled", false);
+    }
+
+    /** The interval between automatic salaries. */
+    public java.time.Duration salaryInterval() {
+        long seconds = config.getLong("salary.interval-seconds", 3600L);
+        return java.time.Duration.ofSeconds(Math.max(1L, seconds));
+    }
+
+    /** The default salary amount. */
+    public long salaryDefaultAmount() {
+        return Math.max(0L, config.getLong("salary.default-amount", 100L));
+    }
+
+    /** Whether fraud detection is enabled. */
+    public boolean fraudEnabled() {
+        return config.getBoolean("fraud-detection.enabled", false);
+    }
+
+    /** Webhook URL for fraud alerts. */
+    public String fraudWebhookUrl() {
+        return config.getString("fraud-detection.webhook-url", "");
+    }
+
+    /** The limit above which a single transaction triggers a fraud alert. */
+    public BigDecimal fraudSingleLimit() {
+        try {
+            return new BigDecimal(
+                    config.getString("fraud-detection.single-limit", "1000000").strip());
+        } catch (NumberFormatException e) {
+            return new BigDecimal("1000000");
+        }
+    }
+
+    /** The velocity monitoring period in seconds. */
+    public long fraudVelocitySeconds() {
+        return Math.max(1L, config.getLong("fraud-detection.velocity-seconds", 60L));
+    }
+
+    /** The cumulative limit in a period above which a velocity fraud alert is triggered. */
+    public BigDecimal fraudVelocityLimit() {
+        try {
+            return new BigDecimal(config.getString("fraud-detection.velocity-limit", "5000000")
+                    .strip());
+        } catch (NumberFormatException e) {
+            return new BigDecimal("5000000");
+        }
+    }
+
+    /** Whether the multi-currency /wallet GUI is enabled. */
+    public boolean walletGuiEnabled() {
+        return config.getBoolean("wallet.gui-enabled", true);
+    }
+
+    public record CommandCost(BigDecimal amount, String currencyId) {}
+
+    /** Returns map of lowercase command labels (without slash) to their configured decimal costs. */
+    public Map<String, CommandCost> commandCosts() {
+        String defaultCurrency = config.getString("wallet.default-currency", "coins");
+        Map<String, CommandCost> costs = new HashMap<>();
+        for (String token : config.getStringList("command-costs", List.of())) {
+            int split = token.lastIndexOf(':');
+            if (split <= 0 || split == token.length() - 1) {
+                continue;
+            }
+            String command = token.substring(0, split).strip().toLowerCase(java.util.Locale.ROOT);
+            if (command.startsWith("/")) {
+                command = command.substring(1);
+            }
+            try {
+                String costPart = token.substring(split + 1).strip();
+                java.util.List<String> parts = com.google.common.base.Splitter.on(' ')
+                        .omitEmptyStrings()
+                        .trimResults()
+                        .splitToList(costPart);
+                if (parts.isEmpty()) {
+                    continue;
+                }
+                BigDecimal cost = new BigDecimal(parts.get(0));
+                if (cost.signum() >= 0) {
+                    String currency =
+                            parts.size() > 1 ? parts.get(1).toLowerCase(java.util.Locale.ROOT) : defaultCurrency;
+                    costs.put(command, new CommandCost(cost, currency));
+                }
+            } catch (Exception notANumber) {
+                // Ignore malformed command cost numbers
+            }
+        }
+        return costs;
     }
 }

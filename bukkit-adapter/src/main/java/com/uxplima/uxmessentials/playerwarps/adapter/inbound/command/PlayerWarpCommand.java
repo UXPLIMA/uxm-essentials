@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerwarps.adapter.inbound.command;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.bukkit.entity.Player;
@@ -12,6 +13,8 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
@@ -21,14 +24,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /pwarp <name> [owner]}: teleport to a player-warp. With no owner the sender warps to their own warp;
- * with an owner they warp to that player's warp, permitted only when it is public, and the owner is resolved
- * online-first then from the profile cache so a public warp stays reachable while its owner is offline. The
- * {@code visibility public <name>} and {@code visibility private <name>} subtrees (gated by
- * {@code uxmessentials.pwarp.public}) flip a warp's visibility. The ownership/public gate, the visibility flip,
- * and the delegated gated hop are the player-warps use cases' job; this handler maps the arguments and resolves
- * the owner. The {@code uxmessentials.pwarp.use} node guards the command. The visibility toggles live under the
- * {@code visibility} literal so a warp named {@code public} or {@code private} is reachable through the bare
- * {@code name} argument rather than being shadowed by a keyword.
+ * with an owner they warp to that player's warp, permitted only when it is public.
  */
 @NullMarked
 public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements CommandRegistration {
@@ -54,21 +50,68 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                                 .then(Commands.argument("name", StringArgumentType.word())
                                         .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
                                         .executes(this::makePrivate))))
+                .then(Commands.literal("lock")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
+                                .executes(this::toggleLock)))
+                .then(Commands.literal("password")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
+                                .executes(this::setPasswordClear)
+                                .then(Commands.argument("password", StringArgumentType.word())
+                                        .executes(this::setPassword))))
+                .then(Commands.literal("edit")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
+                                .executes(this::openPlayerWarpEditor)))
+                .then(Commands.literal("rate")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("owner", StringArgumentType.word())
+                                        .suggests(CommandSuggestions.onlinePlayers())
+                                        .then(Commands.argument(
+                                                        "rating",
+                                                        com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(
+                                                                1.0, 5.0))
+                                                .executes(this::ratePlayerWarp)))))
+                .then(Commands.literal("rating")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("owner", StringArgumentType.word())
+                                        .suggests(CommandSuggestions.onlinePlayers())
+                                        .executes(this::getPlayerWarpRating))))
                 .then(Commands.argument("name", StringArgumentType.word())
                         .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
-                        .executes(this::useOwn)
-                        .then(Commands.argument("owner", StringArgumentType.word())
+                        .executes(this::run)
+                        .then(Commands.argument("arg1", StringArgumentType.word())
                                 .suggests(CommandSuggestions.onlinePlayers())
-                                .executes(this::useOther)))
+                                .executes(this::runWithOneArg)
+                                .then(Commands.argument("arg2", StringArgumentType.word())
+                                        .executes(this::runWithTwoArgs))))
                 .build();
     }
 
     @Override
     public String description() {
-        return "Teleport to your own or a player's public warp.";
+        return "Teleport to your own or a player's public warp, lock it, edit its settings, or set a password.";
     }
 
-    private int useOwn(CommandContext<CommandSourceStack> ctx) {
+    private int openPlayerWarpEditor(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String name = ctx.getArgument("name", String.class);
+        PlayerRef owner = ref(sender);
+        if (!services.repository().exists(owner, PlayerWarpName.of(name))) {
+            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", name));
+            return 0;
+        }
+        if (services.editorView() != null) {
+            services.editorView().open(sender, ref(sender), name, owner);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int run(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
@@ -77,19 +120,38 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         return Command.SINGLE_SUCCESS;
     }
 
-    private int useOther(CommandContext<CommandSourceStack> ctx) {
+    private int runWithOneArg(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        String ownerName = ctx.getArgument("owner", String.class);
+        String warpName = ctx.getArgument("name", String.class);
+        String arg1 = ctx.getArgument("arg1", String.class);
+
+        Optional<PlayerRef> owner = services.players().findByName(arg1);
+        if (owner.isPresent()) {
+            services.usePlayerWarp().useFor(ref(sender), owner.get(), PlayerWarpName.of(warpName));
+        } else {
+            services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(warpName), arg1);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runWithTwoArgs(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String warpName = ctx.getArgument("name", String.class);
+        String ownerName = ctx.getArgument("arg1", String.class);
+        String password = ctx.getArgument("arg2", String.class);
+
         Optional<PlayerRef> owner = services.players().findByName(ownerName);
         if (owner.isEmpty()) {
             unknownPlayer(ctx.getSource().getSender(), ownerName);
             return 0;
         }
-        services.usePlayerWarp()
-                .useFor(ref(sender), owner.get(), PlayerWarpName.of(ctx.getArgument("name", String.class)));
+        services.usePlayerWarp().useFor(ref(sender), owner.get(), PlayerWarpName.of(warpName), Optional.of(password));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -109,5 +171,130 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         }
         services.visibility().setPrivate(ref(sender), PlayerWarpName.of(ctx.getArgument("name", String.class)));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private int toggleLock(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String warpName = ctx.getArgument("name", String.class);
+        Optional<PlayerWarp> opt = services.repository().find(ref(sender), PlayerWarpName.of(warpName));
+        if (opt.isEmpty()) {
+            services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(warpName));
+            return 0;
+        }
+        PlayerWarp warp = opt.get();
+        PlayerWarp updated = warp.withLocked(!warp.isLocked());
+        services.repository().save(updated);
+
+        feedback.send(
+                sender,
+                PlayerwarpsMessageKey.PWARP_LOCK_TOGGLED,
+                Map.of("warp", warpName, "state", Boolean.toString(updated.isLocked())));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int setPasswordClear(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String warpName = ctx.getArgument("name", String.class);
+        Optional<PlayerWarp> opt = services.repository().find(ref(sender), PlayerWarpName.of(warpName));
+        if (opt.isEmpty()) {
+            services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(warpName));
+            return 0;
+        }
+        PlayerWarp warp = opt.get();
+        PlayerWarp updated = warp.withPassword(Optional.empty());
+        services.repository().save(updated);
+
+        feedback.send(sender, PlayerwarpsMessageKey.PWARP_PASSWORD_CLEARED, Map.of("warp", warpName));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int setPassword(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String warpName = ctx.getArgument("name", String.class);
+        String password = ctx.getArgument("password", String.class);
+        Optional<PlayerWarp> opt = services.repository().find(ref(sender), PlayerWarpName.of(warpName));
+        if (opt.isEmpty()) {
+            services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(warpName));
+            return 0;
+        }
+        PlayerWarp warp = opt.get();
+        PlayerWarp updated = warp.withPassword(Optional.of(password));
+        services.repository().save(updated);
+
+        feedback.send(sender, PlayerwarpsMessageKey.PWARP_PASSWORD_SET, Map.of("warp", warpName, "password", password));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int ratePlayerWarp(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String warpName = ctx.getArgument("name", String.class);
+        String ownerName = ctx.getArgument("owner", String.class);
+        double rating = ctx.getArgument("rating", Double.class);
+
+        Optional<PlayerRef> ownerOpt = services.players().findByName(ownerName);
+        if (ownerOpt.isEmpty()) {
+            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", warpName));
+            return 0;
+        }
+        PlayerRef owner = ownerOpt.get();
+
+        if (!services.repository().exists(owner, PlayerWarpName.of(warpName))) {
+            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", warpName));
+            return 0;
+        }
+
+        Optional<PlayerWarp> warpOpt = services.repository().find(owner, PlayerWarpName.of(warpName));
+        if (warpOpt.isPresent() && !warpOpt.get().isPublic() && !owner.uuid().equals(sender.getUniqueId())) {
+            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_PUBLIC, Map.of("warp", warpName));
+            return 0;
+        }
+
+        services.repository().rate(owner, PlayerWarpName.of(warpName), sender.getUniqueId(), rating);
+        feedback.send(
+                sender, PlayerwarpsMessageKey.PWARP_RATED, Map.of("warp", warpName, "rating", Double.toString(rating)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int getPlayerWarpRating(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String warpName = ctx.getArgument("name", String.class);
+        String ownerName = ctx.getArgument("owner", String.class);
+
+        Optional<PlayerRef> ownerOpt = services.players().findByName(ownerName);
+        if (ownerOpt.isEmpty()) {
+            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", warpName));
+            return 0;
+        }
+        PlayerRef owner = ownerOpt.get();
+
+        if (!services.repository().exists(owner, PlayerWarpName.of(warpName))) {
+            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", warpName));
+            return 0;
+        }
+
+        double avg = services.repository().averageRating(owner, PlayerWarpName.of(warpName));
+        feedback.send(sender, PlayerwarpsMessageKey.PWARP_RATING, Map.of("warp", warpName, "rating", oneDecimal(avg)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static String oneDecimal(double value) {
+        return java.math.BigDecimal.valueOf(value)
+                .setScale(1, java.math.RoundingMode.HALF_UP)
+                .toPlainString();
     }
 }

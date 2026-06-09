@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.teleport.application;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
@@ -11,8 +12,10 @@ import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.domain.CooldownStartPhase;
@@ -79,7 +82,7 @@ public final class TeleportEngine {
             notifier.send(mover, TeleportMessageKey.JAILED);
             return Result.err(TeleportError.JAILED);
         }
-        Result<Unit, Duration> gate = cooldowns.check(mover, cooldownKind(kind));
+        Result<Unit, Duration> gate = cooldowns.check(mover, cooldownKind(kind, destination));
         if (gate.isErr()) {
             notifyCooldown(mover, gate.errorOrThrow());
             return Result.err(TeleportError.ON_COOLDOWN);
@@ -94,7 +97,9 @@ public final class TeleportEngine {
      * gate (an accepted {@code tpa}) reuses the warmup wiring without re-checking.
      */
     public WarmupHandle beginGatedWarmup(PlayerRef mover, Destination destination, TeleportKind kind) {
-        WarmupKind warmupKind = new WarmupKind(FEATURE, settings.defaultWarmupSeconds());
+        long seconds =
+                destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
+        WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);
         return warmups.begin(
                 mover,
                 warmupKind,
@@ -105,7 +110,7 @@ public final class TeleportEngine {
     private void onWarmupComplete(PlayerRef mover, Destination destination, TeleportKind kind) {
         executor.teleport(mover, destination, kind);
         if (settings.cooldownStartPhase() == CooldownStartPhase.TELEPORT) {
-            cooldowns.stamp(mover, cooldownKind(kind));
+            cooldowns.stamp(mover, cooldownKind(kind, destination));
         }
     }
 
@@ -121,7 +126,11 @@ public final class TeleportEngine {
      */
     public void stampForPhase(PlayerRef mover, CooldownStartPhase atPhase) {
         if (settings.cooldownStartPhase() == atPhase && atPhase != CooldownStartPhase.TELEPORT) {
-            cooldowns.stamp(mover, cooldownKind(TeleportKind.REQUEST));
+            cooldowns.stamp(
+                    mover,
+                    cooldownKind(
+                            TeleportKind.REQUEST,
+                            Destination.at(new Position(new WorldRef(UUID.randomUUID(), "world"), 0, 0, 0, 0f, 0f))));
         }
     }
 
@@ -137,7 +146,12 @@ public final class TeleportEngine {
      * rate-limits independently, with the override as its fallback default; a verb left at {@code -1}
      * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour.
      */
-    private CooldownKind cooldownKind(TeleportKind kind) {
+    private CooldownKind cooldownKind(TeleportKind kind, Destination destination) {
+        if (destination.cooldownOverride().isPresent()) {
+            long seconds = destination.cooldownOverride().get().toSeconds();
+            return CooldownKind.scoped(
+                    FEATURE, FEATURE + "." + verbScope(kind), seconds, mapPhase(settings.cooldownStartPhase()));
+        }
         long override = settings.verbCooldownOverrideSeconds(kind);
         Cooldowns.CooldownStartPhase phase = mapPhase(settings.cooldownStartPhase());
         if (override < 0) {

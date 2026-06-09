@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
 import org.jooq.Record;
 
 /**
@@ -29,6 +30,9 @@ import org.jooq.Record;
 final class WarpRows {
 
     private static final Warps WARPS = Warps.WARPS;
+    private static final com.google.gson.Gson GSON = new com.google.gson.Gson();
+    private static final java.lang.reflect.Type WELCOME_MESSAGES_TYPE =
+            new com.google.gson.reflect.TypeToken<java.util.List<WelcomeMessage>>() {}.getType();
 
     private WarpRows() {}
 
@@ -44,8 +48,19 @@ final class WarpRows {
                 position,
                 owner,
                 Instant.ofEpochMilli(row.get(WARPS.CREATED_AT)),
-                cost(row.get(WARPS.COST)),
-                Optional.ofNullable(row.get(WARPS.REQUIRED_PERMISSION)));
+                cost(row.get(WARPS.COST), row.get(WARPS.COST_CURRENCY)),
+                Optional.ofNullable(row.get(WARPS.REQUIRED_PERMISSION)),
+                row.get(WARPS.VISITORS),
+                Optional.ofNullable(row.get(WARPS.PASSWORD)),
+                row.get(WARPS.IS_LOCKED) != 0,
+                deserializeWelcomeMessages(row.get(WARPS.WELCOME_MESSAGE), row.get(WARPS.WELCOME_MESSAGE_TYPE)),
+                Optional.ofNullable(row.get(WARPS.DEPARTURE_SOUND)),
+                Optional.ofNullable(row.get(WARPS.ARRIVAL_SOUND)),
+                Optional.ofNullable(row.get(WARPS.DEPARTURE_PARTICLE)),
+                Optional.ofNullable(row.get(WARPS.ARRIVAL_PARTICLE)),
+                Optional.ofNullable(row.get(WARPS.WARMUP_SECONDS)),
+                Optional.ofNullable(row.get(WARPS.COOLDOWN_SECONDS)),
+                Optional.ofNullable(row.get(WARPS.ICON_MATERIAL)));
     }
 
     /** Populate a {@link WarpsRecord} from a domain {@link Warp} for an upsert. */
@@ -62,11 +77,50 @@ final class WarpRows {
                 .setOwner(warp.owner().uuid().toString())
                 .setCreatedAt(warp.createdAt().toEpochMilli())
                 .setCost(warp.hasCost() ? warp.cost().amount() : null)
-                .setRequiredPermission(warp.requiredPermission().orElse(null));
+                .setCostCurrency(warp.hasCost() ? warp.cost().currencyId() : "default")
+                .setRequiredPermission(warp.requiredPermission().orElse(null))
+                .setVisitors(warp.visitors())
+                .setPassword(warp.password().orElse(null))
+                .setIsLocked(warp.isLocked() ? 1 : 0)
+                .setWelcomeMessage(serializeWelcomeMessages(warp.welcomeMessages()))
+                .setWelcomeMessageType(warp.welcomeMessages().isEmpty() ? "CHAT" : "JSON")
+                .setDepartureSound(warp.departureSound().orElse(null))
+                .setArrivalSound(warp.arrivalSound().orElse(null))
+                .setDepartureParticle(warp.departureParticle().orElse(null))
+                .setArrivalParticle(warp.arrivalParticle().orElse(null))
+                .setWarmupSeconds(warp.warmupOverrideSeconds().orElse(null))
+                .setCooldownSeconds(warp.cooldownOverrideSeconds().orElse(null))
+                .setIconMaterial(warp.iconMaterial().orElse(null));
     }
 
-    private static WarpCost cost(BigDecimal stored) {
+    private static WarpCost cost(BigDecimal stored, String currencyId) {
         // A null cost column is a free warp; a stored amount is the price to use it.
-        return stored == null ? WarpCost.free() : WarpCost.of(stored);
+        return stored == null ? WarpCost.free() : WarpCost.of(stored, currencyId != null ? currencyId : "default");
+    }
+
+    private static java.util.List<WelcomeMessage> deserializeWelcomeMessages(String welcomeMessage, String type) {
+        if (welcomeMessage == null || welcomeMessage.isBlank()) {
+            return java.util.List.of();
+        }
+        if (welcomeMessage.startsWith("[")) {
+            try {
+                java.util.List<WelcomeMessage> list = GSON.fromJson(welcomeMessage, WELCOME_MESSAGES_TYPE);
+                if (list != null) {
+                    return list;
+                }
+            } catch (Exception e) {
+                // fallback if JSON is invalid
+            }
+        }
+        String messageType = type != null ? type : "CHAT";
+        return java.util.List.of(new WelcomeMessage(welcomeMessage, messageType));
+    }
+
+    private static @org.jspecify.annotations.Nullable String serializeWelcomeMessages(
+            java.util.List<WelcomeMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return null;
+        }
+        return GSON.toJson(messages);
     }
 }
