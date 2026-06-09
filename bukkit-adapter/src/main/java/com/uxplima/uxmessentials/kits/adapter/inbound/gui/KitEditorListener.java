@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -20,15 +19,12 @@ import org.bukkit.inventory.InventoryHolder;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.listener.ChatPromptListener;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
-import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
@@ -55,8 +51,8 @@ public final class KitEditorListener implements Listener {
     private final @Nullable KitCategoryRepository categoryRepository;
     private final @Nullable KitSettingsView settingsView;
     private final @Nullable ChatPromptListener promptListener;
-    private final @Nullable Messages messages;
-    private final @Nullable MiniMessage miniMessage;
+    private final @Nullable KitEditorText text;
+    private final @Nullable KitCategoryEditing categoryEditing;
 
     public KitEditorListener(KitEditorView editorView) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
@@ -65,8 +61,8 @@ public final class KitEditorListener implements Listener {
         this.categoryRepository = null;
         this.settingsView = null;
         this.promptListener = null;
-        this.messages = null;
-        this.miniMessage = null;
+        this.text = null;
+        this.categoryEditing = null;
     }
 
     public KitEditorListener(
@@ -83,8 +79,8 @@ public final class KitEditorListener implements Listener {
         this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
         this.settingsView = Objects.requireNonNull(settingsView, "settingsView");
         this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
-        this.messages = Objects.requireNonNull(messages, "messages");
-        this.miniMessage = MiniMessage.miniMessage();
+        this.text = new KitEditorText(Objects.requireNonNull(messages, "messages"), MiniMessage.miniMessage());
+        this.categoryEditing = new KitCategoryEditing(services, categoryRepository, promptListener, this.text);
     }
 
     @EventHandler
@@ -112,16 +108,24 @@ public final class KitEditorListener implements Listener {
             onCreateChooserClick(player, h, slot);
         } else if (holder instanceof KitCategoryManagerHolder h) {
             event.setCancelled(true);
-            onCategoryManagerClick(player, h, slot);
+            if (categoryEditing != null) {
+                categoryEditing.onCategoryManagerClick(player, h, slot);
+            }
         } else if (holder instanceof KitCategorySettingsHolder h) {
             event.setCancelled(true);
-            onCategorySettingsClick(player, h, slot);
+            if (categoryEditing != null) {
+                categoryEditing.onCategorySettingsClick(player, h, slot);
+            }
         } else if (holder instanceof KitCategorySelectorHolder h) {
             event.setCancelled(true);
-            onCategorySelectorClick(player, h, slot);
+            if (categoryEditing != null && settingsView != null) {
+                categoryEditing.onCategorySelectorClick(player, h, slot, settingsView);
+            }
         } else if (holder instanceof KitCategoryParentSelectorHolder h) {
             event.setCancelled(true);
-            onCategoryParentSelectorClick(player, h, slot);
+            if (categoryEditing != null) {
+                categoryEditing.onCategoryParentSelectorClick(player, h, slot);
+            }
         }
     }
 
@@ -314,8 +318,8 @@ public final class KitEditorListener implements Listener {
             openManager(player, viewer);
         } else if (slot == 11) {
             promptCreateKit(player, viewer);
-        } else if (slot == 15) {
-            promptCreateCategory(player, viewer);
+        } else if (slot == 15 && categoryEditing != null) {
+            categoryEditing.promptCreateCategory(player, viewer);
         }
     }
 
@@ -335,186 +339,15 @@ public final class KitEditorListener implements Listener {
         });
     }
 
-    private void promptCreateCategory(Player player, PlayerRef viewer) {
-        prompt(player, viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_PROMPT_CREATE, name -> {
-            String clean = sanitizeId(name);
-            if (clean.isEmpty()) {
-                player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NAME));
-                return;
-            }
-            KitCategory category = new KitCategory(clean, name, Optional.empty(), List.of(), 0, Optional.empty());
-            Objects.requireNonNull(categoryRepository).save(category);
-            openCategorySettings(player, viewer, category);
-        });
-    }
-
-    private void onCategoryManagerClick(Player player, KitCategoryManagerHolder managerHolder, int slot) {
-        if (services == null || categoryRepository == null || promptListener == null) {
-            return;
-        }
-        PlayerRef viewer = managerHolder.viewer();
-        if (slot == 53) {
-            openManager(player, viewer);
-        } else if (slot == 49) {
-            promptCreateCategory(player, viewer);
-        } else {
-            List<KitCategory> categories = managerHolder.categories();
-            if (slot >= 0 && slot < categories.size()) {
-                openCategorySettings(player, viewer, categories.get(slot));
-            }
-        }
-    }
-
-    private void onCategorySettingsClick(Player player, KitCategorySettingsHolder settingsHolder, int slot) {
-        if (services == null || categoryRepository == null || promptListener == null) {
-            return;
-        }
-        PlayerRef viewer = settingsHolder.viewer();
-        KitCategory category = settingsHolder.category();
-        if (slot == 26) {
-            KitCategoryManagerView managerView = services.kitCategoryManagerView();
-            if (managerView != null) {
-                managerView.open(player, viewer);
-            }
-            return;
-        }
-        switch (slot) {
-            case 10 -> editCategoryName(player, viewer, category);
-            case 12 -> editCategoryMaterial(player, viewer, category);
-            case 14 -> editCategoryLore(player, viewer, category);
-            case 16 -> editCategorySlot(player, viewer, category);
-            case 18 -> openParentSelector(player, viewer, category);
-            case 22 -> deleteCategory(player, viewer, category);
-            default -> {
-                // no-op: a click outside the action slots
-            }
-        }
-    }
-
-    private void editCategoryName(Player player, PlayerRef viewer, KitCategory category) {
-        prompt(
-                player,
-                viewer,
-                KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_PROMPT,
-                input -> saveCategory(player, viewer, category.withDisplayName(input)));
-    }
-
-    private void editCategoryMaterial(Player player, PlayerRef viewer, KitCategory category) {
-        Material hand = player.getInventory().getItemInMainHand().getType();
-        if (hand.isAir()) {
-            player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_EMPTY_HAND));
-            return;
-        }
-        saveCategory(player, viewer, category.withDisplayMaterial(Optional.of(hand.name())));
-    }
-
-    private void editCategoryLore(Player player, PlayerRef viewer, KitCategory category) {
-        prompt(
-                player,
-                viewer,
-                KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_PROMPT,
-                input -> saveCategory(player, viewer, category.withDisplayLore(splitLines(input))));
-    }
-
-    private void editCategorySlot(Player player, PlayerRef viewer, KitCategory category) {
-        prompt(player, viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_PROMPT, input -> {
-            int targetSlot;
-            try {
-                targetSlot = Integer.parseInt(input);
-            } catch (NumberFormatException e) {
-                player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NUMBER));
-                return;
-            }
-            saveCategory(player, viewer, category.withSlot(targetSlot));
-        });
-    }
-
-    private void openParentSelector(Player player, PlayerRef viewer, KitCategory category) {
-        KitCategoryParentSelectorView view = Objects.requireNonNull(services).kitCategoryParentSelectorView();
-        if (view != null) {
-            view.open(player, viewer, category);
-        }
-    }
-
-    private void deleteCategory(Player player, PlayerRef viewer, KitCategory category) {
-        Objects.requireNonNull(categoryRepository).delete(category.id());
-        KitCategoryManagerView view = Objects.requireNonNull(services).kitCategoryManagerView();
-        if (view != null) {
-            view.open(player, viewer);
-        }
-    }
-
-    private void onCategorySelectorClick(Player player, KitCategorySelectorHolder selectorHolder, int slot) {
-        if (services == null || categoryRepository == null || settingsView == null) {
-            return;
-        }
-        PlayerRef viewer = selectorHolder.viewer();
-        KitDefinition kit = selectorHolder.kit();
-        if (slot == 53) {
-            settingsView.open(player, viewer, kit);
-            return;
-        }
-        if (slot == 49) {
-            saveAndReopen(player, viewer, kit.withCategoryId(Optional.empty()));
-            return;
-        }
-        List<KitCategory> categories = categoryRepository.all();
-        if (slot >= 0 && slot < categories.size()) {
-            saveAndReopen(
-                    player,
-                    viewer,
-                    kit.withCategoryId(Optional.of(categories.get(slot).id())));
-        }
-    }
-
-    private void onCategoryParentSelectorClick(
-            Player player, KitCategoryParentSelectorHolder selectorHolder, int slot) {
-        if (services == null || categoryRepository == null) {
-            return;
-        }
-        PlayerRef viewer = selectorHolder.viewer();
-        KitCategory category = selectorHolder.category();
-        if (slot == 53) {
-            openCategorySettings(player, viewer, category);
-            return;
-        }
-        if (slot == 49) {
-            saveCategory(player, viewer, category.withParentCategoryId(Optional.empty()));
-            return;
-        }
-        List<KitCategory> candidates = categoryRepository.all().stream()
-                .filter(cat -> !cat.id().equals(category.id()))
-                .toList();
-        if (slot >= 0 && slot < candidates.size()) {
-            saveCategory(
-                    player,
-                    viewer,
-                    category.withParentCategoryId(
-                            Optional.of(candidates.get(slot).id())));
-        }
-    }
-
     private void saveAndReopen(Player player, PlayerRef viewer, KitDefinition kit) {
         Objects.requireNonNull(services).kitEditor().save(viewer, kit);
         Objects.requireNonNull(settingsView).open(player, viewer, kit);
-    }
-
-    private void saveCategory(Player player, PlayerRef viewer, KitCategory category) {
-        Objects.requireNonNull(categoryRepository).save(category);
-        openCategorySettings(player, viewer, category);
     }
 
     private void openManager(Player player, PlayerRef viewer) {
         KitManagerView view = Objects.requireNonNull(services).kitManagerView();
         if (view != null) {
             view.open(player, viewer);
-        }
-    }
-
-    private void openCategorySettings(Player player, PlayerRef viewer, KitCategory category) {
-        KitCategorySettingsView view = Objects.requireNonNull(services).kitCategorySettingsView();
-        if (view != null) {
-            view.open(player, viewer, category);
         }
     }
 
@@ -533,16 +366,6 @@ public final class KitEditorListener implements Listener {
     }
 
     private Component text(PlayerRef viewer, MessageKey key) {
-        return text(viewer, key, Map.of());
-    }
-
-    private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        if (messages == null || miniMessage == null) {
-            return Component.empty();
-        }
-        String prefixStr = messages.resolve(viewer, () -> "prefix", Map.of());
-        TagResolver prefix = Placeholder.component("prefix", miniMessage.deserialize(prefixStr));
-        String resolved = messages.resolve(viewer, key, placeholders);
-        return miniMessage.deserialize(resolved, prefix);
+        return text == null ? Component.empty() : text.text(viewer, key);
     }
 }
