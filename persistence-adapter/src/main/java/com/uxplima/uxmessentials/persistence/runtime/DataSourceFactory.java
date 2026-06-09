@@ -43,6 +43,7 @@ public final class DataSourceFactory {
         ensureParentDirectory(file);
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:sqlite:" + file.toAbsolutePath());
+        config.setDriverClassName(DatabaseBackend.SQLITE.driverClassName());
         // The single dedicated write connection is the single-writer invariant; readers proceed
         // concurrently against the WAL on this same connection without contending for the write lock.
         config.setMaximumPoolSize(1);
@@ -57,6 +58,7 @@ public final class DataSourceFactory {
     private static HikariConfig network(DatabaseSettings settings, DatabaseBackend backend) {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(networkUrl(settings, backend));
+        config.setDriverClassName(backend.driverClassName());
         config.setUsername(settings.username());
         config.setPassword(settings.password());
         int pool = settings.readPoolSize();

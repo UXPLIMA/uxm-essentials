@@ -20,20 +20,22 @@ import org.jspecify.annotations.NullMarked;
 public enum DatabaseBackend {
 
     /** Embedded file database; the default. Single-writer — WAL, write pool sized 1. */
-    SQLITE("sqlite", SQLDialect.SQLITE, true),
+    SQLITE("sqlite", "org.sqlite.JDBC", SQLDialect.SQLITE, true),
 
     /** MySQL/MariaDB over the network. The MariaDB driver speaks both wire protocols. */
-    MARIADB("mariadb", SQLDialect.MARIADB, false),
+    MARIADB("mariadb", "org.mariadb.jdbc.Driver", SQLDialect.MARIADB, false),
 
     /** PostgreSQL over the network. */
-    POSTGRES("postgresql", SQLDialect.POSTGRES, false);
+    POSTGRES("postgresql", "org.postgresql.Driver", SQLDialect.POSTGRES, false);
 
     private final String jdbcSubprotocol;
+    private final String driverClassName;
     private final SQLDialect dialect;
     private final boolean singleWriter;
 
-    DatabaseBackend(String jdbcSubprotocol, SQLDialect dialect, boolean singleWriter) {
+    DatabaseBackend(String jdbcSubprotocol, String driverClassName, SQLDialect dialect, boolean singleWriter) {
         this.jdbcSubprotocol = jdbcSubprotocol;
+        this.driverClassName = driverClassName;
         this.dialect = dialect;
         this.singleWriter = singleWriter;
     }
@@ -41,6 +43,16 @@ public enum DatabaseBackend {
     /** The JDBC sub-protocol, e.g. {@code sqlite} in {@code jdbc:sqlite:...}. */
     public String jdbcSubprotocol() {
         return jdbcSubprotocol;
+    }
+
+    /**
+     * The JDBC driver class to register explicitly. The drivers are supplied by the Paper library
+     * loader into the plugin's isolated classloader, which {@code DriverManager} (loaded by the system
+     * classloader) does not scan; naming the class so HikariCP loads it directly is what makes a
+     * network backend connect instead of failing with "No suitable driver".
+     */
+    public String driverClassName() {
+        return driverClassName;
     }
 
     /** The jOOQ dialect the {@code DSLContext} renders SQL in for this backend. */
