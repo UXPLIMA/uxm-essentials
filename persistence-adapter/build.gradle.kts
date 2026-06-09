@@ -60,9 +60,15 @@ jooq {
                         key = "sort"
                         value = "flyway"
                     }
+                    // Force lowercase generated identifiers. The migrations declare tables/columns
+                    // unquoted in lowercase, but the jOOQ DDL parser folds unquoted names to UPPER —
+                    // which `as_is` then preserves. SQLite (default) and case-insensitive MySQL images
+                    // tolerate the mismatch, but a real case-sensitive MySQL/Linux (lower_case_table_names=0)
+                    // has lowercase tables and rejects the uppercased names ("table doesn't exist").
+                    // Lowercasing the generated names matches the migrations on every backend.
                     property {
                         key = "defaultNameCase"
-                        value = "as_is"
+                        value = "lower"
                     }
                 }
             }
