@@ -15,10 +15,14 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
+import com.uxplima.uxmessentials.shared.application.health.HealthReport;
+import com.uxplima.uxmessentials.shared.application.health.HealthStatus;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -30,6 +34,12 @@ import org.jspecify.annotations.Nullable;
  * deliberately plain, operator-facing diagnostic text — the i18n {@code MessageKey} catalog backs
  * player-facing feature messages and lands with the messaging work. The full {@code reload} that
  * drains and restarts a single module off-tick arrives once modules carry runtime state.
+ *
+ * <p>{@code doctor} goes deeper than {@code status}: it runs the wired {@link HealthCheck}s — a database
+ * liveness probe, the economy-provider ownership check, the soft-depend presence/reachability scan, and the
+ * threading/update lines — and prints each as {@code OK}/{@code WARN}/{@code FAIL}. The checks do I/O, so the
+ * run is dispatched off the tick thread through the kernel {@link Scheduler} and the rendered lines bridge back
+ * to the global region for delivery, exactly as the other off-tick bootstrap commands reply.
  */
 @NullMarked
 public final class UxmessCommand implements CommandRegistration {
@@ -45,9 +55,18 @@ public final class UxmessCommand implements CommandRegistration {
     private static final String STATUS_NO_MODULES = "No feature modules are registered yet.";
     private static final String HELP_HEADER = "uxmEssentials commands:";
     private static final String HELP_STATUS = "/uxmess status — list modules and their enable state";
+    private static final String HELP_DOCTOR = "/uxmess doctor — run runtime health checks";
     private static final String HELP_HELP = "/uxmess help — show this help";
     private static final String HELP_RELOAD = "/uxmess reload [module] — reload all modules, or one by id";
     private static final String HELP_IMPORT = "/uxmess import <source> [--dry-run] — import legacy data";
+
+    private static final String DOCTOR_HEADER = "uxmEssentials — health checks";
+    private static final String DOCTOR_RUNNING = "Running health checks off-tick…";
+    private static final String DOCTOR_FAILURE = "One or more checks FAILED — see the lines above.";
+    private static final String DOCTOR_OK = "[OK] ";
+    private static final String DOCTOR_WARN = "[WARN] ";
+    private static final String DOCTOR_FAIL = "[FAIL] ";
+    private static final String WARN = "<#ffcc66>";
     private static final String RELOAD_ALL = "Reload requested for all modules.";
     private static final String RELOAD_ONE = "Reload requested for module ";
     private static final String RELOAD_UNKNOWN = "Unknown module: ";
@@ -64,11 +83,20 @@ public final class UxmessCommand implements CommandRegistration {
     private final ModuleRegistry registry;
     private final ConfigStore config;
     private final MigrationImportNode importNode;
+    private final Scheduler scheduler;
+    private final List<HealthCheck> healthChecks;
 
-    public UxmessCommand(ModuleRegistry registry, ConfigStore config, MigrationImportNode importNode) {
+    public UxmessCommand(
+            ModuleRegistry registry,
+            ConfigStore config,
+            MigrationImportNode importNode,
+            Scheduler scheduler,
+            List<HealthCheck> healthChecks) {
         this.registry = Objects.requireNonNull(registry, "registry");
         this.config = Objects.requireNonNull(config, "config");
         this.importNode = Objects.requireNonNull(importNode, "importNode");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.healthChecks = List.copyOf(Objects.requireNonNull(healthChecks, "healthChecks"));
     }
 
     @Override
@@ -77,6 +105,7 @@ public final class UxmessCommand implements CommandRegistration {
                 .requires(src -> src.getSender().hasPermission(PERMISSION_ADMIN))
                 .executes(this::runHelp)
                 .then(Commands.literal("status").executes(this::runStatus))
+                .then(Commands.literal("doctor").executes(this::runDoctor))
                 .then(Commands.literal("help").executes(this::runHelp))
                 .then(reloadNode())
                 .then(importNode.build())
@@ -114,10 +143,55 @@ public final class UxmessCommand implements CommandRegistration {
         return Command.SINGLE_SUCCESS;
     }
 
+    private int runDoctor(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        sendHeader(sender, DOCTOR_HEADER);
+        sendBody(sender, DOCTOR_RUNNING);
+        // The database probe acquires a connection, so the whole run goes off-tick; the rendered lines bridge
+        // back to the global region for delivery, mirroring the other off-tick bootstrap commands.
+        scheduler.async(() -> {
+            HealthReport report = HealthReport.run(healthChecks);
+            scheduler.onGlobal(() -> renderReport(sender, report));
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void renderReport(CommandSender sender, HealthReport report) {
+        for (HealthReport.Entry entry : report.entries()) {
+            sendCheckLine(sender, entry);
+        }
+        if (report.hasFailure()) {
+            send(sender, ERROR, DOCTOR_FAILURE);
+        }
+    }
+
+    private static void sendCheckLine(CommandSender sender, HealthReport.Entry entry) {
+        HealthStatus status = entry.result().status();
+        String line = tag(status) + entry.name() + " — " + entry.result().message();
+        send(sender, palette(status), line);
+    }
+
+    private static String tag(HealthStatus status) {
+        return switch (status) {
+            case OK -> DOCTOR_OK;
+            case WARN -> DOCTOR_WARN;
+            case FAIL -> DOCTOR_FAIL;
+        };
+    }
+
+    private static String palette(HealthStatus status) {
+        return switch (status) {
+            case OK -> SUCCESS;
+            case WARN -> WARN;
+            case FAIL -> ERROR;
+        };
+    }
+
     private int runHelp(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         sendHeader(sender, HELP_HEADER);
         sendBody(sender, HELP_STATUS);
+        sendBody(sender, HELP_DOCTOR);
         sendBody(sender, HELP_HELP);
         sendBody(sender, HELP_RELOAD);
         sendBody(sender, HELP_IMPORT);

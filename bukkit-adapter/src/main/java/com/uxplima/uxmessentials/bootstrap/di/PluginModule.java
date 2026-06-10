@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bootstrap.di;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +20,12 @@ import com.uxplima.uxmessentials.bootstrap.command.HelpCommand;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
+import com.uxplima.uxmessentials.bootstrap.health.DatabaseHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.EconomyProviderHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.ModuleCountHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.SchedulerHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.SoftDependencyHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
@@ -55,12 +62,14 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.command.CommandOverride;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
+import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
@@ -130,7 +139,8 @@ public final class PluginModule {
         IntegrationsWiring.Wired integrations = IntegrationsWiring.wire(plugin, config, kernel, persistence);
         resources.onClose(integrations.stop());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
-        resources.addCommand(new UxmessCommand(registry, config, importNode));
+        List<HealthCheck> healthChecks = healthChecks(plugin, registry, config, persistence);
+        resources.addCommand(new UxmessCommand(registry, config, importNode, kernel.scheduler(), healthChecks));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
@@ -214,6 +224,31 @@ public final class PluginModule {
                 kernel.log(),
                 module.enabled(config));
         return new MigrationImportNode(service);
+    }
+
+    private static List<HealthCheck> healthChecks(
+            JavaPlugin plugin, ModuleRegistry registry, ConfigStore config, Persistence persistence) {
+        // Assembled after the modules are wired so the set reflects what is actually present: the database and
+        // soft-depend probes always apply, the economy-provider ownership check only when economy is enabled.
+        // The /uxmess doctor command runs each one off-tick (each is wrapped in HealthCheck.safe so a probe that
+        // throws becomes a FAIL line rather than aborting the run).
+        ConfigStore economyConfig = config.scoped(ModuleId.of("economy").configRoot());
+        List<HealthCheck> checks = new ArrayList<>();
+        checks.add(new DatabaseHealthCheck(persistence));
+        if (economyEnabled(registry, config)) {
+            checks.add(new EconomyProviderHealthCheck(plugin.getServer().getServicesManager(), plugin));
+        }
+        checks.add(new SoftDependencyHealthCheck(plugin.getServer().getPluginManager(), economyConfig));
+        checks.add(new SchedulerHealthCheck());
+        checks.add(new UpdateHealthCheck(UpdateCheckSettings.from(config).enabled()));
+        checks.add(new ModuleCountHealthCheck(registry, config));
+        return List.copyOf(checks);
+    }
+
+    private static boolean economyEnabled(ModuleRegistry registry, ConfigStore config) {
+        return registry.byId(ModuleId.of("economy"))
+                .map(module -> module.enabled(config))
+                .orElse(false);
     }
 
     private static PlaceholderContexts wireModules(
