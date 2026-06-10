@@ -82,6 +82,12 @@ public final class FileKitStockStore implements KitStockStore {
         }
     }
 
+    @Override
+    public long claimed(KitId kit) {
+        Objects.requireNonNull(kit, "kit");
+        return counts.getOrDefault(kit.value(), 0);
+    }
+
     private void load() {
         if (!Files.isRegularFile(file)) {
             return;

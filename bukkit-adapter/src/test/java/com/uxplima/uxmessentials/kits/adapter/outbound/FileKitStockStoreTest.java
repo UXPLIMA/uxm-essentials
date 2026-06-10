@@ -39,6 +39,17 @@ class FileKitStockStoreTest {
     }
 
     @Test
+    void claimedReportsTheRunningCount(@TempDir Path dir) {
+        KitStockStore store = store(dir);
+        assertThat(store.claimed(LIMITED)).isZero();
+
+        store.tryConsume(LIMITED, 5);
+        store.tryConsume(LIMITED, 5);
+
+        assertThat(store.claimed(LIMITED)).isEqualTo(2);
+    }
+
+    @Test
     void theCountSurvivesAReload(@TempDir Path dir) {
         Path file = dir.resolve("stock.properties");
         KitStockStore first = new FileKitStockStore(new InlineScheduler(), new NoopLogger(), file);

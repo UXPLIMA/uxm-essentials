@@ -125,7 +125,8 @@ class KitMenuLayoutTest {
                 new StubKitCategoryRepository(),
                 access,
                 kitPreview,
-                layout);
+                layout,
+                Clock.systemUTC());
         PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
         view.open(player, viewer, kits());
         return (PaginatedGui) player.getOpenInventory().getTopInventory().getHolder();

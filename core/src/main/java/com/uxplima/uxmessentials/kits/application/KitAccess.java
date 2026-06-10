@@ -229,6 +229,15 @@ public final class KitAccess {
         return cooldowns.check(who, cooldownKind(who, kit)).isErr();
     }
 
+    /** Whether {@code kit}'s global stock limit has been reached; false for an unlimited kit or with no store wired. */
+    public boolean isOutOfStock(KitDefinition kit) {
+        Objects.requireNonNull(kit, "kit");
+        if (!kit.hasStockLimit()) {
+            return false;
+        }
+        return stock.map(store -> store.claimed(kit.id()) >= kit.stockLimit()).orElse(false);
+    }
+
     public boolean canAfford(PlayerRef who, KitDefinition kit) {
         com.uxplima.uxmessentials.kits.domain.KitCost cost = effectiveCost(who, kit);
         if (cost.isFree() || economy.isEmpty()) {

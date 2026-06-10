@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.kits.adapter;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -215,7 +216,9 @@ public final class KitsWiring {
             KitCategorySelectorView categorySelectorView,
             KitCategoryParentSelectorView categoryParentSelectorView,
             KitCreateChooserView kitCreateChooserView) {
-        Clock clock = Clock.systemUTC();
+        // Server-local zone so kit schedules (and the matching browse-menu lock state) read in the time an
+        // operator authors a window in; the event timestamp uses clock.instant(), which is zone-independent.
+        Clock clock = Clock.system(ZoneId.systemDefault());
         ClaimKit claimKit = new ClaimKit(
                 repository, access, granter, notifier, kernel.events(), clock, economy, Optional.of(actionRunner));
         KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler(), previewLayout);
@@ -227,7 +230,8 @@ public final class KitsWiring {
                 categoryRepository,
                 access,
                 kitPreview,
-                menuLayout);
+                menuLayout,
+                clock);
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(kernel.messages(), kitEditor, kernel.scheduler());
         return new KitServices(

@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.kits.adapter.inbound.gui;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,12 +42,14 @@ final class KitIconRenderer {
     private final KitAccess access;
     private final GuiLayout layout;
     private final MiniMessage miniMessage;
+    private final Clock clock;
 
-    KitIconRenderer(Messages messages, KitAccess access, GuiLayout layout, MiniMessage miniMessage) {
+    KitIconRenderer(Messages messages, KitAccess access, GuiLayout layout, MiniMessage miniMessage, Clock clock) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.access = Objects.requireNonNull(access, "access");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = Objects.requireNonNull(miniMessage, "miniMessage");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     ItemStack categoryIcon(PlayerRef viewer, KitCategory category) {
@@ -120,15 +124,22 @@ final class KitIconRenderer {
 
     /** The player-relative display state that selects which name/material/lore override a kit icon shows. */
     private enum DisplayState {
+        UNAVAILABLE,
         NO_PERMISSION,
         CLAIMED,
         ON_COOLDOWN,
         REQUIREMENTS,
+        OUT_OF_STOCK,
         UNAFFORDABLE,
         NORMAL
     }
 
     private DisplayState stateOf(PlayerRef viewer, KitDefinition kit) {
+        // The icon mirrors the claim gate order: the schedule window is checked first (in ClaimKit, before
+        // anything else), then the per-kit gates, then stock (reserved before the cost), then affordability.
+        if (!kit.isAvailableAt(LocalDateTime.now(clock))) {
+            return DisplayState.UNAVAILABLE;
+        }
         if (!access.hasPermission(viewer, kit)) {
             return DisplayState.NO_PERMISSION;
         }
@@ -138,9 +149,11 @@ final class KitIconRenderer {
         if (access.isOnCooldown(viewer, kit)) {
             return DisplayState.ON_COOLDOWN;
         }
-        // Requirements are gated after the cooldown and before the cost, so the icon mirrors that order.
         if (!access.meetsRequirements(viewer, kit)) {
             return DisplayState.REQUIREMENTS;
+        }
+        if (access.isOutOfStock(kit)) {
+            return DisplayState.OUT_OF_STOCK;
         }
         if (!access.canAfford(viewer, kit)) {
             return DisplayState.UNAFFORDABLE;
@@ -149,32 +162,51 @@ final class KitIconRenderer {
     }
 
     private Component resolveName(PlayerRef viewer, KitDefinition kit) {
+        DisplayState state = stateOf(viewer, kit);
         Optional<String> nameOpt =
-                switch (stateOf(viewer, kit)) {
+                switch (state) {
                     case NO_PERMISSION -> kit.noPermissionName();
                     case CLAIMED -> kit.claimedName();
                     case ON_COOLDOWN -> kit.cooldownName();
                     case REQUIREMENTS -> kit.requirementsName();
                     case UNAFFORDABLE -> kit.unaffordableName();
                     case NORMAL -> kit.displayName();
+                        // The two locked states force their own name so the icon always reads as closed/sold out.
+                    case UNAVAILABLE, OUT_OF_STOCK -> Optional.empty();
                 };
 
-        String rawName = nameOpt.orElseGet(() -> messages.resolve(
-                viewer,
-                KitsMessageKey.KIT_MENU_ENTRY_NAME,
-                Map.of("kit", kit.id().value())));
+        KitsMessageKey defaultKey =
+                switch (state) {
+                    case UNAVAILABLE -> KitsMessageKey.KIT_MENU_UNAVAILABLE_NAME;
+                    case OUT_OF_STOCK -> KitsMessageKey.KIT_MENU_OUT_OF_STOCK_NAME;
+                    default -> KitsMessageKey.KIT_MENU_ENTRY_NAME;
+                };
+        String rawName = nameOpt.orElseGet(() ->
+                messages.resolve(viewer, defaultKey, Map.of("kit", kit.id().value())));
         return miniMessage.deserialize(processPlaceholders(viewer, kit, rawName));
     }
 
     private Material resolveMaterial(PlayerRef viewer, KitDefinition kit) {
+        DisplayState state = stateOf(viewer, kit);
+        // The locked states ignore any per-kit material override so they always show the closed/sold-out icon.
+        switch (state) {
+            case UNAVAILABLE -> {
+                return Material.CLOCK;
+            }
+            case OUT_OF_STOCK -> {
+                return Material.BARRIER;
+            }
+            default -> {}
+        }
         Optional<String> matOpt =
-                switch (stateOf(viewer, kit)) {
+                switch (state) {
                     case NO_PERMISSION -> kit.noPermissionMaterial();
                     case CLAIMED -> kit.claimedMaterial();
                     case ON_COOLDOWN -> kit.cooldownMaterial();
                     case REQUIREMENTS -> kit.requirementsMaterial();
                     case UNAFFORDABLE -> kit.unaffordableMaterial();
                     case NORMAL -> kit.displayMaterial();
+                    case UNAVAILABLE, OUT_OF_STOCK -> Optional.empty(); // handled above
                 };
 
         if (matOpt.isPresent()) {
@@ -197,14 +229,19 @@ final class KitIconRenderer {
     }
 
     private List<Component> resolveLore(PlayerRef viewer, KitDefinition kit) {
+        DisplayState state = stateOf(viewer, kit);
+        if (state == DisplayState.UNAVAILABLE || state == DisplayState.OUT_OF_STOCK) {
+            return lockedLore(viewer, kit, state);
+        }
         List<String> stateLore =
-                switch (stateOf(viewer, kit)) {
+                switch (state) {
                     case NO_PERMISSION -> kit.noPermissionLore();
                     case CLAIMED -> kit.claimedLore();
                     case ON_COOLDOWN -> kit.cooldownLore();
                     case REQUIREMENTS -> kit.requirementsLore();
                     case UNAFFORDABLE -> kit.unaffordableLore();
                     case NORMAL -> List.of();
+                    case UNAVAILABLE, OUT_OF_STOCK -> List.of(); // handled above
                 };
         boolean hasOverride = !stateLore.isEmpty();
         List<String> rawLore = hasOverride ? stateLore : kit.displayLore();
@@ -240,6 +277,26 @@ final class KitIconRenderer {
                     KitsMessageKey.KIT_MENU_LORE_CLAIMABLE,
                     Map.of("kit", kit.id().value())));
         }
+        if (kit.preview()) {
+            lines.add(text(viewer, KitsMessageKey.KIT_MENU_PREVIEW_HINT, Map.of()));
+        }
+        return lines;
+    }
+
+    /**
+     * The lore for a kit the viewer cannot claim because its rotation window is closed or its global stock is
+     * spent: the kit's own display lore for context, then the single locked-reason line, then the preview hint
+     * when the kit allows a preview. No cooldown/cost/claimable lines — none of them apply to a locked kit.
+     */
+    private List<Component> lockedLore(PlayerRef viewer, KitDefinition kit, DisplayState state) {
+        List<Component> lines = new ArrayList<>();
+        for (String line : kit.displayLore()) {
+            lines.add(miniMessage.deserialize(processPlaceholders(viewer, kit, line)));
+        }
+        KitsMessageKey reason = state == DisplayState.UNAVAILABLE
+                ? KitsMessageKey.KIT_MENU_LORE_UNAVAILABLE
+                : KitsMessageKey.KIT_MENU_LORE_OUT_OF_STOCK;
+        lines.add(text(viewer, reason, Map.of("kit", kit.id().value())));
         if (kit.preview()) {
             lines.add(text(viewer, KitsMessageKey.KIT_MENU_PREVIEW_HINT, Map.of()));
         }

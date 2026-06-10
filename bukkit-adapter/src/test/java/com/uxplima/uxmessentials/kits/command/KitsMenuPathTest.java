@@ -181,7 +181,8 @@ class KitsMenuPathTest {
                 new StubKitCategoryRepository(),
                 access,
                 kitPreview,
-                GuiLayout.paginatedDefault(Material.CHEST));
+                GuiLayout.paginatedDefault(Material.CHEST),
+                Clock.systemUTC());
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(messages, kitEditor, new SyncScheduler());
         return new KitServices(

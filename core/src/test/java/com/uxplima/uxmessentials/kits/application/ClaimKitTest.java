@@ -369,6 +369,11 @@ class ClaimKitTest {
         public void release(KitId kit) {
             counts.computeIfPresent(kit.value(), (id, current) -> current > 0 ? current - 1 : 0);
         }
+
+        @Override
+        public long claimed(KitId kit) {
+            return counts.getOrDefault(kit.value(), 0);
+        }
     }
 
     private static final class RecordingGranter implements KitGranter {

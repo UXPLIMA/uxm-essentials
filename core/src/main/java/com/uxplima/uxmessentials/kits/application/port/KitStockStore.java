@@ -26,4 +26,7 @@ public interface KitStockStore {
 
     /** Give back one previously reserved unit of {@code kit}'s stock when a later gate in the same claim fails. */
     void release(KitId kit);
+
+    /** How many units of {@code kit} have been claimed so far — the browse menu reads it to show a sold-out icon. */
+    long claimed(KitId kit);
 }

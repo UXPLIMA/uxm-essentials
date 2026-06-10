@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.kits.adapter.inbound.gui;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +78,8 @@ public final class KitMenuView {
             KitCategoryRepository categoryRepository,
             KitAccess access,
             KitPreviewView preview,
-            GuiLayout layout) {
+            GuiLayout layout,
+            Clock clock) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -87,7 +89,8 @@ public final class KitMenuView {
         this.preview = Objects.requireNonNull(preview, "preview");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.miniMessage = MiniMessage.miniMessage();
-        this.iconRenderer = new KitIconRenderer(messages, access, layout, this.miniMessage);
+        this.iconRenderer =
+                new KitIconRenderer(messages, access, layout, this.miniMessage, Objects.requireNonNull(clock, "clock"));
     }
 
     /** Open the browse menu listing {@code kits} for {@code player}, scheduled on the viewer's entity thread. */
