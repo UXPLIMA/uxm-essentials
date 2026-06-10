@@ -257,6 +257,17 @@ public final class EconomyWiring {
         if (settings.banknotesEnabled()) {
             listenersList.add(new BanknoteListener(services.banknoteRedeemer()));
         }
+        if (settings.dailyRewardEnabled()) {
+            listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.DailyRewardListener(
+                    plugin,
+                    resolved,
+                    services.notifier(),
+                    kernel.scheduler(),
+                    settings.dailyRewardCurrency(currencies),
+                    true,
+                    settings.dailyRewardAmount(),
+                    settings.dailyRewardCooldown()));
+        }
         if (settings.exchangeEnabled()) {
             listenersList.add(chatPromptListener);
         }

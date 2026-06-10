@@ -419,6 +419,30 @@ public final class EconomyConfig {
         return Math.max(0L, config.getLong("salary.default-amount", 100L));
     }
 
+    /** Whether the daily login reward is enabled (off by default). */
+    public boolean dailyRewardEnabled() {
+        return config.getBoolean("daily-reward.enabled", false);
+    }
+
+    /** The daily login reward amount, in the reward currency's units. */
+    public BigDecimal dailyRewardAmount() {
+        return bigDecimal("daily-reward.amount", BigDecimal.ZERO).max(BigDecimal.ZERO);
+    }
+
+    /** The minimum gap between two daily-reward claims (at least an hour). */
+    public Duration dailyRewardCooldown() {
+        return Duration.ofHours(Math.max(1L, config.getLong("daily-reward.cooldown-hours", 24L)));
+    }
+
+    /** The currency the daily reward is paid in; the configured default when blank or unknown. */
+    public Currency dailyRewardCurrency(CurrencyRegistry currencies) {
+        String id = config.getString("daily-reward.currency", "").strip();
+        if (id.isEmpty()) {
+            return currencies.defaultCurrency();
+        }
+        return currencies.find(CurrencyId.of(id)).orElseGet(currencies::defaultCurrency);
+    }
+
     /** Whether fraud detection is enabled. */
     public boolean fraudEnabled() {
         return config.getBoolean("fraud-detection.enabled", false);

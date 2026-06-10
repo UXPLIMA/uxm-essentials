@@ -319,6 +319,7 @@ public enum EconomyMessageKey implements MessageKey {
 
     // Salary
     SALARY_PAYOUT("eco.salary.payout"),
+    DAILY_REWARD_GRANTED("eco.daily-reward.granted"),
 
     // Physical Economy
     PHYSICAL_INVENTORY_FULL("eco.physical.inventory-full"),
