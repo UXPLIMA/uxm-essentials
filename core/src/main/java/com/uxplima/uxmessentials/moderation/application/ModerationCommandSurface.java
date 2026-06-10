@@ -32,6 +32,7 @@ final class ModerationCommandSurface {
                 spec("unmute", "uxmessentials.moderation.unmute", "Lift a player's mute"),
                 spec("jail", "uxmessentials.moderation.jail", "Confine a player to a jail"),
                 spec("unjail", "uxmessentials.moderation.unjail", "Release a jailed player"),
+                spec("togglejail", "uxmessentials.moderation.togglejail", "Toggle a player's jail"),
                 spec("jails", "uxmessentials.moderation.jail", "List the configured jails"),
                 spec("jailedplayers", "uxmessentials.moderation.jail", "List the players currently jailed"),
                 spec("setjail", "uxmessentials.moderation.jail", "Define a jail at your location"),

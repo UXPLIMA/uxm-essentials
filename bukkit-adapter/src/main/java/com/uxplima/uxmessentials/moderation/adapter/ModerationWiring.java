@@ -51,6 +51,7 @@ import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.TempWarn;
+import com.uxplima.uxmessentials.moderation.application.ToggleJail;
 import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
@@ -149,11 +150,14 @@ public final class ModerationWiring {
         ModerationAudit audit = new LoggingModerationAudit(auditLogger());
         CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
         Sanctions sanctionPort = sanctions;
+        Jail jail = new Jail(repository, jails, sanctionPort, guard, notifier, audit, kernel.events(), clock);
+        Unjail unjail = new Unjail(repository, sanctionPort, notifier, audit, kernel.events(), clock);
         return new ModerationServices.Builder()
                 .mute(new Mute(repository, guard, notifier, audit, kernel.events(), history, clock))
                 .unmute(new Unmute(repository, notifier, audit, kernel.events(), history, clock))
-                .jail(new Jail(repository, jails, sanctionPort, guard, notifier, audit, kernel.events(), clock))
-                .unjail(new Unjail(repository, sanctionPort, notifier, audit, kernel.events(), clock))
+                .jail(jail)
+                .unjail(unjail)
+                .toggleJail(new ToggleJail(repository, jails, jail, unjail))
                 .tempBan(new TempBan(repository, sanctionPort, guard, notifier, audit, kernel.events(), history, clock))
                 .ban(new Ban(repository, sanctionPort, guard, notifier, audit, kernel.events(), history, clock))
                 .unban(new Unban(repository, notifier, audit, history))

@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.TempWarn;
+import com.uxplima.uxmessentials.moderation.application.ToggleJail;
 import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
@@ -49,6 +50,7 @@ public final class ModerationServices {
     private final Unmute unmute;
     private final Jail jail;
     private final Unjail unjail;
+    private final ToggleJail toggleJail;
     private final TempBan tempBan;
     private final Ban ban;
     private final Unban unban;
@@ -84,6 +86,7 @@ public final class ModerationServices {
         this.unmute = Objects.requireNonNull(builder.unmute, "unmute");
         this.jail = Objects.requireNonNull(builder.jail, "jail");
         this.unjail = Objects.requireNonNull(builder.unjail, "unjail");
+        this.toggleJail = Objects.requireNonNull(builder.toggleJail, "toggleJail");
         this.tempBan = Objects.requireNonNull(builder.tempBan, "tempBan");
         this.ban = Objects.requireNonNull(builder.ban, "ban");
         this.unban = Objects.requireNonNull(builder.unban, "unban");
@@ -129,6 +132,10 @@ public final class ModerationServices {
 
     public Unjail unjail() {
         return unjail;
+    }
+
+    public ToggleJail toggleJail() {
+        return toggleJail;
     }
 
     public TempBan tempBan() {
@@ -254,6 +261,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable Unmute unmute;
         private @org.jspecify.annotations.Nullable Jail jail;
         private @org.jspecify.annotations.Nullable Unjail unjail;
+        private @org.jspecify.annotations.Nullable ToggleJail toggleJail;
         private @org.jspecify.annotations.Nullable TempBan tempBan;
         private @org.jspecify.annotations.Nullable Ban ban;
         private @org.jspecify.annotations.Nullable Unban unban;
@@ -301,6 +309,11 @@ public final class ModerationServices {
 
         Builder unjail(Unjail value) {
             this.unjail = value;
+            return this;
+        }
+
+        Builder toggleJail(ToggleJail value) {
+            this.toggleJail = value;
             return this;
         }
 

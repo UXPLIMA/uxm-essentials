@@ -445,6 +445,9 @@ permissions:
   uxmessentials.moderation.unjail:
     description: '/unjail <player>.'
     default: op
+  uxmessentials.moderation.togglejail:
+    description: '/togglejail <player> [jail] [reason] — release the target if jailed, otherwise jail them in the named jail (or the first configured jail).'
+    default: op
   uxmessentials.moderation.tempban:
     description: '/tempban <player> <duration> [reason].'
     default: op
