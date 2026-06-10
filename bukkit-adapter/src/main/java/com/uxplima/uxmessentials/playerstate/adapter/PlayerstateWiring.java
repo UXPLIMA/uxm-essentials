@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerState
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.WorldCommandListener;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitNearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerEffects;
@@ -87,7 +88,11 @@ public final class PlayerstateWiring {
         Ports ports = new Ports(store, reconciler, effects, inventoryViewer, nearby, info, notifier);
         PlayerStateServices services = assemble(kernel, config, clock, ports);
         List<CommandRegistration> commands = PlayerStateCommands.all(services, kernel.messages());
-        List<Listener> listeners = List.of(new PlayerStateListener(store, reconciler), new InvseeListener(invseeView));
+        PlayerstateSettings settings = new PlayerstateSettings(config);
+        List<Listener> listeners = List.of(
+                new PlayerStateListener(store, reconciler),
+                new InvseeListener(invseeView),
+                new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()));
         return new Wired(commands, listeners, invseeView);
     }
 

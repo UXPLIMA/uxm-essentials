@@ -142,6 +142,9 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /world
     WORLD_SHOW("playerstate.world.show"),
 
+    // per-world command blocker
+    WORLD_COMMAND_BLOCKED("playerstate.world.command-blocked"),
+
     // /compass — the framing line plus the eight cardinal/intercardinal direction words it embeds
     COMPASS_SHOW("playerstate.compass.show"),
     COMPASS_NORTH("playerstate.compass.north"),
