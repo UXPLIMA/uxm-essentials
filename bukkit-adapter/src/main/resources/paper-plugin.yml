@@ -61,6 +61,11 @@ permissions:
   uxmessentials.lang.use:
     description: '/lang to set or clear your personal language override.'
     default: true
+  # Cross-cutting command discovery — /help lists the commands the sender can use. Per-line filtering
+  # uses each command's own permission, so this base node only gates the listing itself.
+  uxmessentials.help:
+    description: '/help to list the commands you can use.'
+    default: true
   # teleport context (docs/permissions.md "Teleport"). Value-bearing tier nodes
   # (uxmessentials.tp.warmup.<seconds>, uxmessentials.tp.cooldown.<seconds>) are an open
   # space granted per instance and are intentionally not enumerated here.

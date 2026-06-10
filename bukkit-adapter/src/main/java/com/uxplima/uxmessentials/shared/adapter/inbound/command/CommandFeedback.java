@@ -75,7 +75,12 @@ public final class CommandFeedback {
         return miniMessage.deserialize(rendered, prefix);
     }
 
-    private static PlayerRef refOf(CommandSender sender) {
+    /**
+     * The locale-bearing {@link PlayerRef} for {@code sender}: the player's own ref, or a synthetic
+     * console ref (a zero uuid carrying the console name) for a non-player. Exposed so a caller that
+     * pre-resolves a message fragment for inlining still resolves it in the sender's locale.
+     */
+    public static PlayerRef refOf(CommandSender sender) {
         return sender instanceof Player player
                 ? BukkitRefs.toRef(player)
                 : new PlayerRef(CONSOLE_UUID, sender.getName());

@@ -15,6 +15,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
+import com.uxplima.uxmessentials.bootstrap.command.HelpCommand;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
@@ -139,6 +140,10 @@ public final class PluginModule {
                 new DataDirBackupSnapshot(plugin.getDataFolder().toPath(), "backup", kernel.log()),
                 kernel.scheduler(),
                 kernel.log()));
+        // /help is cross-cutting too. It reads the same resolved, module-filtered registration set the plugin
+        // publishes — supplied lazily so it reflects every catalog rename and disable — and filters it per the
+        // sender's own permission. The supplier is evaluated on each invocation, well after wiring completes.
+        resources.addCommand(new HelpCommand(resources::commands, kernel.messages()));
         // Resolved last, once every module and the bootstrap commands have contributed, so the catalog sees
         // the full default surface before it applies the operator's rename/alias/disable choices.
         applyCatalog(plugin, kernel, resources);

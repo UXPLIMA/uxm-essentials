@@ -24,10 +24,10 @@ class CommandCatalogDriftTest {
 
     // The literals PluginModule.wire registers directly before applyCatalog runs, none of which is
     // sourced from a feature module: /uxmess (UxmessCommand.ROOT_LITERAL) is the admin root, /lang
-    // (LangCommand.LITERAL) is the cross-cutting locale switch, and /backup (BackupCommand.LITERAL) is the
-    // operator data snapshot. They share the same catalog namespace as the module commands, so they belong
-    // in the uniqueness and validity checks below.
-    private static final List<String> BOOTSTRAP_LITERALS = List.of("uxmess", "lang", "backup");
+    // (LangCommand.LITERAL) is the cross-cutting locale switch, /backup (BackupCommand.LITERAL) is the
+    // operator data snapshot, and /help (HelpCommand.LITERAL) is the cross-cutting command listing. They
+    // share the same catalog namespace as the module commands, so they belong in the checks below.
+    private static final List<String> BOOTSTRAP_LITERALS = List.of("uxmess", "lang", "backup", "help");
 
     private static List<String> allCommandLiterals() {
         List<String> moduleLiterals = new DefaultModuleRegistry()

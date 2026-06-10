@@ -99,7 +99,8 @@ class MessageKeyLocaleParityDriftTest {
 
     private static Map<MessageKey[], List<String>> ownershipTable() {
         return Map.ofEntries(
-                Map.entry(SharedMessageKey.values(), List.of("command", "cooldown", "warmup", "common", "lang")),
+                Map.entry(
+                        SharedMessageKey.values(), List.of("command", "cooldown", "warmup", "common", "lang", "help")),
                 Map.entry(TeleportMessageKey.values(), List.of("teleport", "tpa", "back", "rtp", "spawn")),
                 Map.entry(HomesMessageKey.values(), List.of("home")),
                 Map.entry(
