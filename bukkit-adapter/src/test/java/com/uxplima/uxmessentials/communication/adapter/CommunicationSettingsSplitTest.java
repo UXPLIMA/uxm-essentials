@@ -51,6 +51,31 @@ class CommunicationSettingsSplitTest {
     }
 
     @Test
+    void aPageMayDeclareAnExplicitPageSizeViaTheSectionForm(@TempDir Path dir) throws Exception {
+        Files.createDirectories(dir);
+        Files.writeString(
+                dir.resolve("info-pages.conf"),
+                """
+                info-pages {
+                  rules = [ "Rule one", "Rule two" ]
+                  info { lines = [ "a", "b", "c" ], page-size = 2 }
+                }
+                """);
+
+        CommunicationSettings settings = new CommunicationSettings(dir, new NoopLogger());
+
+        // The bare-list form keeps the default page size; the section form honours the authored page-size.
+        assertThat(settings.infoRegistry().find("rules"))
+                .map(InfoPage::pageSize)
+                .contains(InfoPage.DEFAULT_PAGE_SIZE);
+        InfoPage info =
+                settings.infoRegistry().find("info").orElseThrow(() -> new AssertionError("info page must parse"));
+        assertThat(info.lines()).containsExactly("a", "b", "c");
+        assertThat(info.pageSize()).isEqualTo(2);
+        assertThat(info.pageCount()).isEqualTo(2);
+    }
+
+    @Test
     void anAbsentDirectoryYieldsFullyInertContent(@TempDir Path dir) {
         Path missing = dir.resolve("does-not-exist");
 

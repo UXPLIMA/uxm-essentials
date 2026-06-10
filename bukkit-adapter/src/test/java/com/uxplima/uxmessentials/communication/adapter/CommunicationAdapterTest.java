@@ -18,6 +18,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationCommands;
+import com.uxplima.uxmessentials.communication.adapter.inbound.command.InfoPageCommand;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ConnectionMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AtomicSequenceCounter;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
@@ -32,6 +33,7 @@ import com.uxplima.uxmessentials.communication.application.ResolveConnectionMess
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
+import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -109,6 +111,68 @@ class CommunicationAdapterTest {
 
         // The /rules command was auto-registered from the info-pages map and printed both operator lines verbatim.
         assertThat(sink.lines).containsExactly("Rule one", "Rule two");
+    }
+
+    @Test
+    void aMultiPageInfoCommandDrawsTheHeaderAndFooterChromeAroundTheFirstPageSlice() {
+        InfoPageCommand info = new InfoPageCommand(
+                "info",
+                InfoRegistry.of(List.of(InfoPage.of("info", List.of("a", "b", "c", "d", "e"), 2))),
+                new BukkitInfoSender(sink),
+                new CommunicationNotifier(sink, sink),
+                sink);
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        dispatcher.getRoot().addChild(info.build());
+
+        execute(dispatcher, "info");
+
+        // Page one of a three-page body: the header is drawn first, then the first two body lines, then the footer.
+        // The double resolves a MessageKey to its key string and delivers it, so the chrome appears in lines too —
+        // assert the full interleaved order, which pins header → body slice → footer.
+        assertThat(sink.lines)
+                .containsExactly(
+                        CommunicationMessageKey.INFO_PAGE_HEADER.key(),
+                        "a",
+                        "b",
+                        CommunicationMessageKey.INFO_PAGE_FOOTER.key());
+        assertThat(sink.keys)
+                .containsExactly(CommunicationMessageKey.INFO_PAGE_HEADER, CommunicationMessageKey.INFO_PAGE_FOOTER);
+    }
+
+    @Test
+    void theLastPageOfAnInfoCommandDrawsAHeaderButNoNextPageFooter() {
+        InfoPageCommand info = new InfoPageCommand(
+                "info",
+                InfoRegistry.of(List.of(InfoPage.of("info", List.of("a", "b", "c", "d", "e"), 2))),
+                new BukkitInfoSender(sink),
+                new CommunicationNotifier(sink, sink),
+                sink);
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        dispatcher.getRoot().addChild(info.build());
+
+        execute(dispatcher, "info 3");
+
+        // The final page shows the header but no "next page" footer; the slice is the single trailing line.
+        assertThat(sink.lines).containsExactly(CommunicationMessageKey.INFO_PAGE_HEADER.key(), "e");
+        assertThat(sink.keys).containsExactly(CommunicationMessageKey.INFO_PAGE_HEADER);
+    }
+
+    @Test
+    void aSinglePageInfoCommandPrintsTheBodyWithNoPaginationChrome() {
+        InfoPageCommand info = new InfoPageCommand(
+                "info",
+                InfoRegistry.of(List.of(InfoPage.of("info", List.of("one", "two"), 8))),
+                new BukkitInfoSender(sink),
+                new CommunicationNotifier(sink, sink),
+                sink);
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        dispatcher.getRoot().addChild(info.build());
+
+        execute(dispatcher, "info");
+
+        // A body that fits in one page is printed verbatim with no header or footer keys.
+        assertThat(sink.lines).containsExactly("one", "two");
+        assertThat(sink.keys).isEmpty();
     }
 
     @Test

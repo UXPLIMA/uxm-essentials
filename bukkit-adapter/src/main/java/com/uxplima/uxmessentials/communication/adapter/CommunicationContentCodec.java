@@ -81,13 +81,30 @@ final class CommunicationContentCodec {
 
     private static List<InfoPage> infoPages(ConfigurationNode node) {
         List<InfoPage> pages = new ArrayList<>();
-        node.childrenMap().forEach((key, child) -> {
-            List<String> lines = strings(child);
-            if (!lines.isEmpty()) {
-                pages.add(InfoPage.of(String.valueOf(key), lines));
-            }
-        });
+        node.childrenMap()
+                .forEach((key, child) -> infoPage(String.valueOf(key), child).ifPresent(pages::add));
         return List.copyOf(pages);
+    }
+
+    /**
+     * Parse one info-page entry. A bare list ({@code rules = [ "a", "b" ]}) is the body with the default page size;
+     * a section ({@code info { lines = [ ... ], page-size = 10 }}) carries an explicit page size. An entry with no
+     * body lines is dropped so it registers no command.
+     */
+    private static Optional<InfoPage> infoPage(String name, ConfigurationNode node) {
+        List<String> lines = node.isList() ? strings(node) : strings(node.node("lines"));
+        if (lines.isEmpty()) {
+            return Optional.empty();
+        }
+        int pageSize = clampPageSize(node.node("page-size").getInt(InfoPage.DEFAULT_PAGE_SIZE));
+        return Optional.of(InfoPage.of(name, lines, pageSize));
+    }
+
+    private static int clampPageSize(int requested) {
+        if (requested < 1) {
+            return 1;
+        }
+        return Math.min(requested, InfoPage.MAX_PAGE_SIZE);
     }
 
     private static List<String> strings(ConfigurationNode node) {

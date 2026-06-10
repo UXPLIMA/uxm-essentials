@@ -25,6 +25,11 @@ public enum CommunicationMessageKey implements MessageKey {
     // /rules /motd /info — a requested info page that is not configured.
     INFO_PAGE_MISSING("communication.info-page-missing"),
 
+    // /rules /motd /info [page] — the paginated header/footer chrome drawn around a multi-page info body. The page
+    // body itself is operator content, never a MessageKey; only this framing is the plugin's own string.
+    INFO_PAGE_HEADER("communication.info-page.header"),
+    INFO_PAGE_FOOTER("communication.info-page.footer"),
+
     // /me — the third-person action broadcast line; the typed action is a placeholder, never re-parsed.
     ME("communication.me"),
 

@@ -10,15 +10,19 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
+import com.uxplima.uxmessentials.communication.application.InfoPageView;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
+import com.uxplima.uxmessentials.communication.application.ShowInfoPage;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -27,6 +31,12 @@ import org.jspecify.annotations.NullMarked;
  * guarded by its per-page permission node {@code uxmessentials.communication.info.<name>}. The page body is
  * operator-authored MiniMessage content rendered through the {@link BukkitInfoSender}, never a plugin
  * {@code MessageKey}.
+ *
+ * <p>The command is paginated: {@code /<name> [page]} shows one page of the body, and a page longer than its
+ * configured size is framed by the plugin's own {@link CommunicationMessageKey#INFO_PAGE_HEADER} and
+ * {@link CommunicationMessageKey#INFO_PAGE_FOOTER} chrome (the only translated strings here — the body stays raw
+ * operator content). The {@link ShowInfoPage} use case clamps an over-large page request into range, so
+ * {@code /info 99} on a two-page document serves page two rather than an error.
  *
  * <p>The page is resolved from the live registry on each run rather than captured, so a
  * {@code /uxmess reload communication} that swaps a fresh registry in serves the new body without re-registering
@@ -61,7 +71,9 @@ public final class InfoPageCommand extends CommunicationCommandSupport implement
         String permission = PERMISSION_PREFIX + command;
         return Commands.literal(command)
                 .requires(src -> src.getSender().hasPermission(permission))
-                .executes(this::show)
+                .executes(ctx -> show(ctx, 1))
+                .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                        .executes(ctx -> show(ctx, ctx.getArgument("page", Integer.class))))
                 .build();
     }
 
@@ -70,7 +82,7 @@ public final class InfoPageCommand extends CommunicationCommandSupport implement
         return "Show the " + command + " info page.";
     }
 
-    private int show(CommandContext<CommandSourceStack> ctx) {
+    private int show(CommandContext<CommandSourceStack> ctx, int requestedPage) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
@@ -80,7 +92,28 @@ public final class InfoPageCommand extends CommunicationCommandSupport implement
             notifier.send(ref(sender), CommunicationMessageKey.INFO_PAGE_MISSING, Map.of("page", command));
             return Command.SINGLE_SUCCESS;
         }
-        infoSender.send(ref(sender), page.get());
+        render(ref(sender), ShowInfoPage.view(page.get(), requestedPage));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private void render(PlayerRef viewer, InfoPageView view) {
+        if (view.isPaginated()) {
+            notifier.send(viewer, CommunicationMessageKey.INFO_PAGE_HEADER, headerPlaceholders(view));
+        }
+        infoSender.send(viewer, view.lines());
+        if (view.isPaginated() && view.page() < view.pageCount()) {
+            notifier.send(viewer, CommunicationMessageKey.INFO_PAGE_FOOTER, footerPlaceholders(view));
+        }
+    }
+
+    private Map<String, String> headerPlaceholders(InfoPageView view) {
+        return Map.of(
+                "command", view.command(),
+                "page", Integer.toString(view.page()),
+                "pages", Integer.toString(view.pageCount()));
+    }
+
+    private Map<String, String> footerPlaceholders(InfoPageView view) {
+        return Map.of("command", view.command(), "next", Integer.toString(view.page() + 1));
     }
 }

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.communication.adapter.outbound;
 
+import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
@@ -28,10 +29,16 @@ public final class BukkitInfoSender {
 
     /** Deliver every line of {@code page} to {@code viewer}, substituting {@code {player}} with the viewer name. */
     public void send(PlayerRef viewer, InfoPage page) {
-        Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(page, "page");
+        send(viewer, page.lines());
+    }
+
+    /** Deliver {@code lines} to {@code viewer}, substituting {@code {player}} with the viewer name in each line. */
+    public void send(PlayerRef viewer, List<String> lines) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(lines, "lines");
         PlaceholderBindings bindings = PlaceholderBindings.empty().with("player", viewer.name());
-        for (String line : page.lines()) {
+        for (String line : lines) {
             sink.deliver(viewer, bindings.apply(line));
         }
     }
