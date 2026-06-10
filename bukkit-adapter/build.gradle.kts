@@ -27,6 +27,13 @@ dependencies {
     // without PlaceholderAPI installed.
     compileOnly(libs.placeholderapi)
 
+    // Map-plugin marker soft-depends — compileOnly: the Dynmap/squaremap marker publishers touch these
+    // symbols only past the plugin-present guard, so the plugin runs fully with neither map plugin installed.
+    // Dynmap splits its surface: dynmap-api carries the DynmapAPI plugin handle, DynmapCoreAPI the markers package.
+    compileOnly(libs.squaremap.api)
+    compileOnly(libs.dynmap.api)
+    compileOnly(libs.dynmap.core.api)
+
     compileOnly(libs.bundles.configs)
     implementation(libs.bstats.bukkit)
 

@@ -14,5 +14,6 @@ allprojects {
         maven("https://repo.codemc.org/repository/maven-public/")  // Treasury economy API
         maven("https://jitpack.io")                                 // Vault economy API
         maven("https://repo.extendedclip.com/releases/")           // PlaceholderAPI
+        maven("https://repo.mikeprimm.com/")                        // Dynmap API (squaremap API is on Maven Central)
     }
 }

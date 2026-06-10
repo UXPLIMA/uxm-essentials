@@ -119,10 +119,11 @@ public final class PluginModule {
                 wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus());
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
-        // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker). These belong
-        // to no feature context: server links apply once on enable, and the update checker — off by default —
-        // contributes an op-only join notice and a stop hook for its recurring check.
-        IntegrationsWiring.Wired integrations = IntegrationsWiring.wire(plugin, config, kernel);
+        // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
+        // integration). These belong to no feature context: server links apply once on enable, the update checker —
+        // off by default — contributes an op-only join notice and a stop hook for its recurring check, and the
+        // map-marker integration renders warps/spawns onto Dynmap/squaremap when one is installed (homes opt-in).
+        IntegrationsWiring.Wired integrations = IntegrationsWiring.wire(plugin, config, kernel, persistence);
         integrations.joinListener().ifPresent(resources::addListener);
         resources.onClose(integrations.stop());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);

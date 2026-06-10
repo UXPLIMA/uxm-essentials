@@ -34,6 +34,14 @@ dependencies:
     Votifier:
       load: BEFORE
       required: false
+    # Dynmap/squaremap back the map-marker integration. Loaded before us so the marker API is ready when
+    # we render on enable; reached only past a plugin-present guard, so the plugin runs fully without either.
+    dynmap:
+      load: BEFORE
+      required: false
+    squaremap:
+      load: BEFORE
+      required: false
 
 # Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
 # The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with
