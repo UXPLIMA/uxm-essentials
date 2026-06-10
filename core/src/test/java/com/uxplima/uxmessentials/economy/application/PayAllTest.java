@@ -48,7 +48,13 @@ class PayAllTest {
         Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
         NativeEconomyProvider provider = new NativeEconomyProvider(repo, registry, clock);
         EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), sink);
-        Pay pay = new Pay(provider, new InMemoryPayPreferences(), new InMemoryPendingPayRegistry(), notifier, clock);
+        Pay pay = new Pay(
+                provider,
+                new InMemoryPayPreferences(),
+                new InMemoryPendingPayRegistry(),
+                notifier,
+                PayTaxation.none(),
+                clock);
         return new PayAll(pay, notifier);
     }
 

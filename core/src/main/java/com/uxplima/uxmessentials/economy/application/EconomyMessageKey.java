@@ -32,6 +32,7 @@ public enum EconomyMessageKey implements MessageKey {
     PAY_CONFIRM_NONE("pay.confirm-none"),
     PAY_CONFIRM_EXPIRED("pay.confirm-expired"),
     PAY_CURRENCY_DISABLED("pay.currency-disabled"),
+    PAY_TAX_APPLIED("pay.tax-applied"),
 
     // Pay confirmation GUI
     PAY_CONFIRM_GUI_TITLE("pay.confirm-gui-title"),

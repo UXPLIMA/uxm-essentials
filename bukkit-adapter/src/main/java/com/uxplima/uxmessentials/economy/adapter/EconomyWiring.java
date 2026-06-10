@@ -27,8 +27,10 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.EconomyProviderRegistr
 import com.uxplima.uxmessentials.economy.adapter.outbound.LoanRepaymentTask;
 import com.uxplima.uxmessentials.economy.adapter.outbound.LoggingEconomyAudit;
 import com.uxplima.uxmessentials.economy.adapter.outbound.PermissionBaltopExemption;
+import com.uxplima.uxmessentials.economy.adapter.outbound.PermissionTaxExemption;
 import com.uxplima.uxmessentials.economy.adapter.outbound.PhysicalWalletRepositoryDecorator;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderKitEconomy;
+import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderTaxSink;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderWarpEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SalaryTask;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SchedulerPendingPayRegistry;
@@ -44,6 +46,7 @@ import com.uxplima.uxmessentials.economy.application.LookupWorth;
 import com.uxplima.uxmessentials.economy.application.NativeEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.application.PayAll;
+import com.uxplima.uxmessentials.economy.application.PayTaxation;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
 import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
@@ -340,7 +343,11 @@ public final class EconomyWiring {
         WorthSource worth = new CombiningWorthSource(
                 worthOverrides, configWorth, currencies.defaultCurrency().id().value());
         Currency defaultCurrency = currencies.defaultCurrency();
-        Pay pay = new Pay(resolved, preferences, pending, notifier, clock);
+        PayTaxation taxation = new PayTaxation(
+                settings.taxPolicy(),
+                new ProviderTaxSink(resolved, settings.taxSinkAccount(), kernel.log()),
+                new PermissionTaxExemption(kernel.permissions(), settings.taxBypassNode()));
+        Pay pay = new Pay(resolved, preferences, pending, notifier, taxation, clock);
 
         // Exchange is a native-ledger feature like loans and banks: the atomic two-currency move runs through the
         // wallet repository this context owns, so it is available only when the resolved provider is the native

@@ -309,6 +309,38 @@ public final class EconomyConfig {
                 scoreCeiling);
     }
 
+    /** The operator-tunable pay-tax rule; disabled by default so an untouched config leaves {@code /pay} untaxed. */
+    public com.uxplima.uxmessentials.economy.application.TaxPolicy taxPolicy() {
+        boolean enabled = config.getBoolean("pay.tax.enabled", false);
+        BigDecimal percent = bigDecimal("pay.tax.percent", BigDecimal.ZERO).max(BigDecimal.ZERO);
+        BigDecimal flat = bigDecimal("pay.tax.flat", BigDecimal.ZERO).max(BigDecimal.ZERO);
+        return new com.uxplima.uxmessentials.economy.application.TaxPolicy(enabled, percent, flat);
+    }
+
+    /** The permission node whose holders pay no {@code /pay} tax. */
+    public String taxBypassNode() {
+        return config.getString("pay.tax.bypass-permission", "uxmessentials.economy.tax.bypass");
+    }
+
+    /**
+     * Where the pay tax goes: a configured holding wallet when {@code pay.tax.sink = "account:<uuid>"}, otherwise
+     * (the default {@code "void"} or a malformed value) destroyed. The account name is cosmetic — the wallet is
+     * keyed by the uuid.
+     */
+    public java.util.Optional<com.uxplima.uxmessentials.shared.domain.PlayerRef> taxSinkAccount() {
+        String raw = config.getString("pay.tax.sink", "void").strip();
+        if (!raw.toLowerCase(java.util.Locale.ROOT).startsWith("account:")) {
+            return java.util.Optional.empty();
+        }
+        try {
+            java.util.UUID uuid =
+                    java.util.UUID.fromString(raw.substring("account:".length()).strip());
+            return java.util.Optional.of(new com.uxplima.uxmessentials.shared.domain.PlayerRef(uuid, "tax-account"));
+        } catch (IllegalArgumentException badUuid) {
+            return java.util.Optional.empty();
+        }
+    }
+
     private BigDecimal bigDecimal(String path, BigDecimal fallback) {
         String raw = config.getString(path, "").strip();
         if (raw.isEmpty()) {

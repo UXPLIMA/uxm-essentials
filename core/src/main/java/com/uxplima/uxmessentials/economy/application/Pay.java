@@ -33,6 +33,7 @@ public final class Pay {
     private final PayPreferences preferences;
     private final PendingPayRegistry pending;
     private final EconomyNotifier notifier;
+    private final PayTaxation taxation;
     private final Clock clock;
 
     public Pay(
@@ -40,11 +41,13 @@ public final class Pay {
             PayPreferences preferences,
             PendingPayRegistry pending,
             EconomyNotifier notifier,
+            PayTaxation taxation,
             Clock clock) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.preferences = Objects.requireNonNull(preferences, "preferences");
         this.pending = Objects.requireNonNull(pending, "pending");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.taxation = Objects.requireNonNull(taxation, "taxation");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -124,11 +127,17 @@ public final class Pay {
     }
 
     private PayOutcome sent(PlayerRef from, PlayerRef to, Money amount) {
-        // The provider applied both legs and emitted the WalletDebited/WalletCredited events at the source;
-        // this use case only confirms to the two players.
+        // The provider applied both legs and emitted the WalletDebited/WalletCredited events at the source.
+        // The tax (if any) is then taken out of the receiver — who was just credited the gross, so the sink's
+        // guarded move always succeeds — and the receiver is told the net they actually kept.
+        Money tax = taxation.collect(from, to, amount);
+        Money net = amount.minus(tax);
         notifier.send(from, EconomyMessageKey.PAY_SENT, Map.of("player", to.name(), "amount", notifier.amount(amount)));
+        if (!tax.isZero()) {
+            notifier.send(from, EconomyMessageKey.PAY_TAX_APPLIED, Map.of("amount", notifier.amount(tax)));
+        }
         notifier.send(
-                to, EconomyMessageKey.PAY_RECEIVED, Map.of("player", from.name(), "amount", notifier.amount(amount)));
+                to, EconomyMessageKey.PAY_RECEIVED, Map.of("player", from.name(), "amount", notifier.amount(net)));
         return PayOutcome.sent();
     }
 

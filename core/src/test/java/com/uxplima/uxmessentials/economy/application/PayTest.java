@@ -53,7 +53,18 @@ class PayTest {
         Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
         NativeEconomyProvider provider = new NativeEconomyProvider(repo, registry, clock);
         EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), sink);
-        return new Pay(provider, preferences, pending, notifier, clock);
+        return new Pay(provider, preferences, pending, notifier, PayTaxation.none(), clock);
+    }
+
+    private Pay payWith(
+            java.util.Set<com.uxplima.uxmessentials.economy.domain.Currency> currencies, PayTaxation taxation) {
+        com.uxplima.uxmessentials.economy.domain.Currency def =
+                currencies.iterator().next();
+        CurrencyRegistry registry = CurrencyRegistry.of(currencies, def.id());
+        Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
+        NativeEconomyProvider provider = new NativeEconomyProvider(repo, registry, clock);
+        EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), sink);
+        return new Pay(provider, preferences, pending, notifier, taxation, clock);
     }
 
     @Test
@@ -111,6 +122,59 @@ class PayTest {
 
         assertThat(outcome.error()).get().isEqualTo(TransferError.CURRENCY_TRANSFER_DISABLED);
         assertThat(repo.findByOwner(alice).orElseThrow().balanceOf(gems)).isEqualTo(Money.of(gems, 100));
+    }
+
+    @Test
+    void taxIsTakenFromTheReceiverAndDestroyedByTheVoidSink() {
+        PayTaxation tax = new PayTaxation(
+                new TaxPolicy(true, java.math.BigDecimal.TEN, java.math.BigDecimal.ZERO),
+                (receiver, amount) -> repo.debit(receiver, amount),
+                payer -> false);
+        Pay pay = payWith(java.util.Set.of(Currencies.COINS), tax);
+        repo.credit(alice, Money.of(Currencies.COINS, 100));
+
+        PayOutcome outcome = pay.pay(alice, bob, Money.of(Currencies.COINS, 100));
+
+        assertThat(outcome.kind()).isEqualTo(PayOutcome.Kind.SENT);
+        assertThat(repo.findByOwner(alice).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 0)); // payer lost the full gross
+        assertThat(repo.findByOwner(bob).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 90)); // 100 gross - 10 tax
+        assertThat(sink.delivered("pay.tax-applied")).isTrue();
+    }
+
+    @Test
+    void taxRoutesToAServerAccountSink() {
+        PlayerRef account = new PlayerRef(UUID.randomUUID(), "Treasury");
+        PayTaxation tax = new PayTaxation(
+                new TaxPolicy(true, java.math.BigDecimal.TEN, java.math.BigDecimal.ZERO),
+                (receiver, amount) -> repo.transfer(receiver, account, amount),
+                payer -> false);
+        Pay pay = payWith(java.util.Set.of(Currencies.COINS), tax);
+        repo.credit(alice, Money.of(Currencies.COINS, 100));
+
+        pay.pay(alice, bob, Money.of(Currencies.COINS, 100));
+
+        assertThat(repo.findByOwner(bob).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 90));
+        assertThat(repo.findByOwner(account).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 10)); // the tax landed in the treasury
+    }
+
+    @Test
+    void exemptPayerIsNotTaxed() {
+        PayTaxation tax = new PayTaxation(
+                new TaxPolicy(true, java.math.BigDecimal.TEN, java.math.BigDecimal.ZERO),
+                (receiver, amount) -> repo.debit(receiver, amount),
+                payer -> true); // everyone exempt
+        Pay pay = payWith(java.util.Set.of(Currencies.COINS), tax);
+        repo.credit(alice, Money.of(Currencies.COINS, 100));
+
+        pay.pay(alice, bob, Money.of(Currencies.COINS, 100));
+
+        assertThat(repo.findByOwner(bob).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 100)); // no tax taken
+        assertThat(sink.delivered("pay.tax-applied")).isFalse();
     }
 
     @Test
