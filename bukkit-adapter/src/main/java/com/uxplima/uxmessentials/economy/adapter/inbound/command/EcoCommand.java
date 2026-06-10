@@ -54,6 +54,9 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .then(Commands.literal("backup")
                         .requires(src -> src.getSender().hasPermission(BASE + ".backup"))
                         .executes(this::runBackup))
+                .then(Commands.literal("export")
+                        .requires(src -> src.getSender().hasPermission(BASE + ".backup"))
+                        .executes(this::runExport))
                 .then(Commands.literal("restore")
                         .requires(src -> src.getSender().hasPermission(BASE + ".restore"))
                         .then(CommandSuggestions.playerArgument("player")
@@ -178,6 +181,25 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         return offline != null && offline.getName() != null
                 ? Optional.of(new PlayerRef(offline.getUniqueId(), offline.getName()))
                 : Optional.empty();
+    }
+
+    private int runExport(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        offTick(() -> {
+            try {
+                String file = services.backupManager().exportCsv();
+                feedback.send(sender, EconomyMessageKey.ECO_ADMIN_EXPORT_CREATED, java.util.Map.of("file", file));
+            } catch (Exception e) {
+                feedback.send(
+                        sender,
+                        EconomyMessageKey.ECO_ADMIN_BACKUP_FAILED,
+                        java.util.Map.of("error", String.valueOf(e.getMessage())));
+            }
+        });
+        return Command.SINGLE_SUCCESS;
     }
 
     private int runReset(CommandContext<CommandSourceStack> ctx) {

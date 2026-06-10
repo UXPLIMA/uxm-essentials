@@ -102,6 +102,7 @@ public enum EconomyMessageKey implements MessageKey {
     ECO_ADMIN_NO_TARGETS("eco.admin.no-targets"),
     ECO_ADMIN_BACKUP_CREATED("eco.admin.backup-created"),
     ECO_ADMIN_BACKUP_FAILED("eco.admin.backup-failed"),
+    ECO_ADMIN_EXPORT_CREATED("eco.admin.export-created"),
     ECO_ADMIN_RESTORE_TARGET_UNKNOWN("eco.admin.restore-target-unknown"),
     ECO_ADMIN_RESTORE_SUCCESS("eco.admin.restore-success"),
     ECO_ADMIN_RESTORE_NOT_FOUND("eco.admin.restore-not-found"),

@@ -76,6 +76,28 @@ public final class EconomyBackupManager extends JooqRepository {
         return timestamp;
     }
 
+    /**
+     * Export every wallet row to a timestamped CSV file ({@code owner,currency,balance}) for offboarding or
+     * external analysis, and return the file name. Reads the whole ledger in one query, then writes the file
+     * outside any transaction (mirroring {@link #backupAll()}).
+     */
+    public String exportCsv() throws IOException {
+        ensureBackupDir();
+        Map<String, Map<String, BigDecimal>> data = readAllBalances();
+        String name = "export_" + dateFormat.format(Instant.now()) + ".csv";
+        File file = new File(backupDir, name);
+        try (java.io.Writer writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
+            writer.write("owner,currency,balance\n");
+            for (Map.Entry<String, Map<String, BigDecimal>> owner : data.entrySet()) {
+                for (Map.Entry<String, BigDecimal> entry : owner.getValue().entrySet()) {
+                    writer.write(owner.getKey() + "," + entry.getKey() + ","
+                            + entry.getValue().toPlainString() + "\n");
+                }
+            }
+        }
+        return name;
+    }
+
     /** Restores a specific player's balances from a past backup matching the timestamp, in one transaction. */
     public boolean restorePlayer(PlayerRef player, String timestamp) throws IOException {
         Objects.requireNonNull(player, "player");
