@@ -44,6 +44,7 @@ public final class PlayerStateCommands {
                 new SpeedCommand(SpeedCommand.Target.FLY, services, messages),
                 new ExtinguishCommand(services, messages),
                 new ClearInventoryCommand(services, messages),
+                new ClearInventoryConfirmToggleCommand(services, messages),
                 new InvseeCommand(services, messages),
                 new EnderseeCommand(services, messages),
                 new SuicideCommand(services, messages),

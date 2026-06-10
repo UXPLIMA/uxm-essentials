@@ -43,6 +43,10 @@ final class PlayerstateCommandSurface {
                         "clearinventory",
                         "uxmessentials.clearinventory.use",
                         cmd("clearinventory", "Clear a player's inventory")),
+                spec(
+                        "clearinventoryconfirmtoggle",
+                        "uxmessentials.clearinventory.confirmtoggle",
+                        cmd("clearinventoryconfirmtoggle", "Toggle a confirmation before /clearinventory")),
                 spec("invsee", "uxmessentials.invsee.use", cmd("invsee", "View a player's inventory")),
                 spec("endersee", "uxmessentials.endersee.use", cmd("endersee", "View a player's ender chest")),
                 spec("suicide", "uxmessentials.suicide.use", cmd("suicide", "Kill yourself")),

@@ -286,6 +286,9 @@ permissions:
   uxmessentials.clearinventory.use:
     description: '/clearinventory (/ci /clear) [player] to empty a player''s inventory.'
     default: op
+  uxmessentials.clearinventory.confirmtoggle:
+    description: '/clearinventoryconfirmtoggle (/citoggle) to require a confirmation before /clearinventory clears your own inventory.'
+    default: true
   uxmessentials.invsee.use:
     description: '/invsee [player] to view a player''s inventory.'
     default: op

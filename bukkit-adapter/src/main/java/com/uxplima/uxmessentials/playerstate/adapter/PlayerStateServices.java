@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.playerstate.application.ShowPing;
 import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
+import com.uxplima.uxmessentials.playerstate.application.ToggleClearInventoryConfirm;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGlow;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
@@ -46,6 +47,7 @@ import org.jspecify.annotations.NullMarked;
  * @param setSpeed {@code /speed}, {@code /walkspeed}, {@code /flyspeed}
  * @param extinguish {@code /ext} ({@code /extinguish})
  * @param clearInventory {@code /clearinventory} ({@code /ci}, {@code /clear})
+ * @param clearInventoryConfirmToggle {@code /clearinventoryconfirmtoggle} ({@code /citoggle})
  * @param openContainer {@code /invsee} and {@code /endersee}
  * @param suicide {@code /suicide}
  * @param listNearby {@code /near}
@@ -75,6 +77,7 @@ public record PlayerStateServices(
         SetSpeed setSpeed,
         Extinguish extinguish,
         ClearInventory clearInventory,
+        ToggleClearInventoryConfirm clearInventoryConfirmToggle,
         OpenContainer openContainer,
         Suicide suicide,
         ListNearby listNearby,
@@ -103,6 +106,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(setSpeed, "setSpeed");
         Objects.requireNonNull(extinguish, "extinguish");
         Objects.requireNonNull(clearInventory, "clearInventory");
+        Objects.requireNonNull(clearInventoryConfirmToggle, "clearInventoryConfirmToggle");
         Objects.requireNonNull(openContainer, "openContainer");
         Objects.requireNonNull(suicide, "suicide");
         Objects.requireNonNull(listNearby, "listNearby");

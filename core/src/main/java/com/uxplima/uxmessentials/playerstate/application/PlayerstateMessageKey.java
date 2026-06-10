@@ -64,6 +64,11 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /clearinventory
     INVENTORY_CLEARED("playerstate.clearinventory.self"),
     INVENTORY_CLEARED_OTHER("playerstate.clearinventory.other"),
+    INVENTORY_CLEAR_CONFIRM("playerstate.clearinventory.confirm"),
+
+    // /clearinventoryconfirmtoggle (/citoggle)
+    CLEAR_CONFIRM_ON("playerstate.clearinventory.confirm-on"),
+    CLEAR_CONFIRM_OFF("playerstate.clearinventory.confirm-off"),
 
     // /invsee
     INVSEE_OPENED("playerstate.invsee.opened"),

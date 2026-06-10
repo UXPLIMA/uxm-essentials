@@ -2,12 +2,18 @@ package com.uxplima.uxmessentials.playerstate.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.playerstate.application.port.ClearInventoryPreferences;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
@@ -29,13 +35,16 @@ import org.junit.jupiter.api.Test;
  * {@code /clearinventory} ({@code /ci}, {@code /clear}): a live-only verb that empties a player's inventory
  * through the {@link PlayerEffects} port without touching the persisted snapshot or publishing a domain event.
  * Pins the two confirmation shapes — a self clear that notifies only the actor, and a staff clear that confirms
- * to the actor with the subject's name and to the subject themselves.
+ * to the actor with the subject's name and to the subject themselves — plus the opt-in two-step confirm a
+ * player turns on with {@code /clearinventoryconfirmtoggle}.
  */
 class ClearInventoryTest {
 
     private RecordingEffects effects;
     private CapturingSink sink;
     private PlayerStateNotifier notifier;
+    private RecordingPreferences preferences;
+    private Clock clock;
     private PlayerRef alice;
     private PlayerRef bob;
 
@@ -44,15 +53,19 @@ class ClearInventoryTest {
         effects = new RecordingEffects();
         sink = new CapturingSink();
         notifier = new PlayerStateNotifier(new KeyMessages(), sink);
+        preferences = new RecordingPreferences();
+        clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
         bob = new PlayerRef(UUID.randomUUID(), "Bob");
     }
 
+    private ClearInventory useCase() {
+        return new ClearInventory(effects, notifier, preferences, clock);
+    }
+
     @Test
     void selfClearEmptiesTheInventoryAndConfirmsToTheActor() {
-        ClearInventory clear = new ClearInventory(effects, notifier);
-
-        clear.clear(alice);
+        useCase().clear(alice);
 
         assertThat(effects.cleared).containsExactly(alice.uuid());
         assertThat(sink.sent).containsExactly(new Sent(alice.uuid(), PlayerstateMessageKey.INVENTORY_CLEARED.key()));
@@ -60,9 +73,7 @@ class ClearInventoryTest {
 
     @Test
     void staffClearEmptiesTheSubjectAndConfirmsToBothParties() {
-        ClearInventory clear = new ClearInventory(effects, notifier);
-
-        clear.clearFor(alice, bob);
+        useCase().clearFor(alice, bob);
 
         assertThat(effects.cleared).containsExactly(bob.uuid());
         assertThat(sink.sent)
@@ -72,7 +83,63 @@ class ClearInventoryTest {
         assertThat(sink.placeholderFor(alice.uuid(), "player")).isEqualTo("Bob");
     }
 
+    @Test
+    void withConfirmOnTheFirstSelfClearPromptsRatherThanClearing() {
+        preferences.confirmOn.add(alice.uuid());
+        ClearInventory clear = useCase();
+
+        clear.clear(alice);
+
+        assertThat(effects.cleared).isEmpty();
+        assertThat(sink.sent)
+                .containsExactly(new Sent(alice.uuid(), PlayerstateMessageKey.INVENTORY_CLEAR_CONFIRM.key()));
+    }
+
+    @Test
+    void withConfirmOnTheSecondSelfClearInsideTheWindowClears() {
+        preferences.confirmOn.add(alice.uuid());
+        ClearInventory clear = useCase();
+
+        clear.clear(alice); // stages the prompt
+        clear.clear(alice); // confirms within the window
+
+        assertThat(effects.cleared).containsExactly(alice.uuid());
+        assertThat(sink.sent)
+                .containsExactly(
+                        new Sent(alice.uuid(), PlayerstateMessageKey.INVENTORY_CLEAR_CONFIRM.key()),
+                        new Sent(alice.uuid(), PlayerstateMessageKey.INVENTORY_CLEARED.key()));
+    }
+
+    @Test
+    void confirmNeverGatesAStaffClearOfAnotherPlayer() {
+        preferences.confirmOn.add(alice.uuid());
+        ClearInventory clear = useCase();
+
+        clear.clearFor(alice, bob);
+
+        assertThat(effects.cleared).containsExactly(bob.uuid());
+    }
+
     private record Sent(UUID viewer, String resolvedKey) {}
+
+    /** A preferences port whose confirm-on membership the tests drive directly. */
+    private static final class RecordingPreferences implements ClearInventoryPreferences {
+        private final Set<UUID> confirmOn = new HashSet<>();
+
+        @Override
+        public boolean confirmEnabled(PlayerRef who) {
+            return confirmOn.contains(who.uuid());
+        }
+
+        @Override
+        public boolean toggleConfirm(PlayerRef who) {
+            if (confirmOn.add(who.uuid())) {
+                return true;
+            }
+            confirmOn.remove(who.uuid());
+            return false;
+        }
+    }
 
     /** An effects port that records every inventory it was asked to clear. */
     private static final class RecordingEffects implements PlayerEffects {

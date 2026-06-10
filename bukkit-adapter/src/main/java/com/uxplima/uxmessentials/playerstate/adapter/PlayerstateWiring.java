@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerInfo;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitStateReconciler;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.InMemoryPlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.PdcClearInventoryPreferences;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.nms.NmsOfflinePlayerStorage;
 import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
@@ -45,10 +46,12 @@ import com.uxplima.uxmessentials.playerstate.application.ShowPing;
 import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
+import com.uxplima.uxmessentials.playerstate.application.ToggleClearInventoryConfirm;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGlow;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
 import com.uxplima.uxmessentials.playerstate.application.ToggleNightVision;
+import com.uxplima.uxmessentials.playerstate.application.port.ClearInventoryPreferences;
 import com.uxplima.uxmessentials.playerstate.application.port.InventoryViewer;
 import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
@@ -94,8 +97,9 @@ public final class PlayerstateWiring {
         NearbyPlayers nearby = new BukkitNearbyPlayers();
         PlayerInfo info = new BukkitPlayerInfo();
         PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
+        ClearInventoryPreferences clearPrefs = new PdcClearInventoryPreferences();
 
-        Ports ports = new Ports(store, reconciler, effects, inventoryViewer, nearby, info, notifier);
+        Ports ports = new Ports(store, reconciler, effects, inventoryViewer, nearby, info, notifier, clearPrefs);
         PlayerStateServices services = assemble(kernel, config, clock, ports);
         PlayerstateSettings settings = new PlayerstateSettings(config);
         NoFlyWorldPolicy noFlyWorlds = new NoFlyWorldPolicy(settings.noFlyWorlds());
@@ -128,7 +132,8 @@ public final class PlayerstateWiring {
                 new SetGamemode(store, reconciler, notifier, events, clock),
                 new SetSpeed(store, reconciler, notifier, events, clock),
                 new Extinguish(effects, notifier),
-                new ClearInventory(effects, notifier),
+                new ClearInventory(effects, notifier, ports.clearPreferences(), clock),
+                new ToggleClearInventoryConfirm(ports.clearPreferences(), notifier),
                 new OpenContainer(inventoryViewer, notifier),
                 new Suicide(effects, notifier),
                 new ListNearby(ports.nearby(), notifier),
@@ -155,7 +160,8 @@ public final class PlayerstateWiring {
             InventoryViewer inventoryViewer,
             NearbyPlayers nearby,
             PlayerInfo info,
-            PlayerStateNotifier notifier) {}
+            PlayerStateNotifier notifier,
+            ClearInventoryPreferences clearPreferences) {}
 
     /**
      * Everything the playerstate module contributes once wired: the Brigadier commands and the listeners (the

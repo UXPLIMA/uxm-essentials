@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.playerstate.application.ShowPing;
 import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ShowPosition;
 import com.uxplima.uxmessentials.playerstate.application.Suicide;
+import com.uxplima.uxmessentials.playerstate.application.ToggleClearInventoryConfirm;
 import com.uxplima.uxmessentials.playerstate.application.ToggleFly;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGlow;
 import com.uxplima.uxmessentials.playerstate.application.ToggleGod;
@@ -80,6 +81,7 @@ class BiomeCommandPathTest {
                 mock(SetSpeed.class),
                 mock(Extinguish.class),
                 mock(ClearInventory.class),
+                mock(ToggleClearInventoryConfirm.class),
                 mock(OpenContainer.class),
                 mock(Suicide.class),
                 mock(ListNearby.class),
