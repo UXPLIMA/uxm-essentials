@@ -36,6 +36,10 @@ public final class Currency {
     private final boolean physical;
     private final java.util.List<Denomination> denominations;
     private final @Nullable String iconMaterial;
+    private final boolean transferAllowed;
+    private final boolean exchangeAllowed;
+    private final boolean leaderboardEnabled;
+    private final boolean permissionRequired;
 
     private Currency(Builder builder) {
         this.id = builder.id;
@@ -52,6 +56,10 @@ public final class Currency {
         this.physical = builder.physical;
         this.denominations = java.util.List.copyOf(builder.denominations);
         this.iconMaterial = builder.iconMaterial;
+        this.transferAllowed = builder.transferAllowed;
+        this.exchangeAllowed = builder.exchangeAllowed;
+        this.leaderboardEnabled = builder.leaderboardEnabled;
+        this.permissionRequired = builder.permissionRequired;
         if (this.min.compareTo(this.max) > 0) {
             throw new IllegalArgumentException("min-balance must not exceed max-balance for currency " + id);
         }
@@ -135,6 +143,30 @@ public final class Currency {
         return java.util.Optional.ofNullable(iconMaterial);
     }
 
+    /** Whether this currency may move between players via {@code /pay} (and {@code /payall}); default {@code true}. */
+    public boolean transferAllowed() {
+        return transferAllowed;
+    }
+
+    /** Whether this currency may take part in {@code /exchange} conversions; default {@code true}. */
+    public boolean exchangeAllowed() {
+        return exchangeAllowed;
+    }
+
+    /** Whether this currency appears in {@code /baltop} leaderboards; default {@code true}. */
+    public boolean leaderboardEnabled() {
+        return leaderboardEnabled;
+    }
+
+    /**
+     * Whether using this currency requires the per-currency permission node
+     * {@code uxmessentials.economy.currency.<id>}; default {@code false}. Lets a server ship a permission-gated
+     * premium currency without bespoke code. The node check lives in the adapter (the domain stays Bukkit-free).
+     */
+    public boolean permissionRequired() {
+        return permissionRequired;
+    }
+
     /** Scale a raw amount to this currency's precision, half-up, so a stored figure never carries extra digits. */
     public BigDecimal normalize(BigDecimal amount) {
         return scale(Objects.requireNonNull(amount, "amount"), precision);
@@ -175,6 +207,10 @@ public final class Currency {
         private boolean physical = false;
         private final java.util.List<Denomination> denominations = new java.util.ArrayList<>();
         private @Nullable String iconMaterial;
+        private boolean transferAllowed = true;
+        private boolean exchangeAllowed = true;
+        private boolean leaderboardEnabled = true;
+        private boolean permissionRequired = false;
 
         private Builder(CurrencyId id) {
             this.id = id;
@@ -244,6 +280,30 @@ public final class Currency {
         /** Set the GUI icon-material name; a {@code null} or blank (the default) leaves the icon to the view's default. */
         public Builder iconMaterial(@Nullable String iconMaterial) {
             this.iconMaterial = iconMaterial == null || iconMaterial.isBlank() ? null : iconMaterial.strip();
+            return this;
+        }
+
+        /** Whether {@code /pay} may move this currency between players (default {@code true}). */
+        public Builder transferAllowed(boolean transferAllowed) {
+            this.transferAllowed = transferAllowed;
+            return this;
+        }
+
+        /** Whether {@code /exchange} may convert this currency (default {@code true}). */
+        public Builder exchangeAllowed(boolean exchangeAllowed) {
+            this.exchangeAllowed = exchangeAllowed;
+            return this;
+        }
+
+        /** Whether this currency appears in {@code /baltop} leaderboards (default {@code true}). */
+        public Builder leaderboardEnabled(boolean leaderboardEnabled) {
+            this.leaderboardEnabled = leaderboardEnabled;
+            return this;
+        }
+
+        /** Whether using this currency requires {@code uxmessentials.economy.currency.<id>} (default {@code false}). */
+        public Builder permissionRequired(boolean permissionRequired) {
+            this.permissionRequired = permissionRequired;
             return this;
         }
 

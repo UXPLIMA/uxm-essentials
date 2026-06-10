@@ -58,6 +58,9 @@ public final class ExchangeService {
         if (!nativeLedger) {
             return ExchangeOutcome.providerUnsupported();
         }
+        if (!sourceCurrency.exchangeAllowed() || !targetCurrency.exchangeAllowed()) {
+            return ExchangeOutcome.currencyDisabled();
+        }
         if (sourceAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return ExchangeOutcome.failed(TransferError.BELOW_MINIMUM);
         }

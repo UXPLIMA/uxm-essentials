@@ -17,6 +17,9 @@ public record ExchangeOutcome(
         LIMIT_EXCEEDED,
         FAILED,
 
+        /** One side of the conversion is a currency configured with {@code exchange-allowed = false}. */
+        CURRENCY_DISABLED,
+
         /**
          * The active economy provider is foreign (Treasury/Vault), so the atomic two-currency move cannot be
          * applied through the native ledger and the feature is refused without moving anything — the same
@@ -45,6 +48,11 @@ public record ExchangeOutcome(
 
     public static ExchangeOutcome failed(TransferError error) {
         return new ExchangeOutcome(Status.FAILED, BigDecimal.ZERO, BigDecimal.ZERO, error);
+    }
+
+    /** One side of the conversion has {@code exchange-allowed = false}; nothing was moved. */
+    public static ExchangeOutcome currencyDisabled() {
+        return new ExchangeOutcome(Status.CURRENCY_DISABLED, BigDecimal.ZERO, BigDecimal.ZERO, null);
     }
 
     /** The active provider is foreign, so the native-ledger exchange cannot run; nothing was moved. */

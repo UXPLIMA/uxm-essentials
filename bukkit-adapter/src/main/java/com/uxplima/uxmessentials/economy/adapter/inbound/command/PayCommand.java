@@ -66,6 +66,9 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
             rejectUnknownCurrency(ref(sender));
             return Command.SINGLE_SUCCESS;
         }
+        if (!currencyPermitted(sender, currency.get())) {
+            return Command.SINGLE_SUCCESS;
+        }
         Optional<Money> money = amount(ctx.getArgument("amount", String.class), currency.get(), ref(sender));
         if (money.isEmpty()) {
             return Command.SINGLE_SUCCESS;

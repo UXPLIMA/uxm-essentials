@@ -82,6 +82,9 @@ public final class Pay {
         if (from.equals(to)) {
             return Optional.of(TransferError.SELF_TRANSFER);
         }
+        if (!amount.currency().transferAllowed()) {
+            return Optional.of(TransferError.CURRENCY_TRANSFER_DISABLED);
+        }
         if (amount.amount().compareTo(amount.currency().minPay()) < 0) {
             return Optional.of(TransferError.BELOW_MINIMUM);
         }

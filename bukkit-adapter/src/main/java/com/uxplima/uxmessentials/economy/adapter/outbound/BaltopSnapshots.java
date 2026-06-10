@@ -57,7 +57,9 @@ public final class BaltopSnapshots {
         }
         running = true;
         for (Currency currency : provider.currencies()) {
-            snapshots.computeIfAbsent(currency, c -> new AtomicReference<>(List.of()));
+            if (currency.leaderboardEnabled()) {
+                snapshots.computeIfAbsent(currency, c -> new AtomicReference<>(List.of()));
+            }
         }
         refreshAll();
         scheduleNext();
@@ -77,6 +79,9 @@ public final class BaltopSnapshots {
         Objects.requireNonNull(currency, "currency");
         if (limit <= 0) {
             throw new IllegalArgumentException("baltop limit must be positive: " + limit);
+        }
+        if (!currency.leaderboardEnabled()) {
+            return List.of(); // hidden from leaderboards by its capability flag — never primed, never built
         }
         AtomicReference<List<BaltopRow>> slot = snapshots.get(currency);
         List<BaltopRow> snapshot = slot == null ? null : slot.get();

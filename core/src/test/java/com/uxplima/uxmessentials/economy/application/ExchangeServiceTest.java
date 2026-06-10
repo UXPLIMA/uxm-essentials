@@ -102,6 +102,24 @@ class ExchangeServiceTest {
     }
 
     @Test
+    void exchangeDisabledCurrencyRefusesWithoutMoving() {
+        Currency lockedGems = Currency.builder(CurrencyId.of("gems"))
+                .precision(0)
+                .max(BigDecimal.valueOf(100))
+                .exchangeAllowed(false)
+                .build();
+        ExchangeRate rate = new ExchangeRate(coins.id(), lockedGems.id(), BigDecimal.ONE, BigDecimal.ZERO);
+        ExchangeService service = serviceWith(List.of(rate), true);
+        repo.credit(alice, Money.of(coins, 200));
+
+        ExchangeOutcome outcome = service.exchange(alice, BigDecimal.valueOf(50), coins, lockedGems);
+
+        assertThat(outcome.status()).isEqualTo(ExchangeOutcome.Status.CURRENCY_DISABLED);
+        assertThat(repo.findByOwner(alice).orElseThrow().balanceOf(coins)).isEqualTo(Money.of(coins, 200));
+        assertThat(repo.findByOwner(alice).orElseThrow().balanceOf(lockedGems)).isEqualTo(Money.of(lockedGems, 0));
+    }
+
+    @Test
     void foreignProviderRefusesWithoutMoving() {
         ExchangeRate rate = new ExchangeRate(coins.id(), gems.id(), BigDecimal.ONE, BigDecimal.ZERO);
         ExchangeService service = serviceWith(List.of(rate), false);

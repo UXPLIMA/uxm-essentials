@@ -33,6 +33,9 @@ public enum TransferError {
     /** The named currency exists in config but the active provider cannot hold it (e.g. legacy Vault). */
     CURRENCY_UNSUPPORTED(EconomyMessageKey.CURRENCY_UNSUPPORTED),
 
+    /** The currency is configured with {@code transfer-allowed = false}, so it cannot move between players. */
+    CURRENCY_TRANSFER_DISABLED(EconomyMessageKey.PAY_CURRENCY_DISABLED),
+
     /** The recipient's inventory is full and the physical items cannot be credited. */
     PHYSICAL_INVENTORY_FULL(EconomyMessageKey.PHYSICAL_INVENTORY_FULL),
 

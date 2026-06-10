@@ -67,6 +67,9 @@ public final class BalanceCommand extends EconomyCommandSupport implements Comma
         if (currency.isEmpty()) {
             return unknownCurrency(sender);
         }
+        if (!currencyPermitted(sender, currency.get())) {
+            return Command.SINGLE_SUCCESS;
+        }
         offTick(() -> services.balance().own(ref(sender), currency.get()));
         return Command.SINGLE_SUCCESS;
     }
@@ -82,6 +85,9 @@ public final class BalanceCommand extends EconomyCommandSupport implements Comma
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
             return unknownCurrency(sender);
+        }
+        if (!currencyPermitted(sender, currency.get())) {
+            return Command.SINGLE_SUCCESS;
         }
         String targetName = ctx.getArgument("player", String.class);
         offTick(() -> resolveAndShow(ref(sender), targetName, currency.get()));

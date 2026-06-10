@@ -31,6 +31,7 @@ public enum EconomyMessageKey implements MessageKey {
     PAY_CONFIRM_PROMPT("pay.confirm-prompt"),
     PAY_CONFIRM_NONE("pay.confirm-none"),
     PAY_CONFIRM_EXPIRED("pay.confirm-expired"),
+    PAY_CURRENCY_DISABLED("pay.currency-disabled"),
 
     // Pay confirmation GUI
     PAY_CONFIRM_GUI_TITLE("pay.confirm-gui-title"),
@@ -54,6 +55,7 @@ public enum EconomyMessageKey implements MessageKey {
     // currency selection
     CURRENCY_UNKNOWN("currency.unknown"),
     CURRENCY_UNSUPPORTED("currency.unsupported"),
+    CURRENCY_NO_PERMISSION("currency.no-permission"),
 
     // balance clamp
     BALANCE_MAX_EXCEEDED("wallet.max-exceeded"),
@@ -148,6 +150,7 @@ public enum EconomyMessageKey implements MessageKey {
     EXCHANGE_LIMIT_EXCEEDED("eco.exchange.limit-exceeded"),
     EXCHANGE_PROVIDER_UNSUPPORTED("eco.exchange.provider-unsupported"),
     EXCHANGE_INVALID_AMOUNT("eco.exchange.invalid-amount"),
+    EXCHANGE_CURRENCY_DISABLED("eco.exchange.currency-disabled"),
     EXCHANGE_GUI_TITLE("eco.exchange.gui-title"),
     EXCHANGE_GUI_SOURCE_NAME("eco.exchange.gui-source-name"),
     EXCHANGE_GUI_SOURCE_LORE("eco.exchange.gui-source-lore"),

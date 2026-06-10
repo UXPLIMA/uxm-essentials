@@ -162,6 +162,10 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
                         messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_PROVIDER_UNSUPPORTED, Map.of());
                 player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
             }
+            case CURRENCY_DISABLED -> {
+                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_CURRENCY_DISABLED, Map.of());
+                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
+            }
             case FAILED -> {
                 com.uxplima.uxmessentials.economy.domain.TransferError err = result.error();
                 com.uxplima.uxmessentials.economy.application.EconomyMessageKey key =

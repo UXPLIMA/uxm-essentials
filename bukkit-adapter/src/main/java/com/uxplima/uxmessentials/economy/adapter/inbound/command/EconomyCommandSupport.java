@@ -50,6 +50,9 @@ abstract class EconomyCommandSupport {
     /** The catalog key for a console invoking a player-only command. */
     static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
 
+    /** Prefix of the per-currency node a {@code permission-required} currency gates on. */
+    private static final String CURRENCY_PERMISSION_PREFIX = "uxmessentials.economy.currency.";
+
     final EconomyServices services;
     final CommandFeedback feedback;
 
@@ -160,6 +163,22 @@ abstract class EconomyCommandSupport {
     /** Tell {@code viewer} the named pay target could not be resolved. */
     final void rejectUnknownTarget(PlayerRef viewer, String name) {
         services.notifier().send(viewer, EconomyMessageKey.PAY_TARGET_UNKNOWN, Map.of("player", name));
+    }
+
+    /**
+     * Whether {@code sender} may use {@code currency}. Always true unless the currency is configured
+     * {@code permission-required}, in which case the sender must hold
+     * {@code uxmessentials.economy.currency.<id>}; on denial the {@code currency.no-permission} rejection is
+     * sent and {@code false} returns, so the caller stops before touching that currency.
+     */
+    final boolean currencyPermitted(Player sender, Currency currency) {
+        if (!currency.permissionRequired()
+                || sender.hasPermission(
+                        CURRENCY_PERMISSION_PREFIX + currency.id().value())) {
+            return true;
+        }
+        services.notifier().send(ref(sender), EconomyMessageKey.CURRENCY_NO_PERMISSION, Map.of());
+        return false;
     }
 
     private boolean hasArgument(CommandContext<CommandSourceStack> ctx) {

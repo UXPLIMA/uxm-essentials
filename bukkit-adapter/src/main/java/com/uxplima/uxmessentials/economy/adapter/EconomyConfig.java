@@ -62,7 +62,11 @@ public final class EconomyConfig {
                     .min(decimal("currencies." + key + ".min-balance", "wallet.min-balance", "0"))
                     .max(decimal("currencies." + key + ".max-balance", "wallet.max-balance", "1000000000000"))
                     .minPay(decimal("currencies." + key + ".min-pay", "pay.min-pay", "0.01"))
-                    .iconMaterial(config.getString("currencies." + key + ".icon-material", ""));
+                    .iconMaterial(config.getString("currencies." + key + ".icon-material", ""))
+                    .transferAllowed(config.getBoolean("currencies." + key + ".transfer-allowed", true))
+                    .exchangeAllowed(config.getBoolean("currencies." + key + ".exchange-allowed", true))
+                    .leaderboardEnabled(config.getBoolean("currencies." + key + ".leaderboard-enabled", true))
+                    .permissionRequired(config.getBoolean("currencies." + key + ".permission-required", false));
             BigDecimal confirm = optionalConfirmThreshold(id);
             if (confirm != null) {
                 builder.confirmThreshold(confirm);

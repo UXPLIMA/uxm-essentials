@@ -275,6 +275,8 @@ public final class ExchangeGuiView {
             case LIMIT_EXCEEDED -> sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_LIMIT_EXCEEDED, Map.of());
             case PROVIDER_UNSUPPORTED -> sendPrefixed(
                     player, viewerRef, EconomyMessageKey.EXCHANGE_PROVIDER_UNSUPPORTED, Map.of());
+            case CURRENCY_DISABLED -> sendPrefixed(
+                    player, viewerRef, EconomyMessageKey.EXCHANGE_CURRENCY_DISABLED, Map.of());
             case FAILED -> {
                 com.uxplima.uxmessentials.economy.domain.TransferError err = result.error();
                 sendPrefixed(player, viewerRef, err != null ? err.messageKey() : EconomyMessageKey.PAY_ERROR, Map.of());

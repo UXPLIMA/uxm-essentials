@@ -58,6 +58,9 @@ public final class WalletCommand extends EconomyCommandSupport implements Comman
             rejectUnknownCurrency(ref(sender));
             return Command.SINGLE_SUCCESS;
         }
+        if (!currencyPermitted(sender, currency.get())) {
+            return Command.SINGLE_SUCCESS;
+        }
         services.walletView().open(sender, currency.get());
         return Command.SINGLE_SUCCESS;
     }

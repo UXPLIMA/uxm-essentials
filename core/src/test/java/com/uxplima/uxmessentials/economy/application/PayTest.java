@@ -98,6 +98,22 @@ class PayTest {
     }
 
     @Test
+    void transferDisabledCurrencyIsRejectedBeforeDebit() {
+        com.uxplima.uxmessentials.economy.domain.Currency gems =
+                com.uxplima.uxmessentials.economy.domain.Currency.builder(
+                                com.uxplima.uxmessentials.economy.domain.CurrencyId.of("gems"))
+                        .transferAllowed(false)
+                        .build();
+        Pay pay = payWith(java.util.Set.of(gems));
+        repo.credit(alice, Money.of(gems, 100));
+
+        PayOutcome outcome = pay.pay(alice, bob, Money.of(gems, 40));
+
+        assertThat(outcome.error()).get().isEqualTo(TransferError.CURRENCY_TRANSFER_DISABLED);
+        assertThat(repo.findByOwner(alice).orElseThrow().balanceOf(gems)).isEqualTo(Money.of(gems, 100));
+    }
+
+    @Test
     void targetWithPayDisabledRefusesBeforeDebit() {
         Pay pay = payWith(java.util.Set.of(Currencies.COINS));
         repo.credit(alice, Money.of(Currencies.COINS, 100));
