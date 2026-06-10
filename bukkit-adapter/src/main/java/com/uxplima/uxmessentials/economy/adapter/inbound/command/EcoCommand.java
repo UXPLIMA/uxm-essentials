@@ -1,9 +1,12 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -26,15 +29,19 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /eco give|take|set|reset <player> <amount> [currency]} and the bulk
  * {@code /eco giveall|giverandom|resetall [amount] [currency]} (alias {@code /economy},
- * docs/10-feature-modules.md §15.4).
+ * docs/10-feature-modules.md §15.4). {@code /eco note give <player> <amount> [currency]} mints an admin-issued
+ * banknote for a player without debiting anyone.
  */
 @NullMarked
 public final class EcoCommand extends EconomyCommandSupport implements CommandRegistration {
 
     private static final String BASE = "uxmessentials.economy.admin";
 
-    public EcoCommand(EconomyServices services, Messages messages) {
+    private final BanknoteMinter minter;
+
+    public EcoCommand(Plugin plugin, EconomyServices services, Messages messages) {
         super(services, messages);
+        this.minter = new BanknoteMinter(plugin, messages, services.banknoteStore());
     }
 
     @Override
@@ -51,6 +58,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .then(giveRandomRangeVerb())
                 .then(historyVerb())
                 .then(logsVerb())
+                .then(noteVerb())
                 .then(Commands.literal("backup")
                         .requires(src -> src.getSender().hasPermission(BASE + ".backup"))
                         .executes(this::runBackup))
@@ -136,6 +144,16 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         return Commands.literal("logs")
                 .requires(src -> src.getSender().hasPermission(BASE + ".logs"))
                 .executes(this::runLogs);
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> noteVerb() {
+        return Commands.literal("note")
+                .requires(src -> src.getSender().hasPermission(BASE + ".note"))
+                .then(Commands.literal("give")
+                        .then(CommandSuggestions.playerArgument("player")
+                                .then(Commands.argument("amount", StringArgumentType.word())
+                                        .executes(this::runNoteGive)
+                                        .then(currencyArgument().executes(this::runNoteGive)))));
     }
 
     private int runTarget(CommandContext<CommandSourceStack> ctx, String verb) {
@@ -324,6 +342,67 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         }
         services.historyView().open(sender, null, "Global");
         return Command.SINGLE_SUCCESS;
+    }
+
+    private int runNoteGive(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        Optional<Currency> currency = currency(ctx);
+        if (currency.isEmpty()) {
+            rejectUnknownCurrency(ref(sender));
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef actor = ref(sender);
+        Optional<Money> amount = amount(ctx.getArgument("amount", String.class), currency.get(), actor);
+        if (amount.isEmpty()) {
+            return Command.SINGLE_SUCCESS;
+        }
+        String targetName = ctx.getArgument("player", String.class);
+        offTick(() -> resolveAndGiveNote(actor, targetName, amount.get()));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Resolve the named recipient and hand them an admin-issued banknote of {@code amount} with no debit. The
+     * recipient must be online to receive the item; an unknown name and an offline player are each reported to
+     * the issuer. The note is minted off the tick thread (it registers the dupe token in the store) and the item
+     * is delivered on the recipient's entity thread, dropping any overflow at their feet.
+     */
+    private void resolveAndGiveNote(PlayerRef actor, String targetName, Money amount) {
+        Optional<PlayerRef> target = resolveAnyTarget(targetName);
+        if (target.isEmpty()) {
+            rejectUnknownTarget(actor, targetName);
+            return;
+        }
+        Player online = org.bukkit.Bukkit.getPlayer(target.get().uuid());
+        if (online == null) {
+            services.notifier()
+                    .send(
+                            actor,
+                            EconomyMessageKey.ECO_ADMIN_NOTE_OFFLINE,
+                            Map.of("player", target.get().name()));
+            return;
+        }
+        ItemStack banknote = minter.mint(target.get(), amount);
+        services.scheduler().onEntity(target.get(), () -> deliverNote(actor, target.get(), online, banknote, amount));
+    }
+
+    private void deliverNote(PlayerRef actor, PlayerRef target, Player online, ItemStack banknote, Money amount) {
+        Map<Integer, ItemStack> remaining = online.getInventory().addItem(banknote);
+        for (ItemStack left : remaining.values()) {
+            online.getWorld().dropItemNaturally(online.getLocation(), left);
+        }
+        services.notifier()
+                .send(
+                        actor,
+                        EconomyMessageKey.ECO_ADMIN_NOTE_GIVEN,
+                        Map.of(
+                                "player",
+                                target.name(),
+                                "amount",
+                                services.notifier().amount(amount)));
     }
 
     private @org.jspecify.annotations.Nullable Resolved resolveTargeted(CommandContext<CommandSourceStack> ctx) {

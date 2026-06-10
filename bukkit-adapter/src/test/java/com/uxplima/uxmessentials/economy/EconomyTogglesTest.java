@@ -47,6 +47,8 @@ class EconomyTogglesTest {
 
         EconomyConfig config = new EconomyConfig(configStore);
         EconomyServices services = mock(EconomyServices.class);
+        when(services.banknoteStore())
+                .thenReturn(mock(com.uxplima.uxmessentials.economy.application.port.BanknoteStore.class));
         Messages messages = mock(Messages.class);
 
         List<CommandRegistration> commands = EconomyCommands.all(plugin, config, services, messages);
@@ -69,6 +71,8 @@ class EconomyTogglesTest {
 
         EconomyConfig config = new EconomyConfig(configStore);
         EconomyServices services = mock(EconomyServices.class);
+        when(services.banknoteStore())
+                .thenReturn(mock(com.uxplima.uxmessentials.economy.application.port.BanknoteStore.class));
         Messages messages = mock(Messages.class);
 
         List<CommandRegistration> commands = EconomyCommands.all(plugin, config, services, messages);

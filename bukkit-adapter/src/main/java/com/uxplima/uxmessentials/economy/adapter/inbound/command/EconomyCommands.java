@@ -35,7 +35,7 @@ public final class EconomyCommands {
         list.add(new PayAllCommand(services, messages));
         list.add(new PayToggleCommand(services, messages));
         list.add(new BaltopCommand(services, messages));
-        list.add(new EcoCommand(services, messages));
+        list.add(new EcoCommand(plugin, services, messages));
 
         if (config.worthEnabled()) {
             list.add(new WorthCommand(services, messages));
