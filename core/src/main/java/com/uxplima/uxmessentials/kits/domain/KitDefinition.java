@@ -53,6 +53,8 @@ import java.util.Optional;
  * @param stockLimit the global cap on how many times the kit may ever be claimed across all players; {@code 0} for unlimited
  * @param parsePlaceholders whether the recipient's PlaceholderAPI tokens are resolved in each granted item's name and lore
  * @param onFull what the grant does when the inventory cannot hold everything: drop the overflow or deny the claim
+ * @param unlockOnce whether the kit's {@code cost} is a one-time unlock fee: charged on the first claim, then waived
+ *     forever once the player has unlocked it — distinct from {@code oneTime} (consumed forever) and from a per-claim cost
  */
 public record KitDefinition(
         KitId id,
@@ -99,7 +101,8 @@ public record KitDefinition(
         KitSchedule schedule,
         int stockLimit,
         boolean parsePlaceholders,
-        KitFullPolicy onFull) {
+        KitFullPolicy onFull,
+        boolean unlockOnce) {
 
     public KitDefinition {
         Objects.requireNonNull(id, "id");
@@ -234,7 +237,8 @@ public record KitDefinition(
                 KitSchedule.always(),
                 0,
                 false,
-                KitFullPolicy.DROP);
+                KitFullPolicy.DROP,
+                false);
     }
 
     public KitDefinition(
@@ -557,6 +561,11 @@ public record KitDefinition(
     public KitDefinition withOnFull(KitFullPolicy value) {
         Objects.requireNonNull(value, "value");
         return copy(b -> b.onFull = value);
+    }
+
+    /** A copy of this kit with its buy-to-unlock flag set to {@code value}, every other setting preserved. */
+    public KitDefinition withUnlockOnce(boolean value) {
+        return copy(b -> b.unlockOnce = value);
     }
 
     private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {

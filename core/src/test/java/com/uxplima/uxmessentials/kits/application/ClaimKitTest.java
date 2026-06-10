@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitStockStore;
+import com.uxplima.uxmessentials.kits.application.port.KitUnlockStore;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
@@ -60,6 +61,7 @@ class ClaimKitTest {
     private KitNotifier notifier;
     private DomainEventPublisher events;
     private FakeStockStore stock;
+    private FakeUnlockStore unlocks;
     private PlayerRef alice;
     private PlayerRef bob;
 
@@ -73,6 +75,7 @@ class ClaimKitTest {
         notifier = new KitNotifier(new KeyMessages(), new CapturingSink());
         events = new CapturingEvents();
         stock = new FakeStockStore();
+        unlocks = new FakeUnlockStore();
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
         bob = new PlayerRef(UUID.randomUUID(), "Bob");
     }
@@ -172,6 +175,22 @@ class ClaimKitTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(KitError.CANNOT_AFFORD);
         assertThat(granter.grants).isZero();
+    }
+
+    @Test
+    void anUnlockOnceKitChargesOnTheFirstClaimAndIsFreeThereafter() {
+        repository.save(priced("forge", new BigDecimal("400")).withUnlockOnce(true));
+        RecordingEconomy economy = new RecordingEconomy(true);
+
+        Result<Unit, KitError> first = claimKit(Optional.of(economy)).claim(alice, KitId.of("forge"));
+        Result<Unit, KitError> second = claimKit(Optional.of(economy)).claim(alice, KitId.of("forge"));
+
+        assertThat(first.isOk()).isTrue();
+        assertThat(second.isOk()).isTrue();
+        assertThat(granter.grants).isEqualTo(2); // both claims granted
+        assertThat(economy.charged)
+                .isEqualByComparingTo("400"); // charged once, the unlock survived to the second claim
+        assertThat(unlocks.hasUnlocked(alice, KitId.of("forge"))).isTrue();
     }
 
     @Test
@@ -275,7 +294,8 @@ class ClaimKitTest {
     }
 
     private ClaimKit claimKit(Optional<KitEconomy> economy) {
-        KitAccess access = new KitAccess(permissions, cooldowns, claims, economy, Optional.empty(), Optional.of(stock));
+        KitAccess access = new KitAccess(
+                permissions, cooldowns, claims, economy, Optional.empty(), Optional.of(stock), Optional.of(unlocks));
         return new ClaimKit(repository, access, granter, notifier, events, Clock.system(ZoneOffset.UTC), economy);
     }
 
@@ -377,6 +397,21 @@ class ClaimKitTest {
         @Override
         public void resetAll(PlayerRef who) {
             claimed.remove(who.uuid());
+        }
+    }
+
+    /** A map-backed buy-to-unlock store mirroring the PDC-backed production store. */
+    private static final class FakeUnlockStore implements KitUnlockStore {
+        private final Map<UUID, Set<String>> unlocked = new HashMap<>();
+
+        @Override
+        public boolean hasUnlocked(PlayerRef who, KitId kit) {
+            return unlocked.getOrDefault(who.uuid(), Set.of()).contains(kit.value());
+        }
+
+        @Override
+        public void markUnlocked(PlayerRef who, KitId kit) {
+            unlocked.computeIfAbsent(who.uuid(), u -> new HashSet<>()).add(kit.value());
         }
     }
 

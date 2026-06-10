@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.FileKitStockStore;
 import com.uxplima.uxmessentials.kits.adapter.outbound.PapiRequirementEvaluator;
 import com.uxplima.uxmessentials.kits.adapter.outbound.PdcKitClaims;
+import com.uxplima.uxmessentials.kits.adapter.outbound.PdcKitUnlocks;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
 import com.uxplima.uxmessentials.kits.application.DelKit;
@@ -49,6 +50,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitStockStore;
+import com.uxplima.uxmessentials.kits.application.port.KitUnlockStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
@@ -102,6 +104,7 @@ public final class KitsWiring {
         Path categoriesDir = dataFolder.resolve("modules").resolve("kits").resolve("categories");
         KitCategoryRepository categoryRepository = ConfigurateKitCategoryRepository.load(categoriesDir, kernel.log());
         KitClaimStore claims = new PdcKitClaims(plugin);
+        KitUnlockStore unlocks = new PdcKitUnlocks(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
         KitActionRunner actionRunner = new BukkitKitActionRunner(kernel.scheduler(), kernel.log());
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
@@ -145,7 +148,13 @@ public final class KitsWiring {
         Path stockFile = dataFolder.resolve("modules").resolve("kits").resolve("stock.properties");
         KitStockStore stockStore = new FileKitStockStore(kernel.scheduler(), kernel.log(), stockFile);
         KitAccess access = new KitAccess(
-                kernel.permissions(), kernel.cooldowns(), claims, economy, requirements, Optional.of(stockStore));
+                kernel.permissions(),
+                kernel.cooldowns(),
+                claims,
+                economy,
+                requirements,
+                Optional.of(stockStore),
+                Optional.of(unlocks));
         KitServices services = assemble(
                 kernel,
                 repository,

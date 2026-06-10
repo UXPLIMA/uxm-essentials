@@ -154,6 +154,7 @@ final class KitCodec {
             com.uxplima.uxmessentials.kits.domain.KitFullPolicy onFull =
                     com.uxplima.uxmessentials.kits.domain.KitFullPolicy.parse(
                             node.node("on-full").getString());
+            boolean unlockOnce = node.node("unlock-once").getBoolean(false);
 
             List<com.uxplima.uxmessentials.kits.domain.KitRequirement> requirements =
                     readRequirements(node.node("requirements"));
@@ -211,7 +212,8 @@ final class KitCodec {
                     schedule,
                     stockLimit,
                     parsePlaceholders,
-                    onFull));
+                    onFull,
+                    unlockOnce));
         } catch (RuntimeException malformed) {
             return Optional.empty();
         }
@@ -274,6 +276,7 @@ final class KitCodec {
                         definition.onFull() == com.uxplima.uxmessentials.kits.domain.KitFullPolicy.DROP
                                 ? null
                                 : definition.onFull().token());
+        node.node("unlock-once").set(definition.unlockOnce() ? true : null);
 
         node.node("permission-cooldowns").set(null);
         if (!definition.permissionCooldowns().isEmpty()) {

@@ -318,6 +318,28 @@ class ConfigurateKitRepositoryTest {
     }
 
     @Test
+    void unlockOnceDefaultsOffAndRoundTripsWhenOn(@TempDir Path root) {
+        Path dir = kitsDir(root);
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+
+        KitDefinition plain =
+                KitDefinition.repeatable(KitId.of("forge"), List.of(KitItem.of("AAAA", 1)), Duration.ZERO);
+        repository.save(plain);
+        repository.save(plain.withUnlockOnce(true).withItems(List.of(KitItem.of("BBBB", 1))));
+
+        KitRepository reloaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        assertThat(reloaded.find(KitId.of("forge")).orElseThrow().unlockOnce()).isTrue();
+
+        // A kit saved without opting in keeps the default off, so existing kits are unaffected.
+        repository.save(KitDefinition.repeatable(KitId.of("legacy"), List.of(KitItem.of("CCCC", 1)), Duration.ZERO));
+        assertThat(ConfigurateKitRepository.load(dir, legacy(root), NOOP)
+                        .find(KitId.of("legacy"))
+                        .orElseThrow()
+                        .unlockOnce())
+                .isFalse();
+    }
+
+    @Test
     void onFullDefaultsToDropAndRoundTripsDeny(@TempDir Path root) {
         Path dir = kitsDir(root);
         KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);

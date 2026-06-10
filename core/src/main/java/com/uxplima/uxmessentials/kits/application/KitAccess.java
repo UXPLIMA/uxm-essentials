@@ -6,6 +6,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitStockStore;
+import com.uxplima.uxmessentials.kits.application.port.KitUnlockStore;
 import com.uxplima.uxmessentials.kits.application.port.RequirementEvaluator;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
@@ -48,6 +49,7 @@ public final class KitAccess {
     private final Optional<KitEconomy> economy;
     private final Optional<RequirementEvaluator> requirements;
     private final Optional<KitStockStore> stock;
+    private final Optional<KitUnlockStore> unlocks;
 
     public KitAccess(Permissions permissions, Cooldowns cooldowns, KitClaimStore claims, Optional<KitEconomy> economy) {
         this(permissions, cooldowns, claims, economy, Optional.empty());
@@ -69,12 +71,24 @@ public final class KitAccess {
             Optional<KitEconomy> economy,
             Optional<RequirementEvaluator> requirements,
             Optional<KitStockStore> stock) {
+        this(permissions, cooldowns, claims, economy, requirements, stock, Optional.empty());
+    }
+
+    public KitAccess(
+            Permissions permissions,
+            Cooldowns cooldowns,
+            KitClaimStore claims,
+            Optional<KitEconomy> economy,
+            Optional<RequirementEvaluator> requirements,
+            Optional<KitStockStore> stock,
+            Optional<KitUnlockStore> unlocks) {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.claims = Objects.requireNonNull(claims, "claims");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.requirements = Objects.requireNonNull(requirements, "requirements");
         this.stock = Objects.requireNonNull(stock, "stock");
+        this.unlocks = Objects.requireNonNull(unlocks, "unlocks");
     }
 
     /**
@@ -177,11 +191,14 @@ public final class KitAccess {
         return requirements.map(evaluator -> evaluator.passes(who, requirement)).orElse(false);
     }
 
-    /** Start the cooldown clock and record the one-time stamp after a successful grant. */
+    /** Start the cooldown clock and record the one-time stamp and the buy-to-unlock mark after a successful grant. */
     public void recordClaim(PlayerRef who, KitDefinition kit) {
         cooldowns.stamp(who, cooldownKind(who, kit));
         if (kit.isOneTime()) {
             claims.markClaimed(who, kit.id());
+        }
+        if (kit.unlockOnce()) {
+            unlocks.ifPresent(store -> store.markUnlocked(who, kit.id()));
         }
     }
 
@@ -192,7 +209,7 @@ public final class KitAccess {
 
     private Result<Unit, KitError> charge(PlayerRef who, KitDefinition kit) {
         com.uxplima.uxmessentials.kits.domain.KitCost cost = effectiveCost(who, kit);
-        if (cost.isFree() || economy.isEmpty()) {
+        if (cost.isFree() || economy.isEmpty() || alreadyUnlocked(who, kit)) {
             return Result.ok();
         }
         KitEconomy provider = economy.get();
@@ -200,6 +217,12 @@ public final class KitAccess {
             return Result.err(KitError.CANNOT_AFFORD);
         }
         return Result.ok();
+    }
+
+    /** Whether {@code kit} is a buy-to-unlock kit {@code who} has already purchased, so its price is now waived. */
+    private boolean alreadyUnlocked(PlayerRef who, KitDefinition kit) {
+        return kit.unlockOnce()
+                && unlocks.map(store -> store.hasUnlocked(who, kit.id())).orElse(false);
     }
 
     private CooldownKind cooldownKind(PlayerRef who, KitDefinition kit) {
@@ -263,7 +286,7 @@ public final class KitAccess {
 
     public boolean canAfford(PlayerRef who, KitDefinition kit) {
         com.uxplima.uxmessentials.kits.domain.KitCost cost = effectiveCost(who, kit);
-        if (cost.isFree() || economy.isEmpty()) {
+        if (cost.isFree() || economy.isEmpty() || alreadyUnlocked(who, kit)) {
             return true;
         }
         return economy.get().canAfford(who, cost.amount(), cost.currencyId());
