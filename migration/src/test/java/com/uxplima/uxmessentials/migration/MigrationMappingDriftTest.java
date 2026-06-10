@@ -71,6 +71,21 @@ class MigrationMappingDriftTest {
     }
 
     @Test
+    void liveBalanceSourcesEachMapBalanceToWallet() {
+        for (SourceId source : List.of(SourceId.of("vault"), SourceId.of("playerpoints"))) {
+            List<MappingRow> rows = SupportedMappings.rows(source);
+            assertThat(rows)
+                    .as("live source %s migrates a single balance row", source)
+                    .hasSize(1);
+            MappingRow row = rows.get(0);
+            assertThat(row.target()).isEqualTo("Wallet");
+            assertThat(row.mapper()).isNotBlank();
+            assertThat(row.conflictUnit()).isNotBlank();
+            assertThat(row.context()).isNotBlank();
+        }
+    }
+
+    @Test
     void deliberatelyNotMigratedTargetsCarryNoRow() {
         List<String> targets =
                 EssentialsXMappings.rows().stream().map(MappingRow::target).toList();

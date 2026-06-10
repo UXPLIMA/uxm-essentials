@@ -6,20 +6,24 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXMappings;
+import com.uxplima.uxmessentials.migration.convert.live.LiveSourceMappings;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Aggregates every <em>built</em> source's per-source mapping table (docs/12-migration §5). It is the
- * single greppable answer to "what does the importer claim to migrate?", scoped by source. Only built
- * sources contribute rows — a planned source has no code table, so it appears nowhere here until it is
- * built (planned ≠ stubbed, §1.2). The drift guard reads this aggregate to assert the three-way equality
- * code ⇄ doc ⇄ fixtures.
+ * single greppable answer to "what does the importer claim to migrate?", scoped by source. The built
+ * sources are EssentialsX (a full on-disk source) plus the live economy sources Vault and PlayerPoints
+ * (balance only). Only built sources contribute rows — a planned source has no code table, so it appears
+ * nowhere here until it is built (planned ≠ stubbed, §1.2). The drift guard reads this aggregate to
+ * assert the three-way equality code ⇄ doc ⇄ fixtures.
  */
 @NullMarked
 public final class SupportedMappings {
 
-    private static final Map<SourceId, List<MappingRow>> BY_SOURCE =
-            Map.of(SourceId.of("essentialsx"), EssentialsXMappings.rows());
+    private static final Map<SourceId, List<MappingRow>> BY_SOURCE = Map.ofEntries(
+            Map.entry(SourceId.of("essentialsx"), EssentialsXMappings.rows()),
+            Map.entry(SourceId.of("vault"), LiveSourceMappings.vaultRows()),
+            Map.entry(SourceId.of("playerpoints"), LiveSourceMappings.playerPointsRows()));
 
     private SupportedMappings() {}
 
