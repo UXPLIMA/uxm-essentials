@@ -119,6 +119,9 @@ public final class PluginModule {
                 wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus());
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
+        // Cross-cutting server-integration polish that belongs to no feature context: the 1.21+ pause-menu
+        // server links apply once on enable from the root config.conf.
+        IntegrationsWiring.wire(plugin, kernel);
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
         resources.addCommand(new UxmessCommand(registry, config, importNode));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
