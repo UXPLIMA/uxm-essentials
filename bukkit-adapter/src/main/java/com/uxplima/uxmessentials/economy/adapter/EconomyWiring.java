@@ -373,6 +373,12 @@ public final class EconomyWiring {
                 settings.fraudSingleLimit(),
                 settings.fraudVelocitySeconds(),
                 settings.fraudVelocityLimit());
+        audit = new com.uxplima.uxmessentials.economy.adapter.outbound.FileEconomyAudit(
+                audit,
+                kernel.scheduler(),
+                kernel.log(),
+                plugin.getDataFolder().toPath().resolve("economy").resolve("operations.log"),
+                settings.operationLogEnabled());
 
         PayPreferences preferences = WalletRepositories.payPreferences(persistence, settings.payToggleDefault());
         PendingPayRegistry pending =

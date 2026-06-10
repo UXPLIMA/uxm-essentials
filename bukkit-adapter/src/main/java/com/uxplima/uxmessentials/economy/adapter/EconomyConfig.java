@@ -446,6 +446,11 @@ public final class EconomyConfig {
         return Math.max(0L, config.getLong("salary.default-amount", 100L));
     }
 
+    /** Whether the plain-text {@code economy/operations.log} audit file is written (off by default). */
+    public boolean operationLogEnabled() {
+        return config.getBoolean("logs.file-enabled", false);
+    }
+
     /** Whether the daily login reward is enabled (off by default). */
     public boolean dailyRewardEnabled() {
         return config.getBoolean("daily-reward.enabled", false);
