@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.migration.adapter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
@@ -10,12 +12,17 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
+import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.migration.BalancePolicy;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordWriter;
+import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedModeration;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -44,6 +51,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
     private final WarpRepository warps;
     private final WalletRepository wallets;
     private final ModerationRepository moderation;
+    private final KitRepository kits;
     private final Currency defaultCurrency;
 
     public RepositoryRecordWriter(
@@ -51,11 +59,13 @@ public final class RepositoryRecordWriter implements RecordWriter {
             WarpRepository warps,
             WalletRepository wallets,
             ModerationRepository moderation,
+            KitRepository kits,
             Currency defaultCurrency) {
         this.homes = Objects.requireNonNull(homes, "homes");
         this.warps = Objects.requireNonNull(warps, "warps");
         this.wallets = Objects.requireNonNull(wallets, "wallets");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
+        this.kits = Objects.requireNonNull(kits, "kits");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
     }
 
@@ -66,7 +76,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         return switch (record) {
             case ImportRecord.UserRecord user -> writeUser(user.user(), options);
             case ImportRecord.WarpRecord warp -> writeWarp(warp.warp().warp(), options);
-            case ImportRecord.KitRecord ignored -> RecordOutcome.WRITTEN;
+            case ImportRecord.KitRecord kit -> writeKit(kit.kit(), options);
             case ImportRecord.ModerationRecord rec -> writeModeration(rec.moderation(), options);
         };
     }
@@ -120,6 +130,29 @@ public final class RepositoryRecordWriter implements RecordWriter {
         }
         warps.save(warp);
         return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
+    }
+
+    private RecordOutcome writeKit(ImportedKit imported, ImportOptions options) {
+        KitDefinition raw = imported.definition();
+        boolean existed = kits.exists(raw.id());
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        // The mapper carried each EssentialsX item as its raw descriptor; the bukkit side resolves it to a stack
+        // and re-encodes it into the kit context's own serialized form, exactly as a live /createkit would. An
+        // item whose material does not resolve on this server is dropped so one bad line never fails the kit.
+        kits.save(raw.withItems(convertItems(raw.items())));
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
+    }
+
+    private List<KitItem> convertItems(List<KitItem> rawItems) {
+        List<KitItem> converted = new ArrayList<>();
+        for (KitItem raw : rawItems) {
+            EssentialsXKitItemConverter.toStack(raw.data())
+                    .map(KitItemCodec::encode)
+                    .ifPresent(converted::add);
+        }
+        return converted;
     }
 
     private RecordOutcome writeModeration(ImportedModeration imported, ImportOptions options) {

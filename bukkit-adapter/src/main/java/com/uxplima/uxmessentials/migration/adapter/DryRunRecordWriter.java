@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.migration.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
@@ -28,10 +30,12 @@ public final class DryRunRecordWriter implements RecordWriter {
 
     private final WarpRepository warps;
     private final ModerationRepository moderation;
+    private final KitRepository kits;
 
-    public DryRunRecordWriter(WarpRepository warps, ModerationRepository moderation) {
+    public DryRunRecordWriter(WarpRepository warps, ModerationRepository moderation, KitRepository kits) {
         this.warps = Objects.requireNonNull(warps, "warps");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
+        this.kits = Objects.requireNonNull(kits, "kits");
     }
 
     @Override
@@ -41,13 +45,21 @@ public final class DryRunRecordWriter implements RecordWriter {
         return switch (record) {
             case ImportRecord.UserRecord ignored -> RecordOutcome.WRITTEN;
             case ImportRecord.WarpRecord warp -> warpOutcome(warp.warp().warp().name(), options);
-            case ImportRecord.KitRecord ignored -> RecordOutcome.WRITTEN;
+            case ImportRecord.KitRecord kit -> kitOutcome(kit.kit().definition().id(), options);
             case ImportRecord.ModerationRecord rec -> moderationOutcome(rec.moderation(), options);
         };
     }
 
     private RecordOutcome warpOutcome(WarpName name, ImportOptions options) {
         boolean existed = warps.exists(name);
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
+    }
+
+    private RecordOutcome kitOutcome(KitId id, ImportOptions options) {
+        boolean existed = kits.exists(id);
         if (existed && options.onConflict() == ConflictPolicy.SKIP) {
             return RecordOutcome.SKIPPED;
         }

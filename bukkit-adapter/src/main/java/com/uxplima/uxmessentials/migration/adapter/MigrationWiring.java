@@ -12,6 +12,8 @@ import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
+import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
+import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.migration.BackupSnapshot;
 import com.uxplima.uxmessentials.migration.BalancePolicy;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
@@ -83,7 +85,7 @@ public final class MigrationWiring {
         Objects.requireNonNull(log, "log");
         SourceRegistry registry = sourceRegistry(plugin);
         ImportData importData = new ImportData(audit(), backup(plugin, log), log);
-        Writers writers = writers(persistence, economyConfig);
+        Writers writers = writers(plugin, persistence, economyConfig, log);
         ImportOptions options = options(plugin, migrationConfig);
         return new MigrationImportService(
                 registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
@@ -95,16 +97,30 @@ public final class MigrationWiring {
         return new SourceRegistry(built);
     }
 
-    private static Writers writers(Persistence persistence, ConfigStore economyConfig) {
+    private static Writers writers(Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log) {
         HomeRepository homes = HomeRepositories.cached(persistence);
         WarpRepository warps = WarpRepositories.cached(persistence);
         ModerationRepository moderation = ModerationStores.repository(persistence);
+        KitRepository kits = kitRepository(plugin, log);
         CurrencyRegistry currencies = new EconomyConfig(economyConfig).currencies();
         Currency defaultCurrency = currencies.defaultCurrency();
         WalletRepository wallets = WalletRepositories.repository(persistence, currencies, Clock.systemUTC());
-        RecordWriter live = new RepositoryRecordWriter(homes, warps, wallets, moderation, defaultCurrency);
-        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation);
+        RecordWriter live = new RepositoryRecordWriter(homes, warps, wallets, moderation, kits, defaultCurrency);
+        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation, kits);
         return new Writers(live, dryRun);
+    }
+
+    /**
+     * The file-backed kit catalog the import writes through — the same {@code modules/kits/kits/} tree the kits
+     * module owns, since kits are deliberately file-based rather than in the relational store. The kits module
+     * caches its own instance, so an imported kit becomes visible to {@code /kit} after a {@code reload kits} or
+     * a restart, exactly as a hand-edited kit file would.
+     */
+    private static KitRepository kitRepository(Plugin plugin, Logger log) {
+        Path dataFolder = plugin.getDataFolder().toPath();
+        Path kitsDir = dataFolder.resolve("modules").resolve("kits").resolve("kits");
+        Path legacy = dataFolder.resolve("kits.conf");
+        return ConfigurateKitRepository.load(kitsDir, legacy, log);
     }
 
     private static MigrationAudit audit() {
