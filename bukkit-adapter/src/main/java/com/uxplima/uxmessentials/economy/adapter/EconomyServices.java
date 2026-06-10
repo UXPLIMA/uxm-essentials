@@ -62,7 +62,6 @@ public record EconomyServices(
         com.uxplima.uxmessentials.economy.application.BankService bankService,
         com.uxplima.uxmessentials.economy.application.LoanService loanService,
         com.uxplima.uxmessentials.persistence.economy.EconomyBackupManager backupManager,
-        com.uxplima.uxmessentials.economy.application.port.EconomyMigrator migrator,
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankGuiView bankGuiView,
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView loanGuiView) {
 
@@ -95,7 +94,6 @@ public record EconomyServices(
         Objects.requireNonNull(bankService, "bankService");
         Objects.requireNonNull(loanService, "loanService");
         Objects.requireNonNull(backupManager, "backupManager");
-        Objects.requireNonNull(migrator, "migrator");
         Objects.requireNonNull(bankGuiView, "bankGuiView");
         Objects.requireNonNull(loanGuiView, "loanGuiView");
     }

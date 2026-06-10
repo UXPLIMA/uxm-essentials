@@ -69,16 +69,6 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                                             return builder.buildFuture();
                                         })
                                         .executes(this::runRestore))))
-                .then(Commands.literal("migrate")
-                        .requires(src -> src.getSender().hasPermission(BASE + ".migrate"))
-                        .then(Commands.argument("source", StringArgumentType.word())
-                                .suggests((ctx, builder) -> {
-                                    builder.suggest("essentialsx");
-                                    builder.suggest("playerpoints");
-                                    builder.suggest("vault");
-                                    return builder.buildFuture();
-                                })
-                                .executes(this::runMigrate)))
                 .build();
     }
 
@@ -406,26 +396,6 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                         sender,
                         EconomyMessageKey.ECO_ADMIN_RESTORE_FAILED,
                         java.util.Map.of("error", String.valueOf(e.getMessage())));
-            }
-        });
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int runMigrate(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) return 0;
-        String source = ctx.getArgument("source", String.class);
-        offTick(() -> {
-            feedback.send(sender, EconomyMessageKey.ECO_ADMIN_MIGRATE_STARTED, java.util.Map.of("source", source));
-            com.uxplima.uxmessentials.shared.domain.Result<com.uxplima.uxmessentials.shared.domain.Unit, String> res =
-                    services.migrator().migrate(source);
-            if (res.isOk()) {
-                feedback.send(sender, EconomyMessageKey.ECO_ADMIN_MIGRATE_SUCCESS, java.util.Map.of("source", source));
-            } else {
-                feedback.send(
-                        sender,
-                        EconomyMessageKey.ECO_ADMIN_MIGRATE_FAILED,
-                        java.util.Map.of("error", String.valueOf(res.errorOrNull())));
             }
         });
         return Command.SINGLE_SUCCESS;

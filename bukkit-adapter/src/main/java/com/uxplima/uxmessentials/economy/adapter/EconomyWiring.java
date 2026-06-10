@@ -462,10 +462,6 @@ public final class EconomyWiring {
                 new com.uxplima.uxmessentials.economy.application.LoanService(
                         loanRepo, settings.loanPolicy(), kernel.events(), clock, nativeLedger);
 
-        com.uxplima.uxmessentials.economy.application.port.EconomyMigrator migrator =
-                new com.uxplima.uxmessentials.economy.adapter.inbound.command.BukkitEconomyMigrator(
-                        plugin, resolved, defaultCurrency);
-
         // The three bank menus open each other, so they cannot all be constructed before the navigation router
         // that links them. A holder supplies the router once it is built; each view holds the supplier as a
         // final field and dereferences it only on a click, keeping the cross-links constructor-injected and
@@ -549,7 +545,6 @@ public final class EconomyWiring {
                 bankService,
                 loanService,
                 backupManager,
-                migrator,
                 bankGuiView,
                 loanGuiView);
     }

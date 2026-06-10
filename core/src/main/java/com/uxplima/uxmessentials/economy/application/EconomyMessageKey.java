@@ -107,9 +107,6 @@ public enum EconomyMessageKey implements MessageKey {
     ECO_ADMIN_RESTORE_SUCCESS("eco.admin.restore-success"),
     ECO_ADMIN_RESTORE_NOT_FOUND("eco.admin.restore-not-found"),
     ECO_ADMIN_RESTORE_FAILED("eco.admin.restore-failed"),
-    ECO_ADMIN_MIGRATE_STARTED("eco.admin.migrate-started"),
-    ECO_ADMIN_MIGRATE_SUCCESS("eco.admin.migrate-success"),
-    ECO_ADMIN_MIGRATE_FAILED("eco.admin.migrate-failed"),
 
     // Command costs
     COMMAND_COST_CHARGED("eco.command-cost.charged"),
