@@ -36,6 +36,16 @@ public interface BankRepository {
     /** Lists all shared bank IDs a player is associated with. */
     List<String> findBankIdsForPlayer(UUID uuid);
 
+    /** Every shared bank, for periodic maintenance such as interest accrual. */
+    List<SharedBank> findAll();
+
+    /**
+     * Atomically add {@code interest} to {@code bankId}'s balance with a single {@code UPDATE … SET balance =
+     * balance + ?} (so a concurrent deposit/withdraw can never be clobbered). This is a system credit — interest
+     * is minted into the bank, no member is debited — applied only when the bank's currency matches.
+     */
+    void creditBank(String bankId, Money interest);
+
     /**
      * Atomically debit {@code amount} from {@code player}'s wallet (the guarded debit) and add it to bank
      * {@code bankId}'s balance in one transaction. If the guarded wallet debit changes no rows the bank balance

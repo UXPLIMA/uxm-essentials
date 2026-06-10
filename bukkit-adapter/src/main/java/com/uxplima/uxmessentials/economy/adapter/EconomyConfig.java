@@ -376,6 +376,33 @@ public final class EconomyConfig {
         return config.getBoolean("maintenance.dry-run", true);
     }
 
+    /** The operator-tunable bank-interest rule; disabled by default so banks accrue nothing until enabled. */
+    public com.uxplima.uxmessentials.economy.application.BankInterestPolicy bankInterestPolicy() {
+        boolean enabled = config.getBoolean("bank.interest.enabled", false);
+        Duration interval = Duration.ofHours(Math.max(1L, config.getLong("bank.interest.interval-hours", 24L)));
+        List<com.uxplima.uxmessentials.economy.application.BankInterestPolicy.Tier> tiers = new java.util.ArrayList<>();
+        for (String token : config.getStringList("bank.interest.tiers", List.of())) {
+            parseTier(token).ifPresent(tiers::add);
+        }
+        return new com.uxplima.uxmessentials.economy.application.BankInterestPolicy(enabled, interval, tiers);
+    }
+
+    /** Parse one {@code "minBalance:ratePercent"} tier token; empty when it is malformed (skipped, not fatal). */
+    private static java.util.Optional<com.uxplima.uxmessentials.economy.application.BankInterestPolicy.Tier> parseTier(
+            String token) {
+        List<String> parts = com.google.common.base.Splitter.on(':').splitToList(token);
+        if (parts.size() != 2) {
+            return java.util.Optional.empty();
+        }
+        try {
+            return java.util.Optional.of(new com.uxplima.uxmessentials.economy.application.BankInterestPolicy.Tier(
+                    new BigDecimal(parts.get(0).strip()),
+                    new BigDecimal(parts.get(1).strip())));
+        } catch (NumberFormatException malformed) {
+            return java.util.Optional.empty();
+        }
+    }
+
     private BigDecimal bigDecimal(String path, BigDecimal fallback) {
         String raw = config.getString(path, "").strip();
         if (raw.isEmpty()) {

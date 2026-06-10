@@ -312,6 +312,14 @@ public final class EconomyWiring {
                         settings.maintenancePruneTransactionDays(),
                         settings.maintenanceDryRun());
 
+        com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask bankInterestTask =
+                new com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask(
+                        com.uxplima.uxmessentials.persistence.economy.WalletRepositories.bankRepository(
+                                persistence, currencies, Clock.systemUTC()),
+                        settings.bankInterestPolicy(),
+                        kernel.scheduler(),
+                        kernel.log());
+
         // Clears every pending chat prompt on stop so a leftover callback can never fire after teardown.
         Runnable promptCleanup = () -> {
             chatPromptListener.clear();
@@ -335,6 +343,7 @@ public final class EconomyWiring {
                 salaryTask,
                 loanRepaymentTask,
                 maintenanceTask,
+                bankInterestTask,
                 promptCleanup);
     }
 
@@ -571,6 +580,7 @@ public final class EconomyWiring {
             @org.jspecify.annotations.Nullable SalaryTask salaryTask,
             @org.jspecify.annotations.Nullable LoanRepaymentTask loanRepaymentTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask,
+            com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask bankInterestTask,
             Runnable promptCleanup) {
 
         public Wired {
@@ -585,6 +595,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(defaultCurrency, "defaultCurrency");
             Objects.requireNonNull(amountFormat, "amountFormat");
             Objects.requireNonNull(maintenanceTask, "maintenanceTask");
+            Objects.requireNonNull(bankInterestTask, "bankInterestTask");
             Objects.requireNonNull(promptCleanup, "promptCleanup");
         }
 
@@ -599,11 +610,13 @@ public final class EconomyWiring {
                 loanRepaymentTask.start();
             }
             maintenanceTask.start();
+            bankInterestTask.start();
         }
 
         /** Drain the queues, stop the loops, and drop this plugin's provider registration. */
         public void stop() {
             promptCleanup.run();
+            bankInterestTask.stop();
             maintenanceTask.stop();
             if (loanRepaymentTask != null) {
                 loanRepaymentTask.stop();

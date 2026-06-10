@@ -42,6 +42,27 @@ public final class InMemoryBankRepository implements BankRepository {
     }
 
     @Override
+    public List<SharedBank> findAll() {
+        return List.copyOf(byId.values());
+    }
+
+    @Override
+    public void creditBank(String bankId, Money interest) {
+        SharedBank bank = byId.get(bankId);
+        if (bank != null && bank.balance().currency().equals(interest.currency())) {
+            byId.put(
+                    bankId,
+                    new SharedBank(
+                            bank.id(),
+                            bank.name(),
+                            bank.balance().plus(interest),
+                            bank.creator(),
+                            bank.members(),
+                            bank.createdAt()));
+        }
+    }
+
+    @Override
     public void delete(String id) {
         byId.remove(id);
     }

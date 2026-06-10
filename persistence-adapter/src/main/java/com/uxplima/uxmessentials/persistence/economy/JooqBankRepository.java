@@ -70,6 +70,42 @@ public final class JooqBankRepository extends JooqRepository implements BankRepo
     }
 
     @Override
+    public List<SharedBank> findAll() {
+        return read(dsl -> {
+            List<SharedBank> banks = new java.util.ArrayList<>();
+            for (EconomySharedBanksRecord bank :
+                    dsl.selectFrom(ECONOMY_SHARED_BANKS).fetch()) {
+                Optional<Currency> currency = currencies.find(CurrencyId.of(bank.getCurrency()));
+                if (currency.isEmpty()) {
+                    continue;
+                }
+                Money balance = Money.of(currency.get(), bank.getBalance());
+                PlayerRef creator = ownerRef(dsl, bank.getCreatorUuid());
+                List<BankMember> members = loadMembers(dsl, bank.getId());
+                banks.add(new SharedBank(bank.getId(), bank.getName(), balance, creator, members, bank.getCreatedAt()));
+            }
+            return banks;
+        });
+    }
+
+    @Override
+    public void creditBank(String bankId, Money interest) {
+        Objects.requireNonNull(bankId, "bankId");
+        Objects.requireNonNull(interest, "interest");
+        write(dsl -> {
+            dsl.update(ECONOMY_SHARED_BANKS)
+                    .set(ECONOMY_SHARED_BANKS.BALANCE, ECONOMY_SHARED_BANKS.BALANCE.add(interest.amount()))
+                    .where(ECONOMY_SHARED_BANKS
+                            .ID
+                            .eq(bankId)
+                            .and(ECONOMY_SHARED_BANKS.CURRENCY.eq(
+                                    interest.currency().id().value())))
+                    .execute();
+            return null;
+        });
+    }
+
+    @Override
     public void save(SharedBank bank) {
         Objects.requireNonNull(bank, "bank");
         write(dsl -> {
