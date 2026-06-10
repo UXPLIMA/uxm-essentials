@@ -46,6 +46,7 @@ import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.SanctionHistoryRecorder;
+import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
@@ -167,6 +168,7 @@ public final class ModerationWiring {
                 .tempWarn(new TempWarn(repository, guard, notifier, audit, kernel.events(), clock))
                 .reviewWarns(new ReviewWarns(repository, notifier, clock))
                 .clearWarns(new ClearWarns(repository, notifier, audit))
+                .sanctionSummary(new SanctionSummary(repository, notifier, clock))
                 .listJails(new ListJails(jails, notifier))
                 .listJailed(new ListJailed(repository, kernel.playerLookup(), notifier, clock))
                 .setJail(new SetJail(jailLocations, notifier, audit, kernel.events(), clock))

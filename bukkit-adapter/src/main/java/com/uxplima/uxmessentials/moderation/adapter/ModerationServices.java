@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
+import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
@@ -60,6 +61,7 @@ public final class ModerationServices {
     private final TempWarn tempWarn;
     private final ReviewWarns reviewWarns;
     private final ClearWarns clearWarns;
+    private final SanctionSummary sanctionSummary;
     private final ListJails listJails;
     private final ListJailed listJailed;
     private final SetJail setJail;
@@ -96,6 +98,7 @@ public final class ModerationServices {
         this.tempWarn = Objects.requireNonNull(builder.tempWarn, "tempWarn");
         this.reviewWarns = Objects.requireNonNull(builder.reviewWarns, "reviewWarns");
         this.clearWarns = Objects.requireNonNull(builder.clearWarns, "clearWarns");
+        this.sanctionSummary = Objects.requireNonNull(builder.sanctionSummary, "sanctionSummary");
         this.listJails = Objects.requireNonNull(builder.listJails, "listJails");
         this.listJailed = Objects.requireNonNull(builder.listJailed, "listJailed");
         this.setJail = Objects.requireNonNull(builder.setJail, "setJail");
@@ -172,6 +175,10 @@ public final class ModerationServices {
 
     public ClearWarns clearWarns() {
         return clearWarns;
+    }
+
+    public SanctionSummary sanctionSummary() {
+        return sanctionSummary;
     }
 
     public ListJails listJails() {
@@ -271,6 +278,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable TempWarn tempWarn;
         private @org.jspecify.annotations.Nullable ReviewWarns reviewWarns;
         private @org.jspecify.annotations.Nullable ClearWarns clearWarns;
+        private @org.jspecify.annotations.Nullable SanctionSummary sanctionSummary;
         private @org.jspecify.annotations.Nullable ListJails listJails;
         private @org.jspecify.annotations.Nullable ListJailed listJailed;
         private @org.jspecify.annotations.Nullable SetJail setJail;
@@ -359,6 +367,11 @@ public final class ModerationServices {
 
         Builder clearWarns(ClearWarns value) {
             this.clearWarns = value;
+            return this;
+        }
+
+        Builder sanctionSummary(SanctionSummary value) {
+            this.sanctionSummary = value;
             return this;
         }
 

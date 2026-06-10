@@ -466,6 +466,9 @@ permissions:
   uxmessentials.moderation.warn:
     description: '/warn <player> [reason], /tempwarn <player> <duration> [reason], /warns <player> and /unwarn <player> — issue (standing or timed), review and clear warning history.'
     default: op
+  uxmessentials.moderation.sanction:
+    description: '/sanction <player> — aggregated read-only punishment summary: current mute, jail, ban state and active warning count.'
+    default: op
   uxmessentials.moderation.banip:
     description: '/banip <player|ip> [reason] / /unbanip <ip> — IP ban with stored-IP alt detection.'
     default: op

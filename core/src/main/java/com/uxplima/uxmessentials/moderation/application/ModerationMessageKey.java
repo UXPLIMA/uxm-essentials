@@ -33,6 +33,16 @@ public enum ModerationMessageKey implements MessageKey {
     JAILS_ENTRY("moderation.jails.entry"),
     JAILS_EMPTY("moderation.jails.empty"),
 
+    // /sanction — aggregated read-only punishment summary for one player
+    SANCTION_HEADER("moderation.sanction.header"),
+    SANCTION_MUTE_ACTIVE("moderation.sanction.mute-active"),
+    SANCTION_MUTE_NONE("moderation.sanction.mute-none"),
+    SANCTION_JAIL_ACTIVE("moderation.sanction.jail-active"),
+    SANCTION_JAIL_NONE("moderation.sanction.jail-none"),
+    SANCTION_BAN_ACTIVE("moderation.sanction.ban-active"),
+    SANCTION_BAN_NONE("moderation.sanction.ban-none"),
+    SANCTION_WARNS("moderation.sanction.warns"),
+
     // /setjail, /deljail — define and remove a stored jail location at the staff member's position
     SETJAIL_SAVED("moderation.setjail.saved"),
     DELJAIL_DELETED("moderation.deljail.deleted"),

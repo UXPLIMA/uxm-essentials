@@ -71,6 +71,7 @@ public final class ModerationCommands {
                         messages,
                         sink,
                         (a, t) -> services.reviewWarns().review(a, t)),
+                new SanctionCommand(services, messages, sink, scheduler),
                 new BanipCommand(services, messages, sink),
                 new TempbanipCommand(services, messages, sink),
                 new UnbanipCommand(services, messages, sink),

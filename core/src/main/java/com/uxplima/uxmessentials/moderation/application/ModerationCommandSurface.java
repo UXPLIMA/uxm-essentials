@@ -50,6 +50,7 @@ final class ModerationCommandSurface {
                 spec("tempwarn", "uxmessentials.moderation.warn", "Warn a player for a duration"),
                 spec("warns", "uxmessentials.moderation.warn", "Review a player's warnings"),
                 spec("unwarn", "uxmessentials.moderation.warn", "Clear a player's warnings"),
+                spec("sanction", "uxmessentials.moderation.sanction", "Show a player's punishment summary"),
                 spec("banip", "uxmessentials.moderation.banip", "Ban a player or IP by address"),
                 spec("tempbanip", "uxmessentials.moderation.banip", "Ban an IP for a duration"),
                 spec("unbanip", "uxmessentials.moderation.banip", "Lift an IP ban"),
