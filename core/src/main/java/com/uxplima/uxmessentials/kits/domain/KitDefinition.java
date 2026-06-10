@@ -50,6 +50,7 @@ import java.util.Optional;
  * @param claimActions ordered typed actions run on a successful claim (before/after the item grant); empty for none
  * @param denyActions ordered typed actions run when a claim is refused by any gate; empty for none
  * @param schedule the optional availability window gating when the kit may be claimed; {@link KitSchedule#always()} for none
+ * @param stockLimit the global cap on how many times the kit may ever be claimed across all players; {@code 0} for unlimited
  */
 public record KitDefinition(
         KitId id,
@@ -93,7 +94,8 @@ public record KitDefinition(
         List<String> requirementsLore,
         List<KitAction> claimActions,
         List<KitAction> denyActions,
-        KitSchedule schedule) {
+        KitSchedule schedule,
+        int stockLimit) {
 
     public KitDefinition {
         Objects.requireNonNull(id, "id");
@@ -134,6 +136,7 @@ public record KitDefinition(
         if (cooldown.isNegative()) {
             throw new IllegalArgumentException("kit cooldown must not be negative: " + cooldown);
         }
+        stockLimit = Math.max(0, stockLimit);
         items = List.copyOf(items);
         displayLore = List.copyOf(displayLore);
         commands = List.copyOf(commands);
@@ -223,7 +226,8 @@ public record KitDefinition(
                 List.of(),
                 List.of(),
                 List.of(),
-                KitSchedule.always());
+                KitSchedule.always(),
+                0);
     }
 
     public KitDefinition(
@@ -532,6 +536,11 @@ public record KitDefinition(
         return copy(b -> b.schedule = value);
     }
 
+    /** A copy of this kit with its global stock limit set to {@code value} ({@code 0} = unlimited), else preserved. */
+    public KitDefinition withStockLimit(int value) {
+        return copy(b -> b.stockLimit = Math.max(0, value));
+    }
+
     private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {
         KitDefinitionFields fields = new KitDefinitionFields(this);
         mutator.accept(fields);
@@ -584,6 +593,11 @@ public record KitDefinition(
     /** Whether the kit's schedule admits a claim at {@code now} (server-local); always true for an unscheduled kit. */
     public boolean isAvailableAt(LocalDateTime now) {
         return schedule.isAvailableAt(now);
+    }
+
+    /** True when the kit caps how many times it may ever be claimed across all players (a positive stock limit). */
+    public boolean hasStockLimit() {
+        return stockLimit > 0;
     }
 
     /** The cooldown in whole seconds, the unit the {@code Cooldowns} port resolves tiers in. */

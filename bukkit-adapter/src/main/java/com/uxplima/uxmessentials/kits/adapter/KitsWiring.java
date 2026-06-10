@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitActionRunner;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitGranter;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitCategoryRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
+import com.uxplima.uxmessentials.kits.adapter.outbound.FileKitStockStore;
 import com.uxplima.uxmessentials.kits.adapter.outbound.PapiRequirementEvaluator;
 import com.uxplima.uxmessentials.kits.adapter.outbound.PdcKitClaims;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
@@ -46,6 +47,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.kits.application.port.KitStockStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
@@ -139,7 +141,10 @@ public final class KitsWiring {
         // requirements fails closed (KitAccess cannot check its conditions, so it cannot be claimed).
         Optional<com.uxplima.uxmessentials.kits.application.port.RequirementEvaluator> requirements =
                 PapiRequirementEvaluator.isPresent() ? Optional.of(new PapiRequirementEvaluator()) : Optional.empty();
-        KitAccess access = new KitAccess(kernel.permissions(), kernel.cooldowns(), claims, economy, requirements);
+        Path stockFile = dataFolder.resolve("modules").resolve("kits").resolve("stock.properties");
+        KitStockStore stockStore = new FileKitStockStore(kernel.scheduler(), kernel.log(), stockFile);
+        KitAccess access = new KitAccess(
+                kernel.permissions(), kernel.cooldowns(), claims, economy, requirements, Optional.of(stockStore));
         KitServices services = assemble(
                 kernel,
                 repository,

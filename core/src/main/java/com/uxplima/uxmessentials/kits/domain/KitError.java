@@ -37,6 +37,9 @@ public enum KitError {
     /** The kit's availability schedule does not admit a claim at the current time (its rotation window is closed). */
     UNAVAILABLE(KitsMessageKey.KIT_UNAVAILABLE),
 
+    /** The kit's global stock limit has been reached — no copies remain for anyone to claim. */
+    OUT_OF_STOCK(KitsMessageKey.KIT_OUT_OF_STOCK),
+
     /** The claim was cancelled by an external plugin event. */
     CANCELLED(KitsMessageKey.KIT_CLAIM_CANCELLED);
 

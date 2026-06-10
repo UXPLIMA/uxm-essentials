@@ -149,6 +149,7 @@ final class KitCodec {
             boolean preview = node.node("preview").getBoolean(true);
             boolean closeOnClaim = node.node("close-on-claim").getBoolean(false);
             com.uxplima.uxmessentials.kits.domain.KitSchedule schedule = readSchedule(node.node("schedule"));
+            int stockLimit = Math.max(0, node.node("stock").getInt(0));
 
             List<com.uxplima.uxmessentials.kits.domain.KitRequirement> requirements =
                     readRequirements(node.node("requirements"));
@@ -203,7 +204,8 @@ final class KitCodec {
                     requirementsLore,
                     claimActions,
                     denyActions,
-                    schedule));
+                    schedule,
+                    stockLimit));
         } catch (RuntimeException malformed) {
             return Optional.empty();
         }
@@ -259,6 +261,7 @@ final class KitCodec {
                 .set(definition.requirementsLore().isEmpty() ? null : definition.requirementsLore());
 
         writeSchedule(node.node("schedule"), definition.schedule());
+        node.node("stock").set(definition.stockLimit() > 0 ? definition.stockLimit() : null);
 
         node.node("permission-cooldowns").set(null);
         if (!definition.permissionCooldowns().isEmpty()) {

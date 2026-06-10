@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.kits.application.port.KitStockStore;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
@@ -57,7 +58,9 @@ class ClaimKitTest {
     private RecordingGranter granter;
     private KitNotifier notifier;
     private DomainEventPublisher events;
+    private FakeStockStore stock;
     private PlayerRef alice;
+    private PlayerRef bob;
 
     @BeforeEach
     void setUp() {
@@ -68,7 +71,9 @@ class ClaimKitTest {
         granter = new RecordingGranter();
         notifier = new KitNotifier(new KeyMessages(), new CapturingSink());
         events = new CapturingEvents();
+        stock = new FakeStockStore();
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
+        bob = new PlayerRef(UUID.randomUUID(), "Bob");
     }
 
     @Test
@@ -202,6 +207,33 @@ class ClaimKitTest {
     }
 
     @Test
+    void aStockLimitedKitIsRefusedOnceItsGlobalLimitIsReached() {
+        repository.save(repeatable("limited", Duration.ZERO).withStockLimit(1));
+
+        Result<Unit, KitError> first = claimKit(Optional.empty()).claim(alice, KitId.of("limited"));
+        Result<Unit, KitError> second = claimKit(Optional.empty()).claim(bob, KitId.of("limited"));
+
+        assertThat(first.isOk()).isTrue();
+        assertThat(second.errorOrThrow()).isEqualTo(KitError.OUT_OF_STOCK);
+        assertThat(granter.grants).isEqualTo(1); // the sold-out claim granted nothing
+    }
+
+    @Test
+    void aFailedChargeReleasesTheReservedStockUnit() {
+        repository.save(priced("limited", new BigDecimal("250")).withStockLimit(1));
+
+        Result<Unit, KitError> broke =
+                claimKit(Optional.of(new RecordingEconomy(false))).claim(alice, KitId.of("limited"));
+        // the reservation was given back, so the last copy is still claimable by a solvent player
+        Result<Unit, KitError> solvent =
+                claimKit(Optional.of(new RecordingEconomy(true))).claim(bob, KitId.of("limited"));
+
+        assertThat(broke.errorOrThrow()).isEqualTo(KitError.CANNOT_AFFORD);
+        assertThat(solvent.isOk()).isTrue();
+        assertThat(granter.grants).isEqualTo(1);
+    }
+
+    @Test
     void listOmitsAConsumedOneTimeKitButKeepsACooldownedOne() {
         repository.save(oneTime("vote"));
         repository.save(repeatable("daily", Duration.ofSeconds(90)));
@@ -214,7 +246,7 @@ class ClaimKitTest {
     }
 
     private ClaimKit claimKit(Optional<KitEconomy> economy) {
-        KitAccess access = new KitAccess(permissions, cooldowns, claims, economy);
+        KitAccess access = new KitAccess(permissions, cooldowns, claims, economy, Optional.empty(), Optional.of(stock));
         return new ClaimKit(repository, access, granter, notifier, events, Clock.system(ZoneOffset.UTC), economy);
     }
 
@@ -316,6 +348,26 @@ class ClaimKitTest {
         @Override
         public void resetAll(PlayerRef who) {
             claimed.remove(who.uuid());
+        }
+    }
+
+    /** A map-backed global stock counter with atomic reserve/release, mirroring the file-backed production store. */
+    private static final class FakeStockStore implements KitStockStore {
+        private final Map<String, Integer> counts = new HashMap<>();
+
+        @Override
+        public boolean tryConsume(KitId kit, int limit) {
+            int now = counts.getOrDefault(kit.value(), 0);
+            if (now < limit) {
+                counts.put(kit.value(), now + 1);
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public void release(KitId kit) {
+            counts.computeIfPresent(kit.value(), (id, current) -> current > 0 ? current - 1 : 0);
         }
     }
 

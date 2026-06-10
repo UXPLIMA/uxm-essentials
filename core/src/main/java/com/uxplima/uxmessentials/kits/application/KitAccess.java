@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
+import com.uxplima.uxmessentials.kits.application.port.KitStockStore;
 import com.uxplima.uxmessentials.kits.application.port.RequirementEvaluator;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
@@ -20,9 +21,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * The claim gate a {@code /kit} passes before the items are granted, applying the claim rules in one place
  * so {@link ClaimKit} stays a thin orchestrator. The order is deliberate: the per-kit permission first
  * (cheapest, and the most informative refusal), then the one-time stamp (a consumed one-time kit is a
- * permanent no), then the cooldown (a repeatable kit's rate limit), then the placeholder requirements, and
- * only last the charge — so a kit whose requirements the player fails is never charged and an over-cooldown
- * kit never burns their money.
+ * permanent no), then the cooldown (a repeatable kit's rate limit), then the placeholder requirements, then the
+ * global stock reservation, and only last the charge — so a kit whose requirements the player fails is never
+ * charged, an over-cooldown kit never burns their money, and a sold-out kit is refused before any charge.
  *
  * <p>This is where the economy and requirement <em>soft couplings</em> live. Each is an {@link Optional}
  * injected at wiring time. When the economy provider is absent, a kit's recorded cost is ignored and the kit is
@@ -46,6 +47,7 @@ public final class KitAccess {
     private final KitClaimStore claims;
     private final Optional<KitEconomy> economy;
     private final Optional<RequirementEvaluator> requirements;
+    private final Optional<KitStockStore> stock;
 
     public KitAccess(Permissions permissions, Cooldowns cooldowns, KitClaimStore claims, Optional<KitEconomy> economy) {
         this(permissions, cooldowns, claims, economy, Optional.empty());
@@ -57,11 +59,22 @@ public final class KitAccess {
             KitClaimStore claims,
             Optional<KitEconomy> economy,
             Optional<RequirementEvaluator> requirements) {
+        this(permissions, cooldowns, claims, economy, requirements, Optional.empty());
+    }
+
+    public KitAccess(
+            Permissions permissions,
+            Cooldowns cooldowns,
+            KitClaimStore claims,
+            Optional<KitEconomy> economy,
+            Optional<RequirementEvaluator> requirements,
+            Optional<KitStockStore> stock) {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.claims = Objects.requireNonNull(claims, "claims");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.requirements = Objects.requireNonNull(requirements, "requirements");
+        this.stock = Objects.requireNonNull(stock, "stock");
     }
 
     /**
@@ -85,7 +98,36 @@ public final class KitAccess {
         if (!meetsRequirements(who, kit)) {
             return Result.err(KitError.REQUIREMENTS_NOT_MET);
         }
-        return charge(who, kit);
+        return reserveStockAndCharge(who, kit);
+    }
+
+    /**
+     * Reserve one unit of a stock-limited kit, then charge any cost. Stock is taken first so a player who cannot
+     * afford the kit never holds a reservation: a failed charge releases the unit back. An unstocked or unlimited
+     * kit reserves nothing and charges normally.
+     */
+    private Result<Unit, KitError> reserveStockAndCharge(PlayerRef who, KitDefinition kit) {
+        if (!reserveStock(kit)) {
+            return Result.err(KitError.OUT_OF_STOCK);
+        }
+        Result<Unit, KitError> charged = charge(who, kit);
+        if (charged.isErr()) {
+            releaseStock(kit);
+        }
+        return charged;
+    }
+
+    private boolean reserveStock(KitDefinition kit) {
+        if (!kit.hasStockLimit()) {
+            return true;
+        }
+        return stock.map(store -> store.tryConsume(kit.id(), kit.stockLimit())).orElse(true);
+    }
+
+    private void releaseStock(KitDefinition kit) {
+        if (kit.hasStockLimit()) {
+            stock.ifPresent(store -> store.release(kit.id()));
+        }
     }
 
     /**
