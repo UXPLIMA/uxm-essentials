@@ -1,10 +1,9 @@
 package com.uxplima.uxmessentials.bootstrap.di;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Objects;
-import java.util.Optional;
 
-import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -13,11 +12,16 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.mapmarker.MapMarkersWir
 import com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks.ServerLinksApplier;
 import com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks.ServerLinksConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
-import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateChecker;
-import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateNoticeListener;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
-import com.uxplima.uxmessentials.shared.domain.Version;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
+import com.uxplima.uxmlib.scheduler.Scheduler;
+import com.uxplima.uxmlib.scheduler.TaskHandle;
+import com.uxplima.uxmlib.update.JsonUrlReleaseProvider;
+import com.uxplima.uxmlib.update.UpdateChecker;
+import com.uxplima.uxmlib.update.UpdateNotifier;
+import com.uxplima.uxmlib.update.UpdateOutcome;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -27,21 +31,26 @@ import org.jspecify.annotations.NullMarked;
  * surface rather than registered as a {@code FeatureModule}.
  *
  * <p>Server links apply immediately (clear-and-set the global links from {@code server-links}); an empty list
- * leaves the live links untouched. The update checker is off by default — when enabled it runs its first
- * non-blocking check on enable, optionally re-checks on its interval through the {@code Scheduler}, and contributes
- * an op-only join-notice listener the caller registers. When disabled, or when the join-notice is off, no listener
- * is produced and nothing is scheduled. The map-marker integration renders warps and spawns (homes are off by
- * default for privacy) onto whichever supported map plugin is installed; with no map plugin or {@code
- * map-markers.enabled = false} it wires nothing.
+ * leaves the live links untouched. The update checker is off by default and built on the uxmLib update toolkit —
+ * when enabled it reads the operator's {@code source-url} as a generic release-JSON endpoint, runs its checks
+ * off-thread through uxmLib's Folia-aware scheduler, and announces a newer release to the console once per
+ * distinct version. When {@code notify-ops-on-join} is on it also surfaces uxmLib's permission-gated,
+ * click-to-open join notice (the {@code uxmessentials.update.notify} node). When disabled, nothing is scheduled.
+ * The map-marker integration renders warps and spawns (homes are off by default for privacy) onto whichever
+ * supported map plugin is installed; with no map plugin or {@code map-markers.enabled = false} it wires nothing.
  */
 @NullMarked
 final class IntegrationsWiring {
 
     private IntegrationsWiring() {}
 
+    // The node a player must hold to see the on-join update notice. An admin/op-style node, not isOp(), so a
+    // server owner controls exactly who is told (the uxmLib notifier gates on the permission, not on op status).
+    private static final String UPDATE_NOTIFY_PERMISSION = "uxmessentials.update.notify";
+
     /**
      * Apply server links, start the update checker, and wire the map-marker integration from {@code config},
-     * returning the optional join-notice listener and the disable hooks (recurring-check stop + marker clear).
+     * returning the disable hooks (recurring-check stop + marker clear) the caller runs on disable.
      */
     static Wired wire(JavaPlugin plugin, ConfigStore config, KernelPorts kernel, Persistence persistence) {
         Objects.requireNonNull(plugin, "plugin");
@@ -68,37 +77,82 @@ final class IntegrationsWiring {
         applier.apply(new ServerLinksConfig(dataFolder, kernel.log()).read());
     }
 
+    // Map the operator's update-check block onto the uxmLib update toolkit. The library's UpdateChecker /
+    // UpdateNotifier run off-thread through its own Folia-aware Scheduler (PaperScheduler), so the bridge is just
+    // constructing that scheduler over the plugin. Disabled -> wire nothing. source-url -> a JsonUrlReleaseProvider
+    // (the same any-endpoint behaviour the local checker had). The version string is handed straight to the lib,
+    // which parses it; an unreadable plugin version still parses ("0.0.0"-style) inside the lib rather than here.
     private static Wired wireUpdateChecker(JavaPlugin plugin, ConfigStore config, KernelPorts kernel) {
         UpdateCheckSettings settings = UpdateCheckSettings.from(config);
         if (!settings.enabled()) {
             return Wired.inert();
         }
-        Version current = Version.parse(plugin.getPluginMeta().getVersion()).orElse(new Version(0, 0, 0));
-        UpdateChecker checker = new UpdateChecker(kernel.scheduler(), kernel.log(), current, settings);
-        checker.start();
-        Optional<Listener> listener = settings.notifyOpsOnJoin()
-                ? Optional.of(new UpdateNoticeListener(
-                        checker, settings.sourceUrl(), kernel.messages(), kernel.messageSink()))
-                : Optional.empty();
-        return new Wired(listener, checker::stop);
+        Scheduler scheduler = new PaperScheduler(plugin);
+        UpdateChecker checker = new UpdateChecker(
+                scheduler,
+                new JsonUrlReleaseProvider(settings.sourceUrl()),
+                plugin.getPluginMeta().getVersion());
+        Runnable stop = settings.notifyOpsOnJoin()
+                ? startWithJoinNotice(plugin, scheduler, checker, settings)
+                : startConsoleOnly(scheduler, checker, kernel.log(), settings);
+        return new Wired(stop);
     }
 
+    // notify-ops-on-join = true: the library notifier owns the console announce and registers its own
+    // permission-gated, click-to-open join notice. It couples the recurring poll with that listener, so a zero
+    // interval (check-once) falls back to the shipped default cadence here — the join listener self-warms its
+    // cache anyway, so a player who joins before the first poll still triggers a check.
+    private static Runnable startWithJoinNotice(
+            JavaPlugin plugin, Scheduler scheduler, UpdateChecker checker, UpdateCheckSettings settings) {
+        UpdateNotifier notifier = new UpdateNotifier(plugin, scheduler, checker, UPDATE_NOTIFY_PERMISSION);
+        notifier.start(Duration.ZERO, settings.repeats() ? settings.interval() : DEFAULT_POLL_PERIOD);
+        return notifier::stop;
+    }
+
+    // notify-ops-on-join = false: no join listener. The checker announces a newer release to the console once
+    // (deduped per distinct newer release by the library), either a single check on enable (interval 0) or on a
+    // recurring async timer. Returns a stop hook that cancels the recurring poll when one was armed.
+    private static Runnable startConsoleOnly(
+            Scheduler scheduler, UpdateChecker checker, Logger log, UpdateCheckSettings settings) {
+        if (!settings.repeats()) {
+            poll(checker, log);
+            return () -> {};
+        }
+        TaskHandle poll = scheduler.asyncTimer(Duration.ZERO, settings.interval(), handle -> poll(checker, log));
+        return poll::cancel;
+    }
+
+    // One console-announcing check. The library's checkAndAnnounce future funnels every outcome (including
+    // failure) into the dedupe and the announce callback, so the returned future carries nothing the caller
+    // needs — dropped here exactly as the library's own notifier drops it.
+    private static void poll(UpdateChecker checker, Logger log) {
+        var ignored = checker.checkAndAnnounce(outcome -> announce(log, checker, outcome));
+    }
+
+    private static void announce(Logger log, UpdateChecker checker, UpdateOutcome outcome) {
+        outcome.release()
+                .ifPresent(release -> log.info(
+                        "uxmEssentials update available: {} -> {}",
+                        checker.currentVersion().toString(),
+                        release.version()));
+    }
+
+    /** The poll cadence used when notify-on-join is on but the operator set a zero (check-once) interval. */
+    private static final Duration DEFAULT_POLL_PERIOD = Duration.ofHours(12);
+
     /**
-     * What the integrations wiring contributes: an optional op-join update-notice listener the caller registers,
-     * and a stop hook that runs every disable action (the update checker's recurring loop, the map-marker layer
-     * clear) on disable.
+     * What the integrations wiring contributes: a stop hook that runs every disable action (the update checker's
+     * recurring loop / notifier teardown, the map-marker layer clear) on disable.
      *
-     * @param joinListener the update-notice listener, present only when the checker is enabled and notifies on join
      * @param stop the disable hook running every integration's teardown
      */
-    record Wired(Optional<Listener> joinListener, Runnable stop) {
+    record Wired(Runnable stop) {
         Wired {
-            Objects.requireNonNull(joinListener, "joinListener");
             Objects.requireNonNull(stop, "stop");
         }
 
         static Wired inert() {
-            return new Wired(Optional.empty(), () -> {});
+            return new Wired(() -> {});
         }
 
         /** Fold the map-marker disable hook into this wiring's aggregate stop, run after the checker stop. */
@@ -108,7 +162,7 @@ final class IntegrationsWiring {
                 stop.run();
                 markerStop.run();
             };
-            return new Wired(joinListener, both);
+            return new Wired(both);
         }
     }
 }

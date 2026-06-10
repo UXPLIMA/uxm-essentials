@@ -6,11 +6,10 @@ package com.uxplima.uxmessentials.shared.application.message;
  * <p>Several families live here (docs/13-i18n §6, the {@code shared} row): the {@code command.*} failures
  * every command-bearing context raises before it reaches a use case (no permission, player-only,
  * unknown player), the {@code cooldown.*} / {@code warmup.*} feedback the shared {@code Cooldowns} /
- * {@code Warmups} ports render, the {@code lang.*} feedback the {@code /lang} override command emits, the
- * {@code help.*} lines the cross-cutting {@code /help} listing renders, and the {@code common.*}
- * cross-cutting notices owned by no single context (the update-available join notice). They sit in
- * {@code shared} so any context references them without a cross-context dependency, exactly as a
- * per-feature {@code MessageKey} enum does for its own block.
+ * {@code Warmups} ports render, the {@code lang.*} feedback the {@code /lang} override command emits, and
+ * the {@code help.*} lines the cross-cutting {@code /help} listing renders. They sit in {@code shared} so
+ * any context references them without a cross-context dependency, exactly as a per-feature
+ * {@code MessageKey} enum does for its own block.
  *
  * <p>Like every {@link MessageKey} enum the constant name and the catalog key map 1:1
  * ({@code COMMAND_NO_PERMISSION} ↔ {@code command.no-permission}); the locale-parity guard asserts each
@@ -45,10 +44,7 @@ public enum SharedMessageKey implements MessageKey {
     HELP_NO_MATCH("help.no-match"),
     HELP_FOOTER("help.footer"),
     HELP_FOOTER_PREV("help.footer-prev"),
-    HELP_FOOTER_NEXT("help.footer-next"),
-
-    // the update checker's op-only join notice when a newer release is available
-    UPDATE_AVAILABLE("common.update-available");
+    HELP_FOOTER_NEXT("help.footer-next");
 
     private final String key;
 

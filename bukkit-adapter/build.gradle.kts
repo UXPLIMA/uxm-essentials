@@ -54,6 +54,10 @@ dependencies {
     implementation("com.uxplima.uxmlib:uxmlib-integration:0.1.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
+    // uxmLib update toolkit (dogfood) — the opt-in release update-checker. Pulls uxmlib-common only.
+    implementation("com.uxplima.uxmlib:uxmlib-update:0.1.0-SNAPSHOT") {
+        exclude(group = "org.spongepowered")
+    }
 
     testImplementation(libs.mockbukkit)
     testImplementation(libs.archunit.junit)

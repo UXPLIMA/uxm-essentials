@@ -124,10 +124,10 @@ public final class PluginModule {
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
         // integration). These belong to no feature context: server links apply once on enable, the update checker —
-        // off by default — contributes an op-only join notice and a stop hook for its recurring check, and the
-        // map-marker integration renders warps/spawns onto Dynmap/squaremap when one is installed (homes opt-in).
+        // off by default, built on the uxmLib update toolkit — self-registers its permission-gated join notice and
+        // returns a stop hook for its recurring check, and the map-marker integration renders warps/spawns onto
+        // Dynmap/squaremap when one is installed (homes opt-in).
         IntegrationsWiring.Wired integrations = IntegrationsWiring.wire(plugin, config, kernel, persistence);
-        integrations.joinListener().ifPresent(resources::addListener);
         resources.onClose(integrations.stop());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
         resources.addCommand(new UxmessCommand(registry, config, importNode));
