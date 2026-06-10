@@ -119,9 +119,12 @@ public final class PluginModule {
                 wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus());
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
-        // Cross-cutting server-integration polish that belongs to no feature context: the 1.21+ pause-menu
-        // server links apply once on enable from the root config.conf.
-        IntegrationsWiring.wire(plugin, kernel);
+        // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker). These belong
+        // to no feature context: server links apply once on enable, and the update checker — off by default —
+        // contributes an op-only join notice and a stop hook for its recurring check.
+        IntegrationsWiring.Wired integrations = IntegrationsWiring.wire(plugin, config, kernel);
+        integrations.joinListener().ifPresent(resources::addListener);
+        resources.onClose(integrations.stop());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
         resources.addCommand(new UxmessCommand(registry, config, importNode));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
