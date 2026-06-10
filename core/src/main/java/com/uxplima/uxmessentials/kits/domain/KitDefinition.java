@@ -51,6 +51,7 @@ import java.util.Optional;
  * @param denyActions ordered typed actions run when a claim is refused by any gate; empty for none
  * @param schedule the optional availability window gating when the kit may be claimed; {@link KitSchedule#always()} for none
  * @param stockLimit the global cap on how many times the kit may ever be claimed across all players; {@code 0} for unlimited
+ * @param parsePlaceholders whether the recipient's PlaceholderAPI tokens are resolved in each granted item's name and lore
  */
 public record KitDefinition(
         KitId id,
@@ -95,7 +96,8 @@ public record KitDefinition(
         List<KitAction> claimActions,
         List<KitAction> denyActions,
         KitSchedule schedule,
-        int stockLimit) {
+        int stockLimit,
+        boolean parsePlaceholders) {
 
     public KitDefinition {
         Objects.requireNonNull(id, "id");
@@ -227,7 +229,8 @@ public record KitDefinition(
                 List.of(),
                 List.of(),
                 KitSchedule.always(),
-                0);
+                0,
+                false);
     }
 
     public KitDefinition(
@@ -539,6 +542,11 @@ public record KitDefinition(
     /** A copy of this kit with its global stock limit set to {@code value} ({@code 0} = unlimited), else preserved. */
     public KitDefinition withStockLimit(int value) {
         return copy(b -> b.stockLimit = Math.max(0, value));
+    }
+
+    /** A copy of this kit with its parse-placeholders flag set to {@code value}, every other setting preserved. */
+    public KitDefinition withParsePlaceholders(boolean value) {
+        return copy(b -> b.parsePlaceholders = value);
     }
 
     private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {

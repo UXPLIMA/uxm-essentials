@@ -295,6 +295,29 @@ class ConfigurateKitRepositoryTest {
     }
 
     @Test
+    void parsePlaceholdersDefaultsOffAndRoundTripsWhenOn(@TempDir Path root) {
+        Path dir = kitsDir(root);
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+
+        KitDefinition plain =
+                KitDefinition.repeatable(KitId.of("plain"), List.of(KitItem.of("AAAA", 1)), Duration.ZERO);
+        repository.save(plain);
+        repository.save(plain.withParsePlaceholders(true).withItems(List.of(KitItem.of("BBBB", 1))));
+
+        KitRepository reloaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        assertThat(reloaded.find(KitId.of("plain")).orElseThrow().parsePlaceholders())
+                .isTrue();
+
+        // A second kit saved without opting in keeps the default off, so existing kits are unaffected.
+        repository.save(KitDefinition.repeatable(KitId.of("legacy"), List.of(KitItem.of("CCCC", 1)), Duration.ZERO));
+        assertThat(ConfigurateKitRepository.load(dir, legacy(root), NOOP)
+                        .find(KitId.of("legacy"))
+                        .orElseThrow()
+                        .parsePlaceholders())
+                .isFalse();
+    }
+
+    @Test
     void readsTypedClaimAndDenyActionsInOrder(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);

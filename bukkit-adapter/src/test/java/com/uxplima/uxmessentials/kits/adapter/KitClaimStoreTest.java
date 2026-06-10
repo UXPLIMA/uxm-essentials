@@ -397,6 +397,67 @@ class KitClaimStoreTest {
         assertThat(claimEventFired.get()).isTrue();
     }
 
+    @Test
+    void parsePlaceholdersOffLeavesAGrantedItemNameUnchanged() {
+        PlayerMock alice = server.addPlayer("Alice");
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+        ItemStack named = namedStack("Reward of {player}");
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit = kitWith(List.of(KitItemCodec.encode(named)), false);
+
+        granter.grant(BukkitRefs.toRef(alice), kit);
+
+        ItemStack granted = firstStack(alice, Material.PAPER);
+        assertThat(plain(granted)).isEqualTo("Reward of {player}");
+    }
+
+    @Test
+    void parsePlaceholdersOnGrantsTheItemWithoutThrowing() {
+        PlayerMock alice = server.addPlayer("Alice");
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+        ItemStack named = namedStack("<gold>{player}'s Reward");
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit = kitWith(List.of(KitItemCodec.encode(named)), true);
+
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
+
+        // PlaceholderAPI is not loadable under MockBukkit, so the bridge is the identity and the token survives
+        // the MiniMessage round-trip — the path runs end to end without throwing and still delivers the item.
+        assertThat(grant.fitInInventory()).isTrue();
+        ItemStack granted = firstStack(alice, Material.PAPER);
+        assertThat(plain(granted)).contains("{player}'s Reward");
+    }
+
+    private static ItemStack namedStack(String miniMessageName) {
+        ItemStack stack = new ItemStack(Material.PAPER, 1);
+        org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+        meta.displayName(
+                net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(miniMessageName));
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    private static ItemStack firstStack(PlayerMock player, Material material) {
+        for (ItemStack stack : player.getInventory().getContents()) {
+            if (stack != null && stack.getType() == material) {
+                return stack;
+            }
+        }
+        throw new AssertionError("no " + material + " in the inventory");
+    }
+
+    private static String plain(ItemStack stack) {
+        net.kyori.adventure.text.Component name =
+                java.util.Objects.requireNonNull(stack.getItemMeta()).displayName();
+        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(java.util.Objects.requireNonNull(name));
+    }
+
+    private static com.uxplima.uxmessentials.kits.domain.KitDefinition kitWith(
+            List<KitItem> items, boolean parsePlaceholders) {
+        return com.uxplima.uxmessentials.kits.domain.KitDefinition.repeatable(
+                        com.uxplima.uxmessentials.kits.domain.KitId.of("rewards"), items, java.time.Duration.ZERO)
+                .withParsePlaceholders(parsePlaceholders);
+    }
+
     /** A logger that discards every line. */
     private static final class NoopLogger implements Logger {
         @Override

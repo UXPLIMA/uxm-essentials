@@ -1,18 +1,26 @@
 package com.uxplima.uxmessentials.kits.adapter.outbound;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.event.KitClaimEvent;
 import com.uxplima.uxmessentials.kits.adapter.inbound.event.KitPreClaimEvent;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -26,6 +34,11 @@ import org.jspecify.annotations.NullMarked;
  * <p>An offline recipient has no inventory to fill, so the grant no-ops and reports that everything "fit" —
  * there is nothing to overflow. A single corrupt kit item is logged and skipped rather than aborting the
  * whole claim, so one bad item never denies a player the rest of a kit.
+ *
+ * <p>When a kit opts in with {@code parse-placeholders: true} and PlaceholderAPI is installed, each granted
+ * item's display name and lore are resolved for the recipient before placement, so an operator can author an
+ * item named {@code <gold>{player}'s Reward}. The flag is off by default, so an existing kit and a server
+ * without PlaceholderAPI grant the item's text unchanged.
  */
 @NullMarked
 public final class BukkitKitGranter implements KitGranter {
@@ -57,9 +70,10 @@ public final class BukkitKitGranter implements KitGranter {
         if (player == null) {
             return Grant.complete();
         }
+        java.util.function.UnaryOperator<String> placeholders = placeholderBridge(recipient, kit);
         boolean fit = true;
         for (KitItem item : kit.items()) {
-            fit &= give(player, item, kit.autoEquip());
+            fit &= give(player, item, kit.autoEquip(), placeholders);
         }
 
         // Fire post-claim event
@@ -69,11 +83,13 @@ public final class BukkitKitGranter implements KitGranter {
         return fit ? Grant.complete() : Grant.overflowed();
     }
 
-    private boolean give(Player player, KitItem item, boolean autoEquip) {
+    private boolean give(
+            Player player, KitItem item, boolean autoEquip, java.util.function.UnaryOperator<String> placeholders) {
         ItemStack stack = decode(item);
         if (stack == null) {
             return true; // a corrupt entry was skipped; it neither filled nor overflowed the inventory
         }
+        applyPlaceholders(stack, placeholders);
 
         int maxStackSize = stack.getMaxStackSize();
         int amount = stack.getAmount();
@@ -216,5 +232,63 @@ public final class BukkitKitGranter implements KitGranter {
             log.warn("skipping unreadable kit item payload: " + malformed.getMessage());
             return null;
         }
+    }
+
+    /**
+     * The per-grant transform applied to each granted item's name and lore: resolve the recipient's
+     * PlaceholderAPI tokens when the kit opts in ({@code parse-placeholders: true}) and PlaceholderAPI is
+     * installed, the identity otherwise — so an existing kit and a server without PlaceholderAPI both grant
+     * the item's text unchanged.
+     */
+    private UnaryOperator<String> placeholderBridge(PlayerRef recipient, KitDefinition kit) {
+        if (kit.parsePlaceholders() && PlaceholderApiSupport.isPresent()) {
+            return PlaceholderApiSupport.messageBridge(recipient.uuid());
+        }
+        return UnaryOperator.identity();
+    }
+
+    /**
+     * Rewrite {@code stack}'s display name and lore through {@code placeholders}, round-tripping each line as
+     * MiniMessage so an item named {@code <gold>{player}'s Reward} resolves for the recipient. A stack with no
+     * meta, no name, and no lore is left untouched, and an identity bridge is a no-op.
+     */
+    private void applyPlaceholders(ItemStack stack, UnaryOperator<String> placeholders) {
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        boolean changed = rewriteName(meta, placeholders);
+        changed |= rewriteLore(meta, placeholders);
+        if (changed) {
+            stack.setItemMeta(meta);
+        }
+    }
+
+    private boolean rewriteName(ItemMeta meta, UnaryOperator<String> placeholders) {
+        Component name = meta.hasDisplayName() ? meta.displayName() : null;
+        if (name == null) {
+            return false;
+        }
+        meta.displayName(resolve(name, placeholders));
+        return true;
+    }
+
+    private boolean rewriteLore(ItemMeta meta, UnaryOperator<String> placeholders) {
+        List<Component> lore = meta.hasLore() ? meta.lore() : null;
+        if (lore == null || lore.isEmpty()) {
+            return false;
+        }
+        List<Component> resolved = new ArrayList<>(lore.size());
+        for (Component line : lore) {
+            resolved.add(resolve(line, placeholders));
+        }
+        meta.lore(resolved);
+        return true;
+    }
+
+    /** Serialize {@code component} to MiniMessage, resolve placeholders, and re-deserialize the result. */
+    private Component resolve(Component component, UnaryOperator<String> placeholders) {
+        MiniMessage mini = MiniMessage.miniMessage();
+        return mini.deserialize(placeholders.apply(mini.serialize(component)));
     }
 }
