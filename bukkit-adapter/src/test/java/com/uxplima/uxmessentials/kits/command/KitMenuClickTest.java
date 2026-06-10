@@ -226,7 +226,13 @@ class KitMenuClickTest {
                 kitMenu,
                 kitPreview,
                 kitEditorView,
-                new NoPlayerLookup());
+                null,
+                new NoPlayerLookup(),
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /** Four free, repeatable, ungated, empty-item kits (the CHEST fallback icon dodges the item codec). */

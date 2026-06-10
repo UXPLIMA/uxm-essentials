@@ -188,7 +188,13 @@ class ShowKitGuiPathTest {
                 kitMenu,
                 kitPreview,
                 kitEditorView,
-                new NoPlayerLookup());
+                null,
+                new NoPlayerLookup(),
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /** A single kit named {@code starter} holding two real, codec-encoded stacks at slots 0 and 1. */

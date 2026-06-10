@@ -196,7 +196,13 @@ class KitsMenuPathTest {
                 kitMenu,
                 kitPreview,
                 kitEditorView,
-                new NoPlayerLookup());
+                null,
+                new NoPlayerLookup(),
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /** Three free, repeatable, ungated, empty-item kits (the CHEST fallback icon dodges the item codec). */
