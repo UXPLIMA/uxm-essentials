@@ -58,6 +58,7 @@ dependencies {
     testImplementation(libs.mockbukkit)
     testImplementation(libs.archunit.junit)
     testImplementation(libs.paper.api)
+    testImplementation(libs.vault.api) // the migration live-feed tests stub a Vault Economy provider
     testImplementation(libs.bundles.adventure)
     testImplementation(libs.bundles.configs)
     testImplementation(libs.bundles.db)

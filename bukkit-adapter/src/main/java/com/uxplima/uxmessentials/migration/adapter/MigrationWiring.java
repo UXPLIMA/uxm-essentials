@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration.adapter;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -24,9 +25,11 @@ import com.uxplima.uxmessentials.migration.MigrationAudit;
 import com.uxplima.uxmessentials.migration.MigrationModule;
 import com.uxplima.uxmessentials.migration.RecordWriter;
 import com.uxplima.uxmessentials.migration.convert.Convert;
+import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
+import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
@@ -83,7 +86,7 @@ public final class MigrationWiring {
         Objects.requireNonNull(economyConfig, "economyConfig");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
-        SourceRegistry registry = sourceRegistry(plugin);
+        SourceRegistry registry = sourceRegistry(plugin, economyConfig, log);
         ImportData importData = new ImportData(audit(), backup(plugin, log), log);
         Writers writers = writers(plugin, persistence, economyConfig, log);
         ImportOptions options = options(plugin, migrationConfig);
@@ -91,9 +94,21 @@ public final class MigrationWiring {
                 registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
     }
 
-    private static SourceRegistry sourceRegistry(Plugin plugin) {
+    private static SourceRegistry sourceRegistry(Plugin plugin, ConfigStore economyConfig, Logger log) {
         WorldNameResolver worlds = new BukkitWorldNameResolver(plugin.getServer());
-        List<Convert> built = List.of(new EssentialsXConvert(worlds));
+        Currency defaultCurrency = new EconomyConfig(economyConfig).currencies().defaultCurrency();
+        List<Convert> built = new ArrayList<>();
+        built.add(new EssentialsXConvert(worlds));
+        built.add(new LiveBalanceConvert(
+                SourceId.of("vault"),
+                "Vault",
+                "the live Vault economy provider",
+                new VaultBalanceFeed(plugin, defaultCurrency)));
+        built.add(new LiveBalanceConvert(
+                SourceId.of("playerpoints"),
+                "PlayerPoints",
+                "the live PlayerPoints plugin",
+                new PlayerPointsBalanceFeed(plugin, log)));
         return new SourceRegistry(built);
     }
 
