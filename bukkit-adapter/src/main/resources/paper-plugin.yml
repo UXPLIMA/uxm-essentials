@@ -91,6 +91,9 @@ permissions:
   uxmessentials.rtp.use:
     description: '/rtp random teleport from the pre-warmed safe-location queue.'
     default: true
+  uxmessentials.teleport.settpr:
+    description: '/settpr <minRange> <maxRange> to set the /rtp search zone at runtime.'
+    default: op
   uxmessentials.spawn.use:
     description: '/spawn to teleport to the resolved server spawn.'
     default: true

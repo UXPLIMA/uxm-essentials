@@ -71,6 +71,7 @@ public final class TeleportCommands {
                 new DeathBackCommand(s, m),
                 // rtp
                 new RtpCommand(s, m),
+                new SetTprCommand(s, m),
                 // spawn
                 new SpawnCommand(s, m),
                 new SetSpawnCommand(s, m),

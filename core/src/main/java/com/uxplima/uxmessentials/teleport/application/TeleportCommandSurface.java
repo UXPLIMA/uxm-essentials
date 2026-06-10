@@ -77,6 +77,10 @@ final class TeleportCommandSurface {
                         DescribedCommand.of("deathback", "Return to your last death location", "dback")),
                 // rtp
                 spec("rtp", "uxmessentials.rtp.use", DescribedCommand.of("rtp", "Random teleport", "wild")),
+                spec(
+                        "settpr",
+                        "uxmessentials.teleport.settpr",
+                        DescribedCommand.of("settpr", "Set the random-teleport zone for /rtp")),
                 // spawn
                 spec("spawn", "uxmessentials.spawn.use", DescribedCommand.of("spawn", "Teleport to spawn")),
                 spec("setspawn", "uxmessentials.spawn.set", DescribedCommand.of("setspawn", "Set the server spawn")),

@@ -35,6 +35,16 @@ public record RtpWorldSettings(
         }
     }
 
+    /**
+     * A copy of this tuning with new search radii, leaving the queue sizing and attempt budget untouched. This
+     * is the {@code /settpr} runtime path — an operator resets the zone without disturbing how big the
+     * pre-warmed queue is or how hard a refill tries. The compact constructor still enforces
+     * {@code maxRadius >= minRadius}.
+     */
+    public RtpWorldSettings withRadii(double newMinRadius, double newMaxRadius) {
+        return new RtpWorldSettings(newMinRadius, newMaxRadius, targetSize, lowWaterMark, attemptBudget);
+    }
+
     /** Read the RTP tuning from {@code config}, applying the documented defaults. */
     public static RtpWorldSettings from(ConfigStore config) {
         Objects.requireNonNull(config, "config");

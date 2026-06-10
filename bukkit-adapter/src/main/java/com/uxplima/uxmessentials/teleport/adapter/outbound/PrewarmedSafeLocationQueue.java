@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 import org.bukkit.Bukkit;
@@ -36,10 +37,15 @@ import org.jspecify.annotations.NullMarked;
  * is the persistence-adapter's concern and is a documented stub here — this queue is in-memory and
  * cold-starts empty, warming on the first refill.
  *
+ * <p>The active tuning sits behind an {@link AtomicReference} so {@code /settpr} can reset the search radii at
+ * runtime ({@link #updateRadii}); the swap is whole-record, and the queue is dropped on swap so refills
+ * re-validate against the new zone rather than serving stale candidates.
+ *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. {@code ready} holds a {@link ConcurrentLinkedQueue} per world;
  * {@code refilling} holds one {@link AtomicBoolean} per world so at most one refill task is outstanding.
- * The {@code running} flag is observed by the refill loop, which exits when the module stops.
+ * {@code settings} is an {@link AtomicReference} read lock-free on every serve/refill and replaced whole by
+ * {@code /settpr}. The {@code running} flag is observed by the refill loop, which exits when the module stops.
  */
 @NullMarked
 public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
@@ -48,7 +54,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
 
     private final Scheduler scheduler;
     private final SafeSearchValidator validator;
-    private final RtpWorldSettings settings;
+    private final AtomicReference<RtpWorldSettings> settings;
     private final Logger log;
     private final BooleanSupplier running;
     private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RtpSafeLocation>> ready = new ConcurrentHashMap<>();
@@ -62,9 +68,28 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
             BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.validator = Objects.requireNonNull(validator, "validator");
-        this.settings = Objects.requireNonNull(settings, "settings");
+        this.settings = new AtomicReference<>(Objects.requireNonNull(settings, "settings"));
         this.log = Objects.requireNonNull(log, "log");
         this.running = Objects.requireNonNull(running, "running");
+    }
+
+    /**
+     * Swap the live search radii used by {@code /rtp} (the {@code /settpr} runtime path), keeping the queue
+     * tuning untouched, then drop every pre-warmed location so refills re-validate against the new zone rather
+     * than serving candidates from the old one. The swap is a single {@link AtomicReference#set} so an in-flight
+     * {@code /rtp} reads either the whole previous tuning or the whole new one.
+     */
+    public RtpWorldSettings updateRadii(double minRadius, double maxRadius) {
+        RtpWorldSettings updated = settings().withRadii(minRadius, maxRadius);
+        settings.set(updated);
+        clear();
+        return updated;
+    }
+
+    private RtpWorldSettings settings() {
+        // The reference is seeded non-null at construction and only ever replaced with a non-null value, so the
+        // get is never null; the requireNonNull makes that contract explicit for the null checker.
+        return Objects.requireNonNull(settings.get(), "settings");
     }
 
     @Override
@@ -101,7 +126,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         }
         ConcurrentLinkedQueue<RtpSafeLocation> queue =
                 ready.computeIfAbsent(world.uid(), id -> new ConcurrentLinkedQueue<>());
-        if (queue.size() >= settings.lowWaterMark()) {
+        if (queue.size() >= settings().lowWaterMark()) {
             return;
         }
         AtomicBoolean guard = refilling.computeIfAbsent(world.uid(), id -> new AtomicBoolean());
@@ -114,8 +139,8 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         try {
             int attempts = 0;
             while (running.getAsBoolean()
-                    && queue.size() < settings.targetSize()
-                    && attempts < settings.attemptBudget()) {
+                    && queue.size() < settings().targetSize()
+                    && attempts < settings().attemptBudget()) {
                 attempts++;
                 Optional<SafeSearchArea> area = area(world);
                 if (area.isEmpty()) {
@@ -132,7 +157,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
     }
 
     private Optional<RtpSafeLocation> boundedSearch(SafeSearchArea area) {
-        for (int attempt = 0; attempt < settings.attemptBudget(); attempt++) {
+        for (int attempt = 0; attempt < settings().attemptBudget(); attempt++) {
             Optional<RtpSafeLocation> found = awaitCandidate(area);
             if (found.isPresent()) {
                 return found;
@@ -178,12 +203,13 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         double borderRadius = border.getSize() / 2.0;
         double centerX = border.getCenter().getX();
         double centerZ = border.getCenter().getZ();
-        double max = Math.min(settings.maxRadius(), borderRadius);
-        if (max < settings.minRadius()) {
+        RtpWorldSettings current = settings();
+        double max = Math.min(current.maxRadius(), borderRadius);
+        if (max < current.minRadius()) {
             return Optional.empty();
         }
-        return Optional.of(new SafeSearchArea(
-                worldRef, centerX, centerZ, settings.minRadius(), settings.maxRadius(), borderRadius));
+        return Optional.of(
+                new SafeSearchArea(worldRef, centerX, centerZ, current.minRadius(), current.maxRadius(), borderRadius));
     }
 
     /** Drop every queue and refill guard on module stop. */

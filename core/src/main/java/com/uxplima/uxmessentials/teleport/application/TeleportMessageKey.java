@@ -48,6 +48,10 @@ public enum TeleportMessageKey implements MessageKey {
     RTP_NO_LOCATION("teleport.rtp.no-location"),
     RTP_EXHAUSTED("teleport.rtp.exhausted"),
 
+    // /settpr — set the rtp zone at runtime
+    SETTPR_SET("teleport.settpr.set"),
+    SETTPR_INVALID("teleport.settpr.invalid"),
+
     // spawn
     SPAWN_TELEPORTED("teleport.spawn.teleported"),
     SPAWN_SET("teleport.spawn.set"),
