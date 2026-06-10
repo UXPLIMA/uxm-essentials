@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.kits.domain;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -48,6 +49,7 @@ import java.util.Optional;
  * @param requirementsLore display lore shown in the browse menu when the viewer fails requirements
  * @param claimActions ordered typed actions run on a successful claim (before/after the item grant); empty for none
  * @param denyActions ordered typed actions run when a claim is refused by any gate; empty for none
+ * @param schedule the optional availability window gating when the kit may be claimed; {@link KitSchedule#always()} for none
  */
 public record KitDefinition(
         KitId id,
@@ -90,7 +92,8 @@ public record KitDefinition(
         Optional<String> requirementsName,
         List<String> requirementsLore,
         List<KitAction> claimActions,
-        List<KitAction> denyActions) {
+        List<KitAction> denyActions,
+        KitSchedule schedule) {
 
     public KitDefinition {
         Objects.requireNonNull(id, "id");
@@ -127,6 +130,7 @@ public record KitDefinition(
         Objects.requireNonNull(requirementsLore, "requirementsLore");
         Objects.requireNonNull(claimActions, "claimActions");
         Objects.requireNonNull(denyActions, "denyActions");
+        Objects.requireNonNull(schedule, "schedule");
         if (cooldown.isNegative()) {
             throw new IllegalArgumentException("kit cooldown must not be negative: " + cooldown);
         }
@@ -218,7 +222,8 @@ public record KitDefinition(
                 Optional.empty(),
                 List.of(),
                 List.of(),
-                List.of());
+                List.of(),
+                KitSchedule.always());
     }
 
     public KitDefinition(
@@ -521,6 +526,12 @@ public record KitDefinition(
         return copy(b -> b.denyActions = value);
     }
 
+    /** A copy of this kit with its availability schedule set to {@code value}, every other setting preserved. */
+    public KitDefinition withSchedule(KitSchedule value) {
+        Objects.requireNonNull(value, "value");
+        return copy(b -> b.schedule = value);
+    }
+
     private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {
         KitDefinitionFields fields = new KitDefinitionFields(this);
         mutator.accept(fields);
@@ -563,6 +574,16 @@ public record KitDefinition(
     /** True when the kit runs any action when a claim is refused. */
     public boolean hasDenyActions() {
         return !denyActions.isEmpty();
+    }
+
+    /** True when the kit restricts when it may be claimed (a non-empty {@link KitSchedule}). */
+    public boolean isScheduled() {
+        return !schedule.isAlways();
+    }
+
+    /** Whether the kit's schedule admits a claim at {@code now} (server-local); always true for an unscheduled kit. */
+    public boolean isAvailableAt(LocalDateTime now) {
+        return schedule.isAvailableAt(now);
     }
 
     /** The cooldown in whole seconds, the unit the {@code Cooldowns} port resolves tiers in. */

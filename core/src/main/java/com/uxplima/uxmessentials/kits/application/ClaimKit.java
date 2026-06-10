@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.kits.application;
 
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -99,6 +100,10 @@ public final class ClaimKit {
     }
 
     private Result<Unit, KitError> admitAndGrant(PlayerRef actor, PlayerRef recipient, KitDefinition kit) {
+        if (!kit.isAvailableAt(LocalDateTime.now(clock))) {
+            deny(actor, recipient, kit, KitError.UNAVAILABLE);
+            return Result.err(KitError.UNAVAILABLE);
+        }
         Result<Unit, KitError> admitted = access.admit(recipient, kit);
         if (admitted.isErr()) {
             deny(actor, recipient, kit, admitted.errorOrThrow());

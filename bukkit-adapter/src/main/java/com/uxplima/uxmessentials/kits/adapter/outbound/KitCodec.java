@@ -148,6 +148,7 @@ final class KitCodec {
             List<com.uxplima.uxmessentials.kits.domain.KitVariant> variants = readVariants(node.node("variants"));
             boolean preview = node.node("preview").getBoolean(true);
             boolean closeOnClaim = node.node("close-on-claim").getBoolean(false);
+            com.uxplima.uxmessentials.kits.domain.KitSchedule schedule = readSchedule(node.node("schedule"));
 
             List<com.uxplima.uxmessentials.kits.domain.KitRequirement> requirements =
                     readRequirements(node.node("requirements"));
@@ -201,7 +202,8 @@ final class KitCodec {
                     requirementsName,
                     requirementsLore,
                     claimActions,
-                    denyActions));
+                    denyActions,
+                    schedule));
         } catch (RuntimeException malformed) {
             return Optional.empty();
         }
@@ -255,6 +257,8 @@ final class KitCodec {
         node.node("requirements-name").set(definition.requirementsName().orElse(null));
         node.node("requirements-lore")
                 .set(definition.requirementsLore().isEmpty() ? null : definition.requirementsLore());
+
+        writeSchedule(node.node("schedule"), definition.schedule());
 
         node.node("permission-cooldowns").set(null);
         if (!definition.permissionCooldowns().isEmpty()) {
@@ -380,6 +384,102 @@ final class KitCodec {
         return child.node("slot").virtual()
                 ? Optional.empty()
                 : Optional.of(child.node("slot").getInt());
+    }
+
+    /**
+     * Read the optional {@code schedule} block gating when the kit may be claimed:
+     *
+     * <pre>{@code
+     * schedule {
+     *   days = [ "FRIDAY", "SATURDAY", "SUNDAY" ]   # weekday names; absent/empty = every day
+     *   daily-start = "20:00"                        # HH:mm daily window start (may wrap past midnight)
+     *   daily-end = "23:00"                          # HH:mm daily window end
+     *   from = "2026-06-01T00:00"                    # ISO local date-time absolute window start
+     *   until = "2026-07-01T00:00"                   # ISO local date-time absolute window end
+     * }
+     * }</pre>
+     *
+     * <p>An absent block (or one whose every key is malformed) yields {@link KitSchedule#always()} so the kit is
+     * claimable at any time, the back-compatible default. Each constraint is tolerant: an unrecognised day name or
+     * an unparseable time/date-time is skipped rather than failing the kit's load.
+     */
+    private static com.uxplima.uxmessentials.kits.domain.KitSchedule readSchedule(ConfigurationNode node) {
+        if (node.virtual() || !node.isMap()) {
+            return com.uxplima.uxmessentials.kits.domain.KitSchedule.always();
+        }
+        java.util.Set<java.time.DayOfWeek> days = readDays(node.node("days"));
+        Optional<java.time.LocalTime> start = parseTime(node.node("daily-start").getString());
+        Optional<java.time.LocalTime> end = parseTime(node.node("daily-end").getString());
+        Optional<java.time.LocalDateTime> from = parseDateTime(node.node("from").getString());
+        Optional<java.time.LocalDateTime> until =
+                parseDateTime(node.node("until").getString());
+        return new com.uxplima.uxmessentials.kits.domain.KitSchedule(days, start, end, from, until);
+    }
+
+    private static java.util.Set<java.time.DayOfWeek> readDays(ConfigurationNode node) {
+        if (node.virtual() || !node.isList()) {
+            return java.util.Set.of();
+        }
+        java.util.EnumSet<java.time.DayOfWeek> days = java.util.EnumSet.noneOf(java.time.DayOfWeek.class);
+        for (ConfigurationNode child : node.childrenList()) {
+            parseDay(child.getString()).ifPresent(days::add);
+        }
+        return days;
+    }
+
+    private static Optional<java.time.DayOfWeek> parseDay(@org.jspecify.annotations.Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(java.time.DayOfWeek.valueOf(raw.strip().toUpperCase(java.util.Locale.ROOT)));
+        } catch (IllegalArgumentException notADay) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<java.time.LocalTime> parseTime(@org.jspecify.annotations.Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(java.time.LocalTime.parse(raw.strip()));
+        } catch (java.time.format.DateTimeParseException notATime) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<java.time.LocalDateTime> parseDateTime(@org.jspecify.annotations.Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(java.time.LocalDateTime.parse(raw.strip()));
+        } catch (java.time.format.DateTimeParseException notADateTime) {
+            return Optional.empty();
+        }
+    }
+
+    private static void writeSchedule(
+            ConfigurationNode node, com.uxplima.uxmessentials.kits.domain.KitSchedule schedule)
+            throws ConfigurateException {
+        if (schedule.isAlways()) {
+            node.set(null);
+            return;
+        }
+        node.node("days")
+                .set(
+                        schedule.days().isEmpty()
+                                ? null
+                                : schedule.days().stream().map(Enum::name).toList());
+        node.node("daily-start")
+                .set(schedule.dailyStart().map(java.time.LocalTime::toString).orElse(null));
+        node.node("daily-end")
+                .set(schedule.dailyEnd().map(java.time.LocalTime::toString).orElse(null));
+        node.node("from")
+                .set(schedule.from().map(java.time.LocalDateTime::toString).orElse(null));
+        node.node("until")
+                .set(schedule.until().map(java.time.LocalDateTime::toString).orElse(null));
     }
 
     private static List<com.uxplima.uxmessentials.kits.domain.KitRequirement> readRequirements(ConfigurationNode node) {

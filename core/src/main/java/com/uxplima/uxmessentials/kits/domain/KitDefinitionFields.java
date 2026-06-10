@@ -55,6 +55,7 @@ final class KitDefinitionFields {
     List<String> requirementsLore;
     List<KitAction> claimActions;
     List<KitAction> denyActions;
+    KitSchedule schedule;
 
     KitDefinitionFields(KitDefinition k) {
         this.id = k.id();
@@ -98,6 +99,7 @@ final class KitDefinitionFields {
         this.requirementsLore = k.requirementsLore();
         this.claimActions = k.claimActions();
         this.denyActions = k.denyActions();
+        this.schedule = k.schedule();
     }
 
     KitDefinition build() {
@@ -142,6 +144,7 @@ final class KitDefinitionFields {
                 requirementsName,
                 requirementsLore,
                 claimActions,
-                denyActions);
+                denyActions,
+                schedule);
     }
 }

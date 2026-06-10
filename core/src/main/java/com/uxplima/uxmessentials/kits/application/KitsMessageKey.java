@@ -62,6 +62,7 @@ public enum KitsMessageKey implements MessageKey {
     KIT_REQUIREMENTS_NOT_MET("kit.requirements-not-met"),
     KIT_CANNOT_AFFORD("kit.cannot-afford"),
     KIT_INVENTORY_FULL("kit.inventory-full"),
+    KIT_UNAVAILABLE("kit.unavailable"),
     KIT_CLAIM_CANCELLED("kit.claim-cancelled"),
 
     // requirement status-symbol lore (browse menu / preview icon)

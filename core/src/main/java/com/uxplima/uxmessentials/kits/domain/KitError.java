@@ -34,6 +34,9 @@ public enum KitError {
     /** The player cannot pay the kit's cost (only reachable when an economy provider is present). */
     CANNOT_AFFORD(KitsMessageKey.KIT_CANNOT_AFFORD),
 
+    /** The kit's availability schedule does not admit a claim at the current time (its rotation window is closed). */
+    UNAVAILABLE(KitsMessageKey.KIT_UNAVAILABLE),
+
     /** The claim was cancelled by an external plugin event. */
     CANCELLED(KitsMessageKey.KIT_CLAIM_CANCELLED);
 

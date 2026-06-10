@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.kits.domain.KitSchedule;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -164,6 +166,39 @@ class ClaimKitTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(KitError.CANNOT_AFFORD);
         assertThat(granter.grants).isZero();
+    }
+
+    @Test
+    void aKitOutsideItsScheduleIsRefusedAndGrantsNothing() {
+        KitSchedule notYetOpen = new KitSchedule(
+                Set.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(LocalDateTime.of(2999, 1, 1, 0, 0)),
+                Optional.empty());
+        repository.save(repeatable("event", Duration.ZERO).withSchedule(notYetOpen));
+
+        Result<Unit, KitError> result = claimKit(Optional.empty()).claim(alice, KitId.of("event"));
+
+        assertThat(result.errorOrThrow()).isEqualTo(KitError.UNAVAILABLE);
+        assertThat(granter.grants).isZero();
+        assertThat(cooldowns.stamped).isEmpty();
+    }
+
+    @Test
+    void aKitInsideItsScheduleClaimsNormally() {
+        KitSchedule open = new KitSchedule(
+                Set.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(LocalDateTime.of(2000, 1, 1, 0, 0)),
+                Optional.of(LocalDateTime.of(2999, 1, 1, 0, 0)));
+        repository.save(repeatable("event", Duration.ZERO).withSchedule(open));
+
+        Result<Unit, KitError> result = claimKit(Optional.empty()).claim(alice, KitId.of("event"));
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(granter.grants).isEqualTo(1);
     }
 
     @Test
