@@ -55,6 +55,7 @@ public final class PlayerStateCommands {
                 new ExperienceCommand(services, messages),
                 new AirCommand(services, messages),
                 new BurnCommand(services, messages),
+                new IceCommand(services, messages),
                 new GetPosCommand(services, messages),
                 new DepthCommand(services, messages),
                 new BiomeCommand(services, messages),

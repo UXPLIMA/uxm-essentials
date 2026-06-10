@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
+import com.uxplima.uxmessentials.playerstate.application.Freeze;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
@@ -138,6 +139,7 @@ public final class PlayerstateWiring {
                 new SetExperience(effects, notifier),
                 new SetAir(effects, notifier),
                 new Burn(effects, notifier),
+                new Freeze(effects, notifier),
                 new ShowPosition(ports.info(), notifier),
                 new ShowPing(ports.info(), notifier),
                 new ShowPlaytime(ports.info(), notifier),

@@ -4,6 +4,7 @@ import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
+import com.uxplima.uxmessentials.playerstate.domain.FreezeDuration;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
@@ -63,6 +64,9 @@ public interface PlayerEffects {
 
     /** Set {@code who} on fire for {@code duration} (or put them out when the duration is zero). */
     void setFire(PlayerRef who, BurnDuration duration);
+
+    /** Apply the powder-snow freeze to {@code who} for {@code duration} (or thaw them when it is zero). */
+    void setFreeze(PlayerRef who, FreezeDuration duration);
 
     /** Set {@code who}'s food level to {@code food} (clamped to {@code 0..20} in the domain). */
     void setFoodLevel(PlayerRef who, FoodLevel food);

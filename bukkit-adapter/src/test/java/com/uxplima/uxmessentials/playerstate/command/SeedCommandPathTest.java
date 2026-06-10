@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
+import com.uxplima.uxmessentials.playerstate.application.Freeze;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
@@ -89,6 +90,7 @@ class SeedCommandPathTest {
                 mock(SetExperience.class),
                 mock(SetAir.class),
                 mock(Burn.class),
+                mock(Freeze.class),
                 mock(ShowPosition.class),
                 mock(ShowPing.class),
                 mock(ShowPlaytime.class),

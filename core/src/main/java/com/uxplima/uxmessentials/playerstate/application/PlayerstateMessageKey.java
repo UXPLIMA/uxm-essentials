@@ -113,6 +113,10 @@ public enum PlayerstateMessageKey implements MessageKey {
     BURN_SET("playerstate.burn.set"),
     BURN_SET_OTHER("playerstate.burn.set-other"),
 
+    // /ice
+    FREEZE_SET("playerstate.ice.set"),
+    FREEZE_SET_OTHER("playerstate.ice.set-other"),
+
     // /getpos (/coords /whereami)
     GETPOS_SHOW("playerstate.getpos.show"),
     GETPOS_SHOW_OTHER("playerstate.getpos.show-other"),

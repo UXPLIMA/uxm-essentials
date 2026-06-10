@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
+import com.uxplima.uxmessentials.playerstate.domain.FreezeDuration;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
@@ -148,6 +149,14 @@ public final class BukkitPlayerEffects implements PlayerEffects {
     public void setFire(PlayerRef who, BurnDuration duration) {
         Objects.requireNonNull(duration, "duration");
         onEntity(who, player -> player.setFireTicks(duration.ticks()));
+    }
+
+    @Override
+    public void setFreeze(PlayerRef who, FreezeDuration duration) {
+        Objects.requireNonNull(duration, "duration");
+        // Cap the requested ticks at the player's max freeze ticks so the powder-snow shiver tops out at the
+        // full frozen visual rather than rolling over silently when an operator asks for a long freeze.
+        onEntity(who, player -> player.setFreezeTicks(Math.min(duration.ticks(), player.getMaxFreezeTicks())));
     }
 
     @Override

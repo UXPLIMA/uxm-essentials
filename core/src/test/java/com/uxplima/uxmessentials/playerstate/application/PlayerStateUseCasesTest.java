@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
+import com.uxplima.uxmessentials.playerstate.domain.FreezeDuration;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
@@ -238,6 +239,13 @@ class PlayerStateUseCasesTest {
     }
 
     @Test
+    void freezeAppliesThroughTheEffectsPortClampedInTheDomain() {
+        new Freeze(effects, notifier).freeze(bob, FreezeDuration.ofSeconds(FreezeDuration.MAX_SECONDS + 50));
+
+        assertThat(effects.freezeSeconds).containsEntry(bob.uuid(), FreezeDuration.MAX_SECONDS); // clamped
+    }
+
+    @Test
     void foodLevelAppliesThroughTheEffectsPortClampedInTheDomain() {
         new SetFoodLevel(effects, notifier).set(alice, FoodLevel.of(25));
 
@@ -371,6 +379,7 @@ class PlayerStateUseCasesTest {
         private final Map<UUID, Integer> currentExp = new ConcurrentHashMap<>();
         private final Map<UUID, Integer> air = new ConcurrentHashMap<>();
         private final Map<UUID, Integer> fireSeconds = new ConcurrentHashMap<>();
+        private final Map<UUID, Integer> freezeSeconds = new ConcurrentHashMap<>();
         private final Map<UUID, Integer> food = new ConcurrentHashMap<>();
         private final Map<UUID, Double> health = new ConcurrentHashMap<>();
         private final List<UUID> restReset = new ArrayList<>();
@@ -442,6 +451,11 @@ class PlayerStateUseCasesTest {
         @Override
         public void setFire(PlayerRef who, BurnDuration duration) {
             fireSeconds.put(who.uuid(), duration.seconds());
+        }
+
+        @Override
+        public void setFreeze(PlayerRef who, FreezeDuration duration) {
+            freezeSeconds.put(who.uuid(), duration.seconds());
         }
 
         @Override

@@ -322,6 +322,9 @@ permissions:
   uxmessentials.burn.use:
     description: '/burn <seconds> to set a player on fire.'
     default: op
+  uxmessentials.ice.use:
+    description: '/ice [player] [seconds] to freeze a player (inverse of /burn).'
+    default: op
   uxmessentials.getpos.use:
     description: '/getpos (/coords /whereami) to show a player''s coordinates.'
     default: op

@@ -6,6 +6,7 @@ import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
+import com.uxplima.uxmessentials.playerstate.application.Freeze;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
@@ -55,6 +56,7 @@ import org.jspecify.annotations.NullMarked;
  * @param experience {@code /exp} ({@code /xp})
  * @param air {@code /air}
  * @param burn {@code /burn}
+ * @param freeze {@code /ice}
  * @param showPosition {@code /getpos} ({@code /coords}, {@code /whereami})
  * @param showPing {@code /ping}
  * @param showPlaytime {@code /playtime}
@@ -83,6 +85,7 @@ public record PlayerStateServices(
         SetExperience experience,
         SetAir air,
         Burn burn,
+        Freeze freeze,
         ShowPosition showPosition,
         ShowPing showPing,
         ShowPlaytime showPlaytime,
@@ -110,6 +113,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(experience, "experience");
         Objects.requireNonNull(air, "air");
         Objects.requireNonNull(burn, "burn");
+        Objects.requireNonNull(freeze, "freeze");
         Objects.requireNonNull(showPosition, "showPosition");
         Objects.requireNonNull(showPing, "showPing");
         Objects.requireNonNull(showPlaytime, "showPlaytime");

@@ -54,6 +54,7 @@ final class PlayerstateCommandSurface {
                 spec("exp", "uxmessentials.exp.use", cmd("exp", "Get or set experience")),
                 spec("air", "uxmessentials.air.use", cmd("air", "Set remaining air")),
                 spec("burn", "uxmessentials.burn.use", cmd("burn", "Set a player on fire")),
+                spec("ice", "uxmessentials.ice.use", cmd("ice", "Freeze a player")),
                 spec("getpos", "uxmessentials.getpos.use", cmd("getpos", "Show a player's coordinates")),
                 spec("ping", "uxmessentials.ping.use", cmd("ping", "Show a player's ping")),
                 spec("playtime", "uxmessentials.playtime.use", cmd("playtime", "Show a player's total play time")),
