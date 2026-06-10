@@ -32,8 +32,20 @@ class KitActionTest {
                 .hasValueSatisfying(a -> assertThat(a.type()).isEqualTo(KitActionType.CONSOLE_COMMAND));
         assertThat(parse("player-command"))
                 .hasValueSatisfying(a -> assertThat(a.type()).isEqualTo(KitActionType.PLAYER_COMMAND));
+        assertThat(parse("clear-inventory"))
+                .hasValueSatisfying(a -> assertThat(a.type()).isEqualTo(KitActionType.CLEAR_INVENTORY));
         assertThat(parse("wait-ticks"))
                 .hasValueSatisfying(a -> assertThat(a.type()).isEqualTo(KitActionType.WAIT_TICKS));
+    }
+
+    @Test
+    void clearInventoryParsesWithAnEmptyValue() {
+        Optional<KitAction> action = KitAction.parse("clear-inventory", "", true, false);
+
+        assertThat(action).isPresent();
+        assertThat(action.get().type()).isEqualTo(KitActionType.CLEAR_INVENTORY);
+        assertThat(action.get().value()).isEmpty();
+        assertThat(action.get().beforeItems()).isTrue();
     }
 
     @Test

@@ -18,7 +18,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The {@link KitActionRunner}: executes a kit's ordered, typed claim/deny actions, each on the thread its
  * effect requires. Player-targeted effects ({@code MESSAGE}, {@code ACTIONBAR}, {@code TITLE}, {@code SOUND},
- * {@code PARTICLE}, {@code FIREWORK}, {@code PLAYER_COMMAND}) run on the recipient's entity region thread; the
+ * {@code PARTICLE}, {@code FIREWORK}, {@code PLAYER_COMMAND}, {@code CLEAR_INVENTORY}) run on the recipient's
+ * entity region thread; the
  * server-wide effects ({@code BROADCAST}, {@code CONSOLE_COMMAND}) run on the global region thread. Both hops
  * go through the injected {@link Scheduler} port — the legacy {@code BukkitScheduler} and {@code BukkitRunnable}
  * are never touched, so this stays Folia-correct.
@@ -119,6 +120,7 @@ public final class BukkitKitActionRunner implements KitActionRunner {
             case PARTICLE -> effects.particle(player, value, kit.id().value());
             case FIREWORK -> effects.firework(player, value, kit.id().value());
             case PLAYER_COMMAND -> player.performCommand(value);
+            case CLEAR_INVENTORY -> effects.clearInventory(player);
             default -> {
                 // CONSOLE_COMMAND / BROADCAST / WAIT_TICKS are handled before this method; nothing to do.
             }

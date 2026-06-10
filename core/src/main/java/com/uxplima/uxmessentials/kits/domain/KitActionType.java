@@ -43,6 +43,13 @@ public enum KitActionType {
     /** Run a command as the player; value is the command line with claim tokens substituted. */
     PLAYER_COMMAND("player-command"),
 
+    /**
+     * Empty the recipient's inventory. Carries no value — operators put it in a kit's {@code claim-actions}
+     * block with {@code before-items: true} so a PvP or loadout kit wipes the inventory before its items are
+     * granted, dealing a clean set rather than topping up whatever the player was holding.
+     */
+    CLEAR_INVENTORY("clear-inventory"),
+
     /** Pause the action sequence; value is the whole-tick delay before the remaining actions run. */
     WAIT_TICKS("wait-ticks");
 

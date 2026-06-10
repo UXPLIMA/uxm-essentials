@@ -100,6 +100,17 @@ class BukkitKitActionRunnerTest {
     }
 
     @Test
+    void aClearInventoryActionEmptiesTheInventoryOnTheEntityThread() {
+        player.getInventory().addItem(new org.bukkit.inventory.ItemStack(org.bukkit.Material.DIAMOND, 3));
+        assertThat(player.getInventory().isEmpty()).isFalse();
+
+        runner.run(ref(), kit(), List.of(new KitAction(KitActionType.CLEAR_INVENTORY, "", true, false)));
+
+        assertThat(scheduler.dispatchedOn).containsExactly("entity");
+        assertThat(player.getInventory().isEmpty()).isTrue();
+    }
+
+    @Test
     void aMalformedSoundIsSkippedAndDoesNotAbortTheSequence() {
         runner.run(
                 ref(),

@@ -56,6 +56,11 @@ final class KitActionEffects {
         org.bukkit.Bukkit.getServer().broadcast(miniMessage.deserialize(text));
     }
 
+    /** Empty the recipient's inventory; the {@code clear-inventory} action's effect (it carries no value). */
+    void clearInventory(Player player) {
+        player.getInventory().clear();
+    }
+
     /** Show a title; spec is {@code fadeIn;stay;fadeOut;<title>;<subtitle>} in ticks, missing parts default safely. */
     void title(Player player, String spec, String kitId) {
         String[] parts = spec.split(";", 5);
