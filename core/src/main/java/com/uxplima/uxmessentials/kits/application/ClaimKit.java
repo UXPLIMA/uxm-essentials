@@ -38,6 +38,12 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * actions run — so an operator can clear the inventory before the grant and fire a celebration after it. The
  * actual effects (sound, title, firework, commands, the {@code wait-ticks} delay) are the
  * {@link KitActionRunner}'s job; this orchestrator only decides what runs and when.
+ *
+ * <p>A kit set to {@code on-full: deny} is space-checked before it is charged: once the cheap gates pass, the
+ * granter is asked whether the recipient's inventory has room, and if not the claim is refused exactly like any
+ * other gate — the deny actions run and the player keeps the claim, with no cooldown, one-time stamp, stock
+ * decrement, charge, or reward deposit applied. The check sits ahead of the irreversible reserve-and-charge
+ * step precisely so a space refusal leaves nothing to compensate.
  */
 public final class ClaimKit {
 
@@ -104,12 +110,21 @@ public final class ClaimKit {
             deny(actor, recipient, kit, KitError.UNAVAILABLE);
             return Result.err(KitError.UNAVAILABLE);
         }
-        Result<Unit, KitError> admitted = access.admit(recipient, kit);
-        if (admitted.isErr()) {
-            deny(actor, recipient, kit, admitted.errorOrThrow());
-            return admitted;
+        Result<Unit, KitError> gated = access.admissible(recipient, kit);
+        if (gated.isErr()) {
+            deny(actor, recipient, kit, gated.errorOrThrow());
+            return gated;
         }
         KitDefinition granted = access.resolveVariant(recipient, kit);
+        if (deniesForFullInventory(recipient, granted)) {
+            deny(actor, recipient, kit, KitError.INVENTORY_FULL);
+            return Result.err(KitError.INVENTORY_FULL);
+        }
+        Result<Unit, KitError> charged = access.reserveAndCharge(recipient, kit);
+        if (charged.isErr()) {
+            deny(actor, recipient, kit, charged.errorOrThrow());
+            return charged;
+        }
         if (!granter.preGrant(recipient, granted)) {
             deny(actor, recipient, kit, KitError.CANCELLED);
             return Result.err(KitError.CANCELLED);
@@ -117,6 +132,11 @@ public final class ClaimKit {
         runActions(recipient, granted, beforeItems(granted));
         granter.grant(recipient, granted);
         runActions(recipient, granted, afterItems(granted));
+        return completeClaim(actor, recipient, kit);
+    }
+
+    /** Record the cooldown/one-time stamp, deposit any claim reward, publish the event, and notify the recipient. */
+    private Result<Unit, KitError> completeClaim(PlayerRef actor, PlayerRef recipient, KitDefinition kit) {
         access.recordClaim(recipient, kit);
         if (economy.isPresent() && kit.claimMoney().compareTo(java.math.BigDecimal.ZERO) > 0) {
             economy.get().deposit(recipient, kit.claimMoney(), kit.claimMoneyCurrency());
@@ -125,6 +145,16 @@ public final class ClaimKit {
         notifier.send(
                 recipient, KitsMessageKey.KIT_CLAIMED, Map.of("kit", kit.id().value()));
         return Result.ok();
+    }
+
+    /**
+     * Whether a kit set to {@code on-full: deny} must refuse {@code recipient} for want of inventory space. The
+     * check runs before the kit is admitted — ahead of any stock reservation or charge — so a space refusal
+     * leaves nothing to compensate; a {@code drop} kit always returns false here and overflows at grant time.
+     */
+    private boolean deniesForFullInventory(PlayerRef recipient, KitDefinition granted) {
+        return granted.onFull() == com.uxplima.uxmessentials.kits.domain.KitFullPolicy.DENY
+                && !granter.hasRoomFor(recipient, granted);
     }
 
     /** Notify the actor of the failure and run the kit's deny actions for the refused recipient. */

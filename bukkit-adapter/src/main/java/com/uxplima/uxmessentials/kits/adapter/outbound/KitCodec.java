@@ -151,6 +151,9 @@ final class KitCodec {
             com.uxplima.uxmessentials.kits.domain.KitSchedule schedule = readSchedule(node.node("schedule"));
             int stockLimit = Math.max(0, node.node("stock").getInt(0));
             boolean parsePlaceholders = node.node("parse-placeholders").getBoolean(false);
+            com.uxplima.uxmessentials.kits.domain.KitFullPolicy onFull =
+                    com.uxplima.uxmessentials.kits.domain.KitFullPolicy.parse(
+                            node.node("on-full").getString());
 
             List<com.uxplima.uxmessentials.kits.domain.KitRequirement> requirements =
                     readRequirements(node.node("requirements"));
@@ -207,7 +210,8 @@ final class KitCodec {
                     denyActions,
                     schedule,
                     stockLimit,
-                    parsePlaceholders));
+                    parsePlaceholders,
+                    onFull));
         } catch (RuntimeException malformed) {
             return Optional.empty();
         }
@@ -265,6 +269,11 @@ final class KitCodec {
         writeSchedule(node.node("schedule"), definition.schedule());
         node.node("stock").set(definition.stockLimit() > 0 ? definition.stockLimit() : null);
         node.node("parse-placeholders").set(definition.parsePlaceholders() ? true : null);
+        node.node("on-full")
+                .set(
+                        definition.onFull() == com.uxplima.uxmessentials.kits.domain.KitFullPolicy.DROP
+                                ? null
+                                : definition.onFull().token());
 
         node.node("permission-cooldowns").set(null);
         if (!definition.permissionCooldowns().isEmpty()) {

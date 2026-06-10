@@ -52,6 +52,7 @@ import java.util.Optional;
  * @param schedule the optional availability window gating when the kit may be claimed; {@link KitSchedule#always()} for none
  * @param stockLimit the global cap on how many times the kit may ever be claimed across all players; {@code 0} for unlimited
  * @param parsePlaceholders whether the recipient's PlaceholderAPI tokens are resolved in each granted item's name and lore
+ * @param onFull what the grant does when the inventory cannot hold everything: drop the overflow or deny the claim
  */
 public record KitDefinition(
         KitId id,
@@ -97,7 +98,8 @@ public record KitDefinition(
         List<KitAction> denyActions,
         KitSchedule schedule,
         int stockLimit,
-        boolean parsePlaceholders) {
+        boolean parsePlaceholders,
+        KitFullPolicy onFull) {
 
     public KitDefinition {
         Objects.requireNonNull(id, "id");
@@ -135,6 +137,7 @@ public record KitDefinition(
         Objects.requireNonNull(claimActions, "claimActions");
         Objects.requireNonNull(denyActions, "denyActions");
         Objects.requireNonNull(schedule, "schedule");
+        Objects.requireNonNull(onFull, "onFull");
         if (cooldown.isNegative()) {
             throw new IllegalArgumentException("kit cooldown must not be negative: " + cooldown);
         }
@@ -230,7 +233,8 @@ public record KitDefinition(
                 List.of(),
                 KitSchedule.always(),
                 0,
-                false);
+                false,
+                KitFullPolicy.DROP);
     }
 
     public KitDefinition(
@@ -547,6 +551,12 @@ public record KitDefinition(
     /** A copy of this kit with its parse-placeholders flag set to {@code value}, every other setting preserved. */
     public KitDefinition withParsePlaceholders(boolean value) {
         return copy(b -> b.parsePlaceholders = value);
+    }
+
+    /** A copy of this kit with its inventory-full policy set to {@code value}, every other setting preserved. */
+    public KitDefinition withOnFull(KitFullPolicy value) {
+        Objects.requireNonNull(value, "value");
+        return copy(b -> b.onFull = value);
     }
 
     private KitDefinition copy(java.util.function.Consumer<KitDefinitionFields> mutator) {

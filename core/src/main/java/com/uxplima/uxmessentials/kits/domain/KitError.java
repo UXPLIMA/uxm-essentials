@@ -41,7 +41,10 @@ public enum KitError {
     OUT_OF_STOCK(KitsMessageKey.KIT_OUT_OF_STOCK),
 
     /** The claim was cancelled by an external plugin event. */
-    CANCELLED(KitsMessageKey.KIT_CLAIM_CANCELLED);
+    CANCELLED(KitsMessageKey.KIT_CLAIM_CANCELLED),
+
+    /** The recipient's inventory could not hold the kit and its {@code on-full} policy is {@code DENY}. */
+    INVENTORY_FULL(KitsMessageKey.KIT_INVENTORY_FULL);
 
     private final KitsMessageKey messageKey;
 

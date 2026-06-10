@@ -318,6 +318,30 @@ class ConfigurateKitRepositoryTest {
     }
 
     @Test
+    void onFullDefaultsToDropAndRoundTripsDeny(@TempDir Path root) {
+        Path dir = kitsDir(root);
+        KitRepository repository = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+
+        KitDefinition dropping =
+                KitDefinition.repeatable(KitId.of("dropping"), List.of(KitItem.of("AAAA", 1)), Duration.ZERO);
+        repository.save(dropping);
+        repository.save(dropping.withOnFull(com.uxplima.uxmessentials.kits.domain.KitFullPolicy.DENY)
+                .withItems(List.of(KitItem.of("BBBB", 1))));
+
+        KitRepository reloaded = ConfigurateKitRepository.load(dir, legacy(root), NOOP);
+        assertThat(reloaded.find(KitId.of("dropping")).orElseThrow().onFull())
+                .isEqualTo(com.uxplima.uxmessentials.kits.domain.KitFullPolicy.DENY);
+
+        // A kit saved without naming a policy keeps the default DROP, so existing kits are unaffected.
+        repository.save(KitDefinition.repeatable(KitId.of("legacy"), List.of(KitItem.of("CCCC", 1)), Duration.ZERO));
+        assertThat(ConfigurateKitRepository.load(dir, legacy(root), NOOP)
+                        .find(KitId.of("legacy"))
+                        .orElseThrow()
+                        .onFull())
+                .isEqualTo(com.uxplima.uxmessentials.kits.domain.KitFullPolicy.DROP);
+    }
+
+    @Test
     void readsTypedClaimAndDenyActionsInOrder(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);

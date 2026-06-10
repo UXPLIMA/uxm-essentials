@@ -24,9 +24,21 @@ public interface KitGranter {
     }
 
     /**
+     * Whether {@code recipient}'s inventory has room for {@code kit}'s items. Consulted by the claim use case
+     * only for a kit whose {@code on-full} policy is {@code DENY}, <em>before</em> any stock is reserved or any
+     * cost is charged, so a refusal for want of space leaves no side effects to compensate. The default returns
+     * {@code true} (room always available), which keeps the {@code DROP} policy and every test fake unaffected.
+     */
+    default boolean hasRoomFor(PlayerRef recipient, KitDefinition kit) {
+        return true;
+    }
+
+    /**
      * Grant kit {@code kit} to {@code recipient}. Returns the outcome so the claim use case can warn when the
      * inventory could not hold everything; a {@code false} {@code fitInInventory} still means the items were
-     * delivered (overflow dropped at the player's feet), not that the claim failed.
+     * delivered (overflow dropped at the player's feet), not that the claim failed. A kit set to
+     * {@code on-full: deny} is gated out earlier by {@link #hasRoomFor}, so the grant itself only ever runs
+     * once the items are known to fit (or are allowed to overflow).
      */
     Grant grant(PlayerRef recipient, KitDefinition kit);
 

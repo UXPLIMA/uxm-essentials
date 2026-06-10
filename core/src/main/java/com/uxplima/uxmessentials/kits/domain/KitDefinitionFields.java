@@ -58,6 +58,7 @@ final class KitDefinitionFields {
     KitSchedule schedule;
     int stockLimit;
     boolean parsePlaceholders;
+    KitFullPolicy onFull;
 
     KitDefinitionFields(KitDefinition k) {
         this.id = k.id();
@@ -104,6 +105,7 @@ final class KitDefinitionFields {
         this.schedule = k.schedule();
         this.stockLimit = k.stockLimit();
         this.parsePlaceholders = k.parsePlaceholders();
+        this.onFull = k.onFull();
     }
 
     KitDefinition build() {
@@ -151,6 +153,7 @@ final class KitDefinitionFields {
                 denyActions,
                 schedule,
                 stockLimit,
-                parsePlaceholders);
+                parsePlaceholders,
+                onFull);
     }
 }

@@ -86,6 +86,22 @@ public final class KitAccess {
     public Result<Unit, KitError> admit(PlayerRef who, KitDefinition kit) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kit, "kit");
+        Result<Unit, KitError> gated = admissible(who, kit);
+        if (gated.isErr()) {
+            return gated;
+        }
+        return reserveStockAndCharge(who, kit);
+    }
+
+    /**
+     * Run only the side-effect-free claim gates — permission, the one-time stamp, the cooldown, and the
+     * requirements — returning the first failing one or success. Unlike {@link #admit}, this reserves no stock
+     * and charges no cost, so the claim use case can interpose its own check (an {@code on-full: deny} inventory
+     * pre-check) between the gates and the irreversible reserve-and-charge step.
+     */
+    public Result<Unit, KitError> admissible(PlayerRef who, KitDefinition kit) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kit, "kit");
         if (kit.requiresPermission() && !permissions.has(who, kit.permissionNode())) {
             return Result.err(KitError.NO_PERMISSION);
         }
@@ -98,6 +114,13 @@ public final class KitAccess {
         if (!meetsRequirements(who, kit)) {
             return Result.err(KitError.REQUIREMENTS_NOT_MET);
         }
+        return Result.ok();
+    }
+
+    /** Reserve stock and charge for a kit already past {@link #admissible}; the irreversible part of {@link #admit}. */
+    public Result<Unit, KitError> reserveAndCharge(PlayerRef who, KitDefinition kit) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kit, "kit");
         return reserveStockAndCharge(who, kit);
     }
 

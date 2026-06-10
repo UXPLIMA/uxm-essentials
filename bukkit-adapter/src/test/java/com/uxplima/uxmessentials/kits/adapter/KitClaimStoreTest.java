@@ -264,6 +264,45 @@ class KitClaimStoreTest {
     }
 
     @Test
+    void hasRoomForIsFalseWhenTheInventoryIsFullAndTrueWhenItIsNot() {
+        PlayerMock alice = server.addPlayer("Alice");
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                kitWith(List.of(KitItemCodec.encode(new ItemStack(Material.DIAMOND, 1))), false);
+
+        assertThat(granter.hasRoomFor(BukkitRefs.toRef(alice), kit)).isTrue();
+
+        fillMainInventory(alice);
+        assertThat(granter.hasRoomFor(BukkitRefs.toRef(alice), kit)).isFalse();
+    }
+
+    @Test
+    void dropIsTheDefaultPolicyAndStillDeliversTheItemWhenTheInventoryIsFull() {
+        PlayerMock alice = server.addPlayer("Alice");
+        fillMainInventory(alice);
+        KitGranter granter = new BukkitKitGranter(new NoopLogger());
+        com.uxplima.uxmessentials.kits.domain.KitDefinition kit =
+                kitWith(List.of(KitItemCodec.encode(new ItemStack(Material.DIAMOND, 1))), false);
+
+        // DROP is the default policy, so a full inventory never refuses the claim — the item is delivered,
+        // either into a remaining slot or dropped at the player's feet (the long-standing behaviour).
+        KitGranter.Grant grant = granter.grant(BukkitRefs.toRef(alice), kit);
+
+        boolean inInventory = alice.getInventory().contains(Material.DIAMOND);
+        boolean droppedAtFeet = alice.getWorld().getEntities().stream()
+                .anyMatch(e -> e instanceof org.bukkit.entity.Item item
+                        && item.getItemStack().getType() == Material.DIAMOND);
+        assertThat(grant).isNotNull();
+        assertThat(inInventory || droppedAtFeet).isTrue();
+    }
+
+    private static void fillMainInventory(PlayerMock player) {
+        for (int slot = 0; slot < 36; slot++) {
+            player.getInventory().setItem(slot, new ItemStack(Material.COBBLESTONE, 64));
+        }
+    }
+
+    @Test
     void oversizedStacksBypassedWithPermission() {
         PlayerMock alice = server.addPlayer("Alice");
         alice.addAttachment(plugin, "uxmessentials.oversizedstacks", true);

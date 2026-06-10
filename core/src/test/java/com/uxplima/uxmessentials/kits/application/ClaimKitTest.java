@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitStockStore;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
+import com.uxplima.uxmessentials.kits.domain.KitFullPolicy;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.kits.domain.KitSchedule;
@@ -219,6 +220,34 @@ class ClaimKitTest {
     }
 
     @Test
+    void aDenyOnFullKitWithNoRoomIsRefusedAndLeavesNoSideEffects() {
+        repository.save(priced("loadout", new BigDecimal("100"))
+                .withOnFull(KitFullPolicy.DENY)
+                .withStockLimit(1));
+        RecordingEconomy economy = new RecordingEconomy(true);
+        granter.hasRoom = false;
+
+        Result<Unit, KitError> result = claimKit(Optional.of(economy)).claim(alice, KitId.of("loadout"));
+
+        assertThat(result.errorOrThrow()).isEqualTo(KitError.INVENTORY_FULL);
+        assertThat(granter.grants).isZero();
+        assertThat(cooldowns.stamped).isEmpty();
+        assertThat(economy.charged).isEqualByComparingTo("0"); // the charge never ran
+        assertThat(stock.claimed(KitId.of("loadout"))).isZero(); // no stock unit was reserved
+    }
+
+    @Test
+    void aDenyOnFullKitWithRoomIsGrantedNormally() {
+        repository.save(repeatable("loadout", Duration.ZERO).withOnFull(KitFullPolicy.DENY));
+        granter.hasRoom = true;
+
+        Result<Unit, KitError> result = claimKit(Optional.empty()).claim(alice, KitId.of("loadout"));
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(granter.grants).isEqualTo(1);
+    }
+
+    @Test
     void aFailedChargeReleasesTheReservedStockUnit() {
         repository.save(priced("limited", new BigDecimal("250")).withStockLimit(1));
 
@@ -378,6 +407,12 @@ class ClaimKitTest {
 
     private static final class RecordingGranter implements KitGranter {
         private int grants;
+        private boolean hasRoom = true;
+
+        @Override
+        public boolean hasRoomFor(PlayerRef recipient, KitDefinition kit) {
+            return hasRoom;
+        }
 
         @Override
         public Grant grant(PlayerRef recipient, KitDefinition kit) {
