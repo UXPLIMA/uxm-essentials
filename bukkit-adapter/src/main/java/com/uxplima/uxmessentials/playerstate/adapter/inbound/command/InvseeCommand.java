@@ -6,9 +6,9 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
@@ -18,9 +18,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /invsee [player]} ({@code uxmessentials.invsee.use}): open a live view of another player's inventory in
- * your own screen — gated for a named target by the shared {@code uxmessentials.playerstate.others} node. The
- * {@code OpenContainer} use case owns the open and the viewer confirmation.
+ * {@code /invsee [player]} ({@code uxmessentials.invsee.use}): open a view of another player's inventory in your
+ * own screen — gated for a named target by the shared {@code uxmessentials.playerstate.others} node. The target
+ * may be online (a live managed copy) or offline (read from their stored player data); the {@code OpenContainer}
+ * use case owns the open and the viewer confirmation, and the adapter routes by online state.
  */
 @NullMarked
 public final class InvseeCommand extends PlayerstateCommandSupport implements CommandRegistration {
@@ -36,7 +37,9 @@ public final class InvseeCommand extends PlayerstateCommandSupport implements Co
         return Commands.literal("invsee")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::view)
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::view))
+                .then(Commands.argument("player", StringArgumentType.word())
+                        .suggests(onlinePlayerSuggestions())
+                        .executes(this::view))
                 .build();
     }
 
@@ -50,7 +53,7 @@ public final class InvseeCommand extends PlayerstateCommandSupport implements Co
         if (sender == null) {
             return 0;
         }
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
+        Optional<PlayerRef> target = resolveStorageTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }

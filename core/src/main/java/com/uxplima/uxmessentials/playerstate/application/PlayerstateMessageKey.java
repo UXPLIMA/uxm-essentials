@@ -71,6 +71,7 @@ public enum PlayerstateMessageKey implements MessageKey {
 
     // /endersee
     ENDERSEE_OPENED("playerstate.endersee.opened"),
+    ENDERSEE_TITLE("playerstate.endersee.title"),
 
     // /suicide
     SUICIDE("playerstate.suicide"),

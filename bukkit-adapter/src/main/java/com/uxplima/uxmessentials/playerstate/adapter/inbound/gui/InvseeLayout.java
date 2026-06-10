@@ -40,6 +40,9 @@ final class InvseeLayout {
     static final int OFFHAND_SLOT = 40;
     static final int FILLER_START = 41; // 41..53 inclusive are filler
 
+    /** Main (0..35) + armour (36..39) + offhand (40): the editable slot span, also the flat-array length. */
+    static final int SLOT_COUNT = OFFHAND_SLOT + 1;
+
     private InvseeLayout() {}
 
     /** Whether {@code slot} is one the viewer may edit (a mirror of a real item slot), not filler. */
@@ -56,39 +59,75 @@ final class InvseeLayout {
 
     /** Copy {@code target}'s live items into {@code menu}, cloning each so the menu never aliases a live stack. */
     static void seed(Inventory menu, Player target) {
-        Objects.requireNonNull(menu, "menu");
+        Objects.requireNonNull(target, "target");
+        seedSlots(menu, fromPlayer(target));
+    }
+
+    /** Reconcile {@code menu}'s editable region back onto {@code target}; filler slots are ignored. */
+    static void writeBack(Inventory menu, Player target) {
+        Objects.requireNonNull(target, "target");
+        applySlots(readSlots(menu), target);
+    }
+
+    /** Snapshot a live player's main/armour/offhand into a flat {@value #SLOT_COUNT}-slot array (cloned). */
+    static @Nullable ItemStack[] fromPlayer(Player target) {
         Objects.requireNonNull(target, "target");
         PlayerInventory live = target.getInventory();
+        @Nullable ItemStack[] slots = new ItemStack[SLOT_COUNT];
         @Nullable ItemStack[] main = live.getContents();
         for (int slot = 0; slot < MAIN_SLOTS; slot++) {
-            menu.setItem(slot, clone(slot < main.length ? main[slot] : null));
+            slots[slot] = clone(slot < main.length ? main[slot] : null);
         }
         @Nullable ItemStack[] armour = live.getArmorContents();
         for (int i = 0; i < armour.length && ARMOUR_START + i < ARMOUR_END; i++) {
-            menu.setItem(ARMOUR_START + i, clone(armour[i]));
+            slots[ARMOUR_START + i] = clone(armour[i]);
         }
-        menu.setItem(OFFHAND_SLOT, clone(live.getItemInOffHand()));
+        slots[OFFHAND_SLOT] = clone(live.getItemInOffHand());
+        return slots;
+    }
+
+    /** Copy a flat {@value #SLOT_COUNT}-slot array into {@code menu} (slots 0..40) and pad the filler region. */
+    static void seedSlots(Inventory menu, @Nullable ItemStack[] slots) {
+        Objects.requireNonNull(menu, "menu");
+        Objects.requireNonNull(slots, "slots");
+        for (int slot = 0; slot <= OFFHAND_SLOT; slot++) {
+            menu.setItem(slot, clone(at(slots, slot)));
+        }
         ItemStack pane = filler();
         for (int slot = FILLER_START; slot < SIZE; slot++) {
             menu.setItem(slot, pane.clone());
         }
     }
 
-    /** Reconcile {@code menu}'s editable region back onto {@code target}; filler slots are ignored. */
-    static void writeBack(Inventory menu, Player target) {
+    /** Read {@code menu}'s editable region (slots 0..40) into a flat {@value #SLOT_COUNT}-slot array (cloned). */
+    static @Nullable ItemStack[] readSlots(Inventory menu) {
         Objects.requireNonNull(menu, "menu");
+        @Nullable ItemStack[] slots = new ItemStack[SLOT_COUNT];
+        for (int slot = 0; slot <= OFFHAND_SLOT; slot++) {
+            slots[slot] = clone(menu.getItem(slot));
+        }
+        return slots;
+    }
+
+    /** Reconcile a flat {@value #SLOT_COUNT}-slot array onto {@code target}'s live inventory. */
+    static void applySlots(@Nullable ItemStack[] slots, Player target) {
+        Objects.requireNonNull(slots, "slots");
         Objects.requireNonNull(target, "target");
         PlayerInventory live = target.getInventory();
         for (int slot = 0; slot < MAIN_SLOTS; slot++) {
-            live.setItem(slot, clone(menu.getItem(slot)));
+            live.setItem(slot, clone(at(slots, slot)));
         }
         @Nullable ItemStack[] armour = new ItemStack[ARMOUR_END - ARMOUR_START];
         for (int i = 0; i < armour.length; i++) {
-            armour[i] = clone(menu.getItem(ARMOUR_START + i));
+            armour[i] = clone(at(slots, ARMOUR_START + i));
         }
         live.setArmorContents(armour);
-        ItemStack offhand = clone(menu.getItem(OFFHAND_SLOT));
+        ItemStack offhand = clone(at(slots, OFFHAND_SLOT));
         live.setItemInOffHand(offhand == null ? new ItemStack(Material.AIR) : offhand);
+    }
+
+    private static @Nullable ItemStack at(@Nullable ItemStack[] slots, int index) {
+        return index < slots.length ? slots[index] : null;
     }
 
     private static @Nullable ItemStack clone(@Nullable ItemStack stack) {

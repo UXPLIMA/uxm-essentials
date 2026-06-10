@@ -9,6 +9,8 @@ import org.bukkit.event.Listener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.NoFlyWorldListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.WorldCommandListener;
@@ -18,6 +20,8 @@ import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerEffect
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerInfo;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitStateReconciler;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.InMemoryPlayerStateStore;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.nms.NmsOfflinePlayerStorage;
 import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
@@ -82,7 +86,10 @@ public final class PlayerstateWiring {
         StateReconciler reconciler = new BukkitStateReconciler(kernel.scheduler());
         PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler());
         InvseeView invseeView = new InvseeView(kernel.messages(), kernel.scheduler());
-        InventoryViewer inventoryViewer = new BukkitInventoryViewer(kernel.scheduler(), invseeView);
+        OfflinePlayerStorage offlineStorage = new NmsOfflinePlayerStorage(kernel.log());
+        OfflineContainerView offlineView =
+                new OfflineContainerView(kernel.messages(), kernel.scheduler(), offlineStorage);
+        InventoryViewer inventoryViewer = new BukkitInventoryViewer(kernel.scheduler(), invseeView, offlineView);
         NearbyPlayers nearby = new BukkitNearbyPlayers();
         PlayerInfo info = new BukkitPlayerInfo();
         PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
@@ -95,9 +102,10 @@ public final class PlayerstateWiring {
         List<Listener> listeners = List.of(
                 new PlayerStateListener(store, reconciler),
                 new InvseeListener(invseeView),
+                new OfflineContainerListener(offlineView),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
                 new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
-        return new Wired(commands, listeners, invseeView);
+        return new Wired(commands, listeners, invseeView, offlineView);
     }
 
     private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {
@@ -155,19 +163,26 @@ public final class PlayerstateWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
-     * @param invseeView the invsee menu, held so {@code stop()} flushes every still-open view
+     * @param invseeView the online invsee menu, held so {@code stop()} flushes every still-open view
+     * @param offlineView the offline invsee/endersee menus, held so {@code stop()} flushes every still-open view
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, InvseeView invseeView) {
+    public record Wired(
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            InvseeView invseeView,
+            OfflineContainerView offlineView) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(invseeView, "invseeView");
+            Objects.requireNonNull(offlineView, "offlineView");
         }
 
-        /** Reconcile every still-open invsee menu back onto its target. Called on module stop. */
+        /** Reconcile every still-open invsee/endersee menu back onto its target. Called on module stop. */
         public void stop() {
             invseeView.flushAll();
+            offlineView.flushAll();
         }
     }
 }

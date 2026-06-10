@@ -1,18 +1,23 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -88,6 +93,56 @@ abstract class PlayerstateCommandSupport {
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
+    }
+
+    /**
+     * Resolve the optional {@code player} string argument to a target that may be <em>offline</em>, for the
+     * storage-viewing verbs ({@code /invsee}, {@code /endersee}). An absent argument is the sender; a present one
+     * resolves only when the sender holds {@link #OTHERS_PERMISSION} — an exact online name first, then a cached
+     * offline profile (non-blocking, from the server's user cache); anything else is the unknown-player
+     * rejection. Unlike {@link #resolveTarget}, the argument is a plain word so an offline name can be typed (an
+     * online-player selector resolves online names only).
+     */
+    final Optional<PlayerRef> resolveStorageTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
+        String typed = typedPlayerArg(ctx);
+        if (typed.isEmpty()) {
+            return Optional.of(BukkitRefs.toRef(sender));
+        }
+        if (!sender.hasPermission(OTHERS_PERMISSION)) {
+            reply(sender, NO_PERMISSION, Map.of());
+            return Optional.empty();
+        }
+        Player online = Bukkit.getPlayerExact(typed);
+        if (online != null) {
+            return Optional.of(BukkitRefs.toRef(online));
+        }
+        OfflinePlayer offline = Bukkit.getOfflinePlayerIfCached(typed);
+        if (offline != null && offline.getName() != null) {
+            return Optional.of(new PlayerRef(offline.getUniqueId(), offline.getName()));
+        }
+        reply(sender, UNKNOWN_PLAYER, Map.of("player", typed));
+        return Optional.empty();
+    }
+
+    /** Tab-completion of online player names for the storage verbs' {@code player} argument. */
+    static SuggestionProvider<CommandSourceStack> onlinePlayerSuggestions() {
+        return (ctx, builder) -> {
+            String prefix = builder.getRemainingLowerCase();
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                if (online.getName().toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                    builder.suggest(online.getName());
+                }
+            }
+            return builder.buildFuture();
+        };
+    }
+
+    private static String typedPlayerArg(CommandContext<CommandSourceStack> ctx) {
+        try {
+            return StringArgumentType.getString(ctx, "player");
+        } catch (IllegalArgumentException absent) {
+            return "";
+        }
     }
 
     private Optional<PlayerRef> resolveSelector(

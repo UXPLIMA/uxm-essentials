@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.run.paper)
     alias(libs.plugins.minotaur)
     alias(libs.plugins.hangar.publish)
-    // alias(libs.plugins.paperweight)  // uncomment only if you touch NMS
+    alias(libs.plugins.paperweight) // offline /invsee reads player-data NBT through Mojang-mapped NMS
 }
 
 dependencies {
@@ -13,7 +13,11 @@ dependencies {
     implementation(project(":migration"))
     api(project(":api"))
 
-    compileOnly(libs.paper.api)
+    // The Mojang-mapped dev bundle supplies the Paper API *and* the server internals (net.minecraft,
+    // org.bukkit.craftbukkit) the offline-inventory adapter needs; it replaces the plain paper-api
+    // compile dependency for the main source set. Paper's runtime plugin remapper maps the shipped
+    // Mojang-mapped jar back to the server's mappings at load (see shadowJar manifest below).
+    paperweight.paperDevBundle(libs.versions.paper.get())
     compileOnly(libs.bundles.adventure) // Paper ships Adventure at runtime
     compileOnly(libs.luckperms.api) // optional soft-depend (Permissions port, ADR 0005)
 
@@ -63,6 +67,15 @@ dependencies {
     testImplementation(libs.gson)
     testImplementation(libs.jedis)
     testImplementation(libs.configurate.yaml)
+}
+
+// The Mojang-mapped dev bundle (declared above via paperDevBundle) is needed only to compile the
+// offline-inventory NMS adapter. Keep it off the test classpath: MockBukkit drives the plugin against the plain
+// Paper API, and the full server's PaperRegistryAccess static initializer throws if its classes leak onto the
+// unit-test runtime. compileOnly alone is what the adapter needs — net.minecraft is provided by the live server,
+// and Paper's runtime remapper maps the shipped Mojang-mapped jar at load (shadowJar manifest above).
+paperweight {
+    addServerDependencyTo.set(listOf(configurations.compileOnly.get()))
 }
 
 // Locale catalogs live in a dedicated source set so they have their own
@@ -120,6 +133,10 @@ val jmh by tasks.registering(JavaExec::class) {
 tasks.shadowJar {
     archiveBaseName.set("uxmEssentials")
     archiveClassifier.set("")
+    // The plugin is compiled and shipped Mojang-mapped; this tells Paper's runtime plugin remapper to
+    // map it to the running server's mappings at load. Without it the NMS calls in the offline-inventory
+    // adapter would miss at runtime. shadowJar builds its own manifest, so the attribute is set here too.
+    manifest { attributes("paperweight-mappings-namespace" to "mojang") }
     // Shade with relocation — see docs/04-build.md §16. Use a single per-plugin
     // namespace (`com.uxplima.uxmessentials.libs.<lib>`) so two plugins shading
     // the same library at different versions do not clash on the classpath. DO

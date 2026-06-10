@@ -4,7 +4,6 @@ import java.util.Objects;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -37,7 +36,7 @@ public final class InvseeListener implements Listener {
         if (holder == null) {
             return;
         }
-        if (!holder.editable() || !clickAllowed(event)) {
+        if (!holder.editable() || !ManagedMenuPolicy.clickAllowed(event, InvseeLayout::isEditable)) {
             event.setCancelled(true);
         }
     }
@@ -48,10 +47,7 @@ public final class InvseeListener implements Listener {
         if (holder == null) {
             return;
         }
-        int topSize = event.getView().getTopInventory().getSize();
-        boolean touchesNonEditable =
-                event.getRawSlots().stream().anyMatch(raw -> raw < topSize && !InvseeLayout.isEditable(raw));
-        if (!holder.editable() || touchesNonEditable) {
+        if (!holder.editable() || ManagedMenuPolicy.dragTouchesNonEditable(event, InvseeLayout::isEditable)) {
             event.setCancelled(true);
         }
     }
@@ -62,27 +58,6 @@ public final class InvseeListener implements Listener {
         if (holder != null) {
             view.onClose(holder);
         }
-    }
-
-    /** Whether an editing viewer's click is safe: it must not move an item into a non-editable menu slot. */
-    private static boolean clickAllowed(InventoryClickEvent event) {
-        if (unboundedIntoTop(event.getAction())) {
-            // A shift-click or double-click collect can land an item anywhere in the top with no named
-            // destination, so it could park on the filler pane; deny it outright.
-            return false;
-        }
-        Inventory top = event.getView().getTopInventory();
-        Inventory clicked = event.getClickedInventory();
-        if (clicked == null || !clicked.equals(top)) {
-            return true; // a click in the viewer's own inventory is theirs to make
-        }
-        // A click that lands on a specific top slot (including a hotbar swap onto it) is fine when editable.
-        return InvseeLayout.isEditable(event.getSlot());
-    }
-
-    /** Actions that can push an item into the top inventory without naming a destination slot. */
-    private static boolean unboundedIntoTop(InventoryAction action) {
-        return action == InventoryAction.MOVE_TO_OTHER_INVENTORY || action == InventoryAction.COLLECT_TO_CURSOR;
     }
 
     private static @Nullable InvseeHolder holderOf(Inventory inventory) {
