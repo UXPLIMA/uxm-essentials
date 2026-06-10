@@ -281,6 +281,19 @@ public final class EconomyWiring {
                         settings.loansEnabled(),
                         settings.loanSweepInterval());
 
+        com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask =
+                new com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask(
+                        WalletRepositories.maintenance(persistence),
+                        kernel.scheduler(),
+                        kernel.log(),
+                        Clock.systemUTC(),
+                        new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitPlayerLastSeen(),
+                        settings.maintenanceEnabled(),
+                        settings.maintenanceInterval(),
+                        settings.maintenancePurgeInactiveDays(),
+                        settings.maintenancePruneTransactionDays(),
+                        settings.maintenanceDryRun());
+
         // Clears every pending chat prompt on stop so a leftover callback can never fire after teardown.
         Runnable promptCleanup = () -> {
             chatPromptListener.clear();
@@ -303,6 +316,7 @@ public final class EconomyWiring {
                 redisSync,
                 salaryTask,
                 loanRepaymentTask,
+                maintenanceTask,
                 promptCleanup);
     }
 
@@ -538,6 +552,7 @@ public final class EconomyWiring {
             @org.jspecify.annotations.Nullable RedisWalletSync redisSync,
             @org.jspecify.annotations.Nullable SalaryTask salaryTask,
             @org.jspecify.annotations.Nullable LoanRepaymentTask loanRepaymentTask,
+            com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask,
             Runnable promptCleanup) {
 
         public Wired {
@@ -551,6 +566,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(plugin, "plugin");
             Objects.requireNonNull(defaultCurrency, "defaultCurrency");
             Objects.requireNonNull(amountFormat, "amountFormat");
+            Objects.requireNonNull(maintenanceTask, "maintenanceTask");
             Objects.requireNonNull(promptCleanup, "promptCleanup");
         }
 
@@ -564,11 +580,13 @@ public final class EconomyWiring {
             if (loanRepaymentTask != null) {
                 loanRepaymentTask.start();
             }
+            maintenanceTask.start();
         }
 
         /** Drain the queues, stop the loops, and drop this plugin's provider registration. */
         public void stop() {
             promptCleanup.run();
+            maintenanceTask.stop();
             if (loanRepaymentTask != null) {
                 loanRepaymentTask.stop();
             }

@@ -341,6 +341,31 @@ public final class EconomyConfig {
         }
     }
 
+    /** Whether the periodic data-maintenance task runs at all (off by default; the destructive opt-in). */
+    public boolean maintenanceEnabled() {
+        return config.getBoolean("maintenance.enabled", false);
+    }
+
+    /** How often the maintenance task runs (at least hourly). */
+    public Duration maintenanceInterval() {
+        return Duration.ofHours(Math.max(1L, config.getLong("maintenance.run-interval-hours", 24L)));
+    }
+
+    /** Purge the wallets of players whose last login is older than this many days. */
+    public long maintenancePurgeInactiveDays() {
+        return Math.max(1L, config.getLong("maintenance.purge-inactive-days", 90L));
+    }
+
+    /** Trim transaction telemetry older than this many days. */
+    public long maintenancePruneTransactionDays() {
+        return Math.max(1L, config.getLong("maintenance.prune-transactions-days", 90L));
+    }
+
+    /** When true (the default), the task only reports what it would remove and deletes nothing. */
+    public boolean maintenanceDryRun() {
+        return config.getBoolean("maintenance.dry-run", true);
+    }
+
     private BigDecimal bigDecimal(String path, BigDecimal fallback) {
         String raw = config.getString(path, "").strip();
         if (raw.isEmpty()) {

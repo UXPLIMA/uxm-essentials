@@ -118,6 +118,13 @@ public final class WalletRepositories {
         return new JooqPendingTransactionRepository(persistence.dsl());
     }
 
+    /** The jOOQ-backed economy data-maintenance port (telemetry trim + inactive-wallet purge). */
+    public static com.uxplima.uxmessentials.economy.application.port.EconomyMaintenance maintenance(
+            Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqEconomyMaintenance(persistence.dsl());
+    }
+
     /** The jOOQ-backed banknote store. */
     public static com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore(
             Persistence persistence) {
