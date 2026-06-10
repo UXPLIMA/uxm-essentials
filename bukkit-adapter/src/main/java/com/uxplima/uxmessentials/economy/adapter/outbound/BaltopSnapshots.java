@@ -30,16 +30,32 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class BaltopSnapshots {
 
+    /** Whether an owner is banned, for the optional {@code baltop.exclude-banned} filter; the testable seam. */
+    @FunctionalInterface
+    public interface BannedLookup {
+        boolean isBanned(com.uxplima.uxmessentials.shared.domain.PlayerRef owner);
+    }
+
     private final Map<Currency, AtomicReference<List<BaltopRow>>> snapshots = new ConcurrentHashMap<>();
     private final EconomyProvider provider;
     private final BaltopExemption exemption;
     private final Scheduler scheduler;
     private final Duration ttl;
     private final int capacity;
+    private final boolean excludeBanned;
+    private final java.math.BigDecimal minBalance;
+    private final BannedLookup banned;
     private volatile boolean running;
 
     public BaltopSnapshots(
-            EconomyProvider provider, BaltopExemption exemption, Scheduler scheduler, Duration ttl, int capacity) {
+            EconomyProvider provider,
+            BaltopExemption exemption,
+            Scheduler scheduler,
+            Duration ttl,
+            int capacity,
+            boolean excludeBanned,
+            java.math.BigDecimal minBalance,
+            BannedLookup banned) {
         this.provider = Objects.requireNonNull(provider, "provider");
         this.exemption = Objects.requireNonNull(exemption, "exemption");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -48,6 +64,9 @@ public final class BaltopSnapshots {
             throw new IllegalArgumentException("baltop snapshot capacity must be positive: " + capacity);
         }
         this.capacity = capacity;
+        this.excludeBanned = excludeBanned;
+        this.minBalance = Objects.requireNonNull(minBalance, "minBalance");
+        this.banned = Objects.requireNonNull(banned, "banned");
     }
 
     /** Prime a snapshot for every configured currency and arm the refresh loop. Called on module start. */
@@ -104,11 +123,23 @@ public final class BaltopSnapshots {
             if (filtered.size() >= capacity) {
                 break;
             }
-            if (!exemption.isExempt(row.owner())) {
-                filtered.add(row);
+            if (!included(row)) {
+                continue;
             }
+            filtered.add(row);
         }
         return List.copyOf(filtered);
+    }
+
+    /** Whether {@code row} belongs in the leaderboard: not exempt, above the floor, and (optionally) not banned. */
+    private boolean included(BaltopRow row) {
+        if (exemption.isExempt(row.owner())) {
+            return false;
+        }
+        if (row.balance().amount().compareTo(minBalance) < 0) {
+            return false;
+        }
+        return !excludeBanned || !banned.isBanned(row.owner());
     }
 
     private void scheduleNext() {

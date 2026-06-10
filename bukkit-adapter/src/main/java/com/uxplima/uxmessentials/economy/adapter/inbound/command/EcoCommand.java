@@ -163,6 +163,23 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         }
     }
 
+    /**
+     * Resolve an admin command's named target to a {@link PlayerRef}, online first and then from the server's
+     * offline profile cache, so {@code /eco give|take|set|reset} can act on a player who is not currently online
+     * (the use cases materialise the offline row with {@code ensureOwner}). The cached lookup is non-blocking;
+     * an unknown name yields empty and the caller reports unknown-player.
+     */
+    private Optional<PlayerRef> resolveAnyTarget(String name) {
+        Optional<PlayerRef> online = services.players().findOnlineByName(name);
+        if (online.isPresent()) {
+            return online;
+        }
+        org.bukkit.OfflinePlayer offline = org.bukkit.Bukkit.getOfflinePlayerIfCached(name);
+        return offline != null && offline.getName() != null
+                ? Optional.of(new PlayerRef(offline.getUniqueId(), offline.getName()))
+                : Optional.empty();
+    }
+
     private int runReset(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
@@ -180,7 +197,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private void resolveAndReset(PlayerRef actor, String targetName, Currency currency) {
-        Optional<PlayerRef> target = services.players().findOnlineByName(targetName);
+        Optional<PlayerRef> target = resolveAnyTarget(targetName);
         if (target.isEmpty()) {
             rejectUnknownTarget(actor, targetName);
             return;
@@ -256,7 +273,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     private void resolveAndGiveRandomRange(PlayerRef actor, String targetName, Money min, Money max) {
-        Optional<PlayerRef> target = services.players().findOnlineByName(targetName);
+        Optional<PlayerRef> target = resolveAnyTarget(targetName);
         if (target.isEmpty()) {
             rejectUnknownTarget(actor, targetName);
             return;
@@ -279,7 +296,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return 0;
         }
         String targetName = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findOnlineByName(targetName);
+        Optional<PlayerRef> target = resolveAnyTarget(targetName);
         if (target.isEmpty()) {
             rejectUnknownTarget(ref(sender), targetName);
             return Command.SINGLE_SUCCESS;
@@ -312,7 +329,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         if (amount.isEmpty()) {
             return null;
         }
-        Optional<PlayerRef> target = services.players().findOnlineByName(ctx.getArgument("player", String.class));
+        Optional<PlayerRef> target = resolveAnyTarget(ctx.getArgument("player", String.class));
         if (target.isEmpty()) {
             rejectUnknownTarget(actor, ctx.getArgument("player", String.class));
             return null;

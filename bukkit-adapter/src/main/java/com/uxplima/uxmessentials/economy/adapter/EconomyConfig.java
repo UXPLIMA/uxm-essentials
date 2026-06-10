@@ -218,6 +218,16 @@ public final class EconomyConfig {
         return config.getString("baltop.exempt-permission", "uxmessentials.economy.baltop.exempt");
     }
 
+    /** Whether banned players are dropped from every {@code /baltop} (default off). */
+    public boolean baltopExcludeBanned() {
+        return config.getBoolean("baltop.exclude-banned", false);
+    }
+
+    /** The minimum balance a row needs to appear in {@code /baltop}; {@code 0} (default) keeps everyone. */
+    public BigDecimal baltopMinBalance() {
+        return bigDecimal("baltop.min-balance", BigDecimal.ZERO).max(BigDecimal.ZERO);
+    }
+
     /** The debounced-settle window. */
     public Duration writeDebounce() {
         return Duration.ofMillis(Math.max(50L, config.getLong("persistence.write-debounce-ms", 250L)));

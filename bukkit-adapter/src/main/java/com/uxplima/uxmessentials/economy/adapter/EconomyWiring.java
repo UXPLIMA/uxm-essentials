@@ -207,7 +207,14 @@ public final class EconomyWiring {
         KernelPorts kernel = ctx.kernel();
         BaltopExemption exemption = new PermissionBaltopExemption(kernel.permissions(), settings.baltopExemptNode());
         BaltopSnapshots snapshots = new BaltopSnapshots(
-                resolved, exemption, kernel.scheduler(), settings.baltopCacheTtl(), settings.baltopCapacity());
+                resolved,
+                exemption,
+                kernel.scheduler(),
+                settings.baltopCacheTtl(),
+                settings.baltopCapacity(),
+                settings.baltopExcludeBanned(),
+                settings.baltopMinBalance(),
+                new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitBannedLookup());
 
         com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener chatPromptListener =
                 new com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener(
