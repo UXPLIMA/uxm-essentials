@@ -14,6 +14,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
+import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
 import com.uxplima.uxmessentials.messaging.adapter.MutableMutePolicy;
 import com.uxplima.uxmessentials.migration.MigrationModule;
+import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
@@ -131,6 +133,12 @@ public final class PluginModule {
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
+        // /backup reuses the migration importer's data-dir snapshot (a "backup-" prefixed copy of the
+        // bundled .conf state), run off-tick through the Scheduler. Operator-level, so it too lives here.
+        resources.addCommand(new BackupCommand(
+                new DataDirBackupSnapshot(plugin.getDataFolder().toPath(), "backup", kernel.log()),
+                kernel.scheduler(),
+                kernel.log()));
         // Resolved last, once every module and the bootstrap commands have contributed, so the catalog sees
         // the full default surface before it applies the operator's rename/alias/disable choices.
         applyCatalog(plugin, kernel, resources);
