@@ -9,6 +9,7 @@ import org.bukkit.event.Listener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.NoFlyWorldListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.WorldCommandListener;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer;
@@ -23,6 +24,7 @@ import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
+import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.playerstate.application.PlayerStateNotifier;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
@@ -87,12 +89,14 @@ public final class PlayerstateWiring {
 
         Ports ports = new Ports(store, reconciler, effects, inventoryViewer, nearby, info, notifier);
         PlayerStateServices services = assemble(kernel, config, clock, ports);
-        List<CommandRegistration> commands = PlayerStateCommands.all(services, kernel.messages());
         PlayerstateSettings settings = new PlayerstateSettings(config);
+        NoFlyWorldPolicy noFlyWorlds = new NoFlyWorldPolicy(settings.noFlyWorlds());
+        List<CommandRegistration> commands = PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds);
         List<Listener> listeners = List.of(
                 new PlayerStateListener(store, reconciler),
                 new InvseeListener(invseeView),
-                new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()));
+                new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
+                new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
         return new Wired(commands, listeners, invseeView);
     }
 

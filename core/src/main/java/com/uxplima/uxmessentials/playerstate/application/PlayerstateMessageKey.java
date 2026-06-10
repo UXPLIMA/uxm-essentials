@@ -27,6 +27,7 @@ public enum PlayerstateMessageKey implements MessageKey {
     FLY_OFF("playerstate.fly.off"),
     FLY_OTHER_ON("playerstate.fly.other-on"),
     FLY_OTHER_OFF("playerstate.fly.other-off"),
+    FLY_WORLD_DISABLED("playerstate.fly.world-disabled"),
 
     // /heal
     HEALED("playerstate.heal.self"),

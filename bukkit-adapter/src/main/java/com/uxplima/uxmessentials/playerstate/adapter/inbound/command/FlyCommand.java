@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.entity.Player;
@@ -12,6 +14,9 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.NoFlyWorldListener;
+import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
+import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -22,14 +27,23 @@ import org.jspecify.annotations.NullMarked;
  * the {@code uxmessentials.playerstate.others} node. v1 ships the plain on/off toggle — timed fly is deferred
  * post-v1, so there is no duration argument. The {@code ToggleFly} use case owns the snapshot mutation,
  * reconciliation, event, and feedback.
+ *
+ * <p>When the target stands in a no-fly world ({@code no-fly-worlds}) and the toggle would <em>enable</em>
+ * flight, the command refuses with {@code FLY_WORLD_DISABLED} rather than toggling — unless the player holds
+ * the {@code uxmessentials.playerstate.fly.allworlds} bypass node. Disabling flight is always allowed, and a
+ * player already permitted to fly by their gamemode (creative/spectator) is left to the gamemode: the refusal
+ * only fires when the toggle would grant plugin flight the world forbids.
  */
 @NullMarked
 public final class FlyCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.fly.use";
 
-    public FlyCommand(PlayerStateServices services, Messages messages) {
+    private final NoFlyWorldPolicy noFlyWorlds;
+
+    public FlyCommand(PlayerStateServices services, Messages messages, NoFlyWorldPolicy noFlyWorlds) {
         super(services, messages);
+        this.noFlyWorlds = Objects.requireNonNull(noFlyWorlds, "noFlyWorlds");
     }
 
     @Override
@@ -55,7 +69,23 @@ public final class FlyCommand extends PlayerstateCommandSupport implements Comma
         if (target.isEmpty()) {
             return 0;
         }
+        Player live = sender.getServer().getPlayer(target.get().uuid());
+        if (live != null && refusedByNoFlyWorld(sender, live)) {
+            return 0;
+        }
         services.toggleFly().toggleFor(ref(sender), target.get());
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** True when the toggle would grant plugin flight in a no-fly world for a player without the bypass. */
+    private boolean refusedByNoFlyWorld(Player sender, Player target) {
+        if (noFlyWorlds.isEmpty()
+                || target.getAllowFlight()
+                || target.hasPermission(NoFlyWorldListener.BYPASS_NODE)
+                || !noFlyWorlds.isNoFly(target.getWorld().getName())) {
+            return false;
+        }
+        feedback.send(sender, PlayerstateMessageKey.FLY_WORLD_DISABLED, Map.of());
+        return true;
     }
 }

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 import java.util.List;
 
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
+import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -24,10 +25,11 @@ public final class PlayerStateCommands {
     private PlayerStateCommands() {}
 
     /** Every playerstate command, in surface order. */
-    public static List<CommandRegistration> all(PlayerStateServices services, Messages messages) {
+    public static List<CommandRegistration> all(
+            PlayerStateServices services, Messages messages, NoFlyWorldPolicy noFlyWorlds) {
         return List.of(
                 new GodCommand(services, messages),
-                new FlyCommand(services, messages),
+                new FlyCommand(services, messages, noFlyWorlds),
                 new HealCommand(services, messages),
                 new FeedCommand(services, messages),
                 new FoodLevelCommand(services, messages),
