@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.vote.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -11,18 +10,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.vote.application.HandleVote.VoteRewards;
+import com.uxplima.uxmessentials.vote.application.HandleVote.PartyReward;
+import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.RewardDispatcher;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
+import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
@@ -31,105 +32,109 @@ import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.event.VoteReceived;
+import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
+import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
+import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * The vote command paths through the real use cases against in-memory fakes — the same wiring the
- * Votifier listener and join handler drive, minus Bukkit. It proves that a vote for an online voter runs
- * the configured per-vote reward commands (with {@code {player}} substituted) and advances the party
- * counter; that the Nth vote which reaches the threshold dispatches the party rewards to every online
- * audience member, publishes {@link VotePartyTriggered}, and resets the counter to zero; and that a vote
- * for an offline voter queues a {@link QueuedReward} and dispatches nothing, while
+ * The vote command paths through the real {@link HandleVote} use case against in-memory fakes — the same
+ * wiring the Votifier listener and join handler drive, minus Bukkit. It proves that a vote for an online
+ * voter records the tally, resolves the per-vote reward set through the {@link RewardEngine}, and applies
+ * each grant; that the Nth vote which reaches the threshold pays the party reward to every online audience
+ * member, publishes {@link VotePartyTriggered}, and resets the counter to zero; and that a vote for an
+ * offline voter has its grants applied to the offline applier (which queues the commands) while
  * {@link ApplyQueuedRewards} on that player's join drains and dispatches the queued commands.
  */
 class VoteCommandPathTest {
 
     private FakeVoteRepository repository;
+    private RecordingApplier applier;
     private RecordingDispatcher dispatcher;
     private FakeAudience audience;
     private VoteNotifier notifier;
     private CapturingEvents events;
-    private FakeLookup lookup;
+    private FakeVoteContext context;
     private PlayerRef alice;
     private PlayerRef bob;
 
     @BeforeEach
     void setUp() {
         repository = new FakeVoteRepository();
+        applier = new RecordingApplier();
         dispatcher = new RecordingDispatcher();
         audience = new FakeAudience();
         notifier = new VoteNotifier(new KeyMessages(), new CapturingSink());
         events = new CapturingEvents();
-        lookup = new FakeLookup();
+        context = new FakeVoteContext();
         alice = new PlayerRef(UUID.randomUUID(), "Alice");
         bob = new PlayerRef(UUID.randomUUID(), "Bob");
     }
 
     @Test
-    void anOnlineVoteRunsThePerVoteRewardsAndAdvancesTheCounter() {
-        lookup.online.add(alice.uuid());
+    void anOnlineVoteRecordsTheTallyResolvesTheRewardSetAndAdvancesTheCounter() {
+        context.online.add(alice.uuid());
         audience.players.add(alice);
 
         HandleVote.Outcome outcome =
-                handle(perVote("give {player} diamond 1"), party(), 25).handle(voteBy(alice));
+                handle(catalogPerVote("give {player} diamond 1"), party(), 25).handle(voteBy(alice));
 
         assertThat(outcome.rewardedNow()).isTrue();
         assertThat(outcome.partyTriggered()).isFalse();
-        assertThat(dispatcher.dispatched).containsExactly("give Alice diamond 1");
+        assertThat(applier.commandsFor(alice)).containsExactly("give {player} diamond 1");
+        assertThat(applier.appliedOnline(alice)).isTrue();
+        assertThat(repository.totalsOf(alice).alltime()).isEqualTo(1);
         assertThat(repository.partyCount()).isEqualTo(1);
         assertThat(events.published).hasOnlyElementsOfType(VoteReceived.class);
     }
 
     @Test
     void theThresholdVoteFiresThePartyForEveryoneAndResetsTheCounter() {
-        lookup.online.add(alice.uuid());
+        context.online.add(alice.uuid());
         audience.players.add(alice);
         audience.players.add(bob);
         repository.setPartyCount(24); // the next vote is the 25th
 
-        HandleVote.Outcome outcome = handle(perVote("eco give {player} 10"), party("crate give {player} vote 1"), 25)
+        HandleVote.Outcome outcome = handle(
+                        catalogPerVote("eco give {player} 10"), party("crate give {player} vote 1"), 25)
                 .handle(voteBy(alice));
 
         assertThat(outcome.partyTriggered()).isTrue();
         assertThat(repository.partyCount()).isZero();
-        // Alice's per-vote reward, then the party reward for both online players.
-        assertThat(dispatcher.dispatched)
-                .containsExactly("eco give Alice 10", "crate give Alice vote 1", "crate give Bob vote 1");
+        // Alice gets her per-vote grant; both online players get the party grant.
+        assertThat(applier.commandsFor(alice)).containsExactly("eco give {player} 10", "crate give {player} vote 1");
+        assertThat(applier.commandsFor(bob)).containsExactly("crate give {player} vote 1");
         assertThat(events.published)
                 .anyMatch(e -> e instanceof VotePartyTriggered triggered && triggered.threshold() == 25);
     }
 
     @Test
     void aVoteAlwaysRecordsTotalsRegardlessOfOnlineStatus() {
-        // Alice is online; her tally should be updated.
-        lookup.online.add(alice.uuid());
+        context.online.add(alice.uuid());
         audience.players.add(alice);
 
-        handle(perVote("give {player} diamond 1"), party(), 25).handle(voteBy(alice));
+        handle(catalogPerVote("give {player} diamond 1"), party(), 25).handle(voteBy(alice));
+        assertThat(repository.totalsOf(alice).alltime()).isEqualTo(1);
 
-        VoteTally tally = repository.totalsOf(alice);
-        assertThat(tally.alltime()).isEqualTo(1);
-
-        // Bob is offline; his tally should also be updated.
-        handle(perVote("give {player} apple 3"), party(), 25).handle(voteBy(bob));
-
-        VoteTally bobTally = repository.totalsOf(bob);
-        assertThat(bobTally.alltime()).isEqualTo(1);
+        // Bob is offline; his tally is still updated.
+        handle(catalogPerVote("give {player} apple 3"), party(), 25).handle(voteBy(bob));
+        assertThat(repository.totalsOf(bob).alltime()).isEqualTo(1);
     }
 
     @Test
-    void anOfflineVoteIsQueuedAndPaysOutOnJoin() {
-        // Bob is offline at vote time — nothing is dispatched, a batch is queued.
+    void anOfflineVoteIsAppliedOfflineThenPaysOutOnJoin() {
+        // Bob is offline at vote time — the grant is applied offline (the real applier queues its commands).
         HandleVote.Outcome outcome =
-                handle(perVote("give {player} apple 3"), party(), 25).handle(voteBy(bob));
+                handle(catalogPerVote("give {player} apple 3"), party(), 25).handle(voteBy(bob));
 
         assertThat(outcome.rewardedNow()).isFalse();
-        assertThat(dispatcher.dispatched).isEmpty();
-        assertThat(repository.hasPending(bob)).isTrue();
+        assertThat(applier.appliedOnline(bob)).isFalse();
+        assertThat(applier.commandsFor(bob)).containsExactly("give {player} apple 3");
         assertThat(repository.partyCount()).isEqualTo(1); // the counter still advances for an offline vote
 
-        // Bob joins: the queued batch drains and dispatches with his name substituted.
+        // The offline applier queued the grant's commands; on join ApplyQueuedRewards drains them.
+        repository.enqueue(new QueuedReward(bob, List.of("give {player} apple 3"), Instant.EPOCH));
         int paid = new ApplyQueuedRewards(repository, dispatcher).applyFor(bob);
 
         assertThat(paid).isEqualTo(1);
@@ -137,29 +142,76 @@ class VoteCommandPathTest {
         assertThat(repository.hasPending(bob)).isFalse();
     }
 
-    private HandleVote handle(List<String> perVote, List<String> party, int threshold) {
+    private HandleVote handle(RewardCatalog catalog, List<String> partyCommands, int threshold) {
         return new HandleVote(
                 repository,
-                dispatcher,
+                new RewardEngine(catalog),
+                applier,
+                context,
                 audience,
                 notifier,
                 events,
-                new VoteRewards(perVote, party, threshold),
-                lookup,
-                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
+                new PartyReward(partyCommands, threshold),
                 ZoneOffset.UTC);
+    }
+
+    private static RewardCatalog catalogPerVote(String... commands) {
+        RewardSpec spec =
+                new RewardSpec(100, Optional.empty(), List.of(commands), List.of(), List.of(), List.of(), Set.of());
+        return new RewardCatalog(List.of(spec), Map.of(), List.of(), List.of());
     }
 
     private static Vote voteBy(PlayerRef voter) {
         return new Vote(voter, "TestVoteSite", Instant.EPOCH);
     }
 
-    private static List<String> perVote(String... commands) {
+    private static List<String> party(String... commands) {
         return List.of(commands);
     }
 
-    private static List<String> party(String... commands) {
-        return List.of(commands);
+    /** Captures every {@link RewardGrant} applied, per voter, with the online flag it was applied under. */
+    private static final class RecordingApplier implements RewardApplier {
+        private final Map<UUID, List<String>> commands = new LinkedHashMap<>();
+        private final Map<UUID, Boolean> online = new LinkedHashMap<>();
+
+        @Override
+        public void apply(PlayerRef voter, boolean isOnline, RewardGrant grant) {
+            commands.computeIfAbsent(voter.uuid(), u -> new ArrayList<>()).addAll(grant.commands());
+            online.put(voter.uuid(), isOnline);
+        }
+
+        List<String> commandsFor(PlayerRef voter) {
+            return commands.getOrDefault(voter.uuid(), List.of());
+        }
+
+        boolean appliedOnline(PlayerRef voter) {
+            return Boolean.TRUE.equals(online.get(voter.uuid()));
+        }
+    }
+
+    /** A deterministic {@link VoteContext}: online by membership, all permissions granted, every roll passes. */
+    private static final class FakeVoteContext implements VoteContext {
+        private final List<UUID> online = new ArrayList<>();
+
+        @Override
+        public String worldOf(PlayerRef voter) {
+            return online.contains(voter.uuid()) ? "world" : "";
+        }
+
+        @Override
+        public boolean hasPermission(PlayerRef voter, String node) {
+            return true;
+        }
+
+        @Override
+        public boolean roll(int chancePercent) {
+            return chancePercent > 0;
+        }
+
+        @Override
+        public boolean isOnline(PlayerRef voter) {
+            return online.contains(voter.uuid());
+        }
     }
 
     /** A map/list-backed {@link VoteRepository}: one counter int and a per-player ordered queue. */
@@ -233,25 +285,6 @@ class VoteCommandPathTest {
         @Override
         public Collection<PlayerRef> online() {
             return List.copyOf(players);
-        }
-    }
-
-    private static final class FakeLookup implements PlayerLookup {
-        private final List<UUID> online = new ArrayList<>();
-
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.empty();
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return online.contains(uuid);
         }
     }
 
