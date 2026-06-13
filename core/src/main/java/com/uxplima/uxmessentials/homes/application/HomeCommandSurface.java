@@ -21,22 +21,7 @@ final class HomeCommandSurface {
 
     static List<CommandSpec> all() {
         return List.of(
-                spec("home", "uxmessentials.home.use", HomeCommand.of("home", "Teleport to one of your homes")),
-                spec("sethome", "uxmessentials.home.set", HomeCommand.of("sethome", "Create or move a home")),
-                spec("delhome", "uxmessentials.home.delete", HomeCommand.of("delhome", "Delete one of your homes")),
-                spec("homes", "uxmessentials.home.list", HomeCommand.of("homes", "List your homes")),
-                spec(
-                        "renamehome",
-                        "uxmessentials.home.rename",
-                        HomeCommand.of("renamehome", "Rename one of your homes")),
-                spec(
-                        "movehome",
-                        "uxmessentials.home.move",
-                        HomeCommand.of("movehome", "Move a home to your current location")),
-                spec(
-                        "setmainhome",
-                        "uxmessentials.home.setmain",
-                        HomeCommand.of("setmainhome", "Set your main /home destination")),
+                spec("home", "uxmessentials.home.use", HomeCommand.of("home", "Open and manage your homes")),
                 spec(
                         "homeadmin",
                         "uxmessentials.home.admin",

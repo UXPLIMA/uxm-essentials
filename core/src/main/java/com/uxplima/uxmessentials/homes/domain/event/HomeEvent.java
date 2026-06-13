@@ -12,4 +12,5 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
  * <p>Names are past tense — a domain event records something that already happened
  * ({@code HomeCreated}, {@code HomeDeleted}), never an imperative command.
  */
-public sealed interface HomeEvent extends DomainEvent permits HomeCreated, HomeDeleted, HomeLimitReached {}
+public sealed interface HomeEvent extends DomainEvent
+        permits HomeCreated, HomeDeleted, HomeLimitReached, HomeRelocated, HomeRenamed, HomeIconChanged {}

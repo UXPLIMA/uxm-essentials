@@ -1,0 +1,113 @@
+package com.uxplima.uxmessentials.homes.application;
+
+import java.time.Clock;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
+import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
+import com.uxplima.uxmessentials.homes.domain.HomeError;
+import com.uxplima.uxmessentials.homes.domain.HomeLimit;
+import com.uxplima.uxmessentials.homes.domain.HomeSet;
+import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
+
+/**
+ * {@code /sethome}: create a home in a given slot at the player's current position. The owner's limit is
+ * resolved through {@link HomeQuota} scoped to the home's world and folded into a maximum-slot count, then
+ * every registered {@link SethomeGuard} runs in order — the first failure short-circuits with its
+ * {@link HomeError} and no aggregate change. If the guards pass, the aggregate gates the slot against the
+ * range/occupancy/limit invariants and creates the home, publishing {@code HomeCreated}. Hitting the cap
+ * publishes {@code HomeLimitReached} and returns {@link HomeError#LIMIT_REACHED} so the command renders the
+ * limit message — never an inline literal.
+ */
+public final class CreateHomeAtSlot {
+
+    private final HomeRepository repository;
+    private final HomeQuota quota;
+    private final List<SethomeGuard> guards;
+    private final HomeNotifier notifier;
+    private final DomainEventPublisher events;
+    private final int unlimitedMaxSlots;
+    private final Clock clock;
+
+    public CreateHomeAtSlot(
+            HomeRepository repository,
+            HomeQuota quota,
+            List<SethomeGuard> guards,
+            HomeNotifier notifier,
+            DomainEventPublisher events,
+            int unlimitedMaxSlots,
+            Clock clock) {
+        this.repository = Objects.requireNonNull(repository, "repository");
+        this.quota = Objects.requireNonNull(quota, "quota");
+        this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.events = Objects.requireNonNull(events, "events");
+        if (unlimitedMaxSlots < 0) {
+            throw new IllegalArgumentException("unlimitedMaxSlots must not be negative: " + unlimitedMaxSlots);
+        }
+        this.unlimitedMaxSlots = unlimitedMaxSlots;
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /** Create {@code owner}'s home in {@code slot} at {@code at}, gating on the guards and the aggregate. */
+    public Result<Unit, HomeError> create(PlayerRef owner, HomeSlot slot, Position at) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(slot, "slot");
+        Objects.requireNonNull(at, "at");
+        HomeSet set = repository.load(owner);
+        HomeLimit limit = quota.resolve(owner, at.world());
+        int max = limit.maxSlots(unlimitedMaxSlots);
+        Result<Unit, HomeError> guarded = runGuards(owner, slot, at);
+        if (guarded.isErr()) {
+            return guarded;
+        }
+        Result<HomeSet.Change, HomeError> outcome = set.createAt(slot, at, limit, max, clock.instant());
+        if (outcome.isErr()) {
+            return reject(set, limit, outcome.errorOrThrow());
+        }
+        return commit(outcome.orElseThrow());
+    }
+
+    private Result<Unit, HomeError> runGuards(PlayerRef owner, HomeSlot slot, Position at) {
+        for (SethomeGuard guard : guards) {
+            Result<Unit, HomeError> verdict = guard.check(owner, slot, at);
+            if (verdict.isErr()) {
+                HomeError error = verdict.errorOrThrow();
+                notifier.send(owner, error.messageKey(), placeholders(slot));
+                return Result.err(error);
+            }
+        }
+        return Result.ok();
+    }
+
+    private Result<Unit, HomeError> commit(HomeSet.Change change) {
+        repository.save(change.home());
+        change.event().ifPresent(events::publish);
+        notifier.send(
+                change.home().owner(),
+                HomesMessageKey.HOME_CREATED,
+                placeholders(change.home().slot()));
+        return Result.ok();
+    }
+
+    private Result<Unit, HomeError> reject(HomeSet set, HomeLimit limit, HomeError error) {
+        if (error == HomeError.LIMIT_REACHED) {
+            events.publish(set.limitReached(limit));
+            notifier.send(set.owner(), error.messageKey(), Map.of("limit", Integer.toString(limit.cap())));
+        } else {
+            notifier.send(set.owner(), error.messageKey());
+        }
+        return Result.err(error);
+    }
+
+    private static Map<String, String> placeholders(HomeSlot slot) {
+        return Map.of("slot", Integer.toString(slot.displayNumber()));
+    }
+}

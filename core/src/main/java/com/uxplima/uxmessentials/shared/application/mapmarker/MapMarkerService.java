@@ -54,7 +54,7 @@ public final class MapMarkerService {
             case HomeCreated created -> publishHome(created);
             case HomeDeleted deleted -> remove(
                     MapMarkerKind.HOME,
-                    homeName(deleted.owner().uuid(), deleted.name().value()));
+                    homeName(deleted.owner().uuid(), deleted.slot().index()));
             default -> {
                 // Not a marker-bearing event; nothing to render.
             }
@@ -73,7 +73,7 @@ public final class MapMarkerService {
         if (!settings.renders(MapMarkerKind.HOME)) {
             return;
         }
-        String name = homeName(created.owner().uuid(), created.name().value());
+        String name = homeName(created.owner().uuid(), created.slot().index());
         publisher.publish(marker(MapMarkerKind.HOME, name, created.location()));
     }
 
@@ -88,8 +88,8 @@ public final class MapMarkerService {
         return MapMarker.of(kind, name, settings.tooltipFor(name), at.world().name(), at.x(), at.y(), at.z());
     }
 
-    /** A home's marker name namespaces the owner so two players' {@code home} entries never collide. */
-    private static String homeName(java.util.UUID owner, String name) {
-        return owner + "/" + name;
+    /** A home's marker name namespaces the owner and slot so two players' home entries never collide. */
+    private static String homeName(java.util.UUID owner, int slotIndex) {
+        return owner + "/" + slotIndex;
     }
 }

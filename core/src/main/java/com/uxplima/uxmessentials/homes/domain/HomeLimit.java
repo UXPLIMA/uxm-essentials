@@ -29,4 +29,13 @@ public record HomeLimit(int cap, boolean unlimited) {
     public boolean isReachedAt(int currentCount) {
         return !unlimited && currentCount >= cap;
     }
+
+    /**
+     * The number of slots the owner may address. A concrete cap is its own slot ceiling; an unlimited
+     * quota has no natural ceiling, so the caller supplies {@code unlimitedCap} — the configured upper
+     * bound on the slot grid — to keep the {@code -1} sentinel from becoming an unbounded index.
+     */
+    public int maxSlots(int unlimitedCap) {
+        return unlimited ? unlimitedCap : cap;
+    }
 }

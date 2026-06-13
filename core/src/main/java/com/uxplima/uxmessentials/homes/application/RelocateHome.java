@@ -3,49 +3,47 @@ package com.uxplima.uxmessentials.homes.application;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
-import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * Set or clear the display label of the home in a slot, keeping its location, icon, and creation time. The
- * label is cosmetic — the slot remains the home's identity — so an empty {@code label} clears it. The
- * aggregate rejects an empty slot with {@link HomeError#NOT_FOUND}; a successful change saves the row and
- * notifies {@link HomesMessageKey#HOME_RENAMED}.
+ * Re-anchor the home in a slot to the player's current position, keeping its label, icon, and creation
+ * time. The aggregate rejects an empty slot with {@link HomeError#NOT_FOUND}; a successful relocate saves
+ * the row and notifies {@link HomesMessageKey#HOME_RELOCATED}.
  */
-public final class RenameHome {
+public final class RelocateHome {
 
     private final HomeRepository repository;
     private final HomeNotifier notifier;
     private final Clock clock;
 
-    public RenameHome(HomeRepository repository, HomeNotifier notifier, Clock clock) {
+    public RelocateHome(HomeRepository repository, HomeNotifier notifier, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Set {@code owner}'s slot label to {@code label} (empty clears it), or reject an empty slot. */
-    public Result<Unit, HomeError> rename(PlayerRef owner, HomeSlot slot, Optional<HomeLabel> label) {
+    /** Relocate {@code owner}'s home in {@code slot} to {@code at}, or reject when the slot is empty. */
+    public Result<Unit, HomeError> relocate(PlayerRef owner, HomeSlot slot, Position at) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(slot, "slot");
-        Objects.requireNonNull(label, "label");
+        Objects.requireNonNull(at, "at");
         HomeSet set = repository.load(owner);
-        Result<HomeSet.Change, HomeError> outcome = set.renameLabel(slot, label, clock.instant());
+        Result<HomeSet.Change, HomeError> outcome = set.relocate(slot, at, clock.instant());
         if (outcome.isErr()) {
             HomeError error = outcome.errorOrThrow();
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));
             return Result.err(error);
         }
         repository.save(outcome.orElseThrow().home());
-        notifier.send(owner, HomesMessageKey.HOME_RENAMED, slotPlaceholder(slot));
+        notifier.send(owner, HomesMessageKey.HOME_RELOCATED, slotPlaceholder(slot));
         return Result.ok();
     }
 

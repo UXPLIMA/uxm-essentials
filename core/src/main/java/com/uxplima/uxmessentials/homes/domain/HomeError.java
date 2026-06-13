@@ -10,17 +10,17 @@ import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
  */
 public enum HomeError {
 
-    /** {@code /sethome} (a new name) past the owner's resolved {@code uxmessentials.home.limit.<n>}. */
+    /** {@code /sethome} into a new slot past the owner's resolved {@code uxmessentials.home.limit.<n>}. */
     LIMIT_REACHED(HomesMessageKey.HOME_LIMIT_REACHED),
 
-    /** A name the owner has no home under: {@code /home}, {@code /delhome}, {@code /movehome}, rename source. */
+    /** A slot the owner has no home in: teleport, relocate, relabel, re-icon, or delete of an empty slot. */
     NOT_FOUND(HomesMessageKey.HOME_NOT_FOUND),
 
-    /** {@code /renamehome} to a name the owner already has a home under. */
-    NAME_TAKEN(HomesMessageKey.HOME_NAME_TAKEN),
+    /** {@code /sethome} into a slot the owner already has a home in. */
+    SLOT_TAKEN(HomesMessageKey.HOME_SLOT_TAKEN),
 
-    /** The owner has no homes at all when one was required. */
-    NONE_SET(HomesMessageKey.HOME_NONE);
+    /** A slot index at or above the owner's resolved maximum-slot count. */
+    SLOT_OUT_OF_RANGE(HomesMessageKey.HOME_SLOT_OUT_OF_RANGE);
 
     private final HomesMessageKey messageKey;
 

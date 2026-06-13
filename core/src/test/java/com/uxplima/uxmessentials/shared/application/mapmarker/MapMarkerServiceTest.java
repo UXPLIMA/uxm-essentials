@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.homes.domain.HomeName;
+import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.homes.domain.event.HomeCreated;
 import com.uxplima.uxmessentials.homes.domain.event.HomeDeleted;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -87,7 +87,7 @@ class MapMarkerServiceTest {
         RecordingPublisher publisher = new RecordingPublisher();
         MapMarkerService service = new MapMarkerService(publisher, settings(Map.of()), List.of());
 
-        service.onEvent(new HomeCreated(ALICE, HomeName.of("base"), Position.of(WORLD, 5, 64, 6)));
+        service.onEvent(new HomeCreated(ALICE, HomeSlot.of(0), Position.of(WORLD, 5, 64, 6)));
 
         assertThat(publisher.published).as("homes off — no private home marker").isEmpty();
     }
@@ -98,11 +98,11 @@ class MapMarkerServiceTest {
         MapMarkerService service =
                 new MapMarkerService(publisher, settings(Map.of("map-markers.homes", true)), List.of());
 
-        service.onEvent(new HomeCreated(ALICE, HomeName.of("base"), Position.of(WORLD, 5, 64, 6)));
+        service.onEvent(new HomeCreated(ALICE, HomeSlot.of(0), Position.of(WORLD, 5, 64, 6)));
 
         assertThat(publisher.published).singleElement().satisfies(m -> {
             assertThat(m.kind()).isEqualTo(MapMarkerKind.HOME);
-            assertThat(m.id()).isEqualTo("home:" + ALICE.uuid() + "/base");
+            assertThat(m.id()).isEqualTo("home:" + ALICE.uuid() + "/0");
         });
     }
 
@@ -112,9 +112,9 @@ class MapMarkerServiceTest {
         MapMarkerService service =
                 new MapMarkerService(publisher, settings(Map.of("map-markers.homes", true)), List.of());
 
-        service.onEvent(new HomeDeleted(ALICE, HomeName.of("base")));
+        service.onEvent(new HomeDeleted(ALICE, HomeSlot.of(0)));
 
-        assertThat(publisher.removed).containsExactly("home:" + ALICE.uuid() + "/base");
+        assertThat(publisher.removed).containsExactly("home:" + ALICE.uuid() + "/0");
     }
 
     @Test

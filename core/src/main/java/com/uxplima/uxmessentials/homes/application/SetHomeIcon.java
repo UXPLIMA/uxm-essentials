@@ -7,7 +7,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
-import com.uxplima.uxmessentials.homes.domain.HomeLabel;
+import com.uxplima.uxmessentials.homes.domain.HomeIcon;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -15,37 +15,37 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * Set or clear the display label of the home in a slot, keeping its location, icon, and creation time. The
- * label is cosmetic — the slot remains the home's identity — so an empty {@code label} clears it. The
+ * Set or clear the GUI icon of the home in a slot, keeping its location, label, and creation time. The
+ * icon is cosmetic — the slot remains the home's identity — so an empty {@code icon} clears it. The
  * aggregate rejects an empty slot with {@link HomeError#NOT_FOUND}; a successful change saves the row and
- * notifies {@link HomesMessageKey#HOME_RENAMED}.
+ * notifies {@link HomesMessageKey#HOME_ICON_CHANGED}.
  */
-public final class RenameHome {
+public final class SetHomeIcon {
 
     private final HomeRepository repository;
     private final HomeNotifier notifier;
     private final Clock clock;
 
-    public RenameHome(HomeRepository repository, HomeNotifier notifier, Clock clock) {
+    public SetHomeIcon(HomeRepository repository, HomeNotifier notifier, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Set {@code owner}'s slot label to {@code label} (empty clears it), or reject an empty slot. */
-    public Result<Unit, HomeError> rename(PlayerRef owner, HomeSlot slot, Optional<HomeLabel> label) {
+    /** Set {@code owner}'s slot icon to {@code icon} (empty clears it), or reject an empty slot. */
+    public Result<Unit, HomeError> setIcon(PlayerRef owner, HomeSlot slot, Optional<HomeIcon> icon) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(slot, "slot");
-        Objects.requireNonNull(label, "label");
+        Objects.requireNonNull(icon, "icon");
         HomeSet set = repository.load(owner);
-        Result<HomeSet.Change, HomeError> outcome = set.renameLabel(slot, label, clock.instant());
+        Result<HomeSet.Change, HomeError> outcome = set.setIcon(slot, icon, clock.instant());
         if (outcome.isErr()) {
             HomeError error = outcome.errorOrThrow();
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));
             return Result.err(error);
         }
         repository.save(outcome.orElseThrow().home());
-        notifier.send(owner, HomesMessageKey.HOME_RENAMED, slotPlaceholder(slot));
+        notifier.send(owner, HomesMessageKey.HOME_ICON_CHANGED, slotPlaceholder(slot));
         return Result.ok();
     }
 

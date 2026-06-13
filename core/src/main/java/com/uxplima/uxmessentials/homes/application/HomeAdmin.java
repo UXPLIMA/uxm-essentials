@@ -9,19 +9,19 @@ import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
-import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
+import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /homeadmin <player> [del|list|tp] [name]}: full admin management over another player's homes as
- * an explicit verb, distinct from the per-command {@code .others} nodes and audit-logged by the adapter.
- * It reuses the same aggregate transitions the player-facing use cases do — there is no second code path
- * for an admin delete — so the uniqueness/limit invariants hold identically. The acting staff member is
- * the {@code actor} who receives feedback; the {@code target} is the owner whose set is read or changed.
+ * {@code /homeadmin <player> [del|list|tp] [slot]}: full admin management over another player's homes as an
+ * explicit verb, audit-logged by the adapter. It reuses the same aggregate transitions the player-facing use
+ * cases do — there is no second code path for an admin delete — so the slot/limit invariants hold
+ * identically. The acting staff member is the {@code actor} who receives feedback; the {@code target} is the
+ * owner whose set is read or changed.
  */
 public final class HomeAdmin {
 
@@ -38,24 +38,7 @@ public final class HomeAdmin {
         this.events = Objects.requireNonNull(events, "events");
     }
 
-    /** Delete {@code target}'s home {@code name}, reporting the result to {@code actor}. */
-    public Result<Unit, HomeError> delete(PlayerRef actor, PlayerRef target, HomeName name) {
-        Objects.requireNonNull(actor, "actor");
-        Objects.requireNonNull(target, "target");
-        Objects.requireNonNull(name, "name");
-        HomeSet set = repository.load(target);
-        Result<HomeSet.Change, HomeError> outcome = set.delete(name);
-        if (outcome.isErr()) {
-            notifier.send(actor, outcome.errorOrThrow().messageKey(), Map.of("home", name.value()));
-            return Result.err(outcome.errorOrThrow());
-        }
-        repository.delete(target, name);
-        outcome.orElseThrow().event().ifPresent(events::publish);
-        notifier.send(actor, HomesMessageKey.HOME_ADMIN_DELETED, attribution(target, name));
-        return Result.ok();
-    }
-
-    /** List {@code target}'s homes to {@code actor}. */
+    /** List {@code target}'s homes to {@code actor}, returning them for the adapter to render. */
     public List<Home> list(PlayerRef actor, PlayerRef target) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
@@ -64,30 +47,45 @@ public final class HomeAdmin {
                 actor,
                 HomesMessageKey.HOME_ADMIN_LIST_HEADER,
                 Map.of("player", target.name(), "count", Integer.toString(homes.size())));
-        for (Home home : homes) {
-            notifier.send(
-                    actor,
-                    HomesMessageKey.HOME_LIST_ENTRY,
-                    Map.of("home", home.name().value()));
-        }
         return homes;
     }
 
-    /** Teleport {@code actor} to {@code target}'s home {@code name}, delegating the hop to teleport. */
-    public Result<Unit, HomeError> teleport(PlayerRef actor, PlayerRef target, HomeName name) {
+    /** Delete {@code target}'s home in {@code slot}, reporting the result to {@code actor}. */
+    public Result<Unit, HomeError> delete(PlayerRef actor, PlayerRef target, HomeSlot slot) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
-        Objects.requireNonNull(name, "name");
-        Optional<Home> home = repository.load(target).find(name);
+        Objects.requireNonNull(slot, "slot");
+        HomeSet set = repository.load(target);
+        Result<HomeSet.Change, HomeError> outcome = set.delete(slot);
+        if (outcome.isErr()) {
+            notifier.send(actor, outcome.errorOrThrow().messageKey(), slotPlaceholder(slot));
+            return Result.err(outcome.errorOrThrow());
+        }
+        repository.deleteSlot(target, slot);
+        outcome.orElseThrow().event().ifPresent(events::publish);
+        notifier.send(actor, HomesMessageKey.HOME_ADMIN_DELETED, attribution(target, slot));
+        return Result.ok();
+    }
+
+    /** Teleport {@code actor} to {@code target}'s home in {@code slot}, delegating the hop to teleport. */
+    public Result<Unit, HomeError> teleport(PlayerRef actor, PlayerRef target, HomeSlot slot) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(slot, "slot");
+        Optional<Home> home = repository.findSlot(target, slot);
         if (home.isEmpty()) {
-            notifier.send(actor, HomeError.NOT_FOUND.messageKey(), Map.of("home", name.value()));
+            notifier.send(actor, HomeError.NOT_FOUND.messageKey(), slotPlaceholder(slot));
             return Result.err(HomeError.NOT_FOUND);
         }
         teleporter.teleportTo(actor, home.get());
         return Result.ok();
     }
 
-    private static Map<String, String> attribution(PlayerRef target, HomeName name) {
-        return Map.of("player", target.name(), "home", name.value());
+    private static Map<String, String> slotPlaceholder(HomeSlot slot) {
+        return Map.of("slot", Integer.toString(slot.displayNumber()));
+    }
+
+    private static Map<String, String> attribution(PlayerRef target, HomeSlot slot) {
+        return Map.of("player", target.name(), "slot", Integer.toString(slot.displayNumber()));
     }
 }

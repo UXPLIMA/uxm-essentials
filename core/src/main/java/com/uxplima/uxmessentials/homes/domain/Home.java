@@ -2,46 +2,75 @@ package com.uxplima.uxmessentials.homes.domain;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 
 /**
- * One named home: an owner, a {@link HomeName}, and the {@link Position} it points at, with the moment
- * it was first created. A home is a value object — moving or renaming one produces a new instance rather
- * than mutating in place, so the {@link HomeSet} aggregate stays immutable between operations.
+ * One home in an owner's slot grid: an owner, the {@link HomeSlot} that is its identity, the
+ * {@link Position} it points at, and two cosmetic decorations — an optional {@link HomeLabel} and an
+ * optional {@link HomeIcon}. Identity is the slot, not a name: relabelling a home leaves it in the same
+ * slot, and the label is purely what the player sees.
  *
- * <p>The position carries its own {@link com.uxplima.uxmessentials.shared.domain.WorldRef}, so the home's
- * world (which the limit quota may be scoped to) is read from {@code location().world()} rather than held
- * separately. Execution of the teleport to this position is the teleport context's job; this aggregate
- * never moves a player.
+ * <p>A home is a value object — relocating, relabelling, or re-iconing one produces a new instance rather
+ * than mutating in place, so the {@link HomeSet} aggregate stays immutable between operations. Each
+ * copy-op bumps {@link #updatedAt()} while preserving {@link #createdAt()}. The position carries its own
+ * {@link com.uxplima.uxmessentials.shared.domain.WorldRef}, so the home's world (which the limit quota may
+ * be scoped to) is read from {@code location().world()} rather than held separately. Execution of the
+ * teleport to this position is the teleport context's job; this aggregate never moves a player.
  *
  * @param owner the player who owns the home
- * @param name the home's canonical name within the owner's set
+ * @param slot the slot that identifies the home within the owner's set
  * @param location where the home points
- * @param createdAt when the home was first created (preserved across a move or rename)
+ * @param label the player-facing display label, or empty when none was set
+ * @param icon the GUI icon material, or empty when none was set
+ * @param createdAt when the home was first created (preserved across every copy-op)
+ * @param updatedAt when the home was last changed (bumped by every copy-op)
  */
-public record Home(PlayerRef owner, HomeName name, Position location, Instant createdAt) {
+public record Home(
+        PlayerRef owner,
+        HomeSlot slot,
+        Position location,
+        Optional<HomeLabel> label,
+        Optional<HomeIcon> icon,
+        Instant createdAt,
+        Instant updatedAt) {
 
     public Home {
         Objects.requireNonNull(owner, "owner");
-        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(slot, "slot");
         Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(label, "label");
+        Objects.requireNonNull(icon, "icon");
         Objects.requireNonNull(createdAt, "createdAt");
+        Objects.requireNonNull(updatedAt, "updatedAt");
     }
 
-    /** A new home created now at {@code location}. */
-    public static Home create(PlayerRef owner, HomeName name, Position location, Instant createdAt) {
-        return new Home(owner, name, location, createdAt);
+    /** A new home created now at {@code location} with no label and no icon. */
+    public static Home create(PlayerRef owner, HomeSlot slot, Position location, Instant now) {
+        Objects.requireNonNull(now, "now");
+        return new Home(owner, slot, location, Optional.empty(), Optional.empty(), now, now);
     }
 
-    /** A copy re-anchored to {@code newLocation}, keeping the name, owner, and original creation time. */
-    public Home movedTo(Position newLocation) {
-        return new Home(owner, name, Objects.requireNonNull(newLocation, "newLocation"), createdAt);
+    /** A copy re-anchored to {@code newLocation}, keeping slot, label, and icon; bumps {@code updatedAt}. */
+    public Home relocatedTo(Position newLocation, Instant now) {
+        Objects.requireNonNull(newLocation, "newLocation");
+        Objects.requireNonNull(now, "now");
+        return new Home(owner, slot, newLocation, label, icon, createdAt, now);
     }
 
-    /** A copy under {@code newName}, keeping the location, owner, and original creation time. */
-    public Home renamedTo(HomeName newName) {
-        return new Home(owner, Objects.requireNonNull(newName, "newName"), location, createdAt);
+    /** A copy under {@code newLabel}, keeping slot, location, and icon; bumps {@code updatedAt}. */
+    public Home withLabel(Optional<HomeLabel> newLabel, Instant now) {
+        Objects.requireNonNull(newLabel, "newLabel");
+        Objects.requireNonNull(now, "now");
+        return new Home(owner, slot, location, newLabel, icon, createdAt, now);
+    }
+
+    /** A copy under {@code newIcon}, keeping slot, location, and label; bumps {@code updatedAt}. */
+    public Home withIcon(Optional<HomeIcon> newIcon, Instant now) {
+        Objects.requireNonNull(newIcon, "newIcon");
+        Objects.requireNonNull(now, "now");
+        return new Home(owner, slot, location, label, newIcon, createdAt, now);
     }
 }
