@@ -45,6 +45,8 @@ import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteContext;
 import com.uxplima.uxmessentials.vote.adapter.outbound.InMemoryBroadcastThrottle;
 import com.uxplima.uxmessentials.vote.adapter.outbound.PdcBroadcastVisibility;
 import com.uxplima.uxmessentials.vote.adapter.outbound.PdcReminderPreferences;
+import com.uxplima.uxmessentials.vote.adapter.outbound.VoteDiscordNotifier;
+import com.uxplima.uxmessentials.vote.adapter.outbound.VoteDiscordSettings;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
@@ -198,6 +200,11 @@ public final class VoteWiring {
                             period);
         }
 
+        // Discord webhook notifier (only when discord.webhook-url is set). When disabled nothing is
+        // subscribed and no task is scheduled, so a default config carries zero overhead.
+        VoteDiscordSettings discordSettings = VoteDiscordSettings.fromConfig(ctx.config());
+        Discord discord = wireDiscord(discordSettings, kernel, repository, events);
+
         // Build the join listener with reminder support when enabled.
         boolean loginNag = ctx.config().getBoolean("reminders.login", true);
         int loginDelaySecs = Math.max(0, ctx.config().getInt("reminders.login-delay-seconds", 5));
@@ -238,7 +245,71 @@ public final class VoteWiring {
                 events,
                 partyEffects,
                 partyPublisher,
-                reminderTask);
+                reminderTask,
+                discord.notifier(),
+                discord.topVoterTask());
+    }
+
+    /**
+     * Build and subscribe the Discord webhook notifier and schedule the top-voter task, but only when the
+     * webhook URL is set and resolves to a live webhook. A disabled config (the default) subscribes nothing
+     * and schedules nothing, so the single-server, un-configured path stays free. A malformed URL is caught
+     * inside {@link VoteDiscordNotifier} — the candidate reports {@link VoteDiscordNotifier#active()} false and
+     * is wired no further. Package-private so the subscribe/schedule decision is unit-testable without a full
+     * {@code wire(...)} stand-up.
+     */
+    static Discord wireDiscord(
+            VoteDiscordSettings settings,
+            KernelPorts kernel,
+            VoteRepository repository,
+            InProcessDomainEventPublisher events) {
+        if (!settings.enabled()) {
+            return new Discord(null, null);
+        }
+        VoteDiscordNotifier notifier = new VoteDiscordNotifier(settings, kernel.log());
+        if (!notifier.active()) {
+            return new Discord(null, null);
+        }
+        events.subscribe(notifier);
+        kernel.log().info("Vote Discord notifications are enabled.");
+        @Nullable AutoCloseable topVoterTask = scheduleDiscordTopVoter(kernel, repository, notifier, settings);
+        return new Discord(notifier, topVoterTask);
+    }
+
+    /** The Discord wiring outcome: the subscribed notifier and the scheduled top-voter handle (both nullable). */
+    record Discord(@Nullable VoteDiscordNotifier notifier, @Nullable AutoCloseable topVoterTask) {}
+
+    /**
+     * Schedule the recurring top-voter Discord embed when the top-voter feature is enabled. The repeating
+     * task runs on the global region; its body hops off-tick before the DB query and the name resolution so
+     * the global tick is never blocked. Returns the cancel handle (closed on stop), or {@code null} when the
+     * top-voter feature is off.
+     */
+    private static @Nullable AutoCloseable scheduleDiscordTopVoter(
+            KernelPorts kernel, VoteRepository repository, VoteDiscordNotifier notifier, VoteDiscordSettings settings) {
+        VoteDiscordSettings.TopVoter topVoter = settings.topVoter();
+        if (!topVoter.enabled()) {
+            return null;
+        }
+        Duration period = Duration.ofMinutes(topVoter.intervalMinutes());
+        return kernel.scheduler()
+                .repeatGlobal(() -> postDiscordTopVoter(kernel, repository, notifier, topVoter), period, period);
+    }
+
+    /** The top-voter task body: query and resolve names off-tick, then fire-and-forget the Discord embed. */
+    private static void postDiscordTopVoter(
+            KernelPorts kernel,
+            VoteRepository repository,
+            VoteDiscordNotifier notifier,
+            VoteDiscordSettings.TopVoter topVoter) {
+        kernel.scheduler().async(() -> {
+            List<com.uxplima.uxmessentials.vote.application.port.VoteRanking> rankings =
+                    repository.topVoters(topVoter.period(), topVoter.limit());
+            notifier.postTopVoter(rankings, uuid -> kernel.playerLookup()
+                    .findByUuid(uuid)
+                    .map(PlayerRef::name)
+                    .orElse(uuid.toString().toLowerCase(java.util.Locale.ROOT)));
+        });
     }
 
     private static void sendIntervalReminders(
@@ -489,6 +560,8 @@ public final class VoteWiring {
      * @param partyEffects the sound/particle consumer to unregister on stop
      * @param partyPublisher the cross-server party-fire publisher to unregister on stop
      * @param reminderTask the repeating reminder task handle (may be null when interval reminders are off)
+     * @param discordNotifier the Discord webhook consumer to unsubscribe on stop (null when Discord is off)
+     * @param discordTopVoterTask the repeating top-voter Discord task handle (null when top-voter is off)
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -499,7 +572,9 @@ public final class VoteWiring {
             InProcessDomainEventPublisher eventBus,
             Consumer<DomainEvent> partyEffects,
             Consumer<DomainEvent> partyPublisher,
-            @Nullable AutoCloseable reminderTask) {
+            @Nullable AutoCloseable reminderTask,
+            @Nullable VoteDiscordNotifier discordNotifier,
+            @Nullable AutoCloseable discordTopVoterTask) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -520,19 +595,28 @@ public final class VoteWiring {
         }
 
         /**
-         * Drop the Votifier handler, the party effects subscriber, the cross-server party publisher, and the
-         * reminder task on disable/reload.
+         * Drop the Votifier handler, the party effects subscriber, the cross-server party publisher, the
+         * reminder task, the Discord webhook subscriber, and the Discord top-voter task on disable/reload.
          */
         public void stop() {
             votifier.unregister();
             eventBus.unsubscribe(partyEffects);
             eventBus.unsubscribe(partyPublisher);
-            if (reminderTask != null) {
-                try {
-                    reminderTask.close();
-                } catch (Exception ignored) {
-                    // ScheduledTask.cancel() does not throw; AutoCloseable.close() may declare it
-                }
+            if (discordNotifier != null) {
+                eventBus.unsubscribe(discordNotifier);
+            }
+            closeQuietly(reminderTask);
+            closeQuietly(discordTopVoterTask);
+        }
+
+        private static void closeQuietly(@Nullable AutoCloseable task) {
+            if (task == null) {
+                return;
+            }
+            try {
+                task.close();
+            } catch (Exception ignored) {
+                // ScheduledTask.cancel() does not throw; AutoCloseable.close() may declare it
             }
         }
     }
