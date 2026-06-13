@@ -21,8 +21,6 @@ class DisplayContentTest {
 
         assertThat(inert.title()).isEmpty();
         assertThat(inert.lines()).isEmpty();
-        assertThat(inert.header()).isEmpty();
-        assertThat(inert.footer()).isEmpty();
         assertThat(inert.worldBlacklist()).isEmpty();
         assertThat(inert.isBlank()).isTrue();
         // A positive cadence so the render timer never busy-spins even with nothing authored.
@@ -35,13 +33,8 @@ class DisplayContentTest {
                 .mapToObj(i -> "<white>line " + i)
                 .collect(Collectors.toList());
 
-        DisplayContent content = new DisplayContent(
-                Optional.of("<gold>Server"),
-                max,
-                List.of("<gray>Welcome"),
-                List.of("<gray>play.example.net"),
-                Duration.ofSeconds(2L),
-                Set.of("world_nether"));
+        DisplayContent content =
+                new DisplayContent(Optional.of("<gold>Server"), max, Duration.ofSeconds(2L), Set.of("world_nether"));
 
         assertThat(content.lines()).hasSize(DisplayContent.MAX_LINES);
         assertThat(content.isBlank()).isFalse();
@@ -53,8 +46,7 @@ class DisplayContentTest {
                 .mapToObj(i -> "line " + i)
                 .collect(Collectors.toList());
 
-        assertThatThrownBy(() -> new DisplayContent(
-                        Optional.empty(), tooMany, List.of(), List.of(), Duration.ofSeconds(1L), Set.of()))
+        assertThatThrownBy(() -> new DisplayContent(Optional.empty(), tooMany, Duration.ofSeconds(1L), Set.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining(String.valueOf(DisplayContent.MAX_LINES));
     }
@@ -67,8 +59,8 @@ class DisplayContentTest {
 
     @Test
     void worldBlacklistMembershipIsQueryable() {
-        DisplayContent content = new DisplayContent(
-                Optional.empty(), List.of(), List.of(), List.of(), Duration.ofSeconds(1L), Set.of("world_the_end"));
+        DisplayContent content =
+                new DisplayContent(Optional.empty(), List.of(), Duration.ofSeconds(1L), Set.of("world_the_end"));
 
         assertThat(content.suppressedIn("world_the_end")).isTrue();
         assertThat(content.suppressedIn("world")).isFalse();
@@ -77,8 +69,7 @@ class DisplayContentTest {
     @Test
     void copiesItsCollectionsSoLaterMutationDoesNotLeakIn() {
         List<String> mutableLines = new java.util.ArrayList<>(List.of("<white>one"));
-        DisplayContent content = new DisplayContent(
-                Optional.empty(), mutableLines, List.of(), List.of(), Duration.ofSeconds(1L), Set.of());
+        DisplayContent content = new DisplayContent(Optional.empty(), mutableLines, Duration.ofSeconds(1L), Set.of());
 
         mutableLines.add("<white>two");
         assertThat(content.lines()).containsExactly("<white>one");
@@ -86,6 +77,6 @@ class DisplayContentTest {
     }
 
     private static DisplayContent content(Duration interval) {
-        return new DisplayContent(Optional.empty(), List.of(), List.of(), List.of(), interval, Collections.emptySet());
+        return new DisplayContent(Optional.empty(), List.of(), interval, Collections.emptySet());
     }
 }

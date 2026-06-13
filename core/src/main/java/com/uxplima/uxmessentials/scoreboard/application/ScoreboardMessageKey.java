@@ -6,9 +6,9 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * The scoreboard context's user-visible message keys. Each constant maps 1:1 to a kebab-case catalog key in
  * {@code messages_<lang>.conf} ({@code SCOREBOARD_SHOWN} ↔ {@code scoreboard.shown}); the constant is the
  * compile-time handle, the catalog holds the text. These are the <em>only</em> localised strings in the context —
- * the {@code /scoreboard} toggle confirmations and the players-only rejection. The sidebar title, sidebar lines, and
- * tablist header/footer are operator-authored MiniMessage content under {@code modules/scoreboard/config.conf},
- * rendered as written and never parity-checked.
+ * the {@code /scoreboard} toggle confirmations and the players-only rejection. The sidebar title and sidebar lines
+ * are operator-authored MiniMessage content under {@code modules/scoreboard/config.conf}, rendered as written and
+ * never parity-checked.
  *
  * <p>Per the i18n contract, a disabled module still ships its keys so the catalog stays whole and the locale-parity
  * guard sees the full {@code en} key set.

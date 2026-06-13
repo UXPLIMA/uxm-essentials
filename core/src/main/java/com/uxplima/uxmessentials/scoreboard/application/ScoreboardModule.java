@@ -14,11 +14,12 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The scoreboard bounded context as a first-class {@link FeatureModule}: a per-player sidebar plus a tablist
- * header/footer, both rendered from operator-authored MiniMessage content under {@code modules/scoreboard/config.conf}
- * through the placeholder pipeline. It owns the single {@code /scoreboard} (alias {@code /sb}) per-player visibility
- * toggle and the self-rescheduling render timer on the {@code Scheduler} port that re-renders every viewer each
- * configured refresh interval; the render/join/quit machinery is Bukkit-facing and lands with the adapter wiring.
+ * The scoreboard bounded context as a first-class {@link FeatureModule}: a per-player sidebar rendered from
+ * operator-authored MiniMessage content under {@code modules/scoreboard/config.conf} through the placeholder
+ * pipeline. It owns the single {@code /scoreboard} (alias {@code /sb}) per-player visibility toggle and the
+ * self-rescheduling render timer on the {@code Scheduler} port that re-renders every viewer each configured refresh
+ * interval; the render/join/quit machinery is Bukkit-facing and lands with the adapter wiring. The tablist
+ * header/footer is a separate {@code tablist} context.
  *
  * <p><b>Ships disabled by default.</b> The sidebar content is operator data, so out of the box this context shows
  * nothing — an operator authors the lines and then flips {@code modules.scoreboard.enabled = true}. The
@@ -28,10 +29,10 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The split between the plugin's own strings and operator content is owned here: the {@code /scoreboard}
  * shown/hidden confirmations are {@code ScoreboardMessageKey}s in both locale catalogs (parity-checked); the sidebar
- * title/lines and tablist header/footer are config-authored content rendered through MiniMessage and never
- * parity-checked. The use case, the render timer, the connection listener, the renderer, and the PDC visibility store
- * are constructed in the adapter wiring once the module has started; the lifecycle bookkeeping here keeps
- * {@code stop()} honest — the render timer observes the running flag and exits cleanly on disable.
+ * title/lines are config-authored content rendered through MiniMessage and never parity-checked. The use case, the
+ * render timer, the connection listener, the renderer, and the PDC visibility store are constructed in the adapter
+ * wiring once the module has started; the lifecycle bookkeeping here keeps {@code stop()} honest — the render timer
+ * observes the running flag and exits cleanly on disable.
  */
 @NullMarked
 public final class ScoreboardModule implements FeatureModule {

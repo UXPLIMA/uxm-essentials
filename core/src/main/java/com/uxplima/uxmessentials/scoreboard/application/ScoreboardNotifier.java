@@ -15,9 +15,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * thread, silently no-opping when they are offline.
  *
  * <p>This notifier carries only {@code MessageKey} content — the plugin's own strings. The operator-authored sidebar
- * title, sidebar lines, and tablist header/footer do <em>not</em> flow through here: the renderer parses them
- * straight from their raw MiniMessage, keeping the parity-checked keys and the unchecked operator content cleanly
- * apart.
+ * title and sidebar lines do <em>not</em> flow through here: the renderer parses them straight from their raw
+ * MiniMessage, keeping the parity-checked keys and the unchecked operator content cleanly apart.
  */
 public final class ScoreboardNotifier {
 
