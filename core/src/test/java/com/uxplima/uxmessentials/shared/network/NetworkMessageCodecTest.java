@@ -20,7 +20,9 @@ class NetworkMessageCodecTest {
                 new HomeChanged("survival-1", OWNER),
                 new WarpChanged("lobby-2", "spawn"),
                 new VaultChanged("survival-1", OWNER, 3),
-                new ServerPing("lobby-2", 1_717_000_000_000L));
+                new ServerPing("lobby-2", 1_717_000_000_000L),
+                new VotePartyFired("survival", 25),
+                new VoteCounterChanged("lobby"));
     }
 
     @ParameterizedTest

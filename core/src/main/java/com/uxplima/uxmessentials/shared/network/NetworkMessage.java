@@ -18,7 +18,8 @@ package com.uxplima.uxmessentials.shared.network;
  * changed on me, drop your cached copy" so the peer re-reads the fresh row on its next access. It never
  * carries a full aggregate to be written blindly — that would race the DB and risk a lost update.
  */
-public sealed interface NetworkMessage permits BalanceChanged, HomeChanged, WarpChanged, VaultChanged, ServerPing {
+public sealed interface NetworkMessage
+        permits BalanceChanged, HomeChanged, WarpChanged, VaultChanged, ServerPing, VotePartyFired, VoteCounterChanged {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -36,7 +37,9 @@ public sealed interface NetworkMessage permits BalanceChanged, HomeChanged, Warp
         HOME_CHANGED(2),
         WARP_CHANGED(3),
         VAULT_CHANGED(4),
-        SERVER_PING(5);
+        SERVER_PING(5),
+        VOTE_PARTY_FIRED(6),
+        VOTE_COUNTER_CHANGED(7);
 
         private final byte wireTag;
 

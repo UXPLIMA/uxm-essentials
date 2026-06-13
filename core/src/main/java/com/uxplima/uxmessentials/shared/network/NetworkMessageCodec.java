@@ -81,6 +81,10 @@ public final class NetworkMessageCodec {
                 out.writeInt(vault.vaultIndex());
             }
             case ServerPing ping -> out.writeLong(ping.epochMillis());
+            case VotePartyFired party -> out.writeInt(party.threshold());
+            case VoteCounterChanged counter -> {
+                // origin already written above; the counter frame carries no further body.
+            }
         }
     }
 
@@ -92,6 +96,8 @@ public final class NetworkMessageCodec {
             case WARP_CHANGED -> new WarpChanged(origin, in.readUTF());
             case VAULT_CHANGED -> new VaultChanged(origin, readUuid(in), in.readInt());
             case SERVER_PING -> new ServerPing(origin, in.readLong());
+            case VOTE_PARTY_FIRED -> new VotePartyFired(origin, in.readInt());
+            case VOTE_COUNTER_CHANGED -> new VoteCounterChanged(origin);
         };
     }
 
