@@ -139,7 +139,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
             return RecordOutcome.SKIPPED;
         }
         // The mapper carried each EssentialsX item as its raw descriptor; the bukkit side resolves it to a stack
-        // and re-encodes it into the kit context's own serialized form, exactly as a live /createkit would. An
+        // and re-encodes it into the kit context's own serialized form, exactly as a live /kit create would. An
         // item whose material does not resolve on this server is dropped so one bad line never fails the kit.
         kits.save(raw.withItems(convertItems(raw.items())));
         return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;

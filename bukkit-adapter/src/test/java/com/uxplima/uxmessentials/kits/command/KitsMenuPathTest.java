@@ -19,7 +19,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
-import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitsCommand;
+import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommand;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
@@ -64,12 +64,14 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /kits} browse menu through the real Brigadier {@code /kits} node and uxmLib's
- * {@code PaginatedGui}. Bare {@code /kits} opens a paginated menu whose content slots hold one display icon per
- * kit the player may claim — backed by a fake {@link KitRepository} of three kits — proving the read-only menu
- * renders one icon per available kit. {@code /kits list} keeps the chat path, asserted by the {@code KIT_LIST}
- * keys it produces. The scheduler is a synchronous double so the entity-bound open runs inline, and uxmLib's
- * menu listener is installed against a mock plugin (reset on teardown) exactly as the vault GUI test does.
+ * MockBukkit coverage of the kits browse menu through the real Brigadier {@code /kit list} subcommand and
+ * uxmLib's {@code PaginatedGui}. {@code /kit list} opens a paginated menu whose content slots hold one display
+ * icon per kit the player may claim — backed by a fake {@link KitRepository} of three kits — proving the
+ * read-only menu renders one icon per available kit. In {@code chat} display mode {@code /kit list} prints the
+ * clickable chat list instead, asserted by the {@code KIT_LIST} keys it produces and the absence of any open
+ * inventory. Per-subcommand permission gating is asserted directly off the built node's {@code .requires(...)}.
+ * The scheduler is a synchronous double so the entity-bound open runs inline, and uxmLib's menu listener is
+ * installed against a mock plugin (reset on teardown) exactly as the vault GUI test does.
  */
 class KitsMenuPathTest {
 
@@ -99,11 +101,11 @@ class KitsMenuPathTest {
     }
 
     @Test
-    void bareKitsOpensAPaginatedMenuWithOneIconPerAvailableKit() {
+    void kitListOpensAPaginatedMenuWithOneIconPerAvailableKit() {
         CommandDispatcher<CommandSourceStack> dispatcher =
                 registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
-        execute(dispatcher, "kits");
+        execute(dispatcher, "kit list");
 
         Inventory menu = player.getOpenInventory().getTopInventory();
         assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
@@ -112,25 +114,78 @@ class KitsMenuPathTest {
     }
 
     @Test
-    void kitsListDrivesTheChatPath() {
-        CommandDispatcher<CommandSourceStack> dispatcher =
-                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
-
-        execute(dispatcher, "kits list");
-
-        assertThat(sink.keys).contains(KitsMessageKey.KIT_LIST_HEADER);
-    }
-
-    @Test
-    void bareKitsInChatModeListsInChatAndOpensNoInventory() {
+    void kitListInChatModeListsInChatAndOpensNoInventory() {
         CommandDispatcher<CommandSourceStack> dispatcher =
                 registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.CHAT);
 
-        execute(dispatcher, "kits");
+        execute(dispatcher, "kit list");
 
         assertThat(sink.keys).contains(KitsMessageKey.KIT_LIST_HEADER);
         // Chat mode opens no inventory at all, so the player has no top inventory to hold a menu.
         assertThat(player.getOpenInventory().getTopInventory()).isNull();
+    }
+
+    @Test
+    void rootRequiresTheUsePermission() {
+        var command = command();
+        assertThat(command.build().getRequirement().test(sourceFor("uxmessentials.kit.use")))
+                .isTrue();
+    }
+
+    @Test
+    void showSubcommandRequiresThePreviewPermission() {
+        assertCanUse("show", "uxmessentials.kit.preview", "uxmessentials.kit.use");
+    }
+
+    @Test
+    void createSubcommandRequiresTheEditPermission() {
+        assertCanUse("create", "uxmessentials.kit.edit", "uxmessentials.kit.use");
+    }
+
+    @Test
+    void delSubcommandRequiresTheEditPermission() {
+        assertCanUse("del", "uxmessentials.kit.edit", "uxmessentials.kit.use");
+    }
+
+    @Test
+    void editorSubcommandRequiresTheEditPermission() {
+        assertCanUse("editor", "uxmessentials.kit.edit", "uxmessentials.kit.use");
+    }
+
+    @Test
+    void resetSubcommandRequiresTheResetPermission() {
+        assertCanUse("reset", "uxmessentials.kit.reset", "uxmessentials.kit.use");
+    }
+
+    /**
+     * Asserts the {@code subcommand} literal under {@code /kit} is reachable only with {@code grantsAccess}
+     * and not with {@code deniedNode} alone — proving Brigadier {@code .requires(...)} gates the subcommand by
+     * its own permission rather than the root's.
+     */
+    private void assertCanUse(String subcommand, String grantsAccess, String deniedNode) {
+        var node = command().build().getChild(subcommand);
+        assertThat(node).as("subcommand '%s' exists under /kit", subcommand).isNotNull();
+        assertThat(node.canUse(sourceFor(grantsAccess)))
+                .as("'%s' should be usable with %s", subcommand, grantsAccess)
+                .isTrue();
+        assertThat(node.canUse(sourceFor(deniedNode)))
+                .as("'%s' should not be usable with only %s", subcommand, deniedNode)
+                .isFalse();
+    }
+
+    private KitCommand command() {
+        return new KitCommand(
+                services,
+                new KeyMessages(),
+                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI,
+                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
+    }
+
+    /** A command source for a fresh player holding exactly {@code node} (and no op). */
+    private CommandSourceStack sourceFor(String node) {
+        PlayerMock holder = server.addPlayer();
+        holder.addAttachment(plugin, node, true);
+        return CommandSourceStackMock.from(holder);
     }
 
     /** Non-air icons in the content rows (slots 0..44), excluding the reserved bottom-row nav buttons. */
@@ -148,7 +203,7 @@ class KitsMenuPathTest {
     private CommandDispatcher<CommandSourceStack> registerCommand(
             com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new KitsCommand(services, new KeyMessages(), () -> mode).build());
+        dispatcher.getRoot().addChild(new KitCommand(services, new KeyMessages(), () -> mode, () -> mode).build());
         return dispatcher;
     }
 

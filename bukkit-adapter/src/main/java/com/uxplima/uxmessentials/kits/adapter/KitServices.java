@@ -29,18 +29,18 @@ import org.jspecify.annotations.Nullable;
  * keeps no other adapter-side runtime state, so there is nothing here to drain on stop beyond dropping this
  * holder.
  *
- * @param claimKit {@code /kit}
- * @param listKits {@code /kits}
- * @param showKit {@code /showkit}
- * @param createKit {@code /createkit}
- * @param delKit {@code /delkit}
- * @param kitEditor {@code /kiteditor}
- * @param kitReset {@code /kitreset}
- * @param kitMenu the read-only {@code /kits} browse menu the bare {@code /kits} command opens
- * @param kitPreview the read-only {@code /showkit} preview menu the GUI preview path opens
- * @param kitEditorView the editable {@code /kiteditor} window the GUI editor path opens
- * @param kitManagerView the admin {@code /kiteditor} manager GUI
- * @param players name → ref resolution for the {@code /kit <name> <player>} and {@code /kitreset} targets
+ * @param claimKit {@code /kit <name>}
+ * @param listKits {@code /kit list}
+ * @param showKit {@code /kit show}
+ * @param createKit {@code /kit create}
+ * @param delKit {@code /kit del}
+ * @param kitEditor {@code /kit editor}
+ * @param kitReset {@code /kit reset}
+ * @param kitMenu the read-only browse menu {@code /kit list} opens
+ * @param kitPreview the read-only preview menu the {@code /kit show} GUI path opens
+ * @param kitEditorView the editable window the {@code /kit editor} GUI path opens
+ * @param kitManagerView the admin {@code /kit editor} manager GUI
+ * @param players name → ref resolution for the {@code /kit <name> <player>} and {@code /kit reset} targets
  */
 @NullMarked
 public record KitServices(

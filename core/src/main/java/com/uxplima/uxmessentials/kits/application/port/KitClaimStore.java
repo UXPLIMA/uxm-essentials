@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * <p>This is intentionally narrow and separate from the shared {@code Cooldowns} port: cooldowns rate-limit
  * a repeatable kit (a "ready-at" timestamp that expires), while a one-time stamp is a permanent
  * "already-claimed" mark with no expiry. A kit can be both — rate-limited and one-time — and the two gates
- * are checked independently. The {@code reset} operations back {@code /kitreset}, clearing a player's
+ * are checked independently. The {@code reset} operations back {@code /kit reset}, clearing a player's
  * stamps so they may claim again.
  *
  * <p>An offline player has no PDC to read, so {@link #hasClaimed} reads {@code false} and {@link #markClaimed}

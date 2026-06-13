@@ -11,12 +11,12 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /createkit <name>}: define a new kit from the staff member's current inventory (the adapter
+ * {@code /kit create <name>}: define a new kit from the staff member's current inventory (the adapter
  * serializes the held items into the {@link KitDefinition} before calling here). A new id is stored as a new
  * kit and persisted to its own {@code modules/kits/kits/<id>.conf} file; an id a kit already exists under is
  * refused with
  * {@link KitError#ALREADY_EXISTS} so a create never silently clobbers a curated kit (that is what
- * {@code /kiteditor} is for). The operator-only permission is enforced at the adapter gate.
+ * {@code /kit editor} is for). The operator-only permission is enforced at the adapter gate.
  */
 public final class CreateKit {
 

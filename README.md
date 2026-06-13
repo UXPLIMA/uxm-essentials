@@ -21,7 +21,8 @@ re-worded or recoloured, and every command can be renamed, aliased or disabled f
   Sharing and staff tools hang off the same command: `/home visit <player>`, `/home invite <player>`,
   `/home uninvite <player>`, and `/home admin <player> …` for moderators.
 - **In-game menus** for kits, warps and homes — click to claim, teleport, or manage — with the
-  layout (rows, icons) editable from config.
+  layout (rows, icons) editable from config. Kit tooling hangs off the same command: `/kit list`,
+  `/kit show <name>`, and `/kit create|del|editor|reset …` for operators.
 - **Real economy**: balances are database-backed (they survive world rollbacks, never the PDC),
   multi-currency-capable, with `/pay`, `/baltop`, `/worth`, `/sell`, a Vault/Treasury provider and
   per-rank limits via numbered permission nodes.

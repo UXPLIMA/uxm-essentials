@@ -10,13 +10,13 @@ import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
  */
 public enum KitError {
 
-    /** An id no kit exists under: {@code /kit}, {@code /delkit}, {@code /kiteditor}, {@code /showkit}. */
+    /** An id no kit exists under: {@code /kit}, {@code /kit del}, {@code /kit editor}, {@code /kit show}. */
     NOT_FOUND(KitsMessageKey.KIT_NOT_FOUND),
 
-    /** {@code /createkit} for an id a kit already exists under. */
+    /** {@code /kit create} for an id a kit already exists under. */
     ALREADY_EXISTS(KitsMessageKey.KIT_ALREADY_EXISTS),
 
-    /** No kits are defined at all when one was required ({@code /kits} renders its own empty notice). */
+    /** No kits are defined at all when one was required ({@code /kit list} renders its own empty notice). */
     NONE_DEFINED(KitsMessageKey.KIT_NONE),
 
     /** The player lacks the kit's required permission (the per-kit node). */

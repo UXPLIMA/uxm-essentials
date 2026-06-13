@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * {@code /kits}: list the kits a player may claim. The list is filtered to the kits the player can actually
+ * {@code /kit list}: list the kits a player may claim. The list is filtered to the kits the player can actually
  * obtain — those whose per-kit permission they hold (a kit not gated behind a permission is always shown) and
  * which they have not already consumed if the kit is one-time. A one-time kit the player has claimed is
  * omitted entirely (§15.5), so the list never advertises a kit the player can no longer take.
@@ -38,7 +38,7 @@ public final class ListKits {
     /**
      * The kits {@code viewer} may claim, in catalog order, with no side effect — a one-time kit they have
      * already consumed and a permission-gated kit they lack the node for are dropped. This is the same filter
-     * the chat {@link #list} renders; the {@code /kits} browse menu calls this directly so the GUI and the
+     * the chat {@link #list} renders; the {@code /kit list} browse menu calls this directly so the GUI and the
      * text list never disagree on what a player may take.
      */
     public List<KitDefinition> available(PlayerRef viewer) {

@@ -110,7 +110,7 @@ abstract class KitCommandSupport {
     /**
      * A kit-id string argument (named {@code argName}) that completes against the kits the invoking player may
      * claim. The kit catalog is held in memory, so the per-keystroke lookup is non-blocking; it is the same
-     * permission/consumed filter {@code /kits} renders, so a player never sees a kit they cannot take.
+     * permission/consumed filter {@code /kit list} renders, so a player never sees a kit they cannot take.
      */
     final RequiredArgumentBuilder<CommandSourceStack, String> kitNameArgument(String argName) {
         return Commands.argument(argName, StringArgumentType.word())

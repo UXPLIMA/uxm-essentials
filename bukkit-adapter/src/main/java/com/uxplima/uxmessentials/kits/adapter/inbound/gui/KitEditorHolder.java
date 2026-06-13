@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The {@link InventoryHolder} that tags a {@code /kiteditor} window, so {@link KitEditorListener} can recognise a
+ * The {@link InventoryHolder} that tags a {@code /kit editor} window, so {@link KitEditorListener} can recognise a
  * close as belonging to one of these editable views (and never to a vanilla container the editor happens to have
  * open) and read the kit being edited and who is editing it. The holder carries the kit's definition as it stood
  * when the window opened, so the close handler can rebuild the replacement from the window's items while

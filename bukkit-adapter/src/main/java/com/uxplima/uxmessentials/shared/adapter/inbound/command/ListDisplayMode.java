@@ -6,10 +6,10 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 
 /**
- * How a bare list command ({@code /warps}, {@code /homes}, {@code /kits}) presents its entries to a player:
- * the paginated browse {@link #GUI} (the historical default) or the clickable {@link #CHAT} list (the same
- * output as the explicit {@code list} subcommand). An operator picks per module via the {@code list-display}
- * key; an unrecognised value falls back to {@link #GUI} so a typo never disables the command.
+ * How a list command ({@code /warp list}, {@code /home}, {@code /kit list}) presents its entries to a player:
+ * the paginated browse {@link #GUI} (the historical default) or the clickable {@link #CHAT} list. An operator
+ * picks per module via the {@code list-display} key; an unrecognised value falls back to {@link #GUI} so a
+ * typo never disables the command.
  *
  * <p>The mode is read from the live {@link ConfigStore} at command-execution time, not cached at construction,
  * so {@code /uxmess reload <module>} takes effect without a restart (CLAUDE.md atomic-reload rule).
@@ -29,7 +29,7 @@ public enum ListDisplayMode {
     /**
      * Resolve the mode named at {@code key} in {@code config}, defaulting to {@link #GUI}. The same {@code gui}
      * | {@code chat} vocabulary is reused by sibling knobs such as the kits context's {@code showkit-display},
-     * which selects whether {@code /showkit} previews a kit in a GUI or in chat.
+     * which selects whether {@code /kit show} previews a kit in a GUI or in chat.
      */
     public static ListDisplayMode from(ConfigStore config, String key) {
         Objects.requireNonNull(config, "config");

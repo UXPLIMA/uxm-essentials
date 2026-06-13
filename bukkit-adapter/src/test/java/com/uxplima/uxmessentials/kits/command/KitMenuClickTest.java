@@ -23,7 +23,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
-import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitsCommand;
+import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommand;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
@@ -68,8 +68,8 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage that a {@code /kits} menu icon click claims that kit through the same {@link ClaimKit}
- * use case the {@code /kit} command drives. The bare {@code /kits} node opens the paginated menu, then a
+ * MockBukkit coverage that a kits menu icon click claims that kit through the same {@link ClaimKit}
+ * use case the {@code /kit} command drives. The {@code /kit list} subcommand opens the paginated menu, then a
  * left-click on content slot 0 (the first kit, {@code starter}) is fired through the installed uxmLib menu
  * listener. Because the real {@link ClaimKit} sends {@code KIT_CLAIMED} for the granted kit, the test asserts
  * the click claimed exactly the clicked kit: the recording granter saw one grant and {@code KIT_CLAIMED}
@@ -105,7 +105,7 @@ class KitMenuClickTest {
     @Test
     void clickingAKitIconClaimsThatKit() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-        execute(dispatcher, "kits");
+        execute(dispatcher, "kit list");
         Inventory menu = player.getOpenInventory().getTopInventory();
         assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
 
@@ -121,7 +121,7 @@ class KitMenuClickTest {
     @Test
     void clickingAnEmptySlotClaimsNothing() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-        execute(dispatcher, "kits");
+        execute(dispatcher, "kit list");
 
         fireClick(44); // a content row slot past the three kits, so nothing is bound there
 
@@ -132,7 +132,7 @@ class KitMenuClickTest {
     @Test
     void rightClickingAKitIconOpensThePreviewWithoutClaiming() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-        execute(dispatcher, "kits");
+        execute(dispatcher, "kit list");
 
         fireClick(0, ClickType.RIGHT); // starter — preview is enabled by default
 
@@ -149,7 +149,7 @@ class KitMenuClickTest {
     @Test
     void rightClickingAPreviewDisabledKitDoesNotOpenThePreview() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-        execute(dispatcher, "kits");
+        execute(dispatcher, "kit list");
 
         fireClick(3, ClickType.RIGHT); // mystery — preview disabled, so the browse menu stays open
 
@@ -175,9 +175,10 @@ class KitMenuClickTest {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher
                 .getRoot()
-                .addChild(new KitsCommand(
+                .addChild(new KitCommand(
                                 services,
                                 new KeyMessages(),
+                                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI,
                                 () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI)
                         .build());
         return dispatcher;

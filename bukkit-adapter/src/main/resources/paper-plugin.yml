@@ -267,10 +267,10 @@ permissions:
   # not enumerated here; only the base nodes are declared. Per-kit permission gating is data-driven in each
   # kit's modules/kits/kits/<id>.conf file, and per-player claim/cooldown state lives in PDC.
   uxmessentials.kit.use:
-    description: '/kit and /kits to claim a kit and list the kits you may claim.'
+    description: '/kit <name> to claim a kit and /kit list to list the kits you may claim.'
     default: true
   uxmessentials.kit.preview:
-    description: '/showkit <name> to preview a kit''s contents without claiming it.'
+    description: '/kit show <name> to preview a kit''s contents without claiming it.'
     default: true
   uxmessentials.kit.cooldown.bypass:
     description: 'Skip kit cooldowns and re-claim one-time kits.'
@@ -279,10 +279,10 @@ permissions:
     description: '/kit <name> <player> to give a kit to another player.'
     default: op
   uxmessentials.kit.edit:
-    description: '/createkit, /delkit, /kiteditor to define, remove and edit kit contents.'
+    description: '/kit create, /kit del, /kit editor to define, remove and edit kit contents.'
     default: op
   uxmessentials.kit.reset:
-    description: '/kitreset <player> [kit] to clear a player''s claim/cooldown stamps.'
+    description: '/kit reset <player> [kit] to clear a player''s claim/cooldown stamps.'
     default: op
   # playerstate context (docs/permissions.md "Playerstate"). Toggle/effect verbs over an immutable
   # PlayerStateSnapshot reconciled on the owning region thread. Each verb has its own base node; the single

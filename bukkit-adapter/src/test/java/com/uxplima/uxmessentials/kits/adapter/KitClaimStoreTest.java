@@ -29,7 +29,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * {@link PdcKitClaims} one-time-claim store (the PDC stamp survives across reads, a per-kit reset clears one
  * stamp, {@code resetAll} clears every stamp), the {@link KitItemCodec} round-trip (an {@code ItemStack}
  * serialises and deserialises back with its amount), and the {@link BukkitKitGranter} delivering a kit into a
- * player's inventory. These are the real adapters the {@code /kit} and {@code /kitreset} commands drive.
+ * player's inventory. These are the real adapters the {@code /kit} and {@code /kit reset} commands drive.
  */
 class KitClaimStoreTest {
 

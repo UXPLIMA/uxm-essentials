@@ -28,8 +28,8 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  * The {@link KitRepository} backed by one HOCON file per kit under {@code modules/kits/kits/}: each kit lives
  * in its own {@code <id>.conf}, whose root node is the kit (cooldown, one-time, permission, cost, items).
  * Definitions are loaded once on construction into an immutable id-keyed map held in an {@link AtomicReference},
- * so reads (the hot {@code /kit} / {@code /kits} paths) are lock-free against the snapshot they fetch. The rare
- * authoring operations ({@code /createkit}, {@code /delkit}, {@code /kiteditor}) touch only the one kit's file
+ * so reads (the hot {@code /kit} / {@code /kit list} paths) are lock-free against the snapshot they fetch. The rare
+ * authoring operations ({@code /kit create}, {@code /kit del}, {@code /kit editor}) touch only the one kit's file
  * and then swap the in-memory snapshot, so the catalog and the folder never drift.
  *
  * <p>Parsing each file is delegated to {@link KitCodec}; a malformed or unreadable file is logged and skipped

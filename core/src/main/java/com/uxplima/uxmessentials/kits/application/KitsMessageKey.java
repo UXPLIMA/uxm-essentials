@@ -21,7 +21,7 @@ public enum KitsMessageKey implements MessageKey {
     KIT_LIST_ENTRY("kit.list.entry"),
     KIT_LIST_EMPTY("kit.list.empty"),
 
-    // browse menu (/kits)
+    // browse menu (/kit list)
     KIT_MENU_TITLE("kit.menu.title"),
     KIT_MENU_ENTRY_NAME("kit.menu.entry.name"),
     KIT_MENU_LORE_COOLDOWN("kit.menu.lore.cooldown"),
@@ -40,19 +40,19 @@ public enum KitsMessageKey implements MessageKey {
     KIT_MENU_CATEGORY_NAME("kit.menu.category.name"),
     KIT_MENU_CATEGORY_LORE("kit.menu.category.lore"),
 
-    // preview (/showkit)
+    // preview (/kit show)
     KIT_PREVIEW_HEADER("kit.preview.header"),
     KIT_PREVIEW_ENTRY("kit.preview.entry"),
     KIT_PREVIEW_GUI_TITLE("kit.preview.gui-title"),
 
-    // authoring (/createkit /delkit /kiteditor)
+    // authoring (/kit create /kit del /kit editor)
     KIT_CREATED("kit.created"),
     KIT_DELETED("kit.deleted"),
     KIT_EDIT_OPENED("kit.edit.opened"),
     KIT_EDITOR_GUI_TITLE("kit.editor.gui-title"),
     KIT_EDITOR_SAVED("kit.editor.saved"),
 
-    // reset (/kitreset)
+    // reset (/kit reset)
     KIT_RESET("kit.reset"),
     KIT_RESET_ALL("kit.reset-all"),
 
@@ -74,7 +74,7 @@ public enum KitsMessageKey implements MessageKey {
     KIT_REQUIREMENT_MET("kit.requirement.met"),
     KIT_REQUIREMENT_UNMET("kit.requirement.unmet"),
 
-    // kit manager GUI (/kiteditor)
+    // kit manager GUI (/kit editor)
     KIT_EDITOR_MANAGER_TITLE("kit.editor.manager-title"),
     KIT_EDITOR_CREATE_BUTTON_NAME("kit.editor.create-button.name"),
     KIT_EDITOR_CREATE_BUTTON_LORE("kit.editor.create-button.lore"),

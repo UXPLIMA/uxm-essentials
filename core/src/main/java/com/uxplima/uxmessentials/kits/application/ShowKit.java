@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 
 /**
- * {@code /showkit <name>}: preview a kit's contents without claiming it ({@code uxmessentials.kit.preview}).
+ * {@code /kit show <name>}: preview a kit's contents without claiming it ({@code uxmessentials.kit.preview}).
  * The kit is resolved by id and its item list is pushed to the viewer as a header plus one entry per stack,
  * so a player can see what a kit grants before spending its cooldown (or its cost). An id no kit exists under
  * is refused with {@link KitError#NOT_FOUND}.

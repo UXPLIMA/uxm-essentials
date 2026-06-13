@@ -9,7 +9,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The {@link InventoryHolder} that tags a {@code /showkit} preview menu, so {@link KitPreviewListener} can
+ * The {@link InventoryHolder} that tags a {@code /kit show} preview menu, so {@link KitPreviewListener} can
  * recognise a click or close as belonging to one of these read-only views (and never to a vanilla container the
  * viewer happens to have open). The holder is created first and the menu is built against it; {@link #attach}
  * then stores the built inventory so {@link #getInventory()} can answer it, the way Bukkit's holder contract

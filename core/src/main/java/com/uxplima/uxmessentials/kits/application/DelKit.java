@@ -11,10 +11,10 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /delkit <name>}: remove a kit definition, freeing its id for reuse. An id no kit exists under is
+ * {@code /kit del <name>}: remove a kit definition, freeing its id for reuse. An id no kit exists under is
  * rejected with {@link KitError#NOT_FOUND}; a successful delete removes the entry from the config-backed
  * catalog. Per-player one-time stamps for the deleted kit are left in place — they are harmless dangling PDC
- * values keyed by a kit that no longer exists, and {@code /kitreset} can clear them if a kit is later
+ * values keyed by a kit that no longer exists, and {@code /kit reset} can clear them if a kit is later
  * recreated under the same id. The operator-only permission is enforced at the adapter gate.
  */
 public final class DelKit {

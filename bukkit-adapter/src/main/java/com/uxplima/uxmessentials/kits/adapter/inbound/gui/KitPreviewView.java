@@ -19,7 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Opens {@code /showkit} as a read-only managed menu: the kit's stacks laid out in their definition-order slots
+ * Opens {@code /kit show} as a read-only managed menu: the kit's stacks laid out in their definition-order slots
  * ({@link KitGuiLayout}), with the trailing slots padded by a gray-glass filler. The menu is sized to the
  * smallest whole number of rows that holds the kit (capped at a 54-slot double chest). It is read-only — every
  * click, drag, and hotbar swap is cancelled by {@link KitPreviewListener}, recognised by the menu's

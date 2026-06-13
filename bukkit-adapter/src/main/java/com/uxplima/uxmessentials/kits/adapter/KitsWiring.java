@@ -265,7 +265,7 @@ public final class KitsWiring {
 
     /**
      * Everything the kits module contributes once wired: the Brigadier commands, the Bukkit listeners (the
-     * read-only {@code /showkit} preview guard and the {@code /kiteditor} window's save-on-close handler), the
+     * read-only {@code /kit show} preview guard and the {@code /kit editor} window's save-on-close handler), the
      * {@link KitEditorView} held so {@link #stop()} can flush every still-open editor on disable, plus the
      * {@link KitRepository} the {@code kit_cooldown_<id>} placeholder resolves a kit's cooldown tier against.
      * The kit catalog is config-backed, so the only durable-while-open state is the set of open editor windows.
@@ -292,7 +292,7 @@ public final class KitsWiring {
         }
 
         /**
-         * Save every still-open {@code /kiteditor} window back to its kit and clear any pending chat prompt.
+         * Save every still-open {@code /kit editor} window back to its kit and clear any pending chat prompt.
          * Called on module stop.
          */
         public void stop() {

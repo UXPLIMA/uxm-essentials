@@ -23,7 +23,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Opens {@code /kiteditor} as an editable managed window seeded with the kit's current stacks at their
+ * Opens {@code /kit editor} as an editable managed window seeded with the kit's current stacks at their
  * definition-order slots ({@link KitGuiLayout#seedEditable}), and on close overwrites the kit's items from the
  * window's final contents through the {@link KitEditor#save} use case. The window is a private six-row chest the
  * editor drags items into and out of freely; the kit's stored data and the editor's own live inventory are never

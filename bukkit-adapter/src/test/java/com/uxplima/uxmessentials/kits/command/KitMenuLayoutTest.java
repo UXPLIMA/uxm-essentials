@@ -50,7 +50,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * Proves the {@code /kits} menu honours its injected {@link GuiLayout}: a layout with three rows opens a
+ * Proves the {@code /kit list} menu honours its injected {@link GuiLayout}: a layout with three rows opens a
  * 27-slot menu (so the conf's row count drives the geometry), the unchanged default still opens 54 slots, and
  * the title resolved from {@link KitsMessageKey#KIT_MENU_TITLE} is preserved regardless of the layout, so the
  * externalised layout never disturbs the catalog-driven title.

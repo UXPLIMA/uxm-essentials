@@ -35,7 +35,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the editable {@code /kiteditor} window: the window is seeded with the kit's current
+ * MockBukkit coverage of the editable {@code /kit editor} window: the window is seeded with the kit's current
  * stacks at their definition-order slots; the editor's edit to the private window copy is encoded back into the
  * kit on close, and nothing is duplicated because the kit is overwritten wholesale from the window's final
  * contents (replace, never append) — an item added in the window lands once and an item removed disappears.

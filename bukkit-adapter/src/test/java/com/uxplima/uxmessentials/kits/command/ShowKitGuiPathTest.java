@@ -24,7 +24,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
-import com.uxplima.uxmessentials.kits.adapter.inbound.command.ShowKitCommand;
+import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommand;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
@@ -69,12 +69,12 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /showkit} GUI preview path through the real Brigadier {@code /showkit} node.
- * In {@code gui} mode the command opens a read-only managed menu sized to fit the kit, with the kit's stacks laid
- * out at their definition-order slots and every interaction cancelled by {@link KitPreviewListener}, so a player
- * can inspect a kit's contents without taking anything. In {@code chat} mode the command opens no inventory and
- * sends the chat preview lines instead. The scheduler is a synchronous double so the entity-bound open runs
- * inline, mirroring the {@code /kits} menu path test.
+ * MockBukkit coverage of the {@code /kit show} GUI preview path through the real Brigadier {@code /kit} node.
+ * In {@code gui} mode the subcommand opens a read-only managed menu sized to fit the kit, with the kit's stacks
+ * laid out at their definition-order slots and every interaction cancelled by {@link KitPreviewListener}, so a
+ * player can inspect a kit's contents without taking anything. In {@code chat} mode the subcommand opens no
+ * inventory and sends the chat preview lines instead. The scheduler is a synchronous double so the entity-bound
+ * open runs inline, mirroring the {@code /kit list} menu path test.
  */
 class ShowKitGuiPathTest {
 
@@ -104,7 +104,7 @@ class ShowKitGuiPathTest {
     void guiModeOpensAReadOnlyMenuHoldingTheKitItems() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.GUI);
 
-        execute(dispatcher, "showkit starter");
+        execute(dispatcher, "kit show starter");
 
         Inventory menu = player.getOpenInventory().getTopInventory();
         assertThat(menu).isNotNull();
@@ -117,7 +117,7 @@ class ShowKitGuiPathTest {
     @Test
     void everyClickInTheGuiPreviewIsCancelled() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.GUI);
-        execute(dispatcher, "showkit starter");
+        execute(dispatcher, "kit show starter");
         InventoryView view = player.getOpenInventory();
 
         InventoryClickEvent click = new InventoryClickEvent(
@@ -131,7 +131,7 @@ class ShowKitGuiPathTest {
     void chatModeSendsTheChatLinesAndOpensNothing() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.CHAT);
 
-        execute(dispatcher, "showkit starter");
+        execute(dispatcher, "kit show starter");
 
         assertThat(sink.keys).contains(KitsMessageKey.KIT_PREVIEW_HEADER);
         assertThat(sink.keys).contains(KitsMessageKey.KIT_PREVIEW_ENTRY);
@@ -140,7 +140,10 @@ class ShowKitGuiPathTest {
 
     private CommandDispatcher<CommandSourceStack> registerCommand(ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new ShowKitCommand(services, new KeyMessages(), () -> mode).build());
+        // The mode under test drives /kit show's preview presentation; the list presentation is irrelevant here.
+        dispatcher
+                .getRoot()
+                .addChild(new KitCommand(services, new KeyMessages(), () -> ListDisplayMode.GUI, () -> mode).build());
         return dispatcher;
     }
 

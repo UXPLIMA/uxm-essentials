@@ -35,7 +35,7 @@ import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Opens the read-only {@code /kits} browse menu as a uxmLib {@link PaginatedGui}: one display icon per kit the
+ * Opens the read-only {@code /kit list} browse menu as a uxmLib {@link PaginatedGui}: one display icon per kit the
  * player may claim, paged through the menu's content slots with previous/next buttons pinned in the reserved
  * bottom row. The kit list is the {@code ListKits.available} filter the chat list also uses, so the menu never
  * advertises a kit the player can no longer take. Each icon shows the kit's name and its cost/cooldown/one-time

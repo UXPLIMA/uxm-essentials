@@ -28,7 +28,7 @@ import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Builds the display icons the {@code /kits} browse menu shows — one per kit and one per category — resolving
+ * Builds the display icons the {@code /kit list} browse menu shows — one per kit and one per category — resolving
  * each icon's player-relative name, material, and lore against the viewer's permission, cooldown, one-time, and
  * affordability state. The renderer holds no menu or scheduler state: it reads the kit/category and the viewer
  * and returns an {@link ItemStack}, so it is a pure presentation collaborator the menu view delegates to. Every

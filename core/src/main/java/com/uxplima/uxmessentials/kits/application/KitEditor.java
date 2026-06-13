@@ -13,17 +13,17 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /kiteditor <name>}: edit an existing kit's contents in-game ({@code uxmessentials.kit.edit}). The
+ * {@code /kit editor <name>}: edit an existing kit's contents in-game ({@code uxmessentials.kit.edit}). The
  * v1 surface is a re-define: the adapter loads the kit so the staff member can inspect it, then overwrites
  * its items from the current inventory through {@link #redefine}, preserving the kit's id, cooldown,
  * one-time flag, permission flag, and cost. An id no kit exists under is refused with
- * {@link KitError#NOT_FOUND} — editing is for curated kits, creating a new one is {@code /createkit}.
+ * {@link KitError#NOT_FOUND} — editing is for curated kits, creating a new one is {@code /kit create}.
  *
  * <p>The richer GUI editor (drag-and-drop slot editing) builds on the same seam: {@link #open} is the read
  * half (confirming the kit exists and returning it for the adapter to present in a window), and {@link #save}
  * is the write half the editor calls on close, overwriting the kit's items from the window contents the adapter
  * encoded while preserving every other kit setting. The chat-driven {@link #redefine} keeps the legacy
- * live-inventory re-define for the {@code /kiteditor <name> save} subcommand.
+ * live-inventory re-define for the {@code /kit editor <name> save} subcommand.
  */
 public final class KitEditor {
 

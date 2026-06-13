@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /kitreset <player> [kit]}: clear a player's one-time-claim stamps so they may claim again
+ * {@code /kit reset <player> [kit]}: clear a player's one-time-claim stamps so they may claim again
  * ({@code uxmessentials.kit.reset}). With a kit id, only that kit's stamp is cleared; without one, every
  * one-time stamp the player holds is cleared. A named kit that does not exist is refused so a typo does not
  * silently no-op. The operator-only permission is enforced at the adapter gate.
