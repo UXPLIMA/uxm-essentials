@@ -14,12 +14,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Warms the joining player's home set into the repository cache so the {@code /home}, {@code /delhome},
- * {@code /renamehome}, {@code /movehome}, and {@code /setmainhome} name-argument suggesters have the names in
- * memory to complete by the time the player starts typing. The suggesters run on the tick thread and must
- * never block on the database, so they only peek the cache; this listener does the one load up front, off the
- * join thread via the {@link Scheduler} port's async seam (the read hits SQLite). A player who never types a
- * home command still pays only one cheap cached read whose entry expires on its own TTL.
+ * Warms the joining player's slot {@code HomeSet} into the repository cache so the first {@code /home} opens
+ * without a cold database read. Opening the grid loads the owner's homes off the tick thread; this listener
+ * does that one load up front on join, off the join thread via the {@link Scheduler} port's async seam (the
+ * read hits SQLite), so a warm cache makes the later open instant. A player who never opens {@code /home}
+ * still pays only one cheap cached read whose entry expires on its own TTL.
  */
 @NullMarked
 public final class HomesJoinListener implements Listener {

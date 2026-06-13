@@ -14,7 +14,7 @@ import java.util.Objects;
  */
 public record HomeLabel(String value) {
 
-    /** Mirrors the {@code homes.label} column width in the schema. */
+    /** A UX cap on label length, well within the 64-char {@code homes.label} column in the schema. */
     public static final int MAX_LENGTH = 32;
 
     public HomeLabel {
