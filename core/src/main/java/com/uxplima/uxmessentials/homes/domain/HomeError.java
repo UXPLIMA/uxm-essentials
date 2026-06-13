@@ -20,7 +20,13 @@ public enum HomeError {
     SLOT_TAKEN(HomesMessageKey.HOME_SLOT_TAKEN),
 
     /** A slot index at or above the owner's resolved maximum-slot count. */
-    SLOT_OUT_OF_RANGE(HomesMessageKey.HOME_SLOT_OUT_OF_RANGE);
+    SLOT_OUT_OF_RANGE(HomesMessageKey.HOME_SLOT_OUT_OF_RANGE),
+
+    /** The target position is in a world where homes are administratively disabled. */
+    WORLD_DISABLED(HomesMessageKey.HOME_WORLD_DISABLED),
+
+    /** The target position is flagged as unsafe to place a home (e.g. in the air, under lava). */
+    UNSAFE_LOCATION(HomesMessageKey.HOME_UNSAFE_LOCATION);
 
     private final HomesMessageKey messageKey;
 

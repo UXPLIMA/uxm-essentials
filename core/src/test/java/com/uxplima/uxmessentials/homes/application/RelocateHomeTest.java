@@ -13,6 +13,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
+import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
@@ -58,7 +59,7 @@ class RelocateHomeTest {
     void relocatingAnExistingHomeSucceedsAndPublishesHomeRelocated() {
         repository.save(Home.create(OWNER, HomeSlot.of(0), at(1, 64, 1), CLOCK.instant()));
 
-        Result<Unit, HomeError> result = useCase().relocate(OWNER, HomeSlot.of(0), at(10, 65, 10));
+        Result<Unit, HomeError> result = useCase(List.of()).relocate(OWNER, HomeSlot.of(0), at(10, 65, 10));
 
         assertThat(result.isOk()).isTrue();
         assertThat(notifier.lastKey).isEqualTo(HomesMessageKey.HOME_RELOCATED);
@@ -71,14 +72,32 @@ class RelocateHomeTest {
 
     @Test
     void relocatingAnEmptySlotRejectsAndPublishesNothing() {
-        Result<Unit, HomeError> result = useCase().relocate(OWNER, HomeSlot.of(0), at(1, 64, 1));
+        Result<Unit, HomeError> result = useCase(List.of()).relocate(OWNER, HomeSlot.of(0), at(1, 64, 1));
 
         assertThat(result.errorOrThrow()).isEqualTo(HomeError.NOT_FOUND);
         assertThat(events.published).isEmpty();
     }
 
-    private RelocateHome useCase() {
-        return new RelocateHome(repository, notifier.notifier(), events, CLOCK);
+    @Test
+    void aGuardThatReturnsAnErrorBlocksRelocateBeforeTheSave() {
+        repository.save(Home.create(OWNER, HomeSlot.of(0), at(1, 64, 1), CLOCK.instant()));
+        SethomeGuard blocking = (owner, slot, at) -> Result.err(HomeError.UNSAFE_LOCATION);
+
+        Result<Unit, HomeError> result = useCase(List.of(blocking)).relocate(OWNER, HomeSlot.of(0), at(10, 65, 10));
+
+        assertThat(result.errorOrThrow()).isEqualTo(HomeError.UNSAFE_LOCATION);
+        assertThat(notifier.lastKey).isEqualTo(HomesMessageKey.HOME_UNSAFE_LOCATION);
+        assertThat(events.published).isEmpty();
+        // The home should still be at the original position — save was not called with the new position.
+        assertThat(repository.findSlot(OWNER, HomeSlot.of(0)))
+                .isPresent()
+                .get()
+                .extracting(home -> home.location().blockX())
+                .isEqualTo(1);
+    }
+
+    private RelocateHome useCase(List<SethomeGuard> guards) {
+        return new RelocateHome(repository, guards, notifier.notifier(), events, CLOCK);
     }
 
     private static Position at(double x, double y, double z) {

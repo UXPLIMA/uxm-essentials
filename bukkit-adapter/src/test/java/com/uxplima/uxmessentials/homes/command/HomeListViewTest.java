@@ -165,7 +165,7 @@ class HomeListViewTest {
                 scheduler,
                 new TeleportHome(repository, new RecordingTeleporter(), notifier),
                 new DeleteHome(repository, notifier, events),
-                new RelocateHome(repository, notifier, events, clock),
+                new RelocateHome(repository, List.of(), notifier, events, clock),
                 new RenameHome(repository, notifier, events, clock),
                 new IconSelectorView(
                         messages,

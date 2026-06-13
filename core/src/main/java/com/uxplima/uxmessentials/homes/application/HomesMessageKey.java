@@ -28,6 +28,8 @@ public enum HomesMessageKey implements MessageKey {
     HOME_NOT_FOUND("home.not-found"),
     HOME_SLOT_TAKEN("home.slot-taken"),
     HOME_SLOT_OUT_OF_RANGE("home.slot-out-of-range"),
+    HOME_WORLD_DISABLED("home.world-disabled"),
+    HOME_UNSAFE_LOCATION("home.unsafe-location"),
 
     // admin
     HOME_ADMIN_DELETED("home.admin.deleted"),

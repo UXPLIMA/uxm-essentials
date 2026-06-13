@@ -109,7 +109,7 @@ public final class HomesWiring {
 
         CreateHomeAtSlot createHome =
                 new CreateHomeAtSlot(repository, quota, List.of(), notifier, kernel.events(), unlimitedMax, clock);
-        RelocateHome relocateHome = new RelocateHome(repository, notifier, kernel.events(), clock);
+        RelocateHome relocateHome = new RelocateHome(repository, List.of(), notifier, kernel.events(), clock);
         RenameHome renameHome = new RenameHome(repository, notifier, kernel.events(), clock);
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);
         DeleteHome deleteHome = new DeleteHome(repository, notifier, kernel.events());

@@ -178,7 +178,7 @@ class HomeCommandPathTest {
                 scheduler,
                 new TeleportHome(repository, teleporter, notifier),
                 new DeleteHome(repository, notifier, events),
-                new RelocateHome(repository, notifier, events, clock),
+                new RelocateHome(repository, List.of(), notifier, events, clock),
                 new RenameHome(repository, notifier, events, clock),
                 iconSelector,
                 new AnvilInput(plugin),
