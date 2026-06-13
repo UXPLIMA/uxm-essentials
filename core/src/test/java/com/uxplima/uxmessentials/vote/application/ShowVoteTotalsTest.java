@@ -7,6 +7,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -112,6 +113,38 @@ class ShowVoteTotalsTest {
         @Override
         public boolean hasPending(PlayerRef player) {
             return false;
+        }
+
+        @Override
+        public void markPartyParticipant(PlayerRef player) {}
+
+        @Override
+        public Set<UUID> partyParticipants() {
+            return Set.of();
+        }
+
+        @Override
+        public void clearPartyParticipants() {}
+
+        @Override
+        public long partyPeriodKey() {
+            return 0L;
+        }
+
+        @Override
+        public void setPartyPeriodKey(long key) {}
+
+        @Override
+        public int thresholdOverride() {
+            return 0;
+        }
+
+        @Override
+        public void setThresholdOverride(int override) {}
+
+        @Override
+        public void resetTotals(PlayerRef player) {
+            stored.put(player.uuid(), VoteTally.empty());
         }
     }
 

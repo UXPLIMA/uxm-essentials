@@ -45,7 +45,22 @@ public enum VoteMessageKey implements MessageKey {
     // /votetop header, per-row entry, and empty-state
     VOTE_TOP_HEADER("vote.top.header"),
     VOTE_TOP_ENTRY("vote.top.entry"),
-    VOTE_TOP_EMPTY("vote.top.empty");
+    VOTE_TOP_EMPTY("vote.top.empty"),
+
+    // approaching-party announcement: {remaining} votes still needed
+    VOTEPARTY_ANNOUNCE("voteparty.announce"),
+
+    // admin forced a party immediately
+    VOTEPARTY_FORCED("voteparty.forced"),
+
+    // admin set the party counter to a specific value: {count}
+    VOTEPARTY_COUNT_SET("voteparty.count-set"),
+
+    // admin gave votes to a player: {player}, {amount}
+    VOTE_ADMIN_GAVE("vote.admin.gave"),
+
+    // admin reset a player's vote totals: {player}
+    VOTE_ADMIN_RESET("vote.admin.reset");
 
     private final String key;
 

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -110,6 +111,36 @@ class TopVotersTest {
         public boolean hasPending(PlayerRef player) {
             return false;
         }
+
+        @Override
+        public void markPartyParticipant(PlayerRef player) {}
+
+        @Override
+        public Set<UUID> partyParticipants() {
+            return Set.of();
+        }
+
+        @Override
+        public void clearPartyParticipants() {}
+
+        @Override
+        public long partyPeriodKey() {
+            return 0L;
+        }
+
+        @Override
+        public void setPartyPeriodKey(long key) {}
+
+        @Override
+        public int thresholdOverride() {
+            return 0;
+        }
+
+        @Override
+        public void setThresholdOverride(int override) {}
+
+        @Override
+        public void resetTotals(PlayerRef player) {}
     }
 
     private static final class CapturingSink implements MessageSink {

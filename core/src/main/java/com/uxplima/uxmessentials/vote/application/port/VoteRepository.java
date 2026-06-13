@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.vote.application.port;
 
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
@@ -60,4 +62,58 @@ public interface VoteRepository {
      * must not return more than {@code limit} rows.
      */
     List<VoteRanking> topVoters(VotePeriod period, int limit);
+
+    // --- Party participant tracking ---
+
+    /**
+     * Record {@code player} as a participant in the current party window (they voted before the next
+     * party fires). Idempotent — calling it multiple times for the same player in the same window is
+     * safe.
+     */
+    void markPartyParticipant(PlayerRef player);
+
+    /**
+     * The UUIDs of every player who has voted during the current party window. Returns a snapshot;
+     * the returned set is not live.
+     */
+    Set<UUID> partyParticipants();
+
+    /**
+     * Clear the participant set — called after a party fires so the next window starts empty.
+     */
+    void clearPartyParticipants();
+
+    // --- Party period key (for reset-schedule boundary detection) ---
+
+    /**
+     * The stored party period key: 0 when no period key has been persisted yet (first run), or the
+     * key written by the most recent {@link #setPartyPeriodKey(long)} call.
+     *
+     * <p>Interpretation is schedule-dependent: for {@code DAILY} this is an epoch-day; for
+     * {@code WEEKLY} it is {@code weekBasedYear * 100 + weekOfYear}; for {@code NONE} the key is
+     * always 0 and is never compared.
+     */
+    long partyPeriodKey();
+
+    /** Persist the party period key for the current calendar window. */
+    void setPartyPeriodKey(long key);
+
+    // --- Threshold override (escalation) ---
+
+    /**
+     * The operator-or-escalation threshold override; 0 means no override is active and the base
+     * threshold from {@link com.uxplima.uxmessentials.vote.application.PartyConfig} is used.
+     */
+    int thresholdOverride();
+
+    /** Persist the threshold override (positive) or clear it (0). */
+    void setThresholdOverride(int override);
+
+    // --- Admin reset ---
+
+    /**
+     * Reset all vote totals for {@code player} to zero (alltime, daily, weekly, monthly, and their
+     * period keys). Does not affect the vote queue or the party counter.
+     */
+    void resetTotals(PlayerRef player);
 }

@@ -1,11 +1,10 @@
 package com.uxplima.uxmessentials.vote.application;
 
+import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.List;
+import java.time.temporal.IsoFields;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -13,13 +12,11 @@ import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.Vote;
-import com.uxplima.uxmessentials.vote.domain.VotePartyCounter;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
-import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.event.VoteReceived;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
-import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
 
 /**
  * The core vote use case. On a received {@link Vote} it records the voter's tally first, then runs the
@@ -29,8 +26,8 @@ import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
  * items delivered) and is thanked, with {@link VoteReceived} published; an offline voter has the grants
  * queued for their next join (the applier queues the commands) and is not thanked. Then the global party
  * counter advances — when it reaches the configured threshold a party fires (the party reward runs for
- * every online player, {@link VotePartyTriggered} is published, and the counter resets to zero),
- * otherwise the incremented count is persisted.
+ * every eligible online player, {@link com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered}
+ * is published, and the counter resets to zero), otherwise the incremented count is persisted.
  *
  * <p>The {@link Outcome} it returns names what happened (rewarded vs queued, and whether a party fired)
  * so the test paths and the {@code /vote testreward} confirmation can assert on it without reading
@@ -45,7 +42,8 @@ public final class HandleVote {
     private final VoteAudience audience;
     private final VoteNotifier notifier;
     private final DomainEventPublisher events;
-    private final PartyReward party;
+    private final PartyConfig party;
+    private final PartyService partyService;
     private final ZoneId zone;
 
     public HandleVote(
@@ -56,7 +54,7 @@ public final class HandleVote {
             VoteAudience audience,
             VoteNotifier notifier,
             DomainEventPublisher events,
-            PartyReward party,
+            PartyConfig party,
             ZoneId zone) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
@@ -67,6 +65,7 @@ public final class HandleVote {
         this.events = Objects.requireNonNull(events, "events");
         this.party = Objects.requireNonNull(party, "party");
         this.zone = Objects.requireNonNull(zone, "zone");
+        this.partyService = new PartyService(repository, applier, audience, notifier, events, party);
     }
 
     /** Apply {@code vote}: record the tally, resolve and apply the reward sets, advance the counter, fire a party when due. */
@@ -75,7 +74,8 @@ public final class HandleVote {
         VoteTally after = repository.totalsOf(vote.voter()).recordVote(vote.at(), zone);
         repository.saveTotals(vote.voter(), after);
         boolean rewarded = creditVoter(vote, after);
-        boolean partyFired = advanceCounter();
+        repository.markPartyParticipant(vote.voter());
+        boolean partyFired = advanceCounter(vote);
         return new Outcome(rewarded, partyFired);
     }
 
@@ -100,55 +100,55 @@ public final class HandleVote {
         return online;
     }
 
-    private boolean advanceCounter() {
-        // The increment is atomic in the repository, so exactly one concurrent vote observes the count that
-        // reaches the threshold — that single thread fires the party and resets the counter, the rest do not.
-        VotePartyCounter counter = new VotePartyCounter(repository.incrementAndGetPartyCount(), party.threshold());
-        if (!counter.isReached()) {
-            return false;
+    private boolean advanceCounter(Vote vote) {
+        maybeResetForNewPeriod(vote);
+        int newCount = repository.incrementAndGetPartyCount();
+        int threshold = partyService.effectiveThreshold();
+        maybeAnnounce(newCount, threshold);
+        if (newCount >= threshold) {
+            partyService.fire(threshold);
+            return true;
         }
-        fireParty(counter.threshold());
-        repository.setPartyCount(counter.reset().count());
-        return true;
+        return false;
     }
 
-    private void fireParty(int threshold) {
-        RewardGrant partyGrant = RewardGrant.of(party.spec());
-        for (PlayerRef online : audience.online()) {
-            applier.apply(online, true, partyGrant);
-            notifier.send(online, VoteMessageKey.VOTEPARTY_REACHED, Map.of("threshold", Integer.toString(threshold)));
+    private void maybeResetForNewPeriod(Vote vote) {
+        PartyResetSchedule schedule = party.resetSchedule();
+        if (schedule == PartyResetSchedule.NONE) {
+            return;
         }
-        events.publish(new VotePartyTriggered(threshold));
+        LocalDate date = LocalDate.ofInstant(vote.at(), zone);
+        long currentKey = periodKey(schedule, date);
+        if (repository.partyPeriodKey() != currentKey) {
+            repository.setPartyCount(0);
+            repository.setPartyPeriodKey(currentKey);
+        }
+    }
+
+    private void maybeAnnounce(int newCount, int threshold) {
+        if (!party.announceAt().contains(newCount)) {
+            return;
+        }
+        int remaining = Math.max(0, threshold - newCount);
+        Map<String, String> placeholders = Map.of("remaining", Integer.toString(remaining));
+        for (PlayerRef online : audience.online()) {
+            notifier.send(online, VoteMessageKey.VOTEPARTY_ANNOUNCE, placeholders);
+        }
+    }
+
+    private static long periodKey(PartyResetSchedule schedule, LocalDate date) {
+        return switch (schedule) {
+            case DAILY -> date.toEpochDay();
+            case WEEKLY -> (long) date.get(IsoFields.WEEK_BASED_YEAR) * 100
+                    + date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+            case NONE -> 0L;
+        };
     }
 
     private void broadcastThanks(String voterName) {
         Map<String, String> placeholders = Map.of("player", voterName);
         for (PlayerRef online : audience.online()) {
             notifier.send(online, VoteMessageKey.VOTE_THANKS, placeholders);
-        }
-    }
-
-    /**
-     * The vote-party reward content: the commands every online player runs when a party fires, and the
-     * threshold that triggers it. The commands are wrapped into a one-spec {@link RewardSpec} (always-grant,
-     * no permission/world gate) so the same {@link RewardApplier} pays both per-vote and party rewards. The
-     * richer per-vote engine catalog is constructed and injected separately.
-     *
-     * @param commands the party console commands, in order, carrying {@code {player}}
-     * @param threshold the accumulated vote count at which a party fires
-     */
-    public record PartyReward(List<String> commands, int threshold) {
-
-        public PartyReward {
-            commands = List.copyOf(Objects.requireNonNull(commands, "commands"));
-            if (threshold < 1) {
-                throw new IllegalArgumentException("threshold must be at least one: " + threshold);
-            }
-        }
-
-        /** The party commands as an always-grant {@link RewardSpec}. */
-        RewardSpec spec() {
-            return new RewardSpec(100, Optional.empty(), commands, List.of(), List.of(), List.of(), Set.of());
         }
     }
 
