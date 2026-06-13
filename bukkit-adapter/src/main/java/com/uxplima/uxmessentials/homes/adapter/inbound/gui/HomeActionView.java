@@ -13,6 +13,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
+import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
@@ -22,8 +23,10 @@ import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
@@ -34,16 +37,21 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The per-home action menu, opened by clicking a filled slot in the {@link HomeListView}. Buttons drive the
- * player-facing use cases on the viewer's entity thread: teleport, delete, relocate-here, rename (through a
- * vanilla anvil), change-icon (the {@link IconSelectorView}), a read-only info display, and a back button. Every
- * visible string resolves from a {@link MessageKey} in the viewer's locale, never an inline literal. The menu
- * touches the live player, so it builds and clicks on the viewer's entity thread through the kernel
- * {@link Scheduler}.
+ * player-facing use cases: teleport, delete, relocate-here, rename (through a vanilla anvil), change-icon (the
+ * {@link IconSelectorView}, gated behind {@code uxmessentials.home.icon}), a read-only info display, and a back
+ * button. Every visible string resolves from a {@link MessageKey} in the viewer's locale, never an inline
+ * literal, and player feedback is delivered through the {@link HomeNotifier}. The menu builds and clicks on the
+ * viewer's entity thread through the kernel {@link Scheduler}; each mutating use case runs off-thread (the write
+ * hits SQLite), hopping back to the entity thread only to reopen the menu.
  */
 @NullMarked
 public final class HomeActionView {
 
+    private static final String ICON_PERMISSION = "uxmessentials.home.icon";
+
     private final Messages messages;
+    private final HomeNotifier notifier;
+    private final Permissions permissions;
     private final Scheduler scheduler;
     private final TeleportHome teleportHome;
     private final DeleteHome deleteHome;
@@ -57,6 +65,8 @@ public final class HomeActionView {
 
     public HomeActionView(
             Messages messages,
+            HomeNotifier notifier,
+            Permissions permissions,
             Scheduler scheduler,
             TeleportHome teleportHome,
             DeleteHome deleteHome,
@@ -67,6 +77,8 @@ public final class HomeActionView {
             HomeActionsLayout layout,
             DateTimeFormatter dateFormat) {
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.teleportHome = Objects.requireNonNull(teleportHome, "teleportHome");
         this.deleteHome = Objects.requireNonNull(deleteHome, "deleteHome");
@@ -108,35 +120,42 @@ public final class HomeActionView {
                 layout.relocateSlot(),
                 GuiItem.button(relocateIcon(viewer), e -> relocate(viewer, home, player, reopenList)));
         gui.set(layout.renameSlot(), GuiItem.button(renameIcon(viewer), e -> rename(player, viewer, home, reopenList)));
-        gui.set(
-                layout.changeIconSlot(),
-                GuiItem.button(iconIcon(viewer), e -> changeIcon(player, viewer, home, reopenList)));
+        if (permissions.has(viewer, ICON_PERMISSION)) {
+            gui.set(
+                    layout.changeIconSlot(),
+                    GuiItem.button(iconIcon(viewer), e -> changeIcon(player, viewer, home, reopenList)));
+        }
         gui.set(layout.backSlot(), GuiItem.button(backIcon(viewer), e -> reopenList.run()));
     }
 
     private void teleport(PlayerRef viewer, Home home, SimpleGui gui, Player player) {
-        scheduler.onEntity(viewer, () -> {
-            teleportHome.toSlot(viewer, home.slot());
-            gui.close(player);
-        });
+        // The teleport use case delegates to the teleport context's engine, which marshals threads itself, so
+        // close the menu here on the entity thread and hand off the slot teleport off-thread.
+        gui.close(player);
+        scheduler.async(() -> teleportHome.toSlot(viewer, home.slot()));
     }
 
     private void delete(PlayerRef viewer, Home home, Runnable reopenList) {
-        scheduler.onEntity(viewer, () -> {
+        scheduler.async(() -> {
             deleteHome.delete(home.owner(), home.slot());
-            reopenList.run();
+            scheduler.onEntity(viewer, reopenList);
         });
     }
 
     private void relocate(PlayerRef viewer, Home home, Player player, Runnable reopenList) {
-        scheduler.onEntity(viewer, () -> {
-            org.bukkit.Location at = Objects.requireNonNull(player.getLocation(), "player location");
-            relocateHome.relocate(home.owner(), home.slot(), BukkitRefs.toPosition(at));
-            reopenList.run();
+        // The click runs on the entity thread, so read the live location here; only the persisting use case
+        // moves off-thread before hopping back to reopen the menu.
+        Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
+        scheduler.async(() -> {
+            relocateHome.relocate(home.owner(), home.slot(), at);
+            scheduler.onEntity(viewer, reopenList);
         });
     }
 
     private void changeIcon(Player player, PlayerRef viewer, Home home, Runnable reopenList) {
+        if (!permissions.has(viewer, ICON_PERMISSION)) {
+            return;
+        }
         iconSelector.open(player, viewer, home, () -> open(player, viewer, home, reopenList));
     }
 
@@ -148,19 +167,32 @@ public final class HomeActionView {
     }
 
     private void onRenamed(Player player, PlayerRef viewer, Home home, Runnable reopenList, AnvilResult result) {
-        if (!(result instanceof AnvilResult.Submitted submitted)) {
+        if (result instanceof AnvilResult.Submitted submitted) {
+            handleRenameInput(player, viewer, home, reopenList, submitted.text());
+        } else {
+            notifier.send(viewer, HomesMessageKey.HOME_RENAME_CANCELLED);
+            open(player, viewer, home, reopenList);
+        }
+    }
+
+    /**
+     * Apply anvil rename input. Blank or overlong text is an error — it does not clear the label: the viewer is
+     * told the input was rejected and the menu reopens unchanged. There is no "clear label" gesture here, so
+     * {@link HomeLabel#of} is only ever called on validated input. Valid input renames off-thread and reopens.
+     * Package-private so the decision branches can be unit-tested without driving a live anvil.
+     */
+    void handleRenameInput(Player player, PlayerRef viewer, Home home, Runnable reopenList, String input) {
+        String text = input.strip();
+        if (text.isBlank() || text.length() > HomeLabel.MAX_LENGTH) {
+            notifier.send(viewer, HomesMessageKey.HOME_RENAME_TOO_LONG);
             open(player, viewer, home, reopenList);
             return;
         }
-        String typed = submitted.text().strip();
-        if (typed.isEmpty() || typed.length() > HomeLabel.MAX_LENGTH) {
-            messages.resolve(viewer, HomesMessageKey.HOME_RENAME_TOO_LONG, Map.of());
-            renameHome.rename(home.owner(), home.slot(), Optional.empty());
-            open(player, viewer, home, reopenList);
-            return;
-        }
-        renameHome.rename(home.owner(), home.slot(), Optional.of(HomeLabel.of(typed)));
-        open(player, viewer, home, reopenList);
+        HomeLabel label = HomeLabel.of(text);
+        scheduler.async(() -> {
+            renameHome.rename(home.owner(), home.slot(), Optional.of(label));
+            scheduler.onEntity(viewer, () -> open(player, viewer, home, reopenList));
+        });
     }
 
     private void fill(SimpleGui gui) {

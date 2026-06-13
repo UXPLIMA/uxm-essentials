@@ -160,6 +160,8 @@ class HomeListViewTest {
         CreateHomeAtSlot create = new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, 1000, clock);
         HomeActionView actionView = new HomeActionView(
                 messages,
+                notifier,
+                new AllowAllPermissions(),
                 scheduler,
                 new TeleportHome(repository, new RecordingTeleporter(), notifier),
                 new DeleteHome(repository, notifier, events),

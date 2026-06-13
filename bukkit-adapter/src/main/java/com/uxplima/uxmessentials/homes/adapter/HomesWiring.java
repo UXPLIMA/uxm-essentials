@@ -120,6 +120,8 @@ public final class HomesWiring {
                 new IconSelectorView(kernel.messages(), kernel.scheduler(), setHomeIcon, iconLayout(guiLayouts));
         HomeActionView actionView = new HomeActionView(
                 kernel.messages(),
+                notifier,
+                kernel.permissions(),
                 kernel.scheduler(),
                 teleportHome,
                 deleteHome,

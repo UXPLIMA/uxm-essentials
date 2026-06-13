@@ -173,6 +173,8 @@ class HomeCommandPathTest {
                 IconSelectorLayout.codeDefault());
         HomeActionView actionView = new HomeActionView(
                 messages,
+                notifier,
+                new AllowAllPermissions(),
                 scheduler,
                 new TeleportHome(repository, teleporter, notifier),
                 new DeleteHome(repository, notifier, events),
