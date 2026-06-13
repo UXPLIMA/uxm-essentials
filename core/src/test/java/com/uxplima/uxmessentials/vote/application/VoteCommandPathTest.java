@@ -23,9 +23,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.HandleVote.VoteRewards;
 import com.uxplima.uxmessentials.vote.application.port.RewardDispatcher;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
+import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.Vote;
+import com.uxplima.uxmessentials.vote.domain.VotePeriod;
+import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.event.VoteReceived;
 import org.junit.jupiter.api.BeforeEach;
@@ -98,6 +101,24 @@ class VoteCommandPathTest {
     }
 
     @Test
+    void aVoteAlwaysRecordsTotalsRegardlessOfOnlineStatus() {
+        // Alice is online; her tally should be updated.
+        lookup.online.add(alice.uuid());
+        audience.players.add(alice);
+
+        handle(perVote("give {player} diamond 1"), party(), 25).handle(voteBy(alice));
+
+        VoteTally tally = repository.totalsOf(alice);
+        assertThat(tally.alltime()).isEqualTo(1);
+
+        // Bob is offline; his tally should also be updated.
+        handle(perVote("give {player} apple 3"), party(), 25).handle(voteBy(bob));
+
+        VoteTally bobTally = repository.totalsOf(bob);
+        assertThat(bobTally.alltime()).isEqualTo(1);
+    }
+
+    @Test
     void anOfflineVoteIsQueuedAndPaysOutOnJoin() {
         // Bob is offline at vote time — nothing is dispatched, a batch is queued.
         HandleVote.Outcome outcome =
@@ -125,7 +146,8 @@ class VoteCommandPathTest {
                 events,
                 new VoteRewards(perVote, party, threshold),
                 lookup,
-                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
+                ZoneOffset.UTC);
     }
 
     private static Vote voteBy(PlayerRef voter) {
@@ -144,6 +166,7 @@ class VoteCommandPathTest {
     private static final class FakeVoteRepository implements VoteRepository {
         private int count;
         private final Map<UUID, List<QueuedReward>> queue = new LinkedHashMap<>();
+        private final Map<UUID, VoteTally> tallies = new LinkedHashMap<>();
 
         @Override
         public int partyCount() {
@@ -175,6 +198,21 @@ class VoteCommandPathTest {
         @Override
         public boolean hasPending(PlayerRef player) {
             return queue.containsKey(player.uuid());
+        }
+
+        @Override
+        public VoteTally totalsOf(PlayerRef player) {
+            return tallies.getOrDefault(player.uuid(), VoteTally.empty());
+        }
+
+        @Override
+        public void saveTotals(PlayerRef player, VoteTally tally) {
+            tallies.put(player.uuid(), tally);
+        }
+
+        @Override
+        public List<VoteRanking> topVoters(VotePeriod period, int limit) {
+            return List.of();
         }
     }
 

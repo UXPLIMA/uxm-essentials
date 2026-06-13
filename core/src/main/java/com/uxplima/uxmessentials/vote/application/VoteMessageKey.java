@@ -34,7 +34,18 @@ public enum VoteMessageKey implements MessageKey {
     VOTE_TESTREWARD("vote.testreward"),
 
     // console rejection — only a player can run /vote or /voteparty
-    VOTE_PLAYERS_ONLY("vote.players-only");
+    VOTE_PLAYERS_ONLY("vote.players-only"),
+
+    // /votes <player> — per-player totals across all periods
+    VOTE_TOTAL("vote.total"),
+
+    // /votes unknown player
+    VOTE_TOTAL_UNKNOWN("vote.total.unknown"),
+
+    // /votetop header, per-row entry, and empty-state
+    VOTE_TOP_HEADER("vote.top.header"),
+    VOTE_TOP_ENTRY("vote.top.entry"),
+    VOTE_TOP_EMPTY("vote.top.empty");
 
     private final String key;
 

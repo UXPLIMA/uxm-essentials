@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vote.application;
 
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -14,6 +15,7 @@ import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.Vote;
 import com.uxplima.uxmessentials.vote.domain.VotePartyCounter;
+import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.event.VoteReceived;
 
@@ -39,6 +41,7 @@ public final class HandleVote {
     private final VoteRewards rewards;
     private final PlayerLookup players;
     private final Clock clock;
+    private final ZoneId zone;
 
     public HandleVote(
             VoteRepository repository,
@@ -48,7 +51,8 @@ public final class HandleVote {
             DomainEventPublisher events,
             VoteRewards rewards,
             PlayerLookup players,
-            Clock clock) {
+            Clock clock,
+            ZoneId zone) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.audience = Objects.requireNonNull(audience, "audience");
@@ -57,14 +61,21 @@ public final class HandleVote {
         this.rewards = Objects.requireNonNull(rewards, "rewards");
         this.players = Objects.requireNonNull(players, "players");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.zone = Objects.requireNonNull(zone, "zone");
     }
 
-    /** Apply {@code vote}: reward or queue the voter, advance the counter, fire a party when due. */
+    /** Apply {@code vote}: record the tally, reward or queue the voter, advance the counter, fire a party when due. */
     public Outcome handle(Vote vote) {
         Objects.requireNonNull(vote, "vote");
+        recordTotals(vote.voter(), vote.at());
         boolean rewarded = creditVoter(vote.voter());
         boolean party = advanceCounter();
         return new Outcome(rewarded, party);
+    }
+
+    private void recordTotals(PlayerRef voter, java.time.Instant at) {
+        VoteTally current = repository.totalsOf(voter);
+        repository.saveTotals(voter, current.recordVote(at, zone));
     }
 
     private boolean creditVoter(PlayerRef voter) {

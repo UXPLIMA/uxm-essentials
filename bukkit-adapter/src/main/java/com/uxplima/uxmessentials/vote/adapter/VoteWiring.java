@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vote.adapter;
 
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 
@@ -89,7 +90,8 @@ public final class VoteWiring {
                 kernel.events(),
                 rewards,
                 kernel.playerLookup(),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                ZoneId.systemDefault());
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, dispatcher);
         VoteLinks links = new VoteLinks(voteLinks, notifier);
         VotePartyStatus status = new VotePartyStatus(repository, notifier, rewards.partyThreshold());

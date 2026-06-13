@@ -4,13 +4,16 @@ import java.util.List;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
+import com.uxplima.uxmessentials.vote.domain.VotePeriod;
+import com.uxplima.uxmessentials.vote.domain.VoteTally;
 
 /**
- * Outbound port for the vote context's durable state: the single global vote-party counter and the
- * per-player offline reward queue. Both survive a restart — a vote that arrives while the voter is
- * offline must still pay out when they next join, and an accumulated party count must not reset on a
- * crash — so neither is PDC-backed. A cache decorator may sit in front of the hot counter; the contract
- * here is the durable source of truth.
+ * Outbound port for the vote context's durable state: the single global vote-party counter, the
+ * per-player offline reward queue, and per-player vote totals across every tracked period.
+ *
+ * <p>All three concerns survive a restart: an accumulated party count must not reset on a crash, a
+ * vote for an offline player must still pay out on their next join, and a player's vote history must
+ * persist so leaderboards and tally displays are accurate after a reload.
  *
  * <p>The queue is ordered per player: {@link #enqueue} appends a batch, {@link #drainFor} returns every
  * pending batch for one player and removes those rows in the same transaction (so a reward is paid out
@@ -41,4 +44,20 @@ public interface VoteRepository {
 
     /** True when {@code player} has at least one pending reward batch. */
     boolean hasPending(PlayerRef player);
+
+    /**
+     * Return the stored {@link VoteTally} for {@code player}, or {@link VoteTally#empty()} when the
+     * player has never voted on this server.
+     */
+    VoteTally totalsOf(PlayerRef player);
+
+    /** Persist an updated {@link VoteTally} for {@code player}. */
+    void saveTotals(PlayerRef player, VoteTally tally);
+
+    /**
+     * Return the top {@code limit} voters for {@code period}, ordered from highest to lowest vote
+     * count. Returns an empty list when no votes have been recorded for the period. The implementation
+     * must not return more than {@code limit} rows.
+     */
+    List<VoteRanking> topVoters(VotePeriod period, int limit);
 }
