@@ -4,11 +4,12 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.Homes.HOMES;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
-import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
+import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.HomesRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -16,10 +17,10 @@ import org.jooq.DSLContext;
 
 /**
  * The jOOQ-backed {@link HomeRepository} over the generated {@code HOMES} table. Reads rebuild an owner's
- * {@link HomeSet} from queryable rows in stored creation order; the quota count is a {@code COUNT(*)} so
- * the limit check never materialises the whole set. A {@code save} upserts on the {@code (owner, name)}
- * primary key — a re-anchor overwrites the same row — and a rename is an atomic keyed update inside one
- * transaction. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ * {@link HomeSet} from queryable rows in slot order; the quota count is a {@code COUNT(*)} so the limit
+ * check never materialises the whole set. A {@code save} upserts on the {@code (owner, slot)} primary key
+ * — a re-anchor or label/icon change overwrites the same row — and a delete is a keyed {@code DELETE}.
+ * Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
  */
 public final class JooqHomeRepository extends JooqRepository implements HomeRepository {
 
@@ -32,7 +33,7 @@ public final class JooqHomeRepository extends JooqRepository implements HomeRepo
         Objects.requireNonNull(owner, "owner");
         List<Home> homes = read(dsl -> dsl.selectFrom(HOMES)
                 .where(HOMES.OWNER.eq(owner.uuid().toString()))
-                .orderBy(HOMES.CREATED_AT.asc(), HOMES.NAME.asc())
+                .orderBy(HOMES.SLOT.asc())
                 .fetch()
                 .map(row -> HomeRows.toHome(row, owner)));
         return HomeSet.of(owner, homes);
@@ -45,6 +46,16 @@ public final class JooqHomeRepository extends JooqRepository implements HomeRepo
     }
 
     @Override
+    public Optional<Home> findSlot(PlayerRef owner, HomeSlot slot) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(slot, "slot");
+        return read(dsl -> dsl.selectFrom(HOMES)
+                .where(HOMES.OWNER.eq(owner.uuid().toString()).and(HOMES.SLOT.eq(slot.index())))
+                .fetchOptional()
+                .map(row -> HomeRows.toHome(row, owner)));
+    }
+
+    @Override
     public void save(Home home) {
         Objects.requireNonNull(home, "home");
         write(dsl -> {
@@ -54,24 +65,11 @@ public final class JooqHomeRepository extends JooqRepository implements HomeRepo
     }
 
     @Override
-    public void rename(PlayerRef owner, HomeName from, HomeName to) {
+    public void deleteSlot(PlayerRef owner, HomeSlot slot) {
         Objects.requireNonNull(owner, "owner");
-        Objects.requireNonNull(from, "from");
-        Objects.requireNonNull(to, "to");
-        write(dsl -> dsl.update(HOMES)
-                .set(HOMES.NAME, to.value())
-                .where(HOMES.OWNER.eq(owner.uuid().toString()))
-                .and(HOMES.NAME.eq(from.value()))
-                .execute());
-    }
-
-    @Override
-    public void delete(PlayerRef owner, HomeName name) {
-        Objects.requireNonNull(owner, "owner");
-        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(slot, "slot");
         write(dsl -> dsl.deleteFrom(HOMES)
-                .where(HOMES.OWNER.eq(owner.uuid().toString()))
-                .and(HOMES.NAME.eq(name.value()))
+                .where(HOMES.OWNER.eq(owner.uuid().toString()).and(HOMES.SLOT.eq(slot.index())))
                 .execute());
     }
 
@@ -80,8 +78,10 @@ public final class JooqHomeRepository extends JooqRepository implements HomeRepo
         HomeRows.apply(record, home);
         dsl.insertInto(HOMES)
                 .set(record)
-                .onConflict(HOMES.OWNER, HOMES.NAME)
+                .onConflict(HOMES.OWNER, HOMES.SLOT)
                 .doUpdate()
+                .set(HOMES.LABEL, record.getLabel())
+                .set(HOMES.ICON, record.getIcon())
                 .set(HOMES.WORLD, record.getWorld())
                 .set(HOMES.WORLD_NAME, record.getWorldName())
                 .set(HOMES.X, record.getX())
@@ -89,6 +89,7 @@ public final class JooqHomeRepository extends JooqRepository implements HomeRepo
                 .set(HOMES.Z, record.getZ())
                 .set(HOMES.YAW, record.getYaw())
                 .set(HOMES.PITCH, record.getPitch())
+                .set(HOMES.UPDATED_AT, record.getUpdatedAt())
                 .execute();
     }
 }

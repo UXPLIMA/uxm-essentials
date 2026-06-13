@@ -8,8 +8,8 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
-import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
+import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -22,7 +22,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <p>The cached value is the whole {@link HomeSet}, so a {@code /home} that needs the owner's homes and the
  * {@code /sethome} count check share one cached read. {@link #count} is derived from the cached set rather
- * than issuing a second {@code COUNT(*)}.
+ * than issuing a second {@code COUNT(*)}. {@link #findSlot} consults the cached set on a hit, avoiding a
+ * round-trip for the common case of an already-loaded owner.
  */
 public final class CachedHomeRepository implements HomeRepository {
 
@@ -54,6 +55,16 @@ public final class CachedHomeRepository implements HomeRepository {
     }
 
     @Override
+    public Optional<Home> findSlot(PlayerRef owner, HomeSlot slot) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(slot, "slot");
+        // Use the cached set when available to avoid a round-trip; fall back to the delegate on a miss.
+        return cache.getIfPresent(owner.uuid())
+                .map(set -> set.find(slot))
+                .orElseGet(() -> delegate.findSlot(owner, slot));
+    }
+
+    @Override
     public void save(Home home) {
         Objects.requireNonNull(home, "home");
         delegate.save(home);
@@ -61,15 +72,11 @@ public final class CachedHomeRepository implements HomeRepository {
     }
 
     @Override
-    public void rename(PlayerRef owner, HomeName from, HomeName to) {
-        delegate.rename(owner, from, to);
-        cache.invalidate(Objects.requireNonNull(owner, "owner").uuid());
-    }
-
-    @Override
-    public void delete(PlayerRef owner, HomeName name) {
-        delegate.delete(owner, name);
-        cache.invalidate(Objects.requireNonNull(owner, "owner").uuid());
+    public void deleteSlot(PlayerRef owner, HomeSlot slot) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(slot, "slot");
+        delegate.deleteSlot(owner, slot);
+        cache.invalidate(owner.uuid());
     }
 
     @Override

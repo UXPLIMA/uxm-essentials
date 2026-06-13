@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.persistence.homes;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
-import com.uxplima.uxmessentials.homes.application.port.MainHomePreference;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,15 +33,5 @@ public final class HomeRepositories {
     public static CachedHomeRepository cachedConcrete(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedHomeRepository(new JooqHomeRepository(persistence.dsl()));
-    }
-
-    /**
-     * A jOOQ {@link MainHomePreference} over the shared persistence DSL — the per-player main-home choice
-     * plain {@code /home} consults. Left uncached: the row is a single keyed lookup read off the
-     * {@code /home} hot path, already cheap, and a tiny one-row choice gains nothing from a cache decorator.
-     */
-    public static MainHomePreference mainHomePreference(Persistence persistence) {
-        Objects.requireNonNull(persistence, "persistence");
-        return new JooqMainHomePreference(persistence.dsl());
     }
 }
