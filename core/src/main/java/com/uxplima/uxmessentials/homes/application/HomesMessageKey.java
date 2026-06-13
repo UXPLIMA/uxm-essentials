@@ -36,6 +36,9 @@ public enum HomesMessageKey implements MessageKey {
     HOME_ADMIN_DELETED("home.admin.deleted"),
     HOME_ADMIN_LIST_HEADER("home.admin.list-header"),
     HOME_ADMIN_TARGET_UNKNOWN("home.admin.target-unknown"),
+    HOME_ADMIN_SET("home.admin.set"),
+    HOME_ADMIN_CLEARED("home.admin.cleared"),
+    HOME_ADMIN_INFO("home.admin.info"),
 
     // slot-grid menu (/home)
     HOME_MENU_TITLE("home.menu.title"),

@@ -123,6 +123,11 @@ class RenameHomeTest {
         public void deleteSlot(PlayerRef owner, HomeSlot slot) {
             homes.remove(slot);
         }
+
+        @Override
+        public void deleteAll(PlayerRef owner) {
+            homes.clear();
+        }
     }
 
     private static final class RecordingPublisher implements DomainEventPublisher {

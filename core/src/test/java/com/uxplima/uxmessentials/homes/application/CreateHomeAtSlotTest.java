@@ -163,6 +163,11 @@ class CreateHomeAtSlotTest {
         public void deleteSlot(PlayerRef owner, HomeSlot slot) {
             homes.remove(slot);
         }
+
+        @Override
+        public void deleteAll(PlayerRef owner) {
+            homes.clear();
+        }
     }
 
     /** A {@link Permissions} fake that resolves a fixed home-limit cap. */

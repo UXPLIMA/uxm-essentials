@@ -117,6 +117,11 @@ class TeleportHomeSlotTest {
         public void deleteSlot(PlayerRef owner, HomeSlot slot) {
             homes.remove(slot);
         }
+
+        @Override
+        public void deleteAll(PlayerRef owner) {
+            homes.clear();
+        }
     }
 
     /** A {@link HomeTeleporter} that records the last home it was asked to send the player to. */

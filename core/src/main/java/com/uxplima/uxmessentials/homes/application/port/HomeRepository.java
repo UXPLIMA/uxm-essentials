@@ -37,6 +37,12 @@ public interface HomeRepository {
     void deleteSlot(PlayerRef owner, HomeSlot slot);
 
     /**
+     * Remove every home the owner holds. Used by the admin bulk-clear operation; a no-op when the
+     * owner has no homes.
+     */
+    void deleteAll(PlayerRef owner);
+
+    /**
      * The owner's homes if they are already in memory, without touching the database. A cache decorator
      * returns its cached set on a hit and an empty {@link Optional} on a miss; an undecorated store has
      * nothing in memory and so returns empty. This exists for tick-thread callers that must never block on
