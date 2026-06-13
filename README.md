@@ -14,9 +14,11 @@ re-worded or recoloured, and every command can be renamed, aliased or disabled f
   player-state, messaging, presence, moderation, item utilities, vaults, communication, holograms,
   player-warps, scoreboard/tab, vote rewards, and Discord account-linking.
 - **~130 commands** with the muscle-memory aliases you already type (`/tp`, `/tpa`, `/back`, `/home`,
-  `/sethome`, `/warp`, `/pay`, `/baltop`, `/msg`, `/r`, `/kit`, `/vault`, `/gm`, `/heal`, `/feed`,
+  `/warp`, `/pay`, `/baltop`, `/msg`, `/r`, `/kit`, `/vault`, `/gm`, `/heal`, `/feed`,
   `/fly`, `/vanish`, `/invsee`, `/ban`, `/mute`, `/jail` …).
-- **In-game menus** for kits, warps and homes — paginated, click to claim or teleport — with the
+- **GUI-first homes**: `/home` opens a slot grid — click an empty cell to set a home there, click a
+  home to teleport, rename, relocate, delete, or pick a custom icon. No name-juggling commands.
+- **In-game menus** for kits, warps and homes — click to claim, teleport, or manage — with the
   layout (rows, icons) editable from config.
 - **Real economy**: balances are database-backed (they survive world rollbacks, never the PDC),
   multi-currency-capable, with `/pay`, `/baltop`, `/worth`, `/sell`, a Vault/Treasury provider and
@@ -58,7 +60,7 @@ plugins/uxmEssentials/
 │  ├─ economy/   config.conf · currencies.conf
 │  ├─ kits/      config.conf · gui/kits-menu.conf · kits/<kit>.conf
 │  ├─ warps/     config.conf · gui/warps-menu.conf
-│  ├─ homes/     config.conf · gui/homes-menu.conf
+│  ├─ homes/     config.conf · gui/home-list.conf · gui/home-actions.conf · gui/icon-selector.conf
 │  ├─ communication/ config.conf · join-quit.conf · announcer.conf · info-pages.conf
 │  └─ … one folder per module
 ├─ messages/messages_<lang>.conf   # all player-facing text

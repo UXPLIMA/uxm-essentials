@@ -20,7 +20,9 @@ class GuiLayoutDriftTest {
     void everyBrowseMenuShipsItsLayoutResourceWithTheExpectedRows() {
         assertRows("kits", "kits-menu", 6);
         assertRows("warps", "warps-menu", 6);
-        assertRows("homes", "homes-menu", 6);
+        assertRows("homes", "home-list", 3);
+        assertRows("homes", "home-actions", 3);
+        assertRows("homes", "icon-selector", 6);
         assertRows("itemworld", "disposal", 6);
         assertRows("kits", "kits-manager", 6);
         assertRows("kits", "kits-settings", 3);
@@ -31,11 +33,15 @@ class GuiLayoutDriftTest {
     void layoutResourcesDeclareNoLocalisedTextKeys() {
         // The comments may mention "title"/"lore" in prose (to point operators at the catalog); what must never
         // appear is a config key that would carry player text — a "title"/"lore"/"name" assignment or a
-        // MessageKey reference. Player text stays in the message catalog, asserted by the locale-parity guard.
+        // MessageKey reference. Player text stays in the message catalog, asserted by the locale-parity guard. A
+        // key like home-actions' rename-slot legitimately contains "name", so the check targets the assignment
+        // form (key = value) rather than the bare substring.
         for (String[] menu : new String[][] {
             {"kits", "kits-menu"},
             {"warps", "warps-menu"},
-            {"homes", "homes-menu"},
+            {"homes", "home-list"},
+            {"homes", "home-actions"},
+            {"homes", "icon-selector"},
             {"itemworld", "disposal"},
             {"kits", "kits-manager"},
             {"kits", "kits-settings"},
@@ -45,9 +51,9 @@ class GuiLayoutDriftTest {
             assertThat(stripComments(body))
                     .as(menu[0] + "/" + menu[1] + " declares no localised-text key")
                     .doesNotContain("MessageKey")
-                    .doesNotContain("title")
-                    .doesNotContain("lore")
-                    .doesNotContain("name");
+                    .doesNotContain("title =")
+                    .doesNotContain("lore =")
+                    .doesNotContain("name =");
         }
     }
 

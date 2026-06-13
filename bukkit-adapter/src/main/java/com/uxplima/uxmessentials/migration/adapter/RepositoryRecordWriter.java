@@ -38,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The live {@link RecordWriter}: applies each mapped record to the target contexts' durable repositories,
  * honouring the conflict and balance policies (docs/12-migration §6). Every write is an idempotent upsert
- * keyed by stable identity — a home by {@code (owner, name)}, a warp by {@code name}, a wallet balance by
+ * keyed by stable identity — a home by {@code (owner, slot)}, a warp by {@code name}, a wallet balance by
  * {@code (uuid, currency)} — so a re-run never duplicates a record, and the wallet balance is always
  * <em>set</em>, never added, so a re-run can never double-credit. It writes through the same repository
  * contracts {@code /sethome}, {@code /setwarp}, and the economy ledger use, so an import can never create
@@ -97,9 +97,9 @@ public final class RepositoryRecordWriter implements RecordWriter {
 
     private boolean shouldWriteHome(Home home, ConflictPolicy policy) {
         if (policy != ConflictPolicy.SKIP) {
-            return true; // overwrite and merge both upsert the home (merge adds only new names, same call)
+            return true; // overwrite and merge both upsert the home into its slot (same call)
         }
-        return homes.load(home.owner()).find(home.name()).isEmpty();
+        return homes.load(home.owner()).find(home.slot()).isEmpty();
     }
 
     private void writeBalance(PlayerRef owner, BigDecimal raw, BalancePolicy policy) {

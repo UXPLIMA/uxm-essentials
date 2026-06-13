@@ -14,15 +14,14 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
-import io.papermc.paper.command.brigadier.CommandSourceStack;
-
-import com.mojang.brigadier.CommandDispatcher;
-import com.uxplima.uxmessentials.homes.adapter.HomeServices;
-import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeAdminCommand;
-import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommand;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
@@ -31,7 +30,6 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
-import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
@@ -49,7 +47,6 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -64,37 +61,35 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
-import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the homes Brigadier surface: {@code /home} opens the slot grid for the sender, and
- * {@code /homeadmin <player> del|tp|list} dispatches to the {@link HomeAdmin} use case against the target's set
- * by slot. The grid open is asserted by the menu the sender ends up viewing; the admin verbs by their effect on
- * the fake repository and the recording teleporter.
+ * MockBukkit coverage of the {@code /home} slot grid: opening it renders one filled cell per owned home and an
+ * empty cell for each free slot up to the limit, clicking an empty cell creates a home there at the player's
+ * position through the real {@link CreateHomeAtSlot}, and clicking a filled cell opens the per-home action menu.
+ * The scheduler is a synchronous double so the entity-bound build runs inline, and uxmLib's menu listener is
+ * installed against a mock plugin (reset on teardown) as the other GUI tests do.
  */
-class HomeCommandPathTest {
+class HomeListViewTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
+    private static final List<Integer> CELLS = List.of(10, 11, 12, 13, 14, 15, 16);
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private PlayerMock target;
     private FakeHomeRepository repository;
-    private RecordingTeleporter teleporter;
-    private HomeServices services;
+    private HomeListView listView;
+    private PlayerRef viewer;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
-        player.setOp(true);
-        target = server.addPlayer("Bob");
+        viewer = new PlayerRef(player.getUniqueId(), player.getName());
         repository = new FakeHomeRepository();
-        teleporter = new RecordingTeleporter();
-        services = services();
+        listView = listView();
         Guis.install(plugin);
     }
 
@@ -105,95 +100,89 @@ class HomeCommandPathTest {
     }
 
     @Test
-    void homeOpensTheSlotGrid() {
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
+    void openingTheGridRendersFilledAndEmptyCells() {
+        repository.put(home(0));
+        repository.put(home(2));
 
-        execute(dispatcher, "home");
+        listView.open(player, viewer);
 
-        Inventory open = player.getOpenInventory().getTopInventory();
-        assertThat(open.getHolder()).isInstanceOf(SimpleGui.class);
+        Inventory grid = player.getOpenInventory().getTopInventory();
+        assertThat(grid.getHolder()).isInstanceOf(SimpleGui.class);
+        // The 3-home limit means slots 0..2 are addressable: cells 0 and 2 carry the filled bed, cell 1 the empty
+        // bed, and the cells past the limit fall back to the filler pane.
+        assertThat(grid.getItem(CELLS.get(0)).getType()).isEqualTo(org.bukkit.Material.RED_BED);
+        assertThat(grid.getItem(CELLS.get(2)).getType()).isEqualTo(org.bukkit.Material.RED_BED);
+        assertThat(grid.getItem(CELLS.get(1)).getType()).isEqualTo(org.bukkit.Material.GRAY_BED);
+        assertThat(grid.getItem(CELLS.get(3)).getType()).isEqualTo(org.bukkit.Material.BLACK_STAINED_GLASS_PANE);
     }
 
     @Test
-    void homeAdminDeleteRemovesTheTargetSlot() {
-        repository.put(home(targetRef(), 0));
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
+    void clickingAnEmptyCellCreatesAHomeThere() {
+        listView.open(player, viewer);
 
-        execute(dispatcher, "homeadmin Bob del 1"); // 1-based display number maps to slot index 0
+        fireClick(CELLS.get(1)); // the second cell maps to slot index 1, which is empty
 
-        assertThat(repository.findSlot(targetRef(), HomeSlot.of(0))).isEmpty();
+        assertThat(repository.find(viewer, HomeSlot.of(1))).isPresent();
     }
 
     @Test
-    void homeAdminTeleportDelegatesToTheTeleporter() {
-        repository.put(home(targetRef(), 0));
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
+    void clickingAFilledCellOpensTheActionMenu() {
+        repository.put(home(0));
+        listView.open(player, viewer);
 
-        execute(dispatcher, "homeadmin Bob tp 1");
+        fireClick(CELLS.get(0)); // the first cell holds the home in slot 0
 
-        assertThat(teleporter.hops).isEqualTo(1);
+        InventoryView open = player.getOpenInventory();
+        assertThat(open.getTopInventory().getHolder()).isInstanceOf(SimpleGui.class);
+        // The action menu is a fresh 27-slot (3-row) menu, distinct from the grid by its teleport button slot.
+        assertThat(open.getTopInventory().getSize()).isEqualTo(27);
+        assertThat(open.getTopInventory().getItem(11)).isNotNull();
     }
 
-    private PlayerRef targetRef() {
-        return new PlayerRef(target.getUniqueId(), target.getName());
+    private void fireClick(int slot) {
+        InventoryView view = player.getOpenInventory();
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(event);
     }
 
-    private CommandDispatcher<CommandSourceStack> register() {
-        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        Messages messages = new KeyMessages();
-        dispatcher.getRoot().addChild(new HomeCommand(services, messages).build());
-        dispatcher.getRoot().addChild(new HomeAdminCommand(services, messages).build());
-        return dispatcher;
+    private Home home(int slot) {
+        return Home.create(viewer, HomeSlot.of(slot), Position.of(WORLD, slot, 64, slot), Instant.EPOCH);
     }
 
-    private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {
-        try {
-            dispatcher.execute(input, CommandSourceStackMock.from(player));
-        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
-            throw new AssertionError("command did not parse: " + input, e);
-        }
-    }
-
-    private Home home(PlayerRef owner, int slot) {
-        return Home.create(owner, HomeSlot.of(slot), Position.of(WORLD, slot, 64, slot), Instant.EPOCH);
-    }
-
-    private HomeServices services() {
+    private HomeListView listView() {
         Messages messages = new KeyMessages();
         HomeNotifier notifier = new HomeNotifier(messages, new NoSink());
         DomainEventPublisher events = new NoEvents();
         Clock clock = Clock.system(ZoneOffset.UTC);
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
         Scheduler scheduler = new SyncScheduler();
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
-        IconSelectorView iconSelector = new IconSelectorView(
-                messages,
-                scheduler,
-                new SetHomeIcon(repository, notifier, events, clock),
-                IconSelectorLayout.codeDefault());
+        CreateHomeAtSlot create = new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, 1000, clock);
         HomeActionView actionView = new HomeActionView(
                 messages,
                 scheduler,
-                new TeleportHome(repository, teleporter, notifier),
+                new TeleportHome(repository, new RecordingTeleporter(), notifier),
                 new DeleteHome(repository, notifier, events),
                 new RelocateHome(repository, notifier, events, clock),
                 new RenameHome(repository, notifier, events, clock),
-                iconSelector,
+                new IconSelectorView(
+                        messages,
+                        scheduler,
+                        new SetHomeIcon(repository, notifier, events, clock),
+                        IconSelectorLayout.codeDefault()),
                 new AnvilInput(plugin),
                 HomeActionsLayout.codeDefault(),
-                fmt);
-        HomeListView listView = new HomeListView(
+                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC));
+        return new HomeListView(
                 messages,
                 scheduler,
                 new ListHomes(repository),
                 quota,
-                new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, 1000, clock),
+                create,
                 actionView,
                 HomeListLayout.codeDefault(),
                 1000,
-                fmt);
-        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, events);
-        return new HomeServices(listView, actionView, iconSelector, homeAdmin, new ServerPlayerLookup(), repository);
+                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC));
     }
 
     /** A map-backed slot repository keyed by (owner, slot). */
@@ -219,6 +208,10 @@ class HomeCommandPathTest {
             return Optional.ofNullable(owned(owner).get(slot.index()));
         }
 
+        Optional<Home> find(PlayerRef owner, HomeSlot slot) {
+            return findSlot(owner, slot);
+        }
+
         @Override
         public void save(Home home) {
             put(home);
@@ -235,31 +228,8 @@ class HomeCommandPathTest {
     }
 
     private static final class RecordingTeleporter implements HomeTeleporter {
-        int hops;
-
         @Override
-        public void teleportTo(PlayerRef who, Home home) {
-            hops++;
-        }
-    }
-
-    /** Resolves online players by name through the live mock server. */
-    private final class ServerPlayerLookup implements PlayerLookup {
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.ofNullable(server.getPlayerExact(name))
-                    .map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.ofNullable(server.getPlayer(uuid)).map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return server.getPlayer(uuid) != null;
-        }
+        public void teleportTo(PlayerRef who, Home home) {}
     }
 
     private static final class NoSink implements MessageSink {
