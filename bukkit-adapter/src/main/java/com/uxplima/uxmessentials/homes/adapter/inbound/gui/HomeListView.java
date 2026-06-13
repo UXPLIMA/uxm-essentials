@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
 import com.uxplima.uxmlib.gui.item.GuiItem;
@@ -80,26 +81,32 @@ public final class HomeListView {
         this.miniMessage = MiniMessage.miniMessage();
     }
 
-    /** Open the slot grid for {@code viewer} on its first page, on the viewer's entity thread. */
+    /** Open the slot grid for {@code viewer} on its first page; loads off-thread, then builds on the entity thread. */
     public void open(Player player, PlayerRef viewer) {
         openPage(player, viewer, 0);
     }
 
     private void openPage(Player player, PlayerRef viewer, int page) {
-        scheduler.onEntity(viewer, () -> {
+        // CLAUDE.md §3: load the homes and resolve the slot ceiling off any tick thread (the read hits SQLite),
+        // then hop back to the viewer's entity thread to build and open the Bukkit inventory.
+        scheduler.async(() -> {
             Map<Integer, Home> bySlot = bySlot(viewer);
             int maxSlots = maxSlots(viewer, player);
-            int pages = pageCount(maxSlots);
-            int safePage = Math.max(0, Math.min(page, pages - 1));
-            SimpleGui gui = Guis.gui()
-                    .title(text(viewer, HomesMessageKey.HOME_MENU_TITLE, Map.of()))
-                    .rows(layout.rows())
-                    .build();
-            fill(gui);
-            renderCells(player, viewer, gui, bySlot, maxSlots, safePage);
-            renderNavigation(player, viewer, gui, safePage, pages);
-            gui.open(player);
+            scheduler.onEntity(viewer, () -> buildAndOpen(player, viewer, bySlot, maxSlots, page));
         });
+    }
+
+    private void buildAndOpen(Player player, PlayerRef viewer, Map<Integer, Home> bySlot, int maxSlots, int page) {
+        int pages = pageCount(maxSlots);
+        int safePage = Math.max(0, Math.min(page, pages - 1));
+        SimpleGui gui = Guis.gui()
+                .title(text(viewer, HomesMessageKey.HOME_MENU_TITLE, Map.of()))
+                .rows(layout.rows())
+                .build();
+        fill(gui);
+        renderCells(player, viewer, gui, bySlot, maxSlots, safePage);
+        renderNavigation(player, viewer, gui, safePage, pages);
+        gui.open(player);
     }
 
     private void renderCells(
@@ -146,10 +153,12 @@ public final class HomeListView {
     }
 
     private void create(Player player, PlayerRef viewer, int slotIndex) {
-        scheduler.onEntity(viewer, () -> {
-            org.bukkit.Location at = Objects.requireNonNull(player.getLocation(), "player location");
-            createHome.create(viewer, HomeSlot.of(slotIndex), BukkitRefs.toPosition(at));
-            open(player, viewer);
+        // The click already runs on the viewer's entity thread, so read the live location here; only the
+        // persisting use case moves off-thread, then we hop back to rebuild the grid.
+        Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
+        scheduler.async(() -> {
+            createHome.create(viewer, HomeSlot.of(slotIndex), at);
+            scheduler.onEntity(viewer, () -> open(player, viewer));
         });
     }
 
