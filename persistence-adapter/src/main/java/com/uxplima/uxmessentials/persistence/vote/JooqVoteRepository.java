@@ -134,6 +134,19 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
     }
 
     @Override
+    public int queuedCount(PlayerRef player) {
+        Objects.requireNonNull(player, "player");
+        // One row per queued command, so counting the player's rows yields the command count directly.
+        return read(dsl -> {
+            Integer count = dsl.selectCount()
+                    .from(VOTE_QUEUE)
+                    .where(VOTE_QUEUE.PLAYER.eq(player.uuid().toString()))
+                    .fetchOne(0, Integer.class);
+            return count == null ? 0 : count;
+        });
+    }
+
+    @Override
     public VoteTally totalsOf(PlayerRef player) {
         Objects.requireNonNull(player, "player");
         return read(dsl -> dsl.selectFrom(VOTE_TOTALS)

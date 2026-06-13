@@ -76,6 +76,11 @@ public final class CachedVoteRepository implements VoteRepository {
     }
 
     @Override
+    public int queuedCount(PlayerRef player) {
+        return delegate.queuedCount(player);
+    }
+
+    @Override
     public VoteTally totalsOf(PlayerRef player) {
         return delegate.totalsOf(player);
     }

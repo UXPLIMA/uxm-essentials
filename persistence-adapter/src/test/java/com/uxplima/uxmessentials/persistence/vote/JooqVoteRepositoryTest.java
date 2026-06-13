@@ -91,6 +91,37 @@ class JooqVoteRepositoryTest {
         assertThat(drained.get(0).commands()).containsExactly("first", "second", "third");
     }
 
+    @Test
+    void queuedCountIsZeroForAFreshPlayer() {
+        assertThat(repository.queuedCount(bob)).isZero();
+    }
+
+    @Test
+    void queuedCountReflectsTheNumberOfCommandsInTheQueue() {
+        repository.enqueue(
+                new QueuedReward(bob, List.of("give {player} diamond 1", "give {player} emerald 2"), Instant.EPOCH));
+
+        assertThat(repository.queuedCount(bob)).isEqualTo(2);
+    }
+
+    @Test
+    void queuedCountReturnsToZeroAfterDrain() {
+        repository.enqueue(new QueuedReward(bob, List.of("first", "second"), Instant.EPOCH));
+
+        repository.drainFor(bob);
+
+        assertThat(repository.queuedCount(bob)).isZero();
+    }
+
+    @Test
+    void queuedCountIsIndependentPerPlayer() {
+        PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
+        repository.enqueue(new QueuedReward(bob, List.of("one", "two", "three"), Instant.EPOCH));
+
+        assertThat(repository.queuedCount(bob)).isEqualTo(3);
+        assertThat(repository.queuedCount(alice)).isZero();
+    }
+
     // -------------------------------------------------------------------------
     // vote_totals: totalsOf / saveTotals / topVoters
     // -------------------------------------------------------------------------
