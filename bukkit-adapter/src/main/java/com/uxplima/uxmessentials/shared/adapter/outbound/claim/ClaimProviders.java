@@ -17,11 +17,13 @@ import org.jspecify.annotations.NullMarked;
  * provider when none is present — mirroring how {@code MapMarkerPublishers} discovers a map plugin and
  * {@code ForeignEconomyProviders} discovers an economy provider.
  *
- * <p>Priority is uxmClaims, then Lands, then GriefPrevention: the in-house plugin wins when present, then the
- * two third-party soft-depends. Each candidate is constructed and asked {@link ClaimProvider#active()} in
- * order; the first active one is returned. Constructing a candidate never loads its plugin SDK (each provider
- * keeps typed references behind its own present-guard), so probing them on a server without any claim plugin
- * is safe and the no-op {@link #INACTIVE} provider is returned.
+ * <p>Priority is uxmClaims, then Lands, GriefPrevention, GriefDefender, ExcellentClaims, SimpleClaimSystem,
+ * RClaim, XClaim, Homestead: the in-house plugin wins when present, then the third-party soft-depends. Each
+ * candidate is constructed and asked {@link ClaimProvider#active()} in order; the first active one is
+ * returned. Constructing a candidate never loads its plugin SDK (each typed provider keeps its references
+ * behind its own present-guard, and the reflective providers touch no SDK type at class-load time), so
+ * probing them on a server without any claim plugin is safe and the no-op {@link #INACTIVE} provider is
+ * returned.
  */
 @NullMarked
 public final class ClaimProviders {
@@ -39,7 +41,13 @@ public final class ClaimProviders {
         List<ClaimProvider> candidates = List.of(
                 new UxmClaimsClaimProvider(plugin, server, log),
                 new LandsClaimProvider(plugin, server, log),
-                new GriefPreventionClaimProvider(plugin, server, log));
+                new GriefPreventionClaimProvider(plugin, server, log),
+                new GriefDefenderClaimProvider(plugin, server, log),
+                new ExcellentClaimsClaimProvider(plugin, server, log),
+                new SimpleClaimSystemClaimProvider(plugin, server, log),
+                new RClaimClaimProvider(plugin, server, log),
+                new XClaimClaimProvider(plugin, server, log),
+                new HomesteadClaimProvider(plugin, server, log));
 
         for (ClaimProvider candidate : candidates) {
             if (candidate.active()) {

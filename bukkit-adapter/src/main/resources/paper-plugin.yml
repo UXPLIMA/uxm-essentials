@@ -42,6 +42,33 @@ dependencies:
     squaremap:
       load: BEFORE
       required: false
+    # Land-claim plugins back the homes claim-policy integration (homes set/teleport respect claims). Loaded
+    # before us so each provider's plugin-present guard sees them on enable; reached only past that guard
+    # (typed providers compileOnly, the rest reflective), so the plugin runs fully without any of them.
+    Lands:
+      load: BEFORE
+      required: false
+    GriefPrevention:
+      load: BEFORE
+      required: false
+    GriefDefender:
+      load: BEFORE
+      required: false
+    ExcellentClaims:
+      load: BEFORE
+      required: false
+    SimpleClaimSystem:
+      load: BEFORE
+      required: false
+    RClaim:
+      load: BEFORE
+      required: false
+    XClaim:
+      load: BEFORE
+      required: false
+    Homestead:
+      load: BEFORE
+      required: false
 
 # Permission nodes are declared here (the permissions source of truth, docs/permissions.md).
 # The per-module tier uxmessentials.module.<name> and the numbered quota nodes are added with

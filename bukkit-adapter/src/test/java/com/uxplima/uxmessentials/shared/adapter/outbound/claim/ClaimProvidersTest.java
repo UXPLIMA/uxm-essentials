@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.claim;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.bukkit.plugin.Plugin;
@@ -48,9 +49,10 @@ class ClaimProvidersTest {
 
     @Test
     void detect_doesNotThrow_whenNoClaimPluginInstalled() {
-        // The probe constructs every candidate (uxmClaims, Lands, GriefPrevention) and calls active() on each.
-        // None of those SDKs is on the test classpath, so this would throw NoClassDefFoundError if a provider
-        // touched its SDK before the present-guard. It must not.
+        // The probe constructs every candidate (uxmClaims, Lands, GriefPrevention, GriefDefender,
+        // ExcellentClaims, SimpleClaimSystem, RClaim, XClaim, Homestead) and calls active() on each. None of
+        // those SDKs is on the test classpath, so this would throw NoClassDefFoundError if a provider touched
+        // its SDK before the present-guard. It must not.
         assertThatCode(() -> ClaimProviders.detect(plugin, server, noOpLog())).doesNotThrowAnyException();
     }
 
@@ -59,6 +61,33 @@ class ClaimProvidersTest {
         ClaimProvider provider = ClaimProviders.detect(plugin, server, noOpLog());
         WorldRef world = new WorldRef(UUID.randomUUID(), "world");
         assertThat(provider.claimAt(world, 10, 20)).isEmpty();
+    }
+
+    @Test
+    void everyCandidate_constructsAndProbesWithoutLoadingItsSdk() {
+        // Each provider added in phase 2 must keep its SDK (typed compileOnly jar) or reflective API
+        // references behind its plugin-present guard. With no claim plugin installed, constructing one and
+        // asking active() / claimAt() must report inactive+empty and must NOT throw NoClassDefFoundError —
+        // the same lazy-structure proof the discoverer relies on, asserted per provider.
+        WorldRef world = new WorldRef(UUID.randomUUID(), "world");
+        for (ClaimProvider provider : candidates()) {
+            assertThatCode(() -> {
+                        assertThat(provider.active()).isFalse();
+                        assertThat(provider.claimAt(world, 10, 20)).isEmpty();
+                    })
+                    .as("provider %s", provider.getClass().getSimpleName())
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    private List<ClaimProvider> candidates() {
+        return List.of(
+                new GriefDefenderClaimProvider(plugin, server, noOpLog()),
+                new ExcellentClaimsClaimProvider(plugin, server, noOpLog()),
+                new SimpleClaimSystemClaimProvider(plugin, server, noOpLog()),
+                new RClaimClaimProvider(plugin, server, noOpLog()),
+                new XClaimClaimProvider(plugin, server, noOpLog()),
+                new HomesteadClaimProvider(plugin, server, noOpLog()));
     }
 
     private static Logger noOpLog() {

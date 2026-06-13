@@ -34,6 +34,8 @@ vault          = "1.7.1"        # com.github.MilkBowl:VaultAPI — JitPack, NOT 
 # claim-plugin hook integrations — compileOnly soft-depends; adapters bind only when the plugin is present
 lands          = "6.26.18"      # com.github.angeschossen:LandsAPI — JitPack, NOT Maven Central (verified 2026-06-13)
 griefprevention = "16.18"       # com.github.TechFortress:GriefPrevention — JitPack (verified 2026-06-13)
+simpleclaimsystem = "1.13.1"    # com.github.Xyness:SimpleClaimSystem — JitPack, NOT Maven Central (verified 2026-06-13)
+rclaim         = "2.6.0"        # com.github.Weesli:RClaim — JitPack, NOT Maven Central (verified 2026-06-13)
 
 # placeholder integration (see docs/11-economy-integration.md soft-depend pattern, ADR 0004)
 placeholderapi = "2.11.6"       # me.clip:placeholderapi — extendedclip repo, NOT Maven Central (verified 2026-05-31)
@@ -98,6 +100,8 @@ vault-api         = { module = "com.github.MilkBowl:VaultAPI",                  
 # claim-plugin hook APIs — compileOnly soft-depends; adapters bind only when the plugin is present
 hook-lands        = { module = "com.github.angeschossen:LandsAPI",               version.ref = "lands" }
 hook-griefprevention = { module = "com.github.TechFortress:GriefPrevention",     version.ref = "griefprevention" }
+hook-simpleclaimsystem = { module = "com.github.Xyness:SimpleClaimSystem",       version.ref = "simpleclaimsystem" }
+hook-rclaim       = { module = "com.github.Weesli:RClaim",                        version.ref = "rclaim" }
 
 # placeholder API — compileOnly soft-depend; the expansion registers only when the plugin is present
 placeholderapi    = { module = "me.clip:placeholderapi",                         version.ref = "placeholderapi" }

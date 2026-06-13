@@ -30,6 +30,8 @@ dependencies {
     // these only when the plugin is present (checked via Bukkit ServicesManager / plugin lookup).
     compileOnly(libs.hook.lands)
     compileOnly(libs.hook.griefprevention)
+    compileOnly(libs.hook.simpleclaimsystem)
+    compileOnly(libs.hook.rclaim)
 
     // PlaceholderAPI soft-depend — compileOnly: the expansion and the message bridge
     // touch these symbols only past the plugin-present guard, so the plugin runs fully
