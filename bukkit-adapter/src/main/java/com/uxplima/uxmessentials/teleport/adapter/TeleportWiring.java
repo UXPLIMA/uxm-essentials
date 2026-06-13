@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RequestExpirySweep;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.TeleportListeners;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.AsyncTeleportExecutor;
@@ -35,6 +36,7 @@ import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.PlayerNotifier;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
+import com.uxplima.uxmessentials.teleport.application.ResolveRespawn;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -73,16 +75,23 @@ public final class TeleportWiring {
         WarmupTracker warmupTracker = new WarmupTracker();
         // The jail gate forwards to NEVER until the moderation context lands and rebinds it (soft couple).
         MutableJailGate jailGate = new MutableJailGate();
-        TeleportServices services = assemble(
-                plugin, kernel, config, persistence, settings, notifier, warmupTracker, jailGate, clock, running);
+        // The home-respawn seam resolves to empty until the homes context lands and rebinds it (soft couple),
+        // so a HOME step in a configured respawn chain falls through whenever homes is disabled.
+        MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
+        SpawnDirectory spawns = spawns(plugin, persistence);
+        TeleportServices services =
+                assemble(plugin, kernel, config, settings, notifier, warmupTracker, jailGate, spawns, clock, running);
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), running::get);
+        RespawnListener respawnListener =
+                new RespawnListener(new ResolveRespawn(settings), spawns, homeRespawnLocator, plugin.getServer());
         return new Wired(
                 services,
                 TeleportCommands.all(services, kernel.messages()),
-                listeners(services, config),
+                listeners(services, config, respawnListener),
                 sweep,
                 jailGate,
+                homeRespawnLocator,
                 running);
     }
 
@@ -90,11 +99,11 @@ public final class TeleportWiring {
             Plugin plugin,
             KernelPorts kernel,
             ConfigStore config,
-            Persistence persistence,
             TeleportSettings settings,
             PlayerNotifier notifier,
             WarmupTracker warmupTracker,
             MutableJailGate jailGate,
+            SpawnDirectory spawns,
             Clock clock,
             AtomicBoolean running) {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
@@ -136,7 +145,7 @@ public final class TeleportWiring {
                 .listPendingRequests(new ListPendingRequests(requests, notifier))
                 .captureBack(new CaptureBack(backStore, engine, notifier, kernel.events(), clock))
                 .resolveRtp(new ResolveRtp(rtpQueue, kernel.worldLookup(), engine, notifier, settings))
-                .resolveSpawn(new ResolveSpawn(spawns(plugin, persistence), kernel.worldLookup(), engine, notifier))
+                .resolveSpawn(new ResolveSpawn(spawns, kernel.worldLookup(), engine, notifier))
                 .build();
     }
 
@@ -155,9 +164,15 @@ public final class TeleportWiring {
         return new VanillaFallbackSpawnDirectory(SpawnDirectories.jooq(persistence), plugin.getServer());
     }
 
-    private static List<Listener> listeners(TeleportServices services, ConfigStore config) {
-        return List.of(new TeleportListeners(
-                services.warmupTracker(), services.captureBack(), config, services.settings()::backCapturePolicy));
+    private static List<Listener> listeners(
+            TeleportServices services, ConfigStore config, RespawnListener respawnListener) {
+        return List.of(
+                new TeleportListeners(
+                        services.warmupTracker(),
+                        services.captureBack(),
+                        config,
+                        services.settings()::backCapturePolicy),
+                respawnListener);
     }
 
     /**
@@ -169,6 +184,8 @@ public final class TeleportWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
      * @param expirySweep the self-rescheduling TTL sweep, armed by the caller
+     * @param jailGate the rebindable jail gate moderation rebinds when it lands
+     * @param homeRespawnLocator the rebindable home-respawn seam homes rebinds when it lands
      * @param running the flag flipped false on stop so the sweep and refill loops exit
      */
     public record Wired(
@@ -177,6 +194,7 @@ public final class TeleportWiring {
             List<Listener> listeners,
             RequestExpirySweep expirySweep,
             MutableJailGate jailGate,
+            MutableHomeRespawnLocator homeRespawnLocator,
             AtomicBoolean running) {
 
         public Wired {
@@ -185,6 +203,7 @@ public final class TeleportWiring {
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(expirySweep, "expirySweep");
             Objects.requireNonNull(jailGate, "jailGate");
+            Objects.requireNonNull(homeRespawnLocator, "homeRespawnLocator");
             Objects.requireNonNull(running, "running");
         }
 

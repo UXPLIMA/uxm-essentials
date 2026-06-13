@@ -32,6 +32,8 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.holograms.adapter.HologramsWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
+import com.uxplima.uxmessentials.homes.adapter.outbound.RepositoryHomeRespawnLocator;
+import com.uxplima.uxmessentials.homes.application.HomeRespawnLocator;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
@@ -78,6 +80,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -346,6 +349,8 @@ public final class PluginModule {
         links.teleportEngine = wired.services().engine();
         // Captured for moderation, which lands later and rebinds this jail gate to the real jail policy.
         links.jailGate = wired.jailGate();
+        // Captured for homes, which lands later and rebinds this seam so the respawn chain's HOME step resolves.
+        links.homeRespawnLocator = wired.homeRespawnLocator();
     }
 
     private static void wireHomes(
@@ -362,7 +367,18 @@ public final class PluginModule {
                 plugin, ctx, persistence, engine, Optional.ofNullable(links.homeEconomy), bus, guiLayouts, resources);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // Rebind the teleport context's home-respawn seam (built while it still resolved to empty) to the
+        // cache-backed locator, so a HOME step in a configured respawn chain now lands on the player's home.
+        // When teleport is disabled its holder is absent and this bind is a no-op.
+        bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository()));
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
+    }
+
+    private static void bindHomeRespawn(ContextLinks links, HomeRespawnLocator locator) {
+        MutableHomeRespawnLocator holder = links.homeRespawnLocator;
+        if (holder != null) {
+            holder.bind(locator);
+        }
     }
 
     private static void wireEconomy(
@@ -623,6 +639,7 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
+        private @org.jspecify.annotations.Nullable MutableHomeRespawnLocator homeRespawnLocator;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                 warpEditorView;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle

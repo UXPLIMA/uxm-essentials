@@ -232,12 +232,16 @@ public final class TeleportSettings {
         return new YBand(minY, maxY);
     }
 
-    /** The per-world respawn chain; falls back to {@link RespawnChain#vanillaDefault()} when unset. */
+    /**
+     * The per-world respawn chain parsed from {@code respawn.chain.<world>}, or an empty chain when the
+     * world configures none. An empty chain resolves to nothing, so the respawn listener leaves the event
+     * untouched and the player respawns vanilla — the chain is opt-in per world, never overriding a death
+     * landing an operator has not asked us to manage.
+     */
     public RespawnChain respawnChain(WorldRef world) {
         Objects.requireNonNull(world, "world");
         List<String> tokens = config.getStringList("respawn.chain." + world.name(), List.of());
-        RespawnChain chain = RespawnChain.parse(tokens);
-        return chain.isEmpty() ? RespawnChain.vanillaDefault() : chain;
+        return RespawnChain.parse(tokens);
     }
 
     /** The configured fallback world an {@code /rtp} redirects to when its world has no queue, or empty. */

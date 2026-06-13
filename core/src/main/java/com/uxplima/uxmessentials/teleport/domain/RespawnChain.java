@@ -37,11 +37,6 @@ public record RespawnChain(List<RespawnStep> steps) {
         return new RespawnChain(parsed);
     }
 
-    /** The fallback chain when a world configures none: spawn, then a random teleport. */
-    public static RespawnChain vanillaDefault() {
-        return new RespawnChain(List.of(RespawnStep.of(RespawnStepKind.SPAWN), RespawnStep.of(RespawnStepKind.RANDOM)));
-    }
-
     /** True when the chain names no steps — the caller falls back to vanilla respawn. */
     public boolean isEmpty() {
         return steps.isEmpty();
