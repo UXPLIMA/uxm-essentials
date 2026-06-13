@@ -17,7 +17,7 @@ import java.util.UUID;
  * pure-codec pattern).
  *
  * <p>Wire layout: a one-byte protocol {@link #VERSION}, then a one-byte {@link NetworkMessage.MessageType}
- * ordinal, then the variant's fields. The version byte lets a future format change be detected rather than
+ * wire tag, then the variant's fields. The version byte lets a future format change be detected rather than
  * silently mis-decoded; {@code bus-channel} and frame-codec compatibility are guaranteed across patch
  * versions only ({@code docs/09-deployment.md} "Updating"), so a mismatched version is rejected loudly.
  * UUIDs are written as two longs; strings via {@link DataOutputStream#writeUTF}.
