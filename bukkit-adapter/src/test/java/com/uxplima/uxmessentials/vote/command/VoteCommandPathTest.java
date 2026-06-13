@@ -2,9 +2,7 @@ package com.uxplima.uxmessentials.vote.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,20 +29,25 @@ import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
-import com.uxplima.uxmessentials.vote.application.HandleVote.VoteRewards;
+import com.uxplima.uxmessentials.vote.application.HandleVote.PartyReward;
+import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
+import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.RewardDispatcher;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
+import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
+import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
+import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -222,13 +225,13 @@ class VoteCommandPathTest {
         VoteNotifier notifier = new VoteNotifier(messages, new NoSink());
         HandleVote handleVote = new HandleVote(
                 repository,
-                new NoOpRewardDispatcher(),
+                new RewardEngine(RewardCatalog.empty()),
+                new NoOpRewardApplier(),
+                new NoOpVoteContext(),
                 new NoOpVoteAudience(),
                 notifier,
                 new NoEvents(),
-                new VoteRewards(List.of(), List.of(), 25),
-                lookup,
-                Clock.fixed(Instant.EPOCH, ZoneId.of("UTC")),
+                new PartyReward(List.of(), 25),
                 ZoneId.of("UTC"));
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpRewardDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
@@ -386,6 +389,33 @@ class VoteCommandPathTest {
     private static final class NoOpRewardDispatcher implements RewardDispatcher {
         @Override
         public void dispatch(List<String> commands, String playerName) {}
+    }
+
+    private static final class NoOpRewardApplier implements RewardApplier {
+        @Override
+        public void apply(PlayerRef voter, boolean online, RewardGrant grant) {}
+    }
+
+    private static final class NoOpVoteContext implements VoteContext {
+        @Override
+        public String worldOf(PlayerRef voter) {
+            return "";
+        }
+
+        @Override
+        public boolean hasPermission(PlayerRef voter, String node) {
+            return false;
+        }
+
+        @Override
+        public boolean roll(int chancePercent) {
+            return chancePercent >= 100;
+        }
+
+        @Override
+        public boolean isOnline(PlayerRef voter) {
+            return false;
+        }
     }
 
     private static final class NoOpVoteAudience implements VoteAudience {

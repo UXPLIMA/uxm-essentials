@@ -1,6 +1,6 @@
 package com.uxplima.uxmessentials.vote.adapter;
 
-import java.time.Clock;
+import java.nio.file.Path;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
@@ -18,19 +18,24 @@ import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VoteJoinListener;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VotifierListener;
+import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardApplier;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardDispatcher;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteAudience;
+import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteContext;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
-import com.uxplima.uxmessentials.vote.application.HandleVote.VoteRewards;
+import com.uxplima.uxmessentials.vote.application.HandleVote.PartyReward;
+import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
-import com.uxplima.uxmessentials.vote.application.port.RewardDispatcher;
+import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
+import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,12 +46,14 @@ import org.jspecify.annotations.NullMarked;
  * context is wired — nothing else news up its classes.
  *
  * <p>The repository is the jOOQ adapter behind a thin party-counter cache (write-through at the database).
- * The reward dispatcher runs configured console commands on the global region thread with the
- * {@code {player}} substitution; the audience snapshots the online players for the party rewards and the
- * thank-you broadcast. The reward and vote-link lists are operator config content (empty out of the box, so
- * the module ships inert). The Votifier listener self-registers behind a plugin-present guard in
- * {@link Wired#startBackgroundWork()} and is dropped in {@link Wired#stop()}, so the module runs unchanged
- * whether or not Votifier is installed.
+ * The reward engine resolves the structured {@code rewards} catalog (per-vote / per-site / first-vote /
+ * milestone specs) parsed from the module config by {@link RewardCatalogLoader}; the {@link BukkitRewardApplier}
+ * applies each resolved grant — console commands, MiniMessage messages and broadcasts, and item grants for an
+ * online voter, queued commands for an offline one — and the {@link BukkitVoteContext} supplies the world,
+ * permission, online, and chance-roll seams the engine reads. The party reward stays a flat command list with
+ * its threshold. The {@link BukkitRewardDispatcher} is kept for the offline-drain path ({@code ApplyQueuedRewards}).
+ * The Votifier listener self-registers behind a plugin-present guard in {@link Wired#startBackgroundWork()} and
+ * is dropped in {@link Wired#stop()}, so the module runs unchanged whether or not Votifier is installed.
  */
 @NullMarked
 public final class VoteWiring {
@@ -63,40 +70,47 @@ public final class VoteWiring {
         KernelPorts kernel = ctx.kernel();
         VoteRepository repository = VoteRepositories.cached(persistence);
         VoteNotifier notifier = new VoteNotifier(kernel.messages(), kernel.messageSink());
-        RewardDispatcher dispatcher = new BukkitRewardDispatcher(kernel.scheduler());
+        BukkitRewardDispatcher dispatcher = new BukkitRewardDispatcher(kernel.scheduler());
         VoteAudience audience = new BukkitVoteAudience();
-        VoteRewards rewards = rewards(ctx.config());
+        RewardApplier applier = new BukkitRewardApplier(repository, dispatcher, kernel.scheduler(), kernel.log());
+        VoteContext context = new BukkitVoteContext(kernel.permissions());
+        RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel));
+        PartyReward party = party(ctx.config());
         List<String> voteLinks = ctx.config().getStringList("vote-links", List.of());
 
-        VoteServices services = assemble(kernel, repository, dispatcher, audience, notifier, rewards, voteLinks);
+        VoteServices services =
+                assemble(kernel, repository, applier, context, engine, audience, notifier, party, voteLinks);
         VotifierListener votifier = new VotifierListener(plugin, services, kernel.playerLookup(), kernel.log());
         List<CommandRegistration> commands = List.of(new VoteCommand(services), new VotePartyCommand(services));
         List<Listener> listeners =
                 List.of(votifier, new VoteJoinListener(services.applyQueuedRewards(), kernel.scheduler()));
-        return new Wired(commands, listeners, votifier, repository, rewards.partyThreshold());
+        return new Wired(commands, listeners, votifier, repository, party.threshold());
     }
 
     private static VoteServices assemble(
             KernelPorts kernel,
             VoteRepository repository,
-            RewardDispatcher dispatcher,
+            RewardApplier applier,
+            VoteContext context,
+            RewardEngine engine,
             VoteAudience audience,
             VoteNotifier notifier,
-            VoteRewards rewards,
+            PartyReward party,
             List<String> voteLinks) {
         HandleVote handleVote = new HandleVote(
                 repository,
-                dispatcher,
+                engine,
+                applier,
+                context,
                 audience,
                 notifier,
                 kernel.events(),
-                rewards,
-                kernel.playerLookup(),
-                Clock.systemUTC(),
+                party,
                 ZoneId.systemDefault());
-        ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, dispatcher);
+        ApplyQueuedRewards applyQueuedRewards =
+                new ApplyQueuedRewards(repository, new BukkitRewardDispatcher(kernel.scheduler()));
         VoteLinks links = new VoteLinks(voteLinks, notifier);
-        VotePartyStatus status = new VotePartyStatus(repository, notifier, rewards.partyThreshold());
+        VotePartyStatus status = new VotePartyStatus(repository, notifier, party.threshold());
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
         return new VoteServices(
@@ -111,11 +125,19 @@ public final class VoteWiring {
                 kernel.messages());
     }
 
-    private static VoteRewards rewards(ConfigStore config) {
-        List<String> perVote = config.getStringList("rewards", List.of());
-        List<String> party = config.getStringList("voteparty.rewards", List.of());
+    private static RewardCatalog loadCatalog(Plugin plugin, KernelPorts kernel) {
+        Path moduleConfig = plugin.getDataFolder()
+                .toPath()
+                .resolve("modules")
+                .resolve("vote")
+                .resolve("config.conf");
+        return RewardCatalogLoader.loadFrom(moduleConfig, kernel.log());
+    }
+
+    private static PartyReward party(ConfigStore config) {
+        List<String> commands = config.getStringList("voteparty.rewards", List.of());
         int threshold = Math.max(1, config.getInt("voteparty.threshold", DEFAULT_THRESHOLD));
-        return new VoteRewards(perVote, party, threshold);
+        return new PartyReward(commands, threshold);
     }
 
     /**
