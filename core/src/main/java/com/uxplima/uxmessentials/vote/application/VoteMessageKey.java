@@ -81,6 +81,10 @@ public enum VoteMessageKey implements MessageKey {
     VOTE_REMIND_ENABLED("vote.remind.enabled"),
     VOTE_REMIND_DISABLED("vote.remind.disabled"),
 
+    // vote-broadcast visibility toggle feedback
+    VOTE_BROADCASTS_SHOWN("vote.broadcasts.shown"),
+    VOTE_BROADCASTS_HIDDEN("vote.broadcasts.hidden"),
+
     // /vote sites GUI — title, per-site status, and clickable URL prompt
     VOTE_GUI_TITLE("vote.gui.title"),
     VOTE_GUI_SITE_VOTABLE("vote.gui.site.votable"),
