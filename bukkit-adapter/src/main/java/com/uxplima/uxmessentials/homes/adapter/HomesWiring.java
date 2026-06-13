@@ -130,7 +130,11 @@ public final class HomesWiring {
         HomeServices services =
                 assemble(plugin, ctx, repository, notifier, quota, teleporter, homeEconomy, guiLayouts, resources);
         HomesJoinListener joinWarmer = new HomesJoinListener(repository, kernel.scheduler());
-        return new Wired(HomeCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
+        return new Wired(
+                HomeCommands.all(services, kernel.messages(), kernel.scheduler()),
+                List.of(joinWarmer),
+                repository,
+                quota);
     }
 
     private static HomeServices assemble(
@@ -201,7 +205,7 @@ public final class HomesWiring {
                 listLayout(guiLayouts),
                 unlimitedMax,
                 dateFormat);
-        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, kernel.events());
+        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, kernel.events(), clock);
         return new HomeServices(listView, actionView, iconSelector, homeAdmin, kernel.playerLookup(), repository);
     }
 

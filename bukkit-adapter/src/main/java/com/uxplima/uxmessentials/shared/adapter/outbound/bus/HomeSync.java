@@ -93,6 +93,12 @@ public final class HomeSync {
         }
 
         @Override
+        public void deleteAll(PlayerRef owner) {
+            delegate.deleteAll(owner);
+            announce(owner);
+        }
+
+        @Override
         public Optional<List<Home>> peek(PlayerRef owner) {
             return delegate.peek(owner);
         }

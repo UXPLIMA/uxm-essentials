@@ -136,6 +136,18 @@ class JooqHomeRepositoryTest {
     }
 
     @Test
+    void deleteAllRemovesEveryHomeForTheOwner() {
+        repository.save(home(HomeSlot.of(0), 0, 64, 0));
+        repository.save(home(HomeSlot.of(1), 1, 64, 1));
+
+        repository.deleteAll(owner);
+
+        assertThat(repository.count(owner)).isEqualTo(0);
+        assertThat(repository.findSlot(owner, HomeSlot.of(0))).isEmpty();
+        assertThat(repository.findSlot(owner, HomeSlot.of(1))).isEmpty();
+    }
+
+    @Test
     void absentLabelAndIconReadAsEmpty() {
         repository.save(home(HomeSlot.of(0), 5, 64, 5));
 

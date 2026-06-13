@@ -138,6 +138,62 @@ class HomeCommandPathTest {
         assertThat(teleporter.hops).isEqualTo(1);
     }
 
+    @Test
+    void homeAdminSetCreatesAHomeForTheTarget() {
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "homeadmin Bob set 1");
+
+        assertThat(repository.findSlot(targetRef(), HomeSlot.of(0))).isPresent();
+    }
+
+    @Test
+    void homeAdminSetDefaultSlotUsesNextFreeIndex() {
+        repository.put(home(targetRef(), 0));
+        repository.put(home(targetRef(), 1));
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        // No slot arg — default slot should be max+1 = 2 (index 2).
+        execute(dispatcher, "homeadmin Bob set");
+
+        assertThat(repository.findSlot(targetRef(), HomeSlot.of(2))).isPresent();
+    }
+
+    @Test
+    void homeAdminClearRemovesAllTargetHomes() {
+        repository.put(home(targetRef(), 0));
+        repository.put(home(targetRef(), 1));
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "homeadmin Bob clear");
+
+        assertThat(repository.count(targetRef())).isEqualTo(0);
+    }
+
+    @Test
+    void homeAdminInfoDoesNotThrowWhenHomeExists() {
+        repository.put(home(targetRef(), 0));
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        // Info resolves and sends a message; we assert no exception is thrown.
+        execute(dispatcher, "homeadmin Bob info 1");
+    }
+
+    @Test
+    void homeAdminOfflineTargetResolutionFallsThroughFindByName() {
+        // Bob is in the fake lookup as an "offline" player returned only by findByName.
+        // We rebuild services with a lookup that returns Bob offline-only.
+        FakeOfflinePlayerLookup offlineLookup = new FakeOfflinePlayerLookup(targetRef());
+        services = servicesWithLookup(offlineLookup);
+        repository.put(home(targetRef(), 0));
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        // del works even though Bob is "offline" (not returned by findOnlineByName).
+        execute(dispatcher, "homeadmin Bob del 1");
+
+        assertThat(repository.findSlot(targetRef(), HomeSlot.of(0))).isEmpty();
+    }
+
     private PlayerRef targetRef() {
         return new PlayerRef(target.getUniqueId(), target.getName());
     }
@@ -146,7 +202,7 @@ class HomeCommandPathTest {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         Messages messages = new KeyMessages();
         dispatcher.getRoot().addChild(new HomeCommand(services, messages).build());
-        dispatcher.getRoot().addChild(new HomeAdminCommand(services, messages).build());
+        dispatcher.getRoot().addChild(new HomeAdminCommand(services, messages, new SyncScheduler()).build());
         return dispatcher;
     }
 
@@ -208,7 +264,7 @@ class HomeCommandPathTest {
                 HomeListLayout.codeDefault(),
                 1000,
                 fmt);
-        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, events);
+        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, events, clock);
         return new HomeServices(listView, actionView, iconSelector, homeAdmin, new ServerPlayerLookup(), repository);
     }
 
@@ -243,6 +299,11 @@ class HomeCommandPathTest {
         @Override
         public void deleteSlot(PlayerRef owner, HomeSlot slot) {
             owned(owner).remove(slot.index());
+        }
+
+        @Override
+        public void deleteAll(PlayerRef owner) {
+            owned(owner).clear();
         }
 
         private Map<Integer, Home> owned(PlayerRef owner) {
@@ -319,6 +380,89 @@ class HomeCommandPathTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
+        }
+    }
+
+    private HomeServices servicesWithLookup(PlayerLookup lookup) {
+        Messages messages = new KeyMessages();
+        HomeNotifier notifier = new HomeNotifier(messages, new NoSink());
+        DomainEventPublisher events = new NoEvents();
+        Clock clock = Clock.system(ZoneOffset.UTC);
+        HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
+        Scheduler scheduler = new SyncScheduler();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        IconSelectorView iconSelector = new IconSelectorView(
+                messages,
+                scheduler,
+                new SetHomeIcon(repository, notifier, events, clock),
+                IconSelectorLayout.codeDefault());
+        HomeActionView actionView = new HomeActionView(
+                messages,
+                notifier,
+                new AllowAllPermissions(),
+                scheduler,
+                new TeleportHome(repository, teleporter, notifier, freeCharge()),
+                new DeleteHome(repository, notifier, events),
+                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
+                new RenameHome(repository, notifier, events, clock),
+                iconSelector,
+                new AnvilInput(plugin),
+                HomeActionsLayout.codeDefault(),
+                fmt,
+                false,
+                false,
+                false,
+                false,
+                pos -> false,
+                new AlwaysAllowClaimService());
+        HomeListView listView = new HomeListView(
+                messages,
+                notifier,
+                new AllowAllPermissions(),
+                scheduler,
+                new ListHomes(repository),
+                quota,
+                new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, freeCharge(), 1000, clock),
+                new SafeLocationGuard(server, false, false, 5),
+                new AlwaysAllowClaimService(),
+                actionView,
+                HomeListLayout.codeDefault(),
+                1000,
+                fmt);
+        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, events, clock);
+        return new HomeServices(listView, actionView, iconSelector, homeAdmin, lookup, repository);
+    }
+
+    /**
+     * A {@link PlayerLookup} that never resolves online but resolves a single known player via
+     * {@link #findByName} — simulates an offline player profile still known to the server.
+     */
+    private static final class FakeOfflinePlayerLookup implements PlayerLookup {
+
+        private final PlayerRef offline;
+
+        FakeOfflinePlayerLookup(PlayerRef offline) {
+            this.offline = offline;
+        }
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty(); // never online
+        }
+
+        @Override
+        public Optional<PlayerRef> findByName(String name) {
+            return offline.name().equalsIgnoreCase(name) ? Optional.of(offline) : Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return offline.uuid().equals(uuid) ? Optional.of(offline) : Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
         }
     }
 

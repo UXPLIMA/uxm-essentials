@@ -5,6 +5,7 @@ import java.util.List;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -22,7 +23,7 @@ public final class HomeCommands {
     private HomeCommands() {}
 
     /** Every homes command, in surface order. */
-    public static List<CommandRegistration> all(HomeServices services, Messages messages) {
-        return List.of(new HomeCommand(services, messages), new HomeAdminCommand(services, messages));
+    public static List<CommandRegistration> all(HomeServices services, Messages messages, Scheduler scheduler) {
+        return List.of(new HomeCommand(services, messages), new HomeAdminCommand(services, messages, scheduler));
     }
 }

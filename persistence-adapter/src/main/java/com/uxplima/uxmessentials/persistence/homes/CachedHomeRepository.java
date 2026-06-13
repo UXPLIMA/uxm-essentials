@@ -80,6 +80,13 @@ public final class CachedHomeRepository implements HomeRepository {
     }
 
     @Override
+    public void deleteAll(PlayerRef owner) {
+        Objects.requireNonNull(owner, "owner");
+        delegate.deleteAll(owner);
+        cache.invalidate(owner.uuid());
+    }
+
+    @Override
     public Optional<List<Home>> peek(PlayerRef owner) {
         Objects.requireNonNull(owner, "owner");
         return cache.getIfPresent(owner.uuid()).map(HomeSet::all);

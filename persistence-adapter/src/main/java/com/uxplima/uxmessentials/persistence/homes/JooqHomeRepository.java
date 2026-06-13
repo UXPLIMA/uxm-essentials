@@ -73,6 +73,14 @@ public final class JooqHomeRepository extends JooqRepository implements HomeRepo
                 .execute());
     }
 
+    @Override
+    public void deleteAll(PlayerRef owner) {
+        Objects.requireNonNull(owner, "owner");
+        write(dsl -> dsl.deleteFrom(HOMES)
+                .where(HOMES.OWNER.eq(owner.uuid().toString()))
+                .execute());
+    }
+
     private static void upsert(DSLContext dsl, Home home) {
         HomesRecord record = dsl.newRecord(HOMES);
         HomeRows.apply(record, home);

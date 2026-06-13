@@ -336,6 +336,11 @@ class HomeListViewTest {
             owned(owner).remove(slot.index());
         }
 
+        @Override
+        public void deleteAll(PlayerRef owner) {
+            owned(owner).clear();
+        }
+
         private Map<Integer, Home> owned(PlayerRef owner) {
             return byOwner.computeIfAbsent(owner.uuid(), u -> new java.util.TreeMap<>());
         }
