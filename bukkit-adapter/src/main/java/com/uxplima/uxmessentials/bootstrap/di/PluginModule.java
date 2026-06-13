@@ -297,7 +297,7 @@ public final class PluginModule {
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("homes"))) {
-            wireHomes(ctx, persistence, resources, links, bus, guiLayouts);
+            wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts);
         } else if (module.id().equals(ModuleId.of("economy"))) {
             wireEconomy(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("warps"))) {
@@ -348,6 +348,7 @@ public final class PluginModule {
     }
 
     private static void wireHomes(
+            JavaPlugin plugin,
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
@@ -356,7 +357,7 @@ public final class PluginModule {
             GuiLayouts guiLayouts) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
-        HomesWiring.Wired wired = HomesWiring.wire(ctx, persistence, engine, bus, guiLayouts);
+        HomesWiring.Wired wired = HomesWiring.wire(plugin, ctx, persistence, engine, bus, guiLayouts, resources);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));

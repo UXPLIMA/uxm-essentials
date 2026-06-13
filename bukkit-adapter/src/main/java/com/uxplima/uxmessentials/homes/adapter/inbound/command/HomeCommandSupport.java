@@ -52,13 +52,4 @@ abstract class HomeCommandSupport {
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
     }
-
-    /**
-     * The player's current {@link com.uxplima.uxmessentials.shared.domain.Position}. Paper marks
-     * {@code Player#getLocation()} nullable (null only for an entity with no world, which a connected
-     * player never is), so the non-null assertion lives here once rather than at every command.
-     */
-    static com.uxplima.uxmessentials.shared.domain.Position position(Player player) {
-        return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
-    }
 }
