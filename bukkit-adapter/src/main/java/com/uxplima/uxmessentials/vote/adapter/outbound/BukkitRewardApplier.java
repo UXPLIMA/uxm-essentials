@@ -42,8 +42,9 @@ import org.jspecify.annotations.Nullable;
  * {@code {player}} placeholder left raw — the drain substitutes it when the voter next joins. The enqueue is a
  * database write, so it hops off the tick thread via the {@link Scheduler}. Messages, broadcasts, and items are
  * skipped offline: there is no inventory to fill and no viewer to message. An offline queue cap bounds how many
- * batches one voter may stack up while away ({@code 0} disables it); a vote past the cap still counts toward
- * totals and the party, only its durable offline reward is dropped.
+ * queued reward commands one voter may stack up while away ({@code 0} disables it) — the cap is checked against
+ * {@link VoteRepository#queuedCount(PlayerRef)}, which counts command rows, not batches; a vote past the cap
+ * still counts toward totals and the party, only its durable offline reward is dropped.
  *
  * <p>Reward message and broadcast lines are operator-authored config content (MiniMessage with a {@code
  * {player}} token), not {@code MessageKey} catalog entries, so they are rendered with MiniMessage directly here
@@ -62,9 +63,11 @@ public final class BukkitRewardApplier implements RewardApplier {
     private final Logger log;
 
     /**
-     * @param offlineLimit the most reward batches an offline voter may have queued at once; {@code 0} (or
-     *                     any non-positive value) means no cap. A vote that would exceed the cap still
-     *                     counts toward totals and the party — only its durable offline reward is dropped
+     * @param offlineLimit the most queued reward commands an offline voter may have stored at once; {@code 0}
+     *                     (or any non-positive value) means no cap. The limit is compared against
+     *                     {@link VoteRepository#queuedCount(PlayerRef)}, which counts command rows. A vote that
+     *                     would exceed the cap still counts toward totals and the party — only its durable
+     *                     offline reward is dropped
      */
     public BukkitRewardApplier(
             VoteRepository repository,

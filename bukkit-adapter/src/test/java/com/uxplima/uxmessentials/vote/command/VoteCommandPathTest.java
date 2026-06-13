@@ -336,10 +336,11 @@ class VoteCommandPathTest {
 
     @Test
     void voteClaimWithQueuedRewardsSendsPaidKeyWithTheCount() {
-        // Two queued batches → applyFor returns 2 → VOTE_CLAIM_PAID with count=2.
-        repository.pendingForClaim = List.of(
-                new QueuedReward(new PlayerRef(sender.getUniqueId(), "Alice"), List.of("say a"), Instant.now()),
-                new QueuedReward(new PlayerRef(sender.getUniqueId(), "Alice"), List.of("say b"), Instant.now()));
+        // Production drains a player's queued rows into ONE batch carrying every command (see
+        // JooqVoteRepository.selectBatch), so the fake mirrors that: a single batch of two commands →
+        // applyFor returns the command total (2) → VOTE_CLAIM_PAID with count=2.
+        repository.pendingForClaim = List.of(new QueuedReward(
+                new PlayerRef(sender.getUniqueId(), "Alice"), List.of("say a", "say b"), Instant.now()));
         CommandDispatcher<CommandSourceStack> dispatcher = register(new ServerPlayerLookup());
 
         execute(dispatcher, "vote claim");
@@ -486,7 +487,11 @@ class VoteCommandPathTest {
         final List<PlayerRef> resetCalls = new ArrayList<>();
         List<VoteRanking> topResult = List.of();
         int incrementCalls = 0;
-        /** The batches {@code /vote claim} drains; empty (the default) means an empty queue. */
+        /**
+         * What {@code /vote claim} drains. Production collapses a player's queued rows into ONE batch (see
+         * {@code JooqVoteRepository.selectBatch}), so this is at most a single-element list and {@code drainFor}
+         * returns it verbatim; empty (the default) means an empty queue.
+         */
         List<QueuedReward> pendingForClaim = List.of();
 
         @Override
@@ -519,7 +524,10 @@ class VoteCommandPathTest {
 
         @Override
         public int queuedCount(PlayerRef player) {
-            return pendingForClaim.size();
+            // One row per command in production, so count commands across the (collapsed) batch, not batches.
+            return pendingForClaim.stream()
+                    .mapToInt(batch -> batch.commands().size())
+                    .sum();
         }
 
         @Override
