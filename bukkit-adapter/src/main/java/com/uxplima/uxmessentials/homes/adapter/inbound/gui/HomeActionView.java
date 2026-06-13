@@ -49,6 +49,11 @@ import org.jspecify.annotations.NullMarked;
  * <p>Delete and relocate optionally show a yes/no confirm dialog before executing (controlled by
  * {@code confirmDelete}/{@code confirmRelocate}). Teleporting to an unsafe destination also prompts when
  * {@code confirmUnsafeTeleport} is on and the viewer lacks {@code uxmessentials.home.bypass.unsafe}.
+ *
+ * <p>Block-safety reads ({@code destinationUnsafe}) inspect a world column, so they run on that column's
+ * region thread, never async or on a remote entity's thread: relocate rejects an unsafe target before the
+ * async persist when {@code blockUnsafeRelocate} is on, and unsafe-teleport reads the (possibly remote)
+ * destination's region before prompting. The pure {@code WorldBlacklistGuard} stays inside the use cases.
  */
 @NullMarked
 public final class HomeActionView {
@@ -82,6 +87,7 @@ public final class HomeActionView {
     private final boolean confirmDelete;
     private final boolean confirmRelocate;
     private final boolean confirmUnsafeTeleport;
+    private final boolean blockUnsafeRelocate;
     private final Predicate<Position> destinationUnsafe;
 
     public HomeActionView(
@@ -100,6 +106,7 @@ public final class HomeActionView {
             boolean confirmDelete,
             boolean confirmRelocate,
             boolean confirmUnsafeTeleport,
+            boolean blockUnsafeRelocate,
             Predicate<Position> destinationUnsafe) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -117,6 +124,7 @@ public final class HomeActionView {
         this.confirmDelete = confirmDelete;
         this.confirmRelocate = confirmRelocate;
         this.confirmUnsafeTeleport = confirmUnsafeTeleport;
+        this.blockUnsafeRelocate = blockUnsafeRelocate;
         this.destinationUnsafe = Objects.requireNonNull(destinationUnsafe, "destinationUnsafe");
     }
 
@@ -163,20 +171,32 @@ public final class HomeActionView {
 
     /**
      * Handle the teleport button. When the destination is unsafe and the viewer has neither the bypass
-     * permission nor the toggle disabled, a warn-confirm is shown first. Package-private so tests can
-     * inject a recording {@link ConfirmPrompt} and assert the decision path without opening a real inventory.
+     * permission nor the toggle disabled, a warn-confirm is shown first. The destination may be in a remote
+     * world/region, so the block-safety read runs on that destination's region thread — never on the
+     * clicking entity's thread — then hops back to the entity thread to prompt or teleport. The pure
+     * toggle/bypass gates run first so a bypassed or disabled flow skips the region hop entirely.
+     * Package-private so tests can inject a recording {@link ConfirmPrompt} and assert the decision path
+     * without opening a real inventory.
      */
     void handleTeleport(Player player, PlayerRef viewer, Home home, SimpleGui gui, ConfirmPrompt confirm) {
-        boolean needsConfirm = confirmUnsafeTeleport
-                && !permissions.has(viewer, BYPASS_UNSAFE_PERMISSION)
-                && destinationUnsafe.test(home.location());
-        if (needsConfirm) {
-            Component title = text(viewer, HomesMessageKey.HOME_CONFIRM_UNSAFE_TP, Map.of());
-            confirm.prompt(
-                    title, () -> doTeleport(player, viewer, home, gui), () -> open(player, viewer, home, () -> {}));
-        } else {
+        if (!confirmUnsafeTeleport || permissions.has(viewer, BYPASS_UNSAFE_PERMISSION)) {
             doTeleport(player, viewer, home, gui);
+            return;
         }
+        scheduler.onRegion(home.location(), () -> {
+            boolean unsafe = destinationUnsafe.test(home.location());
+            scheduler.onEntity(viewer, () -> {
+                if (unsafe) {
+                    Component title = text(viewer, HomesMessageKey.HOME_CONFIRM_UNSAFE_TP, Map.of());
+                    confirm.prompt(
+                            title,
+                            () -> doTeleport(player, viewer, home, gui),
+                            () -> open(player, viewer, home, () -> {}));
+                } else {
+                    doTeleport(player, viewer, home, gui);
+                }
+            });
+        });
     }
 
     private void doTeleport(Player player, PlayerRef viewer, Home home, SimpleGui gui) {
@@ -217,17 +237,30 @@ public final class HomeActionView {
             Component title = text(viewer, HomesMessageKey.HOME_CONFIRM_RELOCATE, slotName(home));
             confirm.prompt(
                     title,
-                    () -> doRelocate(viewer, home, at, reopenList),
+                    () -> doRelocate(player, viewer, home, at, reopenList),
                     () -> open(player, viewer, home, reopenList));
         } else {
-            doRelocate(viewer, home, at, reopenList);
+            doRelocate(player, viewer, home, at, reopenList);
         }
     }
 
-    private void doRelocate(PlayerRef viewer, Home home, Position at, Runnable reopenList) {
-        scheduler.async(() -> {
-            relocateHome.relocate(home.owner(), home.slot(), at);
-            scheduler.onEntity(viewer, reopenList);
+    private void doRelocate(Player player, PlayerRef viewer, Home home, Position at, Runnable reopenList) {
+        // The block-safety read inspects the target column, so hop to its region thread first; only the pure
+        // WorldBlacklistGuard plus the SQLite write run async, then we reopen on the entity thread.
+        scheduler.onRegion(at, () -> {
+            if (blockUnsafeRelocate
+                    && !permissions.has(viewer, BYPASS_UNSAFE_PERMISSION)
+                    && destinationUnsafe.test(at)) {
+                scheduler.onEntity(viewer, () -> {
+                    notifier.send(viewer, HomesMessageKey.HOME_UNSAFE_LOCATION);
+                    open(player, viewer, home, reopenList);
+                });
+                return;
+            }
+            scheduler.async(() -> {
+                relocateHome.relocate(home.owner(), home.slot(), at);
+                scheduler.onEntity(viewer, reopenList);
+            });
         });
     }
 

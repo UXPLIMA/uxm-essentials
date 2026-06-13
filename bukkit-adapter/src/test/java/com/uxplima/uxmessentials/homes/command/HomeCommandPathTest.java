@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
+import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
@@ -187,13 +188,17 @@ class HomeCommandPathTest {
                 false,
                 false,
                 false,
+                false,
                 pos -> false);
         HomeListView listView = new HomeListView(
                 messages,
+                notifier,
+                new AllowAllPermissions(),
                 scheduler,
                 new ListHomes(repository),
                 quota,
                 new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, 1000, clock),
+                new SafeLocationGuard(server, false, false, 5),
                 actionView,
                 HomeListLayout.codeDefault(),
                 1000,

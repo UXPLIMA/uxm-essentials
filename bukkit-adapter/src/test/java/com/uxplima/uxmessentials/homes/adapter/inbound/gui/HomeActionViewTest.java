@@ -10,6 +10,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,6 +94,9 @@ class HomeActionViewTest {
     private RecordingTeleporter teleporter;
     private RecordingSink sink;
     private TogglePermissions permissions;
+
+    @Nullable private SyncScheduler scheduler; // assigned by viewWith(...) on each build
+
     private PlayerRef viewer;
 
     @BeforeEach
@@ -255,7 +259,7 @@ class HomeActionViewTest {
         Home home = seed(home(0));
         RecordingPrompt prompt = new RecordingPrompt();
 
-        viewWith(true, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
+        viewWith(true, false, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
 
         assertThat(prompt.prompted).isTrue();
         // Home must still exist — confirm was not triggered.
@@ -267,7 +271,7 @@ class HomeActionViewTest {
         Home home = seed(home(0));
         RecordingPrompt prompt = RecordingPrompt.autoConfirm();
 
-        viewWith(true, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
+        viewWith(true, false, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
 
         assertThat(repository.findSlot(viewer, HomeSlot.of(0))).isEmpty();
     }
@@ -277,7 +281,7 @@ class HomeActionViewTest {
         Home home = seed(home(0));
         RecordingPrompt prompt = RecordingPrompt.autoCancel();
 
-        viewWith(true, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
+        viewWith(true, false, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
 
         assertThat(repository.findSlot(viewer, HomeSlot.of(0))).isPresent();
     }
@@ -287,7 +291,7 @@ class HomeActionViewTest {
         Home home = seed(home(0));
         RecordingPrompt prompt = new RecordingPrompt();
 
-        viewWith(false, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
+        viewWith(false, false, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
 
         assertThat(prompt.prompted).isFalse();
         assertThat(repository.findSlot(viewer, HomeSlot.of(0))).isEmpty();
@@ -301,7 +305,7 @@ class HomeActionViewTest {
         player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 100, 70, 200));
         RecordingPrompt prompt = new RecordingPrompt();
 
-        viewWith(false, true, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
+        viewWith(false, true, false, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
 
         assertThat(prompt.prompted).isTrue();
         // Still at original coords — confirm was not triggered.
@@ -315,7 +319,7 @@ class HomeActionViewTest {
         player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 100, 70, 200));
         RecordingPrompt prompt = RecordingPrompt.autoConfirm();
 
-        viewWith(false, true, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
+        viewWith(false, true, false, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
 
         Home moved = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
         assertThat(moved.location().blockX()).isEqualTo(100);
@@ -327,11 +331,41 @@ class HomeActionViewTest {
         player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 55, 64, 55));
         RecordingPrompt prompt = new RecordingPrompt();
 
-        viewWith(false, false, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
+        viewWith(false, false, false, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
 
         assertThat(prompt.prompted).isFalse();
         Home moved = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
         assertThat(moved.location().blockX()).isEqualTo(55);
+    }
+
+    @Test
+    void relocateToUnsafeSpotIsRejectedWithoutMoving() {
+        Home home = seed(home(0)); // seeded at x=0,z=0
+        player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 100, 70, 200));
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        // block-unsafe-relocate on, unsafe predicate, bypass denied → reject before persisting.
+        permissions = new TogglePermissions(false);
+        viewWith(false, false, false, true, pos -> true).handleRelocate(player, viewer, home, () -> {}, prompt);
+
+        Home unchanged = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(unchanged.location().blockX()).isEqualTo(0);
+        assertThat(sink.delivered).contains(HomesMessageKey.HOME_UNSAFE_LOCATION.key());
+    }
+
+    @Test
+    void relocateReadsSafetyOnTheTargetRegion() {
+        Home home = seed(home(0));
+        player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 100, 70, 200));
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        HomeActionView view = viewWith(false, false, false, true, pos -> false);
+        view.handleRelocate(player, viewer, home, () -> {}, prompt);
+
+        SyncScheduler used = Objects.requireNonNull(scheduler);
+        assertThat(used.regionHops).anyMatch(p -> p.blockX() == 100 && p.blockY() == 70 && p.blockZ() == 200);
+        Home moved = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(moved.location().blockX()).isEqualTo(100);
     }
 
     // --- confirm-unsafe-teleport decision seam ---
@@ -345,7 +379,7 @@ class HomeActionViewTest {
 
         // Unsafe predicate returns true; confirm toggle is on; permissions deny bypass.
         permissions = new TogglePermissions(false);
-        viewWith(false, false, true, pos -> true)
+        viewWith(false, false, true, false, pos -> true)
                 .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
 
         assertThat(prompt.prompted).isTrue();
@@ -360,7 +394,7 @@ class HomeActionViewTest {
         RecordingPrompt prompt = RecordingPrompt.autoConfirm();
 
         permissions = new TogglePermissions(false);
-        viewWith(false, false, true, pos -> true)
+        viewWith(false, false, true, false, pos -> true)
                 .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
 
         assertThat(teleporter.hops).isEqualTo(1);
@@ -375,7 +409,7 @@ class HomeActionViewTest {
 
         // All permissions granted (includes bypass.unsafe).
         permissions = new TogglePermissions(true);
-        viewWith(false, false, true, pos -> true)
+        viewWith(false, false, true, false, pos -> true)
                 .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
 
         assertThat(prompt.prompted).isFalse();
@@ -391,7 +425,7 @@ class HomeActionViewTest {
 
         permissions = new TogglePermissions(false);
         // Safe predicate returns false — no confirm needed.
-        viewWith(false, false, true, pos -> false)
+        viewWith(false, false, true, false, pos -> false)
                 .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
 
         assertThat(prompt.prompted).isFalse();
@@ -407,11 +441,31 @@ class HomeActionViewTest {
 
         permissions = new TogglePermissions(false);
         // Toggle is off — even with unsafe destination no dialog is shown.
-        viewWith(false, false, false, pos -> true)
+        viewWith(false, false, false, false, pos -> true)
                 .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
 
         assertThat(prompt.prompted).isFalse();
         assertThat(teleporter.hops).isEqualTo(1);
+    }
+
+    @Test
+    void unsafeTeleportCheckReadsTheDestinationRegion() {
+        // The home (its location) sits at slot 0 → x=0,z=0,y=64 in the seeded WORLD.
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        permissions = new TogglePermissions(false);
+        HomeActionView view = viewWith(false, false, true, false, pos -> true);
+        view.handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        // The safety read was scheduled on the destination home's region, not the clicking entity thread.
+        SyncScheduler used = Objects.requireNonNull(scheduler);
+        assertThat(used.regionHops)
+                .anyMatch(p -> p.world().equals(home.location().world())
+                        && p.blockX() == home.location().blockX()
+                        && p.blockZ() == home.location().blockZ());
     }
 
     // --- helpers ---
@@ -438,19 +492,20 @@ class HomeActionViewTest {
 
     /** Build a view with all confirm toggles off and a "safe" destination predicate (existing tests unchanged). */
     private HomeActionView view() {
-        return viewWith(false, false, false, pos -> false);
+        return viewWith(false, false, false, false, pos -> false);
     }
 
     private HomeActionView viewWith(
             boolean confirmDelete,
             boolean confirmRelocate,
             boolean confirmUnsafeTeleport,
+            boolean blockUnsafeRelocate,
             Predicate<Position> destinationUnsafe) {
         Messages messages = new KeyMessages();
         HomeNotifier notifier = new HomeNotifier(messages, sink);
         DomainEventPublisher events = new NoEvents();
         Clock clock = Clock.system(ZoneOffset.UTC);
-        Scheduler scheduler = new SyncScheduler();
+        scheduler = new SyncScheduler();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
         IconSelectorView iconSelector = new IconSelectorView(
                 messages,
@@ -473,6 +528,7 @@ class HomeActionViewTest {
                 confirmDelete,
                 confirmRelocate,
                 confirmUnsafeTeleport,
+                blockUnsafeRelocate,
                 destinationUnsafe);
     }
 
@@ -545,7 +601,13 @@ class HomeActionViewTest {
         public void publish(DomainEvent event) {}
     }
 
+    /**
+     * Runs every hop inline while recording the positions handed to {@link #onRegion}, so a test can prove
+     * the block-safety read is scheduled on the destination's region rather than the calling entity thread.
+     */
     private static final class SyncScheduler implements Scheduler {
+        private final List<Position> regionHops = new ArrayList<>();
+
         @Override
         public void onGlobal(Runnable task) {
             task.run();
@@ -553,6 +615,7 @@ class HomeActionViewTest {
 
         @Override
         public void onRegion(Position position, Runnable task) {
+            regionHops.add(position);
             task.run();
         }
 

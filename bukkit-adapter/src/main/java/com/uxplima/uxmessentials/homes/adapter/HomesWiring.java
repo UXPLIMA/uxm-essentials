@@ -115,7 +115,7 @@ public final class HomesWiring {
         AnvilInput anvil = installAnvil(plugin, resources);
 
         SafeLocationGuard safeGuard = buildSafeGuard(plugin, ctx);
-        List<SethomeGuard> guards = buildGuards(ctx, safeGuard);
+        List<SethomeGuard> guards = buildGuards(ctx);
         CreateHomeAtSlot createHome =
                 new CreateHomeAtSlot(repository, quota, guards, notifier, kernel.events(), unlimitedMax, clock);
         RelocateHome relocateHome = new RelocateHome(repository, guards, notifier, kernel.events(), clock);
@@ -147,13 +147,17 @@ public final class HomesWiring {
                 confirmDelete,
                 confirmRelocate,
                 confirmUnsafeTeleport,
+                safeGuard.blockUnsafe(),
                 (Position pos) -> safeGuard.isUnsafe(pos));
         HomeListView listView = new HomeListView(
                 kernel.messages(),
+                notifier,
+                kernel.permissions(),
                 kernel.scheduler(),
                 listHomes,
                 quota,
                 createHome,
+                safeGuard,
                 actionView,
                 listLayout(guiLayouts),
                 unlimitedMax,
@@ -201,9 +205,11 @@ public final class HomesWiring {
         return new SafeLocationGuard(plugin.getServer(), blockUnsafe, considerMidair, midairDepth);
     }
 
-    private static List<SethomeGuard> buildGuards(ModuleContext ctx, SafeLocationGuard safeGuard) {
+    private static List<SethomeGuard> buildGuards(ModuleContext ctx) {
+        // Only the pure, Bukkit-free guard runs inside the use cases — they execute async, where a block
+        // read is illegal. The block-reading SafeLocationGuard is invoked by the views on the region thread.
         Set<String> disabledWorlds = new HashSet<>(ctx.config().getStringList("disabled-worlds", List.of()));
-        return List.of(new WorldBlacklistGuard(disabledWorlds), safeGuard);
+        return List.of(new WorldBlacklistGuard(disabledWorlds));
     }
 
     /**

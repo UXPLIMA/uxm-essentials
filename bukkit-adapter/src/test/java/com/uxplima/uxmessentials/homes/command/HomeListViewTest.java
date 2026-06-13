@@ -28,10 +28,12 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
+import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
+import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
@@ -79,6 +81,7 @@ class HomeListViewTest {
     private Plugin plugin;
     private PlayerMock player;
     private FakeHomeRepository repository;
+    private RecordingSink sink;
     private HomeListView listView;
     private PlayerRef viewer;
 
@@ -89,6 +92,7 @@ class HomeListViewTest {
         player = server.addPlayer("Alice");
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         repository = new FakeHomeRepository();
+        sink = new RecordingSink();
         listView = listView();
         Guis.install(plugin);
     }
@@ -126,6 +130,39 @@ class HomeListViewTest {
     }
 
     @Test
+    void clickingAnEmptyCellOnAnUnsafeSpotRejectsWithoutPersisting() {
+        // Stand the player inside a solid block so the (block-unsafe-enabled) guard rejects the placement.
+        org.bukkit.World world = player.getWorld();
+        player.setLocation(new org.bukkit.Location(world, 40, 64, 40));
+        world.getBlockAt(40, 64, 40).setType(org.bukkit.Material.STONE);
+        // Deny the unsafe-bypass permission so the guard is allowed to reject.
+        listView = listView(new SafeLocationGuard(server, true, false, 5), new SyncScheduler(), false);
+        listView.open(player, viewer);
+
+        fireClick(CELLS.get(1));
+
+        assertThat(repository.find(viewer, HomeSlot.of(1))).isEmpty();
+        assertThat(sink.delivered).contains(HomesMessageKey.HOME_UNSAFE_LOCATION.key());
+    }
+
+    @Test
+    void creatingAHomeReadsSafetyOnTheTargetRegion() {
+        org.bukkit.World world = player.getWorld();
+        player.setLocation(new org.bukkit.Location(world, 12, 64, 34));
+        SyncScheduler recording = new SyncScheduler();
+        // Block-unsafe on, ground under feet, air at feet/head: the guard reads the column and allows it.
+        world.getBlockAt(12, 63, 34).setType(org.bukkit.Material.STONE);
+        listView = listView(new SafeLocationGuard(server, true, false, 5), recording, false);
+        listView.open(player, viewer);
+
+        fireClick(CELLS.get(1));
+
+        // The safety read was scheduled on the target column's region, not run on the calling thread.
+        assertThat(recording.regionHops).anyMatch(p -> p.blockX() == 12 && p.blockY() == 64 && p.blockZ() == 34);
+        assertThat(repository.find(viewer, HomeSlot.of(1))).isPresent();
+    }
+
+    @Test
     void clickingAFilledCellOpensTheActionMenu() {
         repository.put(home(0));
         listView.open(player, viewer);
@@ -150,13 +187,22 @@ class HomeListViewTest {
         return Home.create(viewer, HomeSlot.of(slot), Position.of(WORLD, slot, 64, slot), Instant.EPOCH);
     }
 
+    /**
+     * Default view: a synchronous scheduler and a safe guard with block-unsafe off, so the create flow
+     * makes its region-thread hop but skips the block read and the persist proceeds. This pins grid
+     * rendering and create/open, not the safety gate.
+     */
     private HomeListView listView() {
+        return listView(new SafeLocationGuard(server, false, false, 5), new SyncScheduler(), true);
+    }
+
+    private HomeListView listView(SafeLocationGuard safeGuard, Scheduler scheduler, boolean grantBypass) {
         Messages messages = new KeyMessages();
-        HomeNotifier notifier = new HomeNotifier(messages, new NoSink());
+        HomeNotifier notifier = new HomeNotifier(messages, sink);
         DomainEventPublisher events = new NoEvents();
         Clock clock = Clock.system(ZoneOffset.UTC);
+        Permissions permissions = new TogglePermissions(grantBypass);
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
-        Scheduler scheduler = new SyncScheduler();
         CreateHomeAtSlot create = new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, 1000, clock);
         HomeActionView actionView = new HomeActionView(
                 messages,
@@ -178,13 +224,17 @@ class HomeListViewTest {
                 false,
                 false,
                 false,
+                false,
                 pos -> false);
         return new HomeListView(
                 messages,
+                notifier,
+                permissions,
                 scheduler,
                 new ListHomes(repository),
                 quota,
                 create,
+                safeGuard,
                 actionView,
                 HomeListLayout.codeDefault(),
                 1000,
@@ -238,9 +288,14 @@ class HomeListViewTest {
         public void teleportTo(PlayerRef who, Home home) {}
     }
 
-    private static final class NoSink implements MessageSink {
+    /** Captures every resolved message string the notifier delivers. */
+    private static final class RecordingSink implements MessageSink {
+        private final List<String> delivered = new java.util.concurrent.CopyOnWriteArrayList<>();
+
         @Override
-        public void deliver(PlayerRef viewer, String renderedText) {}
+        public void deliver(PlayerRef viewer, String renderedText) {
+            delivered.add(renderedText);
+        }
     }
 
     private static final class KeyMessages implements Messages {
@@ -255,7 +310,14 @@ class HomeListViewTest {
         public void publish(DomainEvent event) {}
     }
 
-    private static final class SyncScheduler implements Scheduler {
+    /**
+     * Runs every hop inline (as the production schedulers would after the marshal) while recording the
+     * positions handed to {@link #onRegion}, so a test can prove the block-safety read is scheduled on the
+     * target region rather than the calling thread.
+     */
+    private static class SyncScheduler implements Scheduler {
+        private final List<Position> regionHops = new ArrayList<>();
+
         @Override
         public void onGlobal(Runnable task) {
             task.run();
@@ -263,6 +325,7 @@ class HomeListViewTest {
 
         @Override
         public void onRegion(Position position, Runnable task) {
+            regionHops.add(position);
             task.run();
         }
 
@@ -286,6 +349,26 @@ class HomeListViewTest {
         @Override
         public boolean has(PlayerRef who, String node) {
             return true;
+        }
+
+        @Override
+        public QuotaResult resolveQuota(
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+            return QuotaResult.limited(configDefault);
+        }
+    }
+
+    /** A permission fake whose single {@code has} answer is flipped per test (drives the bypass branch). */
+    private static final class TogglePermissions implements Permissions {
+        private final boolean granted;
+
+        TogglePermissions(boolean granted) {
+            this.granted = granted;
+        }
+
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return granted;
         }
 
         @Override

@@ -12,7 +12,9 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
+import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
@@ -23,6 +25,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -45,11 +48,16 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class HomeListView {
 
+    private static final String BYPASS_UNSAFE_PERMISSION = "uxmessentials.home.bypass.unsafe";
+
     private final Messages messages;
+    private final HomeNotifier notifier;
+    private final Permissions permissions;
     private final Scheduler scheduler;
     private final ListHomes listHomes;
     private final HomeQuota quota;
     private final CreateHomeAtSlot createHome;
+    private final SafeLocationGuard safeGuard;
     private final HomeActionView actionView;
     private final HomeListLayout layout;
     private final int unlimitedMax;
@@ -58,19 +66,25 @@ public final class HomeListView {
 
     public HomeListView(
             Messages messages,
+            HomeNotifier notifier,
+            Permissions permissions,
             Scheduler scheduler,
             ListHomes listHomes,
             HomeQuota quota,
             CreateHomeAtSlot createHome,
+            SafeLocationGuard safeGuard,
             HomeActionView actionView,
             HomeListLayout layout,
             int unlimitedMax,
             DateTimeFormatter dateFormat) {
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.listHomes = Objects.requireNonNull(listHomes, "listHomes");
         this.quota = Objects.requireNonNull(quota, "quota");
         this.createHome = Objects.requireNonNull(createHome, "createHome");
+        this.safeGuard = Objects.requireNonNull(safeGuard, "safeGuard");
         this.actionView = Objects.requireNonNull(actionView, "actionView");
         this.layout = Objects.requireNonNull(layout, "layout");
         if (unlimitedMax < 1) {
@@ -153,13 +167,28 @@ public final class HomeListView {
     }
 
     private void create(Player player, PlayerRef viewer, int slotIndex) {
-        // The click already runs on the viewer's entity thread, so read the live location here; only the
-        // persisting use case moves off-thread, then we hop back to rebuild the grid.
+        // The click runs on the viewer's entity thread, so read the live location here. The block-safety
+        // check reads the target column, which is only legal on that column's region thread — hop there
+        // first, then persist async (the pure WorldBlacklistGuard plus the SQLite write), then rebuild.
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
-        scheduler.async(() -> {
-            createHome.create(viewer, HomeSlot.of(slotIndex), at);
-            scheduler.onEntity(viewer, () -> open(player, viewer));
+        HomeSlot slot = HomeSlot.of(slotIndex);
+        scheduler.onRegion(at, () -> {
+            if (safeGuard.blockUnsafe() && !hasUnsafeBypass(viewer) && safeGuard.isUnsafe(at)) {
+                scheduler.onEntity(viewer, () -> {
+                    notifier.send(viewer, HomesMessageKey.HOME_UNSAFE_LOCATION);
+                    open(player, viewer);
+                });
+                return;
+            }
+            scheduler.async(() -> {
+                createHome.create(viewer, slot, at);
+                scheduler.onEntity(viewer, () -> open(player, viewer));
+            });
         });
+    }
+
+    private boolean hasUnsafeBypass(PlayerRef viewer) {
+        return permissions.has(viewer, BYPASS_UNSAFE_PERMISSION);
     }
 
     private Map<Integer, Home> bySlot(PlayerRef viewer) {
