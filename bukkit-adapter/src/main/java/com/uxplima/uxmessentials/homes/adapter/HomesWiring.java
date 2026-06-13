@@ -3,8 +3,10 @@ package com.uxplima.uxmessentials.homes.adapter;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -18,6 +20,7 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.listener.HomesJoinListener;
+import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.adapter.outbound.TeleportHomeAdapter;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
@@ -29,8 +32,10 @@ import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
+import com.uxplima.uxmessentials.homes.application.WorldBlacklistGuard;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
+import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
 import com.uxplima.uxmessentials.persistence.homes.CachedHomeRepository;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -61,6 +66,7 @@ public final class HomesWiring {
     private static final int DEFAULT_HOME_LIMIT = 3;
     private static final int DEFAULT_UNLIMITED_MAX = 1000;
     private static final String DEFAULT_DATE_FORMAT = "dd/MM/yyyy HH:mm";
+    private static final int DEFAULT_MIDAIR_GROUND_DEPTH = 5;
 
     private HomesWiring() {}
 
@@ -107,9 +113,10 @@ public final class HomesWiring {
         DateTimeFormatter dateFormat = dateFormat(ctx);
         AnvilInput anvil = installAnvil(plugin, resources);
 
+        List<SethomeGuard> guards = buildGuards(plugin, ctx);
         CreateHomeAtSlot createHome =
-                new CreateHomeAtSlot(repository, quota, List.of(), notifier, kernel.events(), unlimitedMax, clock);
-        RelocateHome relocateHome = new RelocateHome(repository, List.of(), notifier, kernel.events(), clock);
+                new CreateHomeAtSlot(repository, quota, guards, notifier, kernel.events(), unlimitedMax, clock);
+        RelocateHome relocateHome = new RelocateHome(repository, guards, notifier, kernel.events(), clock);
         RenameHome renameHome = new RenameHome(repository, notifier, kernel.events(), clock);
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);
         DeleteHome deleteHome = new DeleteHome(repository, notifier, kernel.events());
@@ -175,6 +182,16 @@ public final class HomesWiring {
     private static DateTimeFormatter dateFormat(ModuleContext ctx) {
         String pattern = ctx.config().getString("date-format", DEFAULT_DATE_FORMAT);
         return DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault());
+    }
+
+    private static List<SethomeGuard> buildGuards(Plugin plugin, ModuleContext ctx) {
+        Set<String> disabledWorlds = new HashSet<>(ctx.config().getStringList("disabled-worlds", List.of()));
+        boolean blockUnsafe = ctx.config().getBoolean("block-unsafe-sethome", true);
+        boolean considerMidair = ctx.config().getBoolean("consider-midair-unsafe", true);
+        int midairDepth = Math.max(1, ctx.config().getInt("midair-ground-depth", DEFAULT_MIDAIR_GROUND_DEPTH));
+        return List.of(
+                new WorldBlacklistGuard(disabledWorlds),
+                new SafeLocationGuard(plugin.getServer(), blockUnsafe, considerMidair, midairDepth));
     }
 
     /**
