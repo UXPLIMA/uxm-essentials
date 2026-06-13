@@ -22,11 +22,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
-import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeAdminCommand;
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommand;
-import com.uxplima.uxmessentials.homes.adapter.inbound.command.InviteCommand;
-import com.uxplima.uxmessentials.homes.adapter.inbound.command.UninviteCommand;
-import com.uxplima.uxmessentials.homes.adapter.inbound.command.VisitCommand;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
@@ -84,10 +80,13 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the homes Brigadier surface: {@code /home} opens the slot grid for the sender, and
- * {@code /homeadmin <player> del|tp|list} dispatches to the {@link HomeAdmin} use case against the target's set
- * by slot. The grid open is asserted by the menu the sender ends up viewing; the admin verbs by their effect on
- * the fake repository and the recording teleporter.
+ * MockBukkit coverage of the consolidated homes Brigadier surface: the single {@code /home} command with the
+ * no-arg invocation opening the slot grid and {@code visit}, {@code invite}, {@code uninvite} and the
+ * {@code admin} subtree as subcommands. {@code /home} opens the grid for the sender; {@code /home admin
+ * <player> del|tp|list|set|clear|info} dispatches to the {@link HomeAdmin} use case against the target's set by
+ * slot; {@code /home visit|invite|uninvite <player> [slot]} drive the respective use cases. The grid open is
+ * asserted by the menu the sender ends up viewing; the verbs by their effect on the fake repository, invite
+ * repository, and the recording teleporter.
  */
 class HomeCommandPathTest {
 
@@ -133,11 +132,59 @@ class HomeCommandPathTest {
     }
 
     @Test
+    void rootRequiresTheUsePermission() {
+        HomeCommand command = new HomeCommand(services, new KeyMessages(), new SyncScheduler());
+        assertThat(command.build().getRequirement().test(sourceFor("uxmessentials.home.use")))
+                .isTrue();
+    }
+
+    @Test
+    void adminSubtreeRequiresTheAdminPermissionNotTheUsePermission() {
+        // A player who can open their own grid but lacks home.admin cannot reach the admin subtree.
+        assertCanUse("admin", "uxmessentials.home.admin", "uxmessentials.home.use");
+    }
+
+    @Test
+    void visitSubcommandRequiresTheVisitPermission() {
+        assertCanUse("visit", "uxmessentials.home.visit", "uxmessentials.home.use");
+    }
+
+    @Test
+    void inviteAndUninviteSubcommandsRequireTheInvitePermission() {
+        assertCanUse("invite", "uxmessentials.home.invite", "uxmessentials.home.use");
+        assertCanUse("uninvite", "uxmessentials.home.invite", "uxmessentials.home.use");
+    }
+
+    /**
+     * Asserts the {@code subcommand} literal under {@code /home} is reachable only with {@code grantsAccess}
+     * and not with {@code deniedNode} alone — proving Brigadier {@code .requires(...)} gates the subcommand by
+     * its own permission rather than the root's.
+     */
+    private void assertCanUse(String subcommand, String grantsAccess, String deniedNode) {
+        var root = new HomeCommand(services, new KeyMessages(), new SyncScheduler()).build();
+        var node = root.getChild(subcommand);
+        assertThat(node).as("subcommand '%s' exists under /home", subcommand).isNotNull();
+        assertThat(node.canUse(sourceFor(grantsAccess)))
+                .as("'%s' should be usable with %s", subcommand, grantsAccess)
+                .isTrue();
+        assertThat(node.canUse(sourceFor(deniedNode)))
+                .as("'%s' should not be usable with only %s", subcommand, deniedNode)
+                .isFalse();
+    }
+
+    /** A command source for a fresh player holding exactly {@code node} (and no op). */
+    private CommandSourceStack sourceFor(String node) {
+        PlayerMock holder = server.addPlayer();
+        holder.addAttachment(plugin, node, true);
+        return CommandSourceStackMock.from(holder);
+    }
+
+    @Test
     void homeAdminDeleteRemovesTheTargetSlot() {
         repository.put(home(targetRef(), 0));
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "homeadmin Bob del 1"); // 1-based display number maps to slot index 0
+        execute(dispatcher, "home admin Bob del 1"); // 1-based display number maps to slot index 0
 
         assertThat(repository.findSlot(targetRef(), HomeSlot.of(0))).isEmpty();
     }
@@ -147,7 +194,7 @@ class HomeCommandPathTest {
         repository.put(home(targetRef(), 0));
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "homeadmin Bob tp 1");
+        execute(dispatcher, "home admin Bob tp 1");
 
         assertThat(teleporter.hops).isEqualTo(1);
     }
@@ -156,7 +203,7 @@ class HomeCommandPathTest {
     void homeAdminSetCreatesAHomeForTheTarget() {
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "homeadmin Bob set 1");
+        execute(dispatcher, "home admin Bob set 1");
 
         assertThat(repository.findSlot(targetRef(), HomeSlot.of(0))).isPresent();
     }
@@ -168,7 +215,7 @@ class HomeCommandPathTest {
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
         // No slot arg — default slot should be max+1 = 2 (index 2).
-        execute(dispatcher, "homeadmin Bob set");
+        execute(dispatcher, "home admin Bob set");
 
         assertThat(repository.findSlot(targetRef(), HomeSlot.of(2))).isPresent();
     }
@@ -179,7 +226,7 @@ class HomeCommandPathTest {
         repository.put(home(targetRef(), 1));
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "homeadmin Bob clear");
+        execute(dispatcher, "home admin Bob clear");
 
         assertThat(repository.count(targetRef())).isEqualTo(0);
     }
@@ -190,7 +237,7 @@ class HomeCommandPathTest {
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
         // Info resolves and sends a message; we assert no exception is thrown.
-        execute(dispatcher, "homeadmin Bob info 1");
+        execute(dispatcher, "home admin Bob info 1");
     }
 
     @Test
@@ -203,7 +250,7 @@ class HomeCommandPathTest {
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
         // del works even though Bob is "offline" (not returned by findOnlineByName).
-        execute(dispatcher, "homeadmin Bob del 1");
+        execute(dispatcher, "home admin Bob del 1");
 
         assertThat(repository.findSlot(targetRef(), HomeSlot.of(0))).isEmpty();
     }
@@ -214,7 +261,7 @@ class HomeCommandPathTest {
         repository.put(home(targetRef(), 0).withVisibility(true, Instant.EPOCH));
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "visit Bob"); // default slot 0
+        execute(dispatcher, "home visit Bob"); // default slot 0
 
         assertThat(teleporter.hops).isEqualTo(1);
     }
@@ -224,7 +271,7 @@ class HomeCommandPathTest {
         repository.put(home(targetRef(), 1).withVisibility(true, Instant.EPOCH));
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "visit Bob 2"); // 1-based display 2 maps to slot index 1
+        execute(dispatcher, "home visit Bob 2"); // 1-based display 2 maps to slot index 1
 
         assertThat(teleporter.hops).isEqualTo(1);
     }
@@ -237,7 +284,7 @@ class HomeCommandPathTest {
         repository.put(home(targetRef(), 0).withVisibility(true, Instant.EPOCH));
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "visit Bob");
+        execute(dispatcher, "home visit Bob");
 
         assertThat(teleporter.hops).isEqualTo(1);
     }
@@ -247,7 +294,7 @@ class HomeCommandPathTest {
         repository.put(home(senderRef(), 0));
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "invite Bob"); // default slot 0
+        execute(dispatcher, "home invite Bob"); // default slot 0
 
         assertThat(invites.invites(senderRef(), HomeSlot.of(0))).contains(target.getUniqueId());
     }
@@ -258,7 +305,7 @@ class HomeCommandPathTest {
         invites.addInvite(senderRef(), HomeSlot.of(0), target.getUniqueId());
         CommandDispatcher<CommandSourceStack> dispatcher = register();
 
-        execute(dispatcher, "uninvite Bob");
+        execute(dispatcher, "home uninvite Bob");
 
         assertThat(invites.invites(senderRef(), HomeSlot.of(0))).doesNotContain(target.getUniqueId());
     }
@@ -274,11 +321,7 @@ class HomeCommandPathTest {
     private CommandDispatcher<CommandSourceStack> register() {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         Messages messages = new KeyMessages();
-        dispatcher.getRoot().addChild(new HomeCommand(services, messages).build());
-        dispatcher.getRoot().addChild(new HomeAdminCommand(services, messages, new SyncScheduler()).build());
-        dispatcher.getRoot().addChild(new VisitCommand(services, messages, new SyncScheduler()).build());
-        dispatcher.getRoot().addChild(new InviteCommand(services, messages, new SyncScheduler()).build());
-        dispatcher.getRoot().addChild(new UninviteCommand(services, messages, new SyncScheduler()).build());
+        dispatcher.getRoot().addChild(new HomeCommand(services, messages, new SyncScheduler()).build());
         return dispatcher;
     }
 

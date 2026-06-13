@@ -18,6 +18,8 @@ re-worded or recoloured, and every command can be renamed, aliased or disabled f
   `/fly`, `/vanish`, `/invsee`, `/ban`, `/mute`, `/jail` …).
 - **GUI-first homes**: `/home` opens a slot grid — click an empty cell to set a home there, click a
   home to teleport, rename, relocate, delete, or pick a custom icon. No name-juggling commands.
+  Sharing and staff tools hang off the same command: `/home visit <player>`, `/home invite <player>`,
+  `/home uninvite <player>`, and `/home admin <player> …` for moderators.
 - **In-game menus** for kits, warps and homes — click to claim, teleport, or manage — with the
   layout (rows, icons) editable from config.
 - **Real economy**: balances are database-backed (they survive world rollbacks, never the PDC),
