@@ -183,7 +183,11 @@ class HomeCommandPathTest {
                 iconSelector,
                 new AnvilInput(plugin),
                 HomeActionsLayout.codeDefault(),
-                fmt);
+                fmt,
+                false,
+                false,
+                false,
+                pos -> false);
         HomeListView listView = new HomeListView(
                 messages,
                 scheduler,

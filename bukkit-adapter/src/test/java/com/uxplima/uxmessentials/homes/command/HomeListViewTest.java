@@ -174,7 +174,11 @@ class HomeListViewTest {
                         IconSelectorLayout.codeDefault()),
                 new AnvilInput(plugin),
                 HomeActionsLayout.codeDefault(),
-                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC));
+                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC),
+                false,
+                false,
+                false,
+                pos -> false);
         return new HomeListView(
                 messages,
                 scheduler,

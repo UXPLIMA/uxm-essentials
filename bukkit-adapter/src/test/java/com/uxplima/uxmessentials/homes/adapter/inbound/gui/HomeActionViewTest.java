@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Predicate;
 
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
@@ -23,6 +24,8 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
+
+import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
@@ -50,6 +53,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.PaginatedGui;
+import com.uxplima.uxmlib.gui.SimpleGui;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -62,9 +66,11 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * MockBukkit coverage of the per-home action menu and its child icon picker. Button clicks are driven against the
  * live menu by their layout slot; the rename decision (blank/overlong/valid) is exercised through the extracted
- * {@code handleRenameInput} seam so the branch behaviour is pinned without driving a live anvil. The scheduler is a
- * synchronous double so the async-then-entity hops run inline, and feedback is captured through a recording
- * {@link MessageSink}.
+ * {@code handleRenameInput} seam so the branch behaviour is pinned without driving a live anvil. The confirm-dialog
+ * decisions (delete, relocate, unsafe-teleport) are exercised through the extracted {@code handleDelete},
+ * {@code handleRelocate} and {@code handleTeleport} seams with a {@link RecordingPrompt} so the confirm/direct
+ * branches are covered without opening a live {@code ConfirmMenu} inventory. The scheduler is a synchronous double
+ * so the async-then-entity hops run inline, and feedback is captured through a recording {@link MessageSink}.
  */
 class HomeActionViewTest {
 
@@ -242,6 +248,174 @@ class HomeActionViewTest {
         assertThat(cleared.icon()).isEmpty();
     }
 
+    // --- confirm-delete decision seam ---
+
+    @Test
+    void deleteWithConfirmOnOpensConfirmDialogWithoutDeleting() {
+        Home home = seed(home(0));
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        viewWith(true, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
+
+        assertThat(prompt.prompted).isTrue();
+        // Home must still exist — confirm was not triggered.
+        assertThat(repository.findSlot(viewer, HomeSlot.of(0))).isPresent();
+    }
+
+    @Test
+    void deleteWithConfirmOnDeletesWhenConfirmed() {
+        Home home = seed(home(0));
+        RecordingPrompt prompt = RecordingPrompt.autoConfirm();
+
+        viewWith(true, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
+
+        assertThat(repository.findSlot(viewer, HomeSlot.of(0))).isEmpty();
+    }
+
+    @Test
+    void deleteWithConfirmOnKeepsHomeWhenCancelled() {
+        Home home = seed(home(0));
+        RecordingPrompt prompt = RecordingPrompt.autoCancel();
+
+        viewWith(true, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
+
+        assertThat(repository.findSlot(viewer, HomeSlot.of(0))).isPresent();
+    }
+
+    @Test
+    void deleteWithConfirmOffDeletesDirectly() {
+        Home home = seed(home(0));
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        viewWith(false, false, false, pos -> false).handleDelete(player, viewer, home, () -> {}, prompt);
+
+        assertThat(prompt.prompted).isFalse();
+        assertThat(repository.findSlot(viewer, HomeSlot.of(0))).isEmpty();
+    }
+
+    // --- confirm-relocate decision seam ---
+
+    @Test
+    void relocateWithConfirmOnOpensConfirmDialogWithoutMoving() {
+        Home home = seed(home(0));
+        player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 100, 70, 200));
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        viewWith(false, true, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
+
+        assertThat(prompt.prompted).isTrue();
+        // Still at original coords — confirm was not triggered.
+        Home unchanged = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(unchanged.location().blockX()).isEqualTo(0);
+    }
+
+    @Test
+    void relocateWithConfirmOnMovesWhenConfirmed() {
+        Home home = seed(home(0));
+        player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 100, 70, 200));
+        RecordingPrompt prompt = RecordingPrompt.autoConfirm();
+
+        viewWith(false, true, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
+
+        Home moved = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(moved.location().blockX()).isEqualTo(100);
+    }
+
+    @Test
+    void relocateWithConfirmOffMovesDirectly() {
+        Home home = seed(home(0));
+        player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 55, 64, 55));
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        viewWith(false, false, false, pos -> false).handleRelocate(player, viewer, home, () -> {}, prompt);
+
+        assertThat(prompt.prompted).isFalse();
+        Home moved = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(moved.location().blockX()).isEqualTo(55);
+    }
+
+    // --- confirm-unsafe-teleport decision seam ---
+
+    @Test
+    void teleportToUnsafeDestinationWithConfirmOnOpensConfirmDialog() {
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        // Unsafe predicate returns true; confirm toggle is on; permissions deny bypass.
+        permissions = new TogglePermissions(false);
+        viewWith(false, false, true, pos -> true)
+                .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        assertThat(prompt.prompted).isTrue();
+        assertThat(teleporter.hops).isEqualTo(0);
+    }
+
+    @Test
+    void teleportToUnsafeDestinationWithConfirmOnTeleportsWhenConfirmed() {
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = RecordingPrompt.autoConfirm();
+
+        permissions = new TogglePermissions(false);
+        viewWith(false, false, true, pos -> true)
+                .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        assertThat(teleporter.hops).isEqualTo(1);
+    }
+
+    @Test
+    void teleportToUnsafeDestinationWithBypassPermissionTeleportsDirectly() {
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        // All permissions granted (includes bypass.unsafe).
+        permissions = new TogglePermissions(true);
+        viewWith(false, false, true, pos -> true)
+                .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        assertThat(prompt.prompted).isFalse();
+        assertThat(teleporter.hops).isEqualTo(1);
+    }
+
+    @Test
+    void teleportToSafeDestinationWithConfirmOnTeleportsDirectly() {
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        permissions = new TogglePermissions(false);
+        // Safe predicate returns false — no confirm needed.
+        viewWith(false, false, true, pos -> false)
+                .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        assertThat(prompt.prompted).isFalse();
+        assertThat(teleporter.hops).isEqualTo(1);
+    }
+
+    @Test
+    void teleportWithUnsafeConfirmToggleOffTeleportsDirectly() {
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        permissions = new TogglePermissions(false);
+        // Toggle is off — even with unsafe destination no dialog is shown.
+        viewWith(false, false, false, pos -> true)
+                .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        assertThat(prompt.prompted).isFalse();
+        assertThat(teleporter.hops).isEqualTo(1);
+    }
+
+    // --- helpers ---
+
     private void open(Home home) {
         view().open(player, viewer, home, () -> {});
     }
@@ -262,7 +436,16 @@ class HomeActionViewTest {
         return Home.create(viewer, HomeSlot.of(slot), Position.of(WORLD, slot, 64, slot), Instant.EPOCH);
     }
 
+    /** Build a view with all confirm toggles off and a "safe" destination predicate (existing tests unchanged). */
     private HomeActionView view() {
+        return viewWith(false, false, false, pos -> false);
+    }
+
+    private HomeActionView viewWith(
+            boolean confirmDelete,
+            boolean confirmRelocate,
+            boolean confirmUnsafeTeleport,
+            Predicate<Position> destinationUnsafe) {
         Messages messages = new KeyMessages();
         HomeNotifier notifier = new HomeNotifier(messages, sink);
         DomainEventPublisher events = new NoEvents();
@@ -286,7 +469,11 @@ class HomeActionViewTest {
                 iconSelector,
                 new AnvilInput(plugin),
                 HomeActionsLayout.codeDefault(),
-                fmt);
+                fmt,
+                confirmDelete,
+                confirmRelocate,
+                confirmUnsafeTeleport,
+                destinationUnsafe);
     }
 
     /** A map-backed slot repository keyed by (owner, slot). */
@@ -402,6 +589,43 @@ class HomeActionViewTest {
         public QuotaResult resolveQuota(
                 PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
             return QuotaResult.limited(configDefault);
+        }
+    }
+
+    /**
+     * A {@link HomeActionView.ConfirmPrompt} that records whether it was invoked and optionally
+     * auto-fires one of the decision callbacks for testing confirmed/cancelled branches.
+     */
+    private static final class RecordingPrompt implements HomeActionView.ConfirmPrompt {
+        boolean prompted;
+        private final @Nullable Boolean autoDecision;
+
+        RecordingPrompt() {
+            this.autoDecision = null;
+        }
+
+        private RecordingPrompt(Boolean autoDecision) {
+            this.autoDecision = autoDecision;
+        }
+
+        /** Auto-fires the {@code onConfirm} callback immediately when prompted. */
+        static RecordingPrompt autoConfirm() {
+            return new RecordingPrompt(Boolean.TRUE);
+        }
+
+        /** Auto-fires the {@code onCancel} callback immediately when prompted. */
+        static RecordingPrompt autoCancel() {
+            return new RecordingPrompt(Boolean.FALSE);
+        }
+
+        @Override
+        public void prompt(Component title, Runnable onConfirm, Runnable onCancel) {
+            prompted = true;
+            if (Boolean.TRUE.equals(autoDecision)) {
+                onConfirm.run();
+            } else if (Boolean.FALSE.equals(autoDecision)) {
+                onCancel.run();
+            }
         }
     }
 }

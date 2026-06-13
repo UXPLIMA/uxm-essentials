@@ -80,7 +80,12 @@ public enum HomesMessageKey implements MessageKey {
     // rename via anvil
     HOME_RENAME_PROMPT("home.rename.prompt"),
     HOME_RENAME_TOO_LONG("home.rename.too-long"),
-    HOME_RENAME_CANCELLED("home.rename.cancelled");
+    HOME_RENAME_CANCELLED("home.rename.cancelled"),
+
+    // action-menu confirm dialogs
+    HOME_CONFIRM_DELETE("home.confirm.delete"),
+    HOME_CONFIRM_RELOCATE("home.confirm.relocate"),
+    HOME_CONFIRM_UNSAFE_TP("home.confirm.unsafe-teleport");
 
     private final String key;
 

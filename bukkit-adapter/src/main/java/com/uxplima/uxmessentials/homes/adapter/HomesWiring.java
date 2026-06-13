@@ -45,6 +45,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
@@ -113,7 +114,8 @@ public final class HomesWiring {
         DateTimeFormatter dateFormat = dateFormat(ctx);
         AnvilInput anvil = installAnvil(plugin, resources);
 
-        List<SethomeGuard> guards = buildGuards(plugin, ctx);
+        SafeLocationGuard safeGuard = buildSafeGuard(plugin, ctx);
+        List<SethomeGuard> guards = buildGuards(ctx, safeGuard);
         CreateHomeAtSlot createHome =
                 new CreateHomeAtSlot(repository, quota, guards, notifier, kernel.events(), unlimitedMax, clock);
         RelocateHome relocateHome = new RelocateHome(repository, guards, notifier, kernel.events(), clock);
@@ -122,6 +124,10 @@ public final class HomesWiring {
         DeleteHome deleteHome = new DeleteHome(repository, notifier, kernel.events());
         TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier);
         ListHomes listHomes = new ListHomes(repository);
+
+        boolean confirmDelete = ctx.config().getBoolean("confirm-delete", true);
+        boolean confirmRelocate = ctx.config().getBoolean("confirm-relocate", false);
+        boolean confirmUnsafeTeleport = ctx.config().getBoolean("confirm-unsafe-teleport", true);
 
         IconSelectorView iconSelector =
                 new IconSelectorView(kernel.messages(), kernel.scheduler(), setHomeIcon, iconLayout(guiLayouts));
@@ -137,7 +143,11 @@ public final class HomesWiring {
                 iconSelector,
                 anvil,
                 actionsLayout(guiLayouts),
-                dateFormat);
+                dateFormat,
+                confirmDelete,
+                confirmRelocate,
+                confirmUnsafeTeleport,
+                (Position pos) -> safeGuard.isUnsafe(pos));
         HomeListView listView = new HomeListView(
                 kernel.messages(),
                 kernel.scheduler(),
@@ -184,14 +194,16 @@ public final class HomesWiring {
         return DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault());
     }
 
-    private static List<SethomeGuard> buildGuards(Plugin plugin, ModuleContext ctx) {
-        Set<String> disabledWorlds = new HashSet<>(ctx.config().getStringList("disabled-worlds", List.of()));
+    private static SafeLocationGuard buildSafeGuard(Plugin plugin, ModuleContext ctx) {
         boolean blockUnsafe = ctx.config().getBoolean("block-unsafe-sethome", true);
         boolean considerMidair = ctx.config().getBoolean("consider-midair-unsafe", true);
         int midairDepth = Math.max(1, ctx.config().getInt("midair-ground-depth", DEFAULT_MIDAIR_GROUND_DEPTH));
-        return List.of(
-                new WorldBlacklistGuard(disabledWorlds),
-                new SafeLocationGuard(plugin.getServer(), blockUnsafe, considerMidair, midairDepth));
+        return new SafeLocationGuard(plugin.getServer(), blockUnsafe, considerMidair, midairDepth);
+    }
+
+    private static List<SethomeGuard> buildGuards(ModuleContext ctx, SafeLocationGuard safeGuard) {
+        Set<String> disabledWorlds = new HashSet<>(ctx.config().getStringList("disabled-worlds", List.of()));
+        return List.of(new WorldBlacklistGuard(disabledWorlds), safeGuard);
     }
 
     /**

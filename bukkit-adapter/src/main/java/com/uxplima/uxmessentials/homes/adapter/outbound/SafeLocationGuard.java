@@ -47,12 +47,22 @@ public final class SafeLocationGuard implements SethomeGuard {
         if (!blockUnsafe) {
             return Result.ok();
         }
+        return isUnsafe(at) ? Result.err(HomeError.UNSAFE_LOCATION) : Result.ok();
+    }
+
+    /**
+     * Returns {@code true} when the destination is demonstrably unsafe. An unloaded world is
+     * treated as safe — the check cannot be authoritative without loaded blocks. Bypasses the
+     * {@link #blockUnsafe} toggle so callers that have their own toggle (e.g. the GUI confirm
+     * flow) can invoke the detection logic independently.
+     */
+    public boolean isUnsafe(Position at) {
+        Objects.requireNonNull(at, "at");
         World world = server.getWorld(at.world().uid());
         if (world == null) {
-            // Cannot judge an unloaded world; conservatively allow.
-            return Result.ok();
+            return false;
         }
-        return isUnsafe(world, at) ? Result.err(HomeError.UNSAFE_LOCATION) : Result.ok();
+        return isUnsafe(world, at);
     }
 
     private boolean isUnsafe(World world, Position at) {
