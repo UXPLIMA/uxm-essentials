@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderResolver;
@@ -36,10 +38,19 @@ class IndexedVotePlaceholderTest {
     private RepositoryVotePlaceholders placeholders;
     private PlaceholderResolver resolver;
 
+    /** Maps the three known players' UUIDs to their names; falls back to the UUID string otherwise. */
+    private static String resolveName(UUID uuid) {
+        return Map.of(
+                        ALICE.uuid(), ALICE.name(),
+                        BOB.uuid(), BOB.name(),
+                        CHARLIE.uuid(), CHARLIE.name())
+                .getOrDefault(uuid, uuid.toString());
+    }
+
     @BeforeEach
     void setUp() {
         repository = new StubVoteRepository();
-        placeholders = new RepositoryVotePlaceholders(repository, 25);
+        placeholders = new RepositoryVotePlaceholders(repository, 25, IndexedVotePlaceholderTest::resolveName);
         PlaceholderContexts contexts =
                 PlaceholderContexts.builder().vote(placeholders).build();
         resolver = new PlaceholderResolver(contexts);
@@ -101,6 +112,35 @@ class IndexedVotePlaceholderTest {
 
         assertThat(result).contains("Bob");
         assertThat(repository.lastQueriedPeriod).isEqualTo(VotePeriod.DAILY);
+    }
+
+    @Test
+    void topAtNameUsesResolverWhenRowCarriesUuidString() {
+        // Mirror the persistence layer: the ranked player's name is its UUID string.
+        UUID steveUuid = UUID.randomUUID();
+        repository.topResult = List.of(new VoteRanking(new PlayerRef(steveUuid, steveUuid.toString()), 100));
+        Function<UUID, String> steveResolver = uuid -> uuid.equals(steveUuid) ? "Steve" : uuid.toString();
+        RepositoryVotePlaceholders resolving = new RepositoryVotePlaceholders(repository, 25, steveResolver);
+        PlaceholderResolver localResolver = new PlaceholderResolver(
+                PlaceholderContexts.builder().vote(resolving).build());
+
+        Optional<String> result = localResolver.resolve(CHARLIE, true, "votes_top_monthly_1_name");
+
+        assertThat(result).contains("Steve");
+    }
+
+    @Test
+    void topAtNameFallsBackToUuidWhenResolverUnknown() {
+        UUID ghostUuid = UUID.randomUUID();
+        repository.topResult = List.of(new VoteRanking(new PlayerRef(ghostUuid, ghostUuid.toString()), 50));
+        // Resolver that never knows anyone — returns the UUID string.
+        RepositoryVotePlaceholders resolving = new RepositoryVotePlaceholders(repository, 25, UUID::toString);
+        PlaceholderResolver localResolver = new PlaceholderResolver(
+                PlaceholderContexts.builder().vote(resolving).build());
+
+        Optional<String> result = localResolver.resolve(CHARLIE, true, "votes_top_monthly_1_name");
+
+        assertThat(result).contains(ghostUuid.toString());
     }
 
     // --- positionOf ---

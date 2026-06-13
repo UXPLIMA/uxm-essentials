@@ -42,8 +42,9 @@ public final class ShowNextVote {
 
         notifier.send(viewer, VoteMessageKey.VOTE_NEXT_HEADER);
         for (VoteSiteSpec spec : catalog.sites()) {
+            // Cooldown is keyed on the Votifier service (the write key in HandleVote); display uses name.
             SiteCooldown cd =
-                    new SiteCooldown(spec.name(), repository.lastVoteAtSite(viewer, spec.name()), spec.cooldown());
+                    new SiteCooldown(spec.name(), repository.lastVoteAtSite(viewer, spec.service()), spec.cooldown());
             if (cd.isVotable(now)) {
                 notifier.send(viewer, VoteMessageKey.VOTE_NEXT_AVAILABLE, Map.of("site", spec.name()));
             } else {

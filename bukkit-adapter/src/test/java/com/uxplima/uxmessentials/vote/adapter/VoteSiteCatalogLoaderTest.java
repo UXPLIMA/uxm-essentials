@@ -61,6 +61,30 @@ class VoteSiteCatalogLoaderTest {
     }
 
     @Test
+    void parsesServiceFieldAndDefaultsToNameWhenAbsent(@TempDir Path dir) throws IOException {
+        String hocon =
+                """
+                sites = [
+                  { name = "PlanetMinecraft", service = "PMC", url = "https://planetminecraft.com" }
+                  { name = "minecraft-mp" }
+                ]
+                """;
+        VoteSiteCatalog catalog = load(dir, hocon);
+
+        assertThat(catalog.sites()).hasSize(2);
+
+        // Explicit service is kept separate from the display name.
+        VoteSiteSpec pmc = catalog.sites().get(0);
+        assertThat(pmc.name()).isEqualTo("PlanetMinecraft");
+        assertThat(pmc.service()).isEqualTo("PMC");
+
+        // Absent service defaults to the display name.
+        VoteSiteSpec mp = catalog.sites().get(1);
+        assertThat(mp.name()).isEqualTo("minecraft-mp");
+        assertThat(mp.service()).isEqualTo("minecraft-mp");
+    }
+
+    @Test
     void appliesDefaultCooldownWhenSiteCooldownAbsent(@TempDir Path dir) throws IOException {
         String hocon =
                 """

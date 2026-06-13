@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -97,12 +98,24 @@ public final class VoteJoinListener implements Listener {
         if (!remindersEnabled || eligibility == null || reminderPreferences == null || notifier == null) {
             return;
         }
+        VoteReminderEligibility elig = eligibility;
+        ReminderPreferences prefs = reminderPreferences;
+        VoteNotifier note = notifier;
 
-        // One-shot reminder after loginDelay: check eligibility off-tick, send if eligible.
+        // One-shot reminder after loginDelay. The eligibility check hits the DB off-tick; the PDC opt-in
+        // read and the send then hop to the player's entity thread, guarded against a logout in between.
         scheduler.asyncAfter(loginDelay, () -> {
-            if (reminderPreferences.wantsReminders(who) && eligibility.canVoteSomewhere(who, Instant.now())) {
-                notifier.send(who, VoteMessageKey.VOTE_REMINDER);
+            if (!elig.canVoteSomewhere(who, Instant.now())) {
+                return;
             }
+            scheduler.onEntity(who, () -> {
+                if (Bukkit.getPlayer(who.uuid()) == null) {
+                    return; // logged off between the eligibility check and the entity hop
+                }
+                if (prefs.wantsReminders(who)) {
+                    note.send(who, VoteMessageKey.VOTE_REMINDER);
+                }
+            });
         });
     }
 

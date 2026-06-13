@@ -51,6 +51,28 @@ class VoteReminderEligibilityTest {
         assertThat(elig.canVoteSomewhere(ALICE, NOW)).isTrue();
     }
 
+    @Test
+    void cooldownIsFoundByServiceWhenNameDiffers() {
+        // Display name differs from the Votifier service key; cooldown is recorded under the service.
+        VoteSiteSpec spec = new VoteSiteSpec("PlanetMinecraft", "PMC", Optional.empty(), TWELVE_HOURS);
+        VoteSiteCatalog catalog = new VoteSiteCatalog(List.of(spec));
+        // Voted just now under the SERVICE key "PMC" → on cooldown → not eligible.
+        StubRepo repo = new StubRepo(Map.of("PMC", NOW));
+        VoteReminderEligibility elig = new VoteReminderEligibility(repo, catalog);
+        assertThat(elig.canVoteSomewhere(ALICE, NOW)).isFalse();
+    }
+
+    @Test
+    void recordingUnderTheDisplayNameDoesNotMatchTheServiceKey() {
+        // A vote recorded under the display name (not the service) must NOT register the cooldown.
+        VoteSiteSpec spec = new VoteSiteSpec("PlanetMinecraft", "PMC", Optional.empty(), TWELVE_HOURS);
+        VoteSiteCatalog catalog = new VoteSiteCatalog(List.of(spec));
+        StubRepo repo = new StubRepo(Map.of("PlanetMinecraft", NOW));
+        VoteReminderEligibility elig = new VoteReminderEligibility(repo, catalog);
+        // The lookup uses the service key "PMC", finds nothing → still eligible.
+        assertThat(elig.canVoteSomewhere(ALICE, NOW)).isTrue();
+    }
+
     private static VoteSiteSpec site(String name, Duration cooldown) {
         return new VoteSiteSpec(name, Optional.empty(), cooldown);
     }

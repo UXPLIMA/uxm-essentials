@@ -42,7 +42,8 @@ public final class ShowLastVote {
 
         notifier.send(viewer, VoteMessageKey.VOTE_LAST_HEADER);
         for (VoteSiteSpec spec : catalog.sites()) {
-            Optional<Instant> last = repository.lastVoteAtSite(viewer, spec.name());
+            // Cooldown is keyed on the Votifier service (the write key in HandleVote); display uses name.
+            Optional<Instant> last = repository.lastVoteAtSite(viewer, spec.service());
             if (last.isEmpty()) {
                 notifier.send(viewer, VoteMessageKey.VOTE_LAST_NEVER, Map.of("site", spec.name()));
             } else {

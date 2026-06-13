@@ -24,14 +24,27 @@ public record VoteSiteCatalog(List<VoteSiteSpec> sites) {
     }
 
     /**
-     * Look up a site by name, case-insensitively. Votifier events may not preserve the case the
-     * operator used in config, so matching is always normalised.
+     * Look up a site by its display name, case-insensitively. Operators may not preserve the case
+     * they used in config, so matching is always normalised.
      */
     public Optional<VoteSiteSpec> forName(String name) {
         Objects.requireNonNull(name, "name");
         String lower = name.toLowerCase(Locale.ROOT);
         return sites.stream()
                 .filter(s -> s.name().toLowerCase(Locale.ROOT).equals(lower))
+                .findFirst();
+    }
+
+    /**
+     * Look up a site by its Votifier service key, case-insensitively. A Votifier event carries the
+     * raw service string, which may not match the case the operator configured, so matching is
+     * always normalised. This is the key the per-site cooldown is tracked under.
+     */
+    public Optional<VoteSiteSpec> forService(String service) {
+        Objects.requireNonNull(service, "service");
+        String lower = service.toLowerCase(Locale.ROOT);
+        return sites.stream()
+                .filter(s -> s.service().toLowerCase(Locale.ROOT).equals(lower))
                 .findFirst();
     }
 }

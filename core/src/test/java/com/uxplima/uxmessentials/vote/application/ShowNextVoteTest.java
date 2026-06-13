@@ -67,6 +67,25 @@ class ShowNextVoteTest {
     }
 
     @Test
+    void cooldownIsKeyedOnServiceWhileDisplayUsesName() {
+        // Display name differs from the Votifier service key; the recorded cooldown is under the service.
+        VoteSiteSpec spec = new VoteSiteSpec("PlanetMinecraft", "PMC", Optional.empty(), Duration.ofHours(12));
+        VoteSiteCatalog catalog = new VoteSiteCatalog(List.of(spec));
+        // Recorded under the SERVICE key "PMC", 6h ago — must be found and shown on cooldown.
+        repository.lastVotesBySite = Map.of("PMC", NOW.minus(Duration.ofHours(6)));
+
+        ShowNextVote use = new ShowNextVote(repository, catalog, notifier.voteNotifier());
+        use.show(ALICE, NOW);
+
+        assertThat(notifier.keys).contains(VoteMessageKey.VOTE_NEXT_ENTRY);
+        // The display placeholder is the friendly name, not the service key.
+        assertThat(notifier.placeholderFor(VoteMessageKey.VOTE_NEXT_ENTRY, "site"))
+                .isEqualTo("PlanetMinecraft");
+        assertThat(notifier.placeholderFor(VoteMessageKey.VOTE_NEXT_ENTRY, "time"))
+                .isEqualTo("6h");
+    }
+
+    @Test
     void mixedSitesSendsBothEntryTypes() {
         VoteSiteCatalog catalog =
                 catalogOf(site("ReadySite", Duration.ofHours(12)), site("CooldownSite", Duration.ofHours(12)));

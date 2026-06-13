@@ -31,8 +31,9 @@ public final class VoteReminderEligibility {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(now, "now");
         for (VoteSiteSpec spec : catalog.sites()) {
+            // Cooldown is keyed on the Votifier service (the write key in HandleVote); display uses name.
             SiteCooldown cd =
-                    new SiteCooldown(spec.name(), repository.lastVoteAtSite(player, spec.name()), spec.cooldown());
+                    new SiteCooldown(spec.name(), repository.lastVoteAtSite(player, spec.service()), spec.cooldown());
             if (cd.isVotable(now)) {
                 return true;
             }

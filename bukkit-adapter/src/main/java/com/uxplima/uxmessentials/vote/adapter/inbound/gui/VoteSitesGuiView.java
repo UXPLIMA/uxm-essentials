@@ -131,7 +131,8 @@ public final class VoteSitesGuiView {
         List<VoteSiteSpec> sites = catalog.sites();
         List<SiteEntry> entries = new ArrayList<>(sites.size());
         for (VoteSiteSpec spec : sites) {
-            Optional<Instant> lastVote = repository.lastVoteAtSite(viewerRef, spec.name());
+            // Cooldown is keyed on the Votifier service (the write key in HandleVote); display uses name.
+            Optional<Instant> lastVote = repository.lastVoteAtSite(viewerRef, spec.service());
             SiteCooldown cooldown = new SiteCooldown(spec.name(), lastVote, spec.cooldown());
             boolean votable = cooldown.isVotable(now);
             Duration remaining = votable ? Duration.ZERO : cooldown.remaining(now);

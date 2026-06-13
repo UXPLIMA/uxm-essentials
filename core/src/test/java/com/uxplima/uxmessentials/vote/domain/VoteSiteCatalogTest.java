@@ -47,4 +47,17 @@ class VoteSiteCatalogTest {
         VoteSiteCatalog catalog = new VoteSiteCatalog(List.of(SITE_A));
         assertThat(catalog.sites()).hasSize(1);
     }
+
+    @Test
+    void forServiceMatchesTheServiceKeyNotTheDisplayName() {
+        VoteSiteSpec spec =
+                new VoteSiteSpec("PlanetMinecraft", "PMC", Optional.of("https://pmc.example"), Duration.ofHours(24));
+        VoteSiteCatalog catalog = new VoteSiteCatalog(List.of(spec));
+
+        // Matches the Votifier service key, case-insensitively.
+        assertThat(catalog.forService("PMC")).contains(spec);
+        assertThat(catalog.forService("pmc")).contains(spec);
+        // The display name is NOT the service key.
+        assertThat(catalog.forService("PlanetMinecraft")).isEmpty();
+    }
 }

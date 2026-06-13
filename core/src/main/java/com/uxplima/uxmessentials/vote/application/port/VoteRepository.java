@@ -139,18 +139,23 @@ public interface VoteRepository {
      * The instant at which {@code player} last voted on {@code site}, or empty if they have no
      * recorded vote there. Used to evaluate per-site cooldowns without touching the full tally.
      *
+     * <p>The {@code site} key is the Votifier service string — the write path records the raw
+     * {@code vote.serviceName()} and the read paths look it up under {@code VoteSiteSpec.service()},
+     * so the two line up. The persistence layer normalises case on both sides; callers pass the key
+     * as configured.
+     *
      * @param player the player to query
-     * @param site   the site name exactly as stored (case-sensitive; the catalog normalises on write)
+     * @param site   the Votifier service key the cooldown is tracked under
      */
     Optional<Instant> lastVoteAtSite(PlayerRef player, String site);
 
     /**
      * Record {@code at} as the most recent vote timestamp for {@code player} on {@code site}.
      * Overwrites any existing timestamp. Called by {@link com.uxplima.uxmessentials.vote.application.HandleVote}
-     * immediately after the per-player tally is saved.
+     * immediately after the per-player tally is saved, with the raw Votifier {@code serviceName}.
      *
      * @param player the player who voted
-     * @param site   the site name
+     * @param site   the Votifier service key the cooldown is tracked under
      * @param at     when the vote was received
      */
     void recordLastVoteAtSite(PlayerRef player, String site, Instant at);

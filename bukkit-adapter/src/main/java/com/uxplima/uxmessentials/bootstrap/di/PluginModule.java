@@ -618,7 +618,15 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
-        links.placeholders.vote(new RepositoryVotePlaceholders(wired.repository(), wired.partyThreshold()));
+        // Resolve leaderboard UUIDs to display names for votes_top_<period>_<n>_name — the same lookup
+        // /vote top uses — so the placeholder shows a name, not the UUID the repository stores.
+        com.uxplima.uxmessentials.shared.application.port.PlayerLookup lookup =
+                ctx.kernel().playerLookup();
+        java.util.function.Function<java.util.UUID, String> nameResolver = uuid -> lookup.findByUuid(uuid)
+                .map(com.uxplima.uxmessentials.shared.domain.PlayerRef::name)
+                .orElse(uuid.toString().toLowerCase(java.util.Locale.ROOT));
+        links.placeholders.vote(
+                new RepositoryVotePlaceholders(wired.repository(), wired.partyThreshold(), nameResolver));
     }
 
     private static void wireDiscordlink(

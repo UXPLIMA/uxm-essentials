@@ -20,13 +20,17 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * Parses the {@code sites} block of the vote module config into a {@link VoteSiteCatalog}. Each
- * site entry carries a name (required), an optional URL, and an optional per-site
- * {@code cooldown-minutes} that falls back to the module-level {@code default-cooldown-minutes}.
+ * site entry carries a name (required), an optional {@code service} (the Votifier service key the
+ * cooldown is matched on; defaults to {@code name} when absent), an optional URL, and an optional
+ * per-site {@code cooldown-minutes} that falls back to the module-level
+ * {@code default-cooldown-minutes}.
  *
  * <h2>Back-compat: legacy {@code vote-links}</h2>
  * When {@code sites} is absent or empty but a {@code vote-links} list is present, the loader
- * synthesises a {@link VoteSiteSpec} for each link using the link as both the name and the URL
- * and applying the default cooldown. This keeps existing configs working without any edit.
+ * synthesises a {@link VoteSiteSpec} for each link using the derived domain as the name, service,
+ * and the link as the URL, applying the default cooldown. This keeps existing configs loading, but a
+ * synthesised service rarely matches the real Votifier service string, so legacy links must migrate
+ * to explicit {@code sites} with a {@code service} to get a working per-site cooldown.
  * The {@code vote-links} list is still used by
  * {@link com.uxplima.uxmessentials.vote.application.VoteLinks} to render the plain chat link
  * list; both paths can coexist as independent features.
@@ -105,11 +109,14 @@ public final class VoteSiteCatalogLoader {
             if (name == null || name.isBlank()) {
                 continue;
             }
+            String displayName = name.strip();
+            @Nullable String rawService = child.node("service").getString();
+            String service = rawService == null || rawService.isBlank() ? displayName : rawService.strip();
             @Nullable String rawUrl = child.node("url").getString();
             Optional<String> url = rawUrl == null || rawUrl.isBlank() ? Optional.empty() : Optional.of(rawUrl.strip());
             int cooldownMinutes = child.node("cooldown-minutes").getInt(-1);
             Duration cooldown = cooldownMinutes > 0 ? Duration.ofMinutes(cooldownMinutes) : defaultCooldown;
-            specs.add(new VoteSiteSpec(name.strip(), url, cooldown));
+            specs.add(new VoteSiteSpec(displayName, service, url, cooldown));
         }
         return List.copyOf(specs);
     }

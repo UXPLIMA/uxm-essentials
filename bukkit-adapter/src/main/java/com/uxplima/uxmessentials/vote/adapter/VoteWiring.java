@@ -25,7 +25,9 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEv
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
@@ -50,6 +52,7 @@ import com.uxplima.uxmessentials.vote.application.ShowNextVote;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
+import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
@@ -149,7 +152,10 @@ public final class VoteWiring {
             VoteReminderEligibility eligibility = new VoteReminderEligibility(repository, siteCatalog);
             Duration period = Duration.ofMinutes(intervalMinutes);
             reminderTask = kernel.scheduler()
-                    .repeatGlobal(() -> sendIntervalReminders(eligibility, reminderPrefs, notifier), period, period);
+                    .repeatGlobal(
+                            () -> sendIntervalReminders(kernel.scheduler(), eligibility, reminderPrefs, notifier),
+                            period,
+                            period);
         }
 
         // Build the join listener with reminder support when enabled.
@@ -188,15 +194,42 @@ public final class VoteWiring {
     }
 
     private static void sendIntervalReminders(
-            VoteReminderEligibility eligibility, PdcReminderPreferences reminderPrefs, VoteNotifier notifier) {
-        // Iterate online players on the global tick; each eligibility check hits the repository async.
+            Scheduler scheduler,
+            VoteReminderEligibility eligibility,
+            PdcReminderPreferences reminderPrefs,
+            VoteNotifier notifier) {
+        // This body runs on the global region tick. Only collect online player refs here — the PDC read
+        // (entity thread) and the DB eligibility check (off-tick) must not happen on the global tick.
         for (Player online : Bukkit.getOnlinePlayers()) {
-            com.uxplima.uxmessentials.shared.domain.PlayerRef who =
-                    new com.uxplima.uxmessentials.shared.domain.PlayerRef(online.getUniqueId(), online.getName());
-            if (reminderPrefs.wantsReminders(who) && eligibility.canVoteSomewhere(who, java.time.Instant.now())) {
-                notifier.send(who, com.uxplima.uxmessentials.vote.application.VoteMessageKey.VOTE_REMINDER);
-            }
+            PlayerRef who = new PlayerRef(online.getUniqueId(), online.getName());
+            remindIfEligible(scheduler, eligibility, reminderPrefs, notifier, who);
         }
+    }
+
+    /**
+     * The shared async→onEntity reminder dance used by both the interval task and the login nag: the DB
+     * eligibility check runs off-tick, then the PDC opt-in read and the message send happen on the
+     * player's entity thread, guarded so a player who logged off in between is silently skipped.
+     */
+    private static void remindIfEligible(
+            Scheduler scheduler,
+            VoteReminderEligibility eligibility,
+            PdcReminderPreferences reminderPrefs,
+            VoteNotifier notifier,
+            PlayerRef who) {
+        scheduler.async(() -> {
+            if (!eligibility.canVoteSomewhere(who, java.time.Instant.now())) {
+                return;
+            }
+            scheduler.onEntity(who, () -> {
+                if (Bukkit.getPlayer(who.uuid()) == null) {
+                    return; // logged off between the eligibility check and the entity hop
+                }
+                if (reminderPrefs.wantsReminders(who)) {
+                    notifier.send(who, VoteMessageKey.VOTE_REMINDER);
+                }
+            });
+        });
     }
 
     private static VoteServices assemble(
