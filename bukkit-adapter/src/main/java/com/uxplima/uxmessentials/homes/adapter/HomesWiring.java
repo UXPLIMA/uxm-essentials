@@ -43,8 +43,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
+import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
+import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
@@ -115,6 +120,7 @@ public final class HomesWiring {
         AnvilInput anvil = installAnvil(plugin, resources);
 
         SafeLocationGuard safeGuard = buildSafeGuard(plugin, ctx);
+        ClaimService claimService = buildClaimService(plugin, ctx, kernel);
         List<SethomeGuard> guards = buildGuards(ctx);
         CreateHomeAtSlot createHome =
                 new CreateHomeAtSlot(repository, quota, guards, notifier, kernel.events(), unlimitedMax, clock);
@@ -148,7 +154,8 @@ public final class HomesWiring {
                 confirmRelocate,
                 confirmUnsafeTeleport,
                 safeGuard.blockUnsafe(),
-                (Position pos) -> safeGuard.isUnsafe(pos));
+                (Position pos) -> safeGuard.isUnsafe(pos),
+                claimService);
         HomeListView listView = new HomeListView(
                 kernel.messages(),
                 notifier,
@@ -158,6 +165,7 @@ public final class HomesWiring {
                 quota,
                 createHome,
                 safeGuard,
+                claimService,
                 actionView,
                 listLayout(guiLayouts),
                 unlimitedMax,
@@ -196,6 +204,20 @@ public final class HomesWiring {
     private static DateTimeFormatter dateFormat(ModuleContext ctx) {
         String pattern = ctx.config().getString("date-format", DEFAULT_DATE_FORMAT);
         return DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault());
+    }
+
+    private static ClaimService buildClaimService(Plugin plugin, ModuleContext ctx, KernelPorts kernel) {
+        boolean enabled = ctx.config().getBoolean("claims.enabled", true);
+        if (!enabled) {
+            return new AlwaysAllowClaimService();
+        }
+        boolean requireClaim = ctx.config().getBoolean("claims.require-claim", false);
+        boolean blockForeignClaims = ctx.config().getBoolean("claims.block-foreign-claims", true);
+        int foreignChunkDistance = Math.max(0, ctx.config().getInt("claims.foreign-claim-chunk-distance", 0));
+        boolean checkTeleportAccess = ctx.config().getBoolean("claims.check-teleport-access", true);
+        ClaimPolicySettings settings =
+                new ClaimPolicySettings(requireClaim, blockForeignClaims, foreignChunkDistance, checkTeleportAccess);
+        return new ClaimServiceImpl(ClaimProviders.detect(plugin, plugin.getServer(), kernel.log()), settings);
     }
 
     private static SafeLocationGuard buildSafeGuard(Plugin plugin, ModuleContext ctx) {

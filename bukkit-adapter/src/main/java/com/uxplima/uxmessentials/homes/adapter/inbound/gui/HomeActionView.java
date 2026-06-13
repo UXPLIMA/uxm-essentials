@@ -23,11 +23,13 @@ import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmlib.gui.ConfirmMenu;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
@@ -89,6 +91,7 @@ public final class HomeActionView {
     private final boolean confirmUnsafeTeleport;
     private final boolean blockUnsafeRelocate;
     private final Predicate<Position> destinationUnsafe;
+    private final ClaimService claimService;
 
     public HomeActionView(
             Messages messages,
@@ -107,7 +110,8 @@ public final class HomeActionView {
             boolean confirmRelocate,
             boolean confirmUnsafeTeleport,
             boolean blockUnsafeRelocate,
-            Predicate<Position> destinationUnsafe) {
+            Predicate<Position> destinationUnsafe,
+            ClaimService claimService) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
@@ -126,6 +130,7 @@ public final class HomeActionView {
         this.confirmUnsafeTeleport = confirmUnsafeTeleport;
         this.blockUnsafeRelocate = blockUnsafeRelocate;
         this.destinationUnsafe = Objects.requireNonNull(destinationUnsafe, "destinationUnsafe");
+        this.claimService = Objects.requireNonNull(claimService, "claimService");
     }
 
     /** Open the action menu for {@code home}; {@code reopenList} re-renders the grid after a mutating action. */
@@ -179,11 +184,22 @@ public final class HomeActionView {
      * without opening a real inventory.
      */
     void handleTeleport(Player player, PlayerRef viewer, Home home, SimpleGui gui, ConfirmPrompt confirm) {
-        if (!confirmUnsafeTeleport || permissions.has(viewer, BYPASS_UNSAFE_PERMISSION)) {
-            doTeleport(player, viewer, home, gui);
-            return;
-        }
+        // Access check always runs on the destination region (claim providers read world state there).
+        // The unsafe-tp confirm is layered on top — it can be skipped by toggle or bypass permission,
+        // but the claim-access denial is always hard regardless of those settings.
         scheduler.onRegion(home.location(), () -> {
+            ClaimDecision access = claimService.canAccess(viewer, home.location());
+            if (!access.allowed()) {
+                scheduler.onEntity(viewer, () -> {
+                    notifier.send(viewer, claimMessageKey(access));
+                    open(player, viewer, home, () -> {});
+                });
+                return;
+            }
+            if (!confirmUnsafeTeleport || permissions.has(viewer, BYPASS_UNSAFE_PERMISSION)) {
+                doTeleport(player, viewer, home, gui);
+                return;
+            }
             boolean unsafe = destinationUnsafe.test(home.location());
             scheduler.onEntity(viewer, () -> {
                 if (unsafe) {
@@ -245,14 +261,22 @@ public final class HomeActionView {
     }
 
     private void doRelocate(Player player, PlayerRef viewer, Home home, Position at, Runnable reopenList) {
-        // The block-safety read inspects the target column, so hop to its region thread first; only the pure
-        // WorldBlacklistGuard plus the SQLite write run async, then we reopen on the entity thread.
+        // The block-safety and claim reads inspect the target column, so hop to its region thread first;
+        // only the pure WorldBlacklistGuard plus the SQLite write run async, then we reopen on the entity thread.
         scheduler.onRegion(at, () -> {
             if (blockUnsafeRelocate
                     && !permissions.has(viewer, BYPASS_UNSAFE_PERMISSION)
                     && destinationUnsafe.test(at)) {
                 scheduler.onEntity(viewer, () -> {
                     notifier.send(viewer, HomesMessageKey.HOME_UNSAFE_LOCATION);
+                    open(player, viewer, home, reopenList);
+                });
+                return;
+            }
+            ClaimDecision claimDecision = claimService.canPlace(viewer, at);
+            if (!claimDecision.allowed()) {
+                scheduler.onEntity(viewer, () -> {
+                    notifier.send(viewer, claimMessageKey(claimDecision));
                     open(player, viewer, home, reopenList);
                 });
                 return;
@@ -402,5 +426,15 @@ public final class HomeActionView {
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+    }
+
+    private static HomesMessageKey claimMessageKey(ClaimDecision decision) {
+        return switch (decision) {
+            case DENIED_FOREIGN -> HomesMessageKey.HOME_CLAIM_FOREIGN;
+            case DENIED_REQUIRED -> HomesMessageKey.HOME_CLAIM_REQUIRED;
+            case DENIED_TOO_CLOSE -> HomesMessageKey.HOME_CLAIM_TOO_CLOSE;
+            case DENIED_ACCESS -> HomesMessageKey.HOME_CLAIM_ACCESS_DENIED;
+            case ALLOWED -> throw new IllegalArgumentException("ALLOWED is not a denial");
+        };
     }
 }

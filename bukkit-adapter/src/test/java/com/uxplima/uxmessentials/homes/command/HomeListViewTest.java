@@ -44,7 +44,9 @@ import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -54,6 +56,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
@@ -176,6 +179,32 @@ class HomeListViewTest {
         assertThat(open.getTopInventory().getItem(11)).isNotNull();
     }
 
+    @Test
+    void createBlockedWhenClaimDeniedForeign() {
+        ClaimService deny = new FixedClaimService(ClaimDecision.DENIED_FOREIGN);
+        listView = listView(new SafeLocationGuard(server, false, false, 5), new SyncScheduler(), true, deny);
+        listView.open(player, viewer);
+
+        fireClick(CELLS.get(1));
+
+        assertThat(repository.find(viewer, HomeSlot.of(1))).isEmpty();
+        assertThat(sink.delivered).contains(HomesMessageKey.HOME_CLAIM_FOREIGN.key());
+    }
+
+    @Test
+    void createProceedsWhenClaimAllows() {
+        listView = listView(
+                new SafeLocationGuard(server, false, false, 5),
+                new SyncScheduler(),
+                true,
+                new AlwaysAllowClaimService());
+        listView.open(player, viewer);
+
+        fireClick(CELLS.get(1));
+
+        assertThat(repository.find(viewer, HomeSlot.of(1))).isPresent();
+    }
+
     private void fireClick(int slot) {
         InventoryView view = player.getOpenInventory();
         InventoryClickEvent event = new InventoryClickEvent(
@@ -197,6 +226,11 @@ class HomeListViewTest {
     }
 
     private HomeListView listView(SafeLocationGuard safeGuard, Scheduler scheduler, boolean grantBypass) {
+        return listView(safeGuard, scheduler, grantBypass, new AlwaysAllowClaimService());
+    }
+
+    private HomeListView listView(
+            SafeLocationGuard safeGuard, Scheduler scheduler, boolean grantBypass, ClaimService claimService) {
         Messages messages = new KeyMessages();
         HomeNotifier notifier = new HomeNotifier(messages, sink);
         DomainEventPublisher events = new NoEvents();
@@ -225,7 +259,8 @@ class HomeListViewTest {
                 false,
                 false,
                 false,
-                pos -> false);
+                pos -> false,
+                claimService);
         return new HomeListView(
                 messages,
                 notifier,
@@ -235,10 +270,30 @@ class HomeListViewTest {
                 quota,
                 create,
                 safeGuard,
+                claimService,
                 actionView,
                 HomeListLayout.codeDefault(),
                 1000,
                 DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC));
+    }
+
+    /** Returns a fixed {@link ClaimDecision} for {@code canPlace}; always {@code ALLOWED} for {@code canAccess}. */
+    private static final class FixedClaimService implements ClaimService {
+        private final ClaimDecision decision;
+
+        FixedClaimService(ClaimDecision decision) {
+            this.decision = decision;
+        }
+
+        @Override
+        public ClaimDecision canPlace(PlayerRef who, Position at) {
+            return decision;
+        }
+
+        @Override
+        public ClaimDecision canAccess(PlayerRef who, Position at) {
+            return ClaimDecision.ALLOWED;
+        }
     }
 
     /** A map-backed slot repository keyed by (owner, slot). */

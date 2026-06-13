@@ -45,6 +45,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -189,7 +190,8 @@ class HomeCommandPathTest {
                 false,
                 false,
                 false,
-                pos -> false);
+                pos -> false,
+                new AlwaysAllowClaimService());
         HomeListView listView = new HomeListView(
                 messages,
                 notifier,
@@ -199,6 +201,7 @@ class HomeCommandPathTest {
                 quota,
                 new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, 1000, clock),
                 new SafeLocationGuard(server, false, false, 5),
+                new AlwaysAllowClaimService(),
                 actionView,
                 HomeListLayout.codeDefault(),
                 1000,

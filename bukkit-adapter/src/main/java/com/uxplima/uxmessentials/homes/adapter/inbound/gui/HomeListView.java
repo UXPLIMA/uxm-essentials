@@ -24,11 +24,13 @@ import com.uxplima.uxmessentials.homes.domain.HomeLimit;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
 import com.uxplima.uxmlib.gui.item.GuiItem;
@@ -58,6 +60,7 @@ public final class HomeListView {
     private final HomeQuota quota;
     private final CreateHomeAtSlot createHome;
     private final SafeLocationGuard safeGuard;
+    private final ClaimService claimService;
     private final HomeActionView actionView;
     private final HomeListLayout layout;
     private final int unlimitedMax;
@@ -73,6 +76,7 @@ public final class HomeListView {
             HomeQuota quota,
             CreateHomeAtSlot createHome,
             SafeLocationGuard safeGuard,
+            ClaimService claimService,
             HomeActionView actionView,
             HomeListLayout layout,
             int unlimitedMax,
@@ -85,6 +89,7 @@ public final class HomeListView {
         this.quota = Objects.requireNonNull(quota, "quota");
         this.createHome = Objects.requireNonNull(createHome, "createHome");
         this.safeGuard = Objects.requireNonNull(safeGuard, "safeGuard");
+        this.claimService = Objects.requireNonNull(claimService, "claimService");
         this.actionView = Objects.requireNonNull(actionView, "actionView");
         this.layout = Objects.requireNonNull(layout, "layout");
         if (unlimitedMax < 1) {
@@ -180,6 +185,14 @@ public final class HomeListView {
                 });
                 return;
             }
+            ClaimDecision claimDecision = claimService.canPlace(viewer, at);
+            if (!claimDecision.allowed()) {
+                scheduler.onEntity(viewer, () -> {
+                    notifier.send(viewer, claimMessageKey(claimDecision));
+                    open(player, viewer);
+                });
+                return;
+            }
             scheduler.async(() -> {
                 createHome.create(viewer, slot, at);
                 scheduler.onEntity(viewer, () -> open(player, viewer));
@@ -189,6 +202,16 @@ public final class HomeListView {
 
     private boolean hasUnsafeBypass(PlayerRef viewer) {
         return permissions.has(viewer, BYPASS_UNSAFE_PERMISSION);
+    }
+
+    private static HomesMessageKey claimMessageKey(ClaimDecision decision) {
+        return switch (decision) {
+            case DENIED_FOREIGN -> HomesMessageKey.HOME_CLAIM_FOREIGN;
+            case DENIED_REQUIRED -> HomesMessageKey.HOME_CLAIM_REQUIRED;
+            case DENIED_TOO_CLOSE -> HomesMessageKey.HOME_CLAIM_TOO_CLOSE;
+            case DENIED_ACCESS -> HomesMessageKey.HOME_CLAIM_ACCESS_DENIED;
+            case ALLOWED -> throw new IllegalArgumentException("ALLOWED is not a denial");
+        };
     }
 
     private Map<Integer, Home> bySlot(PlayerRef viewer) {

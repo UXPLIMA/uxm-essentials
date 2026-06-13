@@ -42,7 +42,9 @@ import com.uxplima.uxmessentials.homes.domain.HomeIcon;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -52,6 +54,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.PaginatedGui;
 import com.uxplima.uxmlib.gui.SimpleGui;
@@ -468,6 +471,84 @@ class HomeActionViewTest {
                         && p.blockZ() == home.location().blockZ());
     }
 
+    // --- claim-access teleport gate ---
+
+    @Test
+    void teleportBlockedWhenClaimAccessDenied() {
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        viewWith(false, false, false, false, pos -> false, FixedClaimService.accessDenied())
+                .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        assertThat(teleporter.hops).isEqualTo(0);
+        assertThat(sink.delivered).contains(HomesMessageKey.HOME_CLAIM_ACCESS_DENIED.key());
+    }
+
+    @Test
+    void teleportProceedsWhenClaimAccessAllowed() {
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        permissions = new TogglePermissions(false);
+        viewWith(false, false, false, false, pos -> false, new AlwaysAllowClaimService())
+                .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        assertThat(teleporter.hops).isEqualTo(1);
+        assertThat(sink.delivered).doesNotContain(HomesMessageKey.HOME_CLAIM_ACCESS_DENIED.key());
+    }
+
+    @Test
+    void teleportClaimAccessDeniedIsHardEvenWhenUnsafeTpConfirmIsOff() {
+        // Even with confirm-unsafe-teleport=false, claim-access denial still blocks.
+        Home home = seed(home(0));
+        open(home);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        permissions = new TogglePermissions(false);
+        viewWith(false, false, false, false, pos -> false, FixedClaimService.accessDenied())
+                .handleTeleport(player, viewer, home, (SimpleGui) gui.getHolder(), prompt);
+
+        assertThat(teleporter.hops).isEqualTo(0);
+        assertThat(prompt.prompted).isFalse();
+        assertThat(sink.delivered).contains(HomesMessageKey.HOME_CLAIM_ACCESS_DENIED.key());
+    }
+
+    // --- claim gate on relocate ---
+
+    @Test
+    void relocateBlockedWhenClaimDenies() {
+        Home home = seed(home(0));
+        player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 100, 70, 200));
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        viewWith(false, false, false, false, pos -> false, FixedClaimService.placeDenied(ClaimDecision.DENIED_REQUIRED))
+                .handleRelocate(player, viewer, home, () -> {}, prompt);
+
+        // Home must remain at original coords.
+        Home unchanged = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(unchanged.location().blockX()).isEqualTo(0);
+        assertThat(sink.delivered).contains(HomesMessageKey.HOME_CLAIM_REQUIRED.key());
+    }
+
+    @Test
+    void relocateProceedsWhenClaimAllows() {
+        Home home = seed(home(0));
+        player.setLocation(new org.bukkit.Location(server.getWorlds().get(0), 100, 70, 200));
+        RecordingPrompt prompt = new RecordingPrompt();
+
+        viewWith(false, false, false, false, pos -> false, new AlwaysAllowClaimService())
+                .handleRelocate(player, viewer, home, () -> {}, prompt);
+
+        Home moved = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(moved.location().blockX()).isEqualTo(100);
+    }
+
     // --- helpers ---
 
     private void open(Home home) {
@@ -501,6 +582,22 @@ class HomeActionViewTest {
             boolean confirmUnsafeTeleport,
             boolean blockUnsafeRelocate,
             Predicate<Position> destinationUnsafe) {
+        return viewWith(
+                confirmDelete,
+                confirmRelocate,
+                confirmUnsafeTeleport,
+                blockUnsafeRelocate,
+                destinationUnsafe,
+                new AlwaysAllowClaimService());
+    }
+
+    private HomeActionView viewWith(
+            boolean confirmDelete,
+            boolean confirmRelocate,
+            boolean confirmUnsafeTeleport,
+            boolean blockUnsafeRelocate,
+            Predicate<Position> destinationUnsafe,
+            ClaimService claimService) {
         Messages messages = new KeyMessages();
         HomeNotifier notifier = new HomeNotifier(messages, sink);
         DomainEventPublisher events = new NoEvents();
@@ -529,7 +626,8 @@ class HomeActionViewTest {
                 confirmRelocate,
                 confirmUnsafeTeleport,
                 blockUnsafeRelocate,
-                destinationUnsafe);
+                destinationUnsafe,
+                claimService);
     }
 
     /** A map-backed slot repository keyed by (owner, slot). */
@@ -652,6 +750,38 @@ class HomeActionViewTest {
         public QuotaResult resolveQuota(
                 PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
             return QuotaResult.limited(configDefault);
+        }
+    }
+
+    /**
+     * A {@link ClaimService} that returns a fixed decision for {@code canPlace} and/or {@code canAccess},
+     * letting tests pin a specific denial without needing a real claim plugin.
+     */
+    private static final class FixedClaimService implements ClaimService {
+        private final ClaimDecision onPlace;
+        private final ClaimDecision onAccess;
+
+        private FixedClaimService(ClaimDecision onPlace, ClaimDecision onAccess) {
+            this.onPlace = onPlace;
+            this.onAccess = onAccess;
+        }
+
+        static FixedClaimService accessDenied() {
+            return new FixedClaimService(ClaimDecision.ALLOWED, ClaimDecision.DENIED_ACCESS);
+        }
+
+        static FixedClaimService placeDenied(ClaimDecision decision) {
+            return new FixedClaimService(decision, ClaimDecision.ALLOWED);
+        }
+
+        @Override
+        public ClaimDecision canPlace(PlayerRef who, Position at) {
+            return onPlace;
+        }
+
+        @Override
+        public ClaimDecision canAccess(PlayerRef who, Position at) {
+            return onAccess;
         }
     }
 
