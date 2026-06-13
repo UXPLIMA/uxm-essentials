@@ -38,6 +38,7 @@ public final class PlaceholderResolver {
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
+    private static final String VOTES_STREAK_PREFIX = "streak_";
     private static final String VOTEPARTY_PREFIX = "voteparty_";
 
     private final PlaceholderContexts contexts;
@@ -139,6 +140,8 @@ public final class PlaceholderResolver {
      *   <li>{@code top_<period>_<n>_name} or {@code top_<period>_<n>_votes} — the name or vote
      *       count of the player ranked {@code <n>} (1-based) on the leaderboard.</li>
      *   <li>{@code position_<period>} — the requesting player's 1-based leaderboard rank.</li>
+     *   <li>{@code streak_current} or {@code streak_best} — the requesting player's current or
+     *       best consecutive-day voting streak.</li>
      * </ul>
      */
     private String votes(PlayerRef who, String tail) {
@@ -189,6 +192,16 @@ public final class PlaceholderResolver {
             }
             OptionalInt pos = vote.positionOf(who, period);
             return pos.isPresent() ? Integer.toString(pos.getAsInt()) : EMPTY;
+        }
+
+        if (tail.startsWith(VOTES_STREAK_PREFIX)) {
+            // streak_current  or  streak_best
+            String field = tail.substring(VOTES_STREAK_PREFIX.length());
+            return switch (field) {
+                case "current" -> Long.toString(vote.currentStreak(who));
+                case "best" -> Long.toString(vote.bestStreak(who));
+                default -> EMPTY;
+            };
         }
 
         // Plain period count: votes_<period>

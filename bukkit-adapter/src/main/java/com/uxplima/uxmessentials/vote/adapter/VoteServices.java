@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowLastVote;
 import com.uxplima.uxmessentials.vote.application.ShowNextVote;
+import com.uxplima.uxmessentials.vote.application.ShowVoteStreak;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
@@ -36,6 +37,7 @@ import org.jspecify.annotations.NullMarked;
  * @param voteSitesGui the GUI view for {@code /vote sites} and {@code /vote} in GUI mode
  * @param votePartyStatus the {@code /voteparty} party-progress display
  * @param showVoteTotals the {@code /vote total [player]} per-player tally display
+ * @param showVoteStreak the {@code /vote streak [player]} consecutive-day streak display
  * @param topVoters the {@code /vote top [period]} leaderboard display
  * @param showNextVote the {@code /vote next} per-site cooldown display
  * @param showLastVote the {@code /vote last} per-site last-vote display
@@ -58,6 +60,7 @@ public record VoteServices(
         VoteSitesGuiView voteSitesGui,
         VotePartyStatus votePartyStatus,
         ShowVoteTotals showVoteTotals,
+        ShowVoteStreak showVoteStreak,
         TopVoters topVoters,
         ShowNextVote showNextVote,
         ShowLastVote showLastVote,
@@ -79,6 +82,7 @@ public record VoteServices(
         Objects.requireNonNull(voteSitesGui, "voteSitesGui");
         Objects.requireNonNull(votePartyStatus, "votePartyStatus");
         Objects.requireNonNull(showVoteTotals, "showVoteTotals");
+        Objects.requireNonNull(showVoteStreak, "showVoteStreak");
         Objects.requireNonNull(topVoters, "topVoters");
         Objects.requireNonNull(showNextVote, "showNextVote");
         Objects.requireNonNull(showLastVote, "showLastVote");

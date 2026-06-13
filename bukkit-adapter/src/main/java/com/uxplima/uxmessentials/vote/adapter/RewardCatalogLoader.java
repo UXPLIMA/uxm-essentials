@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.vote.domain.reward.ItemReward;
 import com.uxplima.uxmessentials.vote.domain.reward.MilestoneReward;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
+import com.uxplima.uxmessentials.vote.domain.reward.StreakReward;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurateException;
@@ -32,16 +33,18 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  *   per-site { "PlanetMinecraft" = [ { commands = [ "give {player} diamond 2" ] } ] }
  *   first-vote = [ { messages = [ "<green>Thanks for your first vote!" ] } ]
  *   milestones = [ { at = 100, broadcast = [ "<gold>{player} hit 100 votes!" ] }, { every = 50, commands = [ "crate give {player} vote 1" ] } ]
+ *   streaks = [ { at = 7, broadcast = [ "<gold>{player} voted 7 days running!" ] }, { every = 30, commands = [ "crate give {player} streak 1" ] } ]
  * }
  * }</pre>
  *
  * <p>Each {@code <reward>} node carries {@code chance} (int, default 100), an optional {@code permission}, the
  * three command/message/broadcast string lists, an {@code items} list of {@code { material, amount, name, lore }}
  * maps, and an optional {@code worlds} filter (empty = any world). A milestone node is a {@code <reward>} with
- * one of {@code at} or {@code every} added. Every section is tolerant: an absent block yields an empty
- * list/map, and a malformed entry (a milestone with neither {@code at} nor {@code every}, an item with no
- * material) is skipped rather than failing the load, so an unconfigured server resolves to {@link
- * RewardCatalog#empty()}.
+ * one of {@code at} or {@code every} added; a streak node has the same {@code at}/{@code every} shape but keys
+ * off the voter's consecutive-day streak rather than the all-time count. Every section is tolerant: an absent
+ * block yields an empty list/map, and a malformed entry (a milestone or streak with neither {@code at} nor
+ * {@code every}, an item with no material) is skipped rather than failing the load, so an unconfigured server
+ * resolves to {@link RewardCatalog#empty()}.
  */
 @NullMarked
 public final class RewardCatalogLoader {
@@ -79,7 +82,8 @@ public final class RewardCatalogLoader {
                 readSpecs(rewards.node("per-vote")),
                 readPerSite(rewards.node("per-site")),
                 readSpecs(rewards.node("first-vote")),
-                readMilestones(rewards.node("milestones")));
+                readMilestones(rewards.node("milestones")),
+                readStreaks(rewards.node("streaks")));
     }
 
     private static Map<String, List<RewardSpec>> readPerSite(ConfigurationNode node) {
@@ -146,6 +150,31 @@ public final class RewardCatalogLoader {
             return Optional.empty();
         }
         return Optional.of(new MilestoneReward(at, every, spec.get()));
+    }
+
+    private static List<StreakReward> readStreaks(ConfigurationNode node) {
+        if (node.virtual() || !node.isList()) {
+            return List.of();
+        }
+        List<StreakReward> streaks = new ArrayList<>();
+        for (ConfigurationNode child : node.childrenList()) {
+            readStreak(child).ifPresent(streaks::add);
+        }
+        return List.copyOf(streaks);
+    }
+
+    private static Optional<StreakReward> readStreak(ConfigurationNode node) {
+        Optional<RewardSpec> spec = readSpec(node);
+        if (spec.isEmpty()) {
+            return Optional.empty();
+        }
+        OptionalLong at = positiveLong(node.node("at"));
+        OptionalLong every = positiveLong(node.node("every"));
+        // Exactly one of at/every must be present and positive; a malformed streak is skipped, not fatal.
+        if (at.isPresent() == every.isPresent()) {
+            return Optional.empty();
+        }
+        return Optional.of(new StreakReward(at, every, spec.get()));
     }
 
     private static List<ItemReward> readItems(ConfigurationNode node) {

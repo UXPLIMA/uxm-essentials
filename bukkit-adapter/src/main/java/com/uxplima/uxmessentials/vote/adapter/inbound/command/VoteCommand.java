@@ -38,6 +38,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code sites} — open the vote-sites GUI (or fall back to chat links when gui mode is off).
  *   <li>{@code total [player]} — show the sender's (or another player's) accumulated vote totals
  *       across all periods. Gated by {@code uxmessentials.vote.use}.
+ *   <li>{@code streak [player]} — show the sender's (or another player's) current and best
+ *       consecutive-day voting streak. Gated by {@code uxmessentials.vote.use}.
  *   <li>{@code top [daily|weekly|monthly|alltime]} — show the leaderboard for the given period
  *       (default {@code monthly}). Gated by {@code uxmessentials.vote.top}.
  *   <li>{@code next} — show when the player can next vote on each configured site.
@@ -83,6 +85,9 @@ public final class VoteCommand implements CommandRegistration {
                 .then(Commands.literal("total")
                         .executes(this::totalSelf)
                         .then(CommandSuggestions.playerArgument("player").executes(this::totalOther)))
+                .then(Commands.literal("streak")
+                        .executes(this::streakSelf)
+                        .then(CommandSuggestions.playerArgument("player").executes(this::streakOther)))
                 .then(Commands.literal("top")
                         .requires(src -> src.getSender().hasPermission(TOP_PERMISSION))
                         .executes(this::topMonthly)
@@ -177,6 +182,33 @@ public final class VoteCommand implements CommandRegistration {
         }
         PlayerRef resolved = target.get();
         services.scheduler().async(() -> services.showVoteTotals().show(viewer, resolved));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int streakSelf(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = BukkitRefs.toRef(sender);
+        services.scheduler().async(() -> services.showVoteStreak().show(who, who));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int streakOther(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef viewer = BukkitRefs.toRef(sender);
+        String name = ctx.getArgument("player", String.class);
+        Optional<PlayerRef> target = services.playerLookup().findByName(name);
+        if (target.isEmpty()) {
+            feedback.send(sender, VoteMessageKey.VOTE_TOTAL_UNKNOWN, Map.of("player", name));
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef resolved = target.get();
+        services.scheduler().async(() -> services.showVoteStreak().show(viewer, resolved));
         return Command.SINGLE_SUCCESS;
     }
 

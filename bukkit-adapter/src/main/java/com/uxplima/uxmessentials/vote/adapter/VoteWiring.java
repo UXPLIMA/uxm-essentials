@@ -49,6 +49,7 @@ import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowLastVote;
 import com.uxplima.uxmessentials.vote.application.ShowNextVote;
+import com.uxplima.uxmessentials.vote.application.ShowVoteStreak;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
@@ -116,6 +117,7 @@ public final class VoteWiring {
         VoteContext context = new BukkitVoteContext(kernel.permissions());
         RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel));
         PartyConfig party = partyConfig(ctx.config());
+        int streakGraceDays = Math.max(0, ctx.config().getInt("streak.grace-days", 0));
         List<String> voteLinks = ctx.config().getStringList("vote-links", List.of());
         VoteSiteCatalog siteCatalog = loadSiteCatalog(plugin, kernel);
         PdcReminderPreferences reminderPrefs = new PdcReminderPreferences(plugin);
@@ -133,6 +135,7 @@ public final class VoteWiring {
                 audience,
                 notifier,
                 party,
+                streakGraceDays,
                 voteLinks,
                 siteCatalog,
                 reminderPrefs,
@@ -241,6 +244,7 @@ public final class VoteWiring {
             VoteAudience audience,
             VoteNotifier notifier,
             PartyConfig party,
+            int streakGraceDays,
             List<String> voteLinks,
             VoteSiteCatalog siteCatalog,
             PdcReminderPreferences reminderPrefs,
@@ -254,12 +258,14 @@ public final class VoteWiring {
                 notifier,
                 kernel.events(),
                 party,
+                streakGraceDays,
                 ZoneId.systemDefault());
         ApplyQueuedRewards applyQueuedRewards =
                 new ApplyQueuedRewards(repository, new BukkitRewardDispatcher(kernel.scheduler()));
         VoteLinks links = new VoteLinks(voteLinks, notifier);
         VotePartyStatus status = new VotePartyStatus(repository, notifier, party.baseThreshold());
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
+        ShowVoteStreak showVoteStreak = new ShowVoteStreak(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
         ShowNextVote showNextVote = new ShowNextVote(repository, siteCatalog, notifier);
         ShowLastVote showLastVote = new ShowLastVote(repository, siteCatalog, notifier);
@@ -277,6 +283,7 @@ public final class VoteWiring {
                 sitesGuiView,
                 status,
                 showVoteTotals,
+                showVoteStreak,
                 topVoters,
                 showNextVote,
                 showLastVote,

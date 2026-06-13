@@ -186,12 +186,41 @@ class IndexedVotePlaceholderTest {
         assertThat(result).contains("42");
     }
 
+    // --- streak keys ---
+
+    @Test
+    void votesStreakCurrentReturnsCurrentStreak() {
+        repository.currentStreak = 5L;
+
+        Optional<String> result = resolver.resolve(ALICE, true, "votes_streak_current");
+
+        assertThat(result).contains("5");
+    }
+
+    @Test
+    void votesStreakBestReturnsBestStreak() {
+        repository.bestStreak = 12L;
+
+        Optional<String> result = resolver.resolve(ALICE, true, "votes_streak_best");
+
+        assertThat(result).contains("12");
+    }
+
+    @Test
+    void votesStreakUnknownFieldDegradesToDash() {
+        Optional<String> result = resolver.resolve(ALICE, true, "votes_streak_longest");
+
+        assertThat(result).contains(PlaceholderResolver.EMPTY);
+    }
+
     // --- stubs ---
 
     private static final class StubVoteRepository implements VoteRepository {
         List<VoteRanking> topResult = List.of();
         VotePeriod lastQueriedPeriod = VotePeriod.MONTHLY;
         long monthlyCount = 0L;
+        long currentStreak = 0L;
+        long bestStreak = 0L;
 
         @Override
         public int partyCount() {
@@ -221,8 +250,8 @@ class IndexedVotePlaceholderTest {
 
         @Override
         public VoteTally totalsOf(PlayerRef player) {
-            // alltime, daily, weekly, monthly, dayKey, weekKey, monthKey
-            return new VoteTally(monthlyCount, 0L, 0L, monthlyCount, 0L, 0L, 0L);
+            // alltime, daily, weekly, monthly, dayKey, weekKey, monthKey, currentStreak, bestStreak, streakDayKey
+            return new VoteTally(monthlyCount, 0L, 0L, monthlyCount, 0L, 0L, 0L, currentStreak, bestStreak, 0L);
         }
 
         @Override

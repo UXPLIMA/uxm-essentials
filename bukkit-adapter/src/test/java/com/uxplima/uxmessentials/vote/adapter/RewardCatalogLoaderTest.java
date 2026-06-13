@@ -11,14 +11,16 @@ import com.uxplima.uxmessentials.vote.domain.reward.ItemReward;
 import com.uxplima.uxmessentials.vote.domain.reward.MilestoneReward;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
+import com.uxplima.uxmessentials.vote.domain.reward.StreakReward;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Parses a sample {@code rewards} block and asserts the resulting {@link RewardCatalog}: that per-vote specs
  * carry their chance and items, that per-site keys land under their service name, that a first-vote spec is
- * read, and that both milestone shapes ({@code at} and {@code every}) are parsed. Also checks the tolerant
- * defaults — an absent block and malformed entries yield an empty/clean catalog rather than failing.
+ * read, and that both milestone shapes ({@code at} and {@code every}) and both streak shapes are parsed.
+ * Also checks the tolerant defaults — an absent block and malformed entries yield an empty/clean catalog
+ * rather than failing.
  */
 class RewardCatalogLoaderTest {
 
@@ -41,6 +43,11 @@ class RewardCatalogLoaderTest {
               milestones = [
                 { at = 100, broadcast = [ "<gold>{player} hit 100" ] }
                 { every = 25, commands = [ "crate give {player} vote 1" ] }
+              ]
+              streaks = [
+                { at = 7, broadcast = [ "<gold>{player} voted 7 days running" ] }
+                { every = 30, commands = [ "crate give {player} streak 1" ] }
+                { commands = [ "no-length" ] }
               ]
             }
             """;
@@ -96,6 +103,25 @@ class RewardCatalogLoaderTest {
     }
 
     @Test
+    void bothStreakShapesAreParsedAndMalformedSkipped(@TempDir Path dir) throws IOException {
+        RewardCatalog catalog = load(dir, SAMPLE);
+
+        // The third streak entry has neither at nor every, so it is skipped; only the two valid ones remain.
+        assertThat(catalog.streaks()).hasSize(2);
+        StreakReward atStreak = catalog.streaks().get(0);
+        assertThat(atStreak.at()).hasValue(7L);
+        assertThat(atStreak.every()).isEmpty();
+        assertThat(atStreak.matches(7L)).isTrue();
+        assertThat(atStreak.reward().broadcasts()).containsExactly("<gold>{player} voted 7 days running");
+
+        StreakReward everyStreak = catalog.streaks().get(1);
+        assertThat(everyStreak.every()).hasValue(30L);
+        assertThat(everyStreak.at()).isEmpty();
+        assertThat(everyStreak.matches(60L)).isTrue();
+        assertThat(everyStreak.reward().commands()).containsExactly("crate give {player} streak 1");
+    }
+
+    @Test
     void absentRewardsBlockYieldsEmptyCatalog(@TempDir Path dir) throws IOException {
         RewardCatalog catalog = load(dir, "enabled = true\n");
 
@@ -103,6 +129,7 @@ class RewardCatalogLoaderTest {
         assertThat(catalog.perSite()).isEmpty();
         assertThat(catalog.firstVote()).isEmpty();
         assertThat(catalog.milestones()).isEmpty();
+        assertThat(catalog.streaks()).isEmpty();
     }
 
     @Test

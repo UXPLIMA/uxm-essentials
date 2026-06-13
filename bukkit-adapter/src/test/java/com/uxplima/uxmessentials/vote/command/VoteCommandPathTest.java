@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowLastVote;
 import com.uxplima.uxmessentials.vote.application.ShowNextVote;
+import com.uxplima.uxmessentials.vote.application.ShowVoteStreak;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
@@ -137,6 +138,46 @@ class VoteCommandPathTest {
         // The repository must not be queried for an unresolvable target.
         assertThat(repository.totalsOfCalls).isEmpty();
         assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_TOTAL_UNKNOWN.key());
+    }
+
+    @Test
+    void voteStreakSelfCallsShowVoteStreakWithSenderAsBothViewerAndTarget() {
+        CommandDispatcher<CommandSourceStack> dispatcher = register(new ServerPlayerLookup());
+
+        execute(dispatcher, "vote streak");
+
+        // ShowVoteStreak.show calls totalsOf on the repository; assert the target UUID is the sender's.
+        assertThat(repository.totalsOfCalls).hasSize(1);
+        assertThat(repository.totalsOfCalls.get(0).uuid()).isEqualTo(sender.getUniqueId());
+    }
+
+    @Test
+    void voteStreakOtherResolvesTargetViaPlayerLookup() {
+        CommandDispatcher<CommandSourceStack> dispatcher = register(new ServerPlayerLookup());
+
+        execute(dispatcher, "vote streak Bob");
+
+        assertThat(repository.totalsOfCalls).hasSize(1);
+        assertThat(repository.totalsOfCalls.get(0).uuid()).isEqualTo(target.getUniqueId());
+    }
+
+    @Test
+    void voteStreakUnknownPlayerSendsUnknownKey() {
+        CommandDispatcher<CommandSourceStack> dispatcher = register(new ServerPlayerLookup());
+
+        execute(dispatcher, "vote streak UnknownPlayer");
+
+        // The repository must not be queried for an unresolvable target.
+        assertThat(repository.totalsOfCalls).isEmpty();
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_TOTAL_UNKNOWN.key());
+    }
+
+    @Test
+    void streakSubcommandExistsUnderVote() {
+        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()), () -> ListDisplayMode.CHAT);
+        var root = command.build();
+        var streakNode = root.getChild("streak");
+        assertThat(streakNode).as("streak subcommand must exist under /vote").isNotNull();
     }
 
     @Test
@@ -325,6 +366,7 @@ class VoteCommandPathTest {
                 notifier,
                 events,
                 party,
+                0,
                 ZoneId.of("UTC"));
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpRewardDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
@@ -336,6 +378,7 @@ class VoteCommandPathTest {
                 VoteSitesGuiView.GuiConfig.defaults());
         VotePartyStatus votePartyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
+        ShowVoteStreak showVoteStreak = new ShowVoteStreak(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
         ShowNextVote showNextVote = new ShowNextVote(repository, VoteSiteCatalog.empty(), notifier);
         ShowLastVote showLastVote = new ShowLastVote(repository, VoteSiteCatalog.empty(), notifier);
@@ -352,6 +395,7 @@ class VoteCommandPathTest {
                 sitesGui,
                 votePartyStatus,
                 showVoteTotals,
+                showVoteStreak,
                 topVoters,
                 showNextVote,
                 showLastVote,

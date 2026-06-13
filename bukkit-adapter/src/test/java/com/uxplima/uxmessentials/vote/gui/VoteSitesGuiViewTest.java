@@ -43,6 +43,7 @@ import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowLastVote;
 import com.uxplima.uxmessentials.vote.application.ShowNextVote;
+import com.uxplima.uxmessentials.vote.application.ShowVoteStreak;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
@@ -249,6 +250,7 @@ class VoteSitesGuiViewTest {
                 notifier,
                 new NoEvents(),
                 party,
+                0,
                 ZoneId.of("UTC"));
         VoteLinks links = new VoteLinks(List.of(), notifier);
         return new VoteServices(
@@ -258,6 +260,7 @@ class VoteSitesGuiViewTest {
                 view,
                 new VotePartyStatus(repo, notifier, 25),
                 new ShowVoteTotals(repo, notifier),
+                new ShowVoteStreak(repo, notifier),
                 new TopVoters(repo, notifier, 10),
                 new ShowNextVote(repo, catalog, notifier),
                 new ShowLastVote(repo, catalog, notifier),

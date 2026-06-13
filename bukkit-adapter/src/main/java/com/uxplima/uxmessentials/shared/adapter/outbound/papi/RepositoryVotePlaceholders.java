@@ -59,6 +59,18 @@ public final class RepositoryVotePlaceholders implements VotePlaceholders {
     }
 
     @Override
+    public long currentStreak(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        return repository.totalsOf(who).currentStreak();
+    }
+
+    @Override
+    public long bestStreak(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        return repository.totalsOf(who).bestStreak();
+    }
+
+    @Override
     public int partyCount() {
         return repository.partyCount();
     }

@@ -22,6 +22,25 @@ public interface VotePlaceholders {
     /** How many votes {@code who} has accumulated for the given {@code period}. */
     long countFor(PlayerRef who, VotePeriod period);
 
+    /**
+     * {@code who}'s current consecutive-day voting streak.
+     *
+     * <p>The default returns {@code 0} so existing anonymous or minimal implementations in tests do not
+     * need to override it until they exercise the streak placeholders.
+     */
+    default long currentStreak(PlayerRef who) {
+        return 0;
+    }
+
+    /**
+     * {@code who}'s longest consecutive-day voting streak ever reached.
+     *
+     * <p>The default returns {@code 0} for the same reason as {@link #currentStreak}.
+     */
+    default long bestStreak(PlayerRef who) {
+        return 0;
+    }
+
     /** The current accumulated vote-party counter. */
     int partyCount();
 

@@ -23,8 +23,8 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 /**
  * Verifies that the {@code voteparty} block parses into a {@link PartyConfig} correctly. The test
  * mirrors the production parsing logic in {@code VoteWiring} (package-private, so duplicated here)
- * and exercises threshold, onlyVoters, escalateBy, reset schedule, announceAt, and the legacy flat
- * {@code rewards} list.
+ * and exercises threshold, onlyVoters, escalateBy, reset schedule, announceAt, the legacy flat
+ * {@code rewards} list, and the {@code streak.grace-days} read that flows into {@code HandleVote}.
  *
  * <p>No MockBukkit is needed — the test is a pure-Java Configurate HOCON parse.
  */
@@ -99,7 +99,30 @@ class PartyConfigLoaderTest {
         assertThat(parsePartyConfig(store).resetSchedule()).isEqualTo(PartyResetSchedule.NONE);
     }
 
+    @Test
+    void streakGraceDaysParsesConfiguredValue() throws ConfigurateException {
+        ConfigStore store = storeFrom("streak { grace-days = 2 }");
+        assertThat(parseStreakGraceDays(store)).isEqualTo(2);
+    }
+
+    @Test
+    void streakGraceDaysDefaultsToZeroWhenAbsent() throws ConfigurateException {
+        ConfigStore store = storeFrom("voteparty { threshold = 5 }");
+        assertThat(parseStreakGraceDays(store)).isEqualTo(0);
+    }
+
+    @Test
+    void streakGraceDaysClampsNegativeToZero() throws ConfigurateException {
+        ConfigStore store = storeFrom("streak { grace-days = -3 }");
+        assertThat(parseStreakGraceDays(store)).isEqualTo(0);
+    }
+
     // --- helpers ---
+
+    /** Mirrors the production read in {@code VoteWiring.wire(...)} for the streak grace window. */
+    private static int parseStreakGraceDays(ConfigStore config) {
+        return Math.max(0, config.getInt("streak.grace-days", 0));
+    }
 
     private static ConfigStore storeFrom(String hocon) throws ConfigurateException {
         ConfigurationNode node = HoconConfigurationLoader.builder()

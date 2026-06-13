@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowLastVote;
 import com.uxplima.uxmessentials.vote.application.ShowNextVote;
+import com.uxplima.uxmessentials.vote.application.ShowVoteStreak;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
@@ -228,6 +229,7 @@ class VoteNextLastRemindCommandPathTest {
                 notifier,
                 events,
                 party,
+                0,
                 ZoneId.of("UTC"));
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
@@ -235,6 +237,7 @@ class VoteNextLastRemindCommandPathTest {
                 catalog, repository, new SyncScheduler(), messages, VoteSitesGuiView.GuiConfig.defaults());
         VotePartyStatus partyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
+        ShowVoteStreak showVoteStreak = new ShowVoteStreak(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
         ShowNextVote showNextVote = new ShowNextVote(repository, catalog, notifier);
         ShowLastVote showLastVote = new ShowLastVote(repository, catalog, notifier);
@@ -251,6 +254,7 @@ class VoteNextLastRemindCommandPathTest {
                 sitesGui,
                 partyStatus,
                 showVoteTotals,
+                showVoteStreak,
                 topVoters,
                 showNextVote,
                 showLastVote,
