@@ -7,7 +7,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Server;
-import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.application.port.ClaimProvider;
@@ -36,7 +35,6 @@ public final class UxmClaimsClaimProvider implements ClaimProvider {
     private static final String LOCATION_CLASS = "com.uxplima.claim.domain.model.vo.Location";
     private static final int SENTINEL_Y = 64;
 
-    private final Server server;
     private final Logger log;
 
     // Cached reflective handles, populated on the first successful lookup. Null until then; a resolution
@@ -52,7 +50,7 @@ public final class UxmClaimsClaimProvider implements ClaimProvider {
 
     public UxmClaimsClaimProvider(Plugin plugin, Server server, Logger log) {
         Objects.requireNonNull(plugin, "plugin");
-        this.server = Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(server, "server");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -88,18 +86,15 @@ public final class UxmClaimsClaimProvider implements ClaimProvider {
         if (facade == null) {
             return Optional.empty();
         }
+        // uxmClaims resolves claims by 2D column; Y is not used for matching. SENTINEL_Y avoids a
+        // region-bound getHighestBlockYAt() call, making the proximity scan safe on Folia.
         Object location = requireCtor(locationCtor)
-                .newInstance(world.name(), (double) blockX, columnY(world, blockX, blockZ), (double) blockZ);
+                .newInstance(world.name(), (double) blockX, (double) SENTINEL_Y, (double) blockZ);
         Object claimOpt = requireHandle(findByLocation).invoke(facade, location);
         if (!(claimOpt instanceof Optional<?> opt) || opt.isEmpty()) {
             return Optional.empty();
         }
         return Optional.of(new UxmClaimLookup(opt.get()));
-    }
-
-    private double columnY(WorldRef world, int blockX, int blockZ) {
-        World bukkitWorld = server.getWorld(world.uid());
-        return bukkitWorld == null ? SENTINEL_Y : bukkitWorld.getHighestBlockYAt(blockX, blockZ);
     }
 
     private void resolveHandles() throws ClassNotFoundException, NoSuchMethodException {

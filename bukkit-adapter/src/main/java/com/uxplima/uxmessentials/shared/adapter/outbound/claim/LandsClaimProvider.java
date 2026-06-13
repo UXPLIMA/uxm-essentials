@@ -36,6 +36,11 @@ public final class LandsClaimProvider implements ClaimProvider {
 
     private static final String LANDS = "Lands";
 
+    // Lands resolves claims by 2D column; the Y coordinate is irrelevant to getArea(). Using a constant
+    // avoids getHighestBlockYAt(), which is a region-bound chunk read and would be unsafe on Folia when
+    // the proximity scan visits neighbour columns that may belong to a different region.
+    private static final int CLAIM_LOOKUP_Y = 64;
+
     private final Plugin plugin;
     private final Server server;
     private final Logger log;
@@ -77,8 +82,7 @@ public final class LandsClaimProvider implements ClaimProvider {
         if (bukkitWorld == null) {
             return Optional.empty();
         }
-        int y = bukkitWorld.getHighestBlockYAt(blockX, blockZ);
-        Location location = new Location(bukkitWorld, blockX, y, blockZ);
+        Location location = new Location(bukkitWorld, blockX, CLAIM_LOOKUP_Y, blockZ);
         Area area = integration().getArea(location);
         if (area == null) {
             return Optional.empty();

@@ -35,6 +35,11 @@ public final class GriefPreventionClaimProvider implements ClaimProvider {
 
     private static final String GRIEF_PREVENTION = "GriefPrevention";
 
+    // GriefPrevention resolves claims with ignoreHeight=true, treating them as 2D columns; Y is discarded.
+    // Using a constant avoids getHighestBlockYAt(), which is region-bound and unsafe on Folia when the
+    // proximity scan reads neighbour columns that may belong to a different region.
+    private static final int CLAIM_LOOKUP_Y = 64;
+
     private final Server server;
     private final Logger log;
 
@@ -71,8 +76,7 @@ public final class GriefPreventionClaimProvider implements ClaimProvider {
         if (bukkitWorld == null) {
             return Optional.empty();
         }
-        int y = bukkitWorld.getHighestBlockYAt(blockX, blockZ);
-        Location location = new Location(bukkitWorld, blockX, y, blockZ);
+        Location location = new Location(bukkitWorld, blockX, CLAIM_LOOKUP_Y, blockZ);
         // ignoreHeight=true treats claims as 2D columns; cachedClaim=null since each lookup is independent.
         Claim claim = GriefPrevention.instance.dataStore.getClaimAt(location, true, null);
         if (claim == null) {
