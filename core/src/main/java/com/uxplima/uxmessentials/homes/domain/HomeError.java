@@ -29,7 +29,10 @@ public enum HomeError {
     UNSAFE_LOCATION(HomesMessageKey.HOME_UNSAFE_LOCATION),
 
     /** The player's balance was insufficient to cover the per-action economy cost. */
-    CANNOT_AFFORD(HomesMessageKey.HOME_CANNOT_AFFORD);
+    CANNOT_AFFORD(HomesMessageKey.HOME_CANNOT_AFFORD),
+
+    /** A visit to another owner's home that is neither public nor extended an invite to the actor. */
+    NOT_ACCESSIBLE(HomesMessageKey.HOME_NOT_ACCESSIBLE);
 
     private final HomesMessageKey messageKey;
 

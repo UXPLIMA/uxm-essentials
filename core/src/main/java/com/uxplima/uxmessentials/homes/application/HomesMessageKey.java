@@ -23,6 +23,12 @@ public enum HomesMessageKey implements MessageKey {
     // teleport
     HOME_TELEPORTING("home.teleporting"),
 
+    // public/private visibility + invites/visit
+    HOME_VISIBILITY_PUBLIC("home.visibility.public"),
+    HOME_VISIBILITY_PRIVATE("home.visibility.private"),
+    HOME_INVITED("home.invited"),
+    HOME_UNINVITED("home.uninvited"),
+
     // failures
     HOME_LIMIT_REACHED("home.limit-reached"),
     HOME_NOT_FOUND("home.not-found"),
@@ -31,6 +37,7 @@ public enum HomesMessageKey implements MessageKey {
     HOME_WORLD_DISABLED("home.world-disabled"),
     HOME_UNSAFE_LOCATION("home.unsafe-location"),
     HOME_CANNOT_AFFORD("home.cannot-afford"),
+    HOME_NOT_ACCESSIBLE("home.not-accessible"),
 
     // admin
     HOME_ADMIN_DELETED("home.admin.deleted"),

@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
@@ -32,6 +33,7 @@ public final class HomeAdmin {
     private static final int MAX_ADMIN_SLOTS = 1000;
 
     private final HomeRepository repository;
+    private final HomeInviteRepository invites;
     private final HomeTeleporter teleporter;
     private final HomeNotifier notifier;
     private final DomainEventPublisher events;
@@ -39,11 +41,13 @@ public final class HomeAdmin {
 
     public HomeAdmin(
             HomeRepository repository,
+            HomeInviteRepository invites,
             HomeTeleporter teleporter,
             HomeNotifier notifier,
             DomainEventPublisher events,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.invites = Objects.requireNonNull(invites, "invites");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
@@ -74,6 +78,7 @@ public final class HomeAdmin {
             return Result.err(outcome.errorOrThrow());
         }
         repository.deleteSlot(target, slot);
+        invites.removeAll(target, slot);
         outcome.orElseThrow().event().ifPresent(events::publish);
         notifier.send(actor, HomesMessageKey.HOME_ADMIN_DELETED, attribution(target, slot));
         return Result.ok();
@@ -134,6 +139,7 @@ public final class HomeAdmin {
         Objects.requireNonNull(target, "target");
         int n = repository.load(target).count();
         repository.deleteAll(target);
+        invites.removeAllForOwner(target);
         notifier.send(
                 actor,
                 HomesMessageKey.HOME_ADMIN_CLEARED,

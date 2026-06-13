@@ -10,9 +10,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
@@ -47,12 +49,14 @@ class HomeAdminTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-06-13T10:00:00Z"), ZoneOffset.UTC);
 
     private FakeHomeRepository repository;
+    private FakeInviteRepository invites;
     private CapturingNotifier notifier;
     private RecordingPublisher events;
 
     @BeforeEach
     void setUp() {
         repository = new FakeHomeRepository();
+        invites = new FakeInviteRepository();
         notifier = new CapturingNotifier();
         events = new RecordingPublisher();
     }
@@ -127,6 +131,26 @@ class HomeAdminTest {
         assertThat(notifier.lastPlaceholders).containsEntry("count", "0");
     }
 
+    @Test
+    void clearAllCascadesToInvites() {
+        repository.save(Home.create(TARGET, HomeSlot.of(0), at(0, 64, 0), CLOCK.instant()));
+        invites.addInvite(TARGET, HomeSlot.of(0), UUID.randomUUID());
+
+        useCase().clearAll(ACTOR, TARGET);
+
+        assertThat(invites.hasAnyInvites(TARGET)).isFalse();
+    }
+
+    @Test
+    void deleteCascadesToInvites() {
+        repository.save(Home.create(TARGET, HomeSlot.of(0), at(0, 64, 0), CLOCK.instant()));
+        invites.addInvite(TARGET, HomeSlot.of(0), UUID.randomUUID());
+
+        useCase().delete(ACTOR, TARGET, HomeSlot.of(0));
+
+        assertThat(invites.invites(TARGET, HomeSlot.of(0))).isEmpty();
+    }
+
     // --- info ---
 
     @Test
@@ -174,7 +198,7 @@ class HomeAdminTest {
     // --- helpers ---
 
     private HomeAdmin useCase() {
-        return new HomeAdmin(repository, NoOpTeleporter.INSTANCE, notifier.notifier(), events, CLOCK);
+        return new HomeAdmin(repository, invites, NoOpTeleporter.INSTANCE, notifier.notifier(), events, CLOCK);
     }
 
     private static Position at(double x, double y, double z) {
@@ -218,6 +242,49 @@ class HomeAdminTest {
         @Override
         public void deleteAll(PlayerRef owner) {
             slots(owner).clear();
+        }
+    }
+
+    /** In-memory invite store keyed by (owner, slot); records bulk clears so the cascade can be asserted. */
+    private static final class FakeInviteRepository implements HomeInviteRepository {
+        private final Map<UUID, Map<HomeSlot, Set<UUID>>> store = new java.util.HashMap<>();
+
+        private Set<UUID> guests(PlayerRef owner, HomeSlot slot) {
+            return store.computeIfAbsent(owner.uuid(), k -> new java.util.HashMap<>())
+                    .computeIfAbsent(slot, k -> new java.util.HashSet<>());
+        }
+
+        @Override
+        public Set<UUID> invites(PlayerRef owner, HomeSlot slot) {
+            return Set.copyOf(guests(owner, slot));
+        }
+
+        @Override
+        public void addInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            guests(owner, slot).add(invited);
+        }
+
+        @Override
+        public void removeInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            guests(owner, slot).remove(invited);
+        }
+
+        @Override
+        public void removeAll(PlayerRef owner, HomeSlot slot) {
+            Map<HomeSlot, Set<UUID>> bySlot = store.get(owner.uuid());
+            if (bySlot != null) {
+                bySlot.remove(slot);
+            }
+        }
+
+        @Override
+        public void removeAllForOwner(PlayerRef owner) {
+            store.remove(owner.uuid());
+        }
+
+        boolean hasAnyInvites(PlayerRef owner) {
+            Map<HomeSlot, Set<UUID>> bySlot = store.get(owner.uuid());
+            return bySlot != null && bySlot.values().stream().anyMatch(s -> !s.isEmpty());
         }
     }
 

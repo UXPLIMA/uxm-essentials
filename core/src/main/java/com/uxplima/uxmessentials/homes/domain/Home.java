@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * @param location where the home points
  * @param label the player-facing display label, or empty when none was set
  * @param icon the GUI icon material, or empty when none was set
+ * @param isPublic whether any player may visit this home; a new home is private until the owner shares it
  * @param createdAt when the home was first created (preserved across every copy-op)
  * @param updatedAt when the home was last changed (bumped by every copy-op)
  */
@@ -34,6 +35,7 @@ public record Home(
         Position location,
         Optional<HomeLabel> label,
         Optional<HomeIcon> icon,
+        boolean isPublic,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -47,30 +49,36 @@ public record Home(
         Objects.requireNonNull(updatedAt, "updatedAt");
     }
 
-    /** A new home created now at {@code location} with no label and no icon. */
+    /** A new private home created now at {@code location} with no label and no icon. */
     public static Home create(PlayerRef owner, HomeSlot slot, Position location, Instant now) {
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, location, Optional.empty(), Optional.empty(), now, now);
+        return new Home(owner, slot, location, Optional.empty(), Optional.empty(), false, now, now);
     }
 
-    /** A copy re-anchored to {@code newLocation}, keeping slot, label, and icon; bumps {@code updatedAt}. */
+    /** A copy re-anchored to {@code newLocation}, keeping slot, label, icon, and visibility; bumps {@code updatedAt}. */
     public Home relocatedTo(Position newLocation, Instant now) {
         Objects.requireNonNull(newLocation, "newLocation");
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, newLocation, label, icon, createdAt, now);
+        return new Home(owner, slot, newLocation, label, icon, isPublic, createdAt, now);
     }
 
-    /** A copy under {@code newLabel}, keeping slot, location, and icon; bumps {@code updatedAt}. */
+    /** A copy under {@code newLabel}, keeping slot, location, icon, and visibility; bumps {@code updatedAt}. */
     public Home withLabel(Optional<HomeLabel> newLabel, Instant now) {
         Objects.requireNonNull(newLabel, "newLabel");
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, location, newLabel, icon, createdAt, now);
+        return new Home(owner, slot, location, newLabel, icon, isPublic, createdAt, now);
     }
 
-    /** A copy under {@code newIcon}, keeping slot, location, and label; bumps {@code updatedAt}. */
+    /** A copy under {@code newIcon}, keeping slot, location, label, and visibility; bumps {@code updatedAt}. */
     public Home withIcon(Optional<HomeIcon> newIcon, Instant now) {
         Objects.requireNonNull(newIcon, "newIcon");
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, location, label, newIcon, createdAt, now);
+        return new Home(owner, slot, location, label, newIcon, isPublic, createdAt, now);
+    }
+
+    /** A copy with visibility set to {@code makePublic}, keeping everything else; bumps {@code updatedAt}. */
+    public Home withVisibility(boolean makePublic, Instant now) {
+        Objects.requireNonNull(now, "now");
+        return new Home(owner, slot, location, label, icon, makePublic, createdAt, now);
     }
 }

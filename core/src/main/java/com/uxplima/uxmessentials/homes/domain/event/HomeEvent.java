@@ -13,4 +13,10 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
  * ({@code HomeCreated}, {@code HomeDeleted}), never an imperative command.
  */
 public sealed interface HomeEvent extends DomainEvent
-        permits HomeCreated, HomeDeleted, HomeLimitReached, HomeRelocated, HomeRenamed, HomeIconChanged {}
+        permits HomeCreated,
+                HomeDeleted,
+                HomeLimitReached,
+                HomeRelocated,
+                HomeRenamed,
+                HomeIconChanged,
+                HomeVisibilityChanged {}

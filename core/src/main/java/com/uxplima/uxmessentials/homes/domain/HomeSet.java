@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.homes.domain.event.HomeIconChanged;
 import com.uxplima.uxmessentials.homes.domain.event.HomeLimitReached;
 import com.uxplima.uxmessentials.homes.domain.event.HomeRelocated;
 import com.uxplima.uxmessentials.homes.domain.event.HomeRenamed;
+import com.uxplima.uxmessentials.homes.domain.event.HomeVisibilityChanged;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -149,6 +150,18 @@ public final class HomeSet {
         }
         Home reIconed = existing.withIcon(icon, now);
         return Result.ok(Change.raising(put(reIconed), reIconed, new HomeIconChanged(owner, slot)));
+    }
+
+    /** Flip the visibility of the home in {@code slot} to {@code makePublic}, keeping everything else. */
+    public Result<Change, HomeError> setVisibility(HomeSlot slot, boolean makePublic, Instant now) {
+        Objects.requireNonNull(slot, "slot");
+        Objects.requireNonNull(now, "now");
+        Home existing = homes.get(slot);
+        if (existing == null) {
+            return Result.err(HomeError.NOT_FOUND);
+        }
+        Home updated = existing.withVisibility(makePublic, now);
+        return Result.ok(Change.raising(put(updated), updated, new HomeVisibilityChanged(owner, slot)));
     }
 
     /** {@code /delhome}: remove the home in {@code slot}, rejecting an empty slot. */

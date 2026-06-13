@@ -1,9 +1,9 @@
 package com.uxplima.uxmessentials.homes.application;
 
+import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
@@ -14,43 +14,45 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /delhome}: remove the home in a slot, freeing it under the owner's limit. An empty slot is
- * rejected with {@link HomeError#NOT_FOUND}; a successful delete removes the row and publishes
- * {@code HomeDeleted}.
+ * {@code /home public <slot>} / {@code /home private <slot>}: flip one of the owner's homes between public
+ * (any player may visit it) and private (only the owner and invited players may). A slot the owner has no
+ * home in is rejected with {@link HomeError#NOT_FOUND}; a successful flip saves the home with its new
+ * visibility, publishes {@code HomeVisibilityChanged}, and renders the matching feedback. An owner only ever
+ * toggles their own homes.
  */
-public final class DeleteHome {
+public final class SetHomeVisibility {
 
     private final HomeRepository repository;
-    private final HomeInviteRepository invites;
     private final HomeNotifier notifier;
     private final DomainEventPublisher events;
+    private final Clock clock;
 
-    public DeleteHome(
-            HomeRepository repository,
-            HomeInviteRepository invites,
-            HomeNotifier notifier,
-            DomainEventPublisher events) {
+    public SetHomeVisibility(
+            HomeRepository repository, HomeNotifier notifier, DomainEventPublisher events, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
-        this.invites = Objects.requireNonNull(invites, "invites");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Delete {@code owner}'s home in {@code slot}, or reject when the slot is empty. */
-    public Result<Unit, HomeError> delete(PlayerRef owner, HomeSlot slot) {
+    /** Flip {@code owner}'s home in {@code slot} to {@code makePublic}, or reject when the slot is empty. */
+    public Result<Unit, HomeError> setVisibility(PlayerRef owner, HomeSlot slot, boolean makePublic) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(slot, "slot");
         HomeSet set = repository.load(owner);
-        Result<HomeSet.Change, HomeError> outcome = set.delete(slot);
+        Result<HomeSet.Change, HomeError> outcome = set.setVisibility(slot, makePublic, clock.instant());
         if (outcome.isErr()) {
             HomeError error = outcome.errorOrThrow();
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));
             return Result.err(error);
         }
-        repository.deleteSlot(owner, slot);
-        invites.removeAll(owner, slot);
-        outcome.orElseThrow().event().ifPresent(events::publish);
-        notifier.send(owner, HomesMessageKey.HOME_DELETED, slotPlaceholder(slot));
+        HomeSet.Change change = outcome.orElseThrow();
+        repository.save(change.home());
+        change.event().ifPresent(events::publish);
+        notifier.send(
+                owner,
+                makePublic ? HomesMessageKey.HOME_VISIBILITY_PUBLIC : HomesMessageKey.HOME_VISIBILITY_PRIVATE,
+                slotPlaceholder(slot));
         return Result.ok();
     }
 
