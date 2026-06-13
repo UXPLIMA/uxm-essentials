@@ -85,7 +85,13 @@ public enum HomesMessageKey implements MessageKey {
     // action-menu confirm dialogs
     HOME_CONFIRM_DELETE("home.confirm.delete"),
     HOME_CONFIRM_RELOCATE("home.confirm.relocate"),
-    HOME_CONFIRM_UNSAFE_TP("home.confirm.unsafe-teleport");
+    HOME_CONFIRM_UNSAFE_TP("home.confirm.unsafe-teleport"),
+
+    // claim policy denials (mapped from ClaimDecision in the adapter)
+    HOME_CLAIM_FOREIGN("home.claim.foreign"),
+    HOME_CLAIM_REQUIRED("home.claim.required"),
+    HOME_CLAIM_TOO_CLOSE("home.claim.too-close"),
+    HOME_CLAIM_ACCESS_DENIED("home.claim.access-denied");
 
     private final String key;
 
