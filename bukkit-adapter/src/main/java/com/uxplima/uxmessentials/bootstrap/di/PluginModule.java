@@ -64,6 +64,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContext
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
@@ -329,7 +330,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
             wireScoreboard(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
-            wireVote(plugin, ctx, persistence, resources);
+            wireVote(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
             wireDiscordlink(plugin, ctx, persistence, resources);
         }
@@ -596,19 +597,25 @@ public final class PluginModule {
     }
 
     private static void wireVote(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
         // vote builds its counter-cached jOOQ VoteRepository over persistence.dsl() (the vote_party counter and
         // vote_queue offline reward batches ship in the persistence V15 baseline, always applied), the console
         // reward dispatcher on the global region thread, and the online audience for the party rewards and
         // thank-you broadcast. It carries no cross-context bridge — its only collaborators are the shared
         // persistence DSL, Scheduler, messages/messageSink, and event ports. The reflective Votifier listener
         // self-registers behind a plugin-present guard on start and is dropped on disable, so the module runs
-        // unchanged whether or not Votifier is installed.
+        // unchanged whether or not Votifier is installed. The repository and threshold are surfaced for the
+        // PAPI vote placeholder seam registered after all contexts have wired.
         VoteWiring.Wired wired = VoteWiring.wire(plugin, ctx, persistence);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
+        links.placeholders.vote(new RepositoryVotePlaceholders(wired.repository(), wired.partyThreshold()));
     }
 
     private static void wireDiscordlink(

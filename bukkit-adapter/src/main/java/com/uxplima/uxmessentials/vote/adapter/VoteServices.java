@@ -3,9 +3,12 @@ package com.uxplima.uxmessentials.vote.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
+import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
+import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import org.jspecify.annotations.NullMarked;
@@ -21,6 +24,9 @@ import org.jspecify.annotations.NullMarked;
  * @param applyQueuedRewards the join handler that pays out an offline voter's queued rewards
  * @param voteLinks the {@code /vote} display of the configured vote links
  * @param votePartyStatus the {@code /voteparty} party-progress display
+ * @param showVoteTotals the {@code /vote total [player]} per-player tally display
+ * @param topVoters the {@code /vote top [period]} leaderboard display
+ * @param playerLookup offline-capable profile resolution for target arguments and leaderboard names
  * @param scheduler the Folia-aware scheduler the listeners hop the work onto
  * @param messages MessageKey resolution for the command replies
  */
@@ -30,6 +36,9 @@ public record VoteServices(
         ApplyQueuedRewards applyQueuedRewards,
         VoteLinks voteLinks,
         VotePartyStatus votePartyStatus,
+        ShowVoteTotals showVoteTotals,
+        TopVoters topVoters,
+        PlayerLookup playerLookup,
         Scheduler scheduler,
         Messages messages) {
 
@@ -38,6 +47,9 @@ public record VoteServices(
         Objects.requireNonNull(applyQueuedRewards, "applyQueuedRewards");
         Objects.requireNonNull(voteLinks, "voteLinks");
         Objects.requireNonNull(votePartyStatus, "votePartyStatus");
+        Objects.requireNonNull(showVoteTotals, "showVoteTotals");
+        Objects.requireNonNull(topVoters, "topVoters");
+        Objects.requireNonNull(playerLookup, "playerLookup");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(messages, "messages");
     }

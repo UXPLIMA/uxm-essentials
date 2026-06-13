@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -188,6 +189,76 @@ class PlaceholderResolverTest {
 
         assertThat(resolver.resolve(ALICE, true, "muted")).contains("yes");
         assertThat(resolver.resolve(ALICE, true, "jailed")).contains("no");
+    }
+
+    @Test
+    void votePlaceholdersReadPeriodicTotals() {
+        VotePlaceholders vote = new VotePlaceholders() {
+            @Override
+            public long countFor(PlayerRef who, VotePeriod period) {
+                return switch (period) {
+                    case ALLTIME -> 100L;
+                    case DAILY -> 3L;
+                    case WEEKLY -> 14L;
+                    case MONTHLY -> 42L;
+                };
+            }
+
+            @Override
+            public int partyCount() {
+                return 18;
+            }
+
+            @Override
+            public int partyThreshold() {
+                return 25;
+            }
+        };
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().vote(vote).build());
+
+        assertThat(resolver.resolve(ALICE, true, "votes_alltime")).contains("100");
+        assertThat(resolver.resolve(ALICE, true, "votes_daily")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "votes_weekly")).contains("14");
+        assertThat(resolver.resolve(ALICE, true, "votes_monthly")).contains("42");
+        assertThat(resolver.resolve(ALICE, true, "voteparty_current")).contains("18");
+        assertThat(resolver.resolve(ALICE, true, "voteparty_required")).contains("25");
+        assertThat(resolver.resolve(ALICE, true, "voteparty_remaining")).contains("7");
+    }
+
+    @Test
+    void votePlaceholdersDegradeWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "votes_alltime")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "votes_monthly")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "voteparty_current")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "voteparty_remaining")).contains("-");
+    }
+
+    @Test
+    void unknownVotesPeriodDegradesToDash() {
+        VotePlaceholders vote = new VotePlaceholders() {
+            @Override
+            public long countFor(PlayerRef who, VotePeriod period) {
+                return 5L;
+            }
+
+            @Override
+            public int partyCount() {
+                return 0;
+            }
+
+            @Override
+            public int partyThreshold() {
+                return 25;
+            }
+        };
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().vote(vote).build());
+
+        assertThat(resolver.resolve(ALICE, true, "votes_unknown")).contains("-");
     }
 
     @Test

@@ -839,3 +839,6 @@ permissions:
   uxmessentials.vote.testreward:
     description: '/vote testreward to simulate a vote for yourself and verify the configured rewards.'
     default: op
+  uxmessentials.vote.top:
+    description: '/vote top [period] to see the vote leaderboard for the given period.'
+    default: true

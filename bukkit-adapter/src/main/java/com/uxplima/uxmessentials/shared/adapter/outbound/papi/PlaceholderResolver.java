@@ -8,6 +8,7 @@ import java.util.OptionalInt;
 
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -31,6 +32,8 @@ public final class PlaceholderResolver {
     private static final String YES = "yes";
     private static final String NO = "no";
     private static final String KIT_COOLDOWN_PREFIX = "kit_cooldown_";
+    private static final String VOTES_PREFIX = "votes_";
+    private static final String VOTEPARTY_PREFIX = "voteparty_";
 
     private final PlaceholderContexts contexts;
 
@@ -49,6 +52,12 @@ public final class PlaceholderResolver {
         String normalized = key.toLowerCase(Locale.ROOT);
         if (normalized.startsWith(KIT_COOLDOWN_PREFIX)) {
             return Optional.of(kitCooldown(who, normalized.substring(KIT_COOLDOWN_PREFIX.length())));
+        }
+        if (normalized.startsWith(VOTES_PREFIX)) {
+            return Optional.of(votes(who, normalized.substring(VOTES_PREFIX.length())));
+        }
+        if (normalized.startsWith(VOTEPARTY_PREFIX)) {
+            return Optional.of(voteparty(normalized.substring(VOTEPARTY_PREFIX.length())));
         }
         return switch (normalized) {
             case "homes_count", "homes_limit", "homes_left" -> Optional.of(homes(who, normalized));
@@ -116,6 +125,41 @@ public final class PlaceholderResolver {
 
     private String vaults(PlayerRef who) {
         return contexts.vaults().map(seam -> Integer.toString(seam.count(who))).orElse(EMPTY);
+    }
+
+    private String votes(PlayerRef who, String periodName) {
+        Optional<VotePlaceholders> seam = contexts.vote();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        VotePeriod period =
+                switch (periodName) {
+                    case "daily" -> VotePeriod.DAILY;
+                    case "weekly" -> VotePeriod.WEEKLY;
+                    case "monthly" -> VotePeriod.MONTHLY;
+                    case "alltime" -> VotePeriod.ALLTIME;
+                    default -> null;
+                };
+        if (period == null) {
+            return EMPTY;
+        }
+        return Long.toString(seam.get().countFor(who, period));
+    }
+
+    private String voteparty(String subKey) {
+        Optional<VotePlaceholders> seam = contexts.vote();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        VotePlaceholders vote = seam.get();
+        int count = vote.partyCount();
+        int threshold = vote.partyThreshold();
+        return switch (subKey) {
+            case "current" -> Integer.toString(count);
+            case "required" -> Integer.toString(threshold);
+            case "remaining" -> Integer.toString(Math.max(0, threshold - count));
+            default -> EMPTY;
+        };
     }
 
     private String moderation(PlayerRef who, String key) {

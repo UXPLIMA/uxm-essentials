@@ -22,6 +22,7 @@ public final class PlaceholderContexts {
     private final @Nullable KitsPlaceholders kits;
     private final @Nullable VaultsPlaceholders vaults;
     private final @Nullable ModerationPlaceholders moderation;
+    private final @Nullable VotePlaceholders vote;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -30,6 +31,7 @@ public final class PlaceholderContexts {
         this.kits = builder.kits;
         this.vaults = builder.vaults;
         this.moderation = builder.moderation;
+        this.vote = builder.vote;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -61,6 +63,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(moderation);
     }
 
+    public Optional<VotePlaceholders> vote() {
+        return Optional.ofNullable(vote);
+    }
+
     /** True when no context registered a seam — registering the expansion would surface nothing. */
     public boolean isEmpty() {
         return homes == null
@@ -68,7 +74,8 @@ public final class PlaceholderContexts {
                 && presence == null
                 && kits == null
                 && vaults == null
-                && moderation == null;
+                && moderation == null
+                && vote == null;
     }
 
     /** Mutable collector for the seams, filled as each context's adapters are wired in bootstrap. */
@@ -80,6 +87,7 @@ public final class PlaceholderContexts {
         private @Nullable KitsPlaceholders kits;
         private @Nullable VaultsPlaceholders vaults;
         private @Nullable ModerationPlaceholders moderation;
+        private @Nullable VotePlaceholders vote;
 
         private Builder() {}
 
@@ -110,6 +118,11 @@ public final class PlaceholderContexts {
 
         public Builder moderation(ModerationPlaceholders seam) {
             this.moderation = seam;
+            return this;
+        }
+
+        public Builder vote(VotePlaceholders seam) {
+            this.vote = seam;
             return this;
         }
 

@@ -23,6 +23,8 @@ import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteAudience;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote.VoteRewards;
+import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
+import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
@@ -71,7 +73,7 @@ public final class VoteWiring {
         List<CommandRegistration> commands = List.of(new VoteCommand(services), new VotePartyCommand(services));
         List<Listener> listeners =
                 List.of(votifier, new VoteJoinListener(services.applyQueuedRewards(), kernel.scheduler()));
-        return new Wired(commands, listeners, votifier);
+        return new Wired(commands, listeners, votifier, repository, rewards.partyThreshold());
     }
 
     private static VoteServices assemble(
@@ -95,7 +97,18 @@ public final class VoteWiring {
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, dispatcher);
         VoteLinks links = new VoteLinks(voteLinks, notifier);
         VotePartyStatus status = new VotePartyStatus(repository, notifier, rewards.partyThreshold());
-        return new VoteServices(handleVote, applyQueuedRewards, links, status, kernel.scheduler(), kernel.messages());
+        ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
+        TopVoters topVoters = new TopVoters(repository, notifier, 10);
+        return new VoteServices(
+                handleVote,
+                applyQueuedRewards,
+                links,
+                status,
+                showVoteTotals,
+                topVoters,
+                kernel.playerLookup(),
+                kernel.scheduler(),
+                kernel.messages());
     }
 
     private static VoteRewards rewards(ConfigStore config) {
@@ -107,20 +120,30 @@ public final class VoteWiring {
 
     /**
      * Everything the vote module contributes once wired: the Brigadier commands, the join + Votifier listeners,
-     * and the Votifier listener handle so {@link #startBackgroundWork()} can self-register it and {@link #stop()}
-     * can drop it. The context holds no repeating scheduled work; the only teardown is unregistering the dynamic
-     * Votifier handler so a disable/reload leaves no orphaned registration.
+     * the Votifier listener handle so {@link #startBackgroundWork()} can self-register it and {@link #stop()}
+     * can drop it, and the repository + party threshold so bootstrap can wire the placeholder seam.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the join + Votifier listeners to register
      * @param votifier the Votifier listener, self-registered on start and dropped on stop
+     * @param repository the jOOQ vote repository, exposed for the placeholder seam
+     * @param partyThreshold the configured party threshold, exposed for the placeholder seam
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, VotifierListener votifier) {
+    public record Wired(
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            VotifierListener votifier,
+            VoteRepository repository,
+            int partyThreshold) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(votifier, "votifier");
+            Objects.requireNonNull(repository, "repository");
+            if (partyThreshold < 1) {
+                throw new IllegalArgumentException("partyThreshold must be at least one: " + partyThreshold);
+            }
         }
 
         /** Self-register the reflective Votifier handler behind its plugin-present guard. */
