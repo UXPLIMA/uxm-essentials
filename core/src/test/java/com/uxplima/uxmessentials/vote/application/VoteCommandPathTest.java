@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.vote.domain.event.VoteReceived;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -614,6 +615,16 @@ class VoteCommandPathTest {
         public void resetTotals(PlayerRef player) {
             tallies.put(player.uuid(), VoteTally.empty());
         }
+
+        @Override
+        public Optional<Instant> lastVoteAtSite(PlayerRef player, String site) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {
+            // not tracked in the command-path fake
+        }
     }
 
     private static final class RecordingDispatcher implements RewardDispatcher {
@@ -670,6 +681,51 @@ class VoteCommandPathTest {
         @Override
         public void publish(DomainEvent event) {
             published.add(event);
+        }
+    }
+
+    @Test
+    void handleVoteRecordsLastVoteAtSiteForTheServiceName() {
+        context.online.add(alice.uuid());
+        audience.players.add(alice);
+
+        TrackingSiteRepository trackingRepo = new TrackingSiteRepository();
+        HandleVote handler = new HandleVote(
+                trackingRepo,
+                new RewardEngine(catalogPerVote("give {player} diamond 1")),
+                applier,
+                context,
+                audience,
+                notifier,
+                events,
+                partyConfig("", 25),
+                ZoneOffset.UTC);
+
+        handler.handle(new Vote(alice, "TopVoter", Instant.EPOCH));
+
+        assertThat(trackingRepo.recordedSite).isEqualTo("TopVoter");
+        assertThat(trackingRepo.recordedAt).isEqualTo(Instant.EPOCH);
+        assertThat(trackingRepo.recordedPlayer).isEqualTo(alice);
+    }
+
+    /** Standalone repository that captures recordLastVoteAtSite calls. */
+    private static final class TrackingSiteRepository extends FakeVoteRepositoryBase {
+        @Nullable String recordedSite;
+
+        @Nullable Instant recordedAt;
+
+        @Nullable PlayerRef recordedPlayer;
+
+        @Override
+        public Optional<Instant> lastVoteAtSite(PlayerRef player, String site) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {
+            this.recordedPlayer = player;
+            this.recordedSite = site;
+            this.recordedAt = at;
         }
     }
 }

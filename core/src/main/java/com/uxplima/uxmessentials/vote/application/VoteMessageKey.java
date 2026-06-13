@@ -60,7 +60,23 @@ public enum VoteMessageKey implements MessageKey {
     VOTE_ADMIN_GAVE("vote.admin.gave"),
 
     // admin reset a player's vote totals: {player}
-    VOTE_ADMIN_RESET("vote.admin.reset");
+    VOTE_ADMIN_RESET("vote.admin.reset"),
+
+    // /vote next — per-site cooldown display
+    VOTE_NEXT_HEADER("vote.next.header"),
+    VOTE_NEXT_ENTRY("vote.next.entry"),
+    VOTE_NEXT_AVAILABLE("vote.next.available"),
+    VOTE_NEXT_NONE("vote.next.none"),
+
+    // /vote last — when the player last voted on each site
+    VOTE_LAST_HEADER("vote.last.header"),
+    VOTE_LAST_ENTRY("vote.last.entry"),
+    VOTE_LAST_NEVER("vote.last.never"),
+
+    // reminders — login reminder and toggle feedback
+    VOTE_REMINDER("vote.reminder"),
+    VOTE_REMIND_ENABLED("vote.remind.enabled"),
+    VOTE_REMIND_DISABLED("vote.remind.disabled");
 
     private final String key;
 

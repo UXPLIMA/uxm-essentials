@@ -73,6 +73,7 @@ public final class HandleVote {
         Objects.requireNonNull(vote, "vote");
         VoteTally after = repository.totalsOf(vote.voter()).recordVote(vote.at(), zone);
         repository.saveTotals(vote.voter(), after);
+        repository.recordLastVoteAtSite(vote.voter(), vote.serviceName(), vote.at());
         boolean rewarded = creditVoter(vote, after);
         repository.markPartyParticipant(vote.voter());
         boolean partyFired = advanceCounter(vote);

@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.vote.application.port;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -130,4 +132,26 @@ public interface VoteRepository {
      * period keys). Does not affect the vote queue or the party counter.
      */
     void resetTotals(PlayerRef player);
+
+    // --- Per-site cooldown tracking ---
+
+    /**
+     * The instant at which {@code player} last voted on {@code site}, or empty if they have no
+     * recorded vote there. Used to evaluate per-site cooldowns without touching the full tally.
+     *
+     * @param player the player to query
+     * @param site   the site name exactly as stored (case-sensitive; the catalog normalises on write)
+     */
+    Optional<Instant> lastVoteAtSite(PlayerRef player, String site);
+
+    /**
+     * Record {@code at} as the most recent vote timestamp for {@code player} on {@code site}.
+     * Overwrites any existing timestamp. Called by {@link com.uxplima.uxmessentials.vote.application.HandleVote}
+     * immediately after the per-player tally is saved.
+     *
+     * @param player the player who voted
+     * @param site   the site name
+     * @param at     when the vote was received
+     */
+    void recordLastVoteAtSite(PlayerRef player, String site, Instant at);
 }

@@ -146,6 +146,14 @@ class TopVotersTest {
 
         @Override
         public void resetTotals(PlayerRef player) {}
+
+        @Override
+        public java.util.Optional<java.time.Instant> lastVoteAtSite(PlayerRef player, String site) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public void recordLastVoteAtSite(PlayerRef player, String site, java.time.Instant at) {}
     }
 
     private static final class CapturingSink implements MessageSink {
