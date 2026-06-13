@@ -116,7 +116,7 @@ public final class HandleVote {
             applier.apply(voter, online, grant);
         }
         if (online) {
-            events.publish(new VoteReceived(voter, "vote"));
+            events.publish(new VoteReceived(voter, vote.serviceName()));
         }
         return online;
     }

@@ -104,6 +104,11 @@ class VoteCommandPathTest {
         assertThat(repository.totalsOf(alice).alltime()).isEqualTo(1);
         assertThat(repository.partyCount()).isEqualTo(1);
         assertThat(events.published).hasOnlyElementsOfType(VoteReceived.class);
+        // The published event carries the real Votifier site name, not a hardcoded placeholder.
+        assertThat(events.published)
+                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.type(VoteReceived.class))
+                .extracting(VoteReceived::service)
+                .isEqualTo("TestVoteSite");
     }
 
     @Test
