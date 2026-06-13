@@ -39,6 +39,8 @@ public final class ShowVoteTotals {
                         "daily", Long.toString(tally.daily()),
                         "weekly", Long.toString(tally.weekly()),
                         "monthly", Long.toString(tally.monthly()),
-                        "alltime", Long.toString(tally.alltime())));
+                        "alltime", Long.toString(tally.alltime()),
+                        "current_streak", Long.toString(tally.currentStreak()),
+                        "best_streak", Long.toString(tally.bestStreak())));
     }
 }

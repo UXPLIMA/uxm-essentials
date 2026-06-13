@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.vote.domain.event.VoteReceived;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
+import com.uxplima.uxmessentials.vote.domain.reward.StreakReward;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,6 +124,71 @@ class VoteCommandPathTest {
         // Bob is offline; his tally is still updated.
         handle(catalogPerVote("give {player} apple 3"), partyConfig("", 25)).handle(voteBy(bob));
         assertThat(repository.totalsOf(bob).alltime()).isEqualTo(1);
+    }
+
+    @Test
+    void aVoteAdvancesAndPersistsTheStreakOnANewDay() {
+        context.online.add(alice.uuid());
+        audience.players.add(alice);
+
+        HandleVote handler = new HandleVote(
+                repository,
+                new RewardEngine(catalogPerVote("per-vote")),
+                applier,
+                context,
+                audience,
+                notifier,
+                events,
+                partyConfig("", 100),
+                0,
+                ZoneOffset.UTC);
+
+        // Use non-zero epoch-days so the stored streakDayKey is distinct from the empty() sentinel (0).
+        Instant dayOne = Instant.ofEpochSecond(86400);
+        Instant dayTwo = Instant.ofEpochSecond(86400 * 2);
+        handler.handle(new Vote(alice, "site", dayOne));
+        handler.handle(new Vote(alice, "site", dayTwo));
+
+        VoteTally stored = repository.totalsOf(alice);
+        assertThat(stored.currentStreak()).isEqualTo(2);
+        assertThat(stored.bestStreak()).isEqualTo(2);
+    }
+
+    @Test
+    void aSameDayReVoteDoesNotAdvanceTheStreak() {
+        context.online.add(alice.uuid());
+        audience.players.add(alice);
+
+        // A streak reward keyed to every day; it must fire on the first vote of the day but not the second.
+        StreakReward everyDay = new StreakReward(
+                java.util.OptionalLong.empty(),
+                java.util.OptionalLong.of(1),
+                new RewardSpec(
+                        100, Optional.empty(), List.of("streak-cmd"), List.of(), List.of(), List.of(), Set.of()));
+        RewardCatalog catalog = new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(everyDay));
+        HandleVote handler = new HandleVote(
+                repository,
+                new RewardEngine(catalog),
+                applier,
+                context,
+                audience,
+                notifier,
+                events,
+                partyConfig("", 100),
+                0,
+                ZoneOffset.UTC);
+
+        // A non-zero epoch-day so streakDayKey is distinct from the empty() sentinel (0).
+        Instant sameDay = Instant.ofEpochSecond(86400);
+        handler.handle(new Vote(alice, "site", sameDay));
+        handler.handle(new Vote(alice, "site", sameDay)); // same day re-vote
+
+        // The streak stays at 1 and the streak reward fired only once (first vote of the day).
+        assertThat(repository.totalsOf(alice).currentStreak()).isEqualTo(1);
+        assertThat(applier.commandsFor(alice).stream()
+                        .filter("streak-cmd"::equals)
+                        .count())
+                .isEqualTo(1);
     }
 
     @Test
@@ -222,6 +288,7 @@ class VoteCommandPathTest {
                 notifier,
                 events,
                 config,
+                0,
                 ZoneOffset.UTC);
         handler.handle(new Vote(alice, "site", day1));
 
@@ -252,6 +319,7 @@ class VoteCommandPathTest {
                 broadcastNotifier,
                 events,
                 config,
+                0,
                 ZoneOffset.UTC);
         HandleVote.Outcome outcome = handler.handle(voteBy(alice));
 
@@ -440,6 +508,7 @@ class VoteCommandPathTest {
                 notifier,
                 events,
                 config,
+                0,
                 ZoneOffset.UTC);
     }
 
@@ -459,7 +528,7 @@ class VoteCommandPathTest {
     private static RewardCatalog catalogPerVote(String... commands) {
         RewardSpec spec =
                 new RewardSpec(100, Optional.empty(), List.of(commands), List.of(), List.of(), List.of(), Set.of());
-        return new RewardCatalog(List.of(spec), Map.of(), List.of(), List.of());
+        return new RewardCatalog(List.of(spec), Map.of(), List.of(), List.of(), List.of());
     }
 
     private static Vote voteBy(PlayerRef voter) {
@@ -699,6 +768,7 @@ class VoteCommandPathTest {
                 notifier,
                 events,
                 partyConfig("", 25),
+                0,
                 ZoneOffset.UTC);
 
         handler.handle(new Vote(alice, "TopVoter", Instant.EPOCH));

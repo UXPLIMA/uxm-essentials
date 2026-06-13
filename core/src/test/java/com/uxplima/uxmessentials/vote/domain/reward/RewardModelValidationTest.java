@@ -102,8 +102,46 @@ class RewardModelValidationTest {
     }
 
     @Test
+    void streakRejectsBothAtAndEvery() {
+        assertThatThrownBy(() -> new StreakReward(OptionalLong.of(10), OptionalLong.of(5), spec(100)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void streakRejectsNeitherAtNorEvery() {
+        assertThatThrownBy(() -> new StreakReward(OptionalLong.empty(), OptionalLong.empty(), spec(100)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void streakRejectsNonPositiveThresholds() {
+        assertThatThrownBy(() -> new StreakReward(OptionalLong.of(0), OptionalLong.empty(), spec(100)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new StreakReward(OptionalLong.empty(), OptionalLong.of(-3), spec(100)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void streakAtMatchesOnlyTheExactLength() {
+        StreakReward at = new StreakReward(OptionalLong.of(7), OptionalLong.empty(), spec(100));
+        assertThat(at.matches(7)).isTrue();
+        assertThat(at.matches(6)).isFalse();
+        assertThat(at.matches(14)).isFalse();
+    }
+
+    @Test
+    void streakEveryMatchesPositiveMultiplesOnly() {
+        StreakReward every = new StreakReward(OptionalLong.empty(), OptionalLong.of(5), spec(100));
+        assertThat(every.matches(5)).isTrue();
+        assertThat(every.matches(15)).isTrue();
+        assertThat(every.matches(0)).isFalse();
+        assertThat(every.matches(6)).isFalse();
+    }
+
+    @Test
     void catalogForSiteIsCaseInsensitiveAndEmptyWhenUnknown() {
-        RewardCatalog catalog = new RewardCatalog(List.of(), Map.of("TopG", List.of(spec(100))), List.of(), List.of());
+        RewardCatalog catalog =
+                new RewardCatalog(List.of(), Map.of("TopG", List.of(spec(100))), List.of(), List.of(), List.of());
         assertThat(catalog.forSite("topg")).hasSize(1);
         assertThat(catalog.forSite("TOPG")).hasSize(1);
         assertThat(catalog.forSite("unknown")).isEmpty();
@@ -115,6 +153,7 @@ class RewardModelValidationTest {
         assertThat(empty.perVote()).isEmpty();
         assertThat(empty.firstVote()).isEmpty();
         assertThat(empty.milestones()).isEmpty();
+        assertThat(empty.streaks()).isEmpty();
         assertThat(empty.forSite("any")).isEmpty();
     }
 

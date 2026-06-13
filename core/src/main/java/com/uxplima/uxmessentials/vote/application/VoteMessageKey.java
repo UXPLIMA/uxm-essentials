@@ -42,6 +42,9 @@ public enum VoteMessageKey implements MessageKey {
     // /votes unknown player
     VOTE_TOTAL_UNKNOWN("vote.total.unknown"),
 
+    // /vote streak <player> — current and best consecutive-day streak
+    VOTE_STREAK("vote.streak"),
+
     // /votetop header, per-row entry, and empty-state
     VOTE_TOP_HEADER("vote.top.header"),
     VOTE_TOP_ENTRY("vote.top.entry"),

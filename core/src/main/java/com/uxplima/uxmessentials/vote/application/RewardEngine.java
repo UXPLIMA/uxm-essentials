@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.vote.domain.reward.MilestoneReward;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
+import com.uxplima.uxmessentials.vote.domain.reward.StreakReward;
 
 /**
  * The pure config-driven reward engine: given a {@link RewardCatalog} (fixed at construction) and a
@@ -18,7 +19,8 @@ import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
  *
  * <p>Candidate specs are collected in a fixed order — all per-vote specs, then the per-site specs for the
  * vote's service, then (only when this is the voter's first ever vote) the first-vote specs, then each
- * milestone whose threshold the all-time count just hit. Each candidate is then gated in order: world,
+ * milestone whose threshold the all-time count just hit, then (only when this vote advanced the streak)
+ * each streak reward the current streak length matches. Each candidate is then gated in order: world,
  * permission, chance. A spec is granted only when it clears every gate, and the returned grants keep the
  * candidate order.
  *
@@ -56,6 +58,14 @@ public final class RewardEngine {
         for (MilestoneReward milestone : catalog.milestones()) {
             if (milestone.matches(alltime)) {
                 candidates.add(milestone.reward());
+            }
+        }
+        if (ctx.streakAdvanced()) {
+            long streak = ctx.totalsAfter().currentStreak();
+            for (StreakReward streakReward : catalog.streaks()) {
+                if (streakReward.matches(streak)) {
+                    candidates.add(streakReward.reward());
+                }
             }
         }
         return candidates;

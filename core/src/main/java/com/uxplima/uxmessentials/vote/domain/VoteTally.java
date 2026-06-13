@@ -23,6 +23,12 @@ import java.util.Objects;
  * <p>All fields are non-negative. The compact constructor enforces this so that no invalid tally
  * can be persisted or deserialized into the application layer.
  *
+ * <p>The streak fields track consecutive-day voting independently of the calendar buckets.
+ * {@code currentStreak} is the run of days the player has voted on, {@code bestStreak} the longest
+ * run ever reached, and {@code streakDayKey} the epoch-day of the most recent vote that touched the
+ * streak — so a second vote on the same day leaves the streak unchanged while the first vote of the
+ * next day extends it.
+ *
  * @param alltime accumulated votes across all time
  * @param daily votes in the current calendar day
  * @param weekly votes in the current ISO week
@@ -31,8 +37,21 @@ import java.util.Objects;
  * @param weekKey the ISO-week identifier ({@code weekBasedYear * 100 + weekOfYear}) the weekly
  *     bucket covers
  * @param monthKey the month identifier ({@code year * 12 + monthValue}) the monthly bucket covers
+ * @param currentStreak the current run of consecutive voting days
+ * @param bestStreak the longest run of consecutive voting days ever reached
+ * @param streakDayKey the epoch-day of the most recent vote counted toward the streak
  */
-public record VoteTally(long alltime, long daily, long weekly, long monthly, long dayKey, long weekKey, long monthKey) {
+public record VoteTally(
+        long alltime,
+        long daily,
+        long weekly,
+        long monthly,
+        long dayKey,
+        long weekKey,
+        long monthKey,
+        long currentStreak,
+        long bestStreak,
+        long streakDayKey) {
 
     public VoteTally {
         if (alltime < 0) throw new IllegalArgumentException("alltime must not be negative: " + alltime);
@@ -42,11 +61,28 @@ public record VoteTally(long alltime, long daily, long weekly, long monthly, lon
         if (dayKey < 0) throw new IllegalArgumentException("dayKey must not be negative: " + dayKey);
         if (weekKey < 0) throw new IllegalArgumentException("weekKey must not be negative: " + weekKey);
         if (monthKey < 0) throw new IllegalArgumentException("monthKey must not be negative: " + monthKey);
+        if (currentStreak < 0)
+            throw new IllegalArgumentException("currentStreak must not be negative: " + currentStreak);
+        if (bestStreak < 0) throw new IllegalArgumentException("bestStreak must not be negative: " + bestStreak);
+        if (streakDayKey < 0) throw new IllegalArgumentException("streakDayKey must not be negative: " + streakDayKey);
     }
 
-    /** A brand-new tally with every bucket and key at zero (used for a player's first vote). */
+    /** A brand-new tally with every bucket, key, and streak field at zero (used for a player's first vote). */
     public static VoteTally empty() {
-        return new VoteTally(0L, 0L, 0L, 0L, 0L, 0L, 0L);
+        return new VoteTally(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+    }
+
+    /**
+     * Produce a new tally that records one more vote that arrived at {@code now} in {@code zone},
+     * with no grace window: a vote must land the very next calendar day to extend the streak.
+     * Equivalent to {@link #recordVote(Instant, ZoneId, int)} with {@code graceDays == 0}.
+     *
+     * @param now the wall-clock instant of the incoming vote
+     * @param zone the timezone used to derive calendar boundaries
+     * @return the updated tally (this tally is not mutated)
+     */
+    public VoteTally recordVote(Instant now, ZoneId zone) {
+        return recordVote(now, zone, 0);
     }
 
     /**
@@ -55,11 +91,17 @@ public record VoteTally(long alltime, long daily, long weekly, long monthly, lon
      * advanced since the stored key was written; then the bucket is incremented. Alltime always
      * increments.
      *
+     * <p>The streak transition runs alongside the bucket rollover: a vote on the same day as the
+     * last streak vote leaves the streak unchanged, a vote within {@code 1 + graceDays} days extends
+     * it by one, and a longer gap resets it to one. {@code graceDays} below zero is treated as zero,
+     * so {@code graceDays == 1} lets a player miss a single day without breaking their run.
+     *
      * @param now the wall-clock instant of the incoming vote
      * @param zone the timezone used to derive calendar boundaries
+     * @param graceDays extra missed days tolerated between consecutive votes before the streak breaks
      * @return the updated tally (this tally is not mutated)
      */
-    public VoteTally recordVote(Instant now, ZoneId zone) {
+    public VoteTally recordVote(Instant now, ZoneId zone, int graceDays) {
         Objects.requireNonNull(now, "now");
         Objects.requireNonNull(zone, "zone");
 
@@ -72,8 +114,35 @@ public record VoteTally(long alltime, long daily, long weekly, long monthly, lon
         long newWeekly = (currentWeekKey == weekKey) ? weekly + 1 : 1L;
         long newMonthly = (currentMonthKey == monthKey) ? monthly + 1 : 1L;
 
+        int grace = Math.max(0, graceDays);
+        long newCurrentStreak = nextStreak(currentDayKey, grace);
+        long newBestStreak = Math.max(bestStreak, newCurrentStreak);
+
         return new VoteTally(
-                alltime + 1, newDaily, newWeekly, newMonthly, currentDayKey, currentWeekKey, currentMonthKey);
+                alltime + 1,
+                newDaily,
+                newWeekly,
+                newMonthly,
+                currentDayKey,
+                currentWeekKey,
+                currentMonthKey,
+                newCurrentStreak,
+                newBestStreak,
+                currentDayKey);
+    }
+
+    private long nextStreak(long currentDayKey, int grace) {
+        if (streakDayKey == 0) {
+            return 1L;
+        }
+        long delta = currentDayKey - streakDayKey;
+        if (delta == 0) {
+            return currentStreak;
+        }
+        if (delta >= 1 && delta <= 1 + grace) {
+            return currentStreak + 1;
+        }
+        return 1L;
     }
 
     /**

@@ -9,9 +9,9 @@ import java.util.Objects;
 /**
  * The operator-configured reward sets the engine resolves against, grouped by what triggers them: the
  * per-vote specs (every vote), the per-site specs (keyed by the vote-list service name), the first-vote
- * specs (a player's very first vote), and the milestone rewards (keyed off the all-time count). The
- * adapter parses {@code modules/vote/config.conf} into this catalog once on load and swaps it atomically
- * on reload.
+ * specs (a player's very first vote), the milestone rewards (keyed off the all-time count), and the
+ * streak rewards (keyed off the current consecutive-day streak). The adapter parses
+ * {@code modules/vote/config.conf} into this catalog once on load and swaps it atomically on reload.
  *
  * <p>Per-site lookup is case-insensitive: the keys are stored lower-cased and {@link #forSite(String)}
  * lower-cases its argument, so a vote from {@code "PlanetMinecraft"} matches a {@code planetminecraft}
@@ -21,27 +21,31 @@ import java.util.Objects;
  * @param perSite the specs paid per vote-list service, keyed by lower-cased service name
  * @param firstVote the specs paid on a player's first ever vote
  * @param milestones the all-time-count milestone rewards
+ * @param streaks the consecutive-day streak rewards
  */
 public record RewardCatalog(
         List<RewardSpec> perVote,
         Map<String, List<RewardSpec>> perSite,
         List<RewardSpec> firstVote,
-        List<MilestoneReward> milestones) {
+        List<MilestoneReward> milestones,
+        List<StreakReward> streaks) {
 
     public RewardCatalog {
         Objects.requireNonNull(perVote, "perVote");
         Objects.requireNonNull(perSite, "perSite");
         Objects.requireNonNull(firstVote, "firstVote");
         Objects.requireNonNull(milestones, "milestones");
+        Objects.requireNonNull(streaks, "streaks");
         perVote = List.copyOf(perVote);
         perSite = lowerCasedCopy(perSite);
         firstVote = List.copyOf(firstVote);
         milestones = List.copyOf(milestones);
+        streaks = List.copyOf(streaks);
     }
 
-    /** An empty catalog: no per-vote, per-site, first-vote, or milestone rewards. */
+    /** An empty catalog: no per-vote, per-site, first-vote, milestone, or streak rewards. */
     public static RewardCatalog empty() {
-        return new RewardCatalog(List.of(), Map.of(), List.of(), List.of());
+        return new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of());
     }
 
     /** The per-site specs for {@code service}, matched case-insensitively; an empty list when none. */

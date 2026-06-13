@@ -44,6 +44,7 @@ public final class HandleVote {
     private final DomainEventPublisher events;
     private final PartyConfig party;
     private final PartyService partyService;
+    private final int streakGraceDays;
     private final ZoneId zone;
 
     public HandleVote(
@@ -55,6 +56,7 @@ public final class HandleVote {
             VoteNotifier notifier,
             DomainEventPublisher events,
             PartyConfig party,
+            int streakGraceDays,
             ZoneId zone) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
@@ -64,6 +66,7 @@ public final class HandleVote {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.party = Objects.requireNonNull(party, "party");
+        this.streakGraceDays = streakGraceDays;
         this.zone = Objects.requireNonNull(zone, "zone");
         this.partyService = new PartyService(repository, applier, audience, notifier, events, party);
     }
@@ -71,16 +74,18 @@ public final class HandleVote {
     /** Apply {@code vote}: record the tally, resolve and apply the reward sets, advance the counter, fire a party when due. */
     public Outcome handle(Vote vote) {
         Objects.requireNonNull(vote, "vote");
-        VoteTally after = repository.totalsOf(vote.voter()).recordVote(vote.at(), zone);
+        VoteTally before = repository.totalsOf(vote.voter());
+        VoteTally after = before.recordVote(vote.at(), zone, streakGraceDays);
         repository.saveTotals(vote.voter(), after);
         repository.recordLastVoteAtSite(vote.voter(), vote.serviceName(), vote.at());
-        boolean rewarded = creditVoter(vote, after);
+        boolean streakAdvanced = before.streakDayKey() != after.streakDayKey();
+        boolean rewarded = creditVoter(vote, after, streakAdvanced);
         repository.markPartyParticipant(vote.voter());
         boolean partyFired = advanceCounter(vote);
         return new Outcome(rewarded, partyFired);
     }
 
-    private boolean creditVoter(Vote vote, VoteTally after) {
+    private boolean creditVoter(Vote vote, VoteTally after, boolean streakAdvanced) {
         PlayerRef voter = vote.voter();
         boolean online = context.isOnline(voter);
         RewardContext ctx = new RewardContext(
@@ -89,6 +94,7 @@ public final class HandleVote {
                 online ? context.worldOf(voter) : "",
                 vote.serviceName(),
                 after,
+                streakAdvanced,
                 node -> context.hasPermission(voter, node),
                 context::roll);
         for (RewardGrant grant : engine.resolve(ctx)) {
