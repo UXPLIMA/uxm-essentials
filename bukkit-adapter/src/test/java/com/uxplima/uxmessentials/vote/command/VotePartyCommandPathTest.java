@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vote.command;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Collection;
 import java.util.List;
@@ -30,6 +31,7 @@ import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
 import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
@@ -46,13 +48,18 @@ import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.RewardDispatcher;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
+import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
+import com.uxplima.uxmessentials.vote.domain.BroadcastType;
 import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
@@ -197,13 +204,18 @@ class VotePartyCommandPathTest {
         NoOpRewardApplier applier = new NoOpRewardApplier();
         NoEvents events = new NoEvents();
         NoLookup lookup = new NoLookup();
+        VoteBroadcaster broadcaster = new NoOpBroadcaster();
+        BroadcastSettings broadcastSettings =
+                new BroadcastSettings(BroadcastType.EVERY_VOTE, Duration.ZERO, Set.of(BroadcastChannel.CHAT), Set.of());
         HandleVote handleVote = new HandleVote(
                 repository,
                 new RewardEngine(RewardCatalog.empty()),
                 applier,
                 new NoOpVoteContext(),
                 audience,
-                notifier,
+                broadcastSettings,
+                broadcaster,
+                new NoOpBroadcastThrottle(),
                 events,
                 party,
                 0,
@@ -223,9 +235,11 @@ class VotePartyCommandPathTest {
         ShowNextVote showNextVote = new ShowNextVote(repository, VoteSiteCatalog.empty(), notifier);
         ShowLastVote showLastVote = new ShowLastVote(repository, VoteSiteCatalog.empty(), notifier);
         VoteReminderEligibility reminderEligibility = new VoteReminderEligibility(repository, VoteSiteCatalog.empty());
-        ForceParty forceParty = new ForceParty(repository, applier, audience, notifier, events, party);
+        ForceParty forceParty = new ForceParty(
+                repository, applier, audience, notifier, broadcaster, Set.of(BroadcastChannel.CHAT), events, party);
         SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
-        AddPartyCount addPartyCount = new AddPartyCount(repository, applier, audience, notifier, events, party);
+        AddPartyCount addPartyCount = new AddPartyCount(
+                repository, applier, audience, notifier, broadcaster, Set.of(BroadcastChannel.CHAT), events, party);
         GiveVote giveVote = new GiveVote(handleVote, notifier);
         ResetVoterTotals resetVoterTotals = new ResetVoterTotals(repository, notifier);
         return new VoteServices(
@@ -241,6 +255,7 @@ class VotePartyCommandPathTest {
                 showLastVote,
                 reminderEligibility,
                 new NoOpReminderPreferences(),
+                new NoOpBroadcastVisibility(),
                 forceParty,
                 setPartyCount,
                 addPartyCount,
@@ -392,6 +407,33 @@ class VotePartyCommandPathTest {
     private static final class NoOpRewardDispatcher implements RewardDispatcher {
         @Override
         public void dispatch(List<String> commands, String playerName) {}
+    }
+
+    private static final class NoOpBroadcaster implements VoteBroadcaster {
+        @Override
+        public void broadcast(MessageKey key, Map<String, String> placeholders, Set<BroadcastChannel> channels) {}
+    }
+
+    private static final class NoOpBroadcastThrottle implements BroadcastThrottle {
+        @Override
+        public Optional<Instant> lastBroadcastAt(PlayerRef voter) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void recordBroadcast(PlayerRef voter, Instant at) {}
+    }
+
+    private static final class NoOpBroadcastVisibility implements BroadcastVisibility {
+        @Override
+        public boolean receivesBroadcasts(PlayerRef who) {
+            return true;
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            return true;
+        }
     }
 
     private static final class NoOpRewardApplier implements RewardApplier {

@@ -61,7 +61,6 @@ public final class HandleVote {
             RewardApplier applier,
             VoteContext context,
             VoteAudience audience,
-            VoteNotifier notifier,
             BroadcastSettings broadcastSettings,
             VoteBroadcaster broadcaster,
             BroadcastThrottle throttle,
@@ -74,7 +73,6 @@ public final class HandleVote {
         this.applier = Objects.requireNonNull(applier, "applier");
         this.context = Objects.requireNonNull(context, "context");
         Objects.requireNonNull(audience, "audience");
-        Objects.requireNonNull(notifier, "notifier");
         this.broadcastSettings = Objects.requireNonNull(broadcastSettings, "broadcastSettings");
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
         this.throttle = Objects.requireNonNull(throttle, "throttle");

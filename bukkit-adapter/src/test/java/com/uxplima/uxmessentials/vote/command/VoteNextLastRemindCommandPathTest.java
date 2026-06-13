@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
 import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
@@ -48,13 +49,18 @@ import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.RewardDispatcher;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
+import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
+import com.uxplima.uxmessentials.vote.domain.BroadcastType;
 import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
@@ -91,6 +97,7 @@ class VoteNextLastRemindCommandPathTest {
     private RecordingRepository repository;
     private RecordingMessages messages;
     private RecordingReminderPreferences reminderPrefs;
+    private RecordingBroadcastVisibility broadcastVisibility;
 
     @BeforeEach
     void setUp() {
@@ -101,6 +108,7 @@ class VoteNextLastRemindCommandPathTest {
         repository = new RecordingRepository();
         messages = new RecordingMessages();
         reminderPrefs = new RecordingReminderPreferences(true); // starts opted-in
+        broadcastVisibility = new RecordingBroadcastVisibility(true); // starts receiving
     }
 
     @AfterEach
@@ -175,6 +183,38 @@ class VoteNextLastRemindCommandPathTest {
     }
 
     @Test
+    void voteBroadcastsFlipsVisibilityFromOnToOffAndSendsHiddenKey() {
+        // starts receiving; first toggle should hide broadcasts
+        CommandDispatcher<CommandSourceStack> dispatcher = register(VoteSiteCatalog.empty());
+
+        execute(dispatcher, "vote broadcasts");
+
+        assertThat(broadcastVisibility.lastToggleResult).isFalse();
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_BROADCASTS_HIDDEN.key());
+    }
+
+    @Test
+    void voteBroadcastsFlipsVisibilityFromOffToOnAndSendsShownKey() {
+        // Start hidden.
+        broadcastVisibility = new RecordingBroadcastVisibility(false);
+        CommandDispatcher<CommandSourceStack> dispatcher = register(VoteSiteCatalog.empty());
+
+        execute(dispatcher, "vote broadcasts");
+
+        assertThat(broadcastVisibility.lastToggleResult).isTrue();
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_BROADCASTS_SHOWN.key());
+    }
+
+    @Test
+    void voteBroadcastsSubcommandExistsInCommandTree() {
+        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()), () -> ListDisplayMode.CHAT);
+        var root = command.build();
+        assertThat(root.getChild("broadcasts"))
+                .as("/vote broadcasts must exist")
+                .isNotNull();
+    }
+
+    @Test
     void voteNextSubcommandExistsInCommandTree() {
         VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()), () -> ListDisplayMode.CHAT);
         var root = command.build();
@@ -220,13 +260,18 @@ class VoteNextLastRemindCommandPathTest {
         NoOpApplier applier = new NoOpApplier();
         NoEvents events = new NoEvents();
         NoLookup lookup = new NoLookup();
+        VoteBroadcaster broadcaster = new NoOpBroadcaster();
+        BroadcastSettings broadcastSettings =
+                new BroadcastSettings(BroadcastType.EVERY_VOTE, Duration.ZERO, Set.of(BroadcastChannel.CHAT), Set.of());
         HandleVote handleVote = new HandleVote(
                 repository,
                 new RewardEngine(RewardCatalog.empty()),
                 applier,
                 new NoOpContext(),
                 audience,
-                notifier,
+                broadcastSettings,
+                broadcaster,
+                new NoOpBroadcastThrottle(),
                 events,
                 party,
                 0,
@@ -242,9 +287,11 @@ class VoteNextLastRemindCommandPathTest {
         ShowNextVote showNextVote = new ShowNextVote(repository, catalog, notifier);
         ShowLastVote showLastVote = new ShowLastVote(repository, catalog, notifier);
         VoteReminderEligibility eligibility = new VoteReminderEligibility(repository, catalog);
-        ForceParty forceParty = new ForceParty(repository, applier, audience, notifier, events, party);
+        ForceParty forceParty = new ForceParty(
+                repository, applier, audience, notifier, broadcaster, Set.of(BroadcastChannel.CHAT), events, party);
         SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
-        AddPartyCount addPartyCount = new AddPartyCount(repository, applier, audience, notifier, events, party);
+        AddPartyCount addPartyCount = new AddPartyCount(
+                repository, applier, audience, notifier, broadcaster, Set.of(BroadcastChannel.CHAT), events, party);
         GiveVote giveVote = new GiveVote(handleVote, notifier);
         ResetVoterTotals resetVoterTotals = new ResetVoterTotals(repository, notifier);
         return new VoteServices(
@@ -260,6 +307,7 @@ class VoteNextLastRemindCommandPathTest {
                 showLastVote,
                 eligibility,
                 reminderPrefs,
+                broadcastVisibility,
                 forceParty,
                 setPartyCount,
                 addPartyCount,
@@ -399,6 +447,43 @@ class VoteNextLastRemindCommandPathTest {
             lastToggleResult = wantsReminders;
             return wantsReminders;
         }
+    }
+
+    private static final class RecordingBroadcastVisibility implements BroadcastVisibility {
+        private boolean receives;
+
+        @Nullable Boolean lastToggleResult;
+
+        RecordingBroadcastVisibility(boolean initialReceives) {
+            this.receives = initialReceives;
+        }
+
+        @Override
+        public boolean receivesBroadcasts(PlayerRef who) {
+            return receives;
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            receives = !receives;
+            lastToggleResult = receives;
+            return receives;
+        }
+    }
+
+    private static final class NoOpBroadcaster implements VoteBroadcaster {
+        @Override
+        public void broadcast(MessageKey key, Map<String, String> placeholders, Set<BroadcastChannel> channels) {}
+    }
+
+    private static final class NoOpBroadcastThrottle implements BroadcastThrottle {
+        @Override
+        public Optional<Instant> lastBroadcastAt(PlayerRef voter) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void recordBroadcast(PlayerRef voter, Instant at) {}
     }
 
     // --- minimal stubs ---

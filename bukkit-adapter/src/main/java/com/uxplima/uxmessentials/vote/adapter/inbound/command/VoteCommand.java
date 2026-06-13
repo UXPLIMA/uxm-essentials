@@ -45,6 +45,7 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code next} — show when the player can next vote on each configured site.
  *   <li>{@code last} — show when the player last voted on each configured site.
  *   <li>{@code remind} — toggle vote reminder messages on/off for the sender.
+ *   <li>{@code broadcasts} — toggle whether the sender sees server-wide vote broadcasts.
  *   <li>{@code admin givevote <player> [amount]} — inject synthetic votes for a player (offline-capable),
  *       gated by {@code uxmessentials.vote.admin}.
  *   <li>{@code admin reset <player>} — reset all vote totals for a player (offline-capable),
@@ -98,6 +99,7 @@ public final class VoteCommand implements CommandRegistration {
                 .then(Commands.literal("next").executes(this::showNext))
                 .then(Commands.literal("last").executes(this::showLast))
                 .then(Commands.literal("remind").executes(this::toggleRemind))
+                .then(Commands.literal("broadcasts").executes(this::toggleBroadcasts))
                 .then(Commands.literal("admin")
                         .requires(src -> src.getSender().hasPermission(ADMIN_PERMISSION))
                         .then(Commands.literal("givevote")
@@ -262,6 +264,21 @@ public final class VoteCommand implements CommandRegistration {
         boolean nowWants = services.reminderPreferences().toggle(who);
         feedback.send(
                 sender, nowWants ? VoteMessageKey.VOTE_REMIND_ENABLED : VoteMessageKey.VOTE_REMIND_DISABLED, Map.of());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int toggleBroadcasts(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = BukkitRefs.toRef(sender);
+        // PDC is region-bound; the command fires on the player's region thread, so the toggle is in-line.
+        boolean nowReceives = services.broadcastVisibility().toggle(who);
+        feedback.send(
+                sender,
+                nowReceives ? VoteMessageKey.VOTE_BROADCASTS_SHOWN : VoteMessageKey.VOTE_BROADCASTS_HIDDEN,
+                Map.of());
         return Command.SINGLE_SUCCESS;
     }
 

@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import org.jspecify.annotations.NullMarked;
 
@@ -43,6 +44,7 @@ import org.jspecify.annotations.NullMarked;
  * @param showLastVote the {@code /vote last} per-site last-vote display
  * @param reminderEligibility determines if a player has at least one site ready to vote on
  * @param reminderPreferences per-player opt-in/out preference (PDC-backed)
+ * @param broadcastVisibility per-player vote-broadcast opt-in/out preference (PDC-backed)
  * @param forceParty admin: fire the party immediately
  * @param setPartyCount admin: set the counter to an exact value
  * @param addPartyCount admin: add to the counter (fires if threshold reached)
@@ -66,6 +68,7 @@ public record VoteServices(
         ShowLastVote showLastVote,
         VoteReminderEligibility reminderEligibility,
         ReminderPreferences reminderPreferences,
+        BroadcastVisibility broadcastVisibility,
         ForceParty forceParty,
         SetPartyCount setPartyCount,
         AddPartyCount addPartyCount,
@@ -88,6 +91,7 @@ public record VoteServices(
         Objects.requireNonNull(showLastVote, "showLastVote");
         Objects.requireNonNull(reminderEligibility, "reminderEligibility");
         Objects.requireNonNull(reminderPreferences, "reminderPreferences");
+        Objects.requireNonNull(broadcastVisibility, "broadcastVisibility");
         Objects.requireNonNull(forceParty, "forceParty");
         Objects.requireNonNull(setPartyCount, "setPartyCount");
         Objects.requireNonNull(addPartyCount, "addPartyCount");

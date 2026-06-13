@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.bukkit.Bukkit;
@@ -36,10 +37,14 @@ import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VotifierListener;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardApplier;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardDispatcher;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteAudience;
+import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteBroadcaster;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteContext;
+import com.uxplima.uxmessentials.vote.adapter.outbound.InMemoryBroadcastThrottle;
+import com.uxplima.uxmessentials.vote.adapter.outbound.PdcBroadcastVisibility;
 import com.uxplima.uxmessentials.vote.adapter.outbound.PdcReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
 import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
@@ -57,10 +62,14 @@ import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
+import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.VoteSiteCatalog;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
@@ -122,6 +131,12 @@ public final class VoteWiring {
         VoteSiteCatalog siteCatalog = loadSiteCatalog(plugin, kernel);
         PdcReminderPreferences reminderPrefs = new PdcReminderPreferences(plugin);
 
+        BroadcastSettingsLoader.Loaded broadcastConfig = loadBroadcastSettings(plugin, kernel);
+        BroadcastVisibility broadcastVisibility = new PdcBroadcastVisibility(plugin);
+        BroadcastThrottle broadcastThrottle = new InMemoryBroadcastThrottle();
+        VoteBroadcaster broadcaster = new BukkitVoteBroadcaster(
+                kernel.scheduler(), kernel.messages(), broadcastVisibility, broadcastConfig.display());
+
         VoteSitesGuiView.GuiConfig guiCfg = loadGuiConfig(ctx.config());
         VoteSitesGuiView sitesGuiView =
                 new VoteSitesGuiView(siteCatalog, repository, kernel.scheduler(), kernel.messages(), guiCfg);
@@ -134,6 +149,10 @@ public final class VoteWiring {
                 engine,
                 audience,
                 notifier,
+                broadcaster,
+                broadcastConfig.settings(),
+                broadcastThrottle,
+                broadcastVisibility,
                 party,
                 streakGraceDays,
                 voteLinks,
@@ -243,19 +262,26 @@ public final class VoteWiring {
             RewardEngine engine,
             VoteAudience audience,
             VoteNotifier notifier,
+            VoteBroadcaster broadcaster,
+            BroadcastSettings broadcastSettings,
+            BroadcastThrottle broadcastThrottle,
+            BroadcastVisibility broadcastVisibility,
             PartyConfig party,
             int streakGraceDays,
             List<String> voteLinks,
             VoteSiteCatalog siteCatalog,
             PdcReminderPreferences reminderPrefs,
             VoteSitesGuiView sitesGuiView) {
+        Set<BroadcastChannel> channels = broadcastSettings.channels();
         HandleVote handleVote = new HandleVote(
                 repository,
                 engine,
                 applier,
                 context,
                 audience,
-                notifier,
+                broadcastSettings,
+                broadcaster,
+                broadcastThrottle,
                 kernel.events(),
                 party,
                 streakGraceDays,
@@ -270,10 +296,11 @@ public final class VoteWiring {
         ShowNextVote showNextVote = new ShowNextVote(repository, siteCatalog, notifier);
         ShowLastVote showLastVote = new ShowLastVote(repository, siteCatalog, notifier);
         VoteReminderEligibility reminderEligibility = new VoteReminderEligibility(repository, siteCatalog);
-        ForceParty forceParty = new ForceParty(repository, applier, audience, notifier, kernel.events(), party);
+        ForceParty forceParty =
+                new ForceParty(repository, applier, audience, notifier, broadcaster, channels, kernel.events(), party);
         SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
-        AddPartyCount addPartyCount =
-                new AddPartyCount(repository, applier, audience, notifier, kernel.events(), party);
+        AddPartyCount addPartyCount = new AddPartyCount(
+                repository, applier, audience, notifier, broadcaster, channels, kernel.events(), party);
         GiveVote giveVote = new GiveVote(handleVote, notifier);
         ResetVoterTotals resetVoterTotals = new ResetVoterTotals(repository, notifier);
         return new VoteServices(
@@ -289,6 +316,7 @@ public final class VoteWiring {
                 showLastVote,
                 reminderEligibility,
                 reminderPrefs,
+                broadcastVisibility,
                 forceParty,
                 setPartyCount,
                 addPartyCount,
@@ -307,6 +335,11 @@ public final class VoteWiring {
     private static VoteSiteCatalog loadSiteCatalog(Plugin plugin, KernelPorts kernel) {
         Path moduleConfig = moduleConfigPath(plugin);
         return VoteSiteCatalogLoader.loadFrom(moduleConfig, kernel.log());
+    }
+
+    private static BroadcastSettingsLoader.Loaded loadBroadcastSettings(Plugin plugin, KernelPorts kernel) {
+        Path moduleConfig = moduleConfigPath(plugin);
+        return BroadcastSettingsLoader.loadFrom(moduleConfig, kernel.log());
     }
 
     private static Path moduleConfigPath(Plugin plugin) {

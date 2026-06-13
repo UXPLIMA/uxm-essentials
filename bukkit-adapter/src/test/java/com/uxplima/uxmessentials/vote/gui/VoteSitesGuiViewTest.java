@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
 import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
@@ -51,13 +52,18 @@ import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastThrottle;
+import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.RewardDispatcher;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
+import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
+import com.uxplima.uxmessentials.vote.domain.BroadcastType;
 import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
@@ -241,13 +247,18 @@ class VoteSitesGuiViewTest {
         RewardSpec noOp = new RewardSpec(100, Optional.empty(), List.of(), List.of(), List.of(), List.of(), Set.of());
         PartyConfig party = new PartyConfig(noOp, 25, false, 0, PartyResetSchedule.NONE, List.of());
         FakeVoteRepository repo = new FakeVoteRepository();
+        VoteBroadcaster broadcaster = new NoOpBroadcaster();
+        BroadcastSettings broadcastSettings =
+                new BroadcastSettings(BroadcastType.EVERY_VOTE, Duration.ZERO, Set.of(BroadcastChannel.CHAT), Set.of());
         HandleVote handleVote = new HandleVote(
                 repo,
                 new RewardEngine(RewardCatalog.empty()),
                 new NoOpRewardApplier(),
                 new NoOpVoteContext(),
                 new NoOpVoteAudience(),
-                notifier,
+                broadcastSettings,
+                broadcaster,
+                new NoOpBroadcastThrottle(),
                 new NoEvents(),
                 party,
                 0,
@@ -266,10 +277,26 @@ class VoteSitesGuiViewTest {
                 new ShowLastVote(repo, catalog, notifier),
                 new VoteReminderEligibility(repo, catalog),
                 new NoOpReminderPreferences(),
-                new ForceParty(repo, new NoOpRewardApplier(), new NoOpVoteAudience(), notifier, new NoEvents(), party),
+                new NoOpBroadcastVisibility(),
+                new ForceParty(
+                        repo,
+                        new NoOpRewardApplier(),
+                        new NoOpVoteAudience(),
+                        notifier,
+                        broadcaster,
+                        Set.of(BroadcastChannel.CHAT),
+                        new NoEvents(),
+                        party),
                 new SetPartyCount(repo, notifier),
                 new AddPartyCount(
-                        repo, new NoOpRewardApplier(), new NoOpVoteAudience(), notifier, new NoEvents(), party),
+                        repo,
+                        new NoOpRewardApplier(),
+                        new NoOpVoteAudience(),
+                        notifier,
+                        broadcaster,
+                        Set.of(BroadcastChannel.CHAT),
+                        new NoEvents(),
+                        party),
                 new GiveVote(handleVote, notifier),
                 new ResetVoterTotals(repo, notifier),
                 new NoOpPlayerLookup(),
@@ -444,6 +471,33 @@ class VoteSitesGuiViewTest {
     private static final class NoOpRewardApplier implements RewardApplier {
         @Override
         public void apply(PlayerRef voter, boolean online, RewardGrant grant) {}
+    }
+
+    private static final class NoOpBroadcaster implements VoteBroadcaster {
+        @Override
+        public void broadcast(MessageKey key, Map<String, String> placeholders, Set<BroadcastChannel> channels) {}
+    }
+
+    private static final class NoOpBroadcastThrottle implements BroadcastThrottle {
+        @Override
+        public Optional<Instant> lastBroadcastAt(PlayerRef voter) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void recordBroadcast(PlayerRef voter, Instant at) {}
+    }
+
+    private static final class NoOpBroadcastVisibility implements BroadcastVisibility {
+        @Override
+        public boolean receivesBroadcasts(PlayerRef who) {
+            return true;
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            return true;
+        }
     }
 
     private static final class NoOpRewardDispatcher implements RewardDispatcher {
