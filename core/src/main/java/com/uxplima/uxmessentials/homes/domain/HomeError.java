@@ -26,7 +26,10 @@ public enum HomeError {
     WORLD_DISABLED(HomesMessageKey.HOME_WORLD_DISABLED),
 
     /** The target position is flagged as unsafe to place a home (e.g. in the air, under lava). */
-    UNSAFE_LOCATION(HomesMessageKey.HOME_UNSAFE_LOCATION);
+    UNSAFE_LOCATION(HomesMessageKey.HOME_UNSAFE_LOCATION),
+
+    /** The player's balance was insufficient to cover the per-action economy cost. */
+    CANNOT_AFFORD(HomesMessageKey.HOME_CANNOT_AFFORD);
 
     private final HomesMessageKey messageKey;
 

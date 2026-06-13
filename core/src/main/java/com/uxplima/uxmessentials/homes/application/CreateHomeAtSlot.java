@@ -22,9 +22,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * resolved through {@link HomeQuota} scoped to the home's world and folded into a maximum-slot count, then
  * every registered {@link SethomeGuard} runs in order — the first failure short-circuits with its
  * {@link HomeError} and no aggregate change. If the guards pass, the aggregate gates the slot against the
- * range/occupancy/limit invariants and creates the home, publishing {@code HomeCreated}. Hitting the cap
- * publishes {@code HomeLimitReached} and returns {@link HomeError#LIMIT_REACHED} so the command renders the
- * limit message — never an inline literal.
+ * range/occupancy/limit invariants and creates the home; if the transition succeeds, the optional economy
+ * charge is applied before the result is committed. Hitting the cap publishes {@code HomeLimitReached} and
+ * returns {@link HomeError#LIMIT_REACHED} so the command renders the limit message — never an inline literal.
  */
 public final class CreateHomeAtSlot {
 
@@ -33,6 +33,7 @@ public final class CreateHomeAtSlot {
     private final List<SethomeGuard> guards;
     private final HomeNotifier notifier;
     private final DomainEventPublisher events;
+    private final HomeCharge charge;
     private final int unlimitedMaxSlots;
     private final Clock clock;
 
@@ -42,6 +43,7 @@ public final class CreateHomeAtSlot {
             List<SethomeGuard> guards,
             HomeNotifier notifier,
             DomainEventPublisher events,
+            HomeCharge charge,
             int unlimitedMaxSlots,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -49,6 +51,7 @@ public final class CreateHomeAtSlot {
         this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.charge = Objects.requireNonNull(charge, "charge");
         if (unlimitedMaxSlots < 0) {
             throw new IllegalArgumentException("unlimitedMaxSlots must not be negative: " + unlimitedMaxSlots);
         }
@@ -56,7 +59,7 @@ public final class CreateHomeAtSlot {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Create {@code owner}'s home in {@code slot} at {@code at}, gating on the guards and the aggregate. */
+    /** Create {@code owner}'s home in {@code slot} at {@code at}, gating on the guards, the aggregate, and the economy charge. */
     public Result<Unit, HomeError> create(PlayerRef owner, HomeSlot slot, Position at) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(slot, "slot");
@@ -68,9 +71,16 @@ public final class CreateHomeAtSlot {
         if (guarded.isErr()) {
             return guarded;
         }
+        // Validate via the aggregate first — free checks before the paid charge gate.
         Result<HomeSet.Change, HomeError> outcome = set.createAt(slot, at, limit, max, clock.instant());
         if (outcome.isErr()) {
             return reject(set, limit, outcome.errorOrThrow());
+        }
+        // Aggregate transition succeeded; apply the economy charge before committing to storage.
+        Result<Unit, HomeError> charged = charge.charge(owner, HomeChargeKind.CREATE);
+        if (charged.isErr()) {
+            notifier.send(owner, HomeError.CANNOT_AFFORD.messageKey());
+            return Result.err(HomeError.CANNOT_AFFORD);
         }
         return commit(outcome.orElseThrow());
     }

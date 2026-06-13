@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -45,7 +46,7 @@ class TeleportHomeSlotTest {
     void setUp() {
         repository = new FakeHomeRepository();
         teleporter = new CapturingTeleporter();
-        teleportHome = new TeleportHome(repository, teleporter, silentNotifier());
+        teleportHome = new TeleportHome(repository, teleporter, silentNotifier(), freeCharge());
     }
 
     @Test
@@ -70,6 +71,22 @@ class TeleportHomeSlotTest {
         Messages messages = (viewer, key, placeholders) -> key.key();
         MessageSink sink = (viewer, renderedText) -> {};
         return new HomeNotifier(messages, sink);
+    }
+
+    private static HomeCharge freeCharge() {
+        Permissions permissions = new Permissions() {
+            @Override
+            public boolean has(PlayerRef who, String node) {
+                return false;
+            }
+
+            @Override
+            public QuotaResult resolveQuota(
+                    PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+                return QuotaResult.limited(configDefault);
+            }
+        };
+        return new HomeCharge(permissions, Optional.empty(), HomeChargeSettings.allFree());
     }
 
     /** An in-memory {@link HomeRepository} keyed by slot for the single owner under test. */

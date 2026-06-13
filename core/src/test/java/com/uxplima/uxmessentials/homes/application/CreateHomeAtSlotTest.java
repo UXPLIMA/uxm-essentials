@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.homes.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -11,9 +12,11 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.homes.domain.HomeCost;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
@@ -98,9 +101,34 @@ class CreateHomeAtSlotTest {
         assertThat(notifier.lastKey).isEqualTo(HomesMessageKey.HOME_SLOT_OUT_OF_RANGE);
     }
 
+    @Test
+    void createWithUnaffordableChargeReturnsCannotAffordAndDoesNotSave() {
+        permissions.cap = 3;
+        HomeCost cost = HomeCost.of(new BigDecimal("50.00"));
+        HomeChargeSettings chargeSettings = new HomeChargeSettings(cost, cost, cost);
+        HomeEconomy cannotAfford = new AlwaysFailEconomy();
+        HomeCharge charge = new HomeCharge(permissions, Optional.of(cannotAfford), chargeSettings);
+
+        Result<Unit, HomeError> result = useCase(List.of(), charge).create(OWNER, HomeSlot.of(0), at(1, 2, 3));
+
+        assertThat(result.errorOrThrow()).isEqualTo(HomeError.CANNOT_AFFORD);
+        assertThat(repository.findSlot(OWNER, HomeSlot.of(0))).isEmpty();
+        assertThat(events.published).isEmpty();
+        assertThat(notifier.lastKey).isEqualTo(HomesMessageKey.HOME_CANNOT_AFFORD);
+    }
+
     private CreateHomeAtSlot useCase(List<SethomeGuard> guards) {
+        return useCase(guards, freeCharge());
+    }
+
+    private CreateHomeAtSlot useCase(List<SethomeGuard> guards, HomeCharge charge) {
         HomeQuota quota = new HomeQuota(permissions, 0);
-        return new CreateHomeAtSlot(repository, quota, guards, notifier.notifier(), events, UNLIMITED_MAX_SLOTS, CLOCK);
+        return new CreateHomeAtSlot(
+                repository, quota, guards, notifier.notifier(), events, charge, UNLIMITED_MAX_SLOTS, CLOCK);
+    }
+
+    private HomeCharge freeCharge() {
+        return new HomeCharge(permissions, Optional.empty(), HomeChargeSettings.allFree());
     }
 
     private static Position at(double x, double y, double z) {
@@ -173,6 +201,20 @@ class CreateHomeAtSlotTest {
             };
             MessageSink sink = (viewer, renderedText) -> {};
             return new HomeNotifier(messages, sink);
+        }
+    }
+
+    /** A {@link HomeEconomy} that always rejects withdrawals. */
+    private static final class AlwaysFailEconomy implements HomeEconomy {
+
+        @Override
+        public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
+            return false;
+        }
+
+        @Override
+        public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+            return false;
         }
     }
 }

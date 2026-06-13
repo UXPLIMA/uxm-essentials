@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -97,7 +98,23 @@ class RelocateHomeTest {
     }
 
     private RelocateHome useCase(List<SethomeGuard> guards) {
-        return new RelocateHome(repository, guards, notifier.notifier(), events, CLOCK);
+        HomeCharge charge = new HomeCharge(stubPermissions(), Optional.empty(), HomeChargeSettings.allFree());
+        return new RelocateHome(repository, guards, notifier.notifier(), events, charge, CLOCK);
+    }
+
+    private static Permissions stubPermissions() {
+        return new Permissions() {
+            @Override
+            public boolean has(PlayerRef who, String node) {
+                return false;
+            }
+
+            @Override
+            public QuotaResult resolveQuota(
+                    PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+                return QuotaResult.limited(configDefault);
+            }
+        };
     }
 
     private static Position at(double x, double y, double z) {

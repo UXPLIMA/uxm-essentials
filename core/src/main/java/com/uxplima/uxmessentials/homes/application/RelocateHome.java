@@ -20,7 +20,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * Re-anchor the home in a slot to the player's current position, keeping its label, icon, and creation
  * time. Every registered {@link SethomeGuard} runs first — the first failure short-circuits with its
  * {@link HomeError} without touching the aggregate. The aggregate then rejects an empty slot with
- * {@link HomeError#NOT_FOUND}; a successful relocate saves the row, publishes {@code HomeRelocated}, and
+ * {@link HomeError#NOT_FOUND}; once the aggregate transition succeeds, the optional economy charge is
+ * applied before committing — a successful relocate saves the row, publishes {@code HomeRelocated}, and
  * notifies {@link HomesMessageKey#HOME_RELOCATED}.
  */
 public final class RelocateHome {
@@ -29,6 +30,7 @@ public final class RelocateHome {
     private final List<SethomeGuard> guards;
     private final HomeNotifier notifier;
     private final DomainEventPublisher events;
+    private final HomeCharge charge;
     private final Clock clock;
 
     public RelocateHome(
@@ -36,15 +38,17 @@ public final class RelocateHome {
             List<SethomeGuard> guards,
             HomeNotifier notifier,
             DomainEventPublisher events,
+            HomeCharge charge,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.charge = Objects.requireNonNull(charge, "charge");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Relocate {@code owner}'s home in {@code slot} to {@code at}, or reject on a guard or empty slot. */
+    /** Relocate {@code owner}'s home in {@code slot} to {@code at}, or reject on a guard, empty slot, or insufficient balance. */
     public Result<Unit, HomeError> relocate(PlayerRef owner, HomeSlot slot, Position at) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(slot, "slot");
@@ -63,6 +67,12 @@ public final class RelocateHome {
             HomeError error = outcome.errorOrThrow();
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));
             return Result.err(error);
+        }
+        // Aggregate transition succeeded; apply the economy charge before committing to storage.
+        Result<Unit, HomeError> charged = charge.charge(owner, HomeChargeKind.RELOCATE);
+        if (charged.isErr()) {
+            notifier.send(owner, HomeError.CANNOT_AFFORD.messageKey());
+            return Result.err(HomeError.CANNOT_AFFORD);
         }
         HomeSet.Change change = outcome.orElseThrow();
         repository.save(change.home());
