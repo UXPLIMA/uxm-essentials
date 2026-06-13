@@ -8,7 +8,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.homes.domain.Home;
-import com.uxplima.uxmessentials.homes.domain.HomeName;
+import com.uxplima.uxmessentials.homes.domain.HomeLabel;
+import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXLocation;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXUserdata;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -38,15 +39,43 @@ public final class UserdataMapper {
     }
 
     private List<Home> mapHomes(PlayerRef owner, Map<String, EssXLocation> rawHomes) {
+        // Sort by name for deterministic slot assignment across JVM runs (Map.copyOf loses insertion order).
+        List<Map.Entry<String, EssXLocation>> sorted =
+                rawHomes.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList();
         List<Home> homes = new ArrayList<>();
-        for (Map.Entry<String, EssXLocation> entry : rawHomes.entrySet()) {
-            toHome(owner, entry.getKey(), entry.getValue()).ifPresent(homes::add);
+        int slot = 0;
+        for (Map.Entry<String, EssXLocation> entry : sorted) {
+            Optional<Home> mapped = toHome(owner, HomeSlot.of(slot), entry.getKey(), entry.getValue());
+            if (mapped.isPresent()) {
+                homes.add(mapped.get());
+                slot++;
+            }
         }
         return homes;
     }
 
-    private Optional<Home> toHome(PlayerRef owner, String rawName, EssXLocation location) {
-        return position(location).map(pos -> Home.create(owner, HomeName.of(rawName), pos, Instant.EPOCH));
+    private Optional<Home> toHome(PlayerRef owner, HomeSlot slot, String rawName, EssXLocation location) {
+        return position(location).map(pos -> {
+            Home base = Home.create(owner, slot, pos, Instant.EPOCH);
+            Optional<HomeLabel> label = labelOf(rawName);
+            return label.isEmpty() ? base : base.withLabel(label, Instant.EPOCH);
+        });
+    }
+
+    /**
+     * Converts a raw EssentialsX home name to a {@link HomeLabel}. Names that are blank after stripping
+     * are silently dropped (yields empty). Names longer than {@link HomeLabel#MAX_LENGTH} are truncated to
+     * that length rather than aborting the import.
+     */
+    private static Optional<HomeLabel> labelOf(String rawName) {
+        String trimmed = rawName.strip();
+        if (trimmed.isEmpty()) {
+            return Optional.empty();
+        }
+        if (trimmed.length() > HomeLabel.MAX_LENGTH) {
+            trimmed = trimmed.substring(0, HomeLabel.MAX_LENGTH);
+        }
+        return Optional.of(HomeLabel.of(trimmed));
     }
 
     private Optional<Position> position(EssXLocation location) {

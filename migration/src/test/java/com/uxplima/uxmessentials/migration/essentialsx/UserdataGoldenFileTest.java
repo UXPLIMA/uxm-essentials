@@ -12,6 +12,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.homes.domain.HomeLabel;
+import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.UserdataMapper;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
@@ -39,10 +41,14 @@ class UserdataGoldenFileTest {
 
         assertThat(result.owner().uuid()).isEqualTo(STEVE);
         assertThat(result.owner().name()).isEqualTo("steve");
+        // Homes are mapped in alphabetical name order for determinism: base→slot 0, farm→slot 1, mine→slot 2.
+        assertThat(result.homes()).hasSize(3);
         assertThat(result.homes())
-                .extracting(Home::name)
-                .extracting(name -> name.value())
-                .containsExactlyInAnyOrder("base", "mine", "farm");
+                .extracting(Home::slot)
+                .containsExactly(HomeSlot.of(0), HomeSlot.of(1), HomeSlot.of(2));
+        assertThat(result.homes())
+                .extracting(h -> h.label().map(HomeLabel::value).orElse(""))
+                .containsExactly("base", "farm", "mine");
         assertThat(result.balance()).contains(new BigDecimal("1500.00"));
         assertThat(result.mail()).hasSize(2);
     }
