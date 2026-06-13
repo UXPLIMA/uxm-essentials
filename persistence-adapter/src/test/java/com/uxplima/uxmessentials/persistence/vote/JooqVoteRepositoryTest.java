@@ -25,7 +25,8 @@ import org.junit.jupiter.api.io.TempDir;
  * End-to-end coverage of {@link JooqVoteRepository} against the embedded SQLite backend with the Flyway
  * baseline. Covers the atomic party-counter increment, offline-reward queue ordering and drain-once
  * semantics, and the V24 {@code vote_totals} table: totals round-trip, upsert idempotency, leaderboard
- * ordering and limit, empty-DB behaviour, and unknown-player defaults.
+ * ordering and limit, empty-DB behaviour, unknown-player defaults, and the V27 streak columns
+ * (current/best streak and streak day-key) round-tripping and upserting.
  */
 class JooqVoteRepositoryTest {
 
@@ -102,15 +103,15 @@ class JooqVoteRepositoryTest {
 
     @Test
     void saveTotalsRoundTrip() {
-        VoteTally tally = new VoteTally(42L, 3L, 7L, 12L, 19900L, 202401L, 24289L);
+        VoteTally tally = new VoteTally(42L, 3L, 7L, 12L, 19900L, 202401L, 24289L, 0L, 0L, 0L);
         repository.saveTotals(bob, tally);
         assertThat(repository.totalsOf(bob)).isEqualTo(tally);
     }
 
     @Test
     void saveTotalsUpsertsWithoutDuplicating() {
-        VoteTally first = new VoteTally(1L, 1L, 1L, 1L, 100L, 202401L, 24277L);
-        VoteTally second = new VoteTally(2L, 2L, 2L, 2L, 101L, 202401L, 24278L);
+        VoteTally first = new VoteTally(1L, 1L, 1L, 1L, 100L, 202401L, 24277L, 0L, 0L, 0L);
+        VoteTally second = new VoteTally(2L, 2L, 2L, 2L, 101L, 202401L, 24278L, 0L, 0L, 0L);
 
         repository.saveTotals(bob, first);
         repository.saveTotals(bob, second);
@@ -119,14 +120,54 @@ class JooqVoteRepositoryTest {
     }
 
     @Test
+    void saveTotalsRoundTripsStreakFields() {
+        VoteTally tally = new VoteTally(42L, 3L, 7L, 12L, 19900L, 202401L, 24289L, 5L, 9L, 20000L);
+
+        repository.saveTotals(bob, tally);
+
+        VoteTally read = repository.totalsOf(bob);
+        assertThat(read.currentStreak()).isEqualTo(5L);
+        assertThat(read.bestStreak()).isEqualTo(9L);
+        assertThat(read.streakDayKey()).isEqualTo(20000L);
+        assertThat(read).isEqualTo(tally);
+    }
+
+    @Test
+    void saveTotalsUpsertUpdatesStreakFields() {
+        VoteTally first = new VoteTally(10L, 1L, 1L, 1L, 100L, 202401L, 24277L, 3L, 3L, 19998L);
+        VoteTally second = new VoteTally(11L, 2L, 2L, 2L, 101L, 202401L, 24278L, 4L, 7L, 19999L);
+
+        repository.saveTotals(bob, first);
+        repository.saveTotals(bob, second);
+
+        VoteTally read = repository.totalsOf(bob);
+        assertThat(read.currentStreak()).isEqualTo(4L);
+        assertThat(read.bestStreak()).isEqualTo(7L);
+        assertThat(read.streakDayKey()).isEqualTo(19999L);
+        assertThat(read).isEqualTo(second);
+    }
+
+    @Test
+    void totalsOfUnknownPlayerHasZeroStreakFields() {
+        PlayerRef stranger = new PlayerRef(UUID.randomUUID(), "Stranger");
+
+        VoteTally read = repository.totalsOf(stranger);
+
+        assertThat(read).isEqualTo(VoteTally.empty());
+        assertThat(read.currentStreak()).isZero();
+        assertThat(read.bestStreak()).isZero();
+        assertThat(read.streakDayKey()).isZero();
+    }
+
+    @Test
     void topVotersReturnsPlayersOrderedByPeriodColumnDescending() {
         PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
         PlayerRef charlie = new PlayerRef(UUID.randomUUID(), "Charlie");
 
         // Monthly: alice=5, bob=3, charlie=10 — expected order: charlie, alice, bob.
-        repository.saveTotals(alice, new VoteTally(10L, 2L, 4L, 5L, 100L, 202401L, 24277L));
-        repository.saveTotals(bob, new VoteTally(5L, 1L, 2L, 3L, 100L, 202401L, 24277L));
-        repository.saveTotals(charlie, new VoteTally(15L, 4L, 8L, 10L, 100L, 202401L, 24277L));
+        repository.saveTotals(alice, new VoteTally(10L, 2L, 4L, 5L, 100L, 202401L, 24277L, 0L, 0L, 0L));
+        repository.saveTotals(bob, new VoteTally(5L, 1L, 2L, 3L, 100L, 202401L, 24277L, 0L, 0L, 0L));
+        repository.saveTotals(charlie, new VoteTally(15L, 4L, 8L, 10L, 100L, 202401L, 24277L, 0L, 0L, 0L));
 
         List<VoteRanking> top = repository.topVoters(VotePeriod.MONTHLY, 10);
 
@@ -138,9 +179,9 @@ class JooqVoteRepositoryTest {
         PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
         PlayerRef charlie = new PlayerRef(UUID.randomUUID(), "Charlie");
 
-        repository.saveTotals(alice, new VoteTally(10L, 2L, 4L, 5L, 100L, 202401L, 24277L));
-        repository.saveTotals(bob, new VoteTally(5L, 1L, 2L, 3L, 100L, 202401L, 24277L));
-        repository.saveTotals(charlie, new VoteTally(15L, 4L, 8L, 10L, 100L, 202401L, 24277L));
+        repository.saveTotals(alice, new VoteTally(10L, 2L, 4L, 5L, 100L, 202401L, 24277L, 0L, 0L, 0L));
+        repository.saveTotals(bob, new VoteTally(5L, 1L, 2L, 3L, 100L, 202401L, 24277L, 0L, 0L, 0L));
+        repository.saveTotals(charlie, new VoteTally(15L, 4L, 8L, 10L, 100L, 202401L, 24277L, 0L, 0L, 0L));
 
         List<VoteRanking> top = repository.topVoters(VotePeriod.MONTHLY, 2);
 
@@ -152,7 +193,7 @@ class JooqVoteRepositoryTest {
     @Test
     void topVotersExcludesZeroCountRows() {
         // A player whose alltime count is zero should not appear in the leaderboard.
-        repository.saveTotals(bob, new VoteTally(0L, 0L, 0L, 0L, 0L, 0L, 0L));
+        repository.saveTotals(bob, new VoteTally(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L));
 
         List<VoteRanking> top = repository.topVoters(VotePeriod.ALLTIME, 10);
 
@@ -168,8 +209,8 @@ class JooqVoteRepositoryTest {
     void topVotersAlltimePeriodOrdersByAlltimeColumn() {
         PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
 
-        repository.saveTotals(alice, new VoteTally(100L, 1L, 1L, 1L, 100L, 202401L, 24277L));
-        repository.saveTotals(bob, new VoteTally(200L, 1L, 1L, 1L, 100L, 202401L, 24277L));
+        repository.saveTotals(alice, new VoteTally(100L, 1L, 1L, 1L, 100L, 202401L, 24277L, 0L, 0L, 0L));
+        repository.saveTotals(bob, new VoteTally(200L, 1L, 1L, 1L, 100L, 202401L, 24277L, 0L, 0L, 0L));
 
         List<VoteRanking> top = repository.topVoters(VotePeriod.ALLTIME, 10);
 
@@ -279,7 +320,7 @@ class JooqVoteRepositoryTest {
 
     @Test
     void resetTotalsClearsPlayerTotals() {
-        VoteTally tally = new VoteTally(10L, 3L, 5L, 7L, 100L, 202401L, 24277L);
+        VoteTally tally = new VoteTally(10L, 3L, 5L, 7L, 100L, 202401L, 24277L, 0L, 0L, 0L);
         repository.saveTotals(bob, tally);
 
         repository.resetTotals(bob);
@@ -300,8 +341,8 @@ class JooqVoteRepositoryTest {
     @Test
     void resetTotalsDoesNotAffectOtherPlayers() {
         PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
-        VoteTally aliceTally = new VoteTally(5L, 1L, 2L, 3L, 100L, 202401L, 24277L);
-        VoteTally bobTally = new VoteTally(8L, 2L, 3L, 4L, 100L, 202401L, 24277L);
+        VoteTally aliceTally = new VoteTally(5L, 1L, 2L, 3L, 100L, 202401L, 24277L, 0L, 0L, 0L);
+        VoteTally bobTally = new VoteTally(8L, 2L, 3L, 4L, 100L, 202401L, 24277L, 0L, 0L, 0L);
 
         repository.saveTotals(alice, aliceTally);
         repository.saveTotals(bob, bobTally);

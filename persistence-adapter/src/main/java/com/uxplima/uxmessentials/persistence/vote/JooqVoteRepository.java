@@ -157,6 +157,9 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                 .set(VOTE_TOTALS.DAY_KEY, tally.dayKey())
                 .set(VOTE_TOTALS.WEEK_KEY, tally.weekKey())
                 .set(VOTE_TOTALS.MONTH_KEY, tally.monthKey())
+                .set(VOTE_TOTALS.CURRENT_STREAK, tally.currentStreak())
+                .set(VOTE_TOTALS.BEST_STREAK, tally.bestStreak())
+                .set(VOTE_TOTALS.STREAK_DAY_KEY, tally.streakDayKey())
                 .onConflict(VOTE_TOTALS.PLAYER)
                 .doUpdate()
                 .set(VOTE_TOTALS.ALLTIME, tally.alltime())
@@ -166,6 +169,9 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                 .set(VOTE_TOTALS.DAY_KEY, tally.dayKey())
                 .set(VOTE_TOTALS.WEEK_KEY, tally.weekKey())
                 .set(VOTE_TOTALS.MONTH_KEY, tally.monthKey())
+                .set(VOTE_TOTALS.CURRENT_STREAK, tally.currentStreak())
+                .set(VOTE_TOTALS.BEST_STREAK, tally.bestStreak())
+                .set(VOTE_TOTALS.STREAK_DAY_KEY, tally.streakDayKey())
                 .execute());
     }
 
@@ -354,7 +360,10 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                 row.getMonthly(),
                 row.getDayKey(),
                 row.getWeekKey(),
-                row.getMonthKey());
+                row.getMonthKey(),
+                row.getCurrentStreak(),
+                row.getBestStreak(),
+                row.getStreakDayKey());
     }
 
     private static void insertBatch(DSLContext dsl, QueuedReward reward) {
