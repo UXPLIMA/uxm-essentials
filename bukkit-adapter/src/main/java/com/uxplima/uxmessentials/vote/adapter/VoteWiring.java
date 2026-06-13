@@ -420,26 +420,30 @@ public final class VoteWiring {
             if (sound == null && particle == null) {
                 return;
             }
-            for (Player online : Bukkit.getOnlinePlayers()) {
-                Sound s = sound;
-                Particle p = particle;
-                kernel.scheduler()
-                        .onEntity(
-                                new com.uxplima.uxmessentials.shared.domain.PlayerRef(
-                                        online.getUniqueId(), online.getName()),
-                                () -> {
-                                    @Nullable Location loc = online.getLocation();
-                                    if (loc == null) {
-                                        return;
-                                    }
-                                    if (s != null) {
-                                        online.playSound(loc, s, 1.0f, 1.0f);
-                                    }
-                                    if (p != null) {
-                                        online.spawnParticle(p, loc, 30, 0.5, 0.5, 0.5, 0.1);
-                                    }
-                                });
-            }
+            // VotePartyTriggered is published off-tick from the vote handler, so enumerate the live online
+            // view on the global region thread before hopping per-recipient.
+            kernel.scheduler().onGlobal(() -> {
+                for (Player online : Bukkit.getOnlinePlayers()) {
+                    Sound s = sound;
+                    Particle p = particle;
+                    kernel.scheduler()
+                            .onEntity(
+                                    new com.uxplima.uxmessentials.shared.domain.PlayerRef(
+                                            online.getUniqueId(), online.getName()),
+                                    () -> {
+                                        @Nullable Location loc = online.getLocation();
+                                        if (loc == null) {
+                                            return;
+                                        }
+                                        if (s != null) {
+                                            online.playSound(loc, s, 1.0f, 1.0f);
+                                        }
+                                        if (p != null) {
+                                            online.spawnParticle(p, loc, 30, 0.5, 0.5, 0.5, 0.1);
+                                        }
+                                    });
+                }
+            });
         };
     }
 

@@ -79,10 +79,15 @@ public final class BukkitVoteBroadcaster implements VoteBroadcaster {
         }
         Map<String, String> safePlaceholders = Map.copyOf(placeholders);
         Set<BroadcastChannel> safeChannels = Set.copyOf(channels);
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
-            scheduler.onEntity(who, () -> deliverTo(who, key, safePlaceholders, safeChannels));
-        }
+        // Enumerate the live online view on the global region thread, then hop per-recipient — broadcast()
+        // is called off-tick from the vote handler, and Bukkit.getOnlinePlayers() is not safe to iterate
+        // off-thread. Mirrors BukkitRewardApplier.broadcast.
+        scheduler.onGlobal(() -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
+                scheduler.onEntity(who, () -> deliverTo(who, key, safePlaceholders, safeChannels));
+            }
+        });
     }
 
     private void deliverTo(
