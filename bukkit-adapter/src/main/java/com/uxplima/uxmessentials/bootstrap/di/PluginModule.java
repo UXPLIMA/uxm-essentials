@@ -57,6 +57,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitCooldownPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
@@ -610,7 +611,9 @@ public final class PluginModule {
         // self-registers behind a plugin-present guard on start and is dropped on disable, so the module runs
         // unchanged whether or not Votifier is installed. The repository and threshold are surfaced for the
         // PAPI vote placeholder seam registered after all contexts have wired.
-        VoteWiring.Wired wired = VoteWiring.wire(plugin, ctx, persistence);
+        InProcessDomainEventPublisher events =
+                (InProcessDomainEventPublisher) ctx.kernel().events();
+        VoteWiring.Wired wired = VoteWiring.wire(plugin, ctx, persistence, events);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

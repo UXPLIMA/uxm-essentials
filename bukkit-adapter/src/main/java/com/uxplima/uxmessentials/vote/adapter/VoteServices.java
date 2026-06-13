@@ -5,8 +5,13 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.ForceParty;
+import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
+import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
+import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
@@ -26,6 +31,11 @@ import org.jspecify.annotations.NullMarked;
  * @param votePartyStatus the {@code /voteparty} party-progress display
  * @param showVoteTotals the {@code /vote total [player]} per-player tally display
  * @param topVoters the {@code /vote top [period]} leaderboard display
+ * @param forceParty admin: fire the party immediately
+ * @param setPartyCount admin: set the counter to an exact value
+ * @param addPartyCount admin: add to the counter (fires if threshold reached)
+ * @param giveVote admin: inject synthetic votes for a player
+ * @param resetVoterTotals admin: clear a player's vote totals
  * @param playerLookup offline-capable profile resolution for target arguments and leaderboard names
  * @param scheduler the Folia-aware scheduler the listeners hop the work onto
  * @param messages MessageKey resolution for the command replies
@@ -38,6 +48,11 @@ public record VoteServices(
         VotePartyStatus votePartyStatus,
         ShowVoteTotals showVoteTotals,
         TopVoters topVoters,
+        ForceParty forceParty,
+        SetPartyCount setPartyCount,
+        AddPartyCount addPartyCount,
+        GiveVote giveVote,
+        ResetVoterTotals resetVoterTotals,
         PlayerLookup playerLookup,
         Scheduler scheduler,
         Messages messages) {
@@ -49,6 +64,11 @@ public record VoteServices(
         Objects.requireNonNull(votePartyStatus, "votePartyStatus");
         Objects.requireNonNull(showVoteTotals, "showVoteTotals");
         Objects.requireNonNull(topVoters, "topVoters");
+        Objects.requireNonNull(forceParty, "forceParty");
+        Objects.requireNonNull(setPartyCount, "setPartyCount");
+        Objects.requireNonNull(addPartyCount, "addPartyCount");
+        Objects.requireNonNull(giveVote, "giveVote");
+        Objects.requireNonNull(resetVoterTotals, "resetVoterTotals");
         Objects.requireNonNull(playerLookup, "playerLookup");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(messages, "messages");

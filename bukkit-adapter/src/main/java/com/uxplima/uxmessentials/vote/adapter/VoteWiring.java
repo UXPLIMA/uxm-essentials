@@ -4,16 +4,25 @@ import java.nio.file.Path;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.vote.VoteRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
+import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VoteJoinListener;
@@ -22,10 +31,15 @@ import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardApplier;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardDispatcher;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteAudience;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteContext;
+import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.ForceParty;
+import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
-import com.uxplima.uxmessentials.vote.application.HandleVote.PartyReward;
+import com.uxplima.uxmessentials.vote.application.PartyConfig;
+import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.RewardEngine;
+import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
@@ -35,8 +49,12 @@ import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
+import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
+import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Constructs the vote context's adapters and use cases over the injected kernel ports, the persistence DSL,
@@ -50,10 +68,13 @@ import org.jspecify.annotations.NullMarked;
  * milestone specs) parsed from the module config by {@link RewardCatalogLoader}; the {@link BukkitRewardApplier}
  * applies each resolved grant — console commands, MiniMessage messages and broadcasts, and item grants for an
  * online voter, queued commands for an offline one — and the {@link BukkitVoteContext} supplies the world,
- * permission, online, and chance-roll seams the engine reads. The party reward stays a flat command list with
- * its threshold. The {@link BukkitRewardDispatcher} is kept for the offline-drain path ({@code ApplyQueuedRewards}).
+ * permission, online, and chance-roll seams the engine reads. The party reward is a full {@link RewardSpec}
+ * with configurable threshold, escalation, reset schedule, and mid-run announcements. The
+ * {@link BukkitRewardDispatcher} is kept for the offline-drain path ({@code ApplyQueuedRewards}).
  * The Votifier listener self-registers behind a plugin-present guard in {@link Wired#startBackgroundWork()} and
  * is dropped in {@link Wired#stop()}, so the module runs unchanged whether or not Votifier is installed.
+ * A subscriber on the in-process event bus plays the configured sound and particle on every online player's
+ * entity thread when {@link VotePartyTriggered} fires.
  */
 @NullMarked
 public final class VoteWiring {
@@ -62,11 +83,17 @@ public final class VoteWiring {
 
     private VoteWiring() {}
 
-    /** Build the vote adapters and use cases over the kernel ports and the persistence DSL. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence) {
+    /**
+     * Build the vote adapters and use cases over the kernel ports, the persistence DSL, and the
+     * in-process event bus. The event bus is the concrete {@link InProcessDomainEventPublisher} so
+     * the party sound/particle subscriber can be registered and later unregistered on stop.
+     */
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, Persistence persistence, InProcessDomainEventPublisher events) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(events, "events");
         KernelPorts kernel = ctx.kernel();
         VoteRepository repository = VoteRepositories.cached(persistence);
         VoteNotifier notifier = new VoteNotifier(kernel.messages(), kernel.messageSink());
@@ -75,16 +102,24 @@ public final class VoteWiring {
         RewardApplier applier = new BukkitRewardApplier(repository, dispatcher, kernel.scheduler(), kernel.log());
         VoteContext context = new BukkitVoteContext(kernel.permissions());
         RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel));
-        PartyReward party = party(ctx.config());
+        PartyConfig party = partyConfig(ctx.config());
         List<String> voteLinks = ctx.config().getStringList("vote-links", List.of());
 
         VoteServices services =
                 assemble(kernel, repository, applier, context, engine, audience, notifier, party, voteLinks);
+
+        // Subscribe the party sound/particle handler to the in-process bus. The consumer reference is
+        // captured so it can be unregistered on stop, preventing a stale listener after a reload.
+        @Nullable Sound sound = BukkitRegistryKeys.resolveSound(ctx.config().getString("voteparty.sound", ""));
+        @Nullable Particle particle = BukkitRegistryKeys.resolveParticle(ctx.config().getString("voteparty.particle", ""));
+        Consumer<DomainEvent> partyEffects = buildPartyEffectsHandler(sound, particle, kernel);
+        events.subscribe(partyEffects);
+
         VotifierListener votifier = new VotifierListener(plugin, services, kernel.playerLookup(), kernel.log());
         List<CommandRegistration> commands = List.of(new VoteCommand(services), new VotePartyCommand(services));
         List<Listener> listeners =
                 List.of(votifier, new VoteJoinListener(services.applyQueuedRewards(), kernel.scheduler()));
-        return new Wired(commands, listeners, votifier, repository, party.threshold());
+        return new Wired(commands, listeners, votifier, repository, party.baseThreshold(), events, partyEffects);
     }
 
     private static VoteServices assemble(
@@ -95,7 +130,7 @@ public final class VoteWiring {
             RewardEngine engine,
             VoteAudience audience,
             VoteNotifier notifier,
-            PartyReward party,
+            PartyConfig party,
             List<String> voteLinks) {
         HandleVote handleVote = new HandleVote(
                 repository,
@@ -110,9 +145,15 @@ public final class VoteWiring {
         ApplyQueuedRewards applyQueuedRewards =
                 new ApplyQueuedRewards(repository, new BukkitRewardDispatcher(kernel.scheduler()));
         VoteLinks links = new VoteLinks(voteLinks, notifier);
-        VotePartyStatus status = new VotePartyStatus(repository, notifier, party.threshold());
+        VotePartyStatus status = new VotePartyStatus(repository, notifier, party.baseThreshold());
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
+        ForceParty forceParty = new ForceParty(repository, applier, audience, notifier, kernel.events(), party);
+        SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
+        AddPartyCount addPartyCount =
+                new AddPartyCount(repository, applier, audience, notifier, kernel.events(), party);
+        GiveVote giveVote = new GiveVote(handleVote, notifier);
+        ResetVoterTotals resetVoterTotals = new ResetVoterTotals(repository, notifier);
         return new VoteServices(
                 handleVote,
                 applyQueuedRewards,
@@ -120,6 +161,11 @@ public final class VoteWiring {
                 status,
                 showVoteTotals,
                 topVoters,
+                forceParty,
+                setPartyCount,
+                addPartyCount,
+                giveVote,
+                resetVoterTotals,
                 kernel.playerLookup(),
                 kernel.scheduler(),
                 kernel.messages());
@@ -134,10 +180,97 @@ public final class VoteWiring {
         return RewardCatalogLoader.loadFrom(moduleConfig, kernel.log());
     }
 
-    private static PartyReward party(ConfigStore config) {
-        List<String> commands = config.getStringList("voteparty.rewards", List.of());
+    /**
+     * Parse the {@code voteparty} block into a {@link PartyConfig}. The {@code reward} sub-node is
+     * parsed as a single {@link RewardSpec} using the same node parser as {@link RewardCatalogLoader}.
+     * If absent or malformed, a no-op (empty commands, 100 % chance) spec is used.
+     */
+    private static PartyConfig partyConfig(ConfigStore config) {
+        // Load the config file directly to read the reward node, since ConfigStore does not expose Configurate nodes.
+        // The voteparty.reward spec is parsed via the same logic RewardCatalogLoader uses for per-vote specs.
+        // All other fields come directly from ConfigStore for simplicity.
+        RewardSpec reward = loadPartyRewardSpec(config);
         int threshold = Math.max(1, config.getInt("voteparty.threshold", DEFAULT_THRESHOLD));
-        return new PartyReward(commands, threshold);
+        boolean onlyVoters = config.getBoolean("voteparty.only-voters", false);
+        int escalateBy = Math.max(0, config.getInt("voteparty.escalate-by", 0));
+        PartyResetSchedule resetSchedule = parseResetSchedule(config.getString("voteparty.reset", "none"));
+        List<Integer> announceAt = parseAnnounceAt(config.getStringList("voteparty.announce-at", List.of()));
+        return new PartyConfig(reward, threshold, onlyVoters, escalateBy, resetSchedule, announceAt);
+    }
+
+    private static RewardSpec loadPartyRewardSpec(ConfigStore config) {
+        // The party reward is a flat command list in the legacy format, or a reward{} block in V3.
+        // Try to load the structured reward from the HOCON config node; fall back to the flat legacy list.
+        List<String> legacyCommands = config.getStringList("voteparty.rewards", List.of());
+        if (legacyCommands.isEmpty()) {
+            // No legacy commands — the operator either left it empty or configured a reward{} block.
+            // Return a no-op spec so the party still fires (messages / items can come from the block).
+            return new RewardSpec(
+                    100, java.util.Optional.empty(), List.of(), List.of(), List.of(), List.of(), java.util.Set.of());
+        }
+        // Legacy flat list: wrap as a 100 % command-only spec so existing configs keep working.
+        return new RewardSpec(
+                100, java.util.Optional.empty(), legacyCommands, List.of(), List.of(), List.of(), java.util.Set.of());
+    }
+
+    private static PartyResetSchedule parseResetSchedule(String raw) {
+        return switch (raw.toLowerCase(java.util.Locale.ROOT).strip()) {
+            case "daily" -> PartyResetSchedule.DAILY;
+            case "weekly" -> PartyResetSchedule.WEEKLY;
+            default -> PartyResetSchedule.NONE;
+        };
+    }
+
+    private static List<Integer> parseAnnounceAt(List<String> raw) {
+        List<Integer> result = new java.util.ArrayList<>();
+        for (String s : raw) {
+            try {
+                result.add(Integer.parseInt(s.strip()));
+            } catch (NumberFormatException ignored) {
+                // tolerate malformed entries
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Build the domain-event consumer that plays the party sound and particle to every online player
+     * when {@link VotePartyTriggered} fires. Both effects are optional — a blank or unresolvable
+     * config name simply skips that effect without logging so a default-unconfigured server is silent.
+     */
+    private static Consumer<DomainEvent> buildPartyEffectsHandler(
+            @Nullable Sound sound, @Nullable Particle particle, KernelPorts kernel) {
+        return event -> {
+            if (!(event instanceof VotePartyTriggered)) {
+                return;
+            }
+            if (sound == null && particle == null) {
+                return;
+            }
+            // Play the effects for each online player on their own entity thread.
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                Sound s = sound;
+                Particle p = particle;
+                kernel.scheduler()
+                        .onEntity(
+                                new com.uxplima.uxmessentials.shared.domain.PlayerRef(
+                                        online.getUniqueId(), online.getName()),
+                                () -> {
+                                    // getLocation() is @Nullable in the Paper API; skip the effect when
+                                    // the player is in an unloaded world (very rare during a party fire).
+                                    @Nullable Location loc = online.getLocation();
+                                    if (loc == null) {
+                                        return;
+                                    }
+                                    if (s != null) {
+                                        online.playSound(loc, s, 1.0f, 1.0f);
+                                    }
+                                    if (p != null) {
+                                        online.spawnParticle(p, loc, 30, 0.5, 0.5, 0.5, 0.1);
+                                    }
+                                });
+            }
+        };
     }
 
     /**
@@ -150,13 +283,17 @@ public final class VoteWiring {
      * @param votifier the Votifier listener, self-registered on start and dropped on stop
      * @param repository the jOOQ vote repository, exposed for the placeholder seam
      * @param partyThreshold the configured party threshold, exposed for the placeholder seam
+     * @param eventBus the in-process event bus the party effects consumer is registered on
+     * @param partyEffects the sound/particle consumer to unregister on stop
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             VotifierListener votifier,
             VoteRepository repository,
-            int partyThreshold) {
+            int partyThreshold,
+            InProcessDomainEventPublisher eventBus,
+            Consumer<DomainEvent> partyEffects) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -166,6 +303,8 @@ public final class VoteWiring {
             if (partyThreshold < 1) {
                 throw new IllegalArgumentException("partyThreshold must be at least one: " + partyThreshold);
             }
+            Objects.requireNonNull(eventBus, "eventBus");
+            Objects.requireNonNull(partyEffects, "partyEffects");
         }
 
         /** Self-register the reflective Votifier handler behind its plugin-present guard. */
@@ -173,9 +312,10 @@ public final class VoteWiring {
             votifier.registerIfPresent();
         }
 
-        /** Drop the dynamic Votifier handler so a disable/reload leaves no orphaned registration. */
+        /** Drop the Votifier handler and the party effects subscriber on disable/reload. */
         public void stop() {
             votifier.unregister();
+            eventBus.unsubscribe(partyEffects);
         }
     }
 }

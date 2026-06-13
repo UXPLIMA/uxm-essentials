@@ -13,6 +13,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
@@ -37,10 +38,15 @@ import org.jspecify.annotations.Nullable;
  *       across all periods. Gated by {@code uxmessentials.vote.use}.
  *   <li>{@code top [daily|weekly|monthly|alltime]} — show the leaderboard for the given period
  *       (default {@code monthly}). Gated by {@code uxmessentials.vote.top}.
+ *   <li>{@code admin givevote <player> [amount]} — inject synthetic votes for a player (offline-capable),
+ *       gated by {@code uxmessentials.vote.admin}.
+ *   <li>{@code admin reset <player>} — reset all vote totals for a player (offline-capable),
+ *       gated by {@code uxmessentials.vote.admin}.
  * </ul>
  *
- * <p>A console source gets the players-only rejection. The {@code total} and {@code top} reads run
- * off the tick thread so repository I/O stays async.
+ * <p>A console source gets the players-only rejection for the base command; admin subcommands accept the
+ * console. The {@code total}, {@code top}, and admin reads run off the tick thread so repository I/O stays
+ * async.
  */
 @NullMarked
 public final class VoteCommand implements CommandRegistration {
@@ -48,6 +54,7 @@ public final class VoteCommand implements CommandRegistration {
     private static final String USE_PERMISSION = "uxmessentials.vote.use";
     private static final String TEST_PERMISSION = "uxmessentials.vote.testreward";
     private static final String TOP_PERMISSION = "uxmessentials.vote.top";
+    private static final String ADMIN_PERMISSION = "uxmessentials.vote.admin";
 
     private final VoteServices services;
     private final CommandFeedback feedback;
@@ -75,6 +82,16 @@ public final class VoteCommand implements CommandRegistration {
                         .then(Commands.literal("weekly").executes(ctx -> topPeriod(ctx, VotePeriod.WEEKLY)))
                         .then(Commands.literal("monthly").executes(ctx -> topPeriod(ctx, VotePeriod.MONTHLY)))
                         .then(Commands.literal("alltime").executes(ctx -> topPeriod(ctx, VotePeriod.ALLTIME))))
+                .then(Commands.literal("admin")
+                        .requires(src -> src.getSender().hasPermission(ADMIN_PERMISSION))
+                        .then(Commands.literal("givevote")
+                                .then(CommandSuggestions.playerArgument("player")
+                                        .executes(this::giveVoteDefault)
+                                        .then(Commands.argument("amount", IntegerArgumentType.integer(1))
+                                                .executes(this::giveVote))))
+                        .then(Commands.literal("reset")
+                                .then(CommandSuggestions.playerArgument("player")
+                                        .executes(this::resetTotals))))
                 .build();
     }
 
@@ -145,6 +162,43 @@ public final class VoteCommand implements CommandRegistration {
                 .findByUuid(uuid)
                 .map(PlayerRef::name)
                 .orElse(uuid.toString().toLowerCase(Locale.ROOT))));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int giveVoteDefault(CommandContext<CommandSourceStack> ctx) {
+        return giveVoteImpl(ctx, 1);
+    }
+
+    private int giveVote(CommandContext<CommandSourceStack> ctx) {
+        int amount = ctx.getArgument("amount", Integer.class);
+        return giveVoteImpl(ctx, amount);
+    }
+
+    private int giveVoteImpl(CommandContext<CommandSourceStack> ctx, int amount) {
+        CommandSender sender = ctx.getSource().getSender();
+        PlayerRef actor = CommandFeedback.refOf(sender);
+        String name = ctx.getArgument("player", String.class);
+        Optional<PlayerRef> target = services.playerLookup().findByName(name);
+        if (target.isEmpty()) {
+            feedback.send(sender, VoteMessageKey.VOTE_TOTAL_UNKNOWN, Map.of("player", name));
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef resolved = target.get();
+        services.scheduler().async(() -> services.giveVote().give(actor, resolved, amount));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int resetTotals(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        PlayerRef actor = CommandFeedback.refOf(sender);
+        String name = ctx.getArgument("player", String.class);
+        Optional<PlayerRef> target = services.playerLookup().findByName(name);
+        if (target.isEmpty()) {
+            feedback.send(sender, VoteMessageKey.VOTE_TOTAL_UNKNOWN, Map.of("player", name));
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef resolved = target.get();
+        services.scheduler().async(() -> services.resetVoterTotals().reset(actor, resolved));
         return Command.SINGLE_SUCCESS;
     }
 

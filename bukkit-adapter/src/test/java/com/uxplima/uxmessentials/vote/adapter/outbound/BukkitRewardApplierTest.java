@@ -214,6 +214,36 @@ class BukkitRewardApplierTest {
         public List<VoteRanking> topVoters(VotePeriod period, int limit) {
             return List.of();
         }
+
+        @Override
+        public void markPartyParticipant(PlayerRef player) {}
+
+        @Override
+        public java.util.Set<java.util.UUID> partyParticipants() {
+            return java.util.Set.of();
+        }
+
+        @Override
+        public void clearPartyParticipants() {}
+
+        @Override
+        public long partyPeriodKey() {
+            return 0L;
+        }
+
+        @Override
+        public void setPartyPeriodKey(long key) {}
+
+        @Override
+        public int thresholdOverride() {
+            return 0;
+        }
+
+        @Override
+        public void setThresholdOverride(int override) {}
+
+        @Override
+        public void resetTotals(PlayerRef player) {}
     }
 
     private static final class NoLog implements Logger {

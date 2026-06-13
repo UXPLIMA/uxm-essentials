@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.bukkit.plugin.Plugin;
@@ -27,10 +28,15 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
+import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.ForceParty;
+import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
-import com.uxplima.uxmessentials.vote.application.HandleVote.PartyReward;
+import com.uxplima.uxmessentials.vote.application.PartyConfig;
+import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.RewardEngine;
+import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
@@ -43,11 +49,13 @@ import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
+import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -204,6 +212,73 @@ class VoteCommandPathTest {
         assertThat(messages.resolvedNames).contains("Bob");
     }
 
+    @Test
+    void adminSubtreeExistsUnderVote() {
+        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()));
+        var root = command.build();
+        var adminNode = root.getChild("admin");
+        assertThat(adminNode).as("admin subcommand must exist under /vote").isNotNull();
+    }
+
+    @Test
+    void adminSubtreeRequiresVoteAdminPermission() {
+        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()));
+        var adminNode = command.build().getChild("admin");
+        assertThat(adminNode).isNotNull();
+
+        // A player without vote.admin must not reach the admin node.
+        PlayerMock noAdmin = server.addPlayer();
+        noAdmin.addAttachment(plugin, "uxmessentials.vote.use", true);
+        assertThat(adminNode.canUse(CommandSourceStackMock.from(noAdmin))).isFalse();
+
+        // A player with vote.admin may reach it.
+        PlayerMock admin = server.addPlayer();
+        admin.addAttachment(plugin, "uxmessentials.vote.admin", true);
+        assertThat(adminNode.canUse(CommandSourceStackMock.from(admin))).isTrue();
+    }
+
+    @Test
+    void voteAdminGiveVoteUnknownPlayerSendsUnknownKey() {
+        sender.addAttachment(plugin, "uxmessentials.vote.admin", true);
+        CommandDispatcher<CommandSourceStack> dispatcher = registerWithAdmin();
+
+        execute(dispatcher, "vote admin givevote NonExistentPlayer");
+
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_TOTAL_UNKNOWN.key());
+    }
+
+    @Test
+    void voteAdminResetUnknownPlayerSendsUnknownKey() {
+        sender.addAttachment(plugin, "uxmessentials.vote.admin", true);
+        CommandDispatcher<CommandSourceStack> dispatcher = registerWithAdmin();
+
+        execute(dispatcher, "vote admin reset NonExistentPlayer");
+
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_TOTAL_UNKNOWN.key());
+    }
+
+    @Test
+    void voteAdminGiveVoteCallsGiveVoteUseCase() {
+        sender.addAttachment(plugin, "uxmessentials.vote.admin", true);
+        CommandDispatcher<CommandSourceStack> dispatcher = registerWithAdmin();
+
+        execute(dispatcher, "vote admin givevote Bob 3");
+
+        // GiveVote calls HandleVote.handle 3 times; HandleVote calls incrementAndGetPartyCount once per vote.
+        assertThat(repository.incrementCalls).isEqualTo(3);
+    }
+
+    @Test
+    void voteAdminResetCallsResetTotals() {
+        sender.addAttachment(plugin, "uxmessentials.vote.admin", true);
+        CommandDispatcher<CommandSourceStack> dispatcher = registerWithAdmin();
+
+        execute(dispatcher, "vote admin reset Bob");
+
+        assertThat(repository.resetCalls).hasSize(1);
+        assertThat(repository.resetCalls.get(0).uuid()).isEqualTo(target.getUniqueId());
+    }
+
     // --- helpers ---
 
     private CommandDispatcher<CommandSourceStack> register(PlayerLookup lookup) {
@@ -211,6 +286,11 @@ class VoteCommandPathTest {
         CommandRegistration command = new VoteCommand(services(lookup));
         dispatcher.getRoot().addChild(command.build());
         return dispatcher;
+    }
+
+    private CommandDispatcher<CommandSourceStack> registerWithAdmin() {
+        // Use a lookup that can find Bob (online player)
+        return register(new ServerPlayerLookup());
     }
 
     private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {
@@ -223,21 +303,32 @@ class VoteCommandPathTest {
 
     private VoteServices services(PlayerLookup lookup) {
         VoteNotifier notifier = new VoteNotifier(messages, new NoSink());
+        RewardSpec noOpSpec =
+                new RewardSpec(100, Optional.empty(), List.of(), List.of(), List.of(), List.of(), Set.of());
+        PartyConfig party = new PartyConfig(noOpSpec, 25, false, 0, PartyResetSchedule.NONE, List.of());
+        NoOpVoteAudience audience = new NoOpVoteAudience();
+        NoOpRewardApplier applier = new NoOpRewardApplier();
+        NoEvents events = new NoEvents();
         HandleVote handleVote = new HandleVote(
                 repository,
                 new RewardEngine(RewardCatalog.empty()),
-                new NoOpRewardApplier(),
+                applier,
                 new NoOpVoteContext(),
-                new NoOpVoteAudience(),
+                audience,
                 notifier,
-                new NoEvents(),
-                new PartyReward(List.of(), 25),
+                events,
+                party,
                 ZoneId.of("UTC"));
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpRewardDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
         VotePartyStatus votePartyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
+        ForceParty forceParty = new ForceParty(repository, applier, audience, notifier, events, party);
+        SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
+        AddPartyCount addPartyCount = new AddPartyCount(repository, applier, audience, notifier, events, party);
+        GiveVote giveVote = new GiveVote(handleVote, notifier);
+        ResetVoterTotals resetVoterTotals = new ResetVoterTotals(repository, notifier);
         return new VoteServices(
                 handleVote,
                 applyQueuedRewards,
@@ -245,6 +336,11 @@ class VoteCommandPathTest {
                 votePartyStatus,
                 showVoteTotals,
                 topVoters,
+                forceParty,
+                setPartyCount,
+                addPartyCount,
+                giveVote,
+                resetVoterTotals,
                 lookup,
                 new SyncScheduler(),
                 messages);
@@ -275,7 +371,9 @@ class VoteCommandPathTest {
 
         final List<PlayerRef> totalsOfCalls = new ArrayList<>();
         final List<VotePeriod> topVotersCalls = new ArrayList<>();
+        final List<PlayerRef> resetCalls = new ArrayList<>();
         List<VoteRanking> topResult = List.of();
+        int incrementCalls = 0;
 
         @Override
         public int partyCount() {
@@ -287,6 +385,8 @@ class VoteCommandPathTest {
 
         @Override
         public int incrementAndGetPartyCount() {
+            incrementCalls++;
+            // Return a value well below threshold so the party never fires during tests.
             return 1;
         }
 
@@ -316,6 +416,38 @@ class VoteCommandPathTest {
         public List<VoteRanking> topVoters(VotePeriod period, int limit) {
             topVotersCalls.add(period);
             return topResult;
+        }
+
+        @Override
+        public void markPartyParticipant(PlayerRef player) {}
+
+        @Override
+        public Set<UUID> partyParticipants() {
+            return Set.of();
+        }
+
+        @Override
+        public void clearPartyParticipants() {}
+
+        @Override
+        public long partyPeriodKey() {
+            return 0L;
+        }
+
+        @Override
+        public void setPartyPeriodKey(long key) {}
+
+        @Override
+        public int thresholdOverride() {
+            return 0;
+        }
+
+        @Override
+        public void setThresholdOverride(int override) {}
+
+        @Override
+        public void resetTotals(PlayerRef player) {
+            resetCalls.add(player);
         }
     }
 

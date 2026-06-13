@@ -842,3 +842,9 @@ permissions:
   uxmessentials.vote.top:
     description: '/vote top [period] to see the vote leaderboard for the given period.'
     default: true
+  uxmessentials.vote.admin:
+    description: '/vote admin givevote <player> [amount] and /vote admin reset <player> — inject or clear votes for any player.'
+    default: op
+  uxmessentials.voteparty.admin:
+    description: '/voteparty force|set|add — force the party or adjust the party counter.'
+    default: op
