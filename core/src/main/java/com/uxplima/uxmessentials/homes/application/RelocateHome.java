@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -16,17 +17,19 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 /**
  * Re-anchor the home in a slot to the player's current position, keeping its label, icon, and creation
  * time. The aggregate rejects an empty slot with {@link HomeError#NOT_FOUND}; a successful relocate saves
- * the row and notifies {@link HomesMessageKey#HOME_RELOCATED}.
+ * the row, publishes {@code HomeRelocated}, and notifies {@link HomesMessageKey#HOME_RELOCATED}.
  */
 public final class RelocateHome {
 
     private final HomeRepository repository;
     private final HomeNotifier notifier;
+    private final DomainEventPublisher events;
     private final Clock clock;
 
-    public RelocateHome(HomeRepository repository, HomeNotifier notifier, Clock clock) {
+    public RelocateHome(HomeRepository repository, HomeNotifier notifier, DomainEventPublisher events, Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -42,7 +45,9 @@ public final class RelocateHome {
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));
             return Result.err(error);
         }
-        repository.save(outcome.orElseThrow().home());
+        HomeSet.Change change = outcome.orElseThrow();
+        repository.save(change.home());
+        change.event().ifPresent(events::publish);
         notifier.send(owner, HomesMessageKey.HOME_RELOCATED, slotPlaceholder(slot));
         return Result.ok();
     }
