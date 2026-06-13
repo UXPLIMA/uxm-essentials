@@ -63,6 +63,8 @@ import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.application.port.WorthOverrideStore;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.homes.adapter.outbound.ProviderHomeEconomy;
+import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
 import com.uxplima.uxmessentials.persistence.economy.LockingWalletRepository;
@@ -245,6 +247,7 @@ public final class EconomyWiring {
         List<CommandRegistration> commands = EconomyCommands.all(plugin, settings, services, kernel.messages());
         WarpEconomy warpEconomy = new ProviderWarpEconomy(resolved, currencies.defaultCurrency());
         KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency());
+        HomeEconomy homeEconomy = new ProviderHomeEconomy(resolved, currencies.defaultCurrency());
 
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
@@ -332,6 +335,7 @@ public final class EconomyWiring {
                 listeners,
                 warpEconomy,
                 kitEconomy,
+                homeEconomy,
                 ledger,
                 snapshots,
                 resolved,
@@ -550,13 +554,14 @@ public final class EconomyWiring {
     }
 
     /**
-     * Everything the economy module contributes once wired: the Brigadier commands, the {@code WarpEconomy}
-     * and {@code KitEconomy} bridges the warps and kits contexts charge through, and the lifecycle for the
-     * settle/telemetry/baltop loops and the {@code ServicesManager} registration.
+     * Everything the economy module contributes once wired: the Brigadier commands, the {@code WarpEconomy},
+     * {@code KitEconomy}, and {@code HomeEconomy} bridges the warps, kits, and homes contexts charge through,
+     * and the lifecycle for the settle/telemetry/baltop loops and the {@code ServicesManager} registration.
      *
      * @param commands the Brigadier command registrations to publish
      * @param warpEconomy the bridge warps charges a per-warp cost through
      * @param kitEconomy the bridge kits charges a per-kit cost through
+     * @param homeEconomy the bridge homes charges a per-action cost through
      * @param ledger the native-ledger persistence handle whose loops are armed/drained
      * @param snapshots the per-currency baltop snapshots whose refresh loop is armed/stopped
      * @param provider the resolved provider this plugin uses (registered or deferred)
@@ -570,6 +575,7 @@ public final class EconomyWiring {
             List<org.bukkit.event.Listener> listeners,
             WarpEconomy warpEconomy,
             KitEconomy kitEconomy,
+            HomeEconomy homeEconomy,
             WalletLedger ledger,
             BaltopSnapshots snapshots,
             EconomyProvider provider,
@@ -589,6 +595,7 @@ public final class EconomyWiring {
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(warpEconomy, "warpEconomy");
             Objects.requireNonNull(kitEconomy, "kitEconomy");
+            Objects.requireNonNull(homeEconomy, "homeEconomy");
             Objects.requireNonNull(ledger, "ledger");
             Objects.requireNonNull(snapshots, "snapshots");
             Objects.requireNonNull(provider, "provider");

@@ -29,6 +29,8 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
+import com.uxplima.uxmessentials.homes.application.HomeCharge;
+import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
@@ -614,9 +616,9 @@ class HomeActionViewTest {
                 notifier,
                 permissions,
                 scheduler,
-                new TeleportHome(repository, teleporter, notifier),
+                new TeleportHome(repository, teleporter, notifier, freeCharge()),
                 new DeleteHome(repository, notifier, events),
-                new RelocateHome(repository, List.of(), notifier, events, clock),
+                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
                 iconSelector,
                 new AnvilInput(plugin),
@@ -628,6 +630,11 @@ class HomeActionViewTest {
                 blockUnsafeRelocate,
                 destinationUnsafe,
                 claimService);
+    }
+
+    private HomeCharge freeCharge() {
+        // Tests here do not exercise economy charging — an empty provider and allFree settings skip the gate.
+        return new HomeCharge(new TogglePermissions(true), Optional.empty(), HomeChargeSettings.allFree());
     }
 
     /** A map-backed slot repository keyed by (owner, slot). */

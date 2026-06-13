@@ -150,6 +150,9 @@ permissions:
   uxmessentials.home.bypass.unsafe:
     description: 'Skip the unsafe-destination confirm when teleporting to a home via the GUI.'
     default: op
+  uxmessentials.home.bypass.cost:
+    description: 'Skip the per-action economy cost for home create, relocate, and teleport actions.'
+    default: op
   # warps context (docs/permissions.md "Warps"). The per-warp gate uxmessentials.warp.use.<warp>
   # (optional <world> cooldown tiers, and the operator-granted per-warp nodes) is an open value space
   # granted per warp and is intentionally not enumerated here; only the base nodes are declared.

@@ -31,6 +31,8 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
+import com.uxplima.uxmessentials.homes.application.HomeCharge;
+import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
@@ -237,15 +239,16 @@ class HomeListViewTest {
         Clock clock = Clock.system(ZoneOffset.UTC);
         Permissions permissions = new TogglePermissions(grantBypass);
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
-        CreateHomeAtSlot create = new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, 1000, clock);
+        CreateHomeAtSlot create =
+                new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, freeCharge(), 1000, clock);
         HomeActionView actionView = new HomeActionView(
                 messages,
                 notifier,
                 new AllowAllPermissions(),
                 scheduler,
-                new TeleportHome(repository, new RecordingTeleporter(), notifier),
+                new TeleportHome(repository, new RecordingTeleporter(), notifier, freeCharge()),
                 new DeleteHome(repository, notifier, events),
-                new RelocateHome(repository, List.of(), notifier, events, clock),
+                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
                 new IconSelectorView(
                         messages,
@@ -398,6 +401,10 @@ class HomeListViewTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+    }
+
+    private static HomeCharge freeCharge() {
+        return new HomeCharge(new AllowAllPermissions(), Optional.empty(), HomeChargeSettings.allFree());
     }
 
     private static final class AllowAllPermissions implements Permissions {

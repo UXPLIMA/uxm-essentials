@@ -1,11 +1,13 @@
 package com.uxplima.uxmessentials.homes.adapter;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import org.bukkit.event.Listener;
@@ -25,6 +27,8 @@ import com.uxplima.uxmessentials.homes.adapter.outbound.TeleportHomeAdapter;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
+import com.uxplima.uxmessentials.homes.application.HomeCharge;
+import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
@@ -33,9 +37,11 @@ import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.WorldBlacklistGuard;
+import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
+import com.uxplima.uxmessentials.homes.domain.HomeCost;
 import com.uxplima.uxmessentials.persistence.homes.CachedHomeRepository;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -76,7 +82,10 @@ public final class HomesWiring {
 
     private HomesWiring() {}
 
-    /** Build the homes adapters, use cases, and views from {@code ctx}, the persistence DSL, and the engine. */
+    /**
+     * Build the homes adapters, use cases, and views from {@code ctx}, the persistence DSL, and the engine,
+     * with no economy bridge (a configured home cost is recorded but not charged).
+     */
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
@@ -85,10 +94,29 @@ public final class HomesWiring {
             Bus bus,
             GuiLayouts guiLayouts,
             CloseableResources resources) {
+        return wire(plugin, ctx, persistence, teleportEngine, Optional.empty(), bus, guiLayouts, resources);
+    }
+
+    /**
+     * Build the homes context, charging a configured per-action cost through {@code homeEconomy} when
+     * present. The economy context lands before homes in the registry, so its {@link HomeEconomy} bridge is
+     * captured during economy wiring and handed in here; when it is empty (economy disabled or
+     * {@code economy.enabled = false} in homes config), a configured cost is recorded but not charged.
+     */
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            TeleportEngine teleportEngine,
+            Optional<HomeEconomy> homeEconomy,
+            Bus bus,
+            GuiLayouts guiLayouts,
+            CloseableResources resources) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(homeEconomy, "homeEconomy");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(resources, "resources");
@@ -99,7 +127,8 @@ public final class HomesWiring {
         HomeNotifier notifier = new HomeNotifier(kernel.messages(), kernel.messageSink());
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
-        HomeServices services = assemble(plugin, ctx, repository, notifier, quota, teleporter, guiLayouts, resources);
+        HomeServices services =
+                assemble(plugin, ctx, repository, notifier, quota, teleporter, homeEconomy, guiLayouts, resources);
         HomesJoinListener joinWarmer = new HomesJoinListener(repository, kernel.scheduler());
         return new Wired(HomeCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
     }
@@ -111,6 +140,7 @@ public final class HomesWiring {
             HomeNotifier notifier,
             HomeQuota quota,
             HomeTeleporter teleporter,
+            Optional<HomeEconomy> homeEconomy,
             GuiLayouts guiLayouts,
             CloseableResources resources) {
         KernelPorts kernel = ctx.kernel();
@@ -122,13 +152,14 @@ public final class HomesWiring {
         SafeLocationGuard safeGuard = buildSafeGuard(plugin, ctx);
         ClaimService claimService = buildClaimService(plugin, ctx, kernel);
         List<SethomeGuard> guards = buildGuards(ctx);
+        HomeCharge charge = buildCharge(ctx, kernel, homeEconomy);
         CreateHomeAtSlot createHome =
-                new CreateHomeAtSlot(repository, quota, guards, notifier, kernel.events(), unlimitedMax, clock);
-        RelocateHome relocateHome = new RelocateHome(repository, guards, notifier, kernel.events(), clock);
+                new CreateHomeAtSlot(repository, quota, guards, notifier, kernel.events(), charge, unlimitedMax, clock);
+        RelocateHome relocateHome = new RelocateHome(repository, guards, notifier, kernel.events(), charge, clock);
         RenameHome renameHome = new RenameHome(repository, notifier, kernel.events(), clock);
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);
         DeleteHome deleteHome = new DeleteHome(repository, notifier, kernel.events());
-        TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier);
+        TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier, charge);
         ListHomes listHomes = new ListHomes(repository);
 
         boolean confirmDelete = ctx.config().getBoolean("confirm-delete", true);
@@ -232,6 +263,25 @@ public final class HomesWiring {
         // read is illegal. The block-reading SafeLocationGuard is invoked by the views on the region thread.
         Set<String> disabledWorlds = new HashSet<>(ctx.config().getStringList("disabled-worlds", List.of()));
         return List.of(new WorldBlacklistGuard(disabledWorlds));
+    }
+
+    private static HomeCharge buildCharge(ModuleContext ctx, KernelPorts kernel, Optional<HomeEconomy> homeEconomy) {
+        boolean economyEnabled = ctx.config().getBoolean("economy.enabled", false);
+        if (!economyEnabled || homeEconomy.isEmpty()) {
+            // Economy disabled in config or no provider wired — all actions are free.
+            return new HomeCharge(kernel.permissions(), Optional.empty(), HomeChargeSettings.allFree());
+        }
+        String currency = ctx.config().getString("economy.currency", "default");
+        HomeCost createCost = toCost(ctx.config().getDouble("economy.create-cost", 0), currency);
+        HomeCost relocateCost = toCost(ctx.config().getDouble("economy.relocate-cost", 0), currency);
+        HomeCost teleportCost = toCost(ctx.config().getDouble("economy.teleport-cost", 0), currency);
+        HomeChargeSettings settings = new HomeChargeSettings(createCost, relocateCost, teleportCost);
+        return new HomeCharge(kernel.permissions(), homeEconomy, settings);
+    }
+
+    private static HomeCost toCost(double raw, String currency) {
+        BigDecimal amount = BigDecimal.valueOf(raw);
+        return amount.signum() > 0 ? HomeCost.of(amount, currency) : HomeCost.free();
     }
 
     /**

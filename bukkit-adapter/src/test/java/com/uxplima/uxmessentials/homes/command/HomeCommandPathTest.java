@@ -33,6 +33,8 @@ import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
+import com.uxplima.uxmessentials.homes.application.HomeCharge;
+import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
@@ -178,9 +180,9 @@ class HomeCommandPathTest {
                 notifier,
                 new AllowAllPermissions(),
                 scheduler,
-                new TeleportHome(repository, teleporter, notifier),
+                new TeleportHome(repository, teleporter, notifier, freeCharge()),
                 new DeleteHome(repository, notifier, events),
-                new RelocateHome(repository, List.of(), notifier, events, clock),
+                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
                 iconSelector,
                 new AnvilInput(plugin),
@@ -199,7 +201,7 @@ class HomeCommandPathTest {
                 scheduler,
                 new ListHomes(repository),
                 quota,
-                new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, 1000, clock),
+                new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, freeCharge(), 1000, clock),
                 new SafeLocationGuard(server, false, false, 5),
                 new AlwaysAllowClaimService(),
                 actionView,
@@ -318,6 +320,10 @@ class HomeCommandPathTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+    }
+
+    private static HomeCharge freeCharge() {
+        return new HomeCharge(new AllowAllPermissions(), Optional.empty(), HomeChargeSettings.allFree());
     }
 
     private static final class AllowAllPermissions implements Permissions {

@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.holograms.adapter.HologramsWiring;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
+import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
@@ -357,7 +358,8 @@ public final class PluginModule {
             GuiLayouts guiLayouts) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
-        HomesWiring.Wired wired = HomesWiring.wire(plugin, ctx, persistence, engine, bus, guiLayouts, resources);
+        HomesWiring.Wired wired = HomesWiring.wire(
+                plugin, ctx, persistence, engine, Optional.ofNullable(links.homeEconomy), bus, guiLayouts, resources);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
@@ -375,9 +377,10 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.start();
         resources.onClose(wired::stop);
-        // Captured for warps and kits, which land after economy and charge a recorded cost through it.
+        // Captured for warps, kits, and homes, which land after economy and charge a recorded cost through it.
         links.warpEconomy = wired.warpEconomy();
         links.kitEconomy = wired.kitEconomy();
+        links.homeEconomy = wired.homeEconomy();
         links.placeholders.economy(new ProviderEconomyPlaceholders(
                 wired.provider(), wired.defaultCurrency(), wired.amountFormat(), BalTop.MAX_PAGE_SIZE));
     }
@@ -617,6 +620,7 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable TeleportEngine teleportEngine;
         private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
+        private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
