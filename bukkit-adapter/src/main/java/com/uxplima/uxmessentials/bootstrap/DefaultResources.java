@@ -69,6 +69,7 @@ final class DefaultResources {
             "modules/homes/gui/home-list.conf",
             "modules/homes/gui/home-actions.conf",
             "modules/homes/gui/icon-selector.conf",
+            "modules/homes/gui/invites-menu.conf",
             "modules/itemworld/gui/disposal.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");

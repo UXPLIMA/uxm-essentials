@@ -23,6 +23,7 @@ class GuiLayoutDriftTest {
         assertRows("homes", "home-list", 3);
         assertRows("homes", "home-actions", 3);
         assertRows("homes", "icon-selector", 6);
+        assertRows("homes", "invites-menu", 6);
         assertRows("itemworld", "disposal", 6);
         assertRows("kits", "kits-manager", 6);
         assertRows("kits", "kits-settings", 3);
@@ -42,6 +43,7 @@ class GuiLayoutDriftTest {
             {"homes", "home-list"},
             {"homes", "home-actions"},
             {"homes", "icon-selector"},
+            {"homes", "invites-menu"},
             {"itemworld", "disposal"},
             {"kits", "kits-manager"},
             {"kits", "kits-settings"},

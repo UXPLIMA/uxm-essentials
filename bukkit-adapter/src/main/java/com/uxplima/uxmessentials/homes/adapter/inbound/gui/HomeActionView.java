@@ -18,7 +18,9 @@ import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
+import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
+import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -81,7 +83,10 @@ public final class HomeActionView {
     private final DeleteHome deleteHome;
     private final RelocateHome relocateHome;
     private final RenameHome renameHome;
+    private final SetHomeVisibility setHomeVisibility;
     private final IconSelectorView iconSelector;
+    private final InvitedPlayersMenu invitesMenu;
+    private final HomeRepository repository;
     private final AnvilInput anvil;
     private final HomeActionsLayout layout;
     private final DateTimeFormatter dateFormat;
@@ -102,7 +107,10 @@ public final class HomeActionView {
             DeleteHome deleteHome,
             RelocateHome relocateHome,
             RenameHome renameHome,
+            SetHomeVisibility setHomeVisibility,
             IconSelectorView iconSelector,
+            InvitedPlayersMenu invitesMenu,
+            HomeRepository repository,
             AnvilInput anvil,
             HomeActionsLayout layout,
             DateTimeFormatter dateFormat,
@@ -120,7 +128,10 @@ public final class HomeActionView {
         this.deleteHome = Objects.requireNonNull(deleteHome, "deleteHome");
         this.relocateHome = Objects.requireNonNull(relocateHome, "relocateHome");
         this.renameHome = Objects.requireNonNull(renameHome, "renameHome");
+        this.setHomeVisibility = Objects.requireNonNull(setHomeVisibility, "setHomeVisibility");
         this.iconSelector = Objects.requireNonNull(iconSelector, "iconSelector");
+        this.invitesMenu = Objects.requireNonNull(invitesMenu, "invitesMenu");
+        this.repository = Objects.requireNonNull(repository, "repository");
         this.anvil = Objects.requireNonNull(anvil, "anvil");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.dateFormat = Objects.requireNonNull(dateFormat, "dateFormat");
@@ -171,6 +182,12 @@ public final class HomeActionView {
                     layout.changeIconSlot(),
                     GuiItem.button(iconIcon(viewer), e -> changeIcon(player, viewer, home, reopenList)));
         }
+        gui.set(
+                layout.visibilitySlot(),
+                GuiItem.button(visibilityIcon(viewer, home), e -> toggleVisibility(player, viewer, home, reopenList)));
+        gui.set(
+                layout.invitesSlot(),
+                GuiItem.button(invitesIcon(viewer), e -> openInvites(player, viewer, home, reopenList)));
         gui.set(layout.backSlot(), GuiItem.button(backIcon(viewer), e -> reopenList.run()));
     }
 
@@ -295,6 +312,23 @@ public final class HomeActionView {
         iconSelector.open(player, viewer, home, () -> open(player, viewer, home, reopenList));
     }
 
+    /**
+     * Flip the home between public and private off-thread (the write hits SQLite), then re-read the home so the
+     * reopened action menu reflects the new visibility on its toggle button. Package-private so the flip-and-reopen
+     * decision can be unit-tested without driving a live inventory.
+     */
+    void toggleVisibility(Player player, PlayerRef viewer, Home home, Runnable reopenList) {
+        scheduler.async(() -> {
+            setHomeVisibility.setVisibility(home.owner(), home.slot(), !home.isPublic());
+            Home updated = repository.findSlot(home.owner(), home.slot()).orElse(home);
+            scheduler.onEntity(viewer, () -> open(player, viewer, updated, reopenList));
+        });
+    }
+
+    private void openInvites(Player player, PlayerRef viewer, Home home, Runnable reopenList) {
+        invitesMenu.open(player, viewer, home, () -> open(player, viewer, home, reopenList));
+    }
+
     private void rename(Player player, PlayerRef viewer, Home home, Runnable reopenList) {
         scheduler.onEntity(
                 viewer,
@@ -385,6 +419,27 @@ public final class HomeActionView {
                 layout.changeIconMaterial(),
                 HomesMessageKey.HOME_ACTION_ICON_NAME,
                 HomesMessageKey.HOME_ACTION_ICON_LORE);
+    }
+
+    private ItemStack visibilityIcon(PlayerRef viewer, Home home) {
+        boolean isPublic = home.isPublic();
+        MessageKey name = isPublic
+                ? HomesMessageKey.HOME_ACTION_VISIBILITY_PUBLIC_NAME
+                : HomesMessageKey.HOME_ACTION_VISIBILITY_PRIVATE_NAME;
+        MessageKey lore = isPublic
+                ? HomesMessageKey.HOME_ACTION_VISIBILITY_PUBLIC_LORE
+                : HomesMessageKey.HOME_ACTION_VISIBILITY_PRIVATE_LORE;
+        return ItemBuilder.of(isPublic ? layout.visibilityPublicMaterial() : layout.visibilityPrivateMaterial())
+                .name(text(viewer, name, Map.of()))
+                .lore(List.of(text(viewer, lore, Map.of())))
+                .build();
+    }
+
+    private ItemStack invitesIcon(PlayerRef viewer) {
+        return ItemBuilder.of(layout.invitesMaterial())
+                .name(text(viewer, HomesMessageKey.HOME_ACTION_INVITES_NAME, Map.of()))
+                .lore(List.of(text(viewer, HomesMessageKey.HOME_ACTION_INVITES_LORE, Map.of())))
+                .build();
     }
 
     private ItemStack backIcon(PlayerRef viewer) {

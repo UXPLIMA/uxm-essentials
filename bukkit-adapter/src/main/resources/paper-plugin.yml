@@ -153,6 +153,12 @@ permissions:
   uxmessentials.home.bypass.cost:
     description: 'Skip the per-action economy cost for home create, relocate, and teleport actions.'
     default: op
+  uxmessentials.home.visit:
+    description: '/visit to teleport to another player''s public home or one you were invited to.'
+    default: true
+  uxmessentials.home.invite:
+    description: '/invite and /uninvite to grant or revoke another player''s access to one of your homes.'
+    default: true
   # warps context (docs/permissions.md "Warps"). The per-warp gate uxmessentials.warp.use.<warp>
   # (optional <world> cooldown tiers, and the operator-granted per-warp nodes) is an open value space
   # granted per warp and is intentionally not enumerated here; only the base nodes are declared.

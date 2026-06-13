@@ -21,6 +21,8 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.listener.HomesJoinListener;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.adapter.outbound.TeleportHomeAdapter;
@@ -31,13 +33,19 @@ import com.uxplima.uxmessentials.homes.application.HomeCharge;
 import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
+import com.uxplima.uxmessentials.homes.application.InviteToHome;
+import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
+import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
+import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
+import com.uxplima.uxmessentials.homes.application.VisitHome;
 import com.uxplima.uxmessentials.homes.application.WorldBlacklistGuard;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
@@ -124,11 +132,12 @@ public final class HomesWiring {
         CachedHomeRepository cached = HomeRepositories.cachedConcrete(persistence);
         bus.registry().register(HomeSync.listener(cached));
         HomeRepository repository = HomeSync.repository(cached, bus.publisher());
+        HomeInviteRepository invites = HomeRepositories.homeInviteRepository(persistence);
         HomeNotifier notifier = new HomeNotifier(kernel.messages(), kernel.messageSink());
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
-        HomeServices services =
-                assemble(plugin, ctx, repository, notifier, quota, teleporter, homeEconomy, guiLayouts, resources);
+        HomeServices services = assemble(
+                plugin, ctx, repository, invites, notifier, quota, teleporter, homeEconomy, guiLayouts, resources);
         HomesJoinListener joinWarmer = new HomesJoinListener(repository, kernel.scheduler());
         return new Wired(
                 HomeCommands.all(services, kernel.messages(), kernel.scheduler()),
@@ -141,6 +150,7 @@ public final class HomesWiring {
             Plugin plugin,
             ModuleContext ctx,
             HomeRepository repository,
+            HomeInviteRepository invites,
             HomeNotifier notifier,
             HomeQuota quota,
             HomeTeleporter teleporter,
@@ -162,9 +172,14 @@ public final class HomesWiring {
         RelocateHome relocateHome = new RelocateHome(repository, guards, notifier, kernel.events(), charge, clock);
         RenameHome renameHome = new RenameHome(repository, notifier, kernel.events(), clock);
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);
-        DeleteHome deleteHome = new DeleteHome(repository, notifier, kernel.events());
+        SetHomeVisibility setHomeVisibility = new SetHomeVisibility(repository, notifier, kernel.events(), clock);
+        DeleteHome deleteHome = new DeleteHome(repository, invites, notifier, kernel.events());
         TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier, charge);
         ListHomes listHomes = new ListHomes(repository);
+        ListHomeInvites listHomeInvites = new ListHomeInvites(invites);
+        InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);
+        UninviteFromHome uninviteFromHome = new UninviteFromHome(invites, notifier);
+        VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier);
 
         boolean confirmDelete = ctx.config().getBoolean("confirm-delete", true);
         boolean confirmRelocate = ctx.config().getBoolean("confirm-relocate", false);
@@ -172,6 +187,16 @@ public final class HomesWiring {
 
         IconSelectorView iconSelector =
                 new IconSelectorView(kernel.messages(), kernel.scheduler(), setHomeIcon, iconLayout(guiLayouts));
+        InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
+                kernel.messages(),
+                kernel.scheduler(),
+                listHomeInvites,
+                inviteToHome,
+                uninviteFromHome,
+                kernel.playerLookup(),
+                notifier,
+                anvil,
+                invitesLayout(guiLayouts));
         HomeActionView actionView = new HomeActionView(
                 kernel.messages(),
                 notifier,
@@ -181,7 +206,10 @@ public final class HomesWiring {
                 deleteHome,
                 relocateHome,
                 renameHome,
+                setHomeVisibility,
                 iconSelector,
+                invitesMenu,
+                repository,
                 anvil,
                 actionsLayout(guiLayouts),
                 dateFormat,
@@ -205,8 +233,17 @@ public final class HomesWiring {
                 listLayout(guiLayouts),
                 unlimitedMax,
                 dateFormat);
-        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, kernel.events(), clock);
-        return new HomeServices(listView, actionView, iconSelector, homeAdmin, kernel.playerLookup(), repository);
+        HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, kernel.events(), clock);
+        return new HomeServices(
+                listView,
+                actionView,
+                iconSelector,
+                homeAdmin,
+                visitHome,
+                inviteToHome,
+                uninviteFromHome,
+                kernel.playerLookup(),
+                repository);
     }
 
     private static AnvilInput installAnvil(Plugin plugin, CloseableResources resources) {
@@ -226,6 +263,10 @@ public final class HomesWiring {
 
     private static IconSelectorLayout iconLayout(GuiLayouts guiLayouts) {
         return guiLayouts.loadIconSelector("homes", "icon-selector", IconSelectorLayout.codeDefault());
+    }
+
+    private static InvitesMenuLayout invitesLayout(GuiLayouts guiLayouts) {
+        return guiLayouts.loadInvitesMenu("homes", "invites-menu", InvitesMenuLayout.codeDefault());
     }
 
     private static int defaultLimit(ModuleContext ctx) {

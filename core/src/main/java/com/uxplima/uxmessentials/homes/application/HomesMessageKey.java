@@ -78,6 +78,25 @@ public enum HomesMessageKey implements MessageKey {
     HOME_ACTION_ICON_NAME("home.action.icon.name"),
     HOME_ACTION_ICON_LORE("home.action.icon.lore"),
     HOME_ACTION_BACK_NAME("home.action.back.name"),
+    HOME_ACTION_VISIBILITY_PUBLIC_NAME("home.action.visibility.public.name"),
+    HOME_ACTION_VISIBILITY_PUBLIC_LORE("home.action.visibility.public.lore"),
+    HOME_ACTION_VISIBILITY_PRIVATE_NAME("home.action.visibility.private.name"),
+    HOME_ACTION_VISIBILITY_PRIVATE_LORE("home.action.visibility.private.lore"),
+    HOME_ACTION_INVITES_NAME("home.action.invites.name"),
+    HOME_ACTION_INVITES_LORE("home.action.invites.lore"),
+
+    // invited-players menu
+    HOME_INVITES_TITLE("home.invites.title"),
+    HOME_INVITES_ENTRY_NAME("home.invites.entry.name"),
+    HOME_INVITES_ENTRY_LORE("home.invites.entry.lore"),
+    HOME_INVITES_EMPTY_NAME("home.invites.empty.name"),
+    HOME_INVITES_ADD_NAME("home.invites.add.name"),
+    HOME_INVITES_ADD_LORE("home.invites.add.lore"),
+    HOME_INVITES_ADD_PROMPT("home.invites.add.prompt"),
+    HOME_INVITES_UNKNOWN_PLAYER("home.invites.unknown-player"),
+    HOME_INVITES_BACK("home.invites.back"),
+    HOME_INVITES_PREV("home.invites.prev"),
+    HOME_INVITES_NEXT("home.invites.next"),
 
     // icon picker
     HOME_ICON_TITLE("home.icon.title"),

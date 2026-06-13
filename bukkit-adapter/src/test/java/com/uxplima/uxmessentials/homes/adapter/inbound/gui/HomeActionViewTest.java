@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -33,10 +34,15 @@ import com.uxplima.uxmessentials.homes.application.HomeCharge;
 import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
+import com.uxplima.uxmessentials.homes.application.InviteToHome;
+import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
+import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
+import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
@@ -51,6 +57,7 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -96,6 +103,7 @@ class HomeActionViewTest {
     private Plugin plugin;
     private PlayerMock player;
     private FakeHomeRepository repository;
+    private FakeHomeInviteRepository invites;
     private RecordingTeleporter teleporter;
     private RecordingSink sink;
     private TogglePermissions permissions;
@@ -112,6 +120,7 @@ class HomeActionViewTest {
         player = server.addPlayer("Alice");
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         repository = new FakeHomeRepository();
+        invites = new FakeHomeInviteRepository();
         teleporter = new RecordingTeleporter();
         sink = new RecordingSink();
         permissions = new TogglePermissions(true);
@@ -255,6 +264,66 @@ class HomeActionViewTest {
 
         Home cleared = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
         assertThat(cleared.icon()).isEmpty();
+    }
+
+    // --- visibility toggle decision seam ---
+
+    @Test
+    void visibilityToggleFlipsAPrivateHomePublic() {
+        Home home = seed(home(0)); // create() makes a private home
+        assertThat(home.isPublic()).isFalse();
+
+        view().toggleVisibility(player, viewer, home, () -> {});
+
+        Home flipped = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(flipped.isPublic()).isTrue();
+    }
+
+    @Test
+    void visibilityToggleFlipsAPublicHomePrivate() {
+        Home home = seed(home(0).withVisibility(true, Instant.EPOCH));
+        assertThat(home.isPublic()).isTrue();
+
+        view().toggleVisibility(player, viewer, home, () -> {});
+
+        Home flipped = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
+        assertThat(flipped.isPublic()).isFalse();
+    }
+
+    // --- invited-players menu decision seams ---
+
+    @Test
+    void invitesMenuAddInvitesTheResolvedPlayer() {
+        Home home = seed(home(0));
+        PlayerMock bob = server.addPlayer("Bob");
+        InvitedPlayersMenu menu = invitesMenu();
+
+        menu.handleAddInput(player, viewer, home, () -> {}, "Bob");
+
+        assertThat(invites.invites(viewer, HomeSlot.of(0))).contains(bob.getUniqueId());
+    }
+
+    @Test
+    void invitesMenuAddWithUnknownNameInvitesNobody() {
+        Home home = seed(home(0));
+        InvitedPlayersMenu menu = invitesMenu();
+
+        menu.handleAddInput(player, viewer, home, () -> {}, "Nobody");
+
+        assertThat(invites.invites(viewer, HomeSlot.of(0))).isEmpty();
+        assertThat(sink.delivered).contains(HomesMessageKey.HOME_INVITES_UNKNOWN_PLAYER.key());
+    }
+
+    @Test
+    void invitesMenuRevokeRemovesTheInvite() {
+        Home home = seed(home(0));
+        PlayerMock bob = server.addPlayer("Bob");
+        invites.addInvite(viewer, HomeSlot.of(0), bob.getUniqueId());
+        InvitedPlayersMenu menu = invitesMenu();
+
+        menu.revoke(player, viewer, home, bob.getUniqueId(), "Bob", () -> {});
+
+        assertThat(invites.invites(viewer, HomeSlot.of(0))).doesNotContain(bob.getUniqueId());
     }
 
     // --- confirm-delete decision seam ---
@@ -578,6 +647,23 @@ class HomeActionViewTest {
         return viewWith(false, false, false, false, pos -> false);
     }
 
+    /** Build a standalone invited-players menu over the fakes for the add/revoke decision seams. */
+    private InvitedPlayersMenu invitesMenu() {
+        Messages messages = new KeyMessages();
+        HomeNotifier notifier = new HomeNotifier(messages, sink);
+        Scheduler sync = new SyncScheduler();
+        return new InvitedPlayersMenu(
+                messages,
+                sync,
+                new ListHomeInvites(invites),
+                new InviteToHome(repository, invites, notifier),
+                new UninviteFromHome(invites, notifier),
+                new ServerPlayerLookup(),
+                notifier,
+                new AnvilInput(plugin),
+                InvitesMenuLayout.codeDefault());
+    }
+
     private HomeActionView viewWith(
             boolean confirmDelete,
             boolean confirmRelocate,
@@ -611,16 +697,29 @@ class HomeActionViewTest {
                 scheduler,
                 new SetHomeIcon(repository, notifier, events, clock),
                 IconSelectorLayout.codeDefault());
+        InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
+                messages,
+                scheduler,
+                new ListHomeInvites(invites),
+                new InviteToHome(repository, invites, notifier),
+                new UninviteFromHome(invites, notifier),
+                new ServerPlayerLookup(),
+                notifier,
+                new AnvilInput(plugin),
+                InvitesMenuLayout.codeDefault());
         return new HomeActionView(
                 messages,
                 notifier,
                 permissions,
                 scheduler,
                 new TeleportHome(repository, teleporter, notifier, freeCharge()),
-                new DeleteHome(repository, notifier, events),
+                new DeleteHome(repository, invites, notifier, events),
                 new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
+                new SetHomeVisibility(repository, notifier, events, clock),
                 iconSelector,
+                invitesMenu,
+                repository,
                 new AnvilInput(plugin),
                 HomeActionsLayout.codeDefault(),
                 fmt,
@@ -677,6 +776,66 @@ class HomeActionViewTest {
 
         private Map<Integer, Home> owned(PlayerRef owner) {
             return byOwner.computeIfAbsent(owner.uuid(), u -> new java.util.TreeMap<>());
+        }
+    }
+
+    /** A map-backed invite repository keyed by (owner, slot). */
+    private static final class FakeHomeInviteRepository implements HomeInviteRepository {
+        private final Map<String, Set<UUID>> bySlot = new ConcurrentHashMap<>();
+
+        private static String key(PlayerRef owner, HomeSlot slot) {
+            return owner.uuid() + ":" + slot.index();
+        }
+
+        @Override
+        public Set<UUID> invites(PlayerRef owner, HomeSlot slot) {
+            return Set.copyOf(bySlot.getOrDefault(key(owner, slot), Set.of()));
+        }
+
+        @Override
+        public void addInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            bySlot.computeIfAbsent(key(owner, slot), k -> ConcurrentHashMap.newKeySet())
+                    .add(invited);
+        }
+
+        @Override
+        public void removeInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            bySlot.computeIfAbsent(key(owner, slot), k -> ConcurrentHashMap.newKeySet())
+                    .remove(invited);
+        }
+
+        @Override
+        public void removeAll(PlayerRef owner, HomeSlot slot) {
+            bySlot.remove(key(owner, slot));
+        }
+
+        @Override
+        public void removeAllForOwner(PlayerRef owner) {
+            bySlot.keySet().removeIf(k -> k.startsWith(owner.uuid() + ":"));
+        }
+    }
+
+    /** Resolves players by name/uuid through the live mock server (online and offline-via-played). */
+    private final class ServerPlayerLookup implements PlayerLookup {
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.ofNullable(server.getPlayerExact(name))
+                    .map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
+        }
+
+        @Override
+        public Optional<PlayerRef> findByName(String name) {
+            return findOnlineByName(name);
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return Optional.ofNullable(server.getPlayer(uuid)).map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return server.getPlayer(uuid) != null;
         }
     }
 

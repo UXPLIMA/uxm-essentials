@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,6 +29,8 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
@@ -36,11 +39,16 @@ import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
+import com.uxplima.uxmessentials.homes.application.InviteToHome;
+import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
+import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
+import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
@@ -53,6 +61,7 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -241,20 +250,34 @@ class HomeListViewTest {
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
         CreateHomeAtSlot create =
                 new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, freeCharge(), 1000, clock);
+        HomeInviteRepository invites = new FakeHomeInviteRepository();
+        InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
+                messages,
+                scheduler,
+                new ListHomeInvites(invites),
+                new InviteToHome(repository, invites, notifier),
+                new UninviteFromHome(invites, notifier),
+                new NoPlayerLookup(),
+                notifier,
+                new AnvilInput(plugin),
+                InvitesMenuLayout.codeDefault());
         HomeActionView actionView = new HomeActionView(
                 messages,
                 notifier,
                 new AllowAllPermissions(),
                 scheduler,
                 new TeleportHome(repository, new RecordingTeleporter(), notifier, freeCharge()),
-                new DeleteHome(repository, notifier, events),
+                new DeleteHome(repository, invites, notifier, events),
                 new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
+                new SetHomeVisibility(repository, notifier, events, clock),
                 new IconSelectorView(
                         messages,
                         scheduler,
                         new SetHomeIcon(repository, notifier, events, clock),
                         IconSelectorLayout.codeDefault()),
+                invitesMenu,
+                repository,
                 new AnvilInput(plugin),
                 HomeActionsLayout.codeDefault(),
                 DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC),
@@ -296,6 +319,60 @@ class HomeListViewTest {
         @Override
         public ClaimDecision canAccess(PlayerRef who, Position at) {
             return ClaimDecision.ALLOWED;
+        }
+    }
+
+    /** A map-backed invite repository keyed by (owner, slot); the list view never reads it, kept for wiring. */
+    private static final class FakeHomeInviteRepository implements HomeInviteRepository {
+        private final Map<String, Set<UUID>> bySlot = new ConcurrentHashMap<>();
+
+        private static String key(PlayerRef owner, HomeSlot slot) {
+            return owner.uuid() + ":" + slot.index();
+        }
+
+        @Override
+        public Set<UUID> invites(PlayerRef owner, HomeSlot slot) {
+            return Set.copyOf(bySlot.getOrDefault(key(owner, slot), Set.of()));
+        }
+
+        @Override
+        public void addInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            bySlot.computeIfAbsent(key(owner, slot), k -> ConcurrentHashMap.newKeySet())
+                    .add(invited);
+        }
+
+        @Override
+        public void removeInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            bySlot.computeIfAbsent(key(owner, slot), k -> ConcurrentHashMap.newKeySet())
+                    .remove(invited);
+        }
+
+        @Override
+        public void removeAll(PlayerRef owner, HomeSlot slot) {
+            bySlot.remove(key(owner, slot));
+        }
+
+        @Override
+        public void removeAllForOwner(PlayerRef owner) {
+            bySlot.keySet().removeIf(k -> k.startsWith(owner.uuid() + ":"));
+        }
+    }
+
+    /** A {@link PlayerLookup} that resolves nobody; the list view never opens the invited-players menu. */
+    private static final class NoPlayerLookup implements PlayerLookup {
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
         }
     }
 

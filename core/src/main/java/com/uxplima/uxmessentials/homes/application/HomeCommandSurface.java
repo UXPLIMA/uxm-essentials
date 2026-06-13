@@ -25,7 +25,16 @@ final class HomeCommandSurface {
                 spec(
                         "homeadmin",
                         "uxmessentials.home.admin",
-                        HomeCommand.of("homeadmin", "Manage another player's homes")));
+                        HomeCommand.of("homeadmin", "Manage another player's homes")),
+                spec("visit", "uxmessentials.home.visit", HomeCommand.of("visit", "Visit another player's home")),
+                spec(
+                        "invite",
+                        "uxmessentials.home.invite",
+                        HomeCommand.of("invite", "Invite a player to one of your homes")),
+                spec(
+                        "uninvite",
+                        "uxmessentials.home.invite",
+                        HomeCommand.of("uninvite", "Revoke a player's invite to one of your homes")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

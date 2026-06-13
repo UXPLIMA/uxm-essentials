@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,12 +24,17 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeAdminCommand;
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommand;
+import com.uxplima.uxmessentials.homes.adapter.inbound.command.InviteCommand;
+import com.uxplima.uxmessentials.homes.adapter.inbound.command.UninviteCommand;
+import com.uxplima.uxmessentials.homes.adapter.inbound.command.VisitCommand;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
@@ -37,11 +43,17 @@ import com.uxplima.uxmessentials.homes.application.HomeCharge;
 import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
+import com.uxplima.uxmessentials.homes.application.InviteToHome;
+import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
+import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
+import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
+import com.uxplima.uxmessentials.homes.application.VisitHome;
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
@@ -86,6 +98,7 @@ class HomeCommandPathTest {
     private PlayerMock player;
     private PlayerMock target;
     private FakeHomeRepository repository;
+    private FakeHomeInviteRepository invites;
     private RecordingTeleporter teleporter;
     private HomeServices services;
 
@@ -97,6 +110,7 @@ class HomeCommandPathTest {
         player.setOp(true);
         target = server.addPlayer("Bob");
         repository = new FakeHomeRepository();
+        invites = new FakeHomeInviteRepository();
         teleporter = new RecordingTeleporter();
         services = services();
         Guis.install(plugin);
@@ -194,6 +208,65 @@ class HomeCommandPathTest {
         assertThat(repository.findSlot(targetRef(), HomeSlot.of(0))).isEmpty();
     }
 
+    @Test
+    void visitTeleportsToAPublicHomeOfTheTarget() {
+        // Bob's slot 0 home is public, so Alice may visit it.
+        repository.put(home(targetRef(), 0).withVisibility(true, Instant.EPOCH));
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "visit Bob"); // default slot 0
+
+        assertThat(teleporter.hops).isEqualTo(1);
+    }
+
+    @Test
+    void visitWithExplicitSlotResolvesTheZeroBasedSlot() {
+        repository.put(home(targetRef(), 1).withVisibility(true, Instant.EPOCH));
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "visit Bob 2"); // 1-based display 2 maps to slot index 1
+
+        assertThat(teleporter.hops).isEqualTo(1);
+    }
+
+    @Test
+    void visitResolvesAnOfflineOwner() {
+        // Bob resolves only via findByName (offline), and his public home is reachable.
+        FakeOfflinePlayerLookup offlineLookup = new FakeOfflinePlayerLookup(targetRef());
+        services = servicesWithLookup(offlineLookup);
+        repository.put(home(targetRef(), 0).withVisibility(true, Instant.EPOCH));
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "visit Bob");
+
+        assertThat(teleporter.hops).isEqualTo(1);
+    }
+
+    @Test
+    void inviteAddsTheTargetToTheSendersInviteList() {
+        repository.put(home(senderRef(), 0));
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "invite Bob"); // default slot 0
+
+        assertThat(invites.invites(senderRef(), HomeSlot.of(0))).contains(target.getUniqueId());
+    }
+
+    @Test
+    void uninviteRemovesTheTargetFromTheSendersInviteList() {
+        repository.put(home(senderRef(), 0));
+        invites.addInvite(senderRef(), HomeSlot.of(0), target.getUniqueId());
+        CommandDispatcher<CommandSourceStack> dispatcher = register();
+
+        execute(dispatcher, "uninvite Bob");
+
+        assertThat(invites.invites(senderRef(), HomeSlot.of(0))).doesNotContain(target.getUniqueId());
+    }
+
+    private PlayerRef senderRef() {
+        return new PlayerRef(player.getUniqueId(), player.getName());
+    }
+
     private PlayerRef targetRef() {
         return new PlayerRef(target.getUniqueId(), target.getName());
     }
@@ -203,6 +276,9 @@ class HomeCommandPathTest {
         Messages messages = new KeyMessages();
         dispatcher.getRoot().addChild(new HomeCommand(services, messages).build());
         dispatcher.getRoot().addChild(new HomeAdminCommand(services, messages, new SyncScheduler()).build());
+        dispatcher.getRoot().addChild(new VisitCommand(services, messages, new SyncScheduler()).build());
+        dispatcher.getRoot().addChild(new InviteCommand(services, messages, new SyncScheduler()).build());
+        dispatcher.getRoot().addChild(new UninviteCommand(services, messages, new SyncScheduler()).build());
         return dispatcher;
     }
 
@@ -219,53 +295,7 @@ class HomeCommandPathTest {
     }
 
     private HomeServices services() {
-        Messages messages = new KeyMessages();
-        HomeNotifier notifier = new HomeNotifier(messages, new NoSink());
-        DomainEventPublisher events = new NoEvents();
-        Clock clock = Clock.system(ZoneOffset.UTC);
-        HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
-        Scheduler scheduler = new SyncScheduler();
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
-        IconSelectorView iconSelector = new IconSelectorView(
-                messages,
-                scheduler,
-                new SetHomeIcon(repository, notifier, events, clock),
-                IconSelectorLayout.codeDefault());
-        HomeActionView actionView = new HomeActionView(
-                messages,
-                notifier,
-                new AllowAllPermissions(),
-                scheduler,
-                new TeleportHome(repository, teleporter, notifier, freeCharge()),
-                new DeleteHome(repository, notifier, events),
-                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
-                new RenameHome(repository, notifier, events, clock),
-                iconSelector,
-                new AnvilInput(plugin),
-                HomeActionsLayout.codeDefault(),
-                fmt,
-                false,
-                false,
-                false,
-                false,
-                pos -> false,
-                new AlwaysAllowClaimService());
-        HomeListView listView = new HomeListView(
-                messages,
-                notifier,
-                new AllowAllPermissions(),
-                scheduler,
-                new ListHomes(repository),
-                quota,
-                new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, freeCharge(), 1000, clock),
-                new SafeLocationGuard(server, false, false, 5),
-                new AlwaysAllowClaimService(),
-                actionView,
-                HomeListLayout.codeDefault(),
-                1000,
-                fmt);
-        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, events, clock);
-        return new HomeServices(listView, actionView, iconSelector, homeAdmin, new ServerPlayerLookup(), repository);
+        return servicesWithLookup(new ServerPlayerLookup());
     }
 
     /** A map-backed slot repository keyed by (owner, slot). */
@@ -308,6 +338,42 @@ class HomeCommandPathTest {
 
         private Map<Integer, Home> owned(PlayerRef owner) {
             return byOwner.computeIfAbsent(owner.uuid(), u -> new java.util.TreeMap<>());
+        }
+    }
+
+    /** A map-backed invite repository keyed by (owner, slot). */
+    private static final class FakeHomeInviteRepository implements HomeInviteRepository {
+        private final Map<String, Set<UUID>> bySlot = new ConcurrentHashMap<>();
+
+        private static String key(PlayerRef owner, HomeSlot slot) {
+            return owner.uuid() + ":" + slot.index();
+        }
+
+        @Override
+        public Set<UUID> invites(PlayerRef owner, HomeSlot slot) {
+            return Set.copyOf(bySlot.getOrDefault(key(owner, slot), Set.of()));
+        }
+
+        @Override
+        public void addInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            bySlot.computeIfAbsent(key(owner, slot), k -> ConcurrentHashMap.newKeySet())
+                    .add(invited);
+        }
+
+        @Override
+        public void removeInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            bySlot.computeIfAbsent(key(owner, slot), k -> ConcurrentHashMap.newKeySet())
+                    .remove(invited);
+        }
+
+        @Override
+        public void removeAll(PlayerRef owner, HomeSlot slot) {
+            bySlot.remove(key(owner, slot));
+        }
+
+        @Override
+        public void removeAllForOwner(PlayerRef owner) {
+            bySlot.keySet().removeIf(k -> k.startsWith(owner.uuid() + ":"));
         }
     }
 
@@ -391,21 +457,37 @@ class HomeCommandPathTest {
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
         Scheduler scheduler = new SyncScheduler();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);
+        UninviteFromHome uninviteFromHome = new UninviteFromHome(invites, notifier);
+        VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier);
         IconSelectorView iconSelector = new IconSelectorView(
                 messages,
                 scheduler,
                 new SetHomeIcon(repository, notifier, events, clock),
                 IconSelectorLayout.codeDefault());
+        InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
+                messages,
+                scheduler,
+                new ListHomeInvites(invites),
+                inviteToHome,
+                uninviteFromHome,
+                lookup,
+                notifier,
+                new AnvilInput(plugin),
+                InvitesMenuLayout.codeDefault());
         HomeActionView actionView = new HomeActionView(
                 messages,
                 notifier,
                 new AllowAllPermissions(),
                 scheduler,
                 new TeleportHome(repository, teleporter, notifier, freeCharge()),
-                new DeleteHome(repository, notifier, events),
+                new DeleteHome(repository, invites, notifier, events),
                 new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
+                new SetHomeVisibility(repository, notifier, events, clock),
                 iconSelector,
+                invitesMenu,
+                repository,
                 new AnvilInput(plugin),
                 HomeActionsLayout.codeDefault(),
                 fmt,
@@ -429,8 +511,17 @@ class HomeCommandPathTest {
                 HomeListLayout.codeDefault(),
                 1000,
                 fmt);
-        HomeAdmin homeAdmin = new HomeAdmin(repository, teleporter, notifier, events, clock);
-        return new HomeServices(listView, actionView, iconSelector, homeAdmin, lookup, repository);
+        HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, events, clock);
+        return new HomeServices(
+                listView,
+                actionView,
+                iconSelector,
+                homeAdmin,
+                visitHome,
+                inviteToHome,
+                uninviteFromHome,
+                lookup,
+                repository);
     }
 
     /**
