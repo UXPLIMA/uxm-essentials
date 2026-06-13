@@ -66,7 +66,9 @@ final class DefaultResources {
             "modules/warps/gui/warps-sound-selector.conf",
             "modules/warps/gui/warps-particle-selector.conf",
             "modules/warps/gui/warps-welcome.conf",
-            "modules/homes/gui/homes-menu.conf",
+            "modules/homes/gui/home-list.conf",
+            "modules/homes/gui/home-actions.conf",
+            "modules/homes/gui/icon-selector.conf",
             "modules/itemworld/gui/disposal.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");

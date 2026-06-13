@@ -13,6 +13,9 @@ import java.util.Objects;
 
 import org.bukkit.Material;
 
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurateException;
@@ -247,6 +250,126 @@ public final class GuiLayouts {
                 particlesMaterial,
                 warmupMaterial,
                 cooldownMaterial);
+    }
+
+    /** Resolve the {@code /home} slot-grid layout, falling back to the code default when no conf parses. */
+    public HomeListLayout loadHomeList(String module, String name, HomeListLayout codeDefault) {
+        ConfigurationNode root = root(module, name);
+        if (root == null) {
+            return codeDefault;
+        }
+        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
+        List<Integer> homeSlots = intList(root.node("home-slots"), codeDefault.homeSlots());
+        Material fallbackIcon = material(root.node("fallback-icon").getString(), codeDefault.fallbackIcon());
+        Material emptyIcon = material(root.node("empty-icon").getString(), codeDefault.emptyIcon());
+        Material filler = material(root.node("filler").getString(), codeDefault.filler());
+        int prevSlot = Math.max(0, root.node("prev-slot").getInt(codeDefault.prevSlot()));
+        int nextSlot = Math.max(0, root.node("next-slot").getInt(codeDefault.nextSlot()));
+        int pageInfoSlot = Math.max(0, root.node("page-info-slot").getInt(codeDefault.pageInfoSlot()));
+        return new HomeListLayout(rows, homeSlots, fallbackIcon, emptyIcon, filler, prevSlot, nextSlot, pageInfoSlot);
+    }
+
+    /** Resolve the per-home action-menu layout, falling back to the code default when no conf parses. */
+    public HomeActionsLayout loadHomeActions(String module, String name, HomeActionsLayout codeDefault) {
+        ConfigurationNode root = root(module, name);
+        if (root == null) {
+            return codeDefault;
+        }
+        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
+        return new HomeActionsLayout(
+                rows,
+                Math.max(0, root.node("info-slot").getInt(codeDefault.infoSlot())),
+                Math.max(0, root.node("rename-slot").getInt(codeDefault.renameSlot())),
+                Math.max(0, root.node("teleport-slot").getInt(codeDefault.teleportSlot())),
+                Math.max(0, root.node("delete-slot").getInt(codeDefault.deleteSlot())),
+                Math.max(0, root.node("relocate-slot").getInt(codeDefault.relocateSlot())),
+                Math.max(0, root.node("change-icon-slot").getInt(codeDefault.changeIconSlot())),
+                Math.max(0, root.node("back-slot").getInt(codeDefault.backSlot())),
+                material(root.node("info-material").getString(), codeDefault.infoMaterial()),
+                material(root.node("rename-material").getString(), codeDefault.renameMaterial()),
+                material(root.node("teleport-material").getString(), codeDefault.teleportMaterial()),
+                material(root.node("delete-material").getString(), codeDefault.deleteMaterial()),
+                material(root.node("relocate-material").getString(), codeDefault.relocateMaterial()),
+                material(root.node("change-icon-material").getString(), codeDefault.changeIconMaterial()),
+                material(root.node("back-material").getString(), codeDefault.backMaterial()),
+                material(root.node("filler").getString(), codeDefault.filler()));
+    }
+
+    /** Resolve the home-icon picker layout, falling back to the code default when no conf parses. */
+    public IconSelectorLayout loadIconSelector(String module, String name, IconSelectorLayout codeDefault) {
+        ConfigurationNode root = root(module, name);
+        if (root == null) {
+            return codeDefault;
+        }
+        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
+        List<Material> icons = materialList(root.node("icons"), codeDefault.icons());
+        Material navMaterial = material(root.node("nav-material").getString(), codeDefault.navMaterial());
+        Material resetMaterial = material(root.node("reset-material").getString(), codeDefault.resetMaterial());
+        int resetSlot = Math.max(0, root.node("reset-slot").getInt(codeDefault.resetSlot()));
+        int prevSlot = Math.max(0, root.node("prev-slot").getInt(codeDefault.prevSlot()));
+        int backSlot = Math.max(0, root.node("back-slot").getInt(codeDefault.backSlot()));
+        int nextSlot = Math.max(0, root.node("next-slot").getInt(codeDefault.nextSlot()));
+        return new IconSelectorLayout(rows, icons, navMaterial, resetMaterial, resetSlot, prevSlot, backSlot, nextSlot);
+    }
+
+    /**
+     * Load the HOCON root for {@code module}/{@code name}, preferring an operator's on-disk edit over the
+     * bundled resource. Returns {@code null} when neither exists or the file cannot be parsed, so the caller
+     * falls back to its code default — a typo never stops a menu opening.
+     */
+    private @org.jspecify.annotations.Nullable ConfigurationNode root(String module, String name) {
+        Objects.requireNonNull(module, "module");
+        Objects.requireNonNull(name, "name");
+        Path onDisk =
+                dataFolder.resolve("modules").resolve(module).resolve("gui").resolve(name + ".conf");
+        HoconConfigurationLoader loader;
+        String origin;
+        if (Files.isRegularFile(onDisk)) {
+            loader = HoconConfigurationLoader.builder().path(onDisk).build();
+            origin = onDisk.toString();
+        } else {
+            String resource = "modules/" + module + "/gui/" + name + ".conf";
+            if (getClass().getClassLoader().getResource(resource) == null) {
+                return null;
+            }
+            loader = HoconConfigurationLoader.builder()
+                    .source(() -> openReader(resource))
+                    .build();
+            origin = resource;
+        }
+        try {
+            return loader.load();
+        } catch (ConfigurateException failure) {
+            log.error("failed to load gui layout " + origin, failure);
+            return null;
+        }
+    }
+
+    private List<Integer> intList(ConfigurationNode node, List<Integer> fallback) {
+        if (node.virtual() || node.empty()) {
+            return fallback;
+        }
+        List<Integer> values = new ArrayList<>();
+        for (ConfigurationNode child : node.childrenList()) {
+            values.add(child.getInt());
+        }
+        return values.isEmpty() ? fallback : values;
+    }
+
+    private List<Material> materialList(ConfigurationNode node, List<Material> fallback) {
+        if (node.virtual() || node.empty()) {
+            return fallback;
+        }
+        List<Material> values = new ArrayList<>();
+        for (ConfigurationNode child : node.childrenList()) {
+            Material matched = Material.matchMaterial(child.getString(""));
+            if (matched != null) {
+                values.add(matched);
+            } else {
+                log.warn("gui layout icon {} is unknown, skipping", child.getString(""));
+            }
+        }
+        return values.isEmpty() ? fallback : values;
     }
 
     private BufferedReader openReader(String resource) throws java.io.IOException {

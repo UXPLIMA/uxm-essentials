@@ -6,8 +6,8 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
-import com.uxplima.uxmessentials.homes.domain.HomeName;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
+import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.persistence.homes.CachedHomeRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.HomeChanged;
@@ -20,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <ul>
  *   <li><b>Outbound</b>: {@link #repository(CachedHomeRepository, BusPublisher)} wraps the cached repository
- *       so every local home write ({@code /sethome}, {@code /delhome}, rename, move) publishes a
+ *       so every local home write (a slot {@code save} or {@code deleteSlot}) publishes a
  *       {@link HomeChanged} frame after the durable write commits — peers learn the owner's homes changed.
  *   <li><b>Inbound</b>: {@link #listener(CachedHomeRepository)} returns a {@link RemoteSyncListener} that, on
  *       a remote {@code HomeChanged}, invalidates exactly that owner's cached set so the next {@code /home}
@@ -76,20 +76,19 @@ public final class HomeSync {
         }
 
         @Override
+        public Optional<Home> findSlot(PlayerRef owner, HomeSlot slot) {
+            return delegate.findSlot(owner, slot);
+        }
+
+        @Override
         public void save(Home home) {
             delegate.save(home);
             announce(home.owner());
         }
 
         @Override
-        public void rename(PlayerRef owner, HomeName from, HomeName to) {
-            delegate.rename(owner, from, to);
-            announce(owner);
-        }
-
-        @Override
-        public void delete(PlayerRef owner, HomeName name) {
-            delegate.delete(owner, name);
+        public void deleteSlot(PlayerRef owner, HomeSlot slot) {
+            delegate.deleteSlot(owner, slot);
             announce(owner);
         }
 
