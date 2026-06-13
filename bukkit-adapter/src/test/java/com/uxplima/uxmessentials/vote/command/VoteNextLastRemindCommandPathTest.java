@@ -265,7 +265,7 @@ class VoteNextLastRemindCommandPathTest {
                 new BroadcastSettings(BroadcastType.EVERY_VOTE, Duration.ZERO, Set.of(BroadcastChannel.CHAT), Set.of());
         HandleVote handleVote = new HandleVote(
                 repository,
-                new RewardEngine(RewardCatalog.empty()),
+                new RewardEngine(RewardCatalog.empty(), Set.of()),
                 applier,
                 new NoOpContext(),
                 audience,
@@ -347,6 +347,11 @@ class VoteNextLastRemindCommandPathTest {
         @Override
         public boolean hasPending(PlayerRef player) {
             return false;
+        }
+
+        @Override
+        public int queuedCount(PlayerRef player) {
+            return 0;
         }
 
         @Override

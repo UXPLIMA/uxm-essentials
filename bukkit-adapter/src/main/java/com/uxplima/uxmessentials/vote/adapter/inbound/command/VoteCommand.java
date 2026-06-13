@@ -36,6 +36,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <ul>
  *   <li>{@code sites} — open the vote-sites GUI (or fall back to chat links when gui mode is off).
+ *   <li>{@code claim} — pay out the rewards the player accrued while offline (the queue drain that the
+ *       join handler runs automatically when auto-claim is on). Gated by {@code uxmessentials.vote.use}.
  *   <li>{@code total [player]} — show the sender's (or another player's) accumulated vote totals
  *       across all periods. Gated by {@code uxmessentials.vote.use}.
  *   <li>{@code streak [player]} — show the sender's (or another player's) current and best
@@ -83,6 +85,7 @@ public final class VoteCommand implements CommandRegistration {
                 .then(Commands.literal("testreward")
                         .requires(src -> src.getSender().hasPermission(TEST_PERMISSION))
                         .executes(this::testReward))
+                .then(Commands.literal("claim").executes(this::claim))
                 .then(Commands.literal("total")
                         .executes(this::totalSelf)
                         .then(CommandSuggestions.playerArgument("player").executes(this::totalOther)))
@@ -157,6 +160,24 @@ public final class VoteCommand implements CommandRegistration {
         PlayerRef who = BukkitRefs.toRef(sender);
         services.scheduler().async(() -> services.handleVote().handle(new Vote(who, "test", Instant.now())));
         feedback.send(sender, VoteMessageKey.VOTE_TESTREWARD, Map.of());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int claim(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = BukkitRefs.toRef(sender);
+        // The drain is a transactional DB read-and-delete, so it hops off the tick thread; the count is only
+        // known after it runs, so the confirmation is sent from the same async body once the batch is paid.
+        services.scheduler().async(() -> {
+            int paid = services.applyQueuedRewards().applyFor(who);
+            feedback.send(
+                    sender,
+                    paid > 0 ? VoteMessageKey.VOTE_CLAIM_PAID : VoteMessageKey.VOTE_CLAIM_EMPTY,
+                    paid > 0 ? Map.of("count", Integer.toString(paid)) : Map.of());
+        });
         return Command.SINGLE_SUCCESS;
     }
 

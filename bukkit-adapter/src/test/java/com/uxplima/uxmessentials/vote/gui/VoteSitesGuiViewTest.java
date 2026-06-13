@@ -252,7 +252,7 @@ class VoteSitesGuiViewTest {
                 new BroadcastSettings(BroadcastType.EVERY_VOTE, Duration.ZERO, Set.of(BroadcastChannel.CHAT), Set.of());
         HandleVote handleVote = new HandleVote(
                 repo,
-                new RewardEngine(RewardCatalog.empty()),
+                new RewardEngine(RewardCatalog.empty(), Set.of()),
                 new NoOpRewardApplier(),
                 new NoOpVoteContext(),
                 new NoOpVoteAudience(),
@@ -361,6 +361,11 @@ class VoteSitesGuiViewTest {
         @Override
         public boolean hasPending(PlayerRef player) {
             return false;
+        }
+
+        @Override
+        public int queuedCount(PlayerRef player) {
+            return 0;
         }
 
         @Override

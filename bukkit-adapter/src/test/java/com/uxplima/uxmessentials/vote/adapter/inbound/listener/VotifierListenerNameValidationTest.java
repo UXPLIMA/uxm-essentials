@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.vote.command;
+package com.uxplima.uxmessentials.vote.adapter.inbound.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -14,20 +14,17 @@ import java.util.UUID;
 
 import org.bukkit.plugin.Plugin;
 
-import io.papermc.paper.command.brigadier.CommandSourceStack;
-
-import com.mojang.brigadier.CommandDispatcher;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
-import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
@@ -65,6 +62,7 @@ import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import com.uxplima.uxmessentials.vote.domain.VoteSiteCatalog;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
+import com.uxplima.uxmessentials.vote.domain.VoterNameRules;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
@@ -72,31 +70,26 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
-import org.mockbukkit.mockbukkit.ServerMock;
-import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
-import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /voteparty} admin subcommands: {@code force}, {@code set <n>},
- * and {@code add <n>}. Asserts that each subcommand is perm-gated, routes to the correct use case,
- * and that the use case drives the right repository mutation.
+ * Covers the voter-name validation gate {@link VotifierListener#handleRaw} runs before a vote is built: a
+ * blank, {@code "null"}, or over-16-character username is rejected — no vote is dispatched — while a valid
+ * name flows through to {@link HandleVote}. The dispatch is witnessed through the repository's
+ * {@code incrementAndGetPartyCount}, which {@link HandleVote} calls exactly once per handled vote, so a
+ * rejected name leaves the counter untouched.
  */
-class VotePartyCommandPathTest {
+class VotifierListenerNameValidationTest {
 
-    private ServerMock server;
+    private static final VoterNameRules RULES = VoterNameRules.of(16, "");
+
     private Plugin plugin;
-    private PlayerMock sender;
-    private RecordingVoteRepository repository;
-    private RecordingMessages messages;
+    private CountingRepository repository;
 
     @BeforeEach
     void setUp() {
-        server = MockBukkit.mock();
+        MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        sender = server.addPlayer("Alice");
-        sender.setOp(true);
-        repository = new RecordingVoteRepository();
-        messages = new RecordingMessages();
+        repository = new CountingRepository();
     }
 
     @AfterEach
@@ -105,172 +98,128 @@ class VotePartyCommandPathTest {
     }
 
     @Test
-    void forceSubtreeExistsUnderVoteparty() {
-        VotePartyCommand command = new VotePartyCommand(services());
-        var root = command.build();
-        assertThat(root.getChild("force"))
-                .as("force subcommand must exist under /voteparty")
-                .isNotNull();
+    void aValidNameIsHandled() {
+        VotifierListener listener = listener();
+
+        listener.handleRaw("PMC", "Alice");
+
+        assertThat(repository.handled).isEqualTo(1);
     }
 
     @Test
-    void setSubtreeExistsUnderVoteparty() {
-        VotePartyCommand command = new VotePartyCommand(services());
-        var root = command.build();
-        assertThat(root.getChild("set"))
-                .as("set subcommand must exist under /voteparty")
-                .isNotNull();
+    void aBlankNameIsRejected() {
+        VotifierListener listener = listener();
+
+        listener.handleRaw("PMC", "   ");
+
+        assertThat(repository.handled).isZero();
     }
 
     @Test
-    void addSubtreeExistsUnderVoteparty() {
-        VotePartyCommand command = new VotePartyCommand(services());
-        var root = command.build();
-        assertThat(root.getChild("add"))
-                .as("add subcommand must exist under /voteparty")
-                .isNotNull();
+    void theLiteralNullNameIsRejected() {
+        VotifierListener listener = listener();
+
+        listener.handleRaw("PMC", "null");
+
+        assertThat(repository.handled).isZero();
     }
 
     @Test
-    void forceSubtreeRequiresVotepartyAdminPermission() {
-        VotePartyCommand command = new VotePartyCommand(services());
-        var forceNode = command.build().getChild("force");
-        assertThat(forceNode).isNotNull();
+    void anOverLongNameIsRejected() {
+        VotifierListener listener = listener();
 
-        PlayerMock noAdmin = server.addPlayer();
-        noAdmin.addAttachment(plugin, "uxmessentials.voteparty.use", true);
-        assertThat(forceNode.canUse(CommandSourceStackMock.from(noAdmin))).isFalse();
+        listener.handleRaw("PMC", "ThisNameIsWayTooLongForMinecraft");
 
-        PlayerMock admin = server.addPlayer();
-        admin.addAttachment(plugin, "uxmessentials.voteparty.admin", true);
-        assertThat(forceNode.canUse(CommandSourceStackMock.from(admin))).isTrue();
+        assertThat(repository.handled).isZero();
     }
 
-    @Test
-    void votepartySetWritesCountToRepository() {
-        sender.addAttachment(plugin, "uxmessentials.voteparty.admin", true);
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
-
-        execute(dispatcher, "voteparty set 10");
-
-        assertThat(repository.lastSetCount).isEqualTo(10);
-    }
-
-    @Test
-    void votepartyAddIncreasesCounter() {
-        sender.addAttachment(plugin, "uxmessentials.voteparty.admin", true);
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
-
-        // Repository starts at 0; adding 5 should call setPartyCount(5) since 5 < threshold 25.
-        execute(dispatcher, "voteparty add 5");
-
-        assertThat(repository.lastSetCount).isEqualTo(5);
-    }
-
-    @Test
-    void votepartyForceResetsBothCounterAndParticipants() {
-        sender.addAttachment(plugin, "uxmessentials.voteparty.admin", true);
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
-
-        execute(dispatcher, "voteparty force");
-
-        // ForceParty fires the party → resets the counter to 0.
-        assertThat(repository.lastSetCount).isEqualTo(0);
-    }
-
-    // --- helpers ---
-
-    private CommandDispatcher<CommandSourceStack> register() {
-        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        CommandRegistration command = new VotePartyCommand(services());
-        dispatcher.getRoot().addChild(command.build());
-        return dispatcher;
-    }
-
-    private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {
-        try {
-            dispatcher.execute(input, CommandSourceStackMock.from(sender));
-        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
-            throw new AssertionError("command did not parse: " + input, e);
-        }
+    private VotifierListener listener() {
+        return new VotifierListener(plugin, services(), new NoLookup(), RULES, new NoLog());
     }
 
     private VoteServices services() {
+        Messages messages = (viewer, key, placeholders) -> key.key();
         VoteNotifier notifier = new VoteNotifier(messages, new NoSink());
         RewardSpec noOpSpec =
                 new RewardSpec(100, Optional.empty(), List.of(), List.of(), List.of(), List.of(), Set.of());
         PartyConfig party = new PartyConfig(noOpSpec, 25, false, 0, PartyResetSchedule.NONE, List.of());
-        NoOpVoteAudience audience = new NoOpVoteAudience();
-        NoOpRewardApplier applier = new NoOpRewardApplier();
+        NoOpAudience audience = new NoOpAudience();
+        NoOpApplier applier = new NoOpApplier();
         NoEvents events = new NoEvents();
-        NoLookup lookup = new NoLookup();
         VoteBroadcaster broadcaster = new NoOpBroadcaster();
         BroadcastSettings broadcastSettings =
-                new BroadcastSettings(BroadcastType.EVERY_VOTE, Duration.ZERO, Set.of(BroadcastChannel.CHAT), Set.of());
+                new BroadcastSettings(BroadcastType.NONE, Duration.ZERO, Set.of(BroadcastChannel.CHAT), Set.of());
         HandleVote handleVote = new HandleVote(
                 repository,
                 new RewardEngine(RewardCatalog.empty(), Set.of()),
                 applier,
-                new NoOpVoteContext(),
+                new NoOpContext(),
                 audience,
                 broadcastSettings,
                 broadcaster,
-                new NoOpBroadcastThrottle(),
+                new NoOpThrottle(),
                 events,
                 party,
                 0,
                 ZoneId.of("UTC"));
-        ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpRewardDispatcher());
-        VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
+        ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpDispatcher());
         VoteSitesGuiView sitesGui = new VoteSitesGuiView(
                 VoteSiteCatalog.empty(),
                 repository,
                 new SyncScheduler(),
                 messages,
                 VoteSitesGuiView.GuiConfig.defaults());
-        VotePartyStatus votePartyStatus = new VotePartyStatus(repository, notifier, 25);
-        ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
-        ShowVoteStreak showVoteStreak = new ShowVoteStreak(repository, notifier);
-        TopVoters topVoters = new TopVoters(repository, notifier, 10);
-        ShowNextVote showNextVote = new ShowNextVote(repository, VoteSiteCatalog.empty(), notifier);
-        ShowLastVote showLastVote = new ShowLastVote(repository, VoteSiteCatalog.empty(), notifier);
-        VoteReminderEligibility reminderEligibility = new VoteReminderEligibility(repository, VoteSiteCatalog.empty());
-        ForceParty forceParty = new ForceParty(
-                repository, applier, audience, notifier, broadcaster, Set.of(BroadcastChannel.CHAT), events, party);
-        SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
-        AddPartyCount addPartyCount = new AddPartyCount(
-                repository, applier, audience, notifier, broadcaster, Set.of(BroadcastChannel.CHAT), events, party);
-        GiveVote giveVote = new GiveVote(handleVote, notifier);
-        ResetVoterTotals resetVoterTotals = new ResetVoterTotals(repository, notifier);
         return new VoteServices(
                 handleVote,
                 applyQueuedRewards,
-                voteLinks,
+                new VoteLinks(List.of(), notifier),
                 sitesGui,
-                votePartyStatus,
-                showVoteTotals,
-                showVoteStreak,
-                topVoters,
-                showNextVote,
-                showLastVote,
-                reminderEligibility,
+                new VotePartyStatus(repository, notifier, 25),
+                new ShowVoteTotals(repository, notifier),
+                new ShowVoteStreak(repository, notifier),
+                new TopVoters(repository, notifier, 10),
+                new ShowNextVote(repository, VoteSiteCatalog.empty(), notifier),
+                new ShowLastVote(repository, VoteSiteCatalog.empty(), notifier),
+                new VoteReminderEligibility(repository, VoteSiteCatalog.empty()),
                 new NoOpReminderPreferences(),
                 new NoOpBroadcastVisibility(),
-                forceParty,
-                setPartyCount,
-                addPartyCount,
-                giveVote,
-                resetVoterTotals,
-                lookup,
+                new ForceParty(
+                        repository,
+                        applier,
+                        audience,
+                        notifier,
+                        broadcaster,
+                        Set.of(BroadcastChannel.CHAT),
+                        events,
+                        party),
+                new SetPartyCount(repository, notifier),
+                new AddPartyCount(
+                        repository,
+                        applier,
+                        audience,
+                        notifier,
+                        broadcaster,
+                        Set.of(BroadcastChannel.CHAT),
+                        events,
+                        party),
+                new GiveVote(handleVote, notifier),
+                new ResetVoterTotals(repository, notifier),
+                new NoLookup(),
                 new SyncScheduler(),
                 messages);
     }
 
-    // --- recording fakes ---
+    // --- fakes ---
 
-    private static final class RecordingVoteRepository implements VoteRepository {
+    /** Counts handled votes via the increment {@link HandleVote} calls exactly once per vote. */
+    private static final class CountingRepository implements VoteRepository {
+        int handled = 0;
 
-        int lastSetCount = -1;
+        @Override
+        public int incrementAndGetPartyCount() {
+            handled++;
+            return 1; // well below threshold so no party fires
+        }
 
         @Override
         public int partyCount() {
@@ -278,14 +227,7 @@ class VotePartyCommandPathTest {
         }
 
         @Override
-        public void setPartyCount(int count) {
-            lastSetCount = count;
-        }
-
-        @Override
-        public int incrementAndGetPartyCount() {
-            return 1;
-        }
+        public void setPartyCount(int count) {}
 
         @Override
         public void enqueue(QueuedReward reward) {}
@@ -354,32 +296,29 @@ class VotePartyCommandPathTest {
         public void resetTotals(PlayerRef player) {}
 
         @Override
-        public java.util.Optional<java.time.Instant> lastVoteAtSite(PlayerRef player, String site) {
-            return java.util.Optional.empty();
+        public Optional<Instant> lastVoteAtSite(PlayerRef player, String site) {
+            return Optional.empty();
         }
 
         @Override
-        public void recordLastVoteAtSite(PlayerRef player, String site, java.time.Instant at) {}
+        public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {}
     }
 
-    private static final class RecordingMessages implements Messages {
-
+    private static final class NoLookup implements PlayerLookup {
         @Override
-        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            return key.key();
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
         }
-    }
 
-    // --- stubs ---
-
-    private static final class NoSink implements MessageSink {
         @Override
-        public void deliver(PlayerRef viewer, String renderedText) {}
-    }
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return Optional.empty();
+        }
 
-    private static final class NoEvents implements DomainEventPublisher {
         @Override
-        public void publish(DomainEvent event) {}
+        public boolean isOnline(UUID uuid) {
+            return false;
+        }
     }
 
     private static final class SyncScheduler implements Scheduler {
@@ -389,7 +328,7 @@ class VotePartyCommandPathTest {
         }
 
         @Override
-        public void onRegion(com.uxplima.uxmessentials.shared.domain.Position position, Runnable task) {
+        public void onRegion(Position position, Runnable task) {
             task.run();
         }
 
@@ -407,9 +346,36 @@ class VotePartyCommandPathTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+
+        @Override
+        public AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
+            return () -> {};
+        }
     }
 
-    private static final class NoOpRewardDispatcher implements RewardDispatcher {
+    private static final class NoSink implements MessageSink {
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    private static final class NoEvents implements DomainEventPublisher {
+        @Override
+        public void publish(DomainEvent event) {}
+    }
+
+    private static final class NoOpReminderPreferences implements ReminderPreferences {
+        @Override
+        public boolean wantsReminders(PlayerRef who) {
+            return true;
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            return true;
+        }
+    }
+
+    private static final class NoOpDispatcher implements RewardDispatcher {
         @Override
         public void dispatch(List<String> commands, String playerName) {}
     }
@@ -419,7 +385,7 @@ class VotePartyCommandPathTest {
         public void broadcast(MessageKey key, Map<String, String> placeholders, Set<BroadcastChannel> channels) {}
     }
 
-    private static final class NoOpBroadcastThrottle implements BroadcastThrottle {
+    private static final class NoOpThrottle implements BroadcastThrottle {
         @Override
         public Optional<Instant> lastBroadcastAt(PlayerRef voter) {
             return Optional.empty();
@@ -441,12 +407,12 @@ class VotePartyCommandPathTest {
         }
     }
 
-    private static final class NoOpRewardApplier implements RewardApplier {
+    private static final class NoOpApplier implements RewardApplier {
         @Override
         public void apply(PlayerRef voter, boolean online, RewardGrant grant) {}
     }
 
-    private static final class NoOpVoteContext implements VoteContext {
+    private static final class NoOpContext implements VoteContext {
         @Override
         public String worldOf(PlayerRef voter) {
             return "";
@@ -468,39 +434,24 @@ class VotePartyCommandPathTest {
         }
     }
 
-    private static final class NoOpVoteAudience implements VoteAudience {
+    private static final class NoOpAudience implements VoteAudience {
         @Override
         public Collection<PlayerRef> online() {
             return List.of();
         }
     }
 
-    private static final class NoLookup implements PlayerLookup {
+    private static final class NoLog implements Logger {
         @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.empty();
-        }
+        public void info(String message, Object... args) {}
 
         @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.empty();
-        }
+        public void warn(String message, Object... args) {}
 
         @Override
-        public boolean isOnline(UUID uuid) {
-            return false;
-        }
-    }
-
-    private static final class NoOpReminderPreferences implements ReminderPreferences {
-        @Override
-        public boolean wantsReminders(PlayerRef who) {
-            return true;
-        }
+        public void error(String message, Throwable cause) {}
 
         @Override
-        public boolean toggle(PlayerRef who) {
-            return true;
-        }
+        public void debug(String message, Object... args) {}
     }
 }

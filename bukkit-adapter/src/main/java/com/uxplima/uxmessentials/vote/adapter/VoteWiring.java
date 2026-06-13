@@ -77,6 +77,7 @@ import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.VoteSiteCatalog;
+import com.uxplima.uxmessentials.vote.domain.VoterNameRules;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
@@ -133,9 +134,13 @@ public final class VoteWiring {
         VoteNotifier notifier = new VoteNotifier(kernel.messages(), kernel.messageSink());
         BukkitRewardDispatcher dispatcher = new BukkitRewardDispatcher(kernel.scheduler());
         VoteAudience audience = new BukkitVoteAudience();
-        RewardApplier applier = new BukkitRewardApplier(repository, dispatcher, kernel.scheduler(), kernel.log());
+        int offlineLimit = Math.max(0, ctx.config().getInt("offline-vote-limit", 0));
+        RewardApplier applier =
+                new BukkitRewardApplier(repository, dispatcher, kernel.scheduler(), offlineLimit, kernel.log());
         VoteContext context = new BukkitVoteContext(kernel.permissions());
-        RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel));
+        Set<String> disabledWorlds = Set.copyOf(ctx.config().getStringList("reward.disabled-worlds", List.of()));
+        RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel), disabledWorlds);
+        VoterNameRules nameRules = loadNameRules(ctx.config(), kernel);
         PartyConfig party = partyConfig(ctx.config());
         int streakGraceDays = Math.max(0, ctx.config().getInt("streak.grace-days", 0));
         List<String> voteLinks = ctx.config().getStringList("vote-links", List.of());
@@ -205,7 +210,9 @@ public final class VoteWiring {
         VoteDiscordSettings discordSettings = VoteDiscordSettings.fromConfig(ctx.config());
         Discord discord = wireDiscord(discordSettings, kernel, repository, events);
 
-        // Build the join listener with reminder support when enabled.
+        // Build the join listener with reminder support when enabled. Auto-claim drains the offline queue on
+        // join (the default); with it off the player pays the queue out with /vote claim.
+        boolean autoClaim = ctx.config().getBoolean("claim.auto", true);
         boolean loginNag = ctx.config().getBoolean("reminders.login", true);
         int loginDelaySecs = Math.max(0, ctx.config().getInt("reminders.login-delay-seconds", 5));
         VoteJoinListener joinListener;
@@ -215,6 +222,7 @@ public final class VoteWiring {
                     services.applyQueuedRewards(),
                     repository,
                     kernel.scheduler(),
+                    autoClaim,
                     true,
                     Duration.ofSeconds(loginDelaySecs),
                     eligibility,
@@ -225,6 +233,7 @@ public final class VoteWiring {
                     services.applyQueuedRewards(),
                     repository,
                     kernel.scheduler(),
+                    autoClaim,
                     false,
                     Duration.ZERO,
                     null,
@@ -232,7 +241,8 @@ public final class VoteWiring {
                     null);
         }
 
-        VotifierListener votifier = new VotifierListener(plugin, services, kernel.playerLookup(), kernel.log());
+        VotifierListener votifier =
+                new VotifierListener(plugin, services, kernel.playerLookup(), nameRules, kernel.log());
         List<CommandRegistration> commands = List.of(
                 new VoteCommand(services, () -> ListDisplayMode.from(ctx.config())), new VotePartyCommand(services));
         List<Listener> listeners = List.of(votifier, joinListener);
@@ -445,6 +455,22 @@ public final class VoteWiring {
                 .resolve("modules")
                 .resolve("vote")
                 .resolve("config.conf");
+    }
+
+    /**
+     * Build the {@link VoterNameRules} from the {@code name-validation} block: a max length (at least one)
+     * and an optional whitelist regex (blank = length-only). A malformed regex is tolerated by
+     * {@link VoterNameRules#of} (it falls back to no pattern); detect that fall-back here and warn once at
+     * wiring time so the operator can fix the regex rather than silently losing the whitelist.
+     */
+    private static VoterNameRules loadNameRules(ConfigStore config, KernelPorts kernel) {
+        int maxLength = Math.max(1, config.getInt("name-validation.max-length", 16));
+        String pattern = config.getString("name-validation.pattern", "").strip();
+        VoterNameRules rules = VoterNameRules.of(maxLength, pattern);
+        if (!pattern.isBlank() && rules.pattern().isEmpty()) {
+            kernel.log().warn("event=vote_name_pattern_invalid pattern={}", pattern);
+        }
+        return rules;
     }
 
     private static VoteSitesGuiView.GuiConfig loadGuiConfig(ConfigStore config) {

@@ -334,6 +334,38 @@ class VoteCommandPathTest {
         assertThat(repository.resetCalls.get(0).uuid()).isEqualTo(target.getUniqueId());
     }
 
+    @Test
+    void voteClaimWithQueuedRewardsSendsPaidKeyWithTheCount() {
+        // Two queued batches → applyFor returns 2 → VOTE_CLAIM_PAID with count=2.
+        repository.pendingForClaim = List.of(
+                new QueuedReward(new PlayerRef(sender.getUniqueId(), "Alice"), List.of("say a"), Instant.now()),
+                new QueuedReward(new PlayerRef(sender.getUniqueId(), "Alice"), List.of("say b"), Instant.now()));
+        CommandDispatcher<CommandSourceStack> dispatcher = register(new ServerPlayerLookup());
+
+        execute(dispatcher, "vote claim");
+
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_CLAIM_PAID.key());
+        assertThat(messages.placeholdersByKey.get(VoteMessageKey.VOTE_CLAIM_PAID.key()))
+                .containsEntry("count", "2");
+    }
+
+    @Test
+    void voteClaimWithAnEmptyQueueSendsTheEmptyKey() {
+        // Default: pendingForClaim is empty → applyFor returns 0 → VOTE_CLAIM_EMPTY.
+        CommandDispatcher<CommandSourceStack> dispatcher = register(new ServerPlayerLookup());
+
+        execute(dispatcher, "vote claim");
+
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_CLAIM_EMPTY.key());
+    }
+
+    @Test
+    void claimSubcommandExistsUnderVote() {
+        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()), () -> ListDisplayMode.CHAT);
+        var claimNode = command.build().getChild("claim");
+        assertThat(claimNode).as("claim subcommand must exist under /vote").isNotNull();
+    }
+
     // --- helpers ---
 
     private CommandDispatcher<CommandSourceStack> register(PlayerLookup lookup) {
@@ -369,7 +401,7 @@ class VoteCommandPathTest {
                 new BroadcastSettings(BroadcastType.EVERY_VOTE, Duration.ZERO, Set.of(BroadcastChannel.CHAT), Set.of());
         HandleVote handleVote = new HandleVote(
                 repository,
-                new RewardEngine(RewardCatalog.empty()),
+                new RewardEngine(RewardCatalog.empty(), Set.of()),
                 applier,
                 new NoOpVoteContext(),
                 audience,
@@ -454,6 +486,8 @@ class VoteCommandPathTest {
         final List<PlayerRef> resetCalls = new ArrayList<>();
         List<VoteRanking> topResult = List.of();
         int incrementCalls = 0;
+        /** The batches {@code /vote claim} drains; empty (the default) means an empty queue. */
+        List<QueuedReward> pendingForClaim = List.of();
 
         @Override
         public int partyCount() {
@@ -475,12 +509,17 @@ class VoteCommandPathTest {
 
         @Override
         public List<QueuedReward> drainFor(PlayerRef player) {
-            return List.of();
+            return pendingForClaim;
         }
 
         @Override
         public boolean hasPending(PlayerRef player) {
-            return false;
+            return !pendingForClaim.isEmpty();
+        }
+
+        @Override
+        public int queuedCount(PlayerRef player) {
+            return pendingForClaim.size();
         }
 
         @Override
@@ -552,6 +591,7 @@ class VoteCommandPathTest {
     private static final class RecordingMessages implements Messages {
         final List<String> resolvedKeys = new ArrayList<>();
         final List<String> resolvedNames = new ArrayList<>();
+        final Map<String, Map<String, String>> placeholdersByKey = new java.util.HashMap<>();
 
         /** The most recent non-prefix key resolved, or {@code null} if none yet. */
         @Nullable String lastKey() {
@@ -563,6 +603,7 @@ class VoteCommandPathTest {
             // Skip the shared "prefix" infrastructure resolve — it is not a feature message.
             if (!"prefix".equals(key.key())) {
                 resolvedKeys.add(key.key());
+                placeholdersByKey.put(key.key(), Map.copyOf(placeholders));
             }
             String playerName = placeholders.get("player");
             if (playerName != null) {

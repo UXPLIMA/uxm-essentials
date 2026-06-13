@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.domain.Vote;
+import com.uxplima.uxmessentials.vote.domain.VoterNameRules;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -42,12 +43,15 @@ public final class VotifierListener implements Listener {
     private final Plugin plugin;
     private final VoteServices services;
     private final PlayerLookup players;
+    private final VoterNameRules nameRules;
     private final Logger log;
 
-    public VotifierListener(Plugin plugin, VoteServices services, PlayerLookup players, Logger log) {
+    public VotifierListener(
+            Plugin plugin, VoteServices services, PlayerLookup players, VoterNameRules nameRules, Logger log) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.services = Objects.requireNonNull(services, "services");
         this.players = Objects.requireNonNull(players, "players");
+        this.nameRules = Objects.requireNonNull(nameRules, "nameRules");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -81,8 +85,22 @@ public final class VotifierListener implements Listener {
     }
 
     private void resolveAndHandle(RawVote raw) {
-        PlayerRef voter = resolveVoter(raw.username());
-        services.handleVote().handle(new Vote(voter, raw.service(), Instant.now()));
+        handleRaw(raw.service(), raw.username());
+    }
+
+    /**
+     * Validate the raw username and, when it passes, resolve the voter and dispatch the vote. A junk Votifier
+     * username (empty, {@code "null"}, over-long, or off the name policy) would mint a phantom leaderboard entry
+     * and pay a reward into a non-existent player, so it is rejected — logged and dropped — before any vote is
+     * built (no tally, no queue, no cooldown). Package-private as the test seam for the validation gate.
+     */
+    void handleRaw(String service, String username) {
+        if (!nameRules.isValid(username)) {
+            log.warn("event=vote_rejected reason=invalid_name name={} service={}", username, service);
+            return;
+        }
+        PlayerRef voter = resolveVoter(username);
+        services.handleVote().handle(new Vote(voter, service, Instant.now()));
     }
 
     private Optional<RawVote> readRaw(Event event) {

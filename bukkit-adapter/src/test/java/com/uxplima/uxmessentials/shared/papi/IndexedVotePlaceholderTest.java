@@ -249,6 +249,11 @@ class IndexedVotePlaceholderTest {
         }
 
         @Override
+        public int queuedCount(PlayerRef player) {
+            return 0;
+        }
+
+        @Override
         public VoteTally totalsOf(PlayerRef player) {
             // alltime, daily, weekly, monthly, dayKey, weekKey, monthKey, currentStreak, bestStreak, streakDayKey
             return new VoteTally(monthlyCount, 0L, 0L, monthlyCount, 0L, 0L, 0L, currentStreak, bestStreak, 0L);

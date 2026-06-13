@@ -50,7 +50,8 @@ class BukkitRewardApplierTest {
         voter = server.addPlayer("Alice");
         scheduler = new RecordingScheduler();
         repository = new RecordingRepository();
-        applier = new BukkitRewardApplier(repository, new BukkitRewardDispatcher(scheduler), scheduler, new NoLog());
+        // offlineLimit 0 = unlimited; the limit-specific tests build their own applier with a cap.
+        applier = new BukkitRewardApplier(repository, new BukkitRewardDispatcher(scheduler), scheduler, 0, new NoLog());
     }
 
     @AfterEach
@@ -126,6 +127,42 @@ class BukkitRewardApplierTest {
         assertThat(repository.enqueued).isEmpty();
     }
 
+    @Test
+    void offlineGrantIsSkippedWhenTheQueueIsAtTheLimit() {
+        BukkitRewardApplier capped =
+                new BukkitRewardApplier(repository, new BukkitRewardDispatcher(scheduler), scheduler, 3, new NoLog());
+        repository.queuedCount = 3; // already at the cap
+        PlayerRef offline = new PlayerRef(java.util.UUID.randomUUID(), "Ghost");
+
+        capped.apply(offline, false, new RewardGrant(List.of("eco give {player} 50"), List.of(), List.of(), List.of()));
+
+        assertThat(repository.enqueued).isEmpty();
+    }
+
+    @Test
+    void offlineGrantIsEnqueuedWhenTheQueueIsBelowTheLimit() {
+        BukkitRewardApplier capped =
+                new BukkitRewardApplier(repository, new BukkitRewardDispatcher(scheduler), scheduler, 3, new NoLog());
+        repository.queuedCount = 2; // under the cap
+        PlayerRef offline = new PlayerRef(java.util.UUID.randomUUID(), "Ghost");
+
+        capped.apply(offline, false, new RewardGrant(List.of("eco give {player} 50"), List.of(), List.of(), List.of()));
+
+        assertThat(repository.enqueued).hasSize(1);
+    }
+
+    @Test
+    void offlineGrantIgnoresAStockedQueueWhenTheLimitIsZero() {
+        // The default applier has offlineLimit 0 (unlimited); a queue well past any cap must still enqueue.
+        repository.queuedCount = 999;
+        PlayerRef offline = new PlayerRef(java.util.UUID.randomUUID(), "Ghost");
+
+        applier.apply(
+                offline, false, new RewardGrant(List.of("eco give {player} 50"), List.of(), List.of(), List.of()));
+
+        assertThat(repository.enqueued).hasSize(1);
+    }
+
     private PlayerRef ref() {
         return new PlayerRef(voter.getUniqueId(), voter.getName());
     }
@@ -173,6 +210,8 @@ class BukkitRewardApplierTest {
     /** Records every enqueued offline reward batch; the rest of the contract is unused here. */
     private static final class RecordingRepository implements VoteRepository {
         private final List<QueuedReward> enqueued = new ArrayList<>();
+        /** The count {@link #queuedCount} reports, set by the limit tests to stand in for a stocked queue. */
+        private int queuedCount = 0;
 
         @Override
         public int partyCount() {
@@ -200,6 +239,11 @@ class BukkitRewardApplierTest {
         @Override
         public boolean hasPending(PlayerRef player) {
             return false;
+        }
+
+        @Override
+        public int queuedCount(PlayerRef player) {
+            return queuedCount;
         }
 
         @Override

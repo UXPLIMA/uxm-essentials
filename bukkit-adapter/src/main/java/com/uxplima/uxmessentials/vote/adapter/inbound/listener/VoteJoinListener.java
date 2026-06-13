@@ -26,7 +26,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * On join:
  * <ol>
- *   <li>Pays out the rewards a player accrued while offline (drains the queue via {@link ApplyQueuedRewards}).
+ *   <li>Pays out the rewards a player accrued while offline (drains the queue via {@link ApplyQueuedRewards})
+ *       — only when auto-claim is enabled. With auto-claim off the queue is left for the player to drain
+ *       with {@code /vote claim}.
  *   <li>Warms the repository cache with the player's vote totals so the first PAPI placeholder call is
  *       cheap (no cold DB hit).
  *   <li>Optionally sends a one-shot vote reminder after a short delay when {@code remindersEnabled} is
@@ -43,6 +45,7 @@ public final class VoteJoinListener implements Listener {
     private final ApplyQueuedRewards applyQueuedRewards;
     private final VoteRepository repository;
     private final Scheduler scheduler;
+    private final boolean autoClaim;
     private final boolean remindersEnabled;
     private final Duration loginDelay;
     /** Null when {@code remindersEnabled} is false — avoids a useless object allocation. */
@@ -53,10 +56,11 @@ public final class VoteJoinListener implements Listener {
 
     /**
      * Legacy constructor — queue drain only, no reminders (equivalent to
-     * {@code remindersEnabled = false}). The repository cache-warm still fires.
+     * {@code remindersEnabled = false}). Auto-claim is on, so the queue still drains on join. The
+     * repository cache-warm still fires.
      */
     public VoteJoinListener(ApplyQueuedRewards applyQueuedRewards, Scheduler scheduler) {
-        this(applyQueuedRewards, null, scheduler, false, Duration.ZERO, null, null, null);
+        this(applyQueuedRewards, null, scheduler, true, false, Duration.ZERO, null, null, null);
     }
 
     /**
@@ -64,11 +68,14 @@ public final class VoteJoinListener implements Listener {
      *
      * @param repository may be {@code null} when provided via the legacy single-arg ctor; the
      *                   cache-warm is then skipped
+     * @param autoClaim  when {@code true} the offline reward queue is drained on join; when {@code false}
+     *                   the join leaves the queue for the player to pay out with {@code /vote claim}
      */
     public VoteJoinListener(
             ApplyQueuedRewards applyQueuedRewards,
             @Nullable VoteRepository repository,
             Scheduler scheduler,
+            boolean autoClaim,
             boolean remindersEnabled,
             Duration loginDelay,
             @Nullable VoteReminderEligibility eligibility,
@@ -77,6 +84,7 @@ public final class VoteJoinListener implements Listener {
         this.applyQueuedRewards = Objects.requireNonNull(applyQueuedRewards, "applyQueuedRewards");
         this.repository = repository != null ? repository : NoopRepository.INSTANCE;
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.autoClaim = autoClaim;
         this.remindersEnabled = remindersEnabled;
         this.loginDelay = Objects.requireNonNull(loginDelay, "loginDelay");
         this.eligibility = eligibility;
@@ -89,9 +97,12 @@ public final class VoteJoinListener implements Listener {
         Player player = event.getPlayer();
         PlayerRef who = BukkitRefs.toRef(player);
 
-        // Drain offline rewards and warm the PAPI cache — always async.
+        // Warm the PAPI cache always; drain offline rewards only when auto-claim is on (otherwise the
+        // player pays the queue out with /vote claim). Both run async — never on the join tick.
         scheduler.async(() -> {
-            applyQueuedRewards.applyFor(who);
+            if (autoClaim) {
+                applyQueuedRewards.applyFor(who);
+            }
             repository.totalsOf(who); // warms the Caffeine cache, no user-visible side effect
         });
 
@@ -150,6 +161,11 @@ public final class VoteJoinListener implements Listener {
         @Override
         public boolean hasPending(PlayerRef player) {
             return false;
+        }
+
+        @Override
+        public int queuedCount(PlayerRef player) {
+            return 0;
         }
 
         @Override

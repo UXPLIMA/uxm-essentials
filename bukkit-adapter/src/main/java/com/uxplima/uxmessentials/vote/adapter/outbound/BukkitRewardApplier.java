@@ -41,7 +41,9 @@ import org.jspecify.annotations.Nullable;
  * {@link VoteRepository#enqueue(QueuedReward)} (the existing offline batch the join handler drains) with the
  * {@code {player}} placeholder left raw — the drain substitutes it when the voter next joins. The enqueue is a
  * database write, so it hops off the tick thread via the {@link Scheduler}. Messages, broadcasts, and items are
- * skipped offline: there is no inventory to fill and no viewer to message.
+ * skipped offline: there is no inventory to fill and no viewer to message. An offline queue cap bounds how many
+ * batches one voter may stack up while away ({@code 0} disables it); a vote past the cap still counts toward
+ * totals and the party, only its durable offline reward is dropped.
  *
  * <p>Reward message and broadcast lines are operator-authored config content (MiniMessage with a {@code
  * {player}} token), not {@code MessageKey} catalog entries, so they are rendered with MiniMessage directly here
@@ -55,14 +57,25 @@ public final class BukkitRewardApplier implements RewardApplier {
     private final VoteRepository repository;
     private final BukkitRewardDispatcher dispatcher;
     private final Scheduler scheduler;
+    private final int offlineLimit;
     private final MiniMessage miniMessage;
     private final Logger log;
 
+    /**
+     * @param offlineLimit the most reward batches an offline voter may have queued at once; {@code 0} (or
+     *                     any non-positive value) means no cap. A vote that would exceed the cap still
+     *                     counts toward totals and the party — only its durable offline reward is dropped
+     */
     public BukkitRewardApplier(
-            VoteRepository repository, BukkitRewardDispatcher dispatcher, Scheduler scheduler, Logger log) {
+            VoteRepository repository,
+            BukkitRewardDispatcher dispatcher,
+            Scheduler scheduler,
+            int offlineLimit,
+            Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.offlineLimit = offlineLimit;
         this.log = Objects.requireNonNull(log, "log");
         this.miniMessage = MiniMessage.miniMessage();
     }
@@ -84,7 +97,18 @@ public final class BukkitRewardApplier implements RewardApplier {
         if (grant.commands().isEmpty()) {
             return;
         }
-        scheduler.async(() -> repository.enqueue(new QueuedReward(voter, grant.commands(), Instant.now())));
+        // The count probe and the enqueue are both DB reads/writes, so they share one async hop. A capped
+        // queue at or over its limit drops only this batch's offline reward; the vote itself still counted.
+        scheduler.async(() -> {
+            if (offlineLimit > 0 && repository.queuedCount(voter) >= offlineLimit) {
+                log.debug(
+                        "event=vote_offline_reward_capped player={} limit={}",
+                        voter.name(),
+                        Integer.toString(offlineLimit));
+                return;
+            }
+            repository.enqueue(new QueuedReward(voter, grant.commands(), Instant.now()));
+        });
     }
 
     private void applyOnline(PlayerRef voter, RewardGrant grant) {

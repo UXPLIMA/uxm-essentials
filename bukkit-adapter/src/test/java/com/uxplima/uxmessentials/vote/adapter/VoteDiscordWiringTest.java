@@ -199,6 +199,11 @@ class VoteDiscordWiringTest {
         }
 
         @Override
+        public int queuedCount(PlayerRef player) {
+            return 0;
+        }
+
+        @Override
         public VoteTally totalsOf(PlayerRef player) {
             return VoteTally.empty();
         }

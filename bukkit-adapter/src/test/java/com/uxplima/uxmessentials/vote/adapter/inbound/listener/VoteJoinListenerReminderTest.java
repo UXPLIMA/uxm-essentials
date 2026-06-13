@@ -130,7 +130,7 @@ class VoteJoinListenerReminderTest {
         ApplyQueuedRewards applyQueued = new ApplyQueuedRewards(repository, (commands, name) -> {});
         VoteReminderEligibility eligibility = new VoteReminderEligibility(repository, catalog);
         return new VoteJoinListener(
-                applyQueued, repository, scheduler, true, Duration.ofSeconds(1), eligibility, prefs, notifier);
+                applyQueued, repository, scheduler, true, true, Duration.ofSeconds(1), eligibility, prefs, notifier);
     }
 
     /** A real {@link VoteNotifier} whose {@link Messages} echoes the key and whose sink records it. */
@@ -263,6 +263,11 @@ class VoteJoinListenerReminderTest {
         @Override
         public boolean hasPending(PlayerRef player) {
             return false;
+        }
+
+        @Override
+        public int queuedCount(PlayerRef player) {
+            return 0;
         }
 
         @Override
