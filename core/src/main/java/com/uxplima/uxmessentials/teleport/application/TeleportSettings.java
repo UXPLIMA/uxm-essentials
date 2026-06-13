@@ -109,6 +109,30 @@ public final class TeleportSettings {
         return config.getBoolean("arrival-title", true);
     }
 
+    /**
+     * The arrival sound/particle effect for a {@code kind} teleport, or {@link ArrivalEffect#NONE} when the
+     * {@code arrival-effects} master toggle is off or the verb has no enabled {@code effects.<verb>} block.
+     * Read from {@code effects.<verb>.{enabled,sound,sound-volume,sound-pitch,particle,particle-count,particle-spread}}.
+     */
+    public ArrivalEffect arrivalEffect(TeleportKind kind) {
+        Objects.requireNonNull(kind, "kind");
+        if (!config.getBoolean("arrival-effects", true)) {
+            return ArrivalEffect.NONE;
+        }
+        String base = "effects." + configKey(kind);
+        if (!config.getBoolean(base + ".enabled", false)) {
+            return ArrivalEffect.NONE;
+        }
+        return new ArrivalEffect(
+                true,
+                config.getString(base + ".sound", ""),
+                config.getDouble(base + ".sound-volume", 1.0),
+                config.getDouble(base + ".sound-pitch", 1.0),
+                config.getString(base + ".particle", ""),
+                config.getInt(base + ".particle-count", 0),
+                config.getDouble(base + ".particle-spread", 0.0));
+    }
+
     /** The list of arrival messages configured for a specific teleport kind. */
     public List<String> getArrivalMessages(TeleportKind kind) {
         Objects.requireNonNull(kind, "kind");
