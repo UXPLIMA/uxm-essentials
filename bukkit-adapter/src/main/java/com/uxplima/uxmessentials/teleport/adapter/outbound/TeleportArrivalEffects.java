@@ -82,34 +82,31 @@ public final class TeleportArrivalEffects {
      * ({@code ENTITY_ENDERMAN_TELEPORT}) and the modern dot-notation form ({@code entity.enderman.teleport}).
      * Returns {@code null} when the name is blank or unrecognised — an unknown name should never throw.
      */
-    private static @Nullable Sound resolveSound(String name) {
-        @Nullable NamespacedKey key = toKey(name);
-        return key == null ? null : Registry.SOUNDS.get(key);
-    }
-
-    /**
-     * Resolve a particle by registry key using the same normalisation as {@link #resolveSound}.
-     * Returns {@code null} when the name is blank or unrecognised.
-     */
-    private static @Nullable Particle resolveParticle(String name) {
-        @Nullable NamespacedKey key = toKey(name);
-        return key == null ? null : Registry.PARTICLE_TYPE.get(key);
-    }
-
-    /**
-     * Build a {@link NamespacedKey} from either a legacy UPPER_SNAKE name ({@code ENTITY_ENDERMAN_TELEPORT})
-     * or a modern registry form ({@code entity.enderman.teleport} / {@code minecraft:entity.enderman.teleport}).
-     * Returns {@code null} for a blank input.
-     */
-    private static @Nullable NamespacedKey toKey(String name) {
+    static @Nullable Sound resolveSound(String name) {
         String normalized = name.toLowerCase(Locale.ROOT).trim();
         if (normalized.isEmpty()) {
             return null;
         }
-        // Convert UPPER_SNAKE to dot.notation only when there is no namespace and no dots already
+        // Sound registry keys use dot-notation; convert UPPER_SNAKE only when no namespace or dots present
         if (!normalized.contains(":") && !normalized.contains(".")) {
             normalized = normalized.replace('_', '.');
         }
-        return NamespacedKey.fromString(normalized);
+        @Nullable NamespacedKey key = NamespacedKey.fromString(normalized);
+        return key == null ? null : Registry.SOUNDS.get(key);
+    }
+
+    /**
+     * Resolve a particle by registry key. The Bukkit particle registry uses underscore-separated paths
+     * ({@code end_rod}, {@code dragon_breath}), so unlike sounds, underscores must NOT be converted to dots.
+     * Accepts both bare names ({@code END_ROD}, {@code end_rod}) and explicit namespace form
+     * ({@code minecraft:end_rod}). Returns {@code null} when the name is blank or unrecognised.
+     */
+    static @Nullable Particle resolveParticle(String name) {
+        String normalized = name.toLowerCase(Locale.ROOT).trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        @Nullable NamespacedKey key = NamespacedKey.fromString(normalized);
+        return key == null ? null : Registry.PARTICLE_TYPE.get(key);
     }
 }

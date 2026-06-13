@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.HashMap;
@@ -76,6 +77,17 @@ class TeleportArrivalEffectsTest {
                 "NOT_A_REAL_PARTICLE"));
 
         assertThatCode(() -> effects.arrived(ref(player), TeleportKind.HOME)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void defaultSoundAndParticleNamesResolveThroughTheRegistry() {
+        assertThat(TeleportArrivalEffects.resolveSound("ENTITY_ENDERMAN_TELEPORT"))
+                .isNotNull();
+        assertThat(TeleportArrivalEffects.resolveParticle("END_ROD")).isNotNull();
+        assertThat(TeleportArrivalEffects.resolveParticle("end_rod")).isNotNull();
+        assertThat(TeleportArrivalEffects.resolveSound("NOT_A_REAL_SOUND")).isNull();
+        assertThat(TeleportArrivalEffects.resolveParticle("NOT_A_REAL_PARTICLE"))
+                .isNull();
     }
 
     @Test
