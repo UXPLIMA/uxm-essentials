@@ -10,9 +10,7 @@ import org.bukkit.Color;
 import org.bukkit.DyeColor;
 import org.bukkit.FireworkEffect;
 import org.bukkit.Location;
-import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
-import org.bukkit.Registry;
 import org.bukkit.Sound;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
@@ -22,6 +20,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -170,13 +169,11 @@ final class KitActionEffects {
     }
 
     private static @Nullable Sound resolveSound(String raw) {
-        NamespacedKey key = NamespacedKey.fromString(raw.toLowerCase(Locale.ROOT));
-        return key == null ? null : Registry.SOUNDS.get(key);
+        return BukkitRegistryKeys.resolveSound(raw);
     }
 
     private static @Nullable Particle resolveParticle(String raw) {
-        NamespacedKey key = NamespacedKey.fromString(raw.toLowerCase(Locale.ROOT));
-        return key == null ? null : Registry.PARTICLE_TYPE.get(key);
+        return BukkitRegistryKeys.resolveParticle(raw);
     }
 
     private static Duration ticks(long count) {

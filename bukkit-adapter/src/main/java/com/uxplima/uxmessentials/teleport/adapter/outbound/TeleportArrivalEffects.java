@@ -1,16 +1,14 @@
 package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
-import java.util.Locale;
 import java.util.Objects;
 
 import org.bukkit.Location;
-import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
-import org.bukkit.Registry;
 import org.bukkit.Server;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.ArrivalEffect;
@@ -77,36 +75,12 @@ public final class TeleportArrivalEffects {
         }
     }
 
-    /**
-     * Resolve a sound by registry key, accepting both the legacy UPPER_SNAKE form
-     * ({@code ENTITY_ENDERMAN_TELEPORT}) and the modern dot-notation form ({@code entity.enderman.teleport}).
-     * Returns {@code null} when the name is blank or unrecognised — an unknown name should never throw.
-     */
+    // Thin delegators kept for the test that references them directly by class name.
     static @Nullable Sound resolveSound(String name) {
-        String normalized = name.toLowerCase(Locale.ROOT).trim();
-        if (normalized.isEmpty()) {
-            return null;
-        }
-        // Sound registry keys use dot-notation; convert UPPER_SNAKE only when no namespace or dots present
-        if (!normalized.contains(":") && !normalized.contains(".")) {
-            normalized = normalized.replace('_', '.');
-        }
-        @Nullable NamespacedKey key = NamespacedKey.fromString(normalized);
-        return key == null ? null : Registry.SOUNDS.get(key);
+        return BukkitRegistryKeys.resolveSound(name);
     }
 
-    /**
-     * Resolve a particle by registry key. The Bukkit particle registry uses underscore-separated paths
-     * ({@code end_rod}, {@code dragon_breath}), so unlike sounds, underscores must NOT be converted to dots.
-     * Accepts both bare names ({@code END_ROD}, {@code end_rod}) and explicit namespace form
-     * ({@code minecraft:end_rod}). Returns {@code null} when the name is blank or unrecognised.
-     */
     static @Nullable Particle resolveParticle(String name) {
-        String normalized = name.toLowerCase(Locale.ROOT).trim();
-        if (normalized.isEmpty()) {
-            return null;
-        }
-        @Nullable NamespacedKey key = NamespacedKey.fromString(normalized);
-        return key == null ? null : Registry.PARTICLE_TYPE.get(key);
+        return BukkitRegistryKeys.resolveParticle(name);
     }
 }

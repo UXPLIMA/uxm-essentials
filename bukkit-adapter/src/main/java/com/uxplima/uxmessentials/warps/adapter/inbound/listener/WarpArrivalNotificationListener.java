@@ -22,6 +22,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -98,45 +99,23 @@ public final class WarpArrivalNotificationListener implements Listener {
     }
 
     private void playSound(World world, Location loc, Optional<String> soundName, String fallback) {
-        Sound sound = resolveSound(soundName.orElse(fallback));
+        Sound sound = BukkitRegistryKeys.resolveSound(soundName.orElse(fallback));
         if (sound == null) {
-            sound = resolveSound(fallback);
+            sound = BukkitRegistryKeys.resolveSound(fallback);
         }
         if (sound != null) {
             world.playSound(loc, sound, 1.0f, 1.0f);
         }
     }
 
-    private static @org.jspecify.annotations.Nullable Sound resolveSound(String name) {
-        return org.bukkit.Registry.SOUNDS.get(toKey(name));
-    }
-
     private void playParticle(World world, Location loc, Optional<String> particleName, String fallback) {
-        Particle particle = resolveParticle(particleName.orElse(fallback));
+        Particle particle = BukkitRegistryKeys.resolveParticle(particleName.orElse(fallback));
         if (particle == null) {
-            particle = resolveParticle(fallback);
+            particle = BukkitRegistryKeys.resolveParticle(fallback);
         }
         if (particle != null) {
             world.spawnParticle(particle, loc, 30, 0.5, 0.5, 0.5, 0.1);
         }
-    }
-
-    private static @org.jspecify.annotations.Nullable Particle resolveParticle(String name) {
-        return org.bukkit.Registry.PARTICLE_TYPE.get(toKey(name));
-    }
-
-    /**
-     * Build a registry key from either a modern registry name ({@code entity.enderman.teleport} or
-     * {@code minecraft:entity.enderman.teleport}) or a legacy enum-style name ({@code ENTITY_ENDERMAN_TELEPORT}),
-     * so the registry-style values the editor writes and the enum-style config defaults both resolve.
-     */
-    private static org.bukkit.NamespacedKey toKey(String name) {
-        String normalized = name.toLowerCase(java.util.Locale.ROOT).trim();
-        if (!normalized.contains(":") && !normalized.contains(".")) {
-            normalized = normalized.replace('_', '.');
-        }
-        org.bukkit.NamespacedKey key = org.bukkit.NamespacedKey.fromString(normalized);
-        return key != null ? key : org.bukkit.NamespacedKey.minecraft(normalized.replace('.', '_'));
     }
 
     private void showWelcomeMessages(Player player, PlayerRef ref, PendingWarpNotification pending) {
