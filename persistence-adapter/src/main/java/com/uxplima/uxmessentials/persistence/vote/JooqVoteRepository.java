@@ -1,13 +1,16 @@
 package com.uxplima.uxmessentials.persistence.vote;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteParty.VOTE_PARTY;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.VotePartyParticipants.VOTE_PARTY_PARTICIPANTS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteQueue.VOTE_QUEUE;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteTotals.VOTE_TOTALS;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.VoteTotalsRecord;
@@ -182,6 +185,101 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                     PlayerRef ref = new PlayerRef(UUID.fromString(uuid), uuid);
                     return new VoteRanking(ref, votes);
                 }));
+    }
+
+    // -------------------------------------------------------------------------
+    // Party participants
+    // -------------------------------------------------------------------------
+
+    @Override
+    public void markPartyParticipant(PlayerRef player) {
+        Objects.requireNonNull(player, "player");
+        write(dsl -> dsl.insertInto(VOTE_PARTY_PARTICIPANTS)
+                .set(VOTE_PARTY_PARTICIPANTS.PLAYER, player.uuid().toString())
+                .onConflict(VOTE_PARTY_PARTICIPANTS.PLAYER)
+                .doNothing()
+                .execute());
+    }
+
+    @Override
+    public Set<UUID> partyParticipants() {
+        return read(dsl -> {
+            Set<UUID> uuids = new HashSet<>();
+            dsl.select(VOTE_PARTY_PARTICIPANTS.PLAYER)
+                    .from(VOTE_PARTY_PARTICIPANTS)
+                    .forEach(row -> uuids.add(UUID.fromString(row.get(VOTE_PARTY_PARTICIPANTS.PLAYER))));
+            return uuids;
+        });
+    }
+
+    @Override
+    public void clearPartyParticipants() {
+        write(dsl -> dsl.deleteFrom(VOTE_PARTY_PARTICIPANTS).execute());
+    }
+
+    // -------------------------------------------------------------------------
+    // Party period key
+    // -------------------------------------------------------------------------
+
+    @Override
+    public long partyPeriodKey() {
+        return read(dsl -> dsl.select(VOTE_PARTY.PERIOD_KEY)
+                .from(VOTE_PARTY)
+                .where(VOTE_PARTY.ID.eq(PARTY_ROW_ID))
+                .fetchOptional(VOTE_PARTY.PERIOD_KEY)
+                .orElse(0L));
+    }
+
+    @Override
+    public void setPartyPeriodKey(long key) {
+        write(dsl -> dsl.insertInto(VOTE_PARTY)
+                .set(VOTE_PARTY.ID, PARTY_ROW_ID)
+                .set(VOTE_PARTY.COUNT, 0)
+                .set(VOTE_PARTY.PERIOD_KEY, key)
+                .onConflict(VOTE_PARTY.ID)
+                .doUpdate()
+                .set(VOTE_PARTY.PERIOD_KEY, key)
+                .execute());
+    }
+
+    // -------------------------------------------------------------------------
+    // Threshold override
+    // -------------------------------------------------------------------------
+
+    @Override
+    public int thresholdOverride() {
+        return read(dsl -> dsl.select(VOTE_PARTY.THRESHOLD_OVERRIDE)
+                .from(VOTE_PARTY)
+                .where(VOTE_PARTY.ID.eq(PARTY_ROW_ID))
+                .fetchOptional(VOTE_PARTY.THRESHOLD_OVERRIDE)
+                .orElse(0));
+    }
+
+    @Override
+    public void setThresholdOverride(int override) {
+        if (override < 0) {
+            throw new IllegalArgumentException("override must not be negative: " + override);
+        }
+        write(dsl -> dsl.insertInto(VOTE_PARTY)
+                .set(VOTE_PARTY.ID, PARTY_ROW_ID)
+                .set(VOTE_PARTY.COUNT, 0)
+                .set(VOTE_PARTY.THRESHOLD_OVERRIDE, override)
+                .onConflict(VOTE_PARTY.ID)
+                .doUpdate()
+                .set(VOTE_PARTY.THRESHOLD_OVERRIDE, override)
+                .execute());
+    }
+
+    // -------------------------------------------------------------------------
+    // Admin reset
+    // -------------------------------------------------------------------------
+
+    @Override
+    public void resetTotals(PlayerRef player) {
+        Objects.requireNonNull(player, "player");
+        write(dsl -> dsl.deleteFrom(VOTE_TOTALS)
+                .where(VOTE_TOTALS.PLAYER.eq(player.uuid().toString()))
+                .execute());
     }
 
     // Maps a VotePeriod to its corresponding VOTE_TOTALS column.

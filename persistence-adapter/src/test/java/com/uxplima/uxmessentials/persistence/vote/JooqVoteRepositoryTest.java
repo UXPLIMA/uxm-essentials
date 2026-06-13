@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -173,6 +174,157 @@ class JooqVoteRepositoryTest {
         List<VoteRanking> top = repository.topVoters(VotePeriod.ALLTIME, 10);
 
         assertThat(top).extracting(VoteRanking::votes).containsExactly(200L, 100L);
+    }
+
+    // -------------------------------------------------------------------------
+    // Party participants: markPartyParticipant / partyParticipants / clearPartyParticipants
+    // -------------------------------------------------------------------------
+
+    @Test
+    void partyParticipantsIsEmptyOnFreshDatabase() {
+        assertThat(repository.partyParticipants()).isEmpty();
+    }
+
+    @Test
+    void markPartyParticipantAddsPlayerToSet() {
+        repository.markPartyParticipant(bob);
+
+        Set<UUID> participants = repository.partyParticipants();
+
+        assertThat(participants).containsExactly(bob.uuid());
+    }
+
+    @Test
+    void markPartyParticipantIsIdempotent() {
+        repository.markPartyParticipant(bob);
+        repository.markPartyParticipant(bob);
+
+        assertThat(repository.partyParticipants()).hasSize(1);
+    }
+
+    @Test
+    void clearPartyParticipantsEmptiesTheSet() {
+        PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
+        repository.markPartyParticipant(bob);
+        repository.markPartyParticipant(alice);
+
+        repository.clearPartyParticipants();
+
+        assertThat(repository.partyParticipants()).isEmpty();
+    }
+
+    @Test
+    void multipleParticipantsAreAllReturned() {
+        PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
+        PlayerRef charlie = new PlayerRef(UUID.randomUUID(), "Charlie");
+
+        repository.markPartyParticipant(bob);
+        repository.markPartyParticipant(alice);
+        repository.markPartyParticipant(charlie);
+
+        assertThat(repository.partyParticipants()).containsExactlyInAnyOrder(bob.uuid(), alice.uuid(), charlie.uuid());
+    }
+
+    // -------------------------------------------------------------------------
+    // Party period key: partyPeriodKey / setPartyPeriodKey
+    // -------------------------------------------------------------------------
+
+    @Test
+    void partyPeriodKeyIsZeroOnFreshDatabase() {
+        assertThat(repository.partyPeriodKey()).isZero();
+    }
+
+    @Test
+    void setPartyPeriodKeyRoundTrips() {
+        repository.setPartyPeriodKey(20240601L);
+
+        assertThat(repository.partyPeriodKey()).isEqualTo(20240601L);
+    }
+
+    @Test
+    void setPartyPeriodKeyOverwritesPreviousValue() {
+        repository.setPartyPeriodKey(20240101L);
+        repository.setPartyPeriodKey(20240601L);
+
+        assertThat(repository.partyPeriodKey()).isEqualTo(20240601L);
+    }
+
+    // -------------------------------------------------------------------------
+    // Threshold override: thresholdOverride / setThresholdOverride
+    // -------------------------------------------------------------------------
+
+    @Test
+    void thresholdOverrideIsZeroOnFreshDatabase() {
+        assertThat(repository.thresholdOverride()).isZero();
+    }
+
+    @Test
+    void setThresholdOverrideRoundTrips() {
+        repository.setThresholdOverride(50);
+
+        assertThat(repository.thresholdOverride()).isEqualTo(50);
+    }
+
+    @Test
+    void setThresholdOverrideToZeroClearsOverride() {
+        repository.setThresholdOverride(25);
+        repository.setThresholdOverride(0);
+
+        assertThat(repository.thresholdOverride()).isZero();
+    }
+
+    // -------------------------------------------------------------------------
+    // resetTotals
+    // -------------------------------------------------------------------------
+
+    @Test
+    void resetTotalsClearsPlayerTotals() {
+        VoteTally tally = new VoteTally(10L, 3L, 5L, 7L, 100L, 202401L, 24277L);
+        repository.saveTotals(bob, tally);
+
+        repository.resetTotals(bob);
+
+        assertThat(repository.totalsOf(bob)).isEqualTo(VoteTally.empty());
+    }
+
+    @Test
+    void resetTotalsOnUnknownPlayerIsANoop() {
+        PlayerRef stranger = new PlayerRef(UUID.randomUUID(), "Stranger");
+
+        // Should not throw.
+        repository.resetTotals(stranger);
+
+        assertThat(repository.totalsOf(stranger)).isEqualTo(VoteTally.empty());
+    }
+
+    @Test
+    void resetTotalsDoesNotAffectOtherPlayers() {
+        PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
+        VoteTally aliceTally = new VoteTally(5L, 1L, 2L, 3L, 100L, 202401L, 24277L);
+        VoteTally bobTally = new VoteTally(8L, 2L, 3L, 4L, 100L, 202401L, 24277L);
+
+        repository.saveTotals(alice, aliceTally);
+        repository.saveTotals(bob, bobTally);
+
+        repository.resetTotals(bob);
+
+        assertThat(repository.totalsOf(alice)).isEqualTo(aliceTally);
+        assertThat(repository.totalsOf(bob)).isEqualTo(VoteTally.empty());
+    }
+
+    // -------------------------------------------------------------------------
+    // Regression: existing party-count increment still works after schema change
+    // -------------------------------------------------------------------------
+
+    @Test
+    void partyCountIncrementUnaffectedByNewColumns() {
+        // Verify the id=1 row insert path (which now has new columns defaulting to 0) still works.
+        assertThat(repository.incrementAndGetPartyCount()).isEqualTo(1);
+        assertThat(repository.incrementAndGetPartyCount()).isEqualTo(2);
+
+        // New columns should read their defaults when the row was first written by the counter.
+        assertThat(repository.partyPeriodKey()).isZero();
+        assertThat(repository.thresholdOverride()).isZero();
     }
 
     private static QueuedReward reward(PlayerRef player, String command) {

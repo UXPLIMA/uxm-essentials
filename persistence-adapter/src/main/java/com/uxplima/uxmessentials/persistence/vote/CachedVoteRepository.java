@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.persistence.vote;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -84,6 +86,55 @@ public final class CachedVoteRepository implements VoteRepository {
     @Override
     public List<VoteRanking> topVoters(VotePeriod period, int limit) {
         return delegate.topVoters(period, limit);
+    }
+
+    // Party participants — not cached: membership set mutates on every vote and after each party
+    // fires, so the overhead of invalidation is higher than the cost of the small index scan.
+
+    @Override
+    public void markPartyParticipant(PlayerRef player) {
+        delegate.markPartyParticipant(player);
+    }
+
+    @Override
+    public Set<UUID> partyParticipants() {
+        return delegate.partyParticipants();
+    }
+
+    @Override
+    public void clearPartyParticipants() {
+        delegate.clearPartyParticipants();
+    }
+
+    // Party period key — not cached: read once per period-boundary check, no hot-path pressure.
+
+    @Override
+    public long partyPeriodKey() {
+        return delegate.partyPeriodKey();
+    }
+
+    @Override
+    public void setPartyPeriodKey(long key) {
+        delegate.setPartyPeriodKey(key);
+    }
+
+    // Threshold override — not cached: written by admin commands, read only at threshold evaluation.
+
+    @Override
+    public int thresholdOverride() {
+        return delegate.thresholdOverride();
+    }
+
+    @Override
+    public void setThresholdOverride(int override) {
+        delegate.setThresholdOverride(override);
+    }
+
+    // Admin reset — delegates straight through; invalidates no counter cache (totals are uncached).
+
+    @Override
+    public void resetTotals(PlayerRef player) {
+        delegate.resetTotals(player);
     }
 
     /** Drop the cached counter so the next read reloads it from the database; call on a module reload. */
