@@ -33,6 +33,10 @@ public enum VoteMessageKey implements MessageKey {
     // /vote testreward confirmation
     VOTE_TESTREWARD("vote.testreward"),
 
+    // /vote claim — paid out {count} queued rewards, or the queue was empty
+    VOTE_CLAIM_PAID("vote.claim.paid"),
+    VOTE_CLAIM_EMPTY("vote.claim.empty"),
+
     // console rejection — only a player can run /vote or /voteparty
     VOTE_PLAYERS_ONLY("vote.players-only"),
 

@@ -49,6 +49,9 @@ public interface VoteRepository {
     /** True when {@code player} has at least one pending reward batch. */
     boolean hasPending(PlayerRef player);
 
+    /** The number of queued reward commands for {@code player}; zero when the queue holds nothing for them. */
+    int queuedCount(PlayerRef player);
+
     /**
      * Return the stored {@link VoteTally} for {@code player}, or {@link VoteTally#empty()} when the
      * player has never voted on this server.

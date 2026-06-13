@@ -113,6 +113,11 @@ class TopVotersTest {
         }
 
         @Override
+        public int queuedCount(PlayerRef player) {
+            return 0;
+        }
+
+        @Override
         public void markPartyParticipant(PlayerRef player) {}
 
         @Override

@@ -151,7 +151,7 @@ class VoteCommandPathTest {
 
         HandleVote handler = new HandleVote(
                 repository,
-                new RewardEngine(catalogPerVote("per-vote")),
+                new RewardEngine(catalogPerVote("per-vote"), Set.of()),
                 applier,
                 context,
                 audience,
@@ -188,7 +188,7 @@ class VoteCommandPathTest {
         RewardCatalog catalog = new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(everyDay));
         HandleVote handler = new HandleVote(
                 repository,
-                new RewardEngine(catalog),
+                new RewardEngine(catalog, Set.of()),
                 applier,
                 context,
                 audience,
@@ -303,7 +303,7 @@ class VoteCommandPathTest {
         Instant day1 = Instant.ofEpochSecond(86400);
         HandleVote handler = new HandleVote(
                 repository,
-                new RewardEngine(catalogPerVote("cmd")),
+                new RewardEngine(catalogPerVote("cmd"), Set.of()),
                 applier,
                 context,
                 audience,
@@ -652,7 +652,7 @@ class VoteCommandPathTest {
     private HandleVote handle(RewardCatalog catalog, PartyConfig config, BroadcastSettings settings) {
         return new HandleVote(
                 repository,
-                new RewardEngine(catalog),
+                new RewardEngine(catalog, Set.of()),
                 applier,
                 context,
                 audience,
@@ -781,6 +781,11 @@ class VoteCommandPathTest {
         @Override
         public boolean hasPending(PlayerRef player) {
             return queue.containsKey(player.uuid());
+        }
+
+        @Override
+        public int queuedCount(PlayerRef player) {
+            return queue.getOrDefault(player.uuid(), List.of()).size();
         }
 
         @Override
@@ -950,7 +955,7 @@ class VoteCommandPathTest {
         TrackingSiteRepository trackingRepo = new TrackingSiteRepository();
         HandleVote handler = new HandleVote(
                 trackingRepo,
-                new RewardEngine(catalogPerVote("give {player} diamond 1")),
+                new RewardEngine(catalogPerVote("give {player} diamond 1"), Set.of()),
                 applier,
                 context,
                 audience,

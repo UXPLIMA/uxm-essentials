@@ -1,8 +1,12 @@
 package com.uxplima.uxmessentials.vote.application;
 
+import static java.util.stream.Collectors.toUnmodifiableSet;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.vote.domain.reward.MilestoneReward;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
@@ -27,18 +31,35 @@ import com.uxplima.uxmessentials.vote.domain.reward.StreakReward;
  * <p>The world gate treats an offline voter (empty {@code worldName}) as having no world to satisfy a
  * filter against: a spec with a world filter is skipped offline, while a spec with no world filter passes
  * regardless of online status.
+ *
+ * <p>Distinct from the per-spec world filter, the engine also holds a global set of disabled worlds: a
+ * vote cast in one of those worlds earns nothing at all, no matter what specs would otherwise match. The
+ * set is matched case-insensitively and an empty set disables nothing.
  */
 public final class RewardEngine {
 
     private final RewardCatalog catalog;
+    private final Set<String> disabledWorlds;
 
-    public RewardEngine(RewardCatalog catalog) {
+    /**
+     * @param catalog        the fixed reward catalog this engine resolves against; must not be {@code null}
+     * @param disabledWorlds worlds in which a vote earns no rewards at all, matched case-insensitively;
+     *                       an empty set disables nothing
+     */
+    public RewardEngine(RewardCatalog catalog, Set<String> disabledWorlds) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
+        Objects.requireNonNull(disabledWorlds, "disabledWorlds");
+        this.disabledWorlds =
+                disabledWorlds.stream().map(s -> s.toLowerCase(Locale.ROOT)).collect(toUnmodifiableSet());
     }
 
     /** Resolve the grants {@code ctx} earns from the catalog, in candidate order (per-vote, site, first-vote, milestones). */
     public List<RewardGrant> resolve(RewardContext ctx) {
         Objects.requireNonNull(ctx, "ctx");
+        if (!ctx.worldName().isBlank()
+                && disabledWorlds.contains(ctx.worldName().toLowerCase(Locale.ROOT))) {
+            return List.of();
+        }
         List<RewardGrant> grants = new ArrayList<>();
         for (RewardSpec spec : candidates(ctx)) {
             if (passesAllGates(spec, ctx)) {

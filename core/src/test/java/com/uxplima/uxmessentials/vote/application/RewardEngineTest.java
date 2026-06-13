@@ -122,7 +122,7 @@ class RewardEngineTest {
     @Test
     void firstVoteSpecOnlyFiresWhenTheAllTimeCountIsOne() {
         RewardCatalog catalog = new RewardCatalog(List.of(), Map.of(), List.of(spec("welcome")), List.of(), List.of());
-        RewardEngine engine = new RewardEngine(catalog);
+        RewardEngine engine = new RewardEngine(catalog, Set.of());
 
         assertThat(commandsOf(engine.resolve(
                         ctx(tally(1), "site", true, "world", RewardEngineTest::allPerms, RewardEngineTest::always))))
@@ -135,8 +135,8 @@ class RewardEngineTest {
     @Test
     void milestoneAtFiresOnlyOnTheExactCount() {
         MilestoneReward at100 = new MilestoneReward(OptionalLong.of(100), OptionalLong.empty(), spec("milestone-100"));
-        RewardEngine engine =
-                new RewardEngine(new RewardCatalog(List.of(), Map.of(), List.of(), List.of(at100), List.of()));
+        RewardEngine engine = new RewardEngine(
+                new RewardCatalog(List.of(), Map.of(), List.of(), List.of(at100), List.of()), Set.of());
 
         assertThat(commandsOf(engine.resolve(
                         ctx(tally(100), "site", true, "world", RewardEngineTest::allPerms, RewardEngineTest::always))))
@@ -152,8 +152,8 @@ class RewardEngineTest {
     @Test
     void milestoneEveryFiresOnEveryMultiple() {
         MilestoneReward every10 = new MilestoneReward(OptionalLong.empty(), OptionalLong.of(10), spec("milestone-10s"));
-        RewardEngine engine =
-                new RewardEngine(new RewardCatalog(List.of(), Map.of(), List.of(), List.of(every10), List.of()));
+        RewardEngine engine = new RewardEngine(
+                new RewardCatalog(List.of(), Map.of(), List.of(), List.of(every10), List.of()), Set.of());
 
         assertThat(commandsOf(engine.resolve(
                         ctx(tally(10), "site", true, "world", RewardEngineTest::allPerms, RewardEngineTest::always))))
@@ -170,7 +170,7 @@ class RewardEngineTest {
     void perSiteMatchingIsCaseInsensitive() {
         RewardCatalog catalog = new RewardCatalog(
                 List.of(), Map.of("PlanetMinecraft", List.of(spec("site-bonus"))), List.of(), List.of(), List.of());
-        RewardEngine engine = new RewardEngine(catalog);
+        RewardEngine engine = new RewardEngine(catalog, Set.of());
 
         assertThat(commandsOf(engine.resolve(ctx(
                         tally(5),
@@ -194,7 +194,7 @@ class RewardEngineTest {
                 List.of(spec("first-vote")),
                 List.of(every1),
                 List.of());
-        RewardEngine engine = new RewardEngine(catalog);
+        RewardEngine engine = new RewardEngine(catalog, Set.of());
 
         // alltime == 1 fires all four sets; order is per-vote, site, first-vote, milestones.
         List<RewardGrant> grants = engine.resolve(
@@ -207,7 +207,7 @@ class RewardEngineTest {
     void streakRewardFiresWhenTheStreakAdvancedAndMatches() {
         StreakReward at7 = new StreakReward(OptionalLong.of(7), OptionalLong.empty(), spec("streak-7"));
         RewardEngine engine =
-                new RewardEngine(new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(at7)));
+                new RewardEngine(new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(at7)), Set.of());
 
         assertThat(commandsOf(engine.resolve(streakCtx(streakTally(7), true)))).containsExactly("streak-7");
     }
@@ -215,8 +215,8 @@ class RewardEngineTest {
     @Test
     void streakRewardDoesNotFireWhenTheStreakDidNotAdvanceEvenIfEveryMatches() {
         StreakReward every1 = new StreakReward(OptionalLong.empty(), OptionalLong.of(1), spec("streak-daily"));
-        RewardEngine engine =
-                new RewardEngine(new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(every1)));
+        RewardEngine engine = new RewardEngine(
+                new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(every1)), Set.of());
 
         // A same-day re-vote leaves streakAdvanced false, so the recurring streak reward must not fire.
         assertThat(engine.resolve(streakCtx(streakTally(3), false))).isEmpty();
@@ -227,8 +227,8 @@ class RewardEngineTest {
     @Test
     void streakRewardEveryFiresOnEachMultiple() {
         StreakReward every5 = new StreakReward(OptionalLong.empty(), OptionalLong.of(5), spec("streak-5s"));
-        RewardEngine engine =
-                new RewardEngine(new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(every5)));
+        RewardEngine engine = new RewardEngine(
+                new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(every5)), Set.of());
 
         assertThat(commandsOf(engine.resolve(streakCtx(streakTally(5), true)))).containsExactly("streak-5s");
         assertThat(commandsOf(engine.resolve(streakCtx(streakTally(10), true)))).containsExactly("streak-5s");
@@ -242,7 +242,7 @@ class RewardEngineTest {
                 OptionalLong.empty(),
                 new RewardSpec(50, Optional.empty(), List.of("streak-3"), List.of(), List.of(), List.of(), Set.of()));
         RewardEngine engine =
-                new RewardEngine(new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(at3)));
+                new RewardEngine(new RewardCatalog(List.of(), Map.of(), List.of(), List.of(), List.of(at3)), Set.of());
 
         RewardContext failingRoll = new RewardContext(
                 VOTER,
@@ -256,8 +256,55 @@ class RewardEngineTest {
         assertThat(engine.resolve(failingRoll)).isEmpty();
     }
 
+    @Test
+    void aVoteCastInAGloballyDisabledWorldEarnsNothing() {
+        RewardEngine engine = new RewardEngine(
+                new RewardCatalog(perVote(spec("give x")), Map.of(), List.of(), List.of(), List.of()),
+                Set.of("creative"));
+
+        List<RewardGrant> grants = engine.resolve(
+                ctx(tally(1), "site", true, "creative", RewardEngineTest::allPerms, RewardEngineTest::always));
+
+        assertThat(grants).isEmpty();
+    }
+
+    @Test
+    void aVoteCastOutsideTheDisabledSetIsUnaffected() {
+        RewardEngine engine = new RewardEngine(
+                new RewardCatalog(perVote(spec("give x")), Map.of(), List.of(), List.of(), List.of()),
+                Set.of("creative"));
+
+        List<RewardGrant> grants = engine.resolve(
+                ctx(tally(1), "site", true, "world", RewardEngineTest::allPerms, RewardEngineTest::always));
+
+        assertThat(commandsOf(grants)).containsExactly("give x");
+    }
+
+    @Test
+    void theGlobalDisabledWorldMatchIsCaseInsensitive() {
+        RewardEngine engine = new RewardEngine(
+                new RewardCatalog(perVote(spec("give x")), Map.of(), List.of(), List.of(), List.of()),
+                Set.of("Creative"));
+
+        List<RewardGrant> grants = engine.resolve(
+                ctx(tally(1), "site", true, "creative", RewardEngineTest::allPerms, RewardEngineTest::always));
+
+        assertThat(grants).isEmpty();
+    }
+
+    @Test
+    void anEmptyDisabledWorldSetLeavesEveryWorldEnabled() {
+        RewardEngine engine = new RewardEngine(
+                new RewardCatalog(perVote(spec("give x")), Map.of(), List.of(), List.of(), List.of()), Set.of());
+
+        List<RewardGrant> grants = engine.resolve(
+                ctx(tally(1), "site", true, "creative", RewardEngineTest::allPerms, RewardEngineTest::always));
+
+        assertThat(commandsOf(grants)).containsExactly("give x");
+    }
+
     private static RewardEngine engine(List<RewardSpec> perVote) {
-        return new RewardEngine(new RewardCatalog(perVote, Map.of(), List.of(), List.of(), List.of()));
+        return new RewardEngine(new RewardCatalog(perVote, Map.of(), List.of(), List.of(), List.of()), Set.of());
     }
 
     private static List<RewardSpec> perVote(RewardSpec spec) {
