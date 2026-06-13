@@ -242,6 +242,21 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                 .execute());
     }
 
+    @Override
+    public boolean claimPartyFire(int threshold) {
+        if (threshold < 1) {
+            throw new IllegalArgumentException("threshold must be at least one: " + threshold);
+        }
+        // A single UPDATE that sets count=0 only when count>=threshold. SQLite serialises writes so
+        // exactly one concurrent caller sees count>=threshold; the rest find count already at 0 and
+        // update 0 rows, returning false.
+        return write(dsl -> dsl.update(VOTE_PARTY)
+                        .set(VOTE_PARTY.COUNT, 0)
+                        .where(VOTE_PARTY.ID.eq(PARTY_ROW_ID).and(VOTE_PARTY.COUNT.ge(threshold)))
+                        .execute()
+                > 0);
+    }
+
     // -------------------------------------------------------------------------
     // Threshold override
     // -------------------------------------------------------------------------

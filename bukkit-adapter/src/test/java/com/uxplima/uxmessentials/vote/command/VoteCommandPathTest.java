@@ -446,6 +446,11 @@ class VoteCommandPathTest {
         public void setThresholdOverride(int override) {}
 
         @Override
+        public boolean claimPartyFire(int threshold) {
+            return false;
+        }
+
+        @Override
         public void resetTotals(PlayerRef player) {
             resetCalls.add(player);
         }

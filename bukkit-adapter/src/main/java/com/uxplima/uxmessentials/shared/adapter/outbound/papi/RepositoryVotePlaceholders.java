@@ -11,19 +11,22 @@ import org.jspecify.annotations.NullMarked;
  * {@link VotePlaceholders} over the vote context's read ports: the {@link VoteRepository} tally and
  * party counter. Built during vote wiring from the same repository the {@code HandleVote} use case
  * holds, so the placeholder counts match what the leaderboard and total commands display.
+ *
+ * <p>The threshold placeholders reflect the <em>effective</em> threshold — the stored override when
+ * one is active, the configured base otherwise — so they stay accurate under escalation.
  */
 @NullMarked
 public final class RepositoryVotePlaceholders implements VotePlaceholders {
 
     private final VoteRepository repository;
-    private final int threshold;
+    private final int baseThreshold;
 
-    public RepositoryVotePlaceholders(VoteRepository repository, int threshold) {
+    public RepositoryVotePlaceholders(VoteRepository repository, int baseThreshold) {
         this.repository = Objects.requireNonNull(repository, "repository");
-        if (threshold < 1) {
-            throw new IllegalArgumentException("threshold must be at least one: " + threshold);
+        if (baseThreshold < 1) {
+            throw new IllegalArgumentException("baseThreshold must be at least one: " + baseThreshold);
         }
-        this.threshold = threshold;
+        this.baseThreshold = baseThreshold;
     }
 
     @Override
@@ -40,6 +43,7 @@ public final class RepositoryVotePlaceholders implements VotePlaceholders {
 
     @Override
     public int partyThreshold() {
-        return threshold;
+        int override = repository.thresholdOverride();
+        return override > 0 ? override : baseThreshold;
     }
 }

@@ -338,6 +338,97 @@ class VoteCommandPathTest {
         assertThat(repository.totalsOf(alice).alltime()).isZero();
     }
 
+    // -------------------------------------------------------------------------
+    // Fix C: atomic party-fire claim
+    // -------------------------------------------------------------------------
+
+    @Test
+    void claimPartyFireReturnsTrueOnceAndFalseOnSecondCall() {
+        repository.setPartyCount(25);
+        // First claim wins the reset.
+        assertThat(repository.claimPartyFire(25)).isTrue();
+        assertThat(repository.partyCount()).isZero();
+        // Second call at the same threshold finds count=0 < 25 → does not reset, returns false.
+        assertThat(repository.claimPartyFire(25)).isFalse();
+        assertThat(repository.partyCount()).isZero();
+    }
+
+    @Test
+    void handleVoteCounterIsZeroAfterThresholdCrossedViaClaim() {
+        context.online.add(alice.uuid());
+        audience.players.add(alice);
+        repository.setPartyCount(24);
+
+        HandleVote.Outcome outcome =
+                handle(catalogPerVote("cmd"), partyConfig("party cmd", 25)).handle(voteBy(alice));
+
+        assertThat(outcome.partyTriggered()).isTrue();
+        // claimPartyFire atomically reset the counter; no separate setPartyCount(0) in fire().
+        assertThat(repository.partyCount()).isZero();
+    }
+
+    @Test
+    void forcePartyResetsCounterExplicitlyBeforeFire() {
+        context.online.add(alice.uuid());
+        audience.players.add(alice);
+        repository.setPartyCount(10);
+
+        new ForceParty(repository, applier, audience, notifier, events, partyConfig("cmd", 25)).execute(alice);
+
+        assertThat(repository.partyCount()).isZero();
+        assertThat(events.published).anyMatch(e -> e instanceof VotePartyTriggered);
+    }
+
+    // -------------------------------------------------------------------------
+    // Fix A: escalation clearable
+    // -------------------------------------------------------------------------
+
+    @Test
+    void setPartyCountClearsThresholdOverride() {
+        repository.setThresholdOverride(35);
+
+        new SetPartyCount(repository, notifier).set(alice, 0);
+
+        assertThat(repository.thresholdOverride()).isZero();
+    }
+
+    @Test
+    void escalateByZeroFireClearsExistingOverride() {
+        context.online.add(alice.uuid());
+        audience.players.add(alice);
+        // Override is 35 from a prior escalation; set count to 34 so the next vote crosses it.
+        repository.setPartyCount(34);
+        repository.setThresholdOverride(35);
+
+        // escalateBy=0: party fires at the effective threshold (35) and must clear the override.
+        PartyConfig config = new PartyConfig(alwaysSpec("party cmd"), 25, false, 0, PartyResetSchedule.NONE, List.of());
+        HandleVote.Outcome outcome = handle(catalogPerVote("cmd"), config).handle(voteBy(alice));
+
+        assertThat(outcome.partyTriggered()).isTrue();
+        assertThat(repository.thresholdOverride()).isZero();
+    }
+
+    // -------------------------------------------------------------------------
+    // Fix B: effective threshold in status and PAPI
+    // -------------------------------------------------------------------------
+
+    @Test
+    void votePartyStatusShowsEscalatedThreshold() {
+        repository.setThresholdOverride(40);
+        repository.setPartyCount(10);
+
+        CapturingSink sink = new CapturingSink();
+        // Use a Messages implementation that embeds placeholder values in the delivery so we can
+        // assert on the actual threshold and remaining figures rather than the raw key name.
+        VoteNotifier statusNotifier = new VoteNotifier(new PlaceholderEchoMessages(), sink);
+        // baseThreshold=25; override=40 → effective=40, remaining=30
+        VotePartyStatus status = new VotePartyStatus(repository, statusNotifier, 25);
+        status.show(alice);
+
+        // Delivery must embed the effective threshold (40) and remaining (30), not the base (25).
+        assertThat(sink.deliveries).anyMatch(s -> s.contains("threshold=40") && s.contains("remaining=30"));
+    }
+
     private HandleVote handle(RewardCatalog catalog, PartyConfig config) {
         return new HandleVote(
                 repository,
@@ -441,6 +532,15 @@ class VoteCommandPathTest {
         @Override
         public int incrementAndGetPartyCount() {
             return ++count;
+        }
+
+        @Override
+        public boolean claimPartyFire(int threshold) {
+            if (count >= threshold) {
+                count = 0;
+                return true;
+            }
+            return false;
         }
 
         @Override
@@ -549,6 +649,18 @@ class VoteCommandPathTest {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
             deliveries.add(renderedText);
+        }
+    }
+
+    /** A {@link Messages} fake that echoes every placeholder as {@code key=value} pairs in the delivery. */
+    private static final class PlaceholderEchoMessages implements Messages {
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            StringBuilder sb = new StringBuilder(key.key());
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                sb.append(' ').append(entry.getKey()).append('=').append(entry.getValue());
+            }
+            return sb.toString();
         }
     }
 

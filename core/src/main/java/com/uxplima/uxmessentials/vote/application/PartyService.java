@@ -68,10 +68,16 @@ final class PartyService {
 
         events.publish(new VotePartyTriggered(effectiveThreshold));
         repository.clearPartyParticipants();
-        repository.setPartyCount(0);
+        // Counter reset is the caller's responsibility: HandleVote uses claimPartyFire (atomic),
+        // ForceParty calls setPartyCount(0) before entering here. The reset must not happen here
+        // because the atomic claim in HandleVote has already zeroed the row before fire() is called.
 
         if (party.escalateBy() > 0) {
             repository.setThresholdOverride(effectiveThreshold + party.escalateBy());
+        } else {
+            // escalate-by = 0 (or was turned off in config): clear any stored override so the next
+            // party reverts to the base threshold rather than keeping a ratcheted value.
+            repository.setThresholdOverride(0);
         }
     }
 

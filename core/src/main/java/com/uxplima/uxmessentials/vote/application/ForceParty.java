@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
  */
 public final class ForceParty {
 
+    private final VoteRepository repository;
     private final PartyService partyService;
     private final VoteAudience audience;
     private final VoteNotifier notifier;
@@ -25,7 +26,7 @@ public final class ForceParty {
             VoteNotifier notifier,
             DomainEventPublisher events,
             PartyConfig party) {
-        Objects.requireNonNull(repository, "repository");
+        this.repository = Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(applier, "applier");
         this.audience = Objects.requireNonNull(audience, "audience");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -35,12 +36,14 @@ public final class ForceParty {
     }
 
     /**
-     * Force the party to fire immediately. The effective threshold at the moment of forcing is used
-     * for the event and notification, then the counter resets and escalation applies as normal.
+     * Force the party to fire immediately, regardless of the current counter value. The counter is
+     * reset to zero before firing so the reset ownership model is consistent: PartyService.fire never
+     * resets the counter itself, each call site is responsible.
      */
     public void execute(PlayerRef actor) {
         Objects.requireNonNull(actor, "actor");
         int threshold = partyService.effectiveThreshold();
+        repository.setPartyCount(0);
         partyService.fire(threshold);
         notifier.send(actor, VoteMessageKey.VOTEPARTY_FORCED);
         for (PlayerRef online : audience.online()) {

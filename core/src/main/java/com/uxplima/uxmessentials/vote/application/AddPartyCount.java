@@ -40,6 +40,11 @@ public final class AddPartyCount {
      * Add {@code amount} to the counter and fire a party if the threshold is now reached. Notifies
      * {@code actor} of the new count (or the party fire).
      *
+     * <p>When the new count would reach the threshold the counter is written first, then
+     * {@link VoteRepository#claimPartyFire} atomically claims the reset so the logic stays
+     * consistent with the {@link HandleVote} path (only one caller fires even if two admin commands
+     * race, which is unlikely but guarded for correctness).
+     *
      * @param actor  the admin running the command
      * @param amount the number of votes to add (must be positive)
      */
@@ -51,7 +56,10 @@ public final class AddPartyCount {
         int newCount = repository.partyCount() + amount;
         int threshold = partyService.effectiveThreshold();
         if (newCount >= threshold) {
-            partyService.fire(threshold);
+            repository.setPartyCount(newCount);
+            if (repository.claimPartyFire(threshold)) {
+                partyService.fire(threshold);
+            }
         } else {
             repository.setPartyCount(newCount);
             notifier.send(actor, VoteMessageKey.VOTEPARTY_COUNT_SET, Map.of("count", Integer.toString(newCount)));

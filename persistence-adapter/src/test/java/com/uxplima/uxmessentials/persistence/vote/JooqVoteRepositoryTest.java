@@ -313,6 +313,47 @@ class JooqVoteRepositoryTest {
     }
 
     // -------------------------------------------------------------------------
+    // claimPartyFire: atomic compare-and-reset
+    // -------------------------------------------------------------------------
+
+    @Test
+    void claimPartyFireReturnsTrueAndResetsCountWhenAtThreshold() {
+        repository.setPartyCount(25);
+
+        assertThat(repository.claimPartyFire(25)).isTrue();
+        assertThat(repository.partyCount()).isZero();
+    }
+
+    @Test
+    void claimPartyFireReturnsTrueAndResetsCountWhenAboveThreshold() {
+        repository.setPartyCount(26);
+
+        assertThat(repository.claimPartyFire(25)).isTrue();
+        assertThat(repository.partyCount()).isZero();
+    }
+
+    @Test
+    void claimPartyFireReturnsFalseWhenCountBelowThreshold() {
+        repository.setPartyCount(24);
+
+        assertThat(repository.claimPartyFire(25)).isFalse();
+        // Counter was not touched.
+        assertThat(repository.partyCount()).isEqualTo(24);
+    }
+
+    @Test
+    void claimPartyFireReturnsFalseOnSecondCallAfterFirstWon() {
+        repository.setPartyCount(25);
+
+        boolean firstWin = repository.claimPartyFire(25);
+        boolean secondWin = repository.claimPartyFire(25);
+
+        assertThat(firstWin).isTrue();
+        assertThat(secondWin).isFalse();
+        assertThat(repository.partyCount()).isZero();
+    }
+
+    // -------------------------------------------------------------------------
     // Regression: existing party-count increment still works after schema change
     // -------------------------------------------------------------------------
 

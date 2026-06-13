@@ -21,7 +21,10 @@ public final class SetPartyCount {
     }
 
     /**
-     * Set the party counter to {@code count} and notify {@code actor}.
+     * Set the party counter to {@code count} and notify {@code actor}. Also clears any stored
+     * threshold override so the effective threshold reverts to the configured base — matching the
+     * documented behaviour of {@code /voteparty set <n>} and making "reset escalation" an explicit
+     * admin action rather than an implicit side effect.
      *
      * @param actor the admin running the command (receives confirmation)
      * @param count the new counter value (must not be negative)
@@ -32,6 +35,7 @@ public final class SetPartyCount {
             throw new IllegalArgumentException("count must not be negative: " + count);
         }
         repository.setPartyCount(count);
+        repository.setThresholdOverride(0);
         notifier.send(actor, VoteMessageKey.VOTEPARTY_COUNT_SET, Map.of("count", Integer.toString(count)));
     }
 }

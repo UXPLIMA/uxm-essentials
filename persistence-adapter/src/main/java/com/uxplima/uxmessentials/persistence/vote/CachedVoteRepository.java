@@ -88,6 +88,16 @@ public final class CachedVoteRepository implements VoteRepository {
         return delegate.topVoters(period, limit);
     }
 
+    @Override
+    public boolean claimPartyFire(int threshold) {
+        boolean won = delegate.claimPartyFire(threshold);
+        if (won) {
+            // The durable store now holds 0; align the cache so subsequent partyCount() reads are correct.
+            cachedCount.set(0);
+        }
+        return won;
+    }
+
     // Party participants — not cached: membership set mutates on every vote and after each party
     // fires, so the overhead of invalidation is higher than the cost of the small index scan.
 

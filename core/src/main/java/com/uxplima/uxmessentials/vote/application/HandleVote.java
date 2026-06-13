@@ -105,7 +105,8 @@ public final class HandleVote {
         int newCount = repository.incrementAndGetPartyCount();
         int threshold = partyService.effectiveThreshold();
         maybeAnnounce(newCount, threshold);
-        if (newCount >= threshold) {
+        if (newCount >= threshold && repository.claimPartyFire(threshold)) {
+            // claimPartyFire atomically reset the counter to 0; only this thread proceeds to fire.
             partyService.fire(threshold);
             return true;
         }

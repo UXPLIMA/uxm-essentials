@@ -109,6 +109,20 @@ public interface VoteRepository {
     /** Persist the threshold override (positive) or clear it (0). */
     void setThresholdOverride(int override);
 
+    /**
+     * Atomically reset the party counter to zero <em>only if</em> the current persisted value is
+     * {@code >= threshold}, and return {@code true} when this call performed the reset. Exactly one
+     * concurrent caller wins the compare-and-reset; all others see the counter already at zero and
+     * receive {@code false}. Callers that win are responsible for firing the party; callers that lose
+     * must not fire.
+     *
+     * <p>This prevents the double-fire window that arises when two votes each increment the counter
+     * past the threshold before the first reset lands: with a read-then-write approach both callers
+     * would see {@code newCount >= threshold} and both would fire. The atomic operation serialises
+     * the decision so only one caller proceeds.
+     */
+    boolean claimPartyFire(int threshold);
+
     // --- Admin reset ---
 
     /**
