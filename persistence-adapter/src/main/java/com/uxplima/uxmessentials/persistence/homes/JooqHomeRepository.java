@@ -97,6 +97,7 @@ public final class JooqHomeRepository extends JooqRepository implements HomeRepo
                 .set(HOMES.Z, record.getZ())
                 .set(HOMES.YAW, record.getYaw())
                 .set(HOMES.PITCH, record.getPitch())
+                .set(HOMES.PUBLIC, record.getPublic())
                 .set(HOMES.UPDATED_AT, record.getUpdatedAt())
                 .execute();
     }

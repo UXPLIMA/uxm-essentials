@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.persistence.homes;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import org.jspecify.annotations.NullMarked;
@@ -33,5 +34,16 @@ public final class HomeRepositories {
     public static CachedHomeRepository cachedConcrete(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedHomeRepository(new JooqHomeRepository(persistence.dsl()));
+    }
+
+    /**
+     * A jOOQ {@link HomeInviteRepository} over the shared persistence DSL. Invite lists are small and
+     * short-lived enough that an in-process cache adds more complexity than it saves — every read hits the
+     * DB directly, which keeps the invite state consistent across a multi-server deployment without
+     * requiring a cross-server invalidation channel.
+     */
+    public static HomeInviteRepository homeInviteRepository(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqHomeInviteRepository(persistence.dsl());
     }
 }

@@ -60,6 +60,7 @@ class JooqMainHomePreferenceTest {
                 Position.of(WORLD, 10, 64, 20),
                 Optional.of(HomeLabel.of("Base")),
                 Optional.of(HomeIcon.of("GRASS_BLOCK")),
+                false,
                 Instant.ofEpochMilli(1_000),
                 Instant.ofEpochMilli(2_000));
 
@@ -97,6 +98,7 @@ class JooqMainHomePreferenceTest {
                 Position.of(WORLD, x, 64, x),
                 Optional.empty(),
                 Optional.empty(),
+                false,
                 Instant.ofEpochMilli(1_000),
                 Instant.ofEpochMilli(1_000));
     }

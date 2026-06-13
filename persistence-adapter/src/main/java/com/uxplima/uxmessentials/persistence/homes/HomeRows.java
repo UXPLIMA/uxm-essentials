@@ -48,6 +48,7 @@ final class HomeRows {
                 position,
                 label,
                 icon,
+                row.get(HOMES.PUBLIC) != 0,
                 Instant.ofEpochMilli(row.get(HOMES.CREATED_AT)),
                 Instant.ofEpochMilli(row.get(HOMES.UPDATED_AT)));
     }
@@ -66,6 +67,7 @@ final class HomeRows {
                 .setZ(location.z())
                 .setYaw(location.yaw())
                 .setPitch(location.pitch())
+                .setPublic(home.isPublic() ? 1 : 0)
                 .setCreatedAt(home.createdAt().toEpochMilli())
                 .setUpdatedAt(home.updatedAt().toEpochMilli());
     }

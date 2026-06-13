@@ -125,6 +125,7 @@ class JooqHomeRepositoryTest {
                 Position.of(WORLD, 5, 64, 5),
                 Optional.of(HomeLabel.of("Base")),
                 Optional.of(HomeIcon.of("GRASS_BLOCK")),
+                false,
                 Instant.ofEpochMilli(1_000),
                 Instant.ofEpochMilli(2_000));
         repository.save(withCosmetics);
@@ -166,6 +167,7 @@ class JooqHomeRepositoryTest {
                 Position.of(WORLD, 5, 64, 5),
                 Optional.of(HomeLabel.of("Camp")),
                 Optional.of(HomeIcon.of("OAK_LOG")),
+                false,
                 Instant.ofEpochMilli(1_000),
                 Instant.ofEpochMilli(3_000));
         repository.save(updated);
@@ -176,6 +178,50 @@ class JooqHomeRepositoryTest {
         assertThat(reloaded.icon()).contains(HomeIcon.of("OAK_LOG"));
     }
 
+    @Test
+    void visibilityRoundTripPublicHome() {
+        Home publicHome = new Home(
+                owner,
+                HomeSlot.of(0),
+                Position.of(WORLD, 5, 64, 5),
+                Optional.empty(),
+                Optional.empty(),
+                true,
+                Instant.ofEpochMilli(1_000),
+                Instant.ofEpochMilli(1_000));
+        repository.save(publicHome);
+
+        Home reloaded = repository.findSlot(owner, HomeSlot.of(0)).orElseThrow();
+        assertThat(reloaded.isPublic()).isTrue();
+    }
+
+    @Test
+    void visibilityDefaultsToPrivate() {
+        repository.save(home(HomeSlot.of(0), 0, 64, 0));
+
+        Home reloaded = repository.findSlot(owner, HomeSlot.of(0)).orElseThrow();
+        assertThat(reloaded.isPublic()).isFalse();
+    }
+
+    @Test
+    void upsertUpdatesVisibility() {
+        repository.save(home(HomeSlot.of(0), 0, 64, 0)); // private by default
+        Home madePublic = new Home(
+                owner,
+                HomeSlot.of(0),
+                Position.of(WORLD, 0, 64, 0),
+                Optional.empty(),
+                Optional.empty(),
+                true,
+                Instant.ofEpochMilli(1_000),
+                Instant.ofEpochMilli(2_000));
+        repository.save(madePublic);
+
+        assertThat(repository.count(owner)).isEqualTo(1);
+        assertThat(repository.findSlot(owner, HomeSlot.of(0)).orElseThrow().isPublic())
+                .isTrue();
+    }
+
     private Home home(HomeSlot slot, double x, double y, double z) {
         return new Home(
                 owner,
@@ -183,6 +229,7 @@ class JooqHomeRepositoryTest {
                 Position.of(WORLD, x, y, z),
                 Optional.empty(),
                 Optional.empty(),
+                false,
                 Instant.ofEpochMilli(1_000),
                 Instant.ofEpochMilli(1_000));
     }
