@@ -5,6 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
@@ -31,7 +32,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * @param handleVote the core use case the Votifier listener and {@code /vote testreward} drive
  * @param applyQueuedRewards the join handler that pays out an offline voter's queued rewards
- * @param voteLinks the {@code /vote} display of the configured vote links
+ * @param voteLinks the {@code /vote} display of the configured vote links (used in chat mode)
+ * @param voteSitesGui the GUI view for {@code /vote sites} and {@code /vote} in GUI mode
  * @param votePartyStatus the {@code /voteparty} party-progress display
  * @param showVoteTotals the {@code /vote total [player]} per-player tally display
  * @param topVoters the {@code /vote top [period]} leaderboard display
@@ -53,6 +55,7 @@ public record VoteServices(
         HandleVote handleVote,
         ApplyQueuedRewards applyQueuedRewards,
         VoteLinks voteLinks,
+        VoteSitesGuiView voteSitesGui,
         VotePartyStatus votePartyStatus,
         ShowVoteTotals showVoteTotals,
         TopVoters topVoters,
@@ -73,6 +76,7 @@ public record VoteServices(
         Objects.requireNonNull(handleVote, "handleVote");
         Objects.requireNonNull(applyQueuedRewards, "applyQueuedRewards");
         Objects.requireNonNull(voteLinks, "voteLinks");
+        Objects.requireNonNull(voteSitesGui, "voteSitesGui");
         Objects.requireNonNull(votePartyStatus, "votePartyStatus");
         Objects.requireNonNull(showVoteTotals, "showVoteTotals");
         Objects.requireNonNull(topVoters, "topVoters");

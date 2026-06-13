@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -19,6 +20,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
@@ -33,7 +35,7 @@ import org.jspecify.annotations.Nullable;
  * player. Subcommands:
  *
  * <ul>
- *   <li>{@code testreward} — simulates a vote for the sender so an operator can verify rewards.
+ *   <li>{@code sites} — open the vote-sites GUI (or fall back to chat links when gui mode is off).
  *   <li>{@code total [player]} — show the sender's (or another player's) accumulated vote totals
  *       across all periods. Gated by {@code uxmessentials.vote.use}.
  *   <li>{@code top [daily|weekly|monthly|alltime]} — show the leaderboard for the given period
@@ -61,10 +63,12 @@ public final class VoteCommand implements CommandRegistration {
 
     private final VoteServices services;
     private final CommandFeedback feedback;
+    private final Supplier<ListDisplayMode> displayMode;
 
-    public VoteCommand(VoteServices services) {
+    public VoteCommand(VoteServices services, Supplier<ListDisplayMode> displayMode) {
         this.services = Objects.requireNonNull(services, "services");
         this.feedback = new CommandFeedback(services.messages());
+        this.displayMode = Objects.requireNonNull(displayMode, "displayMode");
     }
 
     @Override
@@ -72,6 +76,7 @@ public final class VoteCommand implements CommandRegistration {
         return Commands.literal("vote")
                 .requires(src -> src.getSender().hasPermission(USE_PERMISSION))
                 .executes(this::showLinks)
+                .then(Commands.literal("sites").executes(this::showSites))
                 .then(Commands.literal("testreward")
                         .requires(src -> src.getSender().hasPermission(TEST_PERMISSION))
                         .executes(this::testReward))
@@ -111,7 +116,29 @@ public final class VoteCommand implements CommandRegistration {
         if (sender == null) {
             return 0;
         }
+        // In GUI mode, open the sites GUI when the catalog is non-empty.
+        if (displayMode.get() == ListDisplayMode.GUI
+                && services.voteSitesGui().isEnabled()
+                && !services.voteSitesGui().catalog().sites().isEmpty()) {
+            services.voteSitesGui().open(sender);
+            return Command.SINGLE_SUCCESS;
+        }
         services.voteLinks().show(BukkitRefs.toRef(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int showSites(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        // If the catalog is empty or GUI is disabled, fall back to chat links.
+        if (!services.voteSitesGui().isEnabled()
+                || services.voteSitesGui().catalog().sites().isEmpty()) {
+            services.voteLinks().show(BukkitRefs.toRef(sender));
+            return Command.SINGLE_SUCCESS;
+        }
+        services.voteSitesGui().open(sender);
         return Command.SINGLE_SUCCESS;
     }
 

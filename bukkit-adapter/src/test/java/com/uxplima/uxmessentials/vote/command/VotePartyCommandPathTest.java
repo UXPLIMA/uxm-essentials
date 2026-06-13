@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
@@ -207,6 +208,12 @@ class VotePartyCommandPathTest {
                 ZoneId.of("UTC"));
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpRewardDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
+        VoteSitesGuiView sitesGui = new VoteSitesGuiView(
+                VoteSiteCatalog.empty(),
+                repository,
+                new SyncScheduler(),
+                messages,
+                VoteSitesGuiView.GuiConfig.defaults());
         VotePartyStatus votePartyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
@@ -222,6 +229,7 @@ class VotePartyCommandPathTest {
                 handleVote,
                 applyQueuedRewards,
                 voteLinks,
+                sitesGui,
                 votePartyStatus,
                 showVoteTotals,
                 topVoters,

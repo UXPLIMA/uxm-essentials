@@ -17,6 +17,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
@@ -173,21 +175,21 @@ class VoteNextLastRemindCommandPathTest {
 
     @Test
     void voteNextSubcommandExistsInCommandTree() {
-        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()));
+        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()), () -> ListDisplayMode.CHAT);
         var root = command.build();
         assertThat(root.getChild("next")).as("/vote next must exist").isNotNull();
     }
 
     @Test
     void voteLastSubcommandExistsInCommandTree() {
-        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()));
+        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()), () -> ListDisplayMode.CHAT);
         var root = command.build();
         assertThat(root.getChild("last")).as("/vote last must exist").isNotNull();
     }
 
     @Test
     void voteRemindSubcommandExistsInCommandTree() {
-        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()));
+        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()), () -> ListDisplayMode.CHAT);
         var root = command.build();
         assertThat(root.getChild("remind")).as("/vote remind must exist").isNotNull();
     }
@@ -196,7 +198,7 @@ class VoteNextLastRemindCommandPathTest {
 
     private CommandDispatcher<CommandSourceStack> register(VoteSiteCatalog catalog) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        CommandRegistration command = new VoteCommand(services(catalog));
+        CommandRegistration command = new VoteCommand(services(catalog), () -> ListDisplayMode.CHAT);
         dispatcher.getRoot().addChild(command.build());
         return dispatcher;
     }
@@ -229,6 +231,8 @@ class VoteNextLastRemindCommandPathTest {
                 ZoneId.of("UTC"));
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
+        VoteSitesGuiView sitesGui = new VoteSitesGuiView(
+                catalog, repository, new SyncScheduler(), messages, VoteSitesGuiView.GuiConfig.defaults());
         VotePartyStatus partyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
@@ -244,6 +248,7 @@ class VoteNextLastRemindCommandPathTest {
                 handleVote,
                 applyQueuedRewards,
                 voteLinks,
+                sitesGui,
                 partyStatus,
                 showVoteTotals,
                 topVoters,

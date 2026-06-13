@@ -76,7 +76,13 @@ public enum VoteMessageKey implements MessageKey {
     // reminders — login reminder and toggle feedback
     VOTE_REMINDER("vote.reminder"),
     VOTE_REMIND_ENABLED("vote.remind.enabled"),
-    VOTE_REMIND_DISABLED("vote.remind.disabled");
+    VOTE_REMIND_DISABLED("vote.remind.disabled"),
+
+    // /vote sites GUI — title, per-site status, and clickable URL prompt
+    VOTE_GUI_TITLE("vote.gui.title"),
+    VOTE_GUI_SITE_VOTABLE("vote.gui.site.votable"),
+    VOTE_GUI_SITE_COOLDOWN("vote.gui.site.cooldown"),
+    VOTE_GUI_CLICK("vote.gui.click");
 
     private final String key;
 

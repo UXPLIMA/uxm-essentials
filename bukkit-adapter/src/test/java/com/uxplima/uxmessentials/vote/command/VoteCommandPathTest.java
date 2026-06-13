@@ -18,6 +18,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -28,6 +29,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
@@ -179,7 +181,7 @@ class VoteCommandPathTest {
 
     @Test
     void topSubcommandRequiresVoteTopPermissionNotJustVoteUse() {
-        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()));
+        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()), () -> ListDisplayMode.CHAT);
         var root = command.build();
         var topNode = root.getChild("top");
         assertThat(topNode).as("top subcommand must exist under /vote").isNotNull();
@@ -197,7 +199,7 @@ class VoteCommandPathTest {
 
     @Test
     void totalSubcommandExistsUnderVote() {
-        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()));
+        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()), () -> ListDisplayMode.CHAT);
         var root = command.build();
         var totalNode = root.getChild("total");
         assertThat(totalNode).as("total subcommand must exist under /vote").isNotNull();
@@ -219,7 +221,7 @@ class VoteCommandPathTest {
 
     @Test
     void adminSubtreeExistsUnderVote() {
-        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()));
+        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()), () -> ListDisplayMode.CHAT);
         var root = command.build();
         var adminNode = root.getChild("admin");
         assertThat(adminNode).as("admin subcommand must exist under /vote").isNotNull();
@@ -227,7 +229,7 @@ class VoteCommandPathTest {
 
     @Test
     void adminSubtreeRequiresVoteAdminPermission() {
-        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()));
+        VoteCommand command = new VoteCommand(services(new ServerPlayerLookup()), () -> ListDisplayMode.CHAT);
         var adminNode = command.build().getChild("admin");
         assertThat(adminNode).isNotNull();
 
@@ -288,7 +290,7 @@ class VoteCommandPathTest {
 
     private CommandDispatcher<CommandSourceStack> register(PlayerLookup lookup) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        CommandRegistration command = new VoteCommand(services(lookup));
+        CommandRegistration command = new VoteCommand(services(lookup), () -> ListDisplayMode.CHAT);
         dispatcher.getRoot().addChild(command.build());
         return dispatcher;
     }
@@ -326,6 +328,12 @@ class VoteCommandPathTest {
                 ZoneId.of("UTC"));
         ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpRewardDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
+        VoteSitesGuiView sitesGui = new VoteSitesGuiView(
+                VoteSiteCatalog.empty(),
+                repository,
+                new SyncScheduler(),
+                messages,
+                VoteSitesGuiView.GuiConfig.defaults());
         VotePartyStatus votePartyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
@@ -341,6 +349,7 @@ class VoteCommandPathTest {
                 handleVote,
                 applyQueuedRewards,
                 voteLinks,
+                sitesGui,
                 votePartyStatus,
                 showVoteTotals,
                 topVoters,

@@ -9,6 +9,7 @@ import java.util.function.Consumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -18,6 +19,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.vote.VoteRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -26,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
+import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesGuiView;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VoteJoinListener;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VotifierListener;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardApplier;
@@ -114,6 +117,10 @@ public final class VoteWiring {
         VoteSiteCatalog siteCatalog = loadSiteCatalog(plugin, kernel);
         PdcReminderPreferences reminderPrefs = new PdcReminderPreferences(plugin);
 
+        VoteSitesGuiView.GuiConfig guiCfg = loadGuiConfig(ctx.config());
+        VoteSitesGuiView sitesGuiView =
+                new VoteSitesGuiView(siteCatalog, repository, kernel.scheduler(), kernel.messages(), guiCfg);
+
         VoteServices services = assemble(
                 kernel,
                 repository,
@@ -125,7 +132,8 @@ public final class VoteWiring {
                 party,
                 voteLinks,
                 siteCatalog,
-                reminderPrefs);
+                reminderPrefs,
+                sitesGuiView);
 
         // Subscribe the party sound/particle handler to the in-process bus.
         @Nullable Sound sound = BukkitRegistryKeys.resolveSound(ctx.config().getString("voteparty.sound", ""));
@@ -172,7 +180,8 @@ public final class VoteWiring {
         }
 
         VotifierListener votifier = new VotifierListener(plugin, services, kernel.playerLookup(), kernel.log());
-        List<CommandRegistration> commands = List.of(new VoteCommand(services), new VotePartyCommand(services));
+        List<CommandRegistration> commands = List.of(
+                new VoteCommand(services, () -> ListDisplayMode.from(ctx.config())), new VotePartyCommand(services));
         List<Listener> listeners = List.of(votifier, joinListener);
         return new Wired(
                 commands, listeners, votifier, repository, party.baseThreshold(), events, partyEffects, reminderTask);
@@ -201,7 +210,8 @@ public final class VoteWiring {
             PartyConfig party,
             List<String> voteLinks,
             VoteSiteCatalog siteCatalog,
-            PdcReminderPreferences reminderPrefs) {
+            PdcReminderPreferences reminderPrefs,
+            VoteSitesGuiView sitesGuiView) {
         HandleVote handleVote = new HandleVote(
                 repository,
                 engine,
@@ -231,6 +241,7 @@ public final class VoteWiring {
                 handleVote,
                 applyQueuedRewards,
                 links,
+                sitesGuiView,
                 status,
                 showVoteTotals,
                 topVoters,
@@ -264,6 +275,17 @@ public final class VoteWiring {
                 .resolve("modules")
                 .resolve("vote")
                 .resolve("config.conf");
+    }
+
+    private static VoteSitesGuiView.GuiConfig loadGuiConfig(ConfigStore config) {
+        boolean enabled = !"chat"
+                .equalsIgnoreCase(config.getString("gui.list-display", "gui").strip());
+        int rows = Math.max(1, Math.min(6, config.getInt("gui.rows", 3)));
+        Material votable = VoteSitesGuiView.GuiConfig.parseMaterial(
+                config.getString("gui.votable-material", "PAPER"), Material.PAPER);
+        Material cooldown = VoteSitesGuiView.GuiConfig.parseMaterial(
+                config.getString("gui.cooldown-material", "CLOCK"), Material.CLOCK);
+        return new VoteSitesGuiView.GuiConfig(enabled, rows, votable, cooldown);
     }
 
     /**
