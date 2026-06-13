@@ -354,6 +354,60 @@ class JooqVoteRepositoryTest {
     }
 
     // -------------------------------------------------------------------------
+    // Per-site cooldown: lastVoteAtSite / recordLastVoteAtSite
+    // -------------------------------------------------------------------------
+
+    @Test
+    void lastVoteAtSiteReturnsEmptyWhenNoRowExists() {
+        assertThat(repository.lastVoteAtSite(bob, "PMC")).isEmpty();
+    }
+
+    @Test
+    void recordAndReadLastVoteAtSiteRoundTrip() {
+        // Epoch millis is the column precision; truncate the test instant to millis so the
+        // stored and expected values agree without relying on sub-millisecond equality.
+        Instant recorded = Instant.ofEpochMilli(Instant.now().toEpochMilli());
+
+        repository.recordLastVoteAtSite(bob, "PMC", recorded);
+
+        assertThat(repository.lastVoteAtSite(bob, "PMC")).hasValue(recorded);
+    }
+
+    @Test
+    void recordLastVoteAtSiteOverwritesPreviousTimestamp() {
+        Instant first = Instant.ofEpochMilli(1_000_000L);
+        Instant second = Instant.ofEpochMilli(2_000_000L);
+
+        repository.recordLastVoteAtSite(bob, "PMC", first);
+        repository.recordLastVoteAtSite(bob, "PMC", second);
+
+        assertThat(repository.lastVoteAtSite(bob, "PMC")).hasValue(second);
+    }
+
+    @Test
+    void recordLastVoteAtSiteIsCaseInsensitiveOnLookup() {
+        Instant recorded = Instant.ofEpochMilli(1_234_567_890L);
+
+        // Write with mixed case; the repository normalises to lowercase on write.
+        repository.recordLastVoteAtSite(bob, "PMC", recorded);
+
+        // Reading with the lowercase form must still find the row.
+        assertThat(repository.lastVoteAtSite(bob, "pmc")).hasValue(recorded);
+    }
+
+    @Test
+    void twoDifferentSitesForOnePlayerAreIndependent() {
+        Instant pmcInstant = Instant.ofEpochMilli(1_000_000L);
+        Instant mcInstant = Instant.ofEpochMilli(2_000_000L);
+
+        repository.recordLastVoteAtSite(bob, "PMC", pmcInstant);
+        repository.recordLastVoteAtSite(bob, "Minecraftservers", mcInstant);
+
+        assertThat(repository.lastVoteAtSite(bob, "pmc")).hasValue(pmcInstant);
+        assertThat(repository.lastVoteAtSite(bob, "minecraftservers")).hasValue(mcInstant);
+    }
+
+    // -------------------------------------------------------------------------
     // Regression: existing party-count increment still works after schema change
     // -------------------------------------------------------------------------
 

@@ -3,13 +3,16 @@ package com.uxplima.uxmessentials.persistence.vote;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteParty.VOTE_PARTY;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VotePartyParticipants.VOTE_PARTY_PARTICIPANTS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteQueue.VOTE_QUEUE;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteSiteCooldown.VOTE_SITE_COOLDOWN;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteTotals.VOTE_TOTALS;
 
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -282,6 +285,42 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                 .onConflict(VOTE_PARTY.ID)
                 .doUpdate()
                 .set(VOTE_PARTY.THRESHOLD_OVERRIDE, override)
+                .execute());
+    }
+
+    // -------------------------------------------------------------------------
+    // Per-site cooldown tracking
+    // -------------------------------------------------------------------------
+
+    @Override
+    public Optional<Instant> lastVoteAtSite(PlayerRef player, String site) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(site, "site");
+        String normalised = site.toLowerCase(java.util.Locale.ROOT);
+        return read(dsl -> dsl.select(VOTE_SITE_COOLDOWN.LAST_VOTE_AT)
+                .from(VOTE_SITE_COOLDOWN)
+                .where(VOTE_SITE_COOLDOWN
+                        .PLAYER
+                        .eq(player.uuid().toString())
+                        .and(VOTE_SITE_COOLDOWN.SITE_NAME.eq(normalised)))
+                .fetchOptional(VOTE_SITE_COOLDOWN.LAST_VOTE_AT)
+                .map(Instant::ofEpochMilli));
+    }
+
+    @Override
+    public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(site, "site");
+        Objects.requireNonNull(at, "at");
+        String normalised = site.toLowerCase(java.util.Locale.ROOT);
+        long epochMilli = at.toEpochMilli();
+        write(dsl -> dsl.insertInto(VOTE_SITE_COOLDOWN)
+                .set(VOTE_SITE_COOLDOWN.PLAYER, player.uuid().toString())
+                .set(VOTE_SITE_COOLDOWN.SITE_NAME, normalised)
+                .set(VOTE_SITE_COOLDOWN.LAST_VOTE_AT, epochMilli)
+                .onConflict(VOTE_SITE_COOLDOWN.PLAYER, VOTE_SITE_COOLDOWN.SITE_NAME)
+                .doUpdate()
+                .set(VOTE_SITE_COOLDOWN.LAST_VOTE_AT, epochMilli)
                 .execute());
     }
 

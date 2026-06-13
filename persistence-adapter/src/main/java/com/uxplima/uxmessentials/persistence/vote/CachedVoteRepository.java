@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.persistence.vote;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -138,6 +140,19 @@ public final class CachedVoteRepository implements VoteRepository {
     @Override
     public void setThresholdOverride(int override) {
         delegate.setThresholdOverride(override);
+    }
+
+    // Per-site cooldown — delegates straight through; reads are infrequent (one per incoming vote per
+    // site), so the round-trip to the delegate is cheaper than the cache-invalidation overhead.
+
+    @Override
+    public Optional<Instant> lastVoteAtSite(PlayerRef player, String site) {
+        return delegate.lastVoteAtSite(player, site);
+    }
+
+    @Override
+    public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {
+        delegate.recordLastVoteAtSite(player, site, at);
     }
 
     // Admin reset — delegates straight through; invalidates no counter cache (totals are uncached).
