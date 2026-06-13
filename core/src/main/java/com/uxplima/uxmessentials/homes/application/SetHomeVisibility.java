@@ -14,11 +14,12 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /home public <slot>} / {@code /home private <slot>}: flip one of the owner's homes between public
- * (any player may visit it) and private (only the owner and invited players may). A slot the owner has no
- * home in is rejected with {@link HomeError#NOT_FOUND}; a successful flip saves the home with its new
- * visibility, publishes {@code HomeVisibilityChanged}, and renders the matching feedback. An owner only ever
- * toggles their own homes.
+ * GUI visibility toggle from the home action view: flip one of the owner's homes between public (any player
+ * may visit it) and private (only the owner and invited players may). There is no standalone command for this
+ * — the toggle is exposed exclusively through the home action GUI. A slot the owner has no home in is
+ * rejected with {@link HomeError#NOT_FOUND}; a successful flip saves the home with its new visibility,
+ * publishes {@code HomeVisibilityChanged}, and renders the matching feedback. An owner only ever toggles
+ * their own homes.
  */
 public final class SetHomeVisibility {
 

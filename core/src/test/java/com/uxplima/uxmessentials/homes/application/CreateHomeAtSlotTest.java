@@ -6,13 +6,17 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
 import com.uxplima.uxmessentials.homes.domain.Home;
@@ -49,6 +53,7 @@ class CreateHomeAtSlotTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-05-30T12:00:00Z"), ZoneOffset.UTC);
 
     private FakeHomeRepository repository;
+    private FakeInviteRepository invites;
     private FakePermissions permissions;
     private CapturingNotifier notifier;
     private RecordingPublisher events;
@@ -56,6 +61,7 @@ class CreateHomeAtSlotTest {
     @BeforeEach
     void setUp() {
         repository = new FakeHomeRepository();
+        invites = new FakeInviteRepository();
         permissions = new FakePermissions();
         notifier = new CapturingNotifier();
         events = new RecordingPublisher();
@@ -102,6 +108,20 @@ class CreateHomeAtSlotTest {
     }
 
     @Test
+    void createClearsOrphanInvitesForTheSlotOnSuccess() {
+        // Simulate orphan rows left by a crash during a prior delete: the invite store already has a guest for
+        // slot 0 even though no home exists yet. A successful create must wipe them so the new home starts
+        // with an empty guest list and the prior guest cannot visit.
+        permissions.cap = 3;
+        invites.addInvite(OWNER, HomeSlot.of(0), UUID.randomUUID());
+
+        Result<Unit, HomeError> result = useCase(List.of()).create(OWNER, HomeSlot.of(0), at(1, 2, 3));
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(invites.invites(OWNER, HomeSlot.of(0))).isEmpty();
+    }
+
+    @Test
     void createWithUnaffordableChargeReturnsCannotAffordAndDoesNotSave() {
         permissions.cap = 3;
         HomeCost cost = HomeCost.of(new BigDecimal("50.00"));
@@ -124,7 +144,7 @@ class CreateHomeAtSlotTest {
     private CreateHomeAtSlot useCase(List<SethomeGuard> guards, HomeCharge charge) {
         HomeQuota quota = new HomeQuota(permissions, 0);
         return new CreateHomeAtSlot(
-                repository, quota, guards, notifier.notifier(), events, charge, UNLIMITED_MAX_SLOTS, CLOCK);
+                repository, invites, quota, guards, notifier.notifier(), events, charge, UNLIMITED_MAX_SLOTS, CLOCK);
     }
 
     private HomeCharge freeCharge() {
@@ -167,6 +187,44 @@ class CreateHomeAtSlotTest {
         @Override
         public void deleteAll(PlayerRef owner) {
             homes.clear();
+        }
+    }
+
+    /** In-memory invite store keyed by (owner, slot). */
+    private static final class FakeInviteRepository implements HomeInviteRepository {
+        private final Map<UUID, Map<HomeSlot, Set<UUID>>> store = new HashMap<>();
+
+        private Set<UUID> guests(PlayerRef owner, HomeSlot slot) {
+            return store.computeIfAbsent(owner.uuid(), k -> new HashMap<>())
+                    .computeIfAbsent(slot, k -> new HashSet<>());
+        }
+
+        @Override
+        public Set<UUID> invites(PlayerRef owner, HomeSlot slot) {
+            return Set.copyOf(guests(owner, slot));
+        }
+
+        @Override
+        public void addInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            guests(owner, slot).add(invited);
+        }
+
+        @Override
+        public void removeInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
+            guests(owner, slot).remove(invited);
+        }
+
+        @Override
+        public void removeAll(PlayerRef owner, HomeSlot slot) {
+            Map<HomeSlot, Set<UUID>> bySlot = store.get(owner.uuid());
+            if (bySlot != null) {
+                bySlot.remove(slot);
+            }
+        }
+
+        @Override
+        public void removeAllForOwner(PlayerRef owner) {
+            store.remove(owner.uuid());
         }
     }
 

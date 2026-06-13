@@ -147,20 +147,25 @@ public final class InvitedPlayersMenu {
     }
 
     /**
-     * Resolve the typed name and invite that player to {@code home}, then refresh the menu. A name the server
-     * cannot resolve tells the viewer it was unknown and reopens unchanged — no invite is added. Package-private
-     * so the resolve-then-invite decision can be unit-tested without driving a live anvil.
+     * Resolve the typed name and invite that player to {@code home}, then refresh the menu. The name lookup is
+     * performed off the tick thread (it may call a blocking offline-player lookup); on the async result, an
+     * unresolvable name sends the unknown-player message and reopens unchanged on the entity thread, while a
+     * successful resolve runs the invite (a DB write, fine async) and then reopens on the entity thread.
+     * Package-private so the resolve-then-invite decision can be unit-tested without driving a live anvil; the
+     * sync test scheduler runs callbacks inline, so tests pass without any threading.
      */
     void handleAddInput(Player player, PlayerRef viewer, Home home, Runnable onBack, String input) {
         String name = input.strip();
-        Optional<PlayerRef> resolved = players.findByName(name);
-        if (resolved.isEmpty()) {
-            notifier.send(viewer, HomesMessageKey.HOME_INVITES_UNKNOWN_PLAYER, Map.of("player", name));
-            open(player, viewer, home, onBack);
-            return;
-        }
-        PlayerRef invited = resolved.get();
         scheduler.async(() -> {
+            Optional<PlayerRef> resolved = players.findByName(name);
+            if (resolved.isEmpty()) {
+                scheduler.onEntity(viewer, () -> {
+                    notifier.send(viewer, HomesMessageKey.HOME_INVITES_UNKNOWN_PLAYER, Map.of("player", name));
+                    open(player, viewer, home, onBack);
+                });
+                return;
+            }
+            PlayerRef invited = resolved.get();
             inviteToHome.invite(home.owner(), home.slot(), invited);
             scheduler.onEntity(viewer, () -> open(player, viewer, home, onBack));
         });

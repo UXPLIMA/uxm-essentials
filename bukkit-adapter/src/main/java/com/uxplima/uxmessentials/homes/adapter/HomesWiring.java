@@ -167,8 +167,8 @@ public final class HomesWiring {
         ClaimService claimService = buildClaimService(plugin, ctx, kernel);
         List<SethomeGuard> guards = buildGuards(ctx);
         HomeCharge charge = buildCharge(ctx, kernel, homeEconomy);
-        CreateHomeAtSlot createHome =
-                new CreateHomeAtSlot(repository, quota, guards, notifier, kernel.events(), charge, unlimitedMax, clock);
+        CreateHomeAtSlot createHome = new CreateHomeAtSlot(
+                repository, invites, quota, guards, notifier, kernel.events(), charge, unlimitedMax, clock);
         RelocateHome relocateHome = new RelocateHome(repository, guards, notifier, kernel.events(), charge, clock);
         RenameHome renameHome = new RenameHome(repository, notifier, kernel.events(), clock);
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);

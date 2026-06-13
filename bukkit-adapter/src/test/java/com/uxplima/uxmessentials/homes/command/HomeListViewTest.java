@@ -248,9 +248,9 @@ class HomeListViewTest {
         Clock clock = Clock.system(ZoneOffset.UTC);
         Permissions permissions = new TogglePermissions(grantBypass);
         HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
-        CreateHomeAtSlot create =
-                new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, freeCharge(), 1000, clock);
         HomeInviteRepository invites = new FakeHomeInviteRepository();
+        CreateHomeAtSlot create = new CreateHomeAtSlot(
+                repository, invites, quota, List.of(), notifier, events, freeCharge(), 1000, clock);
         InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
                 messages,
                 scheduler,

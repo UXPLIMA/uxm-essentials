@@ -12,10 +12,10 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /home invite <slot> <player>}: grant another player access to one of the owner's homes, so they can
- * visit it even while it stays private. A slot the owner has no home in is rejected with
- * {@link HomeError#NOT_FOUND}; otherwise the invited player's UUID is added to the home's guest list and the
- * owner is told who was invited.
+ * {@code /invite <player> [slot]}: grant another player access to one of the owner's homes so they can visit
+ * it while it stays private. Also reachable through the invited-players GUI from the home action view. A slot
+ * the owner has no home in is rejected with {@link HomeError#NOT_FOUND}; otherwise the invited player's UUID
+ * is added to the home's guest list and the owner is told who was invited.
  */
 public final class InviteToHome {
 

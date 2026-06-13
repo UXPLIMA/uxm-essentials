@@ -504,7 +504,8 @@ class HomeCommandPathTest {
                 scheduler,
                 new ListHomes(repository),
                 quota,
-                new CreateHomeAtSlot(repository, quota, List.of(), notifier, events, freeCharge(), 1000, clock),
+                new CreateHomeAtSlot(
+                        repository, invites, quota, List.of(), notifier, events, freeCharge(), 1000, clock),
                 new SafeLocationGuard(server, false, false, 5),
                 new AlwaysAllowClaimService(),
                 actionView,

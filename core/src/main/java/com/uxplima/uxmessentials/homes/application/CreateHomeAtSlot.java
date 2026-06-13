@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class CreateHomeAtSlot {
 
     private final HomeRepository repository;
+    private final HomeInviteRepository invites;
     private final HomeQuota quota;
     private final List<SethomeGuard> guards;
     private final HomeNotifier notifier;
@@ -39,6 +41,7 @@ public final class CreateHomeAtSlot {
 
     public CreateHomeAtSlot(
             HomeRepository repository,
+            HomeInviteRepository invites,
             HomeQuota quota,
             List<SethomeGuard> guards,
             HomeNotifier notifier,
@@ -47,6 +50,7 @@ public final class CreateHomeAtSlot {
             int unlimitedMaxSlots,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.invites = Objects.requireNonNull(invites, "invites");
         this.quota = Objects.requireNonNull(quota, "quota");
         this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -99,6 +103,9 @@ public final class CreateHomeAtSlot {
 
     private Result<Unit, HomeError> commit(HomeSet.Change change) {
         repository.save(change.home());
+        // Clear any orphan invite rows that a prior crash may have left for this slot; a freshly created
+        // home always starts with an empty guest list regardless of DB history.
+        invites.removeAll(change.home().owner(), change.home().slot());
         change.event().ifPresent(events::publish);
         notifier.send(
                 change.home().owner(),
