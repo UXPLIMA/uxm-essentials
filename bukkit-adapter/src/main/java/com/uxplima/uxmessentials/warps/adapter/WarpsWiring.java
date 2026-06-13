@@ -52,8 +52,8 @@ import org.jspecify.annotations.NullMarked;
  * so a priced warp's cost is recorded but not charged until that bridge is wired.
  *
  * <p>Cross-server sync rides the {@link Bus} handle: the wiring registers a {@link WarpSync} listener that
- * drops the cached warp set on a peer's change and wraps the cached repository so every local {@code /setwarp}
- * / {@code /delwarp} / move announces a {@code WarpChanged} to peers. With the bus disabled the publish is a
+ * drops the cached warp set on a peer's change and wraps the cached repository so every local {@code /warp set}
+ * / {@code /warp del} / move announces a {@code WarpChanged} to peers. With the bus disabled the publish is a
  * no-op and the listener is never invoked, so the single-server path is unchanged.
  */
 @NullMarked

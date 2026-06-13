@@ -1,8 +1,12 @@
 package com.uxplima.uxmessentials.warps.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -14,6 +18,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
@@ -23,9 +28,30 @@ import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /warp <name> [player]}: teleport to a server warp. With no trailing player the sender warps
- * themselves; with one, and the {@code uxmessentials.warp.others} node, staff send that player to the warp
- * instead.
+ * {@code /warp}: the single entry point for everything a player does with server warps, structured as a
+ * Brigadier subcommand tree (the same idiom {@code /pwarp} uses).
+ *
+ * <ul>
+ *   <li>{@code /warp <name> [player]} teleports to a server warp — with no trailing player the sender warps
+ *       themselves; with one, and {@code uxmessentials.warp.others}, staff send that player instead. Gated by
+ *       {@code uxmessentials.warp.use}.
+ *   <li>{@code /warp list} opens the warps browse menu (or the chat list when the operator selects
+ *       {@code chat} mode, and always for a console). Gated by {@code uxmessentials.warp.list}.
+ *   <li>{@code /warp set <name>} creates a server-wide warp at the operator's position or re-anchors one of
+ *       the same name. Gated by {@code uxmessentials.warp.set}.
+ *   <li>{@code /warp del <name>} removes a warp. Gated by {@code uxmessentials.warp.delete}.
+ *   <li>{@code /warp info <name>} shows a warp's owner, creation time and cost. Gated by
+ *       {@code uxmessentials.warp.info}.
+ *   <li>{@code /warp move <name>} re-anchors an existing warp to the operator's current position. Gated by
+ *       {@code uxmessentials.warp.move}.
+ *   <li>{@code /warp lock|password|rate|rating|edit <name>} keep their prior per-warp management behaviour.
+ * </ul>
+ *
+ * <p>The positional {@code <name>} could in principle collide with a subcommand literal (a warp literally
+ * named {@code set}), but Brigadier matches literal children before the {@code name} argument, so the
+ * literals always win — the same disambiguation {@code /pwarp} relies on, with no reserved-name guard on
+ * either side. Per-subcommand permissions are enforced by Brigadier {@code .requires(...)} on each node, so
+ * only {@code warp} is a command-catalog id; the subcommands are literals inside the tree.
  */
 @NullMarked
 public final class WarpCommand extends WarpCommandSupport implements CommandRegistration {
@@ -35,15 +61,39 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     private static final String LOCK_PERMISSION = "uxmessentials.warp.lock";
     private static final String PASSWORD_PERMISSION = "uxmessentials.warp.password";
     private static final String EDIT_PERMISSION = "uxmessentials.warp.edit";
+    private static final String LIST_PERMISSION = "uxmessentials.warp.list";
+    private static final String SET_PERMISSION = "uxmessentials.warp.set";
+    private static final String DELETE_PERMISSION = "uxmessentials.warp.delete";
+    private static final String INFO_PERMISSION = "uxmessentials.warp.info";
+    private static final String MOVE_PERMISSION = "uxmessentials.warp.move";
 
-    public WarpCommand(WarpServices services, Messages messages) {
+    private final Supplier<ListDisplayMode> displayMode;
+
+    public WarpCommand(WarpServices services, Messages messages, Supplier<ListDisplayMode> displayMode) {
         super(services, messages);
+        this.displayMode = Objects.requireNonNull(displayMode, "displayMode");
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("warp")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .then(Commands.literal("list")
+                        .requires(src -> src.getSender().hasPermission(LIST_PERMISSION))
+                        .executes(this::runList))
+                .then(Commands.literal("set")
+                        .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(this::runSet)))
+                .then(Commands.literal("del")
+                        .requires(src -> src.getSender().hasPermission(DELETE_PERMISSION))
+                        .then(warpNameArgument().executes(this::runDelete)))
+                .then(Commands.literal("info")
+                        .requires(src -> src.getSender().hasPermission(INFO_PERMISSION))
+                        .then(warpNameArgument().executes(this::runInfo)))
+                .then(Commands.literal("move")
+                        .requires(src -> src.getSender().hasPermission(MOVE_PERMISSION))
+                        .then(warpNameArgument().executes(this::runMove)))
                 .then(Commands.literal("lock")
                         .requires(src -> src.getSender().hasPermission(LOCK_PERMISSION))
                         .then(Commands.argument("name", StringArgumentType.word())
@@ -82,7 +132,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
 
     @Override
     public String description() {
-        return "Teleport to a server warp, lock/unlock it, edit its settings, or set/clear its password.";
+        return "Teleport to a server warp; list, set, delete, move, lock, edit or inspect warps.";
     }
 
     private int openWarpEditor(CommandContext<CommandSourceStack> ctx) {
@@ -127,6 +177,75 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         }
 
         services.useWarp().use(ref(sender), WarpName.of(warpName), arg);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * {@code /warp list}: open the warps browse menu — the same {@code PaginatedGui} bare {@code /warps} used
+     * to open. A console has no inventory and the operator-selectable {@code chat} display mode both fall back
+     * to the clickable chat list, sharing the same {@link com.uxplima.uxmessentials.warps.application.ListWarps}
+     * filter so the two presentations never disagree. The mode is read live so a reload takes effect at once.
+     */
+    private int runList(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!(sender instanceof Player viewer)) {
+            // A console has no inventory to open a menu in; show the chat list instead.
+            return runChatList(ctx);
+        }
+        if (displayMode.get() == ListDisplayMode.CHAT) {
+            // Operator chose command/chat-only output: list in chat without opening an inventory.
+            return runChatList(ctx);
+        }
+        PlayerRef viewerRef = ref(viewer);
+        List<Warp> warps = services.listWarps().available(viewerRef);
+        services.warpMenu().open(viewer, viewerRef, warps);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runChatList(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.listWarps().list(ref(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSet(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WarpName name = WarpName.of(ctx.getArgument("name", String.class));
+        services.setWarp().set(ref(sender), name, position(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runDelete(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.delWarp().delete(ref(sender), WarpName.of(ctx.getArgument("name", String.class)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runInfo(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.warpInfo().show(ref(sender), WarpName.of(ctx.getArgument("name", String.class)));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runMove(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WarpName name = WarpName.of(ctx.getArgument("name", String.class));
+        services.moveWarp().move(ref(sender), name, position(sender));
         return Command.SINGLE_SUCCESS;
     }
 

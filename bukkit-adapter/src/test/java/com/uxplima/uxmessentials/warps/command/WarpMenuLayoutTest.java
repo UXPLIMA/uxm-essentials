@@ -44,7 +44,7 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * Proves the {@code /warps} menu honours its injected {@link GuiLayout}: a three-row layout opens a 27-slot
+ * Proves the {@code /warp list} menu honours its injected {@link GuiLayout}: a three-row layout opens a 27-slot
  * menu, the unchanged default still opens 54 slots, and the title resolved from
  * {@link WarpsMessageKey#WARP_MENU_TITLE} is preserved across layouts.
  */

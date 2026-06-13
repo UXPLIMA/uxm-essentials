@@ -20,13 +20,13 @@ import org.jspecify.annotations.NullMarked;
  * the optional economy seam. Held so every command reads the same use cases; the warps context keeps no
  * other adapter-side runtime state, so there is nothing here to drain on stop beyond dropping this holder.
  *
- * @param useWarp {@code /warp}
- * @param setWarp {@code /setwarp}
- * @param delWarp {@code /delwarp}
- * @param listWarps {@code /warps}
- * @param warpInfo {@code /warpinfo}
- * @param moveWarp {@code /movewarp}
- * @param warpMenu the read-only {@code /warps} browse menu the bare {@code /warps} command opens
+ * @param useWarp {@code /warp <name>}
+ * @param setWarp {@code /warp set}
+ * @param delWarp {@code /warp del}
+ * @param listWarps {@code /warp list}
+ * @param warpInfo {@code /warp info}
+ * @param moveWarp {@code /warp move}
+ * @param warpMenu the read-only browse menu {@code /warp list} opens
  * @param players name → ref resolution, available for future owner-attribution forms
  * @param editorView the warp edit chest GUI
  */

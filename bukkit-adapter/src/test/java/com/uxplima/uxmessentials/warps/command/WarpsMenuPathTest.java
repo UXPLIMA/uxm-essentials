@@ -30,7 +30,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
-import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpsCommand;
+import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommand;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
@@ -58,13 +58,13 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /warps} browse menu through the real Brigadier {@code /warps} node and
- * uxmLib's {@code PaginatedGui}. Bare {@code /warps} opens a paginated menu whose content slots hold one display
+ * MockBukkit coverage of the warps browse menu through the real Brigadier {@code /warp list} subcommand and
+ * uxmLib's {@code PaginatedGui}. {@code /warp list} opens a paginated menu whose content slots hold one display
  * icon per warp the player may use — backed by a fake {@link WarpRepository} of three warps — proving the
- * read-only menu renders one icon per available warp. {@code /warps list} keeps the chat path, asserted by the
- * {@code WARP_LIST} keys it produces. The scheduler is a synchronous double so the entity-bound open runs
- * inline, and uxmLib's menu listener is installed against a mock plugin (reset on teardown) exactly as the kits
- * GUI test does.
+ * read-only menu renders one icon per available warp. In {@code chat} display mode {@code /warp list} prints
+ * the clickable chat list instead, asserted by the {@code WARP_LIST} keys it produces and the absence of any
+ * open inventory. The scheduler is a synchronous double so the entity-bound open runs inline, and uxmLib's
+ * menu listener is installed against a mock plugin (reset on teardown) exactly as the kits GUI test does.
  */
 class WarpsMenuPathTest {
 
@@ -94,11 +94,11 @@ class WarpsMenuPathTest {
     }
 
     @Test
-    void bareWarpsOpensPaginatedMenuWithOneIconPerUsableWarp() {
+    void warpListOpensPaginatedMenuWithOneIconPerUsableWarp() {
         CommandDispatcher<CommandSourceStack> dispatcher =
                 registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
-        execute(dispatcher, "warps");
+        execute(dispatcher, "warp list");
 
         Inventory menu = player.getOpenInventory().getTopInventory();
         assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
@@ -107,25 +107,78 @@ class WarpsMenuPathTest {
     }
 
     @Test
-    void warpsListDrivesTheChatPath() {
-        CommandDispatcher<CommandSourceStack> dispatcher =
-                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
-
-        execute(dispatcher, "warps list");
-
-        assertThat(sink.keys).contains(WarpsMessageKey.WARP_LIST_HEADER);
-    }
-
-    @Test
-    void bareWarpsInChatModeListsInChatAndOpensNoInventory() {
+    void warpListInChatModeListsInChatAndOpensNoInventory() {
         CommandDispatcher<CommandSourceStack> dispatcher =
                 registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.CHAT);
 
-        execute(dispatcher, "warps");
+        execute(dispatcher, "warp list");
 
         assertThat(sink.keys).contains(WarpsMessageKey.WARP_LIST_HEADER);
         // Chat mode opens no inventory at all, so the player has no top inventory to hold a menu.
         assertThat(player.getOpenInventory().getTopInventory()).isNull();
+    }
+
+    @Test
+    void rootRequiresTheUsePermission() {
+        var command = new WarpCommand(
+                services,
+                new KeyMessages(),
+                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
+        assertThat(command.build().getRequirement().test(sourceFor("uxmessentials.warp.use")))
+                .isTrue();
+    }
+
+    @Test
+    void listSubcommandRequiresTheListPermission() {
+        assertCanUse("list", "uxmessentials.warp.list", "uxmessentials.warp.use");
+    }
+
+    @Test
+    void setSubcommandRequiresTheSetPermission() {
+        assertCanUse("set", "uxmessentials.warp.set", "uxmessentials.warp.use");
+    }
+
+    @Test
+    void delSubcommandRequiresTheDeletePermission() {
+        assertCanUse("del", "uxmessentials.warp.delete", "uxmessentials.warp.use");
+    }
+
+    @Test
+    void infoSubcommandRequiresTheInfoPermission() {
+        assertCanUse("info", "uxmessentials.warp.info", "uxmessentials.warp.use");
+    }
+
+    @Test
+    void moveSubcommandRequiresTheMovePermission() {
+        assertCanUse("move", "uxmessentials.warp.move", "uxmessentials.warp.use");
+    }
+
+    /**
+     * Asserts the {@code subcommand} literal under {@code /warp} is reachable only with {@code grantsAccess}
+     * and not with {@code deniedNode} alone — proving Brigadier {@code .requires(...)} gates the subcommand by
+     * its own permission rather than the root's.
+     */
+    private void assertCanUse(String subcommand, String grantsAccess, String deniedNode) {
+        var root = new WarpCommand(
+                        services,
+                        new KeyMessages(),
+                        () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI)
+                .build();
+        var node = root.getChild(subcommand);
+        assertThat(node).as("subcommand '%s' exists under /warp", subcommand).isNotNull();
+        assertThat(node.canUse(sourceFor(grantsAccess)))
+                .as("'%s' should be usable with %s", subcommand, grantsAccess)
+                .isTrue();
+        assertThat(node.canUse(sourceFor(deniedNode)))
+                .as("'%s' should not be usable with only %s", subcommand, deniedNode)
+                .isFalse();
+    }
+
+    /** A command source for a fresh player holding exactly {@code node} (and no op). */
+    private CommandSourceStack sourceFor(String node) {
+        PlayerMock holder = server.addPlayer();
+        holder.addAttachment(plugin, node, true);
+        return CommandSourceStackMock.from(holder);
     }
 
     /** Non-air icons in the content rows (slots 0..44), excluding the reserved bottom-row nav buttons. */
@@ -143,7 +196,7 @@ class WarpsMenuPathTest {
     private CommandDispatcher<CommandSourceStack> registerCommand(
             com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new WarpsCommand(services, new KeyMessages(), () -> mode).build());
+        dispatcher.getRoot().addChild(new WarpCommand(services, new KeyMessages(), () -> mode).build());
         return dispatcher;
     }
 

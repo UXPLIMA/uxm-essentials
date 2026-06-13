@@ -34,7 +34,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
-import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpsCommand;
+import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommand;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
@@ -62,8 +62,8 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage that a {@code /warps} menu icon click warps to that warp through the same {@link UseWarp}
- * use case the {@code /warp} command drives. The bare {@code /warps} node opens the paginated menu, then a
+ * MockBukkit coverage that a warps menu icon click warps to that warp through the same {@link UseWarp}
+ * use case the {@code /warp} command drives. The {@code /warp list} subcommand opens the paginated menu, then a
  * left-click on content slot 0 (the first warp, {@code spawn}) is fired through the installed uxmLib menu
  * listener. Because the real {@link UseWarp} delegates the hop to the teleport context through the
  * {@link WarpTeleporter} and sends {@code WARP_TELEPORTING} for the chosen warp, the test asserts the click
@@ -100,7 +100,7 @@ class WarpMenuClickTest {
     @Test
     void clickingAWarpIconTeleportsToThatWarp() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-        execute(dispatcher, "warps");
+        execute(dispatcher, "warp list");
         Inventory menu = player.getOpenInventory().getTopInventory();
         assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
 
@@ -117,7 +117,7 @@ class WarpMenuClickTest {
     @Test
     void clickingAnEmptySlotTeleportsNothing() {
         CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-        execute(dispatcher, "warps");
+        execute(dispatcher, "warp list");
 
         fireClick(44); // a content row slot past the three warps, so nothing is bound there
 
@@ -137,7 +137,7 @@ class WarpMenuClickTest {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher
                 .getRoot()
-                .addChild(new WarpsCommand(
+                .addChild(new WarpCommand(
                                 services,
                                 new KeyMessages(),
                                 () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI)
