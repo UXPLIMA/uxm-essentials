@@ -2,32 +2,41 @@ package com.uxplima.uxmessentials.persistence.vote;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteParty.VOTE_PARTY;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteQueue.VOTE_QUEUE;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteTotals.VOTE_TOTALS;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
+import com.uxplima.uxmessentials.persistence.jooq.tables.records.VoteTotalsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
+import com.uxplima.uxmessentials.vote.domain.VotePeriod;
+import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import org.jooq.DSLContext;
 import org.jooq.Record;
+import org.jooq.TableField;
 import org.jooq.impl.DSL;
 
 /**
- * The jOOQ-backed {@link VoteRepository} over the generated {@code VOTE_PARTY} and {@code VOTE_QUEUE}
- * tables. The party counter is a single row at {@code id = 1}, so {@link #partyCount()} reads it
- * (defaulting to zero when no row exists yet), {@link #setPartyCount(int)} upserts it, and
+ * The jOOQ-backed {@link VoteRepository} over the generated {@code VOTE_PARTY}, {@code VOTE_QUEUE}, and
+ * {@code VOTE_TOTALS} tables. The party counter is a single row at {@code id = 1}, so {@link #partyCount()}
+ * reads it (defaulting to zero when no row exists yet), {@link #setPartyCount(int)} upserts it, and
  * {@link #incrementAndGetPartyCount()} adds one and returns the new value in a single atomic statement so
  * concurrent votes never lose an increment. The offline queue is one row per command keyed
  * {@code (player, idx)}: {@link #enqueue} appends a batch, computing each row's {@code idx} as
  * {@code MAX(idx)+1} inside the insert and retrying on a primary-key collision so two concurrent enqueues
  * for one player can never drop a vote, and {@link #drainFor} selects then deletes a player's rows in one
- * transaction so a batch pays out exactly once. Every statement is typed jOOQ DSL; no SQL is ever
- * string-concatenated.
+ * transaction so a batch pays out exactly once. Vote totals are one row per player carrying all-time and
+ * periodic (daily/weekly/monthly) counts plus period-window keys; {@link #saveTotals} upserts the row and
+ * {@link #topVoters} orders by the period's column descending, excluding zero-count rows. Every statement
+ * is typed jOOQ DSL; no SQL is ever string-concatenated.
  */
 public final class JooqVoteRepository extends JooqRepository implements VoteRepository {
 
@@ -116,6 +125,84 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
         Objects.requireNonNull(player, "player");
         return read(dsl ->
                 dsl.fetchExists(VOTE_QUEUE, VOTE_QUEUE.PLAYER.eq(player.uuid().toString())));
+    }
+
+    @Override
+    public VoteTally totalsOf(PlayerRef player) {
+        Objects.requireNonNull(player, "player");
+        return read(dsl -> dsl.selectFrom(VOTE_TOTALS)
+                .where(VOTE_TOTALS.PLAYER.eq(player.uuid().toString()))
+                .fetchOptional()
+                .map(JooqVoteRepository::toTally)
+                .orElseGet(VoteTally::empty));
+    }
+
+    @Override
+    public void saveTotals(PlayerRef player, VoteTally tally) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(tally, "tally");
+        String uuid = player.uuid().toString();
+        write(dsl -> dsl.insertInto(VOTE_TOTALS)
+                .set(VOTE_TOTALS.PLAYER, uuid)
+                .set(VOTE_TOTALS.ALLTIME, tally.alltime())
+                .set(VOTE_TOTALS.DAILY, tally.daily())
+                .set(VOTE_TOTALS.WEEKLY, tally.weekly())
+                .set(VOTE_TOTALS.MONTHLY, tally.monthly())
+                .set(VOTE_TOTALS.DAY_KEY, tally.dayKey())
+                .set(VOTE_TOTALS.WEEK_KEY, tally.weekKey())
+                .set(VOTE_TOTALS.MONTH_KEY, tally.monthKey())
+                .onConflict(VOTE_TOTALS.PLAYER)
+                .doUpdate()
+                .set(VOTE_TOTALS.ALLTIME, tally.alltime())
+                .set(VOTE_TOTALS.DAILY, tally.daily())
+                .set(VOTE_TOTALS.WEEKLY, tally.weekly())
+                .set(VOTE_TOTALS.MONTHLY, tally.monthly())
+                .set(VOTE_TOTALS.DAY_KEY, tally.dayKey())
+                .set(VOTE_TOTALS.WEEK_KEY, tally.weekKey())
+                .set(VOTE_TOTALS.MONTH_KEY, tally.monthKey())
+                .execute());
+    }
+
+    @Override
+    public List<VoteRanking> topVoters(VotePeriod period, int limit) {
+        Objects.requireNonNull(period, "period");
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive: " + limit);
+        }
+        TableField<VoteTotalsRecord, Long> col = periodColumn(period);
+        return read(dsl -> dsl.select(VOTE_TOTALS.PLAYER, col)
+                .from(VOTE_TOTALS)
+                .where(col.gt(0L))
+                .orderBy(col.desc())
+                .limit(limit)
+                .fetch(row -> {
+                    String uuid = row.get(VOTE_TOTALS.PLAYER);
+                    long votes = row.get(col);
+                    // UUID stored as canonical 36-char text; name resolved by the adapter in V1-3.
+                    PlayerRef ref = new PlayerRef(UUID.fromString(uuid), uuid);
+                    return new VoteRanking(ref, votes);
+                }));
+    }
+
+    // Maps a VotePeriod to its corresponding VOTE_TOTALS column.
+    private static TableField<VoteTotalsRecord, Long> periodColumn(VotePeriod period) {
+        return switch (period) {
+            case DAILY -> VOTE_TOTALS.DAILY;
+            case WEEKLY -> VOTE_TOTALS.WEEKLY;
+            case MONTHLY -> VOTE_TOTALS.MONTHLY;
+            case ALLTIME -> VOTE_TOTALS.ALLTIME;
+        };
+    }
+
+    private static VoteTally toTally(VoteTotalsRecord row) {
+        return new VoteTally(
+                row.getAlltime(),
+                row.getDaily(),
+                row.getWeekly(),
+                row.getMonthly(),
+                row.getDayKey(),
+                row.getWeekKey(),
+                row.getMonthKey());
     }
 
     private static void insertBatch(DSLContext dsl, QueuedReward reward) {

@@ -5,15 +5,20 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
+import com.uxplima.uxmessentials.vote.domain.VotePeriod;
+import com.uxplima.uxmessentials.vote.domain.VoteTally;
 
 /**
  * A thin cache decorator over a delegate {@link VoteRepository} for the one hot read: the global vote-party
  * counter. The counter is read on every received vote and on every {@code /voteparty}, so it is held in an
  * {@link AtomicInteger} that loads through the delegate once (a sentinel of {@code -1} until first read) and
- * is updated write-through on {@link #setPartyCount}. The offline queue is not cached — its operations
- * mutate rows (enqueue/drain), so they go straight to the durable delegate, which stays the source of truth.
+ * is updated write-through on {@link #setPartyCount}. The offline queue and vote totals are not cached —
+ * queue operations mutate rows (enqueue/drain) and totals are updated on every vote, so they go straight to
+ * the durable delegate which stays the source of truth. The leaderboard query ({@link #topVoters}) is also
+ * uncached, as it is a bounded query that must reflect the latest data.
  */
 public final class CachedVoteRepository implements VoteRepository {
 
@@ -64,6 +69,21 @@ public final class CachedVoteRepository implements VoteRepository {
     @Override
     public boolean hasPending(PlayerRef player) {
         return delegate.hasPending(player);
+    }
+
+    @Override
+    public VoteTally totalsOf(PlayerRef player) {
+        return delegate.totalsOf(player);
+    }
+
+    @Override
+    public void saveTotals(PlayerRef player, VoteTally tally) {
+        delegate.saveTotals(player, tally);
+    }
+
+    @Override
+    public List<VoteRanking> topVoters(VotePeriod period, int limit) {
+        return delegate.topVoters(period, limit);
     }
 
     /** Drop the cached counter so the next read reloads it from the database; call on a module reload. */
