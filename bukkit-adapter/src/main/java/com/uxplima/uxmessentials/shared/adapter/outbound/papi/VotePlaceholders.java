@@ -1,6 +1,10 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
+import java.util.Optional;
+import java.util.OptionalInt;
+
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 
 /**
@@ -23,4 +27,25 @@ public interface VotePlaceholders {
 
     /** The configured party threshold (votes needed to fire the party). */
     int partyThreshold();
+
+    /**
+     * The leaderboard row at 1-based rank {@code rank} for {@code period}, or empty when the rank
+     * is out of range (no data or {@code rank < 1} or {@code rank} exceeds the top-N ceiling).
+     *
+     * <p>The default returns {@link Optional#empty()} so existing anonymous or minimal implementations
+     * in tests do not need to override it until they exercise indexed placeholders.
+     */
+    default Optional<VoteRanking> topAt(VotePeriod period, int rank) {
+        return Optional.empty();
+    }
+
+    /**
+     * The 1-based leaderboard position of {@code who} for {@code period}, or empty when the player
+     * does not appear in the top-N results.
+     *
+     * <p>The default returns {@link OptionalInt#empty()} for the same reason as {@link #topAt}.
+     */
+    default OptionalInt positionOf(PlayerRef who, VotePeriod period) {
+        return OptionalInt.empty();
+    }
 }

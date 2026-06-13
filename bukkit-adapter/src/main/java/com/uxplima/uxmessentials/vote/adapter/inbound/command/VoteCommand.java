@@ -38,6 +38,9 @@ import org.jspecify.annotations.Nullable;
  *       across all periods. Gated by {@code uxmessentials.vote.use}.
  *   <li>{@code top [daily|weekly|monthly|alltime]} — show the leaderboard for the given period
  *       (default {@code monthly}). Gated by {@code uxmessentials.vote.top}.
+ *   <li>{@code next} — show when the player can next vote on each configured site.
+ *   <li>{@code last} — show when the player last voted on each configured site.
+ *   <li>{@code remind} — toggle vote reminder messages on/off for the sender.
  *   <li>{@code admin givevote <player> [amount]} — inject synthetic votes for a player (offline-capable),
  *       gated by {@code uxmessentials.vote.admin}.
  *   <li>{@code admin reset <player>} — reset all vote totals for a player (offline-capable),
@@ -45,8 +48,8 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <p>A console source gets the players-only rejection for the base command; admin subcommands accept the
- * console. The {@code total}, {@code top}, and admin reads run off the tick thread so repository I/O stays
- * async.
+ * console. The {@code total}, {@code top}, {@code next}, {@code last}, and admin reads run off the tick
+ * thread so repository I/O stays async.
  */
 @NullMarked
 public final class VoteCommand implements CommandRegistration {
@@ -82,6 +85,9 @@ public final class VoteCommand implements CommandRegistration {
                         .then(Commands.literal("weekly").executes(ctx -> topPeriod(ctx, VotePeriod.WEEKLY)))
                         .then(Commands.literal("monthly").executes(ctx -> topPeriod(ctx, VotePeriod.MONTHLY)))
                         .then(Commands.literal("alltime").executes(ctx -> topPeriod(ctx, VotePeriod.ALLTIME))))
+                .then(Commands.literal("next").executes(this::showNext))
+                .then(Commands.literal("last").executes(this::showLast))
+                .then(Commands.literal("remind").executes(this::toggleRemind))
                 .then(Commands.literal("admin")
                         .requires(src -> src.getSender().hasPermission(ADMIN_PERMISSION))
                         .then(Commands.literal("givevote")
@@ -162,6 +168,41 @@ public final class VoteCommand implements CommandRegistration {
                 .findByUuid(uuid)
                 .map(PlayerRef::name)
                 .orElse(uuid.toString().toLowerCase(Locale.ROOT))));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int showNext(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = BukkitRefs.toRef(sender);
+        Instant now = Instant.now();
+        services.scheduler().async(() -> services.showNextVote().show(who, now));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int showLast(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = BukkitRefs.toRef(sender);
+        Instant now = Instant.now();
+        services.scheduler().async(() -> services.showLastVote().show(who, now));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int toggleRemind(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = BukkitRefs.toRef(sender);
+        // PDC is region-bound; the command fires on the player's region thread, so the toggle is in-line.
+        boolean nowWants = services.reminderPreferences().toggle(who);
+        feedback.send(
+                sender, nowWants ? VoteMessageKey.VOTE_REMIND_ENABLED : VoteMessageKey.VOTE_REMIND_DISABLED, Map.of());
         return Command.SINGLE_SUCCESS;
     }
 

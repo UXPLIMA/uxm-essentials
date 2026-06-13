@@ -37,12 +37,16 @@ import com.uxplima.uxmessentials.vote.application.PartyConfig;
 import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
+import com.uxplima.uxmessentials.vote.application.ShowLastVote;
+import com.uxplima.uxmessentials.vote.application.ShowNextVote;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
+import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
+import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.RewardDispatcher;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
@@ -52,6 +56,7 @@ import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
+import com.uxplima.uxmessentials.vote.domain.VoteSiteCatalog;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
@@ -324,6 +329,9 @@ class VoteCommandPathTest {
         VotePartyStatus votePartyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
+        ShowNextVote showNextVote = new ShowNextVote(repository, VoteSiteCatalog.empty(), notifier);
+        ShowLastVote showLastVote = new ShowLastVote(repository, VoteSiteCatalog.empty(), notifier);
+        VoteReminderEligibility reminderEligibility = new VoteReminderEligibility(repository, VoteSiteCatalog.empty());
         ForceParty forceParty = new ForceParty(repository, applier, audience, notifier, events, party);
         SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
         AddPartyCount addPartyCount = new AddPartyCount(repository, applier, audience, notifier, events, party);
@@ -336,6 +344,10 @@ class VoteCommandPathTest {
                 votePartyStatus,
                 showVoteTotals,
                 topVoters,
+                showNextVote,
+                showLastVote,
+                reminderEligibility,
+                new NoOpReminderPreferences(),
                 forceParty,
                 setPartyCount,
                 addPartyCount,
@@ -454,6 +466,14 @@ class VoteCommandPathTest {
         public void resetTotals(PlayerRef player) {
             resetCalls.add(player);
         }
+
+        @Override
+        public java.util.Optional<java.time.Instant> lastVoteAtSite(PlayerRef player, String site) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public void recordLastVoteAtSite(PlayerRef player, String site, java.time.Instant at) {}
     }
 
     /**
@@ -520,6 +540,23 @@ class VoteCommandPathTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
+        }
+
+        @Override
+        public AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
+            return () -> {};
+        }
+    }
+
+    private static final class NoOpReminderPreferences implements ReminderPreferences {
+        @Override
+        public boolean wantsReminders(PlayerRef who) {
+            return true;
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            return true;
         }
     }
 

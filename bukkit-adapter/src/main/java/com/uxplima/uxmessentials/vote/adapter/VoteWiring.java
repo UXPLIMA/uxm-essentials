@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vote.adapter;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +32,7 @@ import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardApplier;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardDispatcher;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteAudience;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteContext;
+import com.uxplima.uxmessentials.vote.adapter.outbound.PdcReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
@@ -40,16 +42,20 @@ import com.uxplima.uxmessentials.vote.application.PartyConfig;
 import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.RewardEngine;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
+import com.uxplima.uxmessentials.vote.application.ShowLastVote;
+import com.uxplima.uxmessentials.vote.application.ShowNextVote;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
+import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
+import com.uxplima.uxmessentials.vote.domain.VoteSiteCatalog;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
@@ -60,8 +66,8 @@ import org.jspecify.annotations.Nullable;
  * Constructs the vote context's adapters and use cases over the injected kernel ports, the persistence DSL,
  * and the operator config under {@code modules/vote/config.conf}, and produces everything the plugin must
  * register: the {@code /vote} and {@code /voteparty} Brigadier commands, the join handler that pays out an
- * offline voter's queued rewards, and the reflective Votifier vote listener. This is the one place the vote
- * context is wired — nothing else news up its classes.
+ * offline voter's queued rewards (and optionally sends a login reminder), and the reflective Votifier vote
+ * listener. This is the one place the vote context is wired — nothing else news up its classes.
  *
  * <p>The repository is the jOOQ adapter behind a thin party-counter cache (write-through at the database).
  * The reward engine resolves the structured {@code rewards} catalog (per-vote / per-site / first-vote /
@@ -74,7 +80,8 @@ import org.jspecify.annotations.Nullable;
  * The Votifier listener self-registers behind a plugin-present guard in {@link Wired#startBackgroundWork()} and
  * is dropped in {@link Wired#stop()}, so the module runs unchanged whether or not Votifier is installed.
  * A subscriber on the in-process event bus plays the configured sound and particle on every online player's
- * entity thread when {@link VotePartyTriggered} fires.
+ * entity thread when {@link VotePartyTriggered} fires. When reminders are enabled a repeating global task
+ * pings eligible opted-in players on a configurable interval; the task handle is cancelled on stop.
  */
 @NullMarked
 public final class VoteWiring {
@@ -104,22 +111,83 @@ public final class VoteWiring {
         RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel));
         PartyConfig party = partyConfig(ctx.config());
         List<String> voteLinks = ctx.config().getStringList("vote-links", List.of());
+        VoteSiteCatalog siteCatalog = loadSiteCatalog(plugin, kernel);
+        PdcReminderPreferences reminderPrefs = new PdcReminderPreferences(plugin);
 
-        VoteServices services =
-                assemble(kernel, repository, applier, context, engine, audience, notifier, party, voteLinks);
+        VoteServices services = assemble(
+                kernel,
+                repository,
+                applier,
+                context,
+                engine,
+                audience,
+                notifier,
+                party,
+                voteLinks,
+                siteCatalog,
+                reminderPrefs);
 
-        // Subscribe the party sound/particle handler to the in-process bus. The consumer reference is
-        // captured so it can be unregistered on stop, preventing a stale listener after a reload.
+        // Subscribe the party sound/particle handler to the in-process bus.
         @Nullable Sound sound = BukkitRegistryKeys.resolveSound(ctx.config().getString("voteparty.sound", ""));
         @Nullable Particle particle = BukkitRegistryKeys.resolveParticle(ctx.config().getString("voteparty.particle", ""));
         Consumer<DomainEvent> partyEffects = buildPartyEffectsHandler(sound, particle, kernel);
         events.subscribe(partyEffects);
 
+        // Reminder interval task (only when reminders.enabled && interval-minutes > 0).
+        boolean remindersEnabled = ctx.config().getBoolean("reminders.enabled", false);
+        int intervalMinutes = ctx.config().getInt("reminders.interval-minutes", 0);
+        @Nullable AutoCloseable reminderTask = null;
+        if (remindersEnabled && intervalMinutes > 0) {
+            VoteReminderEligibility eligibility = new VoteReminderEligibility(repository, siteCatalog);
+            Duration period = Duration.ofMinutes(intervalMinutes);
+            reminderTask = kernel.scheduler()
+                    .repeatGlobal(() -> sendIntervalReminders(eligibility, reminderPrefs, notifier), period, period);
+        }
+
+        // Build the join listener with reminder support when enabled.
+        boolean loginNag = ctx.config().getBoolean("reminders.login", true);
+        int loginDelaySecs = Math.max(0, ctx.config().getInt("reminders.login-delay-seconds", 5));
+        VoteJoinListener joinListener;
+        if (remindersEnabled && loginNag) {
+            VoteReminderEligibility eligibility = new VoteReminderEligibility(repository, siteCatalog);
+            joinListener = new VoteJoinListener(
+                    services.applyQueuedRewards(),
+                    repository,
+                    kernel.scheduler(),
+                    true,
+                    Duration.ofSeconds(loginDelaySecs),
+                    eligibility,
+                    reminderPrefs,
+                    notifier);
+        } else {
+            joinListener = new VoteJoinListener(
+                    services.applyQueuedRewards(),
+                    repository,
+                    kernel.scheduler(),
+                    false,
+                    Duration.ZERO,
+                    null,
+                    null,
+                    null);
+        }
+
         VotifierListener votifier = new VotifierListener(plugin, services, kernel.playerLookup(), kernel.log());
         List<CommandRegistration> commands = List.of(new VoteCommand(services), new VotePartyCommand(services));
-        List<Listener> listeners =
-                List.of(votifier, new VoteJoinListener(services.applyQueuedRewards(), kernel.scheduler()));
-        return new Wired(commands, listeners, votifier, repository, party.baseThreshold(), events, partyEffects);
+        List<Listener> listeners = List.of(votifier, joinListener);
+        return new Wired(
+                commands, listeners, votifier, repository, party.baseThreshold(), events, partyEffects, reminderTask);
+    }
+
+    private static void sendIntervalReminders(
+            VoteReminderEligibility eligibility, PdcReminderPreferences reminderPrefs, VoteNotifier notifier) {
+        // Iterate online players on the global tick; each eligibility check hits the repository async.
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            com.uxplima.uxmessentials.shared.domain.PlayerRef who =
+                    new com.uxplima.uxmessentials.shared.domain.PlayerRef(online.getUniqueId(), online.getName());
+            if (reminderPrefs.wantsReminders(who) && eligibility.canVoteSomewhere(who, java.time.Instant.now())) {
+                notifier.send(who, com.uxplima.uxmessentials.vote.application.VoteMessageKey.VOTE_REMINDER);
+            }
+        }
     }
 
     private static VoteServices assemble(
@@ -131,7 +199,9 @@ public final class VoteWiring {
             VoteAudience audience,
             VoteNotifier notifier,
             PartyConfig party,
-            List<String> voteLinks) {
+            List<String> voteLinks,
+            VoteSiteCatalog siteCatalog,
+            PdcReminderPreferences reminderPrefs) {
         HandleVote handleVote = new HandleVote(
                 repository,
                 engine,
@@ -148,6 +218,9 @@ public final class VoteWiring {
         VotePartyStatus status = new VotePartyStatus(repository, notifier, party.baseThreshold());
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
+        ShowNextVote showNextVote = new ShowNextVote(repository, siteCatalog, notifier);
+        ShowLastVote showLastVote = new ShowLastVote(repository, siteCatalog, notifier);
+        VoteReminderEligibility reminderEligibility = new VoteReminderEligibility(repository, siteCatalog);
         ForceParty forceParty = new ForceParty(repository, applier, audience, notifier, kernel.events(), party);
         SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
         AddPartyCount addPartyCount =
@@ -161,6 +234,10 @@ public final class VoteWiring {
                 status,
                 showVoteTotals,
                 topVoters,
+                showNextVote,
+                showLastVote,
+                reminderEligibility,
+                reminderPrefs,
                 forceParty,
                 setPartyCount,
                 addPartyCount,
@@ -172,12 +249,21 @@ public final class VoteWiring {
     }
 
     private static RewardCatalog loadCatalog(Plugin plugin, KernelPorts kernel) {
-        Path moduleConfig = plugin.getDataFolder()
+        Path moduleConfig = moduleConfigPath(plugin);
+        return RewardCatalogLoader.loadFrom(moduleConfig, kernel.log());
+    }
+
+    private static VoteSiteCatalog loadSiteCatalog(Plugin plugin, KernelPorts kernel) {
+        Path moduleConfig = moduleConfigPath(plugin);
+        return VoteSiteCatalogLoader.loadFrom(moduleConfig, kernel.log());
+    }
+
+    private static Path moduleConfigPath(Plugin plugin) {
+        return plugin.getDataFolder()
                 .toPath()
                 .resolve("modules")
                 .resolve("vote")
                 .resolve("config.conf");
-        return RewardCatalogLoader.loadFrom(moduleConfig, kernel.log());
     }
 
     /**
@@ -186,9 +272,6 @@ public final class VoteWiring {
      * If absent or malformed, a no-op (empty commands, 100 % chance) spec is used.
      */
     private static PartyConfig partyConfig(ConfigStore config) {
-        // Load the config file directly to read the reward node, since ConfigStore does not expose Configurate nodes.
-        // The voteparty.reward spec is parsed via the same logic RewardCatalogLoader uses for per-vote specs.
-        // All other fields come directly from ConfigStore for simplicity.
         RewardSpec reward = loadPartyRewardSpec(config);
         int threshold = Math.max(1, config.getInt("voteparty.threshold", DEFAULT_THRESHOLD));
         boolean onlyVoters = config.getBoolean("voteparty.only-voters", false);
@@ -199,16 +282,11 @@ public final class VoteWiring {
     }
 
     private static RewardSpec loadPartyRewardSpec(ConfigStore config) {
-        // The party reward is a flat command list in the legacy format, or a reward{} block in V3.
-        // Try to load the structured reward from the HOCON config node; fall back to the flat legacy list.
         List<String> legacyCommands = config.getStringList("voteparty.rewards", List.of());
         if (legacyCommands.isEmpty()) {
-            // No legacy commands — the operator either left it empty or configured a reward{} block.
-            // Return a no-op spec so the party still fires (messages / items can come from the block).
             return new RewardSpec(
                     100, java.util.Optional.empty(), List.of(), List.of(), List.of(), List.of(), java.util.Set.of());
         }
-        // Legacy flat list: wrap as a 100 % command-only spec so existing configs keep working.
         return new RewardSpec(
                 100, java.util.Optional.empty(), legacyCommands, List.of(), List.of(), List.of(), java.util.Set.of());
     }
@@ -247,7 +325,6 @@ public final class VoteWiring {
             if (sound == null && particle == null) {
                 return;
             }
-            // Play the effects for each online player on their own entity thread.
             for (Player online : Bukkit.getOnlinePlayers()) {
                 Sound s = sound;
                 Particle p = particle;
@@ -256,8 +333,6 @@ public final class VoteWiring {
                                 new com.uxplima.uxmessentials.shared.domain.PlayerRef(
                                         online.getUniqueId(), online.getName()),
                                 () -> {
-                                    // getLocation() is @Nullable in the Paper API; skip the effect when
-                                    // the player is in an unloaded world (very rare during a party fire).
                                     @Nullable Location loc = online.getLocation();
                                     if (loc == null) {
                                         return;
@@ -274,9 +349,11 @@ public final class VoteWiring {
     }
 
     /**
-     * Everything the vote module contributes once wired: the Brigadier commands, the join + Votifier listeners,
-     * the Votifier listener handle so {@link #startBackgroundWork()} can self-register it and {@link #stop()}
-     * can drop it, and the repository + party threshold so bootstrap can wire the placeholder seam.
+     * Everything the vote module contributes once wired: the Brigadier commands, the join + Votifier
+     * listeners, the Votifier listener handle so {@link #startBackgroundWork()} can self-register it and
+     * {@link #stop()} can drop it, and the repository + party threshold so bootstrap can wire the
+     * placeholder seam. The {@code reminderTask} is non-null only when {@code reminders.enabled = true}
+     * and {@code interval-minutes > 0}; it is closed on stop.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the join + Votifier listeners to register
@@ -285,6 +362,7 @@ public final class VoteWiring {
      * @param partyThreshold the configured party threshold, exposed for the placeholder seam
      * @param eventBus the in-process event bus the party effects consumer is registered on
      * @param partyEffects the sound/particle consumer to unregister on stop
+     * @param reminderTask the repeating reminder task handle (may be null when interval reminders are off)
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -293,7 +371,8 @@ public final class VoteWiring {
             VoteRepository repository,
             int partyThreshold,
             InProcessDomainEventPublisher eventBus,
-            Consumer<DomainEvent> partyEffects) {
+            Consumer<DomainEvent> partyEffects,
+            @Nullable AutoCloseable reminderTask) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -312,10 +391,17 @@ public final class VoteWiring {
             votifier.registerIfPresent();
         }
 
-        /** Drop the Votifier handler and the party effects subscriber on disable/reload. */
+        /** Drop the Votifier handler, the party effects subscriber, and the reminder task on disable/reload. */
         public void stop() {
             votifier.unregister();
             eventBus.unsubscribe(partyEffects);
+            if (reminderTask != null) {
+                try {
+                    reminderTask.close();
+                } catch (Exception ignored) {
+                    // ScheduledTask.cancel() does not throw; AutoCloseable.close() may declare it
+                }
+            }
         }
     }
 }

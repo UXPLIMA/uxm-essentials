@@ -3,15 +3,15 @@ package com.uxplima.uxmessentials.vote.command;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-
-import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -26,7 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
-import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
+import com.uxplima.uxmessentials.vote.adapter.inbound.command.VoteCommand;
 import com.uxplima.uxmessentials.vote.application.AddPartyCount;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
 import com.uxplima.uxmessentials.vote.application.ForceParty;
@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.vote.application.ShowNextVote;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
+import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteNotifier;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
@@ -55,10 +56,12 @@ import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import com.uxplima.uxmessentials.vote.domain.VoteSiteCatalog;
+import com.uxplima.uxmessentials.vote.domain.VoteSiteSpec;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardCatalog;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,26 +71,33 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /voteparty} admin subcommands: {@code force}, {@code set <n>},
- * and {@code add <n>}. Asserts that each subcommand is perm-gated, routes to the correct use case,
- * and that the use case drives the right repository mutation.
+ * MockBukkit coverage of the {@code /vote next}, {@code /vote last}, and {@code /vote remind}
+ * subcommands added in V4-3.
+ *
+ * <ul>
+ *   <li>{@code /vote next} routes to {@link ShowNextVote} — asserts the use case is called by
+ *       checking the repository is consulted for per-site timestamps.
+ *   <li>{@code /vote last} routes to {@link ShowLastVote} — same assertion shape.
+ *   <li>{@code /vote remind} toggles the reminder preference and sends the correct key.
+ * </ul>
  */
-class VotePartyCommandPathTest {
+class VoteNextLastRemindCommandPathTest {
 
     private ServerMock server;
-    private Plugin plugin;
     private PlayerMock sender;
-    private RecordingVoteRepository repository;
+    private RecordingRepository repository;
     private RecordingMessages messages;
+    private RecordingReminderPreferences reminderPrefs;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        plugin = MockBukkit.createMockPlugin();
+        MockBukkit.createMockPlugin();
         sender = server.addPlayer("Alice");
         sender.setOp(true);
-        repository = new RecordingVoteRepository();
+        repository = new RecordingRepository();
         messages = new RecordingMessages();
+        reminderPrefs = new RecordingReminderPreferences(true); // starts opted-in
     }
 
     @AfterEach
@@ -96,84 +106,97 @@ class VotePartyCommandPathTest {
     }
 
     @Test
-    void forceSubtreeExistsUnderVoteparty() {
-        VotePartyCommand command = new VotePartyCommand(services());
+    void voteNextSubcommandCallsLastVoteAtSiteForEachConfiguredSite() {
+        VoteSiteCatalog catalog = new VoteSiteCatalog(List.of(
+                new VoteSiteSpec("PMC", Optional.of("https://pmc.example"), Duration.ofHours(24)),
+                new VoteSiteSpec("MP", Optional.empty(), Duration.ofHours(24))));
+        CommandDispatcher<CommandSourceStack> dispatcher = register(catalog);
+
+        execute(dispatcher, "vote next");
+
+        // ShowNextVote calls lastVoteAtSite for each site.
+        assertThat(repository.lastVoteAtSiteCalls).containsExactlyInAnyOrder("PMC", "MP");
+    }
+
+    @Test
+    void voteLastSubcommandCallsLastVoteAtSiteForEachConfiguredSite() {
+        VoteSiteCatalog catalog = new VoteSiteCatalog(
+                List.of(new VoteSiteSpec("PMC", Optional.of("https://pmc.example"), Duration.ofHours(24))));
+        CommandDispatcher<CommandSourceStack> dispatcher = register(catalog);
+
+        execute(dispatcher, "vote last");
+
+        assertThat(repository.lastVoteAtSiteCalls).contains("PMC");
+    }
+
+    @Test
+    void voteNextSendsNoneKeyWhenCatalogIsEmpty() {
+        CommandDispatcher<CommandSourceStack> dispatcher = register(VoteSiteCatalog.empty());
+
+        execute(dispatcher, "vote next");
+
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_NEXT_NONE.key());
+    }
+
+    @Test
+    void voteLastSendsNoneKeyWhenCatalogIsEmpty() {
+        CommandDispatcher<CommandSourceStack> dispatcher = register(VoteSiteCatalog.empty());
+
+        execute(dispatcher, "vote last");
+
+        // ShowLastVote reuses VOTE_NEXT_NONE when the catalog is empty.
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_NEXT_NONE.key());
+    }
+
+    @Test
+    void voteRemindFlipsPrefFromOnToOffAndSendsDisabledKey() {
+        // starts opted-in; first toggle should turn it off
+        CommandDispatcher<CommandSourceStack> dispatcher = register(VoteSiteCatalog.empty());
+
+        execute(dispatcher, "vote remind");
+
+        assertThat(reminderPrefs.lastToggleResult).isFalse();
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_REMIND_DISABLED.key());
+    }
+
+    @Test
+    void voteRemindFlipsPrefFromOffToOnAndSendsEnabledKey() {
+        // Start opted-out.
+        reminderPrefs = new RecordingReminderPreferences(false);
+        CommandDispatcher<CommandSourceStack> dispatcher = register(VoteSiteCatalog.empty());
+
+        execute(dispatcher, "vote remind");
+
+        assertThat(reminderPrefs.lastToggleResult).isTrue();
+        assertThat(messages.lastKey()).isEqualTo(VoteMessageKey.VOTE_REMIND_ENABLED.key());
+    }
+
+    @Test
+    void voteNextSubcommandExistsInCommandTree() {
+        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()));
         var root = command.build();
-        assertThat(root.getChild("force"))
-                .as("force subcommand must exist under /voteparty")
-                .isNotNull();
+        assertThat(root.getChild("next")).as("/vote next must exist").isNotNull();
     }
 
     @Test
-    void setSubtreeExistsUnderVoteparty() {
-        VotePartyCommand command = new VotePartyCommand(services());
+    void voteLastSubcommandExistsInCommandTree() {
+        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()));
         var root = command.build();
-        assertThat(root.getChild("set"))
-                .as("set subcommand must exist under /voteparty")
-                .isNotNull();
+        assertThat(root.getChild("last")).as("/vote last must exist").isNotNull();
     }
 
     @Test
-    void addSubtreeExistsUnderVoteparty() {
-        VotePartyCommand command = new VotePartyCommand(services());
+    void voteRemindSubcommandExistsInCommandTree() {
+        VoteCommand command = new VoteCommand(services(VoteSiteCatalog.empty()));
         var root = command.build();
-        assertThat(root.getChild("add"))
-                .as("add subcommand must exist under /voteparty")
-                .isNotNull();
-    }
-
-    @Test
-    void forceSubtreeRequiresVotepartyAdminPermission() {
-        VotePartyCommand command = new VotePartyCommand(services());
-        var forceNode = command.build().getChild("force");
-        assertThat(forceNode).isNotNull();
-
-        PlayerMock noAdmin = server.addPlayer();
-        noAdmin.addAttachment(plugin, "uxmessentials.voteparty.use", true);
-        assertThat(forceNode.canUse(CommandSourceStackMock.from(noAdmin))).isFalse();
-
-        PlayerMock admin = server.addPlayer();
-        admin.addAttachment(plugin, "uxmessentials.voteparty.admin", true);
-        assertThat(forceNode.canUse(CommandSourceStackMock.from(admin))).isTrue();
-    }
-
-    @Test
-    void votepartySetWritesCountToRepository() {
-        sender.addAttachment(plugin, "uxmessentials.voteparty.admin", true);
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
-
-        execute(dispatcher, "voteparty set 10");
-
-        assertThat(repository.lastSetCount).isEqualTo(10);
-    }
-
-    @Test
-    void votepartyAddIncreasesCounter() {
-        sender.addAttachment(plugin, "uxmessentials.voteparty.admin", true);
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
-
-        // Repository starts at 0; adding 5 should call setPartyCount(5) since 5 < threshold 25.
-        execute(dispatcher, "voteparty add 5");
-
-        assertThat(repository.lastSetCount).isEqualTo(5);
-    }
-
-    @Test
-    void votepartyForceResetsBothCounterAndParticipants() {
-        sender.addAttachment(plugin, "uxmessentials.voteparty.admin", true);
-        CommandDispatcher<CommandSourceStack> dispatcher = register();
-
-        execute(dispatcher, "voteparty force");
-
-        // ForceParty fires the party → resets the counter to 0.
-        assertThat(repository.lastSetCount).isEqualTo(0);
+        assertThat(root.getChild("remind")).as("/vote remind must exist").isNotNull();
     }
 
     // --- helpers ---
 
-    private CommandDispatcher<CommandSourceStack> register() {
+    private CommandDispatcher<CommandSourceStack> register(VoteSiteCatalog catalog) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        CommandRegistration command = new VotePartyCommand(services());
+        CommandRegistration command = new VoteCommand(services(catalog));
         dispatcher.getRoot().addChild(command.build());
         return dispatcher;
     }
@@ -186,33 +209,32 @@ class VotePartyCommandPathTest {
         }
     }
 
-    private VoteServices services() {
+    private VoteServices services(VoteSiteCatalog catalog) {
         VoteNotifier notifier = new VoteNotifier(messages, new NoSink());
-        RewardSpec noOpSpec =
-                new RewardSpec(100, Optional.empty(), List.of(), List.of(), List.of(), List.of(), Set.of());
-        PartyConfig party = new PartyConfig(noOpSpec, 25, false, 0, PartyResetSchedule.NONE, List.of());
-        NoOpVoteAudience audience = new NoOpVoteAudience();
-        NoOpRewardApplier applier = new NoOpRewardApplier();
+        RewardSpec noOp = new RewardSpec(100, Optional.empty(), List.of(), List.of(), List.of(), List.of(), Set.of());
+        PartyConfig party = new PartyConfig(noOp, 25, false, 0, PartyResetSchedule.NONE, List.of());
+        NoOpAudience audience = new NoOpAudience();
+        NoOpApplier applier = new NoOpApplier();
         NoEvents events = new NoEvents();
         NoLookup lookup = new NoLookup();
         HandleVote handleVote = new HandleVote(
                 repository,
                 new RewardEngine(RewardCatalog.empty()),
                 applier,
-                new NoOpVoteContext(),
+                new NoOpContext(),
                 audience,
                 notifier,
                 events,
                 party,
                 ZoneId.of("UTC"));
-        ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpRewardDispatcher());
+        ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(repository, new NoOpDispatcher());
         VoteLinks voteLinks = new VoteLinks(List.of(), notifier);
-        VotePartyStatus votePartyStatus = new VotePartyStatus(repository, notifier, 25);
+        VotePartyStatus partyStatus = new VotePartyStatus(repository, notifier, 25);
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);
         TopVoters topVoters = new TopVoters(repository, notifier, 10);
-        ShowNextVote showNextVote = new ShowNextVote(repository, VoteSiteCatalog.empty(), notifier);
-        ShowLastVote showLastVote = new ShowLastVote(repository, VoteSiteCatalog.empty(), notifier);
-        VoteReminderEligibility reminderEligibility = new VoteReminderEligibility(repository, VoteSiteCatalog.empty());
+        ShowNextVote showNextVote = new ShowNextVote(repository, catalog, notifier);
+        ShowLastVote showLastVote = new ShowLastVote(repository, catalog, notifier);
+        VoteReminderEligibility eligibility = new VoteReminderEligibility(repository, catalog);
         ForceParty forceParty = new ForceParty(repository, applier, audience, notifier, events, party);
         SetPartyCount setPartyCount = new SetPartyCount(repository, notifier);
         AddPartyCount addPartyCount = new AddPartyCount(repository, applier, audience, notifier, events, party);
@@ -222,13 +244,13 @@ class VotePartyCommandPathTest {
                 handleVote,
                 applyQueuedRewards,
                 voteLinks,
-                votePartyStatus,
+                partyStatus,
                 showVoteTotals,
                 topVoters,
                 showNextVote,
                 showLastVote,
-                reminderEligibility,
-                new NoOpReminderPreferences(),
+                eligibility,
+                reminderPrefs,
                 forceParty,
                 setPartyCount,
                 addPartyCount,
@@ -241,9 +263,8 @@ class VotePartyCommandPathTest {
 
     // --- recording fakes ---
 
-    private static final class RecordingVoteRepository implements VoteRepository {
-
-        int lastSetCount = -1;
+    private static final class RecordingRepository implements VoteRepository {
+        final List<String> lastVoteAtSiteCalls = new ArrayList<>();
 
         @Override
         public int partyCount() {
@@ -251,9 +272,7 @@ class VotePartyCommandPathTest {
         }
 
         @Override
-        public void setPartyCount(int count) {
-            lastSetCount = count;
-        }
+        public void setPartyCount(int count) {}
 
         @Override
         public int incrementAndGetPartyCount() {
@@ -322,23 +341,58 @@ class VotePartyCommandPathTest {
         public void resetTotals(PlayerRef player) {}
 
         @Override
-        public java.util.Optional<java.time.Instant> lastVoteAtSite(PlayerRef player, String site) {
-            return java.util.Optional.empty();
+        public Optional<Instant> lastVoteAtSite(PlayerRef player, String site) {
+            lastVoteAtSiteCalls.add(site);
+            return Optional.empty();
         }
 
         @Override
-        public void recordLastVoteAtSite(PlayerRef player, String site, java.time.Instant at) {}
+        public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {}
     }
 
     private static final class RecordingMessages implements Messages {
+        final List<String> resolvedKeys = new ArrayList<>();
+
+        @Nullable String lastKey() {
+            return resolvedKeys.isEmpty() ? null : resolvedKeys.get(resolvedKeys.size() - 1);
+        }
 
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            if (!"prefix".equals(key.key())) {
+                resolvedKeys.add(key.key());
+            }
             return key.key();
         }
     }
 
-    // --- stubs ---
+    /**
+     * Reminder-preferences recording stub. Starts with a known toggle state and tracks the most
+     * recent result returned by {@code toggle()}.
+     */
+    private static final class RecordingReminderPreferences implements ReminderPreferences {
+        private boolean wantsReminders;
+
+        @Nullable Boolean lastToggleResult;
+
+        RecordingReminderPreferences(boolean initialWants) {
+            this.wantsReminders = initialWants;
+        }
+
+        @Override
+        public boolean wantsReminders(PlayerRef who) {
+            return wantsReminders;
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            wantsReminders = !wantsReminders;
+            lastToggleResult = wantsReminders;
+            return wantsReminders;
+        }
+    }
+
+    // --- minimal stubs ---
 
     private static final class NoSink implements MessageSink {
         @Override
@@ -350,6 +404,23 @@ class VotePartyCommandPathTest {
         public void publish(DomainEvent event) {}
     }
 
+    private static final class NoLookup implements PlayerLookup {
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
+        }
+    }
+
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
@@ -357,7 +428,7 @@ class VotePartyCommandPathTest {
         }
 
         @Override
-        public void onRegion(com.uxplima.uxmessentials.shared.domain.Position position, Runnable task) {
+        public void onRegion(com.uxplima.uxmessentials.shared.domain.Position p, Runnable task) {
             task.run();
         }
 
@@ -375,19 +446,24 @@ class VotePartyCommandPathTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+
+        @Override
+        public AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
+            return () -> {};
+        }
     }
 
-    private static final class NoOpRewardDispatcher implements RewardDispatcher {
+    private static final class NoOpDispatcher implements RewardDispatcher {
         @Override
         public void dispatch(List<String> commands, String playerName) {}
     }
 
-    private static final class NoOpRewardApplier implements RewardApplier {
+    private static final class NoOpApplier implements RewardApplier {
         @Override
         public void apply(PlayerRef voter, boolean online, RewardGrant grant) {}
     }
 
-    private static final class NoOpVoteContext implements VoteContext {
+    private static final class NoOpContext implements VoteContext {
         @Override
         public String worldOf(PlayerRef voter) {
             return "";
@@ -409,39 +485,10 @@ class VotePartyCommandPathTest {
         }
     }
 
-    private static final class NoOpVoteAudience implements VoteAudience {
+    private static final class NoOpAudience implements VoteAudience {
         @Override
         public Collection<PlayerRef> online() {
             return List.of();
-        }
-    }
-
-    private static final class NoLookup implements PlayerLookup {
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.empty();
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return false;
-        }
-    }
-
-    private static final class NoOpReminderPreferences implements ReminderPreferences {
-        @Override
-        public boolean wantsReminders(PlayerRef who) {
-            return true;
-        }
-
-        @Override
-        public boolean toggle(PlayerRef who) {
-            return true;
         }
     }
 }

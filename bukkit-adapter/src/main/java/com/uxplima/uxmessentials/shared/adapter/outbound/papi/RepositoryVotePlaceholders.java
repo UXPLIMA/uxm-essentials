@@ -1,8 +1,12 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import org.jspecify.annotations.NullMarked;
@@ -14,9 +18,16 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The threshold placeholders reflect the <em>effective</em> threshold — the stored override when
  * one is active, the configured base otherwise — so they stay accurate under escalation.
+ *
+ * <p>Indexed leaderboard placeholders ({@link #topAt}, {@link #positionOf}) fetch the top-{@value #LEADERBOARD_LIMIT}
+ * rows per query. The result is small and bounded, so no extra cache is added at this layer; the
+ * repository's own cache (when present) absorbs repeated calls.
  */
 @NullMarked
 public final class RepositoryVotePlaceholders implements VotePlaceholders {
+
+    /** The maximum number of rows fetched for indexed leaderboard placeholders. */
+    private static final int LEADERBOARD_LIMIT = 100;
 
     private final VoteRepository repository;
     private final int baseThreshold;
@@ -45,5 +56,32 @@ public final class RepositoryVotePlaceholders implements VotePlaceholders {
     public int partyThreshold() {
         int override = repository.thresholdOverride();
         return override > 0 ? override : baseThreshold;
+    }
+
+    @Override
+    public Optional<VoteRanking> topAt(VotePeriod period, int rank) {
+        Objects.requireNonNull(period, "period");
+        if (rank < 1) {
+            return Optional.empty();
+        }
+        List<VoteRanking> rows = repository.topVoters(period, LEADERBOARD_LIMIT);
+        int index = rank - 1; // convert 1-based rank to 0-based index
+        if (index >= rows.size()) {
+            return Optional.empty();
+        }
+        return Optional.of(rows.get(index));
+    }
+
+    @Override
+    public OptionalInt positionOf(PlayerRef who, VotePeriod period) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(period, "period");
+        List<VoteRanking> rows = repository.topVoters(period, LEADERBOARD_LIMIT);
+        for (int i = 0; i < rows.size(); i++) {
+            if (rows.get(i).player().uuid().equals(who.uuid())) {
+                return OptionalInt.of(i + 1); // 1-based rank
+            }
+        }
+        return OptionalInt.empty();
     }
 }

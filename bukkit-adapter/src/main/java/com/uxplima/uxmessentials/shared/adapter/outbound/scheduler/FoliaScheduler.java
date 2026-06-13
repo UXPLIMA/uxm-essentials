@@ -9,6 +9,8 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
@@ -99,5 +101,19 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         long millis = Math.max(0L, delay.toMillis());
         Bukkit.getAsyncScheduler()
                 .runDelayed(plugin, ignored -> task.run(), Math.max(1L, millis), TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
+        Objects.requireNonNull(task, "task");
+        Objects.requireNonNull(initialDelay, "initialDelay");
+        Objects.requireNonNull(period, "period");
+        // Convert durations to ticks (20 ticks/s); floor to 1 so callers that pass Duration.ZERO
+        // still get a valid schedule rather than an API exception.
+        long initTicks = Math.max(1L, initialDelay.toMillis() / 50L);
+        long periodTicks = Math.max(1L, period.toMillis() / 50L);
+        ScheduledTask handle =
+                Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, ignored -> task.run(), initTicks, periodTicks);
+        return handle::cancel;
     }
 }

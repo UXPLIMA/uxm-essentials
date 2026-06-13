@@ -12,10 +12,14 @@ import com.uxplima.uxmessentials.vote.application.GiveVote;
 import com.uxplima.uxmessentials.vote.application.HandleVote;
 import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
+import com.uxplima.uxmessentials.vote.application.ShowLastVote;
+import com.uxplima.uxmessentials.vote.application.ShowNextVote;
 import com.uxplima.uxmessentials.vote.application.ShowVoteTotals;
 import com.uxplima.uxmessentials.vote.application.TopVoters;
 import com.uxplima.uxmessentials.vote.application.VoteLinks;
 import com.uxplima.uxmessentials.vote.application.VotePartyStatus;
+import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
+import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -31,6 +35,10 @@ import org.jspecify.annotations.NullMarked;
  * @param votePartyStatus the {@code /voteparty} party-progress display
  * @param showVoteTotals the {@code /vote total [player]} per-player tally display
  * @param topVoters the {@code /vote top [period]} leaderboard display
+ * @param showNextVote the {@code /vote next} per-site cooldown display
+ * @param showLastVote the {@code /vote last} per-site last-vote display
+ * @param reminderEligibility determines if a player has at least one site ready to vote on
+ * @param reminderPreferences per-player opt-in/out preference (PDC-backed)
  * @param forceParty admin: fire the party immediately
  * @param setPartyCount admin: set the counter to an exact value
  * @param addPartyCount admin: add to the counter (fires if threshold reached)
@@ -48,6 +56,10 @@ public record VoteServices(
         VotePartyStatus votePartyStatus,
         ShowVoteTotals showVoteTotals,
         TopVoters topVoters,
+        ShowNextVote showNextVote,
+        ShowLastVote showLastVote,
+        VoteReminderEligibility reminderEligibility,
+        ReminderPreferences reminderPreferences,
         ForceParty forceParty,
         SetPartyCount setPartyCount,
         AddPartyCount addPartyCount,
@@ -64,6 +76,10 @@ public record VoteServices(
         Objects.requireNonNull(votePartyStatus, "votePartyStatus");
         Objects.requireNonNull(showVoteTotals, "showVoteTotals");
         Objects.requireNonNull(topVoters, "topVoters");
+        Objects.requireNonNull(showNextVote, "showNextVote");
+        Objects.requireNonNull(showLastVote, "showLastVote");
+        Objects.requireNonNull(reminderEligibility, "reminderEligibility");
+        Objects.requireNonNull(reminderPreferences, "reminderPreferences");
         Objects.requireNonNull(forceParty, "forceParty");
         Objects.requireNonNull(setPartyCount, "setPartyCount");
         Objects.requireNonNull(addPartyCount, "addPartyCount");

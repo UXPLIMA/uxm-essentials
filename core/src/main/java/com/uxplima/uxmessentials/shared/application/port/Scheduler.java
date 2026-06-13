@@ -84,4 +84,22 @@ public interface Scheduler {
 
     /** Run off any tick thread after {@code delay}, on a non-shared executor. */
     void asyncAfter(Duration delay, Runnable task);
+
+    /**
+     * Schedule {@code task} to run on the global region thread at a fixed rate: first after
+     * {@code initialDelay}, then every {@code period}. The returned handle cancels the repeating
+     * task when closed; callers must hold the handle and call {@link AutoCloseable#close()} on
+     * module stop (or reload) to prevent orphaned tasks after a disable.
+     *
+     * <p>The default throws {@link UnsupportedOperationException} so test stubs that do not use
+     * repeating tasks can implement {@link Scheduler} without boilerplate. The Folia adapter
+     * overrides this with the real {@code runAtFixedRate} call.
+     *
+     * <p>If a future feature genuinely needs per-entity or per-region repeating tasks, add
+     * narrower overloads following the same pattern rather than generalising this one.
+     */
+    default AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
+        throw new UnsupportedOperationException("repeatGlobal is not implemented by this Scheduler stub; "
+                + "override it in the FoliaScheduler adapter or in tests that call it");
+    }
 }

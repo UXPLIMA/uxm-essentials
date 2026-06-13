@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.vote.adapter.inbound.listener;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 
 import org.bukkit.entity.Player;
@@ -12,30 +14,186 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
+import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
+import com.uxplima.uxmessentials.vote.application.VoteNotifier;
+import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
+import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
+import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Pays out the rewards a player accrued while offline the moment they join: it drains and dispatches their
- * queued reward batches through {@link ApplyQueuedRewards}, so an offline vote is never lost. The drain
- * reads the database, so it runs off the join thread via the {@link Scheduler} port's async seam; the
- * reward dispatch itself hops to the global region inside the dispatcher. A player with nothing queued is a
- * cheap no-op (the repository's existence probe short-circuits before any drain).
+ * On join:
+ * <ol>
+ *   <li>Pays out the rewards a player accrued while offline (drains the queue via {@link ApplyQueuedRewards}).
+ *   <li>Warms the repository cache with the player's vote totals so the first PAPI placeholder call is
+ *       cheap (no cold DB hit).
+ *   <li>Optionally sends a one-shot vote reminder after a short delay when {@code remindersEnabled} is
+ *       {@code true}, the player has opted in, and they have at least one available site.
+ * </ol>
+ *
+ * <p>All tasks run off-tick via the {@link Scheduler} port. The reminder delay uses
+ * {@link Scheduler#asyncAfter(Duration, Runnable)} so the Scheduler port is the only scheduling
+ * mechanism in use — no {@code BukkitScheduler}, no raw threads.
  */
 @NullMarked
 public final class VoteJoinListener implements Listener {
 
     private final ApplyQueuedRewards applyQueuedRewards;
+    private final VoteRepository repository;
     private final Scheduler scheduler;
+    private final boolean remindersEnabled;
+    private final Duration loginDelay;
+    /** Null when {@code remindersEnabled} is false — avoids a useless object allocation. */
+    private final @Nullable VoteReminderEligibility eligibility;
 
+    private final @Nullable ReminderPreferences reminderPreferences;
+    private final @Nullable VoteNotifier notifier;
+
+    /**
+     * Legacy constructor — queue drain only, no reminders (equivalent to
+     * {@code remindersEnabled = false}). The repository cache-warm still fires.
+     */
     public VoteJoinListener(ApplyQueuedRewards applyQueuedRewards, Scheduler scheduler) {
+        this(applyQueuedRewards, null, scheduler, false, Duration.ZERO, null, null, null);
+    }
+
+    /**
+     * Full constructor used when reminders are enabled.
+     *
+     * @param repository may be {@code null} when provided via the legacy single-arg ctor; the
+     *                   cache-warm is then skipped
+     */
+    public VoteJoinListener(
+            ApplyQueuedRewards applyQueuedRewards,
+            @Nullable VoteRepository repository,
+            Scheduler scheduler,
+            boolean remindersEnabled,
+            Duration loginDelay,
+            @Nullable VoteReminderEligibility eligibility,
+            @Nullable ReminderPreferences reminderPreferences,
+            @Nullable VoteNotifier notifier) {
         this.applyQueuedRewards = Objects.requireNonNull(applyQueuedRewards, "applyQueuedRewards");
+        this.repository = repository != null ? repository : NoopRepository.INSTANCE;
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.remindersEnabled = remindersEnabled;
+        this.loginDelay = Objects.requireNonNull(loginDelay, "loginDelay");
+        this.eligibility = eligibility;
+        this.reminderPreferences = reminderPreferences;
+        this.notifier = notifier;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         PlayerRef who = BukkitRefs.toRef(player);
-        scheduler.async(() -> applyQueuedRewards.applyFor(who));
+
+        // Drain offline rewards and warm the PAPI cache — always async.
+        scheduler.async(() -> {
+            applyQueuedRewards.applyFor(who);
+            repository.totalsOf(who); // warms the Caffeine cache, no user-visible side effect
+        });
+
+        if (!remindersEnabled || eligibility == null || reminderPreferences == null || notifier == null) {
+            return;
+        }
+
+        // One-shot reminder after loginDelay: check eligibility off-tick, send if eligible.
+        scheduler.asyncAfter(loginDelay, () -> {
+            if (reminderPreferences.wantsReminders(who) && eligibility.canVoteSomewhere(who, Instant.now())) {
+                notifier.send(who, VoteMessageKey.VOTE_REMINDER);
+            }
+        });
+    }
+
+    /**
+     * A minimal no-op repository used when the cache-warm is not needed (legacy ctor path). Keeps
+     * the main logic simple — no branches on null in {@link #onJoin}.
+     */
+    private static final class NoopRepository implements VoteRepository {
+        static final NoopRepository INSTANCE = new NoopRepository();
+
+        @Override
+        public int partyCount() {
+            return 0;
+        }
+
+        @Override
+        public void setPartyCount(int count) {}
+
+        @Override
+        public int incrementAndGetPartyCount() {
+            return 0;
+        }
+
+        @Override
+        public void enqueue(com.uxplima.uxmessentials.vote.domain.QueuedReward reward) {}
+
+        @Override
+        public java.util.List<com.uxplima.uxmessentials.vote.domain.QueuedReward> drainFor(PlayerRef player) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public boolean hasPending(PlayerRef player) {
+            return false;
+        }
+
+        @Override
+        public com.uxplima.uxmessentials.vote.domain.VoteTally totalsOf(PlayerRef player) {
+            return com.uxplima.uxmessentials.vote.domain.VoteTally.empty();
+        }
+
+        @Override
+        public void saveTotals(PlayerRef player, com.uxplima.uxmessentials.vote.domain.VoteTally tally) {}
+
+        @Override
+        public java.util.List<com.uxplima.uxmessentials.vote.application.port.VoteRanking> topVoters(
+                com.uxplima.uxmessentials.vote.domain.VotePeriod period, int limit) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public void markPartyParticipant(PlayerRef player) {}
+
+        @Override
+        public java.util.Set<java.util.UUID> partyParticipants() {
+            return java.util.Set.of();
+        }
+
+        @Override
+        public void clearPartyParticipants() {}
+
+        @Override
+        public long partyPeriodKey() {
+            return 0L;
+        }
+
+        @Override
+        public void setPartyPeriodKey(long key) {}
+
+        @Override
+        public int thresholdOverride() {
+            return 0;
+        }
+
+        @Override
+        public void setThresholdOverride(int override) {}
+
+        @Override
+        public boolean claimPartyFire(int threshold) {
+            return false;
+        }
+
+        @Override
+        public void resetTotals(PlayerRef player) {}
+
+        @Override
+        public java.util.Optional<Instant> lastVoteAtSite(PlayerRef player, String site) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {}
     }
 }

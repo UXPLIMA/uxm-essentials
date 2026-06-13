@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -8,8 +9,10 @@ import java.util.OptionalInt;
 
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The placeholder resolution logic, behind a thin seam so it is testable without a live PlaceholderAPI.
@@ -33,6 +36,8 @@ public final class PlaceholderResolver {
     private static final String NO = "no";
     private static final String KIT_COOLDOWN_PREFIX = "kit_cooldown_";
     private static final String VOTES_PREFIX = "votes_";
+    private static final String VOTES_TOP_PREFIX = "top_";
+    private static final String VOTES_POSITION_PREFIX = "position_";
     private static final String VOTEPARTY_PREFIX = "voteparty_";
 
     private final PlaceholderContexts contexts;
@@ -127,23 +132,81 @@ public final class PlaceholderResolver {
         return contexts.vaults().map(seam -> Integer.toString(seam.count(who))).orElse(EMPTY);
     }
 
-    private String votes(PlayerRef who, String periodName) {
+    /**
+     * Resolve a {@code votes_*} tail. Three sub-patterns:
+     * <ul>
+     *   <li>{@code <period>} — the requesting player's vote count for that period.</li>
+     *   <li>{@code top_<period>_<n>_name} or {@code top_<period>_<n>_votes} — the name or vote
+     *       count of the player ranked {@code <n>} (1-based) on the leaderboard.</li>
+     *   <li>{@code position_<period>} — the requesting player's 1-based leaderboard rank.</li>
+     * </ul>
+     */
+    private String votes(PlayerRef who, String tail) {
         Optional<VotePlaceholders> seam = contexts.vote();
         if (seam.isEmpty()) {
             return EMPTY;
         }
-        VotePeriod period =
-                switch (periodName) {
-                    case "daily" -> VotePeriod.DAILY;
-                    case "weekly" -> VotePeriod.WEEKLY;
-                    case "monthly" -> VotePeriod.MONTHLY;
-                    case "alltime" -> VotePeriod.ALLTIME;
-                    default -> null;
-                };
+        VotePlaceholders vote = seam.get();
+
+        if (tail.startsWith(VOTES_TOP_PREFIX)) {
+            // top_<period>_<n>_name  or  top_<period>_<n>_votes
+            // e.g. tail = "top_monthly_1_name" → strip "top_" → "monthly_1_name"
+            String rest = tail.substring(VOTES_TOP_PREFIX.length());
+            // rest = "<period>_<n>_<field>"
+            List<String> parts = List.of(rest.split("_", 3));
+            if (parts.size() != 3) {
+                return EMPTY;
+            }
+            VotePeriod period = parsePeriod(parts.get(0));
+            if (period == null) {
+                return EMPTY;
+            }
+            int rank;
+            try {
+                rank = Integer.parseInt(parts.get(1));
+            } catch (NumberFormatException ignored) {
+                return EMPTY;
+            }
+            String field = parts.get(2);
+            Optional<VoteRanking> row = vote.topAt(period, rank);
+            if (row.isEmpty()) {
+                return EMPTY;
+            }
+            VoteRanking ranking = row.get();
+            return switch (field) {
+                case "name" -> ranking.player().name();
+                case "votes" -> Long.toString(ranking.votes());
+                default -> EMPTY;
+            };
+        }
+
+        if (tail.startsWith(VOTES_POSITION_PREFIX)) {
+            // position_<period>
+            String periodName = tail.substring(VOTES_POSITION_PREFIX.length());
+            VotePeriod period = parsePeriod(periodName);
+            if (period == null) {
+                return EMPTY;
+            }
+            OptionalInt pos = vote.positionOf(who, period);
+            return pos.isPresent() ? Integer.toString(pos.getAsInt()) : EMPTY;
+        }
+
+        // Plain period count: votes_<period>
+        VotePeriod period = parsePeriod(tail);
         if (period == null) {
             return EMPTY;
         }
-        return Long.toString(seam.get().countFor(who, period));
+        return Long.toString(vote.countFor(who, period));
+    }
+
+    private static @Nullable VotePeriod parsePeriod(String periodName) {
+        return switch (periodName) {
+            case "daily" -> VotePeriod.DAILY;
+            case "weekly" -> VotePeriod.WEEKLY;
+            case "monthly" -> VotePeriod.MONTHLY;
+            case "alltime" -> VotePeriod.ALLTIME;
+            default -> null;
+        };
     }
 
     private String voteparty(String subKey) {
