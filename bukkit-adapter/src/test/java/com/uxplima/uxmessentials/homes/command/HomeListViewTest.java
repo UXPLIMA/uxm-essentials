@@ -247,7 +247,7 @@ class HomeListViewTest {
         DomainEventPublisher events = new NoEvents();
         Clock clock = Clock.system(ZoneOffset.UTC);
         Permissions permissions = new TogglePermissions(grantBypass);
-        HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
+        HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3, Permissions.QuotaReduction.MAX);
         HomeInviteRepository invites = new FakeHomeInviteRepository();
         CreateHomeAtSlot create = new CreateHomeAtSlot(
                 repository, invites, quota, List.of(), notifier, events, freeCharge(), 1000, clock);

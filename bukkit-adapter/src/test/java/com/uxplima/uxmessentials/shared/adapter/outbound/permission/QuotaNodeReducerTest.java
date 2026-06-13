@@ -8,15 +8,17 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The uniform numbered/world quota reducer (docs/permissions.md "Uniform numeric reducer"): quotas keep
- * the maximum matching node, cooldown/warmup thresholds keep the minimum, the {@code -1} sentinel
- * short-circuits a quota to unlimited, the optional {@code <world>} segment folds in alongside the
- * unscoped form, and a player with no matching node falls back to the seeded config default. This is the
- * pure numeric core the teleport (and every other) context's cooldown/warmup tiers resolve through.
+ * the maximum matching node, cooldown/warmup thresholds keep the minimum, the stack mode sums all
+ * matching nodes, the {@code -1} sentinel short-circuits a quota/stack to unlimited, the optional
+ * {@code <world>} segment folds in alongside the unscoped form, and a player with no matching node falls
+ * back to the seeded config default. This is the pure numeric core every context's quota resolution
+ * goes through.
  */
 class QuotaNodeReducerTest {
 
     private static final QuotaFamily WARMUP = QuotaFamily.threshold("uxmessentials.tp.warmup");
     private static final QuotaFamily HOME_LIMIT = QuotaFamily.quota("uxmessentials.home.limit");
+    private static final QuotaFamily HOME_STACK = QuotaFamily.stack("uxmessentials.home.limit");
 
     @Test
     void cooldownAndWarmupThresholdsKeepTheSmallestNode() {
@@ -95,5 +97,60 @@ class QuotaNodeReducerTest {
         reducer.offerMeta(1);
 
         assertThat(reducer.result().orElse(99)).isEqualTo(1L);
+    }
+
+    // --- STACK mode ---
+
+    @Test
+    void stackSumsAllMatchingTierNodes() {
+        QuotaNodeReducer reducer = new QuotaNodeReducer(HOME_STACK, null);
+        reducer.seedDefault(3);
+        reducer.offerNode("uxmessentials.home.limit.2");
+        reducer.offerNode("uxmessentials.home.limit.3");
+
+        // tiers sum to 5; config default is not added on top
+        assertThat(reducer.result().orElse(0)).isEqualTo(5L);
+    }
+
+    @Test
+    void stackWithUnlimitedTierShortCircuitsToUnlimited() {
+        QuotaNodeReducer reducer = new QuotaNodeReducer(HOME_STACK, null);
+        reducer.seedDefault(3);
+        reducer.offerNode("uxmessentials.home.limit.2");
+        reducer.offerNode("uxmessentials.home.limit.-1");
+
+        assertThat(reducer.result().isUnlimited()).isTrue();
+    }
+
+    @Test
+    void stackWithNoTierNodeFallsBackToConfigDefault() {
+        QuotaNodeReducer reducer = new QuotaNodeReducer(HOME_STACK, null);
+        reducer.seedDefault(5);
+        // no tier nodes offered
+        reducer.offerNode("uxmessentials.other.family.10"); // wrong family, ignored
+
+        assertThat(reducer.result().orElse(0)).isEqualTo(5L);
+    }
+
+    @Test
+    void maxStillReturnsBiggestNodeAfterStackAdded() {
+        // regression: MAX behaviour must be unaffected by the STACK code path
+        QuotaNodeReducer reducer = new QuotaNodeReducer(HOME_LIMIT, null);
+        reducer.seedDefault(1);
+        reducer.offerNode("uxmessentials.home.limit.5");
+        reducer.offerNode("uxmessentials.home.limit.2");
+
+        assertThat(reducer.result().orElse(0)).isEqualTo(5L);
+    }
+
+    @Test
+    void minStillReturnsSmallestNodeAfterStackAdded() {
+        // regression: MIN behaviour must be unaffected by the STACK code path
+        QuotaNodeReducer reducer = new QuotaNodeReducer(WARMUP, null);
+        reducer.seedDefault(10);
+        reducer.offerNode("uxmessentials.tp.warmup.7");
+        reducer.offerNode("uxmessentials.tp.warmup.3");
+
+        assertThat(reducer.result().orElse(99)).isEqualTo(3L);
     }
 }

@@ -142,7 +142,7 @@ class CreateHomeAtSlotTest {
     }
 
     private CreateHomeAtSlot useCase(List<SethomeGuard> guards, HomeCharge charge) {
-        HomeQuota quota = new HomeQuota(permissions, 0);
+        HomeQuota quota = new HomeQuota(permissions, 0, Permissions.QuotaReduction.MAX);
         return new CreateHomeAtSlot(
                 repository, invites, quota, guards, notifier.notifier(), events, charge, UNLIMITED_MAX_SLOTS, CLOCK);
     }

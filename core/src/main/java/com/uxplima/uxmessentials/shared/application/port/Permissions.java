@@ -42,10 +42,17 @@ public interface Permissions {
      */
     QuotaResult resolveQuota(PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault);
 
-    /** Whether the reducer keeps the largest (quota) or smallest (cooldown/warmup) matching value. */
+    /**
+     * Whether the reducer keeps the largest (quota), smallest (cooldown/warmup), or sums all matching
+     * values (stack). {@link #MAX} and {@link #MIN} choose the single most-generous node across all tiers;
+     * {@link #STACK} accumulates every tier node the player holds, useful for servers that want players to
+     * earn home slots additively across permission groups.
+     */
     enum QuotaReduction {
         MAX,
-        MIN
+        MIN,
+        /** Sum all matching tier nodes; the {@code -1} unlimited sentinel still short-circuits. */
+        STACK
     }
 
     /**
@@ -73,6 +80,11 @@ public interface Permissions {
         /** A cooldown or warmup family (less is better): the reducer keeps the minimum. */
         public static QuotaFamily threshold(String node) {
             return new QuotaFamily(node, QuotaReduction.MIN);
+        }
+
+        /** A stacking quota family: the reducer sums all matching tier nodes (zEssentials-style). */
+        public static QuotaFamily stack(String node) {
+            return new QuotaFamily(node, QuotaReduction.STACK);
         }
     }
 

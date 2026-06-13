@@ -37,6 +37,10 @@ final class QuotaNodeReducer {
     private boolean sawValue;
     private long running;
 
+    // STACK-only: the config default to use when no tier node was seen, kept separate so it is not
+    // added on top of the summed tiers when the player does hold matching nodes.
+    private long stackDefault;
+
     QuotaNodeReducer(QuotaFamily family, @Nullable String worldName) {
         this.family = Objects.requireNonNull(family, "family");
         this.unscopedPrefix = family.node() + ".";
@@ -44,9 +48,18 @@ final class QuotaNodeReducer {
                 worldName == null ? null : family.node() + "." + worldName.toLowerCase(java.util.Locale.ROOT) + ".";
     }
 
-    /** Seed the fold with the config default so a player with no matching node still resolves. */
+    /**
+     * Seed the fold with the config default so a player with no matching node still resolves.
+     *
+     * <p>For {@link QuotaReduction#STACK} the default is stored separately and returned only when no
+     * tier node was seen — it is never added on top of the summed tiers.
+     */
     void seedDefault(long configDefault) {
-        accept(configDefault);
+        if (family.direction() == QuotaReduction.STACK) {
+            stackDefault = configDefault;
+        } else {
+            accept(configDefault);
+        }
     }
 
     /**
@@ -70,6 +83,11 @@ final class QuotaNodeReducer {
     QuotaResult result() {
         if (unlimited) {
             return QuotaResult.unlimited();
+        }
+        if (family.direction() == QuotaReduction.STACK) {
+            // When at least one tier node was seen, return the accumulated sum; otherwise fall back to
+            // the config default stored by seedDefault (so a player with no nodes still gets the default).
+            return QuotaResult.limited(sawValue ? running : stackDefault);
         }
         return QuotaResult.limited(sawValue ? running : 0L);
     }
@@ -99,6 +117,19 @@ final class QuotaNodeReducer {
     private void accept(long value) {
         if (family.direction() == QuotaReduction.MAX && value == UNLIMITED) {
             unlimited = true;
+            return;
+        }
+        if (family.direction() == QuotaReduction.STACK) {
+            if (value == UNLIMITED) {
+                unlimited = true;
+                return;
+            }
+            // Seed running from 0 on first STACK value so we accumulate correctly.
+            if (!sawValue) {
+                running = 0L;
+                sawValue = true;
+            }
+            running += value;
             return;
         }
         if (!sawValue) {

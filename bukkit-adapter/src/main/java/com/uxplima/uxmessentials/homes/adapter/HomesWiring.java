@@ -64,6 +64,7 @@ import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
+import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
@@ -134,7 +135,7 @@ public final class HomesWiring {
         HomeRepository repository = HomeSync.repository(cached, bus.publisher());
         HomeInviteRepository invites = HomeRepositories.homeInviteRepository(persistence);
         HomeNotifier notifier = new HomeNotifier(kernel.messages(), kernel.messageSink());
-        HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx));
+        HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx), limitMode(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
         HomeServices services = assemble(
                 plugin, ctx, repository, invites, notifier, quota, teleporter, homeEconomy, guiLayouts, resources);
@@ -271,6 +272,11 @@ public final class HomesWiring {
 
     private static int defaultLimit(ModuleContext ctx) {
         return Math.max(0, ctx.config().getInt("default-limit", DEFAULT_HOME_LIMIT));
+    }
+
+    private static QuotaReduction limitMode(ModuleContext ctx) {
+        String raw = ctx.config().getString("limit-mode", "highest");
+        return "stack".equalsIgnoreCase(raw) ? QuotaReduction.STACK : QuotaReduction.MAX;
     }
 
     private static int unlimitedMax(ModuleContext ctx) {

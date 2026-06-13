@@ -5,33 +5,52 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.homes.domain.HomeLimit;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
+import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Resolves an owner's home limit through the shared {@code Permissions} quota reducer. The home limit is
- * the highest {@code uxmessentials.home.limit.<n>} node the owner holds (optionally scoped to the home's
- * world via {@code uxmessentials.home.limit.<world>.<n>}), folded together with any LuckPerms meta and the
- * per-context config default; the {@code -1} unlimited sentinel short-circuits to "no limit". The result
- * is handed to the aggregate as a {@link HomeLimit} value object, so the {@code max}/sentinel semantics
+ * Resolves an owner's home limit through the shared {@code Permissions} quota reducer. How multiple
+ * {@code uxmessentials.home.limit.<n>} tiers combine is governed by {@code limitMode}: {@code MAX} keeps
+ * the highest tier the player holds (the default "highest wins" behavior), {@code STACK} sums all tiers
+ * the player holds (zEssentials-style additive slots). The world-scoped form
+ * ({@code uxmessentials.home.limit.<world>.<n>}) is folded in alongside the unscoped form, LuckPerms meta
+ * is treated identically to a node, and the {@code -1} unlimited sentinel short-circuits to "no limit".
+ * The result is handed to the aggregate as a {@link HomeLimit} value object, so the reduction semantics
  * live entirely in the one shared reducer (docs/permissions.md, the numbered-node convention).
  */
 public final class HomeQuota {
 
-    /** The quota family for home limits — the {@code MAX}-direction reducer over the numbered nodes. */
-    public static final QuotaFamily FAMILY = QuotaFamily.quota("uxmessentials.home.limit");
+    private static final String NODE = "uxmessentials.home.limit";
 
     private final Permissions permissions;
+    private final QuotaFamily family;
     private final int configDefault;
 
-    public HomeQuota(Permissions permissions, int configDefault) {
+    /**
+     * @param permissions the permission port used to resolve quota nodes
+     * @param configDefault the per-server default home count for players with no matching tier node
+     * @param limitMode how multiple tier nodes combine — {@link QuotaReduction#MAX} keeps the highest,
+     *     {@link QuotaReduction#STACK} sums them all
+     */
+    public HomeQuota(Permissions permissions, int configDefault, QuotaReduction limitMode) {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         if (configDefault < 0) {
             throw new IllegalArgumentException("default home limit must not be negative: " + configDefault);
         }
         this.configDefault = configDefault;
+        Objects.requireNonNull(limitMode, "limitMode");
+        this.family = limitMode == QuotaReduction.STACK ? QuotaFamily.stack(NODE) : QuotaFamily.quota(NODE);
+    }
+
+    /**
+     * The quota family built for the configured {@code limitMode} — exposed so placeholders and views can
+     * pass the same family to {@link Permissions#resolveQuota} without constructing a second instance.
+     */
+    public QuotaFamily family() {
+        return family;
     }
 
     /**
@@ -40,7 +59,7 @@ public final class HomeQuota {
      */
     public HomeLimit resolve(PlayerRef owner, @Nullable WorldRef world) {
         Objects.requireNonNull(owner, "owner");
-        QuotaResult resolved = permissions.resolveQuota(owner, FAMILY, world, configDefault);
+        QuotaResult resolved = permissions.resolveQuota(owner, family, world, configDefault);
         if (resolved.isUnlimited()) {
             return HomeLimit.noLimit();
         }

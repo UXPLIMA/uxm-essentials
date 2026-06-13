@@ -454,7 +454,7 @@ class HomeCommandPathTest {
         HomeNotifier notifier = new HomeNotifier(messages, new NoSink());
         DomainEventPublisher events = new NoEvents();
         Clock clock = Clock.system(ZoneOffset.UTC);
-        HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3);
+        HomeQuota quota = new HomeQuota(new AllowAllPermissions(), 3, Permissions.QuotaReduction.MAX);
         Scheduler scheduler = new SyncScheduler();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
         InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);
