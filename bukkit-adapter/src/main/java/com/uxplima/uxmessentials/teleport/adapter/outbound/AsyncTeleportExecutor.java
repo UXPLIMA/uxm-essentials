@@ -45,6 +45,7 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
     private final Clock clock;
     private final BooleanSupplier centerToggle;
     private final TeleportArrivalHud arrivalHud;
+    private final TeleportArrivalEffects arrivalEffects;
 
     public AsyncTeleportExecutor(
             Scheduler scheduler,
@@ -53,7 +54,8 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             Logger log,
             Clock clock,
             BooleanSupplier centerToggle,
-            TeleportArrivalHud arrivalHud) {
+            TeleportArrivalHud arrivalHud,
+            TeleportArrivalEffects arrivalEffects) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.backStore = Objects.requireNonNull(backStore, "backStore");
         this.events = Objects.requireNonNull(events, "events");
@@ -61,6 +63,7 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.centerToggle = Objects.requireNonNull(centerToggle, "centerToggle");
         this.arrivalHud = Objects.requireNonNull(arrivalHud, "arrivalHud");
+        this.arrivalEffects = Objects.requireNonNull(arrivalEffects, "arrivalEffects");
     }
 
     @Override
@@ -100,6 +103,7 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
         scheduler.onEntity(who, () -> {
             events.publish(new PlayerTeleported(who, kind, from, to));
             arrivalHud.arrived(who, kind);
+            arrivalEffects.arrived(who, kind);
         });
     }
 

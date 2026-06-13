@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PrewarmedSafeLocationQueue;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.RtpWorldSettings;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.SafeSearchValidator;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalEffects;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalHud;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
@@ -101,6 +102,8 @@ public final class TeleportWiring {
         PdcTeleportFlags flags = new PdcTeleportFlags(plugin);
         TeleportArrivalHud arrivalHud =
                 new TeleportArrivalHud(kernel.messages(), plugin.getServer(), settings, kernel.scheduler());
+        TeleportArrivalEffects arrivalEffects =
+                new TeleportArrivalEffects(plugin.getServer(), settings, kernel.scheduler());
         TeleportExecutor executor = new AsyncTeleportExecutor(
                 kernel.scheduler(),
                 backStore,
@@ -108,7 +111,8 @@ public final class TeleportWiring {
                 kernel.log(),
                 clock,
                 settings::teleportToCenter,
-                arrivalHud);
+                arrivalHud,
+                arrivalEffects);
         PrewarmedSafeLocationQueue rtpQueue = rtpQueue(kernel, config, settings, running);
         Warmups warmups = new TrackingWarmups(kernel.warmups(), warmupTracker, settings::cancelToggles);
         TeleportEngine engine = new TeleportEngine(
