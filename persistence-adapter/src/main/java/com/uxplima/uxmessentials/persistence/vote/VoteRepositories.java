@@ -23,4 +23,16 @@ public final class VoteRepositories {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedVoteRepository(new JooqVoteRepository(persistence.dsl()));
     }
+
+    /**
+     * The counter-cached jOOQ {@link VoteRepository} as its concrete decorator type, so the wiring can hand
+     * the cross-server bus an invalidation hook on the same counter cache the vote commands read — a remote
+     * counter advance or a remote party fire drops the cached running total. Same backing as {@link #cached};
+     * this overload exposes the decorator only so the invalidation seam can reach
+     * {@link CachedVoteRepository#invalidate()}.
+     */
+    public static CachedVoteRepository cachedConcrete(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new CachedVoteRepository(new JooqVoteRepository(persistence.dsl()));
+    }
 }

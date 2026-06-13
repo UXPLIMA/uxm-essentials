@@ -18,10 +18,13 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
 import com.uxplima.uxmessentials.persistence.vote.VoteRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VoteSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -107,18 +110,24 @@ public final class VoteWiring {
     private VoteWiring() {}
 
     /**
-     * Build the vote adapters and use cases over the kernel ports, the persistence DSL, and the
-     * in-process event bus. The event bus is the concrete {@link InProcessDomainEventPublisher} so
-     * the party sound/particle subscriber can be registered and later unregistered on stop.
+     * Build the vote adapters and use cases over the kernel ports, the persistence DSL, the in-process event
+     * bus, and the cross-server {@link Bus}. The event bus is the concrete {@link InProcessDomainEventPublisher}
+     * so the party sound/particle subscriber and the cross-server party publisher can be registered and later
+     * unregistered on stop. The repository is the concrete counter-cached jOOQ adapter wrapped by
+     * {@link VoteSync#repository} so each counter mutation announces a {@code VoteCounterChanged} to peers; the
+     * same cache is handed to {@link VoteSync#listener} so a remote advance or party fire invalidates it. With
+     * the bus disabled both seams are no-ops, so the single-server path is unchanged.
      */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, Persistence persistence, InProcessDomainEventPublisher events) {
+            Plugin plugin, ModuleContext ctx, Persistence persistence, InProcessDomainEventPublisher events, Bus bus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(events, "events");
+        Objects.requireNonNull(bus, "bus");
         KernelPorts kernel = ctx.kernel();
-        VoteRepository repository = VoteRepositories.cached(persistence);
+        CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
+        VoteRepository repository = VoteSync.repository(cachedRepository, bus.publisher());
         VoteNotifier notifier = new VoteNotifier(kernel.messages(), kernel.messageSink());
         BukkitRewardDispatcher dispatcher = new BukkitRewardDispatcher(kernel.scheduler());
         VoteAudience audience = new BukkitVoteAudience();
@@ -166,6 +175,15 @@ public final class VoteWiring {
         Consumer<DomainEvent> partyEffects = buildPartyEffectsHandler(sound, particle, kernel);
         events.subscribe(partyEffects);
 
+        // Cross-server sync: a remote VoteCounterChanged drops the cached counter; a remote VotePartyFired
+        // drops it and echoes the party announcement (no reward — the origin already paid its players out).
+        // A local VotePartyTriggered is published as a VotePartyFired so peers celebrate the same party. The
+        // bus is a no-op when the cluster is disabled, so this is unconditional and free on a single server.
+        Set<BroadcastChannel> broadcastChannels = broadcastConfig.settings().channels();
+        bus.registry().register(VoteSync.listener(cachedRepository, broadcaster, broadcastChannels));
+        Consumer<DomainEvent> partyPublisher = VoteSync.partyPublisher(bus.publisher());
+        events.subscribe(partyPublisher);
+
         // Reminder interval task (only when reminders.enabled && interval-minutes > 0).
         boolean remindersEnabled = ctx.config().getBoolean("reminders.enabled", false);
         int intervalMinutes = ctx.config().getInt("reminders.interval-minutes", 0);
@@ -212,7 +230,15 @@ public final class VoteWiring {
                 new VoteCommand(services, () -> ListDisplayMode.from(ctx.config())), new VotePartyCommand(services));
         List<Listener> listeners = List.of(votifier, joinListener);
         return new Wired(
-                commands, listeners, votifier, repository, party.baseThreshold(), events, partyEffects, reminderTask);
+                commands,
+                listeners,
+                votifier,
+                repository,
+                party.baseThreshold(),
+                events,
+                partyEffects,
+                partyPublisher,
+                reminderTask);
     }
 
     private static void sendIntervalReminders(
@@ -461,6 +487,7 @@ public final class VoteWiring {
      * @param partyThreshold the configured party threshold, exposed for the placeholder seam
      * @param eventBus the in-process event bus the party effects consumer is registered on
      * @param partyEffects the sound/particle consumer to unregister on stop
+     * @param partyPublisher the cross-server party-fire publisher to unregister on stop
      * @param reminderTask the repeating reminder task handle (may be null when interval reminders are off)
      */
     public record Wired(
@@ -471,6 +498,7 @@ public final class VoteWiring {
             int partyThreshold,
             InProcessDomainEventPublisher eventBus,
             Consumer<DomainEvent> partyEffects,
+            Consumer<DomainEvent> partyPublisher,
             @Nullable AutoCloseable reminderTask) {
 
         public Wired {
@@ -483,6 +511,7 @@ public final class VoteWiring {
             }
             Objects.requireNonNull(eventBus, "eventBus");
             Objects.requireNonNull(partyEffects, "partyEffects");
+            Objects.requireNonNull(partyPublisher, "partyPublisher");
         }
 
         /** Self-register the reflective Votifier handler behind its plugin-present guard. */
@@ -490,10 +519,14 @@ public final class VoteWiring {
             votifier.registerIfPresent();
         }
 
-        /** Drop the Votifier handler, the party effects subscriber, and the reminder task on disable/reload. */
+        /**
+         * Drop the Votifier handler, the party effects subscriber, the cross-server party publisher, and the
+         * reminder task on disable/reload.
+         */
         public void stop() {
             votifier.unregister();
             eventBus.unsubscribe(partyEffects);
+            eventBus.unsubscribe(partyPublisher);
             if (reminderTask != null) {
                 try {
                     reminderTask.close();
