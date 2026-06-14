@@ -17,12 +17,15 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationSettings;
+import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
+import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
+import com.uxplima.uxmessentials.communication.application.port.RandomSource;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -60,6 +63,7 @@ class AnnounceCommandTest {
     private CommunicationSettings settings;
     private BukkitAnnouncerBroadcaster broadcaster;
     private BroadcastOptOutStore optOutStore;
+    private RecordingScheduler scheduler;
 
     @BeforeEach
     void setUp(@TempDir Path dataDir) throws Exception {
@@ -73,6 +77,7 @@ class AnnounceCommandTest {
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
         broadcaster = new BukkitAnnouncerBroadcaster(
                 new EchoMessagesSink(), optOutStore, channels, AnnounceCommandTest::context);
+        scheduler = new RecordingScheduler();
     }
 
     @AfterEach
@@ -99,6 +104,31 @@ class AnnounceCommandTest {
         execute(dispatcher, "announce reload");
 
         assertThat(settings.announcerConfig().announcementCount()).isEqualTo(2);
+        assertThat(PLAIN.serialize(alice.nextComponentMessage()))
+                .contains(CommunicationMessageKey.ANNOUNCER_RELOADED.key());
+    }
+
+    @Test
+    void reloadRunsOffTickAndReArmsTheOverrideLoops() throws Exception {
+        CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
+        // A reload that newly gives an announcement an interval-seconds override: it leaves the shared rotation, so
+        // a fresh override loop must be armed or it would never broadcast again.
+        Files.writeString(
+                moduleDir.resolve("announcer.conf"),
+                """
+                announcer {
+                  announcements = [
+                    { id = "timed", channels = [ "CHAT" ], lines = [ "tick" ], interval-seconds = 30 }
+                  ]
+                }
+                """);
+
+        execute(dispatcher, "announce reload");
+
+        // The config I/O ran off the tick thread, then re-armed an override loop (one asyncAfter for "timed").
+        assertThat(scheduler.asyncCalls()).isGreaterThanOrEqualTo(1);
+        assertThat(scheduler.asyncAfterCalls()).isGreaterThanOrEqualTo(1);
+        assertThat(settings.announcerConfig().announcementCount()).isEqualTo(1);
         assertThat(PLAIN.serialize(alice.nextComponentMessage()))
                 .contains(CommunicationMessageKey.ANNOUNCER_RELOADED.key());
     }
@@ -147,7 +177,14 @@ class AnnounceCommandTest {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         CommunicationNotifier notifier = new CommunicationNotifier(new EchoMessagesSink(), new EchoMessagesSink());
         BroadcastOptOut optOut = new BroadcastOptOut(optOutStore, notifier, new NoEvents(), Clock.systemUTC());
-        AnnounceCommand command = new AnnounceCommand(settings, broadcaster, optOut, new EchoMessagesSink());
+        AnnouncerTask announcer = new AnnouncerTask(
+                scheduler,
+                new NextAnnouncement(() -> settings.announcerConfig().rotating(), new ZeroRandom()),
+                broadcaster,
+                settings::announcerConfig,
+                () -> true);
+        AnnounceCommand command =
+                new AnnounceCommand(settings, broadcaster, optOut, announcer, scheduler, new EchoMessagesSink());
         dispatcher.getRoot().addChild(command.build());
         return dispatcher;
     }
@@ -226,6 +263,58 @@ class AnnounceCommandTest {
 
         @Override
         public void debug(String message, Object... args) {}
+    }
+
+    private static final class ZeroRandom implements RandomSource {
+        @Override
+        public int nextBounded(int bound) {
+            return 0;
+        }
+    }
+
+    /**
+     * Records how often {@code async} / {@code asyncAfter} are called so the reload test can prove the config I/O ran
+     * off-tick and the override loops were re-armed, while running every task inline so the effect is observable.
+     */
+    private static final class RecordingScheduler implements Scheduler {
+        private int asyncCalls;
+        private int asyncAfterCalls;
+
+        int asyncCalls() {
+            return asyncCalls;
+        }
+
+        int asyncAfterCalls() {
+            return asyncAfterCalls;
+        }
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            asyncCalls++;
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(java.time.Duration delay, Runnable task) {
+            asyncAfterCalls++;
+            // Do not run: an override loop's asyncAfter would reschedule itself forever. Recording the call is enough
+            // to prove the loop was armed.
+        }
     }
 
     /** Runs every hop inline so the preview delivery executes within the test. */

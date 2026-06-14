@@ -8,6 +8,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.entity.Player;
 
@@ -119,12 +120,97 @@ class AnnouncerTaskTest {
         assertThat(alice.nextComponentMessage()).isNull();
     }
 
+    @Test
+    void anOverrideLoopIsCancelledOnStopAndTicksNoMore() {
+        AnnouncerConfig config = config(0, override("o", "tick", 30));
+        AnnouncerTask task = task(config);
+
+        task.start();
+        scheduler.drainRound(); // the default-rotation tick (nothing to pick) + the override's first tick
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("tick");
+
+        task.stop();
+        // The override tick rescheduled itself before stop; draining it must observe the cancellation and not fire.
+        scheduler.drainRound();
+        assertThat(alice.nextComponentMessage()).isNull();
+    }
+
+    @Test
+    void rearmAfterAddingAnOverrideAnnouncementStartsItBroadcasting() {
+        // Start with no override announcements at all: nothing is armed on its own loop.
+        AtomicReference<AnnouncerConfig> live = new AtomicReference<>(config(0));
+        AnnouncerTask task = task(live::get);
+
+        task.start();
+        scheduler.drainRound(); // only the default-rotation tick, which has nothing to pick
+        assertThat(alice.nextComponentMessage()).isNull();
+
+        // A reload adds a brand-new override announcement — the bug was that it never broadcast.
+        live.set(config(0, override("fresh", "hello", 30)));
+        task.rearmOverrides();
+        scheduler.drainRound();
+
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("hello");
+    }
+
+    @Test
+    void rearmAfterRemovingAnOverrideAnnouncementStopsItsLoop() {
+        AtomicReference<AnnouncerConfig> live = new AtomicReference<>(config(0, override("o", "tick", 30)));
+        AnnouncerTask task = task(live::get);
+
+        task.start();
+        scheduler.drainRound();
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("tick");
+
+        // Drop the override on reload and re-arm: the old loop is cancelled, no new loop is armed.
+        live.set(config(0));
+        task.rearmOverrides();
+        scheduler.drainRound();
+        scheduler.drainRound();
+
+        assertThat(alice.nextComponentMessage()).isNull();
+    }
+
+    @Test
+    void rearmAfterChangingAnOverrideIntervalKeepsItBroadcasting() {
+        AtomicReference<AnnouncerConfig> live = new AtomicReference<>(config(0, override("o", "tick", 30)));
+        AnnouncerTask task = task(live::get);
+
+        task.start();
+        scheduler.drainRound();
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("tick");
+
+        // The same announcement with a new cadence: the re-armed loop honours it and keeps firing.
+        live.set(config(0, override("o", "tick", 5)));
+        task.rearmOverrides();
+        scheduler.drainRound();
+
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("tick");
+    }
+
+    @Test
+    void theDefaultRotationDoesNotBroadcastOverrideAnnouncements() {
+        // One default-rotation announcement and one override announcement together.
+        AnnouncerConfig config = config(0, chat("rot", "rotation"), override("o", "override", 30));
+        AnnouncerTask task = task(config);
+
+        task.start();
+        scheduler.drainOne(); // exactly the default-rotation tick — must pick "rotation", never "override"
+
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("rotation");
+        assertThat(alice.nextComponentMessage()).isNull();
+    }
+
     private AnnouncerTask task(AnnouncerConfig config) {
+        return task(() -> config);
+    }
+
+    private AnnouncerTask task(java.util.function.Supplier<AnnouncerConfig> live) {
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
         BukkitAnnouncerBroadcaster broadcaster =
                 new BukkitAnnouncerBroadcaster(new ThrowingSink(), optOut, channels, this::context);
-        NextAnnouncement next = new NextAnnouncement(config::rotating, new ZeroRandom());
-        return new AnnouncerTask(scheduler, next, broadcaster, () -> config, () -> true);
+        NextAnnouncement next = new NextAnnouncement(() -> live.get().rotating(), new ZeroRandom());
+        return new AnnouncerTask(scheduler, next, broadcaster, live, () -> true);
     }
 
     private ConditionContext context(Player player) {
@@ -145,6 +231,18 @@ class AnnouncerTaskTest {
                 List.of(line),
                 DisplayCondition.always(),
                 Optional.empty(),
+                Set.of(BroadcastChannel.CHAT),
+                Optional.empty(),
+                false);
+    }
+
+    /** A CHAT announcement that runs on its own {@code intervalSeconds} loop rather than the shared rotation. */
+    private static Announcement override(String id, String line, int intervalSeconds) {
+        return new Announcement(
+                id,
+                List.of(line),
+                DisplayCondition.always(),
+                Optional.of(Duration.ofSeconds(intervalSeconds)),
                 Set.of(BroadcastChannel.CHAT),
                 Optional.empty(),
                 false);
@@ -202,6 +300,21 @@ class AnnouncerTaskTest {
             Runnable next = queue.poll();
             if (next != null) {
                 next.run();
+            }
+        }
+
+        /**
+         * Run exactly the tasks queued at the moment of the call (one "round" of ticks), leaving any reschedules
+         * they enqueue for the next round. Snapshotting the size first keeps a self-rescheduling loop from running
+         * forever within a single round.
+         */
+        void drainRound() {
+            int pending = queue.size();
+            for (int i = 0; i < pending; i++) {
+                Runnable next = queue.poll();
+                if (next != null) {
+                    next.run();
+                }
             }
         }
 

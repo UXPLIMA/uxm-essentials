@@ -89,6 +89,8 @@ public final class CommunicationWiring {
                 notifier,
                 kernel.messages(),
                 broadcaster,
+                announcer,
+                kernel.scheduler(),
                 kernel.messageSink(),
                 chatLock,
                 settings);
@@ -167,9 +169,10 @@ public final class CommunicationWiring {
             announcer.start();
         }
 
-        /** Stop the announcer timer. */
+        /** Stop the announcer timer: flip the running flag and cancel every armed override loop. */
         public void stop() {
             running.set(false);
+            announcer.stop();
         }
     }
 }

@@ -15,6 +15,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationSettings;
+import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
@@ -22,6 +23,7 @@ import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import org.jspecify.annotations.NullMarked;
 
@@ -30,8 +32,11 @@ import org.jspecify.annotations.NullMarked;
  * announcer. Three admin subcommands plus a per-player toggle alias:
  *
  * <ul>
- *   <li>{@code reload} — re-read {@code announcer.conf} and swap the live config in, confirming with the count of
- *       announcements through {@link CommunicationMessageKey#ANNOUNCER_RELOADED}.
+ *   <li>{@code reload} — re-read {@code announcer.conf} and swap the live config in, then re-arm the
+ *       per-announcement override loops so a newly-added override fires (it is excluded from the shared rotation).
+ *       The re-read is HOCON file I/O, so it runs off-tick on the {@code Scheduler} and the confirmation —
+ *       the count of announcements through {@link CommunicationMessageKey#ANNOUNCER_RELOADED} — bridges back to the
+ *       global region for delivery, mirroring {@code /uxmess}'s off-tick reload commands.
  *   <li>{@code list} — list the configured announcement ids and the channels each pushes to.
  *   <li>{@code preview <id>} — show that announcement to the invoking player alone, bypassing the opt-out and
  *       condition gates; an unknown id answers with {@link CommunicationMessageKey#ANNOUNCE_PREVIEW_UNKNOWN}.
@@ -51,16 +56,22 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     private final CommunicationSettings settings;
     private final BukkitAnnouncerBroadcaster broadcaster;
     private final BroadcastOptOut optOut;
+    private final AnnouncerTask announcer;
+    private final Scheduler scheduler;
 
     public AnnounceCommand(
             CommunicationSettings settings,
             BukkitAnnouncerBroadcaster broadcaster,
             BroadcastOptOut optOut,
+            AnnouncerTask announcer,
+            Scheduler scheduler,
             Messages messages) {
         super(messages);
         this.settings = Objects.requireNonNull(settings, "settings");
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
+        this.announcer = Objects.requireNonNull(announcer, "announcer");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
@@ -81,12 +92,18 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     }
 
     private int reload(CommandContext<CommandSourceStack> ctx) {
-        settings.reload();
-        int count = settings.announcerConfig().announcementCount();
-        feedback.send(
-                ctx.getSource().getSender(),
-                CommunicationMessageKey.ANNOUNCER_RELOADED,
-                Map.of("count", Integer.toString(count)));
+        CommandSender sender = ctx.getSource().getSender();
+        // Re-reading the three HOCON files is blocking I/O, so it runs off the tick thread; re-arming the override
+        // loops then picks up any announcement newly given an interval-seconds override (otherwise it would be
+        // excluded from the rotation with no loop of its own and silently never broadcast). The confirmation hops
+        // back to the global region for delivery, like /uxmess's off-tick reload commands.
+        scheduler.async(() -> {
+            settings.reload();
+            announcer.rearmOverrides();
+            int count = settings.announcerConfig().announcementCount();
+            scheduler.onGlobal(() -> feedback.send(
+                    sender, CommunicationMessageKey.ANNOUNCER_RELOADED, Map.of("count", Integer.toString(count))));
+        });
         return Command.SINGLE_SUCCESS;
     }
 

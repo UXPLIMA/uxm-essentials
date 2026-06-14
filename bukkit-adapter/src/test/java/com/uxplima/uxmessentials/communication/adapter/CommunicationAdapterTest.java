@@ -20,6 +20,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationCommands;
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.InfoPageCommand;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ConnectionMessageListener;
+import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AtomicSequenceCounter;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
+import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
 import com.uxplima.uxmessentials.communication.application.ResolveConnectionMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
@@ -268,6 +270,13 @@ class CommunicationAdapterTest {
         BroadcastOptOut optOut = new BroadcastOptOut(optOutStore, notifier, new NoEvents(), Clock.systemUTC());
         InfoRegistry registry = settings.infoRegistry();
         BukkitAnnouncerBroadcaster broadcaster = announcerBroadcaster();
+        Scheduler scheduler = new SyncScheduler();
+        AnnouncerTask announcer = new AnnouncerTask(
+                scheduler,
+                new NextAnnouncement(() -> settings.announcerConfig().rotating(), random()),
+                broadcaster,
+                settings::announcerConfig,
+                () -> true);
         return CommunicationCommands.all(
                 optOut,
                 registry,
@@ -275,6 +284,8 @@ class CommunicationAdapterTest {
                 notifier,
                 sink,
                 broadcaster,
+                announcer,
+                scheduler,
                 sink,
                 new com.uxplima.uxmessentials.communication.adapter.ChatLock(),
                 settings);
