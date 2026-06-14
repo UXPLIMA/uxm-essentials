@@ -30,13 +30,13 @@ class StaffModuleTest {
     }
 
     @Test
-    void publishesTheStaffModeAndStaffChatCommands() {
+    void publishesTheStaffModeStaffChatAndStaffListCommands() {
         List<CommandSpec> commands = new StaffModule().commands();
 
-        assertThat(commands).extracting(CommandSpec::literal).containsExactly("staffmode", "staffchat");
+        assertThat(commands).extracting(CommandSpec::literal).containsExactly("staffmode", "staffchat", "stafflist");
         assertThat(commands)
                 .extracting(CommandSpec::permission)
-                .containsExactly("uxmessentials.staff.mode", "uxmessentials.staff.chat");
+                .containsExactly("uxmessentials.staff.mode", "uxmessentials.staff.chat", "uxmessentials.staff.list");
     }
 
     @Test

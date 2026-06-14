@@ -26,7 +26,31 @@ public enum StaffMessageKey implements MessageKey {
     STAFF_CHAT_FORMAT("staff.chat.format"),
 
     // EXAMINE gadget info line — {target}{ping}{gamemode}{health}{world}
-    STAFF_EXAMINE_INFO("staff.examine.info");
+    STAFF_EXAMINE_INFO("staff.examine.info"),
+
+    // FREEZE gadget feedback — target frozen, unfrozen, or exempt from being frozen
+    STAFF_FREEZE_ON("staff.freeze.on"),
+    STAFF_FREEZE_OFF("staff.freeze.off"),
+    STAFF_FREEZE_EXEMPT("staff.freeze.exempt"),
+
+    // shared gadget feedback — a gadget was used while not looking at a player
+    STAFF_GADGET_NO_TARGET("staff.gadget.no-target"),
+
+    // COMPASS gadget feedback — admin teleport to the target succeeded or could not be started
+    STAFF_TELEPORTED("staff.teleported"),
+    STAFF_TELEPORT_FAILED("staff.teleport.failed"),
+
+    // FOLLOW gadget feedback — following started, stopped, or ended because the target left
+    STAFF_FOLLOW_ON("staff.follow.on"),
+    STAFF_FOLLOW_OFF("staff.follow.off"),
+    STAFF_FOLLOW_ENDED("staff.follow.ended"),
+
+    // COMPASS navigator menu title
+    STAFF_NAVIGATOR_TITLE("staff.navigator.title"),
+
+    // /stafflist output — heading and the empty-roster line
+    STAFF_LIST_TITLE("staff.list.title"),
+    STAFF_LIST_EMPTY("staff.list.empty");
 
     private final String key;
 

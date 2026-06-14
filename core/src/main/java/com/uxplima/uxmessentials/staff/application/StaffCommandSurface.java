@@ -9,10 +9,11 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
  * The staff context's command surface as platform-neutral {@link CommandSpec}s: {@code /staffmode} guarded
- * by {@code uxmessentials.staff.mode} (toggle staff mode on or off) and {@code /staffchat} (alias
- * {@code /sc}) guarded by {@code uxmessentials.staff.chat} (send a line on the staff channel). The literals
- * and nodes are fixed and greppable so the surface guard checks them against {@code paper-plugin.yml}; the
- * realised Brigadier handlers are built in the adapter.
+ * by {@code uxmessentials.staff.mode} (toggle staff mode on or off), {@code /staffchat} (alias {@code /sc})
+ * guarded by {@code uxmessentials.staff.chat} (send a line on the staff channel), and {@code /stafflist}
+ * guarded by {@code uxmessentials.staff.list} (show who is currently in staff mode). The literals and nodes
+ * are fixed and greppable so the surface guard checks them against {@code paper-plugin.yml}; the realised
+ * Brigadier handlers are built in the adapter.
  *
  * <p>There is deliberately no sanction command here — staff mode only orchestrates the existing modules.
  */
@@ -26,7 +27,11 @@ final class StaffCommandSurface {
                 spec(
                         "staffchat",
                         "uxmessentials.staff.chat",
-                        command("staffchat", "Send a message on the staff channel", List.of("sc"))));
+                        command("staffchat", "Send a message on the staff channel", List.of("sc"))),
+                spec(
+                        "stafflist",
+                        "uxmessentials.staff.list",
+                        command("stafflist", "List who is currently in staff mode", List.of())));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {
