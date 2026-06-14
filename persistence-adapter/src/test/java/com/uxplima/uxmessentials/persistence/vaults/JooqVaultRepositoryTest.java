@@ -27,7 +27,9 @@ import org.junit.jupiter.api.io.TempDir;
  * empty vault stores a null {@code contents} cell and round-trips back to empty, that a re-save upserts on the
  * {@code (owner, idx)} key rather than inserting, that the per-owner index listing reads ascending, that the
  * count the amount quota relies on reflects the rows, and that a delete removes exactly the one row (freeing the
- * quota slot, idempotent on a missing row, leaving the owner's other vaults intact).
+ * quota slot, idempotent on a missing row, leaving the owner's other vaults intact). It also proves the
+ * inactive-vault purge: rows touched strictly before the cutoff go, rows at or after it stay, the affected count
+ * is returned, a cutoff before every row removes nothing, and a surviving row stays fully readable.
  */
 class JooqVaultRepositoryTest {
 
@@ -132,8 +134,64 @@ class JooqVaultRepositoryTest {
         assertThat(repository.count(owner)).isEqualTo(1);
     }
 
+    @Test
+    void deleteUntouchedBeforePurgesRowsOlderThanTheCutoffAndKeepsTheRest() {
+        repository.save(vaultTouchedAt(1, Instant.ofEpochMilli(1_000)));
+        repository.save(vaultTouchedAt(2, Instant.ofEpochMilli(2_000)));
+        repository.save(vaultTouchedAt(3, Instant.ofEpochMilli(3_000)));
+
+        int purged = repository.deleteUntouchedBefore(Instant.ofEpochMilli(2_500));
+
+        assertThat(purged).isEqualTo(2);
+        assertThat(repository.find(VaultId.of(owner, 1))).isEmpty();
+        assertThat(repository.find(VaultId.of(owner, 2))).isEmpty();
+        assertThat(repository.find(VaultId.of(owner, 3))).isPresent();
+        assertThat(repository.ownedIndices(owner)).containsExactly(3);
+    }
+
+    @Test
+    void deleteUntouchedBeforeIsStrictlyBeforeSoARowAtTheCutoffSurvives() {
+        repository.save(vaultTouchedAt(1, Instant.ofEpochMilli(5_000)));
+
+        int purged = repository.deleteUntouchedBefore(Instant.ofEpochMilli(5_000));
+
+        assertThat(purged).isZero();
+        assertThat(repository.find(VaultId.of(owner, 1))).isPresent();
+    }
+
+    @Test
+    void deleteUntouchedBeforeRemovesNothingWhenTheCutoffPrecedesEveryRow() {
+        repository.save(vaultTouchedAt(1, Instant.ofEpochMilli(10_000)));
+        repository.save(vaultTouchedAt(2, Instant.ofEpochMilli(20_000)));
+
+        int purged = repository.deleteUntouchedBefore(Instant.ofEpochMilli(1_000));
+
+        assertThat(purged).isZero();
+        assertThat(repository.count(owner)).isEqualTo(2);
+    }
+
+    @Test
+    void deleteUntouchedBeforeKeepsAKeptRowFullyReadable() {
+        byte[] payload = {7, 8, 9};
+        repository.save(Vault.of(
+                VaultId.of(owner, 1), new VaultSize(6), VaultContents.of(payload), Instant.ofEpochMilli(9_000)));
+
+        repository.deleteUntouchedBefore(Instant.ofEpochMilli(5_000));
+
+        Vault kept = repository.find(VaultId.of(owner, 1)).orElseThrow();
+        assertThat(kept.size().rows()).isEqualTo(6);
+        assertThat(kept.contents().payload())
+                .get()
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.BYTE_ARRAY)
+                .containsExactly(payload);
+    }
+
     private Vault vault(int index, int rows, VaultContents contents) {
         return Vault.of(VaultId.of(owner, index), new VaultSize(rows), contents, Instant.ofEpochMilli(1_000));
+    }
+
+    private Vault vaultTouchedAt(int index, Instant lastTouched) {
+        return Vault.of(VaultId.of(owner, index), new VaultSize(6), VaultContents.empty(), lastTouched);
     }
 
     /** A config that selects the embedded SQLite backend with every default — no network coordinates. */

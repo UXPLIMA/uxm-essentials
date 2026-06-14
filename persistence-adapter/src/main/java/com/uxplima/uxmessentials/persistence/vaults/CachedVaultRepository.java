@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.persistence.vaults;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -74,6 +75,16 @@ public final class CachedVaultRepository implements VaultRepository {
         Objects.requireNonNull(id, "id");
         delegate.delete(id);
         cache.invalidate(id);
+    }
+
+    @Override
+    public int deleteUntouchedBefore(Instant cutoff) {
+        Objects.requireNonNull(cutoff, "cutoff");
+        int purged = delegate.deleteUntouchedBefore(cutoff);
+        // A bulk purge cannot enumerate the removed ids, so drop the whole cache rather than guess which
+        // entries survived; the rare admin-triggered sweep makes a full clear acceptable.
+        cache.invalidateAll();
+        return purged;
     }
 
     /** Drop every cached vault; call on a module reload. */

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.persistence.vaults;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Vaults.VAULTS;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,7 +22,9 @@ import org.jooq.DSLContext;
  * materialises the rows. A {@code save} upserts on the primary key — a re-save of the same vault overwrites its
  * size, contents and last-touched in place — so a close-save never inserts a duplicate row. A {@code delete}
  * removes the one {@code (owner, idx)} row, freeing the owner's quota slot; deleting an id with no row affects
- * zero rows and is a silent no-op. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ * zero rows and is a silent no-op. The inactive-vault purge deletes every row whose {@code last_touched} is
+ * strictly before the cutoff in one statement and returns the affected count. Every statement is typed jOOQ
+ * DSL; no SQL is ever string-concatenated.
  */
 public final class JooqVaultRepository extends JooqRepository implements VaultRepository {
 
@@ -74,6 +77,14 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
                     .execute();
             return null;
         });
+    }
+
+    @Override
+    public int deleteUntouchedBefore(Instant cutoff) {
+        Objects.requireNonNull(cutoff, "cutoff");
+        return write(dsl -> dsl.deleteFrom(VAULTS)
+                .where(VAULTS.LAST_TOUCHED.lt(cutoff.toEpochMilli()))
+                .execute());
     }
 
     private static void upsert(DSLContext dsl, Vault vault) {
