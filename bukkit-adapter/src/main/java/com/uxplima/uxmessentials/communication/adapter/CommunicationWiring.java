@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.communication.adapter;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -144,8 +145,14 @@ public final class CommunicationWiring {
         return List.of(
                 new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings),
                 new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
+                // English-only project (a founding decision): vanilla advancement titles are translatable components,
+                // so the listener renders them through the GlobalTranslator in this locale before flattening to text.
                 new AdvancementMessageListener(
-                        settings::advancementNotices, channelBroadcaster, optOutStore, CommunicationWiring::isVanished),
+                        settings::advancementNotices,
+                        channelBroadcaster,
+                        optOutStore,
+                        CommunicationWiring::isVanished,
+                        Locale.ENGLISH),
                 new ChatLockListener(chatLock, notifier));
     }
 

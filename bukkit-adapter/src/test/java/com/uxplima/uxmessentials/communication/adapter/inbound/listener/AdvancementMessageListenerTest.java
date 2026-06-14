@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
+import java.text.MessageFormat;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -20,8 +22,11 @@ import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import io.papermc.paper.advancement.AdvancementDisplay;
 
 import net.kyori.adventure.bossbar.BossBar;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.translation.GlobalTranslator;
+import net.kyori.adventure.translation.TranslationStore;
 
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
@@ -31,6 +36,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,11 +60,13 @@ class AdvancementMessageListenerTest {
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
     private static final String VANILLA = "vanilla advancement line";
+    private static final Key TRANSLATIONS = Key.key("uxmessentials", "advancement-test");
 
     private ServerMock server;
     private PlayerMock earner;
     private PlayerMock viewer;
     private FakeOptOut optOut;
+    private @Nullable TranslationStore<MessageFormat> translations;
 
     @BeforeEach
     void setUp() {
@@ -72,7 +80,25 @@ class AdvancementMessageListenerTest {
 
     @AfterEach
     void tearDown() {
+        if (translations != null) {
+            GlobalTranslator.translator().removeSource(translations);
+            translations = null;
+        }
         MockBukkit.unmock();
+    }
+
+    /**
+     * Register a single key → {@code value} translation with the {@link GlobalTranslator}, mirroring how a vanilla
+     * advancement title resolves: a real title is a {@link Component#translatable} keyed by name, and the listener
+     * resolves it through the translator before flattening. Removed in {@link #tearDown()} so the global state does
+     * not leak between tests.
+     */
+    private void registerTranslation(String key, String value) {
+        TranslationStore<MessageFormat> store = TranslationStore.messageFormat(TRANSLATIONS);
+        store.defaultLocale(Locale.ENGLISH);
+        store.register(key, Locale.ENGLISH, new MessageFormat(value, Locale.ENGLISH));
+        GlobalTranslator.translator().addSource(store);
+        translations = store;
     }
 
     @Test
@@ -87,6 +113,22 @@ class AdvancementMessageListenerTest {
         assertThat(PLAIN.serialize(received(viewer))).isEqualTo("Earner earned [The End?]");
         // The earner is also an online recipient and receives the broadcast.
         assertThat(PLAIN.serialize(received(earner))).isEqualTo("Earner earned [The End?]");
+    }
+
+    @Test
+    void translatableTitleRendersToReadableTextNotTheRawKey() {
+        // A real vanilla advancement title is a translatable component keyed by name; the listener must resolve it
+        // through the GlobalTranslator before flattening, or the raw key leaks into the broadcast.
+        registerTranslation("advancements.test.title", "The End?");
+        AdvancementNoticeConfig cfg = enabled("{player} has made the advancement [{title}]");
+        fire(
+                cfg,
+                AdvancementMessageListenerTest::never,
+                translatableAdvancement("minecraft:end/kill_dragon", "advancements.test.title"));
+
+        String broadcast = PLAIN.serialize(received(viewer));
+        assertThat(broadcast).isEqualTo("Earner has made the advancement [The End?]");
+        assertThat(broadcast).doesNotContain("advancements.test.title");
     }
 
     @Test
@@ -222,7 +264,8 @@ class AdvancementMessageListenerTest {
                 "{player}: {title} — {description} ({advancement})",
                 "Steve",
                 "minecraft:adventure/adventuring_time",
-                display);
+                display,
+                Locale.ENGLISH);
 
         assertThat(result)
                 .isEqualTo("Steve: Adventuring Time — Discover every biome (minecraft:adventure/adventuring_time)");
@@ -231,7 +274,7 @@ class AdvancementMessageListenerTest {
     @Test
     void substituteToleratesANullDisplayWithEmptyTitleAndDescription() {
         String result = AdvancementMessageListener.substitute(
-                "{player} [{title}] {description}", "Steve", "minecraft:recipes/misc/map", null);
+                "{player} [{title}] {description}", "Steve", "minecraft:recipes/misc/map", null, Locale.ENGLISH);
 
         assertThat(result).isEqualTo("Steve [] ");
     }
@@ -248,7 +291,8 @@ class AdvancementMessageListenerTest {
     private PlayerAdvancementDoneEvent fire(
             AdvancementNoticeConfig cfg, Predicate<Player> vanished, Advancement advancement) {
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
-        AdvancementMessageListener listener = new AdvancementMessageListener(() -> cfg, channels, optOut, vanished);
+        AdvancementMessageListener listener =
+                new AdvancementMessageListener(() -> cfg, channels, optOut, vanished, Locale.ENGLISH);
         PlayerAdvancementDoneEvent event = new PlayerAdvancementDoneEvent(earner, advancement, Component.text(VANILLA));
         listener.onAdvancement(event);
         return event;
@@ -261,6 +305,22 @@ class AdvancementMessageListenerTest {
         lenient().when(display.doesAnnounceToChat()).thenReturn(announceable);
         lenient().when(display.title()).thenReturn(Component.text(title));
         lenient().when(display.description()).thenReturn(Component.text(description));
+        lenient().when(advancement.getDisplay()).thenReturn(display);
+        return advancement;
+    }
+
+    /**
+     * An announceable advancement whose title is a {@link Component#translatable} keyed by {@code titleKey}, as a real
+     * vanilla advancement title is — unlike the literal-title {@link #advancement} helper, this exercises the
+     * translator-render path.
+     */
+    private static Advancement translatableAdvancement(String key, String titleKey) {
+        Advancement advancement = mock(Advancement.class);
+        lenient().when(advancement.getKey()).thenReturn(NamespacedKey.fromString(key));
+        AdvancementDisplay display = mock(AdvancementDisplay.class);
+        lenient().when(display.doesAnnounceToChat()).thenReturn(true);
+        lenient().when(display.title()).thenReturn(Component.translatable(titleKey));
+        lenient().when(display.description()).thenReturn(Component.empty());
         lenient().when(advancement.getDisplay()).thenReturn(display);
         return advancement;
     }

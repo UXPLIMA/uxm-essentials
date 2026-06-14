@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -15,6 +16,7 @@ import io.papermc.paper.advancement.AdvancementDisplay;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.translation.GlobalTranslator;
 
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.domain.AdvancementFilter;
@@ -53,6 +55,13 @@ import org.jspecify.annotations.Nullable;
  * through {@link HudText} (per-viewer PlaceholderAPI then MiniMessage). A viewer who opted out of broadcasts via
  * {@code /broadcasttoggle} renders {@code null} and is skipped — advancement notices are broadcasts.
  *
+ * <p><b>Translatable titles.</b> A vanilla advancement's title and description are {@link Component#translatable
+ * translatable} components keyed by name (e.g. {@code advancements.end.kill_dragon.title}). Flattening those straight
+ * to plain text yields the raw translation key rather than readable text, so each is first resolved through
+ * {@link GlobalTranslator#render(Component, Locale)} in the server-default locale before it is serialized — the project
+ * is English-only, so that locale is {@link Locale#ENGLISH}. A title already built from literal text passes through the
+ * render unchanged.
+ *
  * <p>The event fires on the earner's region thread; the {@link ChannelBroadcaster} performs its own
  * global-enumerate then per-entity hops, so the handler just builds the per-viewer render and hands it over.
  */
@@ -66,16 +75,19 @@ public final class AdvancementMessageListener implements Listener {
     private final ChannelBroadcaster channels;
     private final BroadcastOptOutStore optOut;
     private final Predicate<Player> vanished;
+    private final Locale locale;
 
     public AdvancementMessageListener(
             Supplier<AdvancementNoticeConfig> config,
             ChannelBroadcaster channels,
             BroadcastOptOutStore optOut,
-            Predicate<Player> vanished) {
+            Predicate<Player> vanished,
+            Locale locale) {
         this.config = Objects.requireNonNull(config, "config");
         this.channels = Objects.requireNonNull(channels, "channels");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
         this.vanished = Objects.requireNonNull(vanished, "vanished");
+        this.locale = Objects.requireNonNull(locale, "locale");
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -95,7 +107,7 @@ public final class AdvancementMessageListener implements Listener {
         }
         // We are announcing our own notice — clear the vanilla line so the player does not see it twice.
         event.message(null);
-        String template = substitute(AdvancementFilter.templateFor(cfg, key), earner.getName(), key, display);
+        String template = substitute(AdvancementFilter.templateFor(cfg, key), earner.getName(), key, display, locale);
         @Nullable Sound sound = cfg.sound().map(BukkitRegistryKeys::resolveSound).orElse(null);
         channels.broadcast(viewer -> render(viewer, template), cfg.channels(), sound);
     }
@@ -117,17 +129,25 @@ public final class AdvancementMessageListener implements Listener {
     /**
      * Substitute the advancement placeholders into {@code template}: {@code {player}} → the earner's name,
      * {@code {advancement}} → the namespaced {@code key}, and {@code {title}}/{@code {description}} → the display's
-     * title/description flattened to plain text. A {@code null} display (recipes and some hidden advancements have
-     * none) substitutes an empty title and description rather than failing, so a template referencing them still
-     * renders. Package-private so it can be exercised directly: MockBukkit cannot construct a real
-     * {@code Advancement}/{@code AdvancementDisplay}, so the substitution is tested through this seam.
+     * title/description flattened to plain text. A vanilla title/description is a translatable component, so each is
+     * resolved through {@link GlobalTranslator} in {@code locale} before flattening — otherwise the raw translation
+     * key ({@code advancements.end.kill_dragon.title}) would surface instead of readable text. A {@code null} display
+     * (recipes and some hidden advancements have none) substitutes an empty title and description rather than failing,
+     * so a template referencing them still renders. Package-private so it can be exercised directly: MockBukkit cannot
+     * construct a real {@code Advancement}/{@code AdvancementDisplay}, so the substitution is tested through this seam.
      */
-    static String substitute(String template, String player, String key, @Nullable AdvancementDisplay display) {
-        String title = display == null ? "" : PLAIN.serialize(display.title());
-        String description = display == null ? "" : PLAIN.serialize(display.description());
+    static String substitute(
+            String template, String player, String key, @Nullable AdvancementDisplay display, Locale locale) {
+        String title = display == null ? "" : flatten(display.title(), locale);
+        String description = display == null ? "" : flatten(display.description(), locale);
         return template.replace("{player}", player)
                 .replace("{advancement}", key)
                 .replace("{title}", title)
                 .replace("{description}", description);
+    }
+
+    /** Resolve any translatable parts of {@code component} in {@code locale}, then flatten to plain text. */
+    private static String flatten(Component component, Locale locale) {
+        return PLAIN.serialize(GlobalTranslator.render(component, locale));
     }
 }
