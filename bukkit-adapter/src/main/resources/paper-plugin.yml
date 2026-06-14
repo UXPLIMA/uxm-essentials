@@ -736,11 +736,17 @@ permissions:
     description: 'Hot-reload / inspect the vaults module (DB-persisted player vault storage).'
     default: op
   uxmessentials.vault.use:
-    description: '/vault to open your default vault (or list them), and /vault <n> to open the Nth.'
+    description: '/vault to open your default vault (or list them), /vault <n> to open the Nth, and /vault delete <n> to delete your own.'
     default: true
   uxmessentials.vault.others:
     description: '/vault <player> [n] — open and audit another player''s vault (audit-logged).'
     default: op
+  uxmessentials.vault.admin.delete:
+    description: '/vault delete <player> <n> — delete another player''s vault (audit-logged, no refund).'
+    default: op
+  uxmessentials.vault.free:
+    description: 'Bypass every vault economy fee (create/open); no refund is paid on delete.'
+    default: false
   # communication context (docs/permissions.md "Communication"). The operator's broadcast surface:
   # connection-message policies, the rotating announcer, and the info pages. The per-page nodes
   # uxmessentials.communication.info.<name> (one per configured info page: /rules, /motd, /info, …) are an open

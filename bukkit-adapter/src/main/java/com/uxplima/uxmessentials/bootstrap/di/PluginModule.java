@@ -403,10 +403,12 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.start();
         resources.onClose(wired::stop);
-        // Captured for warps, kits, and homes, which land after economy and charge a recorded cost through it.
+        // Captured for warps, kits, homes, and vaults, which land after economy and charge a recorded cost
+        // through it.
         links.warpEconomy = wired.warpEconomy();
         links.kitEconomy = wired.kitEconomy();
         links.homeEconomy = wired.homeEconomy();
+        links.vaultEconomy = wired.vaultEconomy();
         links.placeholders.economy(new ProviderEconomyPlaceholders(
                 wired.provider(), wired.defaultCurrency(), wired.amountFormat(), BalTop.MAX_PAGE_SIZE));
     }
@@ -514,10 +516,12 @@ public final class PluginModule {
             ContextLinks links) {
         // vaults builds its cached jOOQ VaultRepository over persistence.dsl(), the audit logger on the dedicated
         // audit channel, the inventory-holder GUI and the InventoryClose save listener. It opts into cross-server
-        // sync through the bus handle — a remote vault save invalidates exactly that vault here — but carries no
-        // cross-context bridge, so nothing is captured for a later context. On stop the still-open vault windows
-        // are close-and-saved before the pool closes.
-        VaultsWiring.Wired wired = VaultsWiring.wire(plugin, ctx, persistence, bus);
+        // sync through the bus handle — a remote vault save invalidates exactly that vault here. The economy
+        // bridge captured during economy wiring is handed in so a configured vault cost can be charged; when it
+        // is absent a configured cost is recorded but never charged. On stop the still-open vault windows are
+        // close-and-saved before the pool closes.
+        VaultsWiring.Wired wired =
+                VaultsWiring.wire(plugin, ctx, persistence, bus, Optional.ofNullable(links.vaultEconomy));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -706,6 +710,8 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
+        private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
+                vaultEconomy;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
         private @org.jspecify.annotations.Nullable MutableAfkStatus afkStatus;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;

@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.vaults.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
@@ -11,15 +13,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.bukkit.Material;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.Plugin;
-
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.vaults.VaultRepositories;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -53,11 +50,11 @@ import com.uxplima.uxmessentials.vaults.application.VaultCharge;
 import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
+import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
+import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.StorageGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,85 +66,143 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the vault GUI open → store → close → save round-trip through the real Brigadier
- * {@code /vault} node and uxmLib's {@code StorageGui}, backed by the real cached jOOQ {@code VaultRepository}
- * (from {@link VaultRepositories}) over an embedded SQLite database. {@code /vault} opens a {@code StorageGui}
- * sized to the resolved quota; an item placed in it and the window closed is serialized and written through to
- * the DB; re-opening the same vault re-reads the stored item — proving vaults are DB-persisted and survive past
- * the live GUI, never PDC.
+ * MockBukkit coverage of {@code /vault delete} through the real Brigadier {@code /vault} node, backed by the
+ * real cached jOOQ {@code VaultRepository} over embedded SQLite. The own form deletes the caller's vault row
+ * (freeing the quota slot) and refunds the configured amount when economy is on; the admin form
+ * ({@code /vault delete <player> <n>}) is gated by {@code uxmessentials.vault.admin.delete}, deletes an offline
+ * owner's vault and audits the override with no refund. The charge wiring is exercised on open: a new vault
+ * costs the create fee when economy is enabled, is free when it is disabled, and the bypass node skips it.
  *
- * <p>The scheduler is a synchronous double so the entity-bound open and the async save run inline. uxmLib's
- * menu listener is installed via {@link Guis#install} against a mock plugin, and the close is dispatched as a
- * real {@link InventoryCloseEvent} through the plugin manager — exactly the path a live close takes — so the
- * GUI's own close handler writes the vault through.
+ * <p>The scheduler is synchronous so the off-tick delete runs inline; the audit and economy ports are
+ * recording fakes so the override line and the debit/credit are asserted directly.
  */
-class VaultGuiPathTest {
+class VaultDeleteCommandTest {
 
     private ServerMock server;
-    private Plugin plugin;
     private PlayerMock player;
     private Persistence persistence;
     private VaultRepository repository;
-    private VaultServices services;
     private RecordingSink sink;
+    private RecordingAudit audit;
+    private RecordingEconomy economy;
 
     @BeforeEach
     void setUp(@TempDir Path dataFolder) {
         server = MockBukkit.mock();
-        plugin = MockBukkit.createMockPlugin();
+        MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         player = server.addPlayer("Alice");
         player.setOp(true);
         persistence = Persistence.open(new SqliteConfig(), dataFolder, List.of("db/migration"), new NoopLogger());
         repository = VaultRepositories.cached(persistence);
         sink = new RecordingSink();
-        services = services();
-        Guis.install(plugin);
+        audit = new RecordingAudit();
+        economy = new RecordingEconomy();
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall(); // reset the static install state so the next test re-installs the menu listener
         persistence.close();
         MockBukkit.unmock();
     }
 
     @Test
-    void openStoreClosePersistsTheVaultAndReopenReadsItBack() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
-
-        execute(dispatcher, "vault 1");
-        Inventory vault = player.getOpenInventory().getTopInventory();
-        assertThat(vault.getHolder()).isInstanceOf(StorageGui.class);
-        assertThat(vault.getSize()).isEqualTo(54); // the default 6-row size quota
-
-        // Store an item and close the window: the StorageGui's close handler serializes and writes it through.
-        vault.setItem(0, new ItemStack(Material.DIAMOND, 12));
-        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
-
-        // The stored item is durable in the DB, not just in the live GUI.
+    void deleteOwnRemovesTheRowAndNotifies() {
+        VaultServices services = services(VaultEconomy.NONE, VaultChargeSettings.allFree(), new AllowAllPermissions());
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(services);
+        services.openVault().open(ref(), 1); // allocate vault 1 so there is a row to delete
         assertThat(repository.find(VaultId.of(ref(), 1))).isPresent();
-        player.closeInventory();
 
-        execute(dispatcher, "vault 1");
-        Inventory reopened = player.getOpenInventory().getTopInventory();
-        ItemStack restored = reopened.getItem(0);
-        assertThat(restored).isNotNull();
-        assertThat(restored.getType()).isEqualTo(Material.DIAMOND);
-        assertThat(restored.getAmount()).isEqualTo(12);
+        execute(dispatcher, "vault delete 1");
+
+        assertThat(repository.find(VaultId.of(ref(), 1))).isEmpty();
+        assertThat(sink.keys).contains(VaultsMessageKey.VAULT_DELETED);
     }
 
     @Test
-    void openWithNoIndexOpensTheDefaultVault() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+    void deleteOwnRefundsWhenEconomyIsOn() {
+        VaultChargeSettings settings = new VaultChargeSettings(BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("5"));
+        VaultServices services = services(economy, settings, new AllowExceptFree());
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(services);
+        services.openVault().open(ref(), 1);
 
-        execute(dispatcher, "vault");
+        execute(dispatcher, "vault delete 1");
 
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(StorageGui.class);
-        assertThat(sink.keys).contains(com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_OPENED);
+        assertThat(economy.deposited).isEqualByComparingTo(new BigDecimal("5"));
     }
 
-    private CommandDispatcher<CommandSourceStack> registerCommand() {
+    @Test
+    void deleteUnknownVaultNotifies() {
+        VaultServices services = services(VaultEconomy.NONE, VaultChargeSettings.allFree(), new AllowAllPermissions());
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(services);
+
+        execute(dispatcher, "vault delete 2");
+
+        assertThat(sink.keys).contains(VaultsMessageKey.VAULT_DELETE_UNKNOWN);
+    }
+
+    @Test
+    void deleteOtherDeletesAndAuditsWithNoRefund() {
+        VaultChargeSettings settings = new VaultChargeSettings(BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("5"));
+        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+        VaultServices services = services(economy, settings, new AllowAllPermissions(), bob);
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(services);
+        // Allocate Bob's vault 1 so the staff override has a row to delete.
+        services.openVault().open(bob, 1);
+        assertThat(repository.find(VaultId.of(bob, 1))).isPresent();
+
+        execute(dispatcher, "vault delete Bob 1");
+
+        assertThat(repository.find(VaultId.of(bob, 1))).isEmpty();
+        assertThat(audit.deletedOwners).containsExactly(bob.uuid());
+        assertThat(economy.deposited).isNull(); // the admin override pays no refund
+    }
+
+    @Test
+    void deleteOtherIsHiddenWithoutTheAdminNode() {
+        // requires(...) gates the admin branch; an unprivileged sender cannot parse /vault delete <player> <n>.
+        player.setOp(false);
+        VaultServices services = services(
+                VaultEconomy.NONE, VaultChargeSettings.allFree(), new NodePermissions("uxmessentials.vault.use"));
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(services);
+
+        assertThatThrownBy(() -> dispatcher.execute("vault delete Bob 1", CommandSourceStackMock.from(player)))
+                .isInstanceOf(CommandSyntaxException.class);
+    }
+
+    @Test
+    void openChargesCreateFeeWhenEconomyEnabled() {
+        VaultChargeSettings settings = new VaultChargeSettings(new BigDecimal("7"), BigDecimal.ZERO, BigDecimal.ZERO);
+        VaultServices services = services(economy, settings, new AllowExceptFree());
+
+        services.openVault().open(ref(), 1);
+
+        assertThat(economy.withdrawn).isEqualByComparingTo(new BigDecimal("7"));
+    }
+
+    @Test
+    void openIsFreeWhenEconomyDisabled() {
+        VaultChargeSettings settings = new VaultChargeSettings(new BigDecimal("7"), BigDecimal.ZERO, BigDecimal.ZERO);
+        // Economy NONE — the configured cost is recorded but never charged.
+        VaultServices services = services(VaultEconomy.NONE, settings, new AllowAllPermissions());
+
+        services.openVault().open(ref(), 1);
+
+        assertThat(economy.withdrawn).isNull();
+    }
+
+    @Test
+    void openIsFreeWhenBypassNodeHeld() {
+        VaultChargeSettings settings = new VaultChargeSettings(new BigDecimal("7"), BigDecimal.ZERO, BigDecimal.ZERO);
+        // Economy present, but the player holds uxmessentials.vault.free, so no fee is charged.
+        VaultServices services = services(economy, settings, new NodePermissions("uxmessentials.vault.free"));
+
+        services.openVault().open(ref(), 1);
+
+        assertThat(economy.withdrawn).isNull();
+    }
+
+    private CommandDispatcher<CommandSourceStack> registerCommand(VaultServices services) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(new VaultCommand(services).build());
         return dispatcher;
@@ -156,7 +211,7 @@ class VaultGuiPathTest {
     private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {
         try {
             dispatcher.execute(input, CommandSourceStackMock.from(player));
-        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+        } catch (CommandSyntaxException e) {
             throw new AssertionError("command did not parse: " + input, e);
         }
     }
@@ -165,16 +220,24 @@ class VaultGuiPathTest {
         return new PlayerRef(player.getUniqueId(), player.getName());
     }
 
-    private VaultServices services() {
-        KernelPorts kernel = kernel();
-        VaultAmountQuota amount = new VaultAmountQuota(kernel.permissions(), 3);
+    private VaultServices services(VaultEconomy vaultEconomy, VaultChargeSettings settings, Permissions perms) {
+        return services(vaultEconomy, settings, perms, null);
+    }
+
+    private VaultServices services(
+            VaultEconomy vaultEconomy,
+            VaultChargeSettings settings,
+            Permissions perms,
+            @Nullable PlayerRef offlineOwner) {
+        KernelPorts kernel = kernel(perms, offlineOwner);
+        VaultAmountQuota amount = new VaultAmountQuota(kernel.permissions(), 5);
         VaultSizeQuota size = new VaultSizeQuota(kernel.permissions(), 6);
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
-        VaultChargeSettings chargeSettings = VaultChargeSettings.allFree();
-        VaultCharge charge = new VaultCharge(kernel.permissions(), Optional.empty(), chargeSettings);
+        Optional<VaultEconomy> economyPort =
+                vaultEconomy == VaultEconomy.NONE ? Optional.empty() : Optional.of(vaultEconomy);
+        VaultCharge charge = new VaultCharge(kernel.permissions(), economyPort, settings);
         SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
         VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
-        VaultAudit audit = new NoAudit();
         return new VaultServices(
                 new OpenVault(repository, amount, size, charge, Clock.systemUTC()),
                 new ListVaults(repository),
@@ -185,19 +248,19 @@ class VaultGuiPathTest {
                 size,
                 notifier,
                 view,
-                chargeSettings,
+                settings,
                 kernel);
     }
 
-    private KernelPorts kernel() {
+    private KernelPorts kernel(Permissions perms, @Nullable PlayerRef offlineOwner) {
         return new KernelPorts(
                 new SyncScheduler(),
-                new AllowAllPermissions(),
+                perms,
                 new NoCooldowns(),
                 new NoWarmups(),
                 new KeyMessages(),
                 sink,
-                new NoPlayerLookup(),
+                new NamePlayerLookup(offlineOwner),
                 new NoWorldLookup(),
                 new NoPlayerLocator(),
                 new NoEvents(),
@@ -227,7 +290,7 @@ class VaultGuiPathTest {
 
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
-            // renderedText is the key() string (see KeyMessages); the key list is what tests assert on
+            // the key list (populated by KeyMessages) is what the tests assert on
         }
     }
 
@@ -236,6 +299,39 @@ class VaultGuiPathTest {
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             sink.keys.add(key);
             return key.key();
+        }
+    }
+
+    private static final class RecordingAudit implements VaultAudit {
+        private final List<UUID> deletedOwners = new ArrayList<>();
+
+        @Override
+        public void adminOpened(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {}
+
+        @Override
+        public void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {
+            deletedOwners.add(ownerUuid);
+        }
+    }
+
+    /** Records the most recent withdraw and deposit so the charge/refund wiring is asserted. */
+    private static final class RecordingEconomy implements VaultEconomy {
+        private @Nullable BigDecimal withdrawn;
+        private @Nullable BigDecimal deposited;
+
+        @Override
+        public boolean canAfford(PlayerRef who, BigDecimal amount) {
+            return true;
+        }
+
+        @Override
+        public void withdraw(PlayerRef who, BigDecimal amount) {
+            this.withdrawn = amount;
+        }
+
+        @Override
+        public void deposit(PlayerRef who, BigDecimal amount) {
+            this.deposited = amount;
         }
     }
 
@@ -279,6 +375,40 @@ class VaultGuiPathTest {
         }
     }
 
+    /** Grants every node except the cost-bypass {@code uxmessentials.vault.free}, so a fee actually fires. */
+    private static final class AllowExceptFree implements Permissions {
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return !"uxmessentials.vault.free".equals(node);
+        }
+
+        @Override
+        public QuotaResult resolveQuota(
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+            return QuotaResult.limited(configDefault);
+        }
+    }
+
+    /** Grants exactly the given node and nothing else — for the bypass and unprivileged-branch tests. */
+    private static final class NodePermissions implements Permissions {
+        private final String granted;
+
+        private NodePermissions(String granted) {
+            this.granted = granted;
+        }
+
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return granted.equals(node);
+        }
+
+        @Override
+        public QuotaResult resolveQuota(
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+            return QuotaResult.limited(configDefault);
+        }
+    }
+
     private static final class NoCooldowns implements Cooldowns {
         @Override
         public com.uxplima.uxmessentials.shared.domain.Result<com.uxplima.uxmessentials.shared.domain.Unit, Duration>
@@ -307,10 +437,22 @@ class VaultGuiPathTest {
         }
     }
 
-    private static final class NoPlayerLookup implements PlayerLookup {
+    /** Resolves a single offline owner by name (for the admin-delete path), online lookups empty. */
+    private static final class NamePlayerLookup implements PlayerLookup {
+        private final @Nullable PlayerRef owner;
+
+        private NamePlayerLookup(@Nullable PlayerRef owner) {
+            this.owner = owner;
+        }
+
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
             return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByName(String name) {
+            return owner != null && owner.name().equals(name) ? Optional.of(owner) : Optional.empty();
         }
 
         @Override
@@ -346,14 +488,6 @@ class VaultGuiPathTest {
     private static final class NoEvents implements DomainEventPublisher {
         @Override
         public void publish(DomainEvent event) {}
-    }
-
-    private static final class NoAudit implements VaultAudit {
-        @Override
-        public void adminOpened(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {}
-
-        @Override
-        public void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {}
     }
 
     private static final class NoopLogger implements Logger {

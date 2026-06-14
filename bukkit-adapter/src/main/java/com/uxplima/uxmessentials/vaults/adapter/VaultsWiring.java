@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vaults.adapter;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -20,14 +21,18 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommands;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.LoggingVaultAudit;
+import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
+import com.uxplima.uxmessentials.vaults.application.VaultCharge;
+import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
 import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
+import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import org.jspecify.annotations.NullMarked;
 import org.slf4j.LoggerFactory;
@@ -58,12 +63,28 @@ public final class VaultsWiring {
 
     private VaultsWiring() {}
 
-    /** Build the vaults adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the bus. */
+    /**
+     * Build the vaults adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the bus, with
+     * no economy bridge — a configured vault cost is recorded but not charged.
+     */
     public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus) {
+        return wire(plugin, ctx, persistence, bus, Optional.empty());
+    }
+
+    /**
+     * Build the vaults context, charging a configured per-action cost (and paying the delete refund) through
+     * {@code vaultEconomy} when present. The economy context lands before vaults in the registry, so its
+     * {@link VaultEconomy} bridge is captured during economy wiring and handed in here; when it is empty
+     * (economy disabled, or {@code economy.enabled = false} in vaults config), a configured cost is recorded
+     * but not charged and no refund is paid.
+     */
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus, Optional<VaultEconomy> vaultEconomy) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(vaultEconomy, "vaultEconomy");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         VaultSettings settings = new VaultSettings(ctx.config());
@@ -72,28 +93,44 @@ public final class VaultsWiring {
         CachedVaultRepository cached = VaultRepositories.cachedConcrete(persistence);
         bus.registry().register(VaultSync.listener(cached));
         VaultRepository repository = VaultSync.repository(cached, bus.publisher());
-        VaultServices services = assemble(kernel, settings, repository, clock);
+        VaultServices services = assemble(kernel, settings, repository, clock, vaultEconomy);
         return new Wired(VaultCommands.all(services), List.of(), services.view(), repository);
     }
 
     private static VaultServices assemble(
-            KernelPorts kernel, VaultSettings settings, VaultRepository repository, Clock clock) {
+            KernelPorts kernel,
+            VaultSettings settings,
+            VaultRepository repository,
+            Clock clock,
+            Optional<VaultEconomy> vaultEconomy) {
         VaultAmountQuota amountQuota = new VaultAmountQuota(kernel.permissions(), settings.defaultAmount());
         VaultSizeQuota sizeQuota = new VaultSizeQuota(kernel.permissions(), settings.defaultSize());
         VaultAudit audit = new LoggingVaultAudit(auditLogger());
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
+        VaultCharge charge = buildCharge(kernel, settings, vaultEconomy);
         SaveVault saveVault = new SaveVault(repository, kernel.events(), clock);
         VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
         return new VaultServices(
-                new OpenVault(repository, amountQuota, sizeQuota, clock),
+                new OpenVault(repository, amountQuota, sizeQuota, charge, clock),
                 new ListVaults(repository),
                 new OpenAdminVault(repository, sizeQuota, audit, clock),
+                new DeleteVault(repository, charge, audit, notifier),
                 saveVault,
                 amountQuota,
                 sizeQuota,
                 notifier,
                 view,
+                settings.chargeSettings(),
                 kernel);
+    }
+
+    private static VaultCharge buildCharge(
+            KernelPorts kernel, VaultSettings settings, Optional<VaultEconomy> vaultEconomy) {
+        if (!settings.economyEnabled() || vaultEconomy.isEmpty()) {
+            // Economy disabled in config or no provider wired — every vault action is free, no refund is paid.
+            return new VaultCharge(kernel.permissions(), Optional.empty(), VaultChargeSettings.allFree());
+        }
+        return new VaultCharge(kernel.permissions(), vaultEconomy, settings.chargeSettings());
     }
 
     private static Logger auditLogger() {

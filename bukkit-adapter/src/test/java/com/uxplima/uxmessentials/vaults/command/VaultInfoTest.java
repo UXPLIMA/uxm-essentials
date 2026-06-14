@@ -37,11 +37,14 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommand;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
+import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
+import com.uxplima.uxmessentials.vaults.application.VaultCharge;
+import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
@@ -137,18 +140,22 @@ class VaultInfoTest {
         VaultAmountQuota amount = new VaultAmountQuota(kernel.permissions(), 5);
         VaultSizeQuota size = new VaultSizeQuota(kernel.permissions(), 3); // 3 rows -> 27 slots
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
+        VaultChargeSettings chargeSettings = VaultChargeSettings.allFree();
+        VaultCharge charge = new VaultCharge(kernel.permissions(), Optional.empty(), chargeSettings);
         SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
         VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
-        VaultAudit audit = (a, o, u, i) -> {};
+        VaultAudit audit = new NoAudit();
         return new VaultServices(
-                new OpenVault(repository, amount, size, Clock.systemUTC()),
+                new OpenVault(repository, amount, size, charge, Clock.systemUTC()),
                 new ListVaults(repository),
                 new OpenAdminVault(repository, size, audit, Clock.systemUTC()),
+                new DeleteVault(repository, charge, audit, notifier),
                 saveVault,
                 amount,
                 size,
                 notifier,
                 view,
+                chargeSettings,
                 kernel);
     }
 
@@ -313,6 +320,14 @@ class VaultInfoTest {
     private static final class NoEvents implements DomainEventPublisher {
         @Override
         public void publish(DomainEvent event) {}
+    }
+
+    private static final class NoAudit implements VaultAudit {
+        @Override
+        public void adminOpened(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {}
+
+        @Override
+        public void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {}
     }
 
     private static final class NoopLogger implements Logger {

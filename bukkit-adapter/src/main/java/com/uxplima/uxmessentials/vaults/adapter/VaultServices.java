@@ -4,11 +4,13 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
+import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
+import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
 import org.jspecify.annotations.NullMarked;
@@ -21,12 +23,14 @@ import org.jspecify.annotations.NullMarked;
  *
  * @param openVault resolves and allocates a player's vault
  * @param listVaults the owned-vault listing
- * @param openAdminVault the audit-logged staff override
+ * @param openAdminVault the audit-logged staff inspect override
+ * @param deleteVault removes a vault row (own with refund, or the audited staff override)
  * @param saveVault the write-through on close
  * @param amountQuota the owner's vault-count cap, read by {@code /vault info}
  * @param sizeQuota the owner's per-vault row count, read by {@code /vault info}
  * @param notifier player-facing feedback
  * @param view the inventory-holder GUI builder
+ * @param chargeSettings the create/open fees and delete refund, so the cannot-afford notice can name the cost
  * @param kernel the shared outbound ports (scheduler, player lookup, events)
  */
 @NullMarked
@@ -34,22 +38,26 @@ public record VaultServices(
         OpenVault openVault,
         ListVaults listVaults,
         OpenAdminVault openAdminVault,
+        DeleteVault deleteVault,
         SaveVault saveVault,
         VaultAmountQuota amountQuota,
         VaultSizeQuota sizeQuota,
         VaultNotifier notifier,
         VaultView view,
+        VaultChargeSettings chargeSettings,
         KernelPorts kernel) {
 
     public VaultServices {
         Objects.requireNonNull(openVault, "openVault");
         Objects.requireNonNull(listVaults, "listVaults");
         Objects.requireNonNull(openAdminVault, "openAdminVault");
+        Objects.requireNonNull(deleteVault, "deleteVault");
         Objects.requireNonNull(saveVault, "saveVault");
         Objects.requireNonNull(amountQuota, "amountQuota");
         Objects.requireNonNull(sizeQuota, "sizeQuota");
         Objects.requireNonNull(notifier, "notifier");
         Objects.requireNonNull(view, "view");
+        Objects.requireNonNull(chargeSettings, "chargeSettings");
         Objects.requireNonNull(kernel, "kernel");
     }
 }

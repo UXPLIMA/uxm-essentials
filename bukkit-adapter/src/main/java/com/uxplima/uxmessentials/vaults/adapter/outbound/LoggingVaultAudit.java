@@ -12,9 +12,10 @@ import org.jspecify.annotations.NullMarked;
  * The {@link VaultAudit} implementation that writes the vaults audit trail to the dedicated
  * {@code com.uxplima.uxmessentials.audit} channel as structured {@code event=<name> actor=<staff> key=value}
  * lines (docs/09-deployment.md §Audit logging), mirroring the moderation and itemworld audit. Only the staff
- * override ({@code /vault <player> [n]}) is audited — a player opening their own vault is not — so a single
- * {@code event=vault_admin_open} line is emitted per override, with the actor and owner logged by UUID for
- * stable identity and the owner name carried for the human-readable render.
+ * overrides are audited — a player opening or deleting their own vault is not — so one
+ * {@code event=vault_admin_open} line is emitted per inspect override ({@code /vault <player> [n]}) and one
+ * {@code event=vault_admin_delete} line per delete override ({@code /vault delete <player> <n>}), with the
+ * actor and owner logged by UUID for stable identity and the owner name carried for the human-readable render.
  *
  * <p>Audit lines are operator-facing, so they go through a {@link Logger} bound to the audit channel — never
  * the player-facing {@code MessageKey} catalog.
@@ -32,6 +33,16 @@ public final class LoggingVaultAudit implements VaultAudit {
     public void adminOpened(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {
         audit.info(
                 "event=vault_admin_open actor={} owner={} owner_name={} idx={}",
+                actor.uuid(),
+                ownerUuid,
+                owner.name(),
+                index);
+    }
+
+    @Override
+    public void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {
+        audit.info(
+                "event=vault_admin_delete actor={} owner={} owner_name={} idx={}",
                 actor.uuid(),
                 ownerUuid,
                 owner.name(),
