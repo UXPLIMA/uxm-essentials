@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
@@ -115,7 +116,8 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(ItemworldMessageKey.values(), List.of("itemworld", "give", "time", "weather")),
                 Map.entry(VaultsMessageKey.values(), List.of("vault", "vaults")),
                 Map.entry(CommunicationMessageKey.values(), List.of("communication")),
-                Map.entry(HologramsMessageKey.values(), List.of("hologram")));
+                Map.entry(HologramsMessageKey.values(), List.of("hologram")),
+                Map.entry(StaffMessageKey.values(), List.of("staff")));
     }
 
     @Test

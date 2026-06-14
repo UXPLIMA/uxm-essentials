@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
+import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
@@ -54,7 +55,8 @@ public final class MessageKeyCatalog {
             PlayerwarpsMessageKey.values(),
             ScoreboardMessageKey.values(),
             VoteMessageKey.values(),
-            DiscordlinkMessageKey.values());
+            DiscordlinkMessageKey.values(),
+            StaffMessageKey.values());
 
     private MessageKeyCatalog() {}
 

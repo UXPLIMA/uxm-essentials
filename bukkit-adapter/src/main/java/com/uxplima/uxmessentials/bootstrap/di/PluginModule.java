@@ -85,6 +85,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.tablist.adapter.TablistWiring;
 import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
@@ -315,7 +316,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("kits"))) {
             wireKits(plugin, ctx, resources, links, guiLayouts);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
-            wirePlayerstate(ctx, resources);
+            wirePlayerstate(ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
             wireMessaging(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("presence"))) {
@@ -342,6 +343,8 @@ public final class PluginModule {
             wireDiscordlink(plugin, ctx, persistence, resources);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
             wireNametags(plugin, ctx, resources);
+        } else if (module.id().equals(ModuleId.of("staff"))) {
+            wireStaff(plugin, ctx, persistence, resources, links);
         }
     }
 
@@ -449,13 +452,15 @@ public final class PluginModule {
                 new KitCooldownPlaceholders(wired.repository(), ctx.kernel().cooldowns()));
     }
 
-    private static void wirePlayerstate(ModuleContext ctx, CloseableResources resources) {
+    private static void wirePlayerstate(ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // playerstate persists nothing: the per-player snapshot map is transient in-memory state, and all
         // live-player reconciliation routes through the kernel Scheduler port onto the owning region thread.
         PlayerstateWiring.Wired wired = PlayerstateWiring.wire(ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        // Captured for staff (wired last), which binds its EXAMINE gadget to this /invsee open use case.
+        links.staffOpenContainer = wired.services().openContainer();
     }
 
     private static void wireMessaging(
@@ -474,6 +479,8 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.mutePolicy = wired.mutePolicy();
         links.afkStatus = wired.afkStatus();
+        // Captured for staff (wired last), which binds its staff chat to the messaging staff-audience resolver.
+        links.staffAudience = new com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience();
     }
 
     private static void wireModeration(
@@ -568,6 +575,9 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.placeholders.presence(new StorePresencePlaceholders(wired.store(), wired.clock()));
         bindAfk(links, new PresenceAfkStatus(wired.store()));
+        // Captured for staff (wired last), which binds its VANISH gadget and vanish-on-enter to this toggle + store.
+        links.staffPresenceVanish = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.PresenceVanishSeam(
+                wired.services().toggleVanish(), wired.store());
     }
 
     private static void wireCommunication(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
@@ -651,6 +661,29 @@ public final class PluginModule {
         resources.onClose(wired::stop);
     }
 
+    private static void wireStaff(
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
+        // staff persists the captured loadout through the jOOQ StaffLoadoutRepository over persistence.dsl() (the
+        // staff_loadout table ships in the persistence V29 baseline, always applied) — the item-loss-safe net, so
+        // a crash mid-mode leaves the real loadout recoverable. It wires last, so it binds its three soft-couple
+        // holders to the presence/playerstate/messaging seams captured during those contexts' wiring; a seam is
+        // absent when its source module is disabled, leaving that gadget or staff chat on NONE (degrade, not fail).
+        // On stop it exits every staff member still in staff mode, restoring their real loadout so a disable/reload
+        // never strands anyone in the gadget hotbar.
+        StaffWiring.StaffSeams seams = new StaffWiring.StaffSeams(
+                Optional.ofNullable(links.staffPresenceVanish),
+                Optional.ofNullable(links.staffOpenContainer),
+                Optional.ofNullable(links.staffAudience));
+        StaffWiring.Wired wired = StaffWiring.wire(plugin, ctx, persistence, seams);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        resources.onClose(wired::stop);
+    }
+
     private static void wireVote(
             JavaPlugin plugin,
             ModuleContext ctx,
@@ -723,6 +756,15 @@ public final class PluginModule {
                 warpPlayerWarpHandle;
         private com.uxplima.uxmessentials.warps.adapter.@org.jspecify.annotations.Nullable WarpTeleportRegistry
                 warpTeleportRegistry;
+        // The soft-couple seams staff binds when it wires (it lands last). Each is captured during the source
+        // context's wiring and left null when that context is disabled, so staff degrades the matching gadget or
+        // staff chat to a no-op rather than failing.
+        private com.uxplima.uxmessentials.staff.adapter.StaffWiring.@org.jspecify.annotations.Nullable PresenceVanishSeam
+                staffPresenceVanish;
+        private com.uxplima.uxmessentials.playerstate.application.@org.jspecify.annotations.Nullable OpenContainer
+                staffOpenContainer;
+        private com.uxplima.uxmessentials.messaging.application.port.@org.jspecify.annotations.Nullable StaffAudience
+                staffAudience;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
     }

@@ -67,6 +67,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
         assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
         assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("staff"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -87,7 +88,8 @@ class FeatureModuleRegistryDriftTest {
                         "tablist",
                         "vote",
                         "discordlink",
-                        "nametags");
+                        "nametags",
+                        "staff");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -417,14 +419,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void nametagsIsTheLastModuleShipsDisabledAndPublishesNoCommandSurface() {
+    void nametagsShipsDisabledAndPublishesNoCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule nametags = registry.byId(ModuleId.of("nametags"))
                 .orElseThrow(() -> new AssertionError("nametags is not registered"));
 
-        // nametags is the 19th context — a per-wearer above-head TextDisplay nametag on the Scheduler refresh timer —
-        // registered last after the eighteen prior modules.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("nametags");
+        // nametags is the 19th context — a per-wearer above-head TextDisplay nametag on the Scheduler refresh timer.
+        // The later staff context now lands last, so nametags must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
 
         // It ships DISABLED (like scoreboard/tablist, its formats are operator data): with no modules.conf override it
         // is absent from the enabled set while every steady-state sibling stays on. Explicitly enabling exactly it
@@ -444,6 +446,39 @@ class FeatureModuleRegistryDriftTest {
         // MigrationSet.
         assertThat(nametags.commands()).isEmpty();
         assertThat(nametags.migrations()).isEmpty();
+    }
+
+    @Test
+    void staffIsTheLastModuleShipsDisabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule staff =
+                registry.byId(ModuleId.of("staff")).orElseThrow(() -> new AssertionError("staff is not registered"));
+
+        // staff is the 20th context — a STAFF-MODE-ONLY toolkit (the /staffmode toggle + gadget hotbar + staff chat) —
+        // registered last after the nineteen prior modules.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("staff");
+
+        // It ships DISABLED (like scoreboard/tablist/nametags, its gadget hotbar is operator data): with no
+        // modules.conf
+        // override it is absent from the enabled set while every steady-state sibling stays on. Explicitly enabling
+        // exactly it brings only it on; disabling it leaves every sibling untouched.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).doesNotContain("staff");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps", "discordlink");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.staff.enabled", true))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(on).contains("staff", "teleport", "holograms");
+
+        // Enabled, staff contributes exactly /staffmode and /staffchat (the /sc alias is not a separate literal) and
+        // owns no extra Flyway location (its staff_loadout table is in the persistence V29 baseline, always applied),
+        // so it declares no MigrationSet of its own. STAFF-MODE ONLY: no sanction command is published.
+        Set<String> literals =
+                staff.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactlyInAnyOrder("staffmode", "staffchat");
+        assertThat(staff.migrations()).isEmpty();
     }
 
     @Test

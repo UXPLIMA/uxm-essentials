@@ -110,7 +110,7 @@ public final class PlayerstateWiring {
                 new OfflineContainerListener(offlineView),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
                 new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
-        return new Wired(commands, listeners, invseeView, offlineView);
+        return new Wired(commands, listeners, invseeView, offlineView, services);
     }
 
     private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {
@@ -173,18 +173,21 @@ public final class PlayerstateWiring {
      * @param listeners the Bukkit listeners to register
      * @param invseeView the online invsee menu, held so {@code stop()} flushes every still-open view
      * @param offlineView the offline invsee/endersee menus, held so {@code stop()} flushes every still-open view
+     * @param services the constructed use cases, exposing {@code openContainer} cross-context for the staff EXAMINE gadget
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             InvseeView invseeView,
-            OfflineContainerView offlineView) {
+            OfflineContainerView offlineView,
+            PlayerStateServices services) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(invseeView, "invseeView");
             Objects.requireNonNull(offlineView, "offlineView");
+            Objects.requireNonNull(services, "services");
         }
 
         /** Reconcile every still-open invsee/endersee menu back onto its target. Called on module stop. */

@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
+import com.uxplima.uxmessentials.staff.application.StaffModule;
 import com.uxplima.uxmessentials.tablist.application.TablistModule;
 import com.uxplima.uxmessentials.teleport.application.TeleportModule;
 import com.uxplima.uxmessentials.vaults.application.VaultsModule;
@@ -122,6 +123,13 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // hard dependency edge, and like scoreboard/tablist it ships DISABLED by default (its formats are operator
         // data), so it wires nothing until enabled in modules.conf. It lands last after discordlink.
         delegate.register(new NametagsModule());
+        // staff is the 20th context — a STAFF-MODE-ONLY toolkit (the /staffmode toggle with an item-loss-safe DB-backed
+        // loadout swap, the VANISH + EXAMINE gadget hotbar, and staff chat). The gadgets orchestrate the existing
+        // presence/playerstate modules through soft-couple ports that degrade to no-ops when those modules are off, and
+        // staff chat fans out through messaging's staff audience, so staff carries no hard dependency edge; like
+        // scoreboard/tablist/nametags it ships DISABLED by default (its gadget hotbar is operator-authored), so it
+        // wires nothing until enabled in modules.conf. It lands last after nametags.
+        delegate.register(new StaffModule());
         // The shared kernel is not a module and never appears here.
     }
 
