@@ -29,7 +29,7 @@ import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordWriter;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedKit;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -105,7 +105,8 @@ class RepositoryRecordWriterKitTest {
                 mock(WalletRepository.class),
                 mock(ModerationRepository.class),
                 kits,
-                mock(Currency.class));
+                mock(Currency.class),
+                java.time.Clock.systemUTC());
     }
 
     private static ImportOptions options(ConflictPolicy onConflict) {

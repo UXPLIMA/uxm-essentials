@@ -23,6 +23,9 @@ public final class ImportSummary {
     private final LongAdder kits = new LongAdder();
     private final LongAdder jails = new LongAdder();
     private final LongAdder mutes = new LongAdder();
+    private final LongAdder bans = new LongAdder();
+    private final LongAdder ipBans = new LongAdder();
+    private final LongAdder warns = new LongAdder();
     private final LongAdder skipped = new LongAdder();
     private final LongAdder failed = new LongAdder();
 
@@ -47,6 +50,9 @@ public final class ImportSummary {
             case ImportRecord.WarpRecord ignored -> warps.increment();
             case ImportRecord.KitRecord ignored -> kits.increment();
             case ImportRecord.ModerationRecord moderation -> countModeration(moderation);
+            case ImportRecord.BanRecord ignored -> bans.increment();
+            case ImportRecord.IpBanRecord ignored -> ipBans.increment();
+            case ImportRecord.WarnRecord ignored -> warns.increment();
         }
     }
 
@@ -89,6 +95,18 @@ public final class ImportSummary {
         return mutes.sum();
     }
 
+    public long bans() {
+        return bans.sum();
+    }
+
+    public long ipBans() {
+        return ipBans.sum();
+    }
+
+    public long warns() {
+        return warns.sum();
+    }
+
     public long skipped() {
         return skipped.sum();
     }
@@ -102,7 +120,7 @@ public final class ImportSummary {
      * once here (it is one record) even though it feeds two of the finish line's counters.
      */
     public long total() {
-        return users() + warps() + kits() + moderation();
+        return users() + warps() + kits() + moderation() + bans() + ipBans() + warns();
     }
 
     private long moderation() {
@@ -115,7 +133,8 @@ public final class ImportSummary {
     /** A one-line, audit-friendly rendering of the totals plus the run duration. */
     public String describe(Duration elapsed) {
         return "source=" + source + " dry_run=" + dryRun() + " users=" + users() + " warps=" + warps() + " kits="
-                + kits() + " jails=" + jails() + " mutes=" + mutes() + " skipped=" + skipped() + " failed="
-                + failed() + " duration_ms=" + elapsed.toMillis();
+                + kits() + " jails=" + jails() + " mutes=" + mutes() + " bans=" + bans() + " ip_bans=" + ipBans()
+                + " warns=" + warns() + " skipped=" + skipped() + " failed=" + failed() + " duration_ms="
+                + elapsed.toMillis();
     }
 }

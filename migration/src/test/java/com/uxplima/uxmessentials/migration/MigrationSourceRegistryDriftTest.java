@@ -10,9 +10,9 @@ import com.uxplima.uxmessentials.migration.convert.Convert;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
 import com.uxplima.uxmessentials.migration.convert.live.BalanceFeed;
 import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import org.junit.jupiter.api.Test;
 
 /**

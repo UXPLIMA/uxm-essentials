@@ -11,8 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedKit;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedWarp;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.KitMapper;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WarpMapper;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
@@ -20,6 +18,8 @@ import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXKit;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXWarp;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.KitsParser;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.WarpParser;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedWarp;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.junit.jupiter.api.Test;
 

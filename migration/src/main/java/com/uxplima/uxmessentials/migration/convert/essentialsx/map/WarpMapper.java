@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXLocation;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXWarp;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedWarp;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;

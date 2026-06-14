@@ -8,6 +8,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXJail;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXModeration;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXMute;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;

@@ -119,9 +119,10 @@ public final class MigrationWiring {
         KitRepository kits = kitRepository(plugin, log);
         CurrencyRegistry currencies = new EconomyConfig(economyConfig).currencies();
         Currency defaultCurrency = currencies.defaultCurrency();
-        WalletRepository wallets = WalletRepositories.repository(persistence, currencies, Clock.systemUTC());
-        RecordWriter live = new RepositoryRecordWriter(homes, warps, wallets, moderation, kits, defaultCurrency);
-        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation, kits);
+        Clock clock = Clock.systemUTC();
+        WalletRepository wallets = WalletRepositories.repository(persistence, currencies, clock);
+        RecordWriter live = new RepositoryRecordWriter(homes, warps, wallets, moderation, kits, defaultCurrency, clock);
+        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation, kits, clock);
         return new Writers(live, dryRun);
     }
 

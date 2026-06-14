@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXLocation;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXUserdata;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;

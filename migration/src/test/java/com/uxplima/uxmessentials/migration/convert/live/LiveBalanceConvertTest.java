@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportPlan;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
 

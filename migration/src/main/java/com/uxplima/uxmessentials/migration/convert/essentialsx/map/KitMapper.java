@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXKit;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import org.jspecify.annotations.NullMarked;
 
 /**

@@ -12,8 +12,8 @@ import java.util.stream.Stream;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
 import com.uxplima.uxmessentials.migration.convert.live.BalanceFeed;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;

@@ -15,7 +15,7 @@ import java.util.stream.Stream;
 import com.uxplima.uxmessentials.migration.convert.Convert;
 import com.uxplima.uxmessentials.migration.convert.SourceDescriptor;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;

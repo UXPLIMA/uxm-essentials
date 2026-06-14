@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.migration.adapter;
 
+import java.time.Clock;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
@@ -9,11 +10,15 @@ import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordWriter;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedModeration;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
+import com.uxplima.uxmessentials.moderation.domain.TempbanState;
+import com.uxplima.uxmessentials.moderation.domain.Warn;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.jspecify.annotations.NullMarked;
@@ -31,11 +36,13 @@ public final class DryRunRecordWriter implements RecordWriter {
     private final WarpRepository warps;
     private final ModerationRepository moderation;
     private final KitRepository kits;
+    private final Clock clock;
 
-    public DryRunRecordWriter(WarpRepository warps, ModerationRepository moderation, KitRepository kits) {
+    public DryRunRecordWriter(WarpRepository warps, ModerationRepository moderation, KitRepository kits, Clock clock) {
         this.warps = Objects.requireNonNull(warps, "warps");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
@@ -47,6 +54,9 @@ public final class DryRunRecordWriter implements RecordWriter {
             case ImportRecord.WarpRecord warp -> warpOutcome(warp.warp().warp().name(), options);
             case ImportRecord.KitRecord kit -> kitOutcome(kit.kit().definition().id(), options);
             case ImportRecord.ModerationRecord rec -> moderationOutcome(rec.moderation(), options);
+            case ImportRecord.BanRecord ban -> banOutcome(ban.target(), options);
+            case ImportRecord.IpBanRecord ban -> ipBanOutcome(ban.ban(), options);
+            case ImportRecord.WarnRecord warn -> warnOutcome(warn.target(), warn.warn());
         };
     }
 
@@ -76,5 +86,29 @@ public final class DryRunRecordWriter implements RecordWriter {
 
     private static boolean isSanctioned(ModerationProfile existing) {
         return !(existing.mute() instanceof MuteState.None) || !(existing.jail() instanceof JailState.None);
+    }
+
+    private RecordOutcome banOutcome(PlayerRef target, ImportOptions options) {
+        boolean existed = moderation.loadTempban(target) instanceof TempbanState.Active;
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
+    }
+
+    private RecordOutcome ipBanOutcome(IpBan ban, ImportOptions options) {
+        boolean existed = moderation.activeIpBan(ban.ip(), clock.instant()).isPresent();
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
+    }
+
+    private RecordOutcome warnOutcome(PlayerRef target, Warn warn) {
+        // A warning is append-only and deduped by content, so a re-run reports SKIPPED for one already stored
+        // and WRITTEN for a new one (it can never overwrite an existing row).
+        boolean existed =
+                moderation.warns(target, warn.issuedAt()).stream().anyMatch(existing -> existing.equals(warn));
+        return existed ? RecordOutcome.SKIPPED : RecordOutcome.WRITTEN;
     }
 }

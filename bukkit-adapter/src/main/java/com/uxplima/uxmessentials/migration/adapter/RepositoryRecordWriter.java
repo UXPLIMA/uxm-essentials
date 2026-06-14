@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.migration.adapter;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,13 +23,16 @@ import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordWriter;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedKit;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedModeration;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
+import com.uxplima.uxmessentials.moderation.domain.TempbanState;
+import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
@@ -53,6 +57,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
     private final ModerationRepository moderation;
     private final KitRepository kits;
     private final Currency defaultCurrency;
+    private final Clock clock;
 
     public RepositoryRecordWriter(
             HomeRepository homes,
@@ -60,13 +65,15 @@ public final class RepositoryRecordWriter implements RecordWriter {
             WalletRepository wallets,
             ModerationRepository moderation,
             KitRepository kits,
-            Currency defaultCurrency) {
+            Currency defaultCurrency,
+            Clock clock) {
         this.homes = Objects.requireNonNull(homes, "homes");
         this.warps = Objects.requireNonNull(warps, "warps");
         this.wallets = Objects.requireNonNull(wallets, "wallets");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
@@ -78,6 +85,9 @@ public final class RepositoryRecordWriter implements RecordWriter {
             case ImportRecord.WarpRecord warp -> writeWarp(warp.warp().warp(), options);
             case ImportRecord.KitRecord kit -> writeKit(kit.kit(), options);
             case ImportRecord.ModerationRecord rec -> writeModeration(rec.moderation(), options);
+            case ImportRecord.BanRecord ban -> writeBan(ban, options);
+            case ImportRecord.IpBanRecord ban -> writeIpBan(ban.ban(), options);
+            case ImportRecord.WarnRecord warn -> writeWarn(warn);
         };
     }
 
@@ -181,5 +191,46 @@ public final class RepositoryRecordWriter implements RecordWriter {
 
     private static boolean isSanctioned(ModerationProfile existing) {
         return !(existing.mute() instanceof MuteState.None) || !(existing.jail() instanceof JailState.None);
+    }
+
+    private RecordOutcome writeBan(ImportRecord.BanRecord rec, ImportOptions options) {
+        PlayerRef target = rec.target();
+        boolean existed = moderation.loadTempban(target) instanceof TempbanState.Active;
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        // Materialise the seen row so an offline target's FK-bearing ban write never breaks integrity; the
+        // tempban is a keyed upsert (set, never append), so a re-run replaces the row rather than duplicating
+        // it — a permanent ban rides in as a far-future Active, exactly the row /ban writes (docs/12-migration §6).
+        moderation.ensureUserExists(target, clock.instant());
+        moderation.saveTempban(target, rec.ban());
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
+    }
+
+    private RecordOutcome writeIpBan(IpBan ban, ImportOptions options) {
+        boolean existed = moderation.activeIpBan(ban.ip(), clock.instant()).isPresent();
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        // The IP ban is keyed by address, so the upsert replaces a same-address row rather than duplicating it.
+        moderation.saveIpBan(ban);
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
+    }
+
+    private RecordOutcome writeWarn(ImportRecord.WarnRecord rec) {
+        PlayerRef target = rec.target();
+        // The warning history is append-only — a single row cannot be "overwritten" — so idempotence is by
+        // content under every policy: a re-run that already holds an equivalent warning (same issuer, reason
+        // and issue instant) skips rather than appending a duplicate (docs/12-migration §6).
+        if (hasEquivalentWarn(target, rec.warn())) {
+            return RecordOutcome.SKIPPED;
+        }
+        moderation.ensureUserExists(target, clock.instant());
+        moderation.appendWarn(target, rec.warn());
+        return RecordOutcome.WRITTEN;
+    }
+
+    private boolean hasEquivalentWarn(PlayerRef target, Warn warn) {
+        return moderation.warns(target, warn.issuedAt()).stream().anyMatch(existing -> existing.equals(warn));
     }
 }

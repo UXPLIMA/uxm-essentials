@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.migration.convert.live;
 
 import java.util.stream.Stream;
 
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import org.jspecify.annotations.NullMarked;
 
 /**

@@ -12,8 +12,8 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
 import com.uxplima.uxmessentials.economy.domain.Currency;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
 import com.uxplima.uxmessentials.migration.convert.live.BalanceFeed;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import net.milkbowl.vault.economy.Economy;
 import org.jspecify.annotations.NullMarked;

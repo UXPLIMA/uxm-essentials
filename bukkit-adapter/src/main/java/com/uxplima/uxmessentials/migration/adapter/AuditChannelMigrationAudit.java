@@ -11,9 +11,11 @@ import com.uxplima.uxmessentials.migration.ImportSummary;
 import com.uxplima.uxmessentials.migration.MigrationAudit;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedModeration;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
+import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
+import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -53,6 +55,9 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
             case ImportRecord.WarpRecord warp -> recordWarp(source, warp, outcome);
             case ImportRecord.KitRecord kit -> recordKit(source, kit, outcome);
             case ImportRecord.ModerationRecord moderation -> recordModeration(source, moderation, outcome);
+            case ImportRecord.BanRecord ban -> recordBan(source, ban, outcome);
+            case ImportRecord.IpBanRecord ban -> recordIpBan(source, ban, outcome);
+            case ImportRecord.WarnRecord warn -> recordWarn(source, warn, outcome);
         }
     }
 
@@ -118,6 +123,40 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
                 outcome.ok());
     }
 
+    private void recordBan(SourceId source, ImportRecord.BanRecord rec, RecordOutcome outcome) {
+        audit.info(
+                "event=migration_import_ban source={} uuid={} until={} conflict={} ok={}",
+                source,
+                rec.target().uuid(),
+                until(rec.ban().expiry()),
+                outcome.token(),
+                outcome.ok());
+    }
+
+    private void recordIpBan(SourceId source, ImportRecord.IpBanRecord rec, RecordOutcome outcome) {
+        IpBan ban = rec.ban();
+        audit.info(
+                "event=migration_import_ip_ban source={} ip={} target={} until={} conflict={} ok={}",
+                source,
+                ban.ip(),
+                ban.target().map(java.util.UUID::toString).orElse("none"),
+                until(ban.until()),
+                outcome.token(),
+                outcome.ok());
+    }
+
+    private void recordWarn(SourceId source, ImportRecord.WarnRecord rec, RecordOutcome outcome) {
+        Warn warn = rec.warn();
+        audit.info(
+                "event=migration_import_warn source={} uuid={} issued_at={} expires_at={} conflict={} ok={}",
+                source,
+                rec.target().uuid(),
+                warn.issuedAt(),
+                until(warn.expiresAt()),
+                outcome.token(),
+                outcome.ok());
+    }
+
     private static String jailUntil(ModerationProfile profile) {
         return profile.jail() instanceof JailState.Active active ? until(active.until()) : "permanent";
     }
@@ -129,7 +168,7 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
     @Override
     public void finish(String actor, ImportSummary summary, Duration elapsed) {
         audit.info(
-                "event=migration_import_finish actor={} source={} dry_run={} users={} warps={} kits={} jails={} mutes={} skipped={} failed={} duration_ms={}",
+                "event=migration_import_finish actor={} source={} dry_run={} users={} warps={} kits={} jails={} mutes={} bans={} ip_bans={} warns={} skipped={} failed={} duration_ms={}",
                 actor,
                 summary.source(),
                 summary.dryRun(),
@@ -138,6 +177,9 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
                 summary.kits(),
                 summary.jails(),
                 summary.mutes(),
+                summary.bans(),
+                summary.ipBans(),
+                summary.warns(),
                 summary.skipped(),
                 summary.failed(),
                 elapsed.toMillis());

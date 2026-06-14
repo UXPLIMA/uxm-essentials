@@ -13,7 +13,7 @@ import org.bukkit.plugin.ServicePriority;
 
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
-import com.uxplima.uxmessentials.migration.convert.essentialsx.map.ImportedUser;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import net.milkbowl.vault.economy.AbstractEconomy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.junit.jupiter.api.AfterEach;
