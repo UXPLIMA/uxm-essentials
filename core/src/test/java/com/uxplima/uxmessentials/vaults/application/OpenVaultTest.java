@@ -247,5 +247,11 @@ class OpenVaultTest {
         public void delete(VaultId id) {
             rows.remove(id);
         }
+
+        @Override
+        public int deleteUntouchedBefore(Instant cutoff) {
+            // Not exercised here.
+            return 0;
+        }
     }
 }

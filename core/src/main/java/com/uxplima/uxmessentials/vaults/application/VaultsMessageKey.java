@@ -40,6 +40,9 @@ public enum VaultsMessageKey implements MessageKey {
     // item blacklist (items refused on save and returned to the player)
     VAULT_ITEM_BLOCKED("vaults.item-blocked"),
 
+    // overflow rescue (items in slots beyond a shrunken size quota, returned to the player on open)
+    VAULT_OVERFLOW_RETURNED("vaults.overflow-returned"),
+
     // vault-selector GUI (/vault with several owned): one icon per index, owned vs locked
     VAULT_SELECTOR_TITLE("vaults.selector.title"),
     VAULT_SELECTOR_ENTRY_NAME("vaults.selector.entry.name"),

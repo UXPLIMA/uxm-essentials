@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.vaults.application.port;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,4 +39,12 @@ public interface VaultRepository {
      * the adapter's concern; the use case depends only on this contract.
      */
     void delete(VaultId id);
+
+    /**
+     * Delete every vault row whose last-touched instant is strictly before {@code cutoff}, returning the number
+     * of rows removed (the inactive-vault cleanup sweep). A vault not touched since {@code cutoff} has neither
+     * been opened nor saved in that window, so it is purged to reclaim storage. The cache invalidation is the
+     * adapter's concern; the use case depends only on this contract.
+     */
+    int deleteUntouchedBefore(Instant cutoff);
 }
