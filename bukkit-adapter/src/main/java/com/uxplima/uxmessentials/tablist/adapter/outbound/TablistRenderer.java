@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.tablist.adapter.outbound;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
@@ -22,7 +24,11 @@ import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
+import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import com.uxplima.uxmlib.hud.Tablist;
+import com.uxplima.uxmlib.packet.tablist.TabEntry;
+import com.uxplima.uxmlib.packet.tablist.TabListPackets;
+import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -61,6 +67,17 @@ import org.jspecify.annotations.NullMarked;
  *       broken alphabetically by name by the client. An absent order leaves the vanilla order untouched.</li>
  * </ul>
  *
+ * <p><strong>Custom skins go through packets.</strong> The one thing native Paper cannot do is put a custom texture on a
+ * tab row. When a selected format carries a {@link TablistFormat#skin() skin source}, the renderer resolves it to a
+ * {@link TabSkin} and delivers the row to <em>every</em> viewer through uxmLib's {@link TabListPackets#addOrUpdate} —
+ * re-adding the player's entry with the texture seated on the profile — <em>instead of</em> the native list-name/order
+ * setters for that player. The rendered name and order are the same ones native would apply, so nothing regresses except
+ * the (added) texture. When the format carries <em>no</em> skin (the default) the native path above is taken unchanged.
+ * Re-adding a real online player's entry every refresh tick would flicker, so the packet — like the native name/order —
+ * is sent only when the applied tuple (name source, order, skin source) <em>changes</em> for the player; a steady-state
+ * tick re-sends nothing. On a switch away from a skin format the entry is re-added once with the player's own real
+ * texture so the custom skin reverts.
+ *
  * <p><strong>Apply-only-on-change.</strong> The header/footer diff flicker-free inside uxmLib's {@code Tablist}, but the
  * list name and order are re-sent to the client on every setter call, so the renderer applies them only when the value
  * actually changes. It remembers the last name-format <em>source string</em> and the last order it applied per player
@@ -81,6 +98,9 @@ public final class TablistRenderer {
     private final Tablist tablist;
     private final Supplier<TablistFormatConfig> formats;
     private final AnimationRegistry animations;
+    private final TabListPackets packets;
+    private final TablistSkinResolver skinResolver;
+    private final Supplier<? extends Collection<? extends Player>> viewers;
 
     /**
      * The last name-format source string applied to each player's list name, keyed by player UUID. An absent key means
@@ -103,10 +123,36 @@ public final class TablistRenderer {
      */
     private final Map<UUID, Boolean> appliedHeaderFooter = new ConcurrentHashMap<>();
 
-    public TablistRenderer(Supplier<TablistFormatConfig> formats, AnimationRegistry animations) {
+    /**
+     * The last skin row this renderer painted through packets for each player, keyed by player UUID. An absent key means
+     * the player is on the native path (no skin). The remembered tuple is the name source, order, and skin source so a
+     * tick that changes none of them re-sends no packet (no flicker on a steady-state tick), while a format switch — or
+     * an offline skin fetch completing — re-paints. Cleared on revert/clear/quit so a re-selected skin format re-paints.
+     */
+    private final Map<UUID, AppliedSkin> appliedSkin = new ConcurrentHashMap<>();
+
+    /** Build a renderer with the full packet path. {@code viewers} supplies who a skin packet is broadcast to. */
+    public TablistRenderer(
+            Supplier<TablistFormatConfig> formats,
+            AnimationRegistry animations,
+            TabListPackets packets,
+            TablistSkinResolver skinResolver,
+            Supplier<? extends Collection<? extends Player>> viewers) {
         this.formats = Objects.requireNonNull(formats, "formats");
         this.animations = Objects.requireNonNull(animations, "animations");
+        this.packets = Objects.requireNonNull(packets, "packets");
+        this.skinResolver = Objects.requireNonNull(skinResolver, "skinResolver");
+        this.viewers = Objects.requireNonNull(viewers, "viewers");
         this.tablist = new Tablist();
+    }
+
+    /** Build a renderer whose viewers are every online player — the production fan-out. */
+    public TablistRenderer(
+            Supplier<TablistFormatConfig> formats,
+            AnimationRegistry animations,
+            TabListPackets packets,
+            TablistSkinResolver skinResolver) {
+        this(formats, animations, packets, skinResolver, Bukkit::getOnlinePlayers);
     }
 
     /** Render (or clear) {@code player}'s tablist from the selected format. Must run on the player's region thread. */
@@ -128,24 +174,74 @@ public final class TablistRenderer {
             return;
         }
         applyHeaderFooter(player, content, tick);
-        applyNameFormat(player, format.nameFormat(), tick);
-        applyOrder(player, format.sortOrder());
+        applyRow(player, format, tick);
     }
 
-    /** Clear {@code player}'s header/footer and reset any list name/order this renderer applied. */
+    /** Clear {@code player}'s header/footer and reset any list name/order/skin this renderer applied. */
     public void clear(Player player) {
         Objects.requireNonNull(player, "player");
         tablist.clear(player);
         appliedHeaderFooter.remove(player.getUniqueId());
-        resetNameAndOrder(player);
+        resetRow(player);
     }
 
-    /** Clear {@code player}'s header/footer and forget their name/order tracking on quit. */
+    /** Clear {@code player}'s header/footer and forget their name/order/skin tracking on quit. */
     public void forget(Player player) {
         Objects.requireNonNull(player, "player");
         tablist.clear(player);
         appliedHeaderFooter.remove(player.getUniqueId());
+        // On quit the player's connection is gone; just drop the tracking. A native reset packet to a closing channel
+        // is a no-op, so revert is skipped — only the tracking is forgotten so a relog re-paints from scratch.
+        appliedSkin.remove(player.getUniqueId());
         resetNameAndOrder(player);
+    }
+
+    /**
+     * Apply the name and order a selected format carries. A format with a {@link TablistFormat#skin() skin} delivers the
+     * row (name + order + texture) through packets to every viewer instead of the native setters; a format with no skin
+     * keeps the native list-name/order path. A switch between the two reverts the path it is leaving so neither lingers.
+     */
+    private void applyRow(Player player, TablistFormat format, long tick) {
+        Optional<TablistSkinSource> skinSource = format.skin();
+        if (skinSource.isEmpty()) {
+            // No skin: native path, and revert any skin entry this renderer previously painted for the player.
+            revertSkin(player);
+            applyNameFormat(player, format.nameFormat(), tick);
+            applyOrder(player, format.sortOrder());
+            return;
+        }
+        applySkinRow(player, format, skinSource.get(), tick);
+    }
+
+    /**
+     * Paint {@code player}'s row through a packet carrying the resolved skin, sent to every viewer. Applied only when the
+     * tuple (name source, order, skin source) changed for the player, so a steady-state tick re-sends nothing and a real
+     * online player's entry is not re-added every tick. A skin source that resolves to no texture yet (an offline fetch
+     * still in flight) falls back to the native path this tick — the resolver fills its cache and a later tick repaints.
+     */
+    private void applySkinRow(Player player, TablistFormat format, TablistSkinSource skinSource, long tick) {
+        Optional<TabSkin> skin = skinResolver.resolve(skinSource);
+        if (skin.isEmpty()) {
+            // The texture is not available yet; take the native path so the name/order still apply with no skin.
+            revertSkin(player);
+            applyNameFormat(player, format.nameFormat(), tick);
+            applyOrder(player, format.sortOrder());
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        String nameSource = format.nameFormat().orElse("");
+        int order = format.sortOrder().orElse(0);
+        AppliedSkin desired = new AppliedSkin(nameSource, order, skinSource);
+        if (desired.equals(appliedSkin.get(uuid))) {
+            return;
+        }
+        // Taking ownership of the row through packets, so drop any native name/order this renderer set for the player.
+        resetNameAndOrder(player);
+        Component name = format.nameFormat()
+                .map(source -> renderName(player, source, tick))
+                .orElse(displayName(player));
+        broadcast(packets.addOrUpdate(new TabEntry(uuid, name, order, skin.get(), player.getName())));
+        appliedSkin.put(uuid, desired);
     }
 
     /**
@@ -227,6 +323,29 @@ public final class TablistRenderer {
         appliedOrder.put(uuid, order);
     }
 
+    /**
+     * Revert a skin row this renderer previously painted for the player: re-add the entry once with the player's own
+     * real texture (read inline from their live profile, no network) and the vanilla name/order, so the custom skin
+     * drops back to the player's real skin without removing the server-owned entry. A no-op for a player not on the
+     * skin path.
+     */
+    private void revertSkin(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (appliedSkin.remove(uuid) == null) {
+            return;
+        }
+        TabSkin own = skinResolver
+                .resolve(new TablistSkinSource.PlayerName(player.getName()))
+                .orElse(null);
+        broadcast(packets.addOrUpdate(new TabEntry(uuid, displayName(player), 0, own, player.getName())));
+    }
+
+    /** Reset the player's vanilla list name/order/skin if this renderer set any, and drop their tracking. */
+    private void resetRow(Player player) {
+        revertSkin(player);
+        resetNameAndOrder(player);
+    }
+
     /** Reset the player's vanilla list name/order if this renderer set either, and drop their tracking. */
     private void resetNameAndOrder(Player player) {
         UUID uuid = player.getUniqueId();
@@ -236,6 +355,18 @@ public final class TablistRenderer {
         if (appliedOrder.remove(uuid) != null) {
             player.setPlayerListOrder(0);
         }
+    }
+
+    /** Send a built packet to every current viewer. The same packet object is reused across viewers, never rebuilt. */
+    private void broadcast(Object packet) {
+        for (Player viewer : viewers.get()) {
+            packets.send(viewer, packet);
+        }
+    }
+
+    /** The player's plain name as a component — the fallback display when a skin row carries no name format. */
+    private static Component displayName(Player player) {
+        return Component.text(player.getName());
     }
 
     private Component renderName(Player player, String source, long tick) {
@@ -261,4 +392,11 @@ public final class TablistRenderer {
     private Component render(Player player, String source, long tick) {
         return HudText.render(player.getUniqueId(), animations.resolve(source, tick));
     }
+
+    /**
+     * The skin row last painted for a player: the name-format source, sort order, and skin source. Two paints with an
+     * equal tuple are the same row, so the packet is not re-sent — this is what keeps a real online player's entry from
+     * being re-added every refresh tick (the flicker guard). A change in any field re-paints.
+     */
+    private record AppliedSkin(String nameSource, int order, TablistSkinSource skinSource) {}
 }

@@ -46,6 +46,9 @@ dependencies {
     compileOnly(libs.dynmap.core.api)
 
     compileOnly(libs.bundles.configs)
+    // Caffeine is supplied at runtime by the plugin loader (see UxmEssentialsLoader); compileOnly here so the tablist
+    // skin-fetch cache can bind to it without re-shading a library the loader already provides.
+    compileOnly(libs.caffeine)
     implementation(libs.bstats.bukkit)
 
     // uxmLib GUI toolkit (dogfood) — consumed from mavenLocal; pulls uxmlib-item + uxmlib-common
@@ -68,6 +71,12 @@ dependencies {
     // Mojang-mapped NMS module (rides along Mojang-mapped in the shaded jar, like the offline-inventory adapter), and
     // it sends through uxmlib-npc's channel sender.
     implementation("com.uxplima.uxmlib:uxmlib-nametags:0.1.0-SNAPSHOT") {
+        exclude(group = "org.spongepowered")
+    }
+    // uxmLib packet-tablist toolkit (dogfood) — the per-viewer player-info packet builder the tablist context uses to
+    // paint a custom skin on a tab row (the one tab thing native Paper cannot do). Same Mojang-mapped NMS module shape
+    // as uxmlib-nametags; sends through uxmlib-npc's channel sender.
+    implementation("com.uxplima.uxmlib:uxmlib-packet:0.1.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
     implementation("com.uxplima.uxmlib:uxmlib-npc:0.1.0-SNAPSHOT") {

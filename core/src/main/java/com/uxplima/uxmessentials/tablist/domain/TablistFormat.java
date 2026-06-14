@@ -25,12 +25,18 @@ import com.uxplima.uxmessentials.shared.display.DisplayCondition;
  * placeholders. The {@code sortOrder}, when present, is the {@code Player.setPlayerListOrder(int)} value — a positive
  * integer where a higher value sorts the player higher in the tab list (see the renderer for the confirmed semantics).
  *
+ * <p>The optional {@code skin} is the one thing native Paper cannot do: a custom texture on the viewer's tab row. When
+ * present the adapter delivers this format's row to each viewer through a player-info packet carrying the texture rather
+ * than the native list-name/order setters; when absent (the default) the renderer keeps the native path unchanged. The
+ * display name and order still come from {@code nameFormat}/{@code sortOrder} — only the delivery changes, plus the skin.
+ *
  * @param name the format name, non-blank (the config map key; used only for operator-facing identification and tie-break)
  * @param condition the per-viewer gate; {@link DisplayCondition#always()} for an unconditional format
  * @param priority the selection rank; higher wins, ties broken by name (see {@link TablistFormatConfig#select})
  * @param content the operator-authored header/footer rendered when this format is selected
  * @param nameFormat the per-viewer list-name template, or empty to leave the vanilla list name untouched
  * @param sortOrder the per-viewer {@code setPlayerListOrder} value, or empty to leave the vanilla sort order untouched
+ * @param skin the custom-skin source, or empty to keep the native list-name/order delivery (the default, no skin)
  */
 public record TablistFormat(
         String name,
@@ -38,7 +44,8 @@ public record TablistFormat(
         int priority,
         TablistContent content,
         Optional<String> nameFormat,
-        OptionalInt sortOrder) {
+        OptionalInt sortOrder,
+        Optional<TablistSkinSource> skin) {
 
     public TablistFormat {
         Objects.requireNonNull(name, "name");
@@ -46,8 +53,20 @@ public record TablistFormat(
         Objects.requireNonNull(content, "content");
         Objects.requireNonNull(nameFormat, "nameFormat");
         Objects.requireNonNull(sortOrder, "sortOrder");
+        Objects.requireNonNull(skin, "skin");
         if (name.isBlank()) {
             throw new IllegalArgumentException("a tablist format name must not be blank");
         }
+    }
+
+    /** A format with no custom skin — the common case, preserving the native list-name/order delivery. */
+    public TablistFormat(
+            String name,
+            DisplayCondition condition,
+            int priority,
+            TablistContent content,
+            Optional<String> nameFormat,
+            OptionalInt sortOrder) {
+        this(name, condition, priority, content, nameFormat, sortOrder, Optional.empty());
     }
 }

@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
+import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.spongepowered.configurate.ConfigurateException;
@@ -92,6 +93,69 @@ class TablistContentCodecTest {
         TablistFormat vip = select(parsed, n -> true, "world");
         assertThat(vip.content().isBlank()).isTrue();
         assertThat(vip.nameFormat()).contains("<gold>{player}");
+    }
+
+    @Test
+    void parsesAPlayerSkinSource(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default { condition = "", priority = 0, name-format = "<gold>{player}", skin = "player:Notch" }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(select(parsed, n -> true, "world").skin()).contains(new TablistSkinSource.PlayerName("Notch"));
+    }
+
+    @Test
+    void parsesATextureSkinSourceWithASignature(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default { condition = "", priority = 0, header = [ "x" ], skin = "texture:dmFsdWU=:sig" }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(select(parsed, n -> true, "world").skin())
+                .contains(new TablistSkinSource.Texture("dmFsdWU=", Optional.of("sig")));
+    }
+
+    @Test
+    void aSkinOnlyFormatIsKept(@TempDir Path dir) throws Exception {
+        // A format that sets neither header/footer nor a name/order but does carry a skin still does something.
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  vip { condition = "", priority = 0, skin = "player:Notch" }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(parsed.formats().formats()).hasSize(1);
+        assertThat(select(parsed, n -> true, "world").skin()).isPresent();
+    }
+
+    @Test
+    void anUnrecognisedSkinPrefixIsTreatedAsNoSkin(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default { condition = "", priority = 0, header = [ "x" ], skin = "url:http://example" }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(select(parsed, n -> true, "world").skin()).isEmpty();
     }
 
     @Test

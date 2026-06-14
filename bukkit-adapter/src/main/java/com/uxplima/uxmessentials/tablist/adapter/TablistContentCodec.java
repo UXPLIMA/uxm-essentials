@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
+import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurationNode;
 
@@ -39,6 +40,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  *     footer = [ "<gray>play.example.net" ]
  *     name-format = "<red>[Staff] {player}"           # how this viewer appears to everyone in the tab list
  *     sort-order = 100                                # higher = shown higher in the tab list; must be positive
+ *     skin = "player:Notch"                           # OPTIONAL custom tab-row skin; "player:<name>" or "texture:<b64>"
  *     world-blacklist = [ "world_the_end" ]
  *   }
  *   default { condition = "", priority = 0, header = [ "<gold>Welcome" ] }
@@ -127,14 +129,15 @@ final class TablistContentCodec {
         TablistContent content = tablistContent(node);
         Optional<String> nameFormat = optionalString(node.node("name-format"));
         OptionalInt sortOrder = sortOrder(node.node("sort-order"));
-        // A format that neither shows header/footer nor sets a name or order does nothing; drop it.
-        if (content.isBlank() && nameFormat.isEmpty() && sortOrder.isEmpty()) {
+        Optional<TablistSkinSource> skin = skinSource(node.node("skin"));
+        // A format that neither shows header/footer nor sets a name, order, or skin does nothing; drop it.
+        if (content.isBlank() && nameFormat.isEmpty() && sortOrder.isEmpty() && skin.isEmpty()) {
             return Optional.empty();
         }
         DisplayCondition condition =
                 ConditionParser.parse(node.node("condition").getString());
         int priority = node.node("priority").getInt(0);
-        return Optional.of(new TablistFormat(name, condition, priority, content, nameFormat, sortOrder));
+        return Optional.of(new TablistFormat(name, condition, priority, content, nameFormat, sortOrder, skin));
     }
 
     /**
@@ -160,6 +163,48 @@ final class TablistContentCodec {
                 strings(node.node("footer")),
                 refreshInterval(node.node("refresh-ticks")),
                 worldBlacklist(node.node("world-blacklist")));
+    }
+
+    /**
+     * Parse a format's optional {@code skin} value, the one tab thing native Paper cannot do. Two prefixes are accepted:
+     *
+     * <ul>
+     *   <li>{@code "texture:<base64>"} or {@code "texture:<base64>:<signature>"} — a Mojang texture property given
+     *       directly. The base64 value may itself contain {@code =} padding but no {@code :}, so the part after the first
+     *       colon up to an optional second colon is the value and the remainder (if any) the signature;</li>
+     *   <li>{@code "player:<name>"} — copy a named player's skin (read live when online, fetched when offline).</li>
+     * </ul>
+     *
+     * <p>The parse is tolerant like the rest of the codec: an absent, blank, or unrecognised value yields empty (no
+     * skin, the native path) rather than failing the format.
+     */
+    private static Optional<TablistSkinSource> skinSource(ConfigurationNode node) {
+        String raw = node.getString("");
+        if (raw.isBlank()) {
+            return Optional.empty();
+        }
+        String value = raw.trim();
+        if (value.startsWith("player:")) {
+            String name = value.substring("player:".length()).trim();
+            return name.isBlank() ? Optional.empty() : Optional.of(new TablistSkinSource.PlayerName(name));
+        }
+        if (value.startsWith("texture:")) {
+            return texture(value.substring("texture:".length()));
+        }
+        return Optional.empty();
+    }
+
+    /** Parse the part after {@code texture:} into a {@link TablistSkinSource.Texture}: {@code <base64>[:<signature>]}. */
+    private static Optional<TablistSkinSource> texture(String body) {
+        int split = body.indexOf(':');
+        String value = (split < 0 ? body : body.substring(0, split)).trim();
+        if (value.isBlank()) {
+            return Optional.empty();
+        }
+        Optional<String> signature = split < 0
+                ? Optional.empty()
+                : Optional.of(body.substring(split + 1).trim()).filter(s -> !s.isBlank());
+        return Optional.of(new TablistSkinSource.Texture(value, signature));
     }
 
     private static OptionalInt sortOrder(ConfigurationNode node) {

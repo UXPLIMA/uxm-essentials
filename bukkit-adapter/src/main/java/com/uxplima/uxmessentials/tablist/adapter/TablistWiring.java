@@ -15,9 +15,15 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.tablist.adapter.inbound.listener.TablistConnectionListener;
+import com.uxplima.uxmessentials.tablist.adapter.outbound.BukkitMojangProfileSource;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistRenderTask;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistRenderer;
+import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistSkinResolver;
 import com.uxplima.uxmlib.hud.Tablist;
+import com.uxplima.uxmlib.npc.ChannelResolver;
+import com.uxplima.uxmlib.npc.PacketSender;
+import com.uxplima.uxmlib.packet.tablist.TabListPackets;
+import com.uxplima.uxmlib.packet.tablist.internal.NmsTabListPackets;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -28,7 +34,10 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The tablist is always-on for every viewer when enabled — there is no per-player visibility toggle, so the context
  * publishes no command. It persists nothing: the header/footer content is config-authored under
- * {@code modules/tablist/config.conf}. The renderer dogfoods uxmLib's {@link Tablist}; the render timer on the
+ * {@code modules/tablist/config.conf}. The renderer dogfoods uxmLib's {@link Tablist} for the header/footer and, for a
+ * format that authors a custom-skin row, uxmLib's packet {@link TabListPackets} (a {@link ChannelResolver} →
+ * {@link PacketSender} → {@link NmsTabListPackets} stack) — the one tab thing native Paper cannot do. Offline skin names
+ * are fetched off the tick thread and cached by the {@link TablistSkinResolver}. The render timer on the
  * {@code Scheduler} port is stopped and every active header/footer cleared on disable so a disable or reload tears
  * down cleanly.
  */
@@ -51,7 +60,16 @@ public final class TablistWiring {
         // The animation registry holds the stateful uxmLib animators, so it is built once from the load-time catalog,
         // shared by the renderer (which reads frames) and the render task (which advances the clock once a tick).
         AnimationRegistry animations = new AnimationRegistry(settings.animations());
-        TablistRenderer renderer = new TablistRenderer(settings::formats, animations);
+
+        // The packet stack for custom-skin tab rows (the one tab thing native Paper cannot do): a channel resolver
+        // finds
+        // each viewer's Netty channel, the sender writes to it, and the NMS port builds the player-info packets.
+        // Mirrors
+        // the nametag wiring. The skin resolver reads online textures inline and fetches offline names off the tick
+        // thread through the kernel Scheduler, caching the result.
+        TabListPackets packets = new NmsTabListPackets(new PacketSender(new ChannelResolver()));
+        TablistSkinResolver skinResolver = new TablistSkinResolver(new BukkitMojangProfileSource(), kernel.scheduler());
+        TablistRenderer renderer = new TablistRenderer(settings::formats, animations, packets, skinResolver);
         TablistRenderTask renderTask = new TablistRenderTask(
                 kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
 
