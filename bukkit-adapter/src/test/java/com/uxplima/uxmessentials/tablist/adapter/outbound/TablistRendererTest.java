@@ -659,6 +659,48 @@ class TablistRendererTest {
     }
 
     @Test
+    void aDeferredFillerSkinPaintsSkinlessWhilePendingThenRepaintsWithTheSkinOnceResolved() {
+        // FINDING-1 mirror of the offline-skin row test: an offline player: filler is painted skinless while the fetch
+        // is in flight, but is NOT recorded as the steady state, so a later tick (the texture now cached) re-sends the
+        // entry WITH the skin rather than leaving the filler Steve forever.
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        FakeProfiles profiles = new FakeProfiles();
+        profiles.fetchable.put("notch", new TabSkin("notchtex", null));
+        DeferredScheduler scheduler = new DeferredScheduler();
+        TablistSkinResolver resolver = new TablistSkinResolver(profiles, scheduler);
+        TablistSkinSource skin = new TablistSkinSource.PlayerName("Notch");
+        TablistRenderer renderer = new TablistRenderer(
+                new AtomicReference<>(new TablistFormatConfig(List.of(fillerFormat(
+                        "default", layoutOf(new TablistFiller(5, "<gold>play.example.net", Optional.of(skin)))))))::get,
+                new AnimationRegistry(List.of()),
+                packets,
+                resolver,
+                server::getOnlinePlayers);
+
+        // First paint: the offline name is not cached yet, so the filler is painted skinless and an async fetch queued.
+        renderer.renderFor(viewer);
+        UUID id = fillerId(viewer.getUniqueId(), 5);
+        List<TabEntry> firstPaint = packets.entriesSentTo(viewer.getUniqueId()).stream()
+                .filter(e -> e.id().equals(id))
+                .toList();
+        assertThat(firstPaint).hasSize(1);
+        assertThat(firstPaint.get(0).skin()).isNull();
+        assertThat(scheduler.pending).hasSize(1);
+
+        // Run the async fetch off the tick thread; a later paint now finds the cached texture and repaints WITH it.
+        scheduler.runAll();
+        renderer.renderFor(viewer);
+
+        List<TabEntry> all = packets.entriesSentTo(viewer.getUniqueId()).stream()
+                .filter(e -> e.id().equals(id))
+                .toList();
+        // Two paints to the same cell id: the first skinless, the second carrying the resolved texture.
+        assertThat(all).hasSize(2);
+        assertThat(skinOf(all.get(1)).textureValue()).isEqualTo("notchtex");
+    }
+
+    @Test
     void aNoFillerFormatPaintsNoFillerEntriesAndRemovesNothing() {
         PlayerMock viewer = server.addPlayer();
         RecordingPackets packets = new RecordingPackets();

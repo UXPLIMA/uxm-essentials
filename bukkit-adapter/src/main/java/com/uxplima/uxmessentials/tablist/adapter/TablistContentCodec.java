@@ -166,7 +166,9 @@ final class TablistContentCodec {
      * {@link TablistLayout#empty()} (no fillers, the native tab grid untouched), a filler with a non-positive or absent
      * {@code slot} or a blank {@code text} is skipped and logged, an unrecognised {@code direction} falls back to
      * {@code COLUMNS}, and a non-positive {@code rows} falls back to the standard twenty. A duplicate slot keeps the
-     * first and logs the rest so the grid never paints two rows into one cell.
+     * first and logs the rest, and a slot past the grid's capacity ({@link TablistLayout#COLUMNS} columns by {@code rows})
+     * is rejected and logged, so the grid never paints two rows into one cell — an out-of-grid slot would otherwise
+     * wrap onto an in-grid cell in {@code ROWS} mode and collide with the filler genuinely placed there.
      */
     private static TablistLayout layout(ConfigurationNode node, String formatName, Logger log) {
         if (node.virtual() || !node.isMap()) {
@@ -177,28 +179,42 @@ final class TablistContentCodec {
         if (rows <= 0) {
             rows = TablistLayout.DEFAULT_GRID_ROWS;
         }
-        List<TablistFiller> fillers = fillers(node.node("fillers"), formatName, log);
+        int capacity = TablistLayout.COLUMNS * rows;
+        List<TablistFiller> fillers = fillers(node.node("fillers"), formatName, capacity, log);
         return fillers.isEmpty() ? TablistLayout.empty() : new TablistLayout(fillers, direction, rows);
     }
 
-    private static List<TablistFiller> fillers(ConfigurationNode node, String formatName, Logger log) {
+    private static List<TablistFiller> fillers(ConfigurationNode node, String formatName, int capacity, Logger log) {
         if (node.virtual() || !node.isList()) {
             return List.of();
         }
         List<TablistFiller> parsed = new ArrayList<>();
         Set<Integer> seenSlots = new LinkedHashSet<>();
         for (ConfigurationNode child : node.childrenList()) {
-            filler(child, formatName, seenSlots, log).ifPresent(parsed::add);
+            filler(child, formatName, capacity, seenSlots, log).ifPresent(parsed::add);
         }
         return parsed;
     }
 
     private static Optional<TablistFiller> filler(
-            ConfigurationNode node, String formatName, Set<Integer> seenSlots, Logger log) {
+            ConfigurationNode node, String formatName, int capacity, Set<Integer> seenSlots, Logger log) {
         int slot = node.node("slot").getInt(0);
         String text = node.node("text").getString("");
         if (slot <= 0 || text.isBlank()) {
             log.warn("tablist_filler_skipped format={} slot={} reason=invalid-slot-or-text", formatName, slot);
+            return Optional.empty();
+        }
+        if (slot > capacity) {
+            // A slot past the grid wraps onto an in-grid cell in ROWS mode (translateSlot is a bijection only within
+            // the
+            // grid), so two fillers would collide on one client cell. Reject it with the same clear operator feedback
+            // as
+            // a duplicate slot rather than silently painting one row over another.
+            log.warn(
+                    "tablist_filler_skipped format={} slot={} reason=slot-out-of-grid capacity={}",
+                    formatName,
+                    slot,
+                    capacity);
             return Optional.empty();
         }
         if (!seenSlots.add(slot)) {

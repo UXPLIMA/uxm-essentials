@@ -279,6 +279,72 @@ class TablistContentCodecTest {
     }
 
     @Test
+    void rejectsAnOutOfGridFillerSlotButKeepsInGridSlots(@TempDir Path dir) throws Exception {
+        // In ROWS mode an out-of-grid slot wraps onto an in-grid cell (raw slot 2 and 81 both map to cell 21 in a 4x20
+        // grid), so two fillers would collide on one client cell. The codec bounds the slot to the grid capacity
+        // (4 columns x rows) and rejects + logs the out-of-range one, exactly like the duplicate-slot guard.
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default {
+                    condition = ""
+                    priority = 0
+                    header = [ "x" ]
+                    layout {
+                      direction = "ROWS"
+                      rows = 20
+                      fillers = [
+                        { slot = 2, text = "<gold>in-grid" }
+                        { slot = 81, text = "<gold>out-of-grid" }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, log);
+
+        TablistLayout layout = select(parsed, n -> true, "world").layout();
+        // Only the in-grid slot 2 survives; the out-of-grid slot 81 (capacity is 4x20 = 80) is dropped, not collided.
+        assertThat(layout.fillers()).hasSize(1);
+        assertThat(layout.fillers().get(0).slot()).isEqualTo(2);
+        assertThat(log.warnings)
+                .anyMatch(w ->
+                        w.contains("tablist_filler_skipped") && w.contains("slot-out-of-grid") && w.contains("81"));
+    }
+
+    @Test
+    void acceptsTheLastInGridSlotAndRejectsTheFirstOutOfGridSlot(@TempDir Path dir) throws Exception {
+        // The boundary: slot 80 is the last cell of a 4x20 grid (kept), slot 81 is the first past it (rejected).
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default {
+                    condition = ""
+                    priority = 0
+                    header = [ "x" ]
+                    layout {
+                      rows = 20
+                      fillers = [
+                        { slot = 80, text = "<gold>last" }
+                        { slot = 81, text = "<gold>over" }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, log);
+
+        TablistLayout layout = select(parsed, n -> true, "world").layout();
+        assertThat(layout.fillers()).extracting(TablistFiller::slot).containsExactly(80);
+    }
+
+    @Test
     void aFormatWithNoLayoutCarriesTheEmptyLayout(@TempDir Path dir) throws Exception {
         ConfigurationNode root = load(
                 dir,
