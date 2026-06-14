@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldModule;
 import com.uxplima.uxmessentials.kits.application.KitsModule;
 import com.uxplima.uxmessentials.messaging.application.MessagingModule;
 import com.uxplima.uxmessentials.moderation.application.ModerationModule;
+import com.uxplima.uxmessentials.nametags.application.NametagsModule;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
@@ -115,6 +116,12 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // optional Discord jar can redeem a code with no compile-time link. Like the steady-state features it ships
         // ENABLED, so it lands last after vote.
         delegate.register(new DiscordlinkModule());
+        // nametags is the 19th context — a per-wearer above-head TextDisplay nametag rendered on the Scheduler refresh
+        // timer over uxmLib's native-display hologram stack. It soft-couples to presence (vanish-aware viewer culling
+        // through the canSee graph, degrading to "everyone can see everyone" when presence is off), so it carries no
+        // hard dependency edge, and like scoreboard/tablist it ships DISABLED by default (its formats are operator
+        // data), so it wires nothing until enabled in modules.conf. It lands last after discordlink.
+        delegate.register(new NametagsModule());
         // The shared kernel is not a module and never appears here.
     }
 

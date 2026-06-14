@@ -66,6 +66,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("tablist"))).isPresent();
         assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
         assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -85,7 +86,8 @@ class FeatureModuleRegistryDriftTest {
                         "scoreboard",
                         "tablist",
                         "vote",
-                        "discordlink");
+                        "discordlink",
+                        "nametags");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -382,14 +384,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void discordlinkIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+    void discordlinkShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule discordlink = registry.byId(ModuleId.of("discordlink"))
                 .orElseThrow(() -> new AssertionError("discordlink is not registered"));
 
-        // discordlink is the 18th context — Discord account linking — registered last after the seventeen prior
-        // modules.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("discordlink");
+        // discordlink is the 18th context — Discord account linking — registered after the seventeen prior modules.
+        // The later nametags context now lands last, so discordlink must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
 
         // It ships ENABLED (a steady-state feature): with no modules.conf override it is on, and disabling exactly
         // discordlink removes only it while every sibling stays on.
@@ -412,6 +414,36 @@ class FeatureModuleRegistryDriftTest {
                 discordlink.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactlyInAnyOrder("discordlink", "discordunlink");
         assertThat(discordlink.migrations()).isEmpty();
+    }
+
+    @Test
+    void nametagsIsTheLastModuleShipsDisabledAndPublishesNoCommandSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule nametags = registry.byId(ModuleId.of("nametags"))
+                .orElseThrow(() -> new AssertionError("nametags is not registered"));
+
+        // nametags is the 19th context — a per-wearer above-head TextDisplay nametag on the Scheduler refresh timer —
+        // registered last after the eighteen prior modules.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("nametags");
+
+        // It ships DISABLED (like scoreboard/tablist, its formats are operator data): with no modules.conf override it
+        // is absent from the enabled set while every steady-state sibling stays on. Explicitly enabling exactly it
+        // brings only it on; disabling it leaves every sibling untouched.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).doesNotContain("nametags");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps", "discordlink");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.nametags.enabled", true))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(on).contains("nametags", "teleport", "holograms");
+
+        // The nametag is always-on for every wearer when enabled — there is no per-player visibility toggle — so it
+        // publishes no command, and it persists nothing (the formats are config-authored), so it declares no
+        // MigrationSet.
+        assertThat(nametags.commands()).isEmpty();
+        assertThat(nametags.migrations()).isEmpty();
     }
 
     @Test

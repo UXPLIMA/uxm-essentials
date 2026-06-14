@@ -45,6 +45,7 @@ import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
+import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
@@ -337,6 +338,8 @@ public final class PluginModule {
             wireVote(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
             wireDiscordlink(plugin, ctx, persistence, resources);
+        } else if (module.id().equals(ModuleId.of("nametags"))) {
+            wireNametags(plugin, ctx, resources);
         }
     }
 
@@ -607,6 +610,21 @@ public final class PluginModule {
         // command. The renderer dogfoods uxmlib-hud's Tablist; the render timer on the Scheduler port is stopped and
         // every active header/footer cleared on disable.
         TablistWiring.Wired wired = TablistWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
+    }
+
+    private static void wireNametags(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // nametags persists nothing: the per-wearer formats are config-authored under modules/nametags/config.conf. It
+        // soft-couples to presence (vanish-aware viewer culling through Bukkit's canSee graph, degrading to "everyone
+        // can see everyone" with presence off), so nothing is captured for a later context and there is no hard edge.
+        // The nametag is always-on (no per-player toggle) so it publishes no command. The renderer spawns a
+        // viewer-restricted TextDisplay per wearer over uxmLib's native-display stack; the render timer on the
+        // Scheduler port is stopped and every spawned nametag despawned on disable so a disable/reload leaves no
+        // orphan.
+        NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
