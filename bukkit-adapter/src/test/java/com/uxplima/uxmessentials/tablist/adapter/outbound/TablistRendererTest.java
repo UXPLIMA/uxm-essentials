@@ -177,10 +177,78 @@ class TablistRendererTest {
         assertThat(plain(player.footer())).isEqualTo("Foot: OFF");
     }
 
-    /** A PlayerMock that records the header/footer components handed to {@code sendPlayerListHeaderAndFooter}. */
+    @Test
+    void aNameOnlyFormatDoesNotBlankTheHeaderOrFooterButAppliesTheName() {
+        // A format with an EMPTY header AND footer must NOT call sendPlayerListHeaderAndFooter at all — uxmLib's
+        // Tablist.set sends both together, so sending an empty pair would wipe whatever vanilla or another plugin set.
+        // The send count being zero is the observable proof the tab header/footer was left untouched.
+        CapturingPlayerMock player = new CapturingPlayerMock(server, "nameonly");
+        server.addPlayer(player);
+        TablistRenderer renderer =
+                renderer(new TablistFormatConfig(List.of(nameOnlyFormat("default", "<gold>{player}", 42))));
+
+        renderer.renderFor(player);
+
+        assertThat(player.sendCount()).isZero();
+        // The name and order still apply — a name-only/order-only format is fully functional.
+        assertThat(plain(player.playerListName())).isEqualTo(player.getName());
+        assertThat(player.getPlayerListOrder()).isEqualTo(42);
+    }
+
+    @Test
+    void switchingFromAHeaderFormatToANameOnlyFormatClearsTheRenderersHeaderFooter() {
+        // A player who had a header-having format and then switches to a name-only one must have THIS renderer's
+        // header/footer cleared (an empty pair) rather than left stale — the second send is the clear.
+        CapturingPlayerMock player = new CapturingPlayerMock(server, "switcher");
+        server.addPlayer(player);
+        AtomicReference<TablistFormatConfig> ref =
+                new AtomicReference<>(new TablistFormatConfig(List.of(new TablistFormat(
+                        "header",
+                        DisplayCondition.always(),
+                        0,
+                        new TablistContent(
+                                List.of("<gold>Welcome"), List.of("<gray>footer"), Duration.ofSeconds(1L), Set.of()),
+                        Optional.of("<gold>{player}"),
+                        OptionalInt.of(5)))));
+        TablistRenderer renderer = new TablistRenderer(ref::get, new AnimationRegistry(List.of()));
+
+        renderer.renderFor(player);
+        assertThat(player.sendCount()).isEqualTo(1);
+        assertThat(plain(player.header())).isEqualTo("Welcome");
+
+        // Switch to a name-only format: the renderer clears its own header/footer (sends an empty pair).
+        ref.set(new TablistFormatConfig(List.of(nameOnlyFormat("default", "<aqua>{player}", 9))));
+        renderer.renderFor(player);
+
+        assertThat(player.sendCount()).isEqualTo(2);
+        assertThat(plain(player.header())).isEmpty();
+        assertThat(plain(player.footer())).isEmpty();
+    }
+
+    @Test
+    void aNameOnlyFormatLeavesAFreshPlayerUntouchedAcrossSteadyStateTicks() {
+        // A player who never had a header/footer from this renderer keeps zero sends across repeated paints of a
+        // name-only format — the renderer never blanks a tab it did not author.
+        CapturingPlayerMock player = new CapturingPlayerMock(server, "steady");
+        server.addPlayer(player);
+        TablistRenderer renderer =
+                renderer(new TablistFormatConfig(List.of(nameOnlyFormat("default", "<gold>{player}", 3))));
+
+        renderer.renderFor(player);
+        renderer.renderFor(player);
+
+        assertThat(player.sendCount()).isZero();
+    }
+
+    /**
+     * A PlayerMock that records the header/footer components handed to {@code sendPlayerListHeaderAndFooter} and counts
+     * the sends. The stock PlayerMock leaves that call a no-op, so this is the only way to observe whether the renderer
+     * sent a header/footer at all — the send count distinguishes "never touched" from "cleared to empty".
+     */
     private static final class CapturingPlayerMock extends PlayerMock {
         private @Nullable Component lastHeader;
         private @Nullable Component lastFooter;
+        private int sendCount;
 
         CapturingPlayerMock(ServerMock server, String name) {
             super(server, name);
@@ -190,6 +258,7 @@ class TablistRendererTest {
         public void sendPlayerListHeaderAndFooter(Component header, Component footer) {
             this.lastHeader = header;
             this.lastFooter = footer;
+            this.sendCount++;
         }
 
         Component header() {
@@ -198,6 +267,10 @@ class TablistRendererTest {
 
         Component footer() {
             return java.util.Objects.requireNonNull(lastFooter, "footer not sent");
+        }
+
+        int sendCount() {
+            return sendCount;
         }
     }
 
@@ -218,6 +291,18 @@ class TablistRendererTest {
                 condition,
                 priority,
                 content,
+                Optional.ofNullable(nameFormat),
+                sortOrder == null ? OptionalInt.empty() : OptionalInt.of(sortOrder));
+    }
+
+    /** A format with an EMPTY header AND footer (a name-only / order-only format) plus the given name/order. */
+    private static TablistFormat nameOnlyFormat(String name, @Nullable String nameFormat, @Nullable Integer sortOrder) {
+        TablistContent blank = new TablistContent(List.of(), List.of(), Duration.ofSeconds(1L), Set.of());
+        return new TablistFormat(
+                name,
+                DisplayCondition.always(),
+                0,
+                blank,
                 Optional.ofNullable(nameFormat),
                 sortOrder == null ? OptionalInt.empty() : OptionalInt.of(sortOrder));
     }

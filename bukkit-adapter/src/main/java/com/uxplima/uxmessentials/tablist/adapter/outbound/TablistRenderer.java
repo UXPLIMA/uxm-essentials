@@ -34,6 +34,15 @@ import org.jspecify.annotations.NullMarked;
  * condition sees real values. When no format matches, the header/footer is cleared and any list name/order this renderer
  * applied is reset to vanilla.
  *
+ * <p><strong>Empty header/footer leave the tab untouched.</strong> A format may carry a name format and/or sort order
+ * but an empty header and footer (a name-only / order-only format) — a supported case. uxmLib's {@link Tablist#set}
+ * sends both the header and the footer in one native call, so blindly rendering an empty pair would wipe whatever header
+ * and footer vanilla or another plugin had set for the player. So the renderer only sends the header/footer when the
+ * selected format actually authors one, and tracks which players it last sent one to ({@link #appliedHeaderFooter}): a
+ * player who switches <em>from</em> a header-having format <em>to</em> a name-only one has the renderer's own
+ * header/footer cleared (it would otherwise go stale), while a player who never had one keeps the tab the operator never
+ * authored.
+ *
  * <p>A selected format contributes three things, each independent:
  *
  * <ul>
@@ -84,6 +93,16 @@ public final class TablistRenderer {
     /** The last sort order applied to each player, keyed by player UUID. An absent key means no order is applied. */
     private final Map<UUID, Integer> appliedOrder = new ConcurrentHashMap<>();
 
+    /**
+     * Whether this renderer currently has a header/footer applied for each player, keyed by player UUID. A {@code true}
+     * value means the last selected format authored a header/footer and we sent it, so a switch to a name-only/order-only
+     * format must clear it rather than leave it stale. An absent key means we never sent one, so a blank-content format
+     * leaves the player's tab untouched. A {@link ConcurrentHashMap} guards the connect-while-rendering race and keeps
+     * the project's "every player-keyed map is concurrent" convention; every mutation otherwise runs on the player's
+     * region/entity thread.
+     */
+    private final Map<UUID, Boolean> appliedHeaderFooter = new ConcurrentHashMap<>();
+
     public TablistRenderer(Supplier<TablistFormatConfig> formats, AnimationRegistry animations) {
         this.formats = Objects.requireNonNull(formats, "formats");
         this.animations = Objects.requireNonNull(animations, "animations");
@@ -108,7 +127,7 @@ public final class TablistRenderer {
             clear(player);
             return;
         }
-        renderHeaderFooter(player, content, tick);
+        applyHeaderFooter(player, content, tick);
         applyNameFormat(player, format.nameFormat(), tick);
         applyOrder(player, format.sortOrder());
     }
@@ -117,6 +136,7 @@ public final class TablistRenderer {
     public void clear(Player player) {
         Objects.requireNonNull(player, "player");
         tablist.clear(player);
+        appliedHeaderFooter.remove(player.getUniqueId());
         resetNameAndOrder(player);
     }
 
@@ -124,11 +144,27 @@ public final class TablistRenderer {
     public void forget(Player player) {
         Objects.requireNonNull(player, "player");
         tablist.clear(player);
+        appliedHeaderFooter.remove(player.getUniqueId());
         resetNameAndOrder(player);
     }
 
-    private void renderHeaderFooter(Player player, TablistContent content, long tick) {
+    /**
+     * Reconcile the player's tab header/footer with the selected format's {@link TablistContent}. An authored
+     * (non-blank) content is sent and the player marked as carrying this renderer's header/footer. A blank content (a
+     * name-only / order-only format) sends nothing — uxmLib's {@link Tablist#set} would otherwise wipe the player's
+     * existing header/footer — but if this renderer previously sent one for the player (a switch from a header-having
+     * format) it clears its own to avoid leaving a stale header/footer behind.
+     */
+    private void applyHeaderFooter(Player player, TablistContent content, long tick) {
+        UUID uuid = player.getUniqueId();
+        if (content.isBlank()) {
+            if (appliedHeaderFooter.remove(uuid) != null) {
+                tablist.clear(player);
+            }
+            return;
+        }
         tablist.set(player, joinLines(player, content.header(), tick), joinLines(player, content.footer(), tick));
+        appliedHeaderFooter.put(uuid, Boolean.TRUE);
     }
 
     /**
