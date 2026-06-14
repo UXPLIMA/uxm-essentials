@@ -95,6 +95,9 @@ class MuteBlocksMessageTest {
                 new AlwaysAccepts(),
                 new NoSpies(),
                 policy,
+                com.uxplima.uxmessentials.messaging.application.port.AfkStatus.NEVER,
+                new NoopMail(),
+                false,
                 new com.uxplima.uxmessentials.messaging.application.MessagingNotifier(
                         new KeyMessages(), new NoopSink()),
                 new NoopEvents(),
@@ -178,6 +181,35 @@ class MuteBlocksMessageTest {
         @Override
         public List<PlayerRef> activeSpies() {
             return List.of();
+        }
+    }
+
+    private static final class NoopMail implements com.uxplima.uxmessentials.messaging.application.port.MailRepository {
+        @Override
+        public com.uxplima.uxmessentials.messaging.domain.MailBox load(PlayerRef recipient) {
+            return com.uxplima.uxmessentials.messaging.domain.MailBox.empty(recipient);
+        }
+
+        @Override
+        public long unreadCount(PlayerRef recipient) {
+            return 0;
+        }
+
+        @Override
+        public com.uxplima.uxmessentials.messaging.domain.MailItem append(
+                com.uxplima.uxmessentials.messaging.domain.MailItem item) {
+            return item;
+        }
+
+        @Override
+        public void markAllRead(PlayerRef recipient) {}
+
+        @Override
+        public void clear(PlayerRef recipient) {}
+
+        @Override
+        public int deleteSentBefore(Instant cutoff) {
+            return 0;
         }
     }
 

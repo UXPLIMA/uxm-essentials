@@ -1,16 +1,22 @@
 package com.uxplima.uxmessentials.messaging.application;
 
 import java.time.Clock;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
+import com.uxplima.uxmessentials.messaging.application.port.AfkStatus;
 import com.uxplima.uxmessentials.messaging.application.port.ConversationStore;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
+import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreChannel;
 import com.uxplima.uxmessentials.messaging.domain.LastConversation;
+import com.uxplima.uxmessentials.messaging.domain.MailItem;
+import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.messaging.domain.event.PrivateMessageSent;
@@ -31,6 +37,22 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * <p>On delivery it echoes to the sender, delivers to the recipient, fans out to active socialspy staff,
  * records the reply target on <em>both</em> sides (either may {@code /reply}), and publishes
  * {@code PrivateMessageSent}. The reply path ({@link Reply}) shares this engine through {@link #deliver}.
+ *
+ * <p>Two presence-aware courtesies wrap that core flow. <strong>AFK notice:</strong> after a real delivery to
+ * an AFK target the sender is also told the target is away (the {@link AfkStatus} soft-couple), so they know
+ * not to expect a reply — AFK is a notice, never a block, and the message still delivers. The notice fires
+ * only on a genuine delivery, never on a silently-dropped ignore: telling the sender "they're AFK" there
+ * would leak that the (ignoring) target is online, breaking the ignore-is-not-observable contract.
+ * <strong>Offline → mail fallback:</strong> when the caller reports the target is offline and the
+ * {@code offlineToMail} policy is on, the message is stored as durable mail (the {@link MailRepository}
+ * append path {@link SendMail} uses) and the sender is told it became mail; with the policy off the existing
+ * {@code TARGET_OFFLINE} rejection stands.
+ *
+ * <p><strong>Vanish privacy is untouched.</strong> A vanished target the sender cannot see is resolved as
+ * "offline/unknown" at the command boundary ({@code MessagingCommandSupport#visibleTarget}), which never
+ * calls this use case for that target — so a hidden player is never routed to mail and their presence is
+ * never leaked. The offline → mail fallback applies only to a genuinely-offline target the adapter passes in
+ * with {@code targetOnline=false}; the existing not-found semantics for a hidden target are preserved exactly.
  */
 public final class SendMessage {
 
@@ -40,6 +62,9 @@ public final class SendMessage {
     private final MessageToggleStore toggles;
     private final SocialSpyStore socialSpy;
     private final MutePolicy mute;
+    private final AfkStatus afk;
+    private final MailRepository mail;
+    private final boolean offlineToMail;
     private final MessagingNotifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
@@ -51,6 +76,9 @@ public final class SendMessage {
             MessageToggleStore toggles,
             SocialSpyStore socialSpy,
             MutePolicy mute,
+            AfkStatus afk,
+            MailRepository mail,
+            boolean offlineToMail,
             MessagingNotifier notifier,
             DomainEventPublisher events,
             Clock clock) {
@@ -60,17 +88,52 @@ public final class SendMessage {
         this.toggles = Objects.requireNonNull(toggles, "toggles");
         this.socialSpy = Objects.requireNonNull(socialSpy, "socialSpy");
         this.mute = Objects.requireNonNull(mute, "mute");
+        this.afk = Objects.requireNonNull(afk, "afk");
+        this.mail = Objects.requireNonNull(mail, "mail");
+        this.offlineToMail = offlineToMail;
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Send {@code body} from {@code sender} to {@code target}, applying every gate. */
+    /**
+     * Send {@code body} from {@code sender} to an online {@code target}, applying every gate. Convenience for
+     * the common online case (and the {@link Reply} path, whose lookup only resolves online targets) — equal
+     * to {@link #send(PlayerRef, PlayerRef, MessageBody, boolean)} with {@code targetOnline=true}.
+     */
     public Result<Unit, MessagingError> send(PlayerRef sender, PlayerRef target, MessageBody body) {
+        return send(sender, target, body, true);
+    }
+
+    /**
+     * Send {@code body} from {@code sender} to {@code target}, applying every gate. When {@code targetOnline}
+     * is false the target is genuinely offline: with the offline-to-mail policy on the message is stored as
+     * mail and the sender is told; with it off the {@code TARGET_OFFLINE} rejection stands. (A vanished,
+     * unseeable target is reported as offline at the command boundary and never reaches here — see the class
+     * note on vanish privacy.)
+     */
+    public Result<Unit, MessagingError> send(
+            PlayerRef sender, PlayerRef target, MessageBody body, boolean targetOnline) {
         Objects.requireNonNull(sender, "sender");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(body, "body");
+        if (!targetOnline) {
+            return offline(sender, target, body);
+        }
         return deliver(sender, target, body);
+    }
+
+    private Result<Unit, MessagingError> offline(PlayerRef sender, PlayerRef target, MessageBody body) {
+        // A muted sender is gated even on the mail fallback, mirroring SendMail's mute gate.
+        if (mute.isMuted(sender)) {
+            return reject(sender, MessagingError.SENDER_MUTED);
+        }
+        if (!offlineToMail) {
+            return reject(sender, MessagingError.TARGET_OFFLINE);
+        }
+        mail.append(MailItem.compose(target, MailSender.player(sender), body, clock.instant()));
+        notifier.send(sender, MessagingMessageKey.MSG_SENT_TO_MAIL, Map.of("player", target.name()));
+        return Result.ok();
     }
 
     /**
@@ -106,9 +169,22 @@ public final class SendMessage {
     private void dispatch(PlayerRef sender, PlayerRef target, MessageBody body) {
         delivery.echoSent(sender, target, body);
         delivery.deliverMessage(sender, target, body);
+        notifyIfAfk(sender, target);
         fanOutSpies(sender, target, body);
         rememberBothSides(sender, target);
         events.publish(new PrivateMessageSent(sender, target, body, clock.instant()));
+    }
+
+    private void notifyIfAfk(PlayerRef sender, PlayerRef target) {
+        // Fired only on a real delivery, never on a silently-dropped ignore: an AFK notice there would reveal
+        // that the ignoring target is online, breaking the ignore-is-not-observable contract.
+        Optional<String> reason = afk.afkReasonOf(target);
+        if (reason.isPresent()) {
+            notifier.send(
+                    sender,
+                    MessagingMessageKey.MSG_TARGET_AFK,
+                    Map.of("player", target.name(), "reason", reason.get()));
+        }
     }
 
     private void fanOutSpies(PlayerRef sender, PlayerRef target, MessageBody body) {

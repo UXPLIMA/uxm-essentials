@@ -23,6 +23,8 @@ public enum MessagingMessageKey implements MessageKey {
     MSG_MUTED("msg.muted"),
     MSG_IGNORED("msg.ignored"),
     MSG_NO_REPLY_TARGET("msg.no-reply-target"),
+    MSG_TARGET_AFK("msg.target-afk"),
+    MSG_SENT_TO_MAIL("msg.sent-to-mail"),
 
     // /msgtoggle
     MSG_TOGGLE_ON("msg.toggle-on"),
@@ -52,6 +54,7 @@ public enum MessagingMessageKey implements MessageKey {
     MAIL_READ_ENTRY("mail.read.entry"),
     MAIL_EMPTY("mail.empty"),
     MAIL_CLEARED("mail.cleared"),
+    MAIL_SENDALL_DONE("mail.sendall"),
 
     // /helpop
     HELPOP_SENT("helpop.sent"),

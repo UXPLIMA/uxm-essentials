@@ -13,8 +13,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.uxplima.uxmessentials.messaging.application.port.AfkStatus;
 import com.uxplima.uxmessentials.messaging.application.port.ConversationStore;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
+import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
@@ -23,6 +25,8 @@ import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreList;
 import com.uxplima.uxmessentials.messaging.domain.IgnoreScope;
 import com.uxplima.uxmessentials.messaging.domain.LastConversation;
+import com.uxplima.uxmessentials.messaging.domain.MailBox;
+import com.uxplima.uxmessentials.messaging.domain.MailId;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
@@ -55,10 +59,30 @@ class MessagingCommandPathTest {
     private FakeToggleStore toggles;
     private FakeSocialSpy socialSpy;
     private SettableMute mute;
+    private SettableAfk afk;
+    private CapturingMail mail;
+    private CapturingSink senderNotices;
     private RecordingEvents events;
     private MutableClock clock;
     private SendMessage sendMessage;
     private Reply reply;
+
+    private SendMessage sendMessageWith(boolean offlineToMail) {
+        MessagingNotifier notifier = new MessagingNotifier(new KeyMessages(), senderNotices);
+        return new SendMessage(
+                delivery,
+                ignores,
+                conversations,
+                toggles,
+                socialSpy,
+                mute,
+                afk,
+                mail,
+                offlineToMail,
+                notifier,
+                events,
+                clock);
+    }
 
     @BeforeEach
     void setUp() {
@@ -68,11 +92,13 @@ class MessagingCommandPathTest {
         toggles = new FakeToggleStore();
         socialSpy = new FakeSocialSpy();
         mute = new SettableMute();
+        afk = new SettableAfk();
+        mail = new CapturingMail();
+        senderNotices = new CapturingSink();
         events = new RecordingEvents();
         clock = new MutableClock(Instant.parse("2026-05-30T12:00:00Z"));
         MessagingNotifier notifier = new MessagingNotifier(new KeyMessages(), new NoopSink());
-        sendMessage =
-                new SendMessage(delivery, ignores, conversations, toggles, socialSpy, mute, notifier, events, clock);
+        sendMessage = sendMessageWith(false);
         reply = new Reply(
                 sendMessage,
                 conversations,
@@ -178,6 +204,73 @@ class MessagingCommandPathTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(MessagingError.NO_REPLY_TARGET);
         assertThat(delivery.delivered).isEmpty();
+    }
+
+    @Test
+    void messagingAnAfkTargetDeliversAndNotifiesTheSender() {
+        afk.reasons.put(bob.uuid(), "lunch");
+
+        var result = sendMessage.send(alice, bob, hello);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(delivery.delivered).containsExactly("Bob:hello"); // AFK is a notice, not a block
+        assertThat(senderNotices.keys).contains(MessagingMessageKey.MSG_TARGET_AFK.key());
+    }
+
+    @Test
+    void messagingANonAfkTargetSendsNoAfkNotice() {
+        var result = sendMessage.send(alice, bob, hello);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(senderNotices.keys).doesNotContain(MessagingMessageKey.MSG_TARGET_AFK.key());
+    }
+
+    @Test
+    void anAfkTargetWhoIgnoresTheSenderGetsNoAfkNoticeLeak() {
+        ignores.lists.put(bob.uuid(), IgnoreList.empty(bob).ignore(alice, IgnoreScope.ALL));
+        afk.reasons.put(bob.uuid(), "lunch");
+
+        var result = sendMessage.send(alice, bob, hello);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(delivery.delivered).isEmpty(); // silently dropped
+        // No AFK notice — it would reveal the ignoring target is online.
+        assertThat(senderNotices.keys).doesNotContain(MessagingMessageKey.MSG_TARGET_AFK.key());
+    }
+
+    @Test
+    void anOfflineTargetIsStoredAsMailWhenTheFallbackIsOn() {
+        SendMessage offlineToMail = sendMessageWith(true);
+
+        var result = offlineToMail.send(alice, bob, hello, false);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(mail.appended).hasSize(1);
+        MailItem stored = mail.appended.get(0);
+        assertThat(stored.recipient()).isEqualTo(bob);
+        assertThat(stored.body()).isEqualTo(hello);
+        assertThat(stored.sender().name()).isEqualTo(alice.name());
+        assertThat(senderNotices.keys).contains(MessagingMessageKey.MSG_SENT_TO_MAIL.key());
+        assertThat(delivery.delivered).isEmpty(); // not delivered live — the target is offline
+    }
+
+    @Test
+    void anOfflineTargetRejectsAsBeforeWhenTheFallbackIsOff() {
+        var result = sendMessage.send(alice, bob, hello, false); // fallback off (default)
+
+        assertThat(result.errorOrThrow()).isEqualTo(MessagingError.TARGET_OFFLINE);
+        assertThat(mail.appended).isEmpty();
+    }
+
+    @Test
+    void aMutedSenderCannotMailAnOfflineTarget() {
+        mute.muted.add(alice.uuid());
+        SendMessage offlineToMail = sendMessageWith(true);
+
+        var result = offlineToMail.send(alice, bob, hello, false);
+
+        assertThat(result.errorOrThrow()).isEqualTo(MessagingError.SENDER_MUTED);
+        assertThat(mail.appended).isEmpty();
     }
 
     // --- fakes -------------------------------------------------------------------------------------------
@@ -314,6 +407,47 @@ class MessagingCommandPathTest {
         }
     }
 
+    private static final class SettableAfk implements AfkStatus {
+        final ConcurrentHashMap<UUID, String> reasons = new ConcurrentHashMap<>();
+
+        @Override
+        public Optional<String> afkReasonOf(PlayerRef who) {
+            return Optional.ofNullable(reasons.get(who.uuid()));
+        }
+    }
+
+    private static final class CapturingMail implements MailRepository {
+        final List<MailItem> appended = new ArrayList<>();
+
+        @Override
+        public MailBox load(PlayerRef recipient) {
+            return MailBox.empty(recipient);
+        }
+
+        @Override
+        public long unreadCount(PlayerRef recipient) {
+            return 0;
+        }
+
+        @Override
+        public MailItem append(MailItem item) {
+            MailItem stored = item.withId(MailId.of(appended.size() + 1L));
+            appended.add(stored);
+            return stored;
+        }
+
+        @Override
+        public void markAllRead(PlayerRef recipient) {}
+
+        @Override
+        public void clear(PlayerRef recipient) {}
+
+        @Override
+        public int deleteSentBefore(Instant cutoff) {
+            return 0;
+        }
+    }
+
     private record OnlineLookup(PlayerRef online) implements PlayerLookup {
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
@@ -350,6 +484,16 @@ class MessagingCommandPathTest {
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    /** Captures the message keys delivered to a viewer; {@link KeyMessages} renders each key to its own name. */
+    private static final class CapturingSink implements MessageSink {
+        final List<String> keys = new ArrayList<>();
+
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            keys.add(renderedText);
+        }
     }
 
     private static final class MutableClock extends Clock {
