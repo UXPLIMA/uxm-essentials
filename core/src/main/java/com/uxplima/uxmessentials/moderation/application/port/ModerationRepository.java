@@ -105,4 +105,10 @@ public interface ModerationRepository {
 
     /** Lazily materialize {@code target}'s seen row so an offline FK-bearing write never breaks integrity. */
     void ensureUserExists(PlayerRef target, Instant at);
+
+    /** Whether the server is currently locked down (only bypass-perm holders may join). Survives restart. */
+    boolean isLockedDown();
+
+    /** Set the server lockdown flag; persisted so a restart re-applies it until an operator lifts it. */
+    void setLockedDown(boolean enabled);
 }

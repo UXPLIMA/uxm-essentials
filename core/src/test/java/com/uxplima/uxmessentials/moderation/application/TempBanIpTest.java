@@ -49,10 +49,10 @@ class TempBanIpTest {
         });
         // Before the hour is up, the login listener refuses a connection from the banned address.
         LoginEnforcement gate = enforcement(repository, NOW.plus(Duration.ofMinutes(30)));
-        assertThat(gate.evaluate(OFFENDER, IP).allowed()).isFalse();
+        assertThat(gate.evaluate(OFFENDER, IP, false).allowed()).isFalse();
         // After the hour, the same address is admitted again — the ban auto-expired.
         LoginEnforcement later = enforcement(repository, NOW.plus(Duration.ofHours(2)));
-        assertThat(later.evaluate(OFFENDER, IP).allowed()).isTrue();
+        assertThat(later.evaluate(OFFENDER, IP, false).allowed()).isTrue();
     }
 
     @Test
@@ -65,7 +65,7 @@ class TempBanIpTest {
         assertThat(result.isErr()).isTrue();
         assertThat(result.errorOrThrow()).isEqualTo(ModerationError.BAD_DURATION);
         // Nothing was written: the address is still admitted.
-        assertThat(enforcement(repository, NOW).evaluate(OFFENDER, IP).allowed())
+        assertThat(enforcement(repository, NOW).evaluate(OFFENDER, IP, false).allowed())
                 .isTrue();
         // A refused tempbanip records no history row.
         assertThat(history.appended).isEmpty();

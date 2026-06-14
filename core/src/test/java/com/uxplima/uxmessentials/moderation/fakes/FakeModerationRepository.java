@@ -35,6 +35,7 @@ public final class FakeModerationRepository implements ModerationRepository {
     private final Map<String, IpBan> ipBans = new ConcurrentHashMap<>();
     private final Map<UUID, SeenRecord> seen = new ConcurrentHashMap<>();
     public final List<UUID> ensured = new ArrayList<>();
+    private volatile boolean lockedDown;
 
     @Override
     public ModerationProfile load(PlayerRef target) {
@@ -174,6 +175,16 @@ public final class FakeModerationRepository implements ModerationRepository {
     public void ensureUserExists(PlayerRef target, Instant at) {
         ensured.add(target.uuid());
         seen.putIfAbsent(target.uuid(), SeenRecord.firstJoin(target, Optional.empty(), at));
+    }
+
+    @Override
+    public boolean isLockedDown() {
+        return lockedDown;
+    }
+
+    @Override
+    public void setLockedDown(boolean enabled) {
+        this.lockedDown = enabled;
     }
 
     private static <V> void upsert(Map<UUID, V> map, UUID key, V value, boolean delete) {

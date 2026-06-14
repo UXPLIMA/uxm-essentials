@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.moderation.application.ListBans;
 import com.uxplima.uxmessentials.moderation.application.ListJailed;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
 import com.uxplima.uxmessentials.moderation.application.ListMutes;
+import com.uxplima.uxmessentials.moderation.application.Lockdown;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
@@ -226,6 +227,7 @@ public final class ModerationWiring {
                 .commandSpy(new CommandSpy(commandSpyStore, notifier))
                 .jailCountdown(new JailCountdown(repository, sanctionPort, audit, kernel.events(), clock))
                 .loginEnforcement(new LoginEnforcement(repository, notifier, audit, clock))
+                .lockdown(new Lockdown(repository, notifier, broadcast, audit))
                 .repository(repository)
                 .players(kernel.playerLookup())
                 .targets(new BukkitTargetResolver(plugin.getServer()))

@@ -117,6 +117,7 @@ public final class ModerationCommands {
                         (a, t) -> services.seen().seenIp(a, t)),
                 new AltsCommand(services, messages, sink, scheduler),
                 new CommandSpyCommand(services, messages, sink),
+                new LockdownCommand(services, messages, sink, scheduler),
                 new SudoCommand(scheduler, messages, sink));
     }
 

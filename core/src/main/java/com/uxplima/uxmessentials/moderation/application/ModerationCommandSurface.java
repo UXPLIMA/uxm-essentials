@@ -68,6 +68,7 @@ final class ModerationCommandSurface {
                 spec("seenip", "uxmessentials.moderation.seen", "Show a player's last IP and alts"),
                 spec("alts", "uxmessentials.moderation.seen", "List accounts sharing a player's IP"),
                 spec("commandspy", "uxmessentials.moderation.commandspy", "Watch the commands players run"),
+                spec("lockdown", "uxmessentials.moderation.lockdown", "Lock the server to bypass holders only"),
                 spec("sudo", "uxmessentials.moderation.sudo", "Run a command as another player"));
     }
 

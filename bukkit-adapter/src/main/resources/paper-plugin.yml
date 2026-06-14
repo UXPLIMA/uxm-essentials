@@ -531,6 +531,12 @@ permissions:
   uxmessentials.moderation.commandspy:
     description: '/commandspy (/cspy) to watch the commands other players run.'
     default: op
+  uxmessentials.moderation.lockdown:
+    description: '/lockdown [on|off] — refuse every login except holders of the lockdown bypass; the flag survives restart.'
+    default: op
+  uxmessentials.moderation.lockdown.bypass:
+    description: 'Join the server while it is locked down (/lockdown). Held by staff who must stay reachable during a lockdown.'
+    default: op
   uxmessentials.moderation.sudo:
     description: '/sudo <player> <command> — run a command as another player.'
     default: op

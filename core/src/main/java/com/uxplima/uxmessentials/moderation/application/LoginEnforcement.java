@@ -18,8 +18,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * The ban-on-login enforcement the {@code PlayerLoginEvent} (priority HIGHEST) listener consults before
- * player data loads (docs/09-deployment.md). For the connecting UUID/IP it checks, in order: an active
- * per-UUID tempban, then an active IP ban on the connecting address. Either match is a kick-before-data-load.
+ * player data loads (docs/09-deployment.md). For the connecting UUID/IP it checks, in order: a server-wide
+ * lockdown (the broadest gate — only bypass-perm holders pass), then an active per-UUID tempban, then an
+ * active IP ban on the connecting address. Any match is a kick-before-data-load.
  * Independently it runs alt-detection — the other UUIDs that have connected from this IP — and emits
  * {@code event=alt_detected} (allow/kick) for the audit trail, whether or not the login is refused.
  *
@@ -42,11 +43,20 @@ public final class LoginEnforcement {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Decide whether {@code who} connecting from {@code ip} may log in, recording seen and alt-detection. */
-    public Decision evaluate(PlayerRef who, String ip) {
+    /**
+     * Decide whether {@code who} connecting from {@code ip} may log in, recording seen and alt-detection.
+     * {@code hasBypass} is whether the connecting player holds {@code uxmessentials.moderation.lockdown.bypass};
+     * the listener resolves it from the live {@code Player} (a permission cannot be read for a connecting player
+     * inside this pure use case) and threads it in so a locked-down server refuses every login but theirs.
+     */
+    public Decision evaluate(PlayerRef who, String ip, boolean hasBypass) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(ip, "ip");
         Instant now = clock.instant();
+        if (repository.isLockedDown() && !hasBypass) {
+            recordAndDetect(who, ip, now, true);
+            return Decision.deny(render(who, ModerationMessageKey.MOD_LOCKDOWN_KICK, Map.of()));
+        }
         Optional<Decision> tempban = tempbanKick(who, now);
         if (tempban.isPresent()) {
             recordAndDetect(who, ip, now, true);

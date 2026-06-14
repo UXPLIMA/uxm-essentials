@@ -110,6 +110,11 @@ public final class RecordingModerationAudit implements ModerationAudit {
         lines.add(new Line("jail_location_delete", true));
     }
 
+    @Override
+    public void lockdown(UUID actor, boolean enabled) {
+        lines.add(new Line("server_lockdown", true));
+    }
+
     /** A recorded audit line, keyed by its event name and ok flag so a test can match it. */
     public sealed interface Recorded permits Line, ClearLine {
         String event();

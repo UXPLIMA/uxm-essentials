@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.moderation.application.ListBans;
 import com.uxplima.uxmessentials.moderation.application.ListJailed;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
 import com.uxplima.uxmessentials.moderation.application.ListMutes;
+import com.uxplima.uxmessentials.moderation.application.Lockdown;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
@@ -87,6 +88,7 @@ public final class ModerationServices {
     private final CommandSpy commandSpy;
     private final JailCountdown jailCountdown;
     private final LoginEnforcement loginEnforcement;
+    private final Lockdown lockdown;
     private final ModerationRepository repository;
     private final PlayerLookup players;
     private final TargetResolver targets;
@@ -128,6 +130,7 @@ public final class ModerationServices {
         this.commandSpy = Objects.requireNonNull(builder.commandSpy, "commandSpy");
         this.jailCountdown = Objects.requireNonNull(builder.jailCountdown, "jailCountdown");
         this.loginEnforcement = Objects.requireNonNull(builder.loginEnforcement, "loginEnforcement");
+        this.lockdown = Objects.requireNonNull(builder.lockdown, "lockdown");
         this.repository = Objects.requireNonNull(builder.repository, "repository");
         this.players = Objects.requireNonNull(builder.players, "players");
         this.targets = Objects.requireNonNull(builder.targets, "targets");
@@ -277,6 +280,10 @@ public final class ModerationServices {
         return loginEnforcement;
     }
 
+    public Lockdown lockdown() {
+        return lockdown;
+    }
+
     public ModerationRepository repository() {
         return repository;
     }
@@ -328,6 +335,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable CommandSpy commandSpy;
         private @org.jspecify.annotations.Nullable JailCountdown jailCountdown;
         private @org.jspecify.annotations.Nullable LoginEnforcement loginEnforcement;
+        private @org.jspecify.annotations.Nullable Lockdown lockdown;
         private @org.jspecify.annotations.Nullable ModerationRepository repository;
         private @org.jspecify.annotations.Nullable PlayerLookup players;
         private @org.jspecify.annotations.Nullable TargetResolver targets;
@@ -509,6 +517,11 @@ public final class ModerationServices {
 
         Builder loginEnforcement(LoginEnforcement value) {
             this.loginEnforcement = value;
+            return this;
+        }
+
+        Builder lockdown(Lockdown value) {
+            this.lockdown = value;
             return this;
         }
 

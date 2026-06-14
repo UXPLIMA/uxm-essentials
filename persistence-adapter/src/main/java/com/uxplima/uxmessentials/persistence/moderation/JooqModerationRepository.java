@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.persistence.moderation;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationIpBans.MODERATION_IP_BANS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationJails.MODERATION_JAILS;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationLockdown.MODERATION_LOCKDOWN;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationMutes.MODERATION_MUTES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSeen.MODERATION_SEEN;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationTempbans.MODERATION_TEMPBANS;
@@ -219,5 +220,25 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(at, "at");
         write(dsl -> ModerationWrites.ensureSeenRow(dsl, target, at));
+    }
+
+    private static final short LOCKDOWN_ROW = (short) 0;
+
+    @Override
+    public boolean isLockedDown() {
+        return read(dsl -> Optional.ofNullable(dsl.select(MODERATION_LOCKDOWN.ENABLED)
+                        .from(MODERATION_LOCKDOWN)
+                        .where(MODERATION_LOCKDOWN.ID.eq(LOCKDOWN_ROW))
+                        .fetchOne(MODERATION_LOCKDOWN.ENABLED))
+                .map(flag -> flag != 0)
+                .orElse(false));
+    }
+
+    @Override
+    public void setLockedDown(boolean enabled) {
+        write(dsl -> dsl.update(MODERATION_LOCKDOWN)
+                .set(MODERATION_LOCKDOWN.ENABLED, (short) (enabled ? 1 : 0))
+                .where(MODERATION_LOCKDOWN.ID.eq(LOCKDOWN_ROW))
+                .execute());
     }
 }

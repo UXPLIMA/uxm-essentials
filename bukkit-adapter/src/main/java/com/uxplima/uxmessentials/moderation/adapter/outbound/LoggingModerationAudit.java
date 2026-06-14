@@ -168,6 +168,11 @@ public final class LoggingModerationAudit implements ModerationAudit {
         audit.info("event=jail_location_delete actor={} jail={} ok=true", actor.uuid(), jail);
     }
 
+    @Override
+    public void lockdown(UUID actor, boolean enabled) {
+        audit.info("event=server_lockdown actor={} enabled={} ok=true", actor, enabled);
+    }
+
     private static String quote(Optional<String> reason) {
         String value = reason.orElse("");
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";

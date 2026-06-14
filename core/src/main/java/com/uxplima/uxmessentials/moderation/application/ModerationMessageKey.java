@@ -143,6 +143,11 @@ public enum ModerationMessageKey implements MessageKey {
     // /sudo
     SUDO_DONE("moderation.sudo.done"),
 
+    // /lockdown — refuse every login except bypass-perm holders; the kick line is the disconnect screen
+    MOD_LOCKDOWN_ENABLED("moderation.lockdown.enabled"),
+    MOD_LOCKDOWN_DISABLED("moderation.lockdown.disabled"),
+    MOD_LOCKDOWN_KICK("moderation.lockdown.kick"),
+
     // /seen, /seenip
     SEEN_REPORT("moderation.seen.report"),
     SEEN_NEVER("moderation.seen.never"),

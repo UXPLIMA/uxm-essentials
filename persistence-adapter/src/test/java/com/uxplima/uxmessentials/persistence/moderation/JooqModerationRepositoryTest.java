@@ -165,6 +165,18 @@ class JooqModerationRepositoryTest {
     }
 
     @Test
+    void lockdownFlagDefaultsOffAndRoundTripsBothWays() {
+        // The V33 seed row makes a fresh database read not-locked without an upsert.
+        assertThat(repository.isLockedDown()).isFalse();
+
+        repository.setLockedDown(true);
+        assertThat(repository.isLockedDown()).isTrue();
+
+        repository.setLockedDown(false);
+        assertThat(repository.isLockedDown()).isFalse();
+    }
+
+    @Test
     void ensureUserExistsMaterializesAnOfflineRowOnce() {
         repository.ensureUserExists(alice, T0);
         repository.ensureUserExists(alice, T0.plusSeconds(99));

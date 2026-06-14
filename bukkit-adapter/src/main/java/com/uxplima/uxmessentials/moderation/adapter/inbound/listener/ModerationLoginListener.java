@@ -15,10 +15,12 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The ban-on-login enforcement at {@code PlayerLoginEvent} priority HIGHEST (docs/09-deployment.md): for the
- * connecting player it asks {@link LoginEnforcement} whether an active tempban or IP ban bars the login, and
- * disallows the connection <em>before</em> player data loads (kick-before-data-load) when it does. The
- * connecting IP is read from the event's real address, so the IP ban and the alt-detection check are real
- * lookups, not a UUID-only gate.
+ * connecting player it asks {@link LoginEnforcement} whether a server lockdown, an active tempban or an IP ban
+ * bars the login, and disallows the connection <em>before</em> player data loads (kick-before-data-load) when
+ * it does. The connecting IP is read from the event's real address, so the IP ban and the alt-detection check
+ * are real lookups, not a UUID-only gate. The lockdown bypass is a live permission read off the connecting
+ * {@code Player} — the one place that permission can be resolved before data load — passed into the pure use
+ * case so it stays free of the Bukkit permission API.
  *
  * <p>HIGHEST runs after lower-priority listeners but before MONITOR, so a plugin observing the final decision
  * still sees our disallow; we never override an already-denied login (a kick set by another plugin stays).
@@ -29,6 +31,8 @@ import org.jspecify.annotations.NullMarked;
 @SuppressWarnings("deprecation")
 @NullMarked
 public final class ModerationLoginListener implements Listener {
+
+    private static final String LOCKDOWN_BYPASS = "uxmessentials.moderation.lockdown.bypass";
 
     private final LoginEnforcement enforcement;
 
@@ -44,7 +48,8 @@ public final class ModerationLoginListener implements Listener {
         PlayerRef who =
                 new PlayerRef(event.getPlayer().getUniqueId(), event.getPlayer().getName());
         String ip = event.getRealAddress().getHostAddress();
-        LoginEnforcement.Decision decision = enforcement.evaluate(who, ip);
+        boolean hasBypass = event.getPlayer().hasPermission(LOCKDOWN_BYPASS);
+        LoginEnforcement.Decision decision = enforcement.evaluate(who, ip, hasBypass);
         if (!decision.allowed()) {
             event.disallow(
                     PlayerLoginEvent.Result.KICK_BANNED,

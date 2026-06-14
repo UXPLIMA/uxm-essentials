@@ -125,6 +125,16 @@ abstract class UnsupportedModerationRepository implements ModerationRepository {
         throw unsupported();
     }
 
+    @Override
+    public boolean isLockedDown() {
+        throw unsupported();
+    }
+
+    @Override
+    public void setLockedDown(boolean enabled) {
+        throw unsupported();
+    }
+
     private static UnsupportedOperationException unsupported() {
         return new UnsupportedOperationException("the check commands read only loadTempban/loadMute");
     }

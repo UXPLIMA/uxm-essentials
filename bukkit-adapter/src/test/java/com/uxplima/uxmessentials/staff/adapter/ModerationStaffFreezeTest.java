@@ -188,5 +188,8 @@ class ModerationStaffFreezeTest {
 
         @Override
         public void jailLocationRemoved(PlayerRef actor, String jail) {}
+
+        @Override
+        public void lockdown(UUID actor, boolean enabled) {}
     }
 }

@@ -1,0 +1,52 @@
+package com.uxplima.uxmessentials.moderation.application;
+
+import java.util.Map;
+import java.util.Objects;
+
+import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
+import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+
+/**
+ * {@code /lockdown [on|off]}: flip whether the server refuses every login except holders of the bypass
+ * permission. The flag is the durable {@link ModerationRepository} row (it survives restart, the hard
+ * moderation invariant), so a server locked down before a crash stays locked down on the next boot until an
+ * operator lifts it. The login refusal itself lives in {@link LoginEnforcement}; this use case only flips the
+ * flag, tells the actor, and announces the change to the staff broadcast audience the way the other server-wide
+ * moderation actions do.
+ */
+public final class Lockdown {
+
+    private final ModerationRepository repository;
+    private final ModerationNotifier notifier;
+    private final SanctionBroadcast broadcast;
+    private final ModerationAudit audit;
+
+    public Lockdown(
+            ModerationRepository repository,
+            ModerationNotifier notifier,
+            SanctionBroadcast broadcast,
+            ModerationAudit audit) {
+        this.repository = Objects.requireNonNull(repository, "repository");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
+        this.audit = Objects.requireNonNull(audit, "audit");
+    }
+
+    /** Set the server lockdown flag, confirm to {@code actor} and announce the change to the broadcast audience. */
+    public void setLockdown(PlayerRef actor, boolean enabled) {
+        Objects.requireNonNull(actor, "actor");
+        repository.setLockedDown(enabled);
+        ModerationMessageKey key =
+                enabled ? ModerationMessageKey.MOD_LOCKDOWN_ENABLED : ModerationMessageKey.MOD_LOCKDOWN_DISABLED;
+        notifier.send(actor, key);
+        broadcast.announce(key, Map.of("actor", actor.name()));
+        audit.lockdown(actor.uuid(), enabled);
+    }
+
+    /** Whether the server is currently locked down. */
+    public boolean isLockedDown() {
+        return repository.isLockedDown();
+    }
+}
