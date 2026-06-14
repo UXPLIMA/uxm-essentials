@@ -31,8 +31,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * Covers the {@link ScoreboardRenderer} render path under MockBukkit: a selected board shows a sidebar, the
  * condition-driven selection picks the right board per viewer (a staff player gets the staff board, a non-staff the
- * default, no match clears), a blacklisted world tears the selected board down, and the hide-score-numbers path reaches
- * the objective's number-format setter.
+ * default, no match clears), a blacklisted world tears the selected board down, the hide-score-numbers path reaches the
+ * objective's number-format setter, and the format is re-applied across a reused-sidebar board switch but left alone on a
+ * steady-state tick.
  *
  * <p>MockBukkit's {@code ObjectiveMock.numberFormat} is unimplemented (it throws), so a board that hides its numbers
  * cannot be rendered to completion here; {@link #appliesABlankNumberFormatWhenHidingNumbers()} asserts the call lands
@@ -109,6 +110,48 @@ class ScoreboardRendererTest {
         assertThatThrownBy(() -> renderer.renderFor(player))
                 .isInstanceOf(org.mockbukkit.mockbukkit.exception.UnimplementedOperationException.class)
                 .hasStackTraceContaining("numberFormat");
+    }
+
+    @Test
+    void reAppliesTheNumberFormatWhenTheSelectedBoardSwitchesHideChoice() {
+        // H-3: a viewer can switch boards (hide=true -> hide=false) with the same sidebar reused and no teardown in
+        // between. The number format must follow the now-selected board, so the reuse render must reach the objective's
+        // numberFormat setter again. MockBukkit leaves that setter unimplemented (it throws on any argument, null
+        // included), so we observe the call landing rather than the rendered result.
+        PlayerMock player = server.addPlayer();
+        AtomicReference<SidebarConfig> ref =
+                new AtomicReference<>(single(board("default", DisplayCondition.always(), true, Set.of())));
+        ScoreboardRenderer renderer =
+                new ScoreboardRenderer(sidebars, alwaysShown(), ref::get, new AnimationRegistry(List.of()));
+
+        // First paint creates the sidebar then applies the blank format (hide=true); the create path reaches the
+        // setter,
+        // which MockBukkit refuses. Swallow that — the sidebar itself was created before the setter threw.
+        assertThatThrownBy(() -> renderer.renderFor(player))
+                .isInstanceOf(org.mockbukkit.mockbukkit.exception.UnimplementedOperationException.class);
+        assertThat(sidebars.get(player.getUniqueId())).isNotNull();
+
+        // Switch the selected board to one that shows numbers; the sidebar is reused (not recreated) but the format
+        // must
+        // be reset, so the setter is reached again. Before the fix the reuse branch skipped it and the numbers stayed
+        // hidden.
+        ref.set(single(board("default", DisplayCondition.always(), false, Set.of())));
+        assertThatThrownBy(() -> renderer.renderFor(player))
+                .isInstanceOf(org.mockbukkit.mockbukkit.exception.UnimplementedOperationException.class)
+                .hasStackTraceContaining("numberFormat");
+    }
+
+    @Test
+    void doesNotReApplyTheNumberFormatOnASteadyStateTick() {
+        // No board switch -> no change -> the setter is never re-invoked. A show-numbers board never touches the setter
+        // (a fresh objective already shows the vanilla numbers), so two paints in a row must both complete cleanly; if
+        // the renderer re-applied every tick the MockBukkit setter would throw on the second paint.
+        PlayerMock player = server.addPlayer();
+        ScoreboardRenderer renderer = renderer(single(board("default", DisplayCondition.always(), false, Set.of())));
+
+        renderer.renderFor(player);
+        assertThatCode(() -> renderer.renderFor(player)).doesNotThrowAnyException();
+        assertThat(sidebars.count()).isEqualTo(1);
     }
 
     @Test

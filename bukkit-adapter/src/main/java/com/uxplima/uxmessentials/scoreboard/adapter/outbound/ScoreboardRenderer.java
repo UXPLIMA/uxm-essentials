@@ -2,8 +2,11 @@ package com.uxplima.uxmessentials.scoreboard.adapter.outbound;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
@@ -55,9 +58,15 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>When the selected board's {@link DisplayContent#hideScoreNumbers()} is set the renderer drops the red per-line
  * score numbers vanilla draws down the right edge by applying a {@linkplain NumberFormat#blank() blank number format} to
- * the sidebar objective. uxmLib's {@code Sidebar} owns its objective on its own native scoreboard and does not expose
- * it, so the objective is reached through the player's now-active scoreboard ({@code getObjective(DisplaySlot.SIDEBAR)});
- * the format is applied once when the board is first created, never re-applied on a steady-state tick.
+ * the sidebar objective; when it is unset the format is reset to the vanilla default ({@code numberFormat(null)}) so the
+ * red numbers show again. uxmLib's {@code Sidebar} owns its objective on its own native scoreboard and does not expose
+ * it, so the objective is reached through the player's now-active scoreboard ({@code getObjective(DisplaySlot.SIDEBAR)}).
+ * Because the same sidebar is reused across ticks and even across a board switch — a viewer can move from a board that
+ * hides numbers to one that shows them with no teardown in between — the format must track the <em>currently</em>
+ * selected board, not the one the sidebar was created for. The renderer remembers the last value it applied per player
+ * ({@link #appliedHideNumbers}) and re-applies only when the sidebar is freshly created or the selected board's choice
+ * changed; a steady-state tick with no switch never re-calls the setter (re-applying sends a client update and risks
+ * flicker). The remembered value is dropped on tear-down so a recreated board re-applies from scratch.
  *
  * <p>The tablist header/footer is a separate context now: {@code tablist} owns it through its own renderer and refresh
  * timer, so this renderer touches only the sidebar.
@@ -77,6 +86,15 @@ public final class ScoreboardRenderer {
     private final ScoreboardVisibilityStore visibility;
     private final Supplier<SidebarConfig> boards;
     private final AnimationRegistry animations;
+
+    /**
+     * The last {@link DisplayContent#hideScoreNumbers()} value applied to each player's live sidebar objective, keyed by
+     * player UUID. Owned by the player's region/entity thread (every mutation runs there), so a plain map under
+     * {@code compute}/{@code remove} would suffice; a {@link ConcurrentHashMap} guards the connect-while-rendering race
+     * and keeps the project's "every player-keyed map is concurrent" convention. An absent key means no format has been
+     * applied for the player's current board, so the next render applies from scratch.
+     */
+    private final Map<UUID, Boolean> appliedHideNumbers = new ConcurrentHashMap<>();
 
     public ScoreboardRenderer(
             SidebarManager sidebars,
@@ -113,6 +131,7 @@ public final class ScoreboardRenderer {
     /** Tear down {@code player}'s sidebar — on hide, on quit, or when the display is suppressed. */
     public void clear(Player player) {
         Objects.requireNonNull(player, "player");
+        appliedHideNumbers.remove(player.getUniqueId());
         if (sidebars.get(player.getUniqueId()) != null) {
             sidebars.remove(player);
         }
@@ -121,6 +140,7 @@ public final class ScoreboardRenderer {
     /** Drop {@code uuid}'s sidebar bookkeeping without restoring a prior board — on quit. */
     public void forget(Player player) {
         Objects.requireNonNull(player, "player");
+        appliedHideNumbers.remove(player.getUniqueId());
         sidebars.forget(player.getUniqueId());
     }
 
@@ -140,30 +160,48 @@ public final class ScoreboardRenderer {
     private void renderSidebar(Player player, DisplayContent live, ConditionContext ctx, long tick) {
         Component title =
                 live.title().map(source -> render(player, source, tick)).orElse(Component.empty());
-        Sidebar sidebar = sidebars.get(player.getUniqueId());
-        if (sidebar == null) {
+        Sidebar existing = sidebars.get(player.getUniqueId());
+        boolean created = existing == null;
+        Sidebar sidebar;
+        if (existing == null) {
             sidebar = sidebars.create(player, title);
-            applyNumberFormat(player, live);
         } else {
+            sidebar = existing;
             sidebar.title(title);
         }
+        applyNumberFormat(player, live, created);
         sidebar.lines(renderLines(player, live.lines(), ctx, tick));
     }
 
     /**
-     * Apply the operator's number-format choice to the freshly created sidebar objective. uxmLib's {@code Sidebar}
-     * keeps its objective private and shows its own scoreboard on {@code create}, so the live objective is read back
-     * from the player's now-active scoreboard. Done once at creation — a steady-state tick reuses the same board and
-     * the same format, so there is nothing to re-apply.
+     * Reconcile the live sidebar objective's number format with the currently selected board's
+     * {@link DisplayContent#hideScoreNumbers()} choice. uxmLib's {@code Sidebar} keeps its objective private and shows
+     * its own scoreboard on creation, so the live objective is read back from the player's now-active scoreboard.
+     *
+     * <p>A freshly {@code created} objective already shows the vanilla red numbers, so a brand-new board that does not
+     * hide them needs no setter call at all — the baseline is simply recorded. Otherwise the format is touched only when
+     * the desired choice differs from the last value applied for this player: a steady-state tick with no board switch
+     * leaves the objective alone (re-applying sends a client update and risks flicker), while a switch between two reused
+     * boards re-applies. On a hide-numbers board the format is set blank; on a show-numbers board it is reset to the
+     * vanilla default with {@code numberFormat(null)} so the red numbers reappear after a switch back.
      */
-    private void applyNumberFormat(Player player, DisplayContent live) {
-        if (!live.hideScoreNumbers()) {
+    private void applyNumberFormat(Player player, DisplayContent live, boolean created) {
+        UUID uuid = player.getUniqueId();
+        boolean desired = live.hideScoreNumbers();
+        Boolean lastApplied = appliedHideNumbers.get(uuid);
+        if (created) {
+            lastApplied = Boolean.FALSE; // a new objective shows the vanilla numbers until told otherwise
+        }
+        if (Boolean.valueOf(desired).equals(lastApplied)) {
+            appliedHideNumbers.put(uuid, desired);
             return;
         }
         Objective objective = player.getScoreboard().getObjective(DisplaySlot.SIDEBAR);
-        if (objective != null) {
-            objective.numberFormat(NumberFormat.blank());
+        if (objective == null) {
+            return;
         }
+        objective.numberFormat(desired ? NumberFormat.blank() : null);
+        appliedHideNumbers.put(uuid, desired);
     }
 
     private List<Component> renderLines(Player player, List<String> sources, ConditionContext ctx, long tick) {
