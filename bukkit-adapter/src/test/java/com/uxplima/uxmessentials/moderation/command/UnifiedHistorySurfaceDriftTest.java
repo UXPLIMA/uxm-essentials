@@ -37,6 +37,11 @@ class UnifiedHistorySurfaceDriftTest {
     }
 
     @Test
+    void staffRollbackWiresUnderItsOwnNode() {
+        assertThat(moderationSpec("staffrollback").permission()).isEqualTo("uxmessentials.moderation.staffrollback");
+    }
+
+    @Test
     void checkBanWiresUnderTheCheckNode() {
         assertThat(moderationSpec("checkban").permission()).isEqualTo("uxmessentials.moderation.check");
     }

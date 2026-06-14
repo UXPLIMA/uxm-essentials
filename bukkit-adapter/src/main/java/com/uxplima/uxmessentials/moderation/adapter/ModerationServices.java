@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
+import com.uxplima.uxmessentials.moderation.application.StaffRollback;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.TempWarn;
@@ -86,6 +87,7 @@ public final class ModerationServices {
     private final Seen seen;
     private final ListAlts listAlts;
     private final CommandSpy commandSpy;
+    private final StaffRollback staffRollback;
     private final JailCountdown jailCountdown;
     private final LoginEnforcement loginEnforcement;
     private final Lockdown lockdown;
@@ -128,6 +130,7 @@ public final class ModerationServices {
         this.seen = Objects.requireNonNull(builder.seen, "seen");
         this.listAlts = Objects.requireNonNull(builder.listAlts, "listAlts");
         this.commandSpy = Objects.requireNonNull(builder.commandSpy, "commandSpy");
+        this.staffRollback = Objects.requireNonNull(builder.staffRollback, "staffRollback");
         this.jailCountdown = Objects.requireNonNull(builder.jailCountdown, "jailCountdown");
         this.loginEnforcement = Objects.requireNonNull(builder.loginEnforcement, "loginEnforcement");
         this.lockdown = Objects.requireNonNull(builder.lockdown, "lockdown");
@@ -272,6 +275,10 @@ public final class ModerationServices {
         return commandSpy;
     }
 
+    public StaffRollback staffRollback() {
+        return staffRollback;
+    }
+
     public JailCountdown jailCountdown() {
         return jailCountdown;
     }
@@ -333,6 +340,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable Seen seen;
         private @org.jspecify.annotations.Nullable ListAlts listAlts;
         private @org.jspecify.annotations.Nullable CommandSpy commandSpy;
+        private @org.jspecify.annotations.Nullable StaffRollback staffRollback;
         private @org.jspecify.annotations.Nullable JailCountdown jailCountdown;
         private @org.jspecify.annotations.Nullable LoginEnforcement loginEnforcement;
         private @org.jspecify.annotations.Nullable Lockdown lockdown;
@@ -507,6 +515,11 @@ public final class ModerationServices {
 
         Builder commandSpy(CommandSpy value) {
             this.commandSpy = value;
+            return this;
+        }
+
+        Builder staffRollback(StaffRollback value) {
+            this.staffRollback = value;
             return this;
         }
 

@@ -56,6 +56,7 @@ import com.uxplima.uxmessentials.moderation.application.SanctionHistoryRecorder;
 import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
+import com.uxplima.uxmessentials.moderation.application.StaffRollback;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.TempWarn;
@@ -188,15 +189,22 @@ public final class ModerationWiring {
                 repository, sanctionPort, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
         Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast);
         WarnEscalator escalator = new WarnEscalator(settings.warnEscalation(), mute, tempBan, ban, kick, notifier);
+        // The revoke use cases are built as named locals so /staffrollback drives the same instances the
+        // standalone /unmute, /unban and /unwarn commands do — one audited path, no parallel rollback logic.
+        Unmute unmute = new Unmute(repository, notifier, audit, kernel.events(), history, clock);
+        Unban unban = new Unban(repository, notifier, audit, history);
+        ClearWarns clearWarns = new ClearWarns(repository, notifier, audit);
+        StaffRollback staffRollback = new StaffRollback(
+                sanctionHistory, repository, kernel.playerLookup(), unban, unmute, clearWarns, notifier, clock);
         return new ModerationServices.Builder()
                 .mute(mute)
-                .unmute(new Unmute(repository, notifier, audit, kernel.events(), history, clock))
+                .unmute(unmute)
                 .jail(jail)
                 .unjail(unjail)
                 .toggleJail(new ToggleJail(repository, jails, jail, unjail))
                 .tempBan(tempBan)
                 .ban(ban)
-                .unban(new Unban(repository, notifier, audit, history))
+                .unban(unban)
                 .kick(kick)
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
                 .warn(new IssueWarn(
@@ -204,7 +212,7 @@ public final class ModerationWiring {
                 .tempWarn(new TempWarn(
                         repository, guard, notifier, audit, kernel.events(), history, broadcast, escalator, clock))
                 .reviewWarns(new ReviewWarns(repository, notifier, clock))
-                .clearWarns(new ClearWarns(repository, notifier, audit))
+                .clearWarns(clearWarns)
                 .sanctionSummary(new SanctionSummary(repository, notifier, clock))
                 .listJails(new ListJails(jails, notifier))
                 .listJailed(new ListJailed(repository, kernel.playerLookup(), notifier, clock))
@@ -225,6 +233,7 @@ public final class ModerationWiring {
                 .seen(new Seen(repository, kernel.playerLookup(), notifier, clock))
                 .listAlts(new ListAlts(repository, kernel.playerLookup(), notifier))
                 .commandSpy(new CommandSpy(commandSpyStore, notifier))
+                .staffRollback(staffRollback)
                 .jailCountdown(new JailCountdown(repository, sanctionPort, audit, kernel.events(), clock))
                 .loginEnforcement(new LoginEnforcement(repository, notifier, audit, clock))
                 .lockdown(new Lockdown(repository, notifier, broadcast, audit))

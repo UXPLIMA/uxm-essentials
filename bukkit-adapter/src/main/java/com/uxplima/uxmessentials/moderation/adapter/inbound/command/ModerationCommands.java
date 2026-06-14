@@ -64,6 +64,7 @@ public final class ModerationCommands {
                 new MuteHistoryCommand(services, messages, sink, scheduler),
                 new HistoryCommand(services, messages, sink, scheduler),
                 new StaffHistoryCommand(services, messages, sink, scheduler),
+                new StaffRollbackCommand(services, messages, sink, scheduler),
                 new CheckBanCommand(services, messages, sink, scheduler),
                 new CheckMuteCommand(services, messages, sink, scheduler),
                 new KickCommand(services, messages, sink, silentByDefault),

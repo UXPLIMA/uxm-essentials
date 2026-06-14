@@ -93,6 +93,10 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_STAFFHISTORY_ENTRY("moderation.staffhistory.entry"),
     MOD_STAFFHISTORY_EMPTY("moderation.staffhistory.empty"),
 
+    // /staffrollback — revoke a staff member's still-active sanctions
+    MOD_STAFFROLLBACK_SUMMARY("moderation.staffrollback.summary"),
+    MOD_STAFFROLLBACK_NONE("moderation.staffrollback.none"),
+
     // /checkban, /checkmute — present-tense "is this player banned/muted?" checks
     MOD_CHECK_BANNED("moderation.check.banned"),
     MOD_CHECK_NOT_BANNED("moderation.check.not-banned"),

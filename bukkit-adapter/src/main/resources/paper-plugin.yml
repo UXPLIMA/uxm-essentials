@@ -507,6 +507,9 @@ permissions:
   uxmessentials.moderation.staffhistory:
     description: '/staffhistory <staff> — review the sanctions a staff member has issued, newest-first.'
     default: op
+  uxmessentials.moderation.staffrollback:
+    description: '/staffrollback <staff> [limit] — revoke a staff member''s still-active sanctions (un-ban/un-mute/clear-warns the targets they sanctioned).'
+    default: op
   uxmessentials.moderation.check:
     description: '/checkban <player> and /checkmute <player> — report whether a player is currently banned or muted.'
     default: op
