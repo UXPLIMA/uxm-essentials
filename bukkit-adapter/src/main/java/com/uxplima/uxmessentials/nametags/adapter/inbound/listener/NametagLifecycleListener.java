@@ -21,8 +21,9 @@ import org.jspecify.annotations.NullMarked;
  * remove-then-show on a world change so the packet renderer re-homes the line stack in the new world's region.
  *
  * <p>The join and world-change handlers hop onto the player's entity thread through the {@link Scheduler} port before
- * touching the live player or starting the lib's per-wearer refresh task (Folia). The quit handler only drops a tracked
- * handle and sends remove packets, which is channel I/O safe from any thread, so it needs no hop here.
+ * touching the live player or starting the lib's per-wearer refresh task (Folia). The quit handler needs no hop:
+ * {@link PlayerQuitEvent} fires on the quitting player's region thread, so it drops the tracked handle, sends remove
+ * packets, and removes the player's stranded entry from the hide-team on their board — all region-safe there.
  */
 @NullMarked
 public final class NametagLifecycleListener implements Listener {
@@ -43,7 +44,11 @@ public final class NametagLifecycleListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        presenter.remove(event.getPlayer().getUniqueId());
+        // PlayerQuitEvent fires on the quitting player's region thread with the player still online, so the live player
+        // is passed (not just the UUID): the hide-team on the main shared board is a server-lifetime singleton whose
+        // entries survive the quit, so the stranded name entry must be removed from the board here, which is
+        // region-safe.
+        presenter.remove(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

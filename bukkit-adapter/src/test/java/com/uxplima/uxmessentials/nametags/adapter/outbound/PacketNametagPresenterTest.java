@@ -316,6 +316,70 @@ class PacketNametagPresenterTest {
         assertThat(team.hasEntry(wearer.getName())).isTrue();
     }
 
+    @Test
+    void removeWithThePlayerRestoresTheVanillaNameOnTheBoard() {
+        PlayerMock wearer = server.addPlayer();
+        server.addPlayer();
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        PacketNametagPresenter presenter =
+                presenter(singleFormat("default", DisplayCondition.always()), alwaysVisible(), coordinator, true);
+        presenter.show(wearer);
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isTrue();
+
+        // The quit path passes the live player so the stranded hide-team entry is removed from the board, not just the
+        // bookkeeping (remove(uuid) would leave the entry on a server-lifetime board).
+        presenter.remove(wearer);
+
+        assertThat(presenter.isTracked(wearer.getUniqueId())).isFalse();
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isFalse();
+        var team = wearer.getScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
+        assertThat(team).isNotNull();
+        assertThat(team.hasEntry(wearer.getName())).isFalse();
+    }
+
+    @Test
+    void quitLeavesNoStaleHideEntryOnTheMainBoard() {
+        PlayerMock wearer = server.addPlayer();
+        server.addPlayer();
+        // Reproduce the leak face: the player is on the main shared board (scoreboard module off, or restored to main),
+        // whose hide-team is a server-lifetime singleton. The quit path must remove the entry, not just unmark the map.
+        wearer.setScoreboard(server.getScoreboardManager().getMainScoreboard());
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        PacketNametagPresenter presenter =
+                presenter(singleFormat("default", DisplayCondition.always()), alwaysVisible(), coordinator, true);
+        presenter.show(wearer);
+        var mainTeam = server.getScoreboardManager().getMainScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
+        assertThat(mainTeam).isNotNull();
+        assertThat(mainTeam.hasEntry(wearer.getName())).isTrue();
+
+        presenter.remove(wearer);
+
+        assertThat(mainTeam.hasEntry(wearer.getName())).isFalse();
+    }
+
+    @Test
+    void reconnectWithNoMatchingFormatRestoresTheVanillaNameEvenIfAStaleEntryExists() {
+        PlayerMock wearer = server.addPlayer();
+        server.addPlayer();
+        wearer.setScoreboard(server.getScoreboardManager().getMainScoreboard());
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        // Defense-in-depth: simulate a stranded hide entry from an earlier session that fix #2 normally prevents.
+        coordinator.hide(wearer);
+        var mainTeam = server.getScoreboardManager().getMainScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
+        assertThat(mainTeam).isNotNull();
+        assertThat(mainTeam.hasEntry(wearer.getName())).isTrue();
+        // The reconnecting player now matches no format (staff format, non-staff player).
+        PacketNametagPresenter presenter = presenter(
+                singleFormat("staff", new DisplayCondition.Permission(STAFF_NODE)), alwaysVisible(), coordinator, true);
+
+        presenter.show(wearer);
+
+        // show early-returns (nothing tracked) but still unhides, so the player is not left nameless.
+        assertThat(presenter.isTracked(wearer.getUniqueId())).isFalse();
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isFalse();
+        assertThat(mainTeam.hasEntry(wearer.getName())).isFalse();
+    }
+
     private PacketNametagPresenter presenter(NametagConfig config, NametagVanish vanish) {
         return presenter(config, vanish, new NameVisibilityCoordinator(), false);
     }

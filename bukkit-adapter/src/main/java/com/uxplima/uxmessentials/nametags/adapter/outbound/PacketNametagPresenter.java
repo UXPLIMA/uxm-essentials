@@ -106,6 +106,10 @@ public final class PacketNametagPresenter {
         }
         Optional<NametagFormat> selected = selectFor(wearer);
         if (selected.isEmpty()) {
+            // No format applies (e.g. a reconnecting player who used to match one no longer does). Defensively restore
+            // the vanilla name in case a stale hide-team entry somehow survived, so the player is never left nameless.
+            // We are on the wearer's region thread, so touching the board is safe.
+            nameVisibility.show(wearer);
             return;
         }
         NametagFormat format = selected.get();
@@ -158,10 +162,11 @@ public final class PacketNametagPresenter {
 
     /**
      * Remove {@code uuid}'s nametag if it has one, sending the lib's remove packets to every viewer. Clears the
-     * vanilla-name-hide bookkeeping too — a pure map mutation, safe from the quit thread (the hide-team entry dies with
-     * the player on quit; a world-change remove is followed by a re-show that re-hides). The vanilla name is restored
-     * on the board only at the region-thread call sites that still hold the live player ({@link #update}'s no-format
-     * branch and module stop), since touching a {@link org.bukkit.scoreboard.Team} off the region thread is unsafe.
+     * vanilla-name-hide bookkeeping (a pure map mutation) but does <em>not</em> touch the board, so it is safe from any
+     * thread and is used where a re-show follows that re-hides on the player's region thread (a world change). It does
+     * not restore the vanilla name on the board; the call sites that still hold the live player on its region thread do
+     * that — {@link #remove(Player)} on quit, {@link #update}'s no-format branch, and module stop — since touching a
+     * {@link org.bukkit.scoreboard.Team} off the region thread is unsafe.
      */
     public void remove(UUID uuid) {
         Objects.requireNonNull(uuid, "uuid");
@@ -170,6 +175,22 @@ public final class PacketNametagPresenter {
             tracked.handle().remove();
         }
         nameVisibility.clear(uuid);
+    }
+
+    /**
+     * Remove {@code player}'s nametag and drop their stranded name from the hide-team on their current board. The quit
+     * handler calls this on the quitting player's region thread, where the player is still online and the board entry is
+     * still valid: the main shared board is a server-lifetime singleton whose team entries survive the quit, so unless
+     * the entry is removed here it would strand the vanilla name hidden and leak over uptime. Must run on the player's
+     * region thread.
+     */
+    public void remove(Player player) {
+        Objects.requireNonNull(player, "player");
+        Tracked tracked = live.remove(player.getUniqueId());
+        if (tracked != null) {
+            tracked.handle().remove();
+        }
+        nameVisibility.clear(player);
     }
 
     /** Remove every tracked nametag now — call on module stop so no nametag leaks. */

@@ -121,11 +121,55 @@ class NameVisibilityCoordinatorTest {
         coordinator.clear(wearer.getUniqueId());
 
         assertThat(coordinator.isHidden(wearer.getUniqueId())).isFalse();
-        // The team entry survives the bookkeeping clear (it dies with the player on a real quit, not here); a later
-        // reapply with the now-unmarked state drops it.
+        // The UUID-only clear is for an offline/cross-thread caller and leaves the board entry in place; a later
+        // reapply
+        // with the now-unmarked state drops it.
         coordinator.reapply(wearer, wearer.getScoreboard());
         Team team = wearer.getScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
         assertThat(team).isNotNull();
         assertThat(team.hasEntry(wearer.getName())).isFalse();
+    }
+
+    @Test
+    void clearWithThePlayerUnmarksAndRemovesTheBoardEntry() {
+        PlayerMock wearer = server.addPlayer();
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        coordinator.hide(wearer);
+
+        coordinator.clear(wearer);
+
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isFalse();
+        // The player overload drops the stranded entry from the board itself, not just the bookkeeping.
+        Team team = wearer.getScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
+        assertThat(team).isNotNull();
+        assertThat(team.hasEntry(wearer.getName())).isFalse();
+    }
+
+    @Test
+    void clearWithThePlayerLeavesNoStaleEntryOnTheMainBoard() {
+        PlayerMock wearer = server.addPlayer();
+        // The main shared board is what player.getScoreboard() returns by default and is a server-lifetime singleton,
+        // so
+        // its team entries do not die when the player quits. Hiding then clearing must leave no stale entry behind.
+        wearer.setScoreboard(server.getScoreboardManager().getMainScoreboard());
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        coordinator.hide(wearer);
+        Team mainTeam = server.getScoreboardManager().getMainScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
+        assertThat(mainTeam).isNotNull();
+        assertThat(mainTeam.hasEntry(wearer.getName())).isTrue();
+
+        coordinator.clear(wearer);
+
+        assertThat(mainTeam.hasEntry(wearer.getName())).isFalse();
+    }
+
+    @Test
+    void clearWithThePlayerIsASafeNoOpWhenNoEntryExists() {
+        PlayerMock wearer = server.addPlayer();
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+
+        // Never hidden: there is no hide-team and no entry, so the clear must not throw.
+        assertThatCode(() -> coordinator.clear(wearer)).doesNotThrowAnyException();
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isFalse();
     }
 }

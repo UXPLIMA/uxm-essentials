@@ -28,11 +28,12 @@ import org.jspecify.annotations.NullMarked;
  *
  * <h2>Threading</h2>
  *
- * Every method that touches a live {@link Scoreboard}/{@link Team} ({@link #hide}, {@link #show}, {@link #reapply})
- * assumes it runs on the player's region/entity thread — every caller (the presenter's show/update on the wearer's
- * entity thread, and the scoreboard board-switch callback, which fires from the per-player render hop) is already there.
- * {@link #clear} is a pure map mutation and is safe from any thread (it is called on quit, off the region thread). The
- * hidden set is the project's per-player concurrent map.
+ * Every method that touches a live {@link Scoreboard}/{@link Team} ({@link #hide}, {@link #show}, {@link #reapply},
+ * {@link #clear(Player)}) assumes it runs on the player's region/entity thread — every caller (the presenter's
+ * show/update on the wearer's entity thread, the scoreboard board-switch callback, which fires from the per-player
+ * render hop, and the quit handler, which fires on the quitting player's region thread) is already there.
+ * {@link #clear(UUID)} is a pure map mutation and is safe from any thread, for an offline or cross-thread caller that
+ * cannot reach the board. The hidden set is the project's per-player concurrent map.
  */
 @NullMarked
 public final class NameVisibilityCoordinator {
@@ -82,13 +83,32 @@ public final class NameVisibilityCoordinator {
     }
 
     /**
-     * Drop {@code uuid} from the hidden set without touching any board — called on quit, off the region thread. The
-     * team entry dies with the player (a board's team entries are cleared when the holder leaves), so only the
-     * bookkeeping needs clearing here, leaving a relog to re-evaluate from scratch.
+     * Drop {@code uuid} from the hidden set without touching any board. For an offline or cross-thread caller that holds
+     * only the UUID — it cannot safely reach the player's board, so it clears the bookkeeping only and relies on the
+     * relog re-evaluation. A caller that still holds the live player on its region thread should prefer
+     * {@link #clear(Player)}, which also drops the stranded team entry: the hide-team on the main shared board is a
+     * server-lifetime singleton, so its entries do <em>not</em> die when the player leaves.
      */
     public void clear(UUID uuid) {
         Objects.requireNonNull(uuid, "uuid");
         hidden.remove(uuid);
+    }
+
+    /**
+     * Drop {@code player} from the hidden set and remove their name from the hide-team on their current board. Run on
+     * the player's region thread (it touches a live {@link Team}); the quit handler is the intended caller, where the
+     * player is still online and the board/entry are still valid. The board mutation is needed because the main shared
+     * board is a server-lifetime singleton whose team entries survive the quit — leaving the entry would strand the
+     * vanilla name hidden and leak a dead name string into the team over uptime.
+     */
+    public void clear(Player player) {
+        Objects.requireNonNull(player, "player");
+        hidden.remove(player.getUniqueId());
+        Team team = player.getScoreboard().getTeam(TEAM_NAME);
+        String entry = player.getName();
+        if (team != null && team.hasEntry(entry)) {
+            team.removeEntry(entry);
+        }
     }
 
     /** Whether {@code uuid} is currently marked hidden. Test/observability seam. */
