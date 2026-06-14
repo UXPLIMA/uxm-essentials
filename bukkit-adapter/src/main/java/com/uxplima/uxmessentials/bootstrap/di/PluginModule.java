@@ -687,7 +687,11 @@ public final class PluginModule {
                 Optional.ofNullable(links.staffAudience),
                 Optional.ofNullable(links.staffModerationFreeze),
                 Optional.ofNullable(links.staffTeleport));
-        StaffWiring.Wired wired = StaffWiring.wire(plugin, ctx, persistence, seams);
+        // The in-process bus is the concrete publisher so the enter/exit alert subscriber can be registered here
+        // and unsubscribed on stop (the kernel port exposes only publish). With messaging off no alert is wired.
+        InProcessDomainEventPublisher events =
+                (InProcessDomainEventPublisher) ctx.kernel().events();
+        StaffWiring.Wired wired = StaffWiring.wire(plugin, ctx, persistence, seams, events);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

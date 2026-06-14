@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -21,8 +22,10 @@ import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffChatCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffListCommand;
@@ -34,6 +37,7 @@ import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActio
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffJoinListener;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffModeListener;
 import com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture;
+import com.uxplima.uxmessentials.staff.adapter.outbound.MessagingStaffAlerts;
 import com.uxplima.uxmessentials.staff.adapter.outbound.MessagingStaffChannel;
 import com.uxplima.uxmessentials.staff.adapter.outbound.ModerationStaffFreeze;
 import com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector;
@@ -47,8 +51,11 @@ import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
 import com.uxplima.uxmessentials.staff.application.SendStaffChat;
 import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
+import com.uxplima.uxmessentials.staff.domain.event.StaffModeEntered;
+import com.uxplima.uxmessentials.staff.domain.event.StaffModeExited;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Constructs the staff context's adapters and use cases over the injected kernel ports, the persistence DSL, and
@@ -70,12 +77,23 @@ public final class StaffWiring {
 
     private StaffWiring() {}
 
-    /** Build the staff adapters from {@code plugin}, {@code ctx}, the {@code persistence} DSL, and the {@code seams}. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, StaffSeams seams) {
+    /**
+     * Build the staff adapters from {@code plugin}, {@code ctx}, the {@code persistence} DSL, the {@code seams},
+     * and the in-process event bus. The bus is the concrete {@link InProcessDomainEventPublisher} so the
+     * enter/exit roster-alert subscriber can be registered here and unsubscribed on stop — the kernel port
+     * exposes only {@code publish}.
+     */
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            StaffSeams seams,
+            InProcessDomainEventPublisher events) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(seams, "seams");
+        Objects.requireNonNull(events, "events");
         KernelPorts kernel = ctx.kernel();
         StaffSettings settings = new StaffSettings(ctx.config(), kernel.log());
         AtomicBoolean running = new AtomicBoolean(true);
@@ -134,7 +152,31 @@ public final class StaffWiring {
         List<Listener> listeners = List.of(
                 new StaffModeListener(services, gadgetItems, followService, actions),
                 new StaffJoinListener(services, repository, kernel.scheduler()));
-        return new Wired(commands, listeners, services, followService, kernel.scheduler(), running);
+
+        // Roster alerts ride the messaging staff-chat audience, so they are only wired when messaging is enabled.
+        // EnterStaffMode/ExitStaffMode publish the toggle events; RecoverStaffLoadout publishes neither, so a
+        // crash recovery on join never broadcasts an alert. The subscriber is dropped on stop to avoid a leak.
+        @Nullable Consumer<DomainEvent> alertSubscriber = subscribeAlerts(seams, settings, kernel, events);
+        return new Wired(
+                commands, listeners, services, followService, kernel.scheduler(), running, events, alertSubscriber);
+    }
+
+    private static @Nullable Consumer<DomainEvent> subscribeAlerts(
+            StaffSeams seams, StaffSettings settings, KernelPorts kernel, InProcessDomainEventPublisher events) {
+        if (seams.staffAudience().isEmpty()) {
+            return null;
+        }
+        MessagingStaffAlerts alerts = new MessagingStaffAlerts(
+                seams.staffAudience().get(), kernel.messageSink(), kernel.messages(), settings.staffChatNode());
+        Consumer<DomainEvent> subscriber = event -> {
+            if (event instanceof StaffModeEntered entered) {
+                alerts.announceEnter(entered.staff());
+            } else if (event instanceof StaffModeExited exited) {
+                alerts.announceExit(exited.staff());
+            }
+        };
+        events.subscribe(subscriber);
+        return subscriber;
     }
 
     private static void bindSeams(
@@ -223,6 +265,8 @@ public final class StaffWiring {
      * @param followService the FOLLOW gadget runtime, shut down on stop to cancel its repeating task
      * @param scheduler the Scheduler port, used to run each exit on the player's entity thread on stop
      * @param running the flag flipped false on stop so the toggle command stops accepting new entries
+     * @param eventBus the in-process event bus the roster-alert subscriber is registered on
+     * @param alertSubscriber the enter/exit alert consumer to unsubscribe on stop (null when messaging is off)
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -230,7 +274,9 @@ public final class StaffWiring {
             StaffServices services,
             StaffFollowService followService,
             com.uxplima.uxmessentials.shared.application.port.Scheduler scheduler,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            InProcessDomainEventPublisher eventBus,
+            @Nullable Consumer<DomainEvent> alertSubscriber) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -239,11 +285,15 @@ public final class StaffWiring {
             Objects.requireNonNull(followService, "followService");
             Objects.requireNonNull(scheduler, "scheduler");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(eventBus, "eventBus");
         }
 
         /** Exit every online staff member still in staff mode, restoring their real loadout on their entity thread. */
         public void stop() {
             running.set(false);
+            if (alertSubscriber != null) {
+                eventBus.unsubscribe(alertSubscriber);
+            }
             // Restore every staff member's real loadout first, then stop the follow runtime: a follow-shutdown
             // failure must never abort the loadout restore and strand staff in the gadget hotbar on disable.
             for (UUID id : services.store().activePlayers()) {

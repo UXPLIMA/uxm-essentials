@@ -7,6 +7,8 @@ import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffGadgetItems;
@@ -40,6 +42,7 @@ import org.jspecify.annotations.NullMarked;
 public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
 
     private static final int MAIN_INVENTORY_SLOTS = 36;
+    private static final int INFINITE_TICKS = -1;
 
     private final StaffSettings settings;
     private final StaffGadgetItems gadgetItems;
@@ -71,7 +74,8 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
                 player.getLevel(),
                 player.getExp(),
                 player.getGameMode().name(),
-                player.getAllowFlight() && player.isFlying(),
+                player.isFlying(),
+                player.getAllowFlight(),
                 StaffEffectCodec.encode(player.getActivePotionEffects()),
                 vanish.isVanished(who));
     }
@@ -114,7 +118,25 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
         for (StaffSettings.GadgetSpec spec : settings.gadgets()) {
             inventory.setItem(spec.slot(), gadgetItems.build(spec));
         }
+        applyStaffModePerks(player);
         player.updateInventory();
+    }
+
+    /**
+     * Grant the configured in-mode perks after the gadget hotbar is laid out. This runs after {@code capture}
+     * (the enter sequence captures the real loadout first), so the granted night vision is never part of the
+     * saved set and the captured flight allowance still reflects the player's real pre-mode value — both revert
+     * cleanly on exit (the captured {@code allowFlight} on restore, the granted effect cleared by
+     * {@link #restoreEffects}).
+     */
+    private void applyStaffModePerks(Player player) {
+        if (settings.flightOnEnter()) {
+            player.setAllowFlight(true);
+            player.setFlying(true);
+        }
+        if (settings.nightVisionOnEnter()) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, INFINITE_TICKS, 0, false, false));
+        }
     }
 
     private static SavedLoadout emptyLoadout() {
@@ -126,6 +148,7 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
                 0,
                 0.0f,
                 GameMode.SURVIVAL.name(),
+                false,
                 false,
                 LoadoutBlob.empty(),
                 false);
@@ -155,8 +178,10 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
     private static void restoreGameMode(Player player, SavedLoadout loadout) {
         GameMode mode = parseGameMode(loadout.gameMode());
         player.setGameMode(mode);
+        // Honour the captured allowance so a real pre-mode fly permission is preserved while a staff-granted one
+        // (captured allowFlight=false for a survival player) is removed on exit. Creative/spectator always fly.
         boolean flightCapable = mode == GameMode.CREATIVE || mode == GameMode.SPECTATOR;
-        player.setAllowFlight(flightCapable || loadout.flying());
+        player.setAllowFlight(flightCapable || loadout.allowFlight());
         player.setFlying(loadout.flying());
     }
 

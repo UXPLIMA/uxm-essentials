@@ -41,6 +41,8 @@ public final class StaffSettings {
     private static final String DEFAULT_STAFF_CHAT_NODE = "uxmessentials.staff.chat";
 
     private final boolean vanishOnEnter;
+    private final boolean flightOnEnter;
+    private final boolean nightVisionOnEnter;
     private final List<GadgetSpec> gadgets;
     private final String staffChatNode;
     private final int followIntervalTicks;
@@ -49,6 +51,8 @@ public final class StaffSettings {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(log, "log");
         this.vanishOnEnter = config.getBoolean("vanish-on-enter", true);
+        this.flightOnEnter = config.getBoolean("flight-on-enter", true);
+        this.nightVisionOnEnter = config.getBoolean("night-vision-on-enter", true);
         this.staffChatNode = config.getString("staff-chat.receive-node", DEFAULT_STAFF_CHAT_NODE);
         this.followIntervalTicks = Math.max(1, config.getInt("follow.interval-ticks", DEFAULT_FOLLOW_INTERVAL_TICKS));
         this.gadgets = List.copyOf(parseGadgets(config, log));
@@ -57,6 +61,16 @@ public final class StaffSettings {
     /** Whether entering staff mode vanishes the staff member (soft-coupled to presence; no-op without it). */
     public boolean vanishOnEnter() {
         return vanishOnEnter;
+    }
+
+    /** Whether entering staff mode grants flight, reverting to the captured real allowance on exit. */
+    public boolean flightOnEnter() {
+        return flightOnEnter;
+    }
+
+    /** Whether entering staff mode grants night vision, cleared with the rest of the in-mode effects on exit. */
+    public boolean nightVisionOnEnter() {
+        return nightVisionOnEnter;
     }
 
     /** The configured gadget hotbar, in declaration order; empty when none are validly configured. */
