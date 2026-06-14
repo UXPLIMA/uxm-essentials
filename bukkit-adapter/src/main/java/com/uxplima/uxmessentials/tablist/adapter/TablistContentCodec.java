@@ -16,8 +16,10 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.display.ConditionParser;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
+import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
+import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurationNode;
@@ -42,6 +44,10 @@ import org.spongepowered.configurate.ConfigurationNode;
  *     sort-order = 100                                # higher = shown higher in the tab list; must be positive
  *     skin = "player:Notch"                           # OPTIONAL custom tab-row skin; "player:<name>" or "texture:<b64>"
  *     world-blacklist = [ "world_the_end" ]
+ *     layout {                                         # OPTIONAL fixed-slot filler grid (see #layout)
+ *       direction = "COLUMNS"
+ *       fillers = [ { slot = 5, text = "<gray>play.example.net", skin = "player:Notch" } ]
+ *     }
  *   }
  *   default { condition = "", priority = 0, header = [ "<gold>Welcome" ] }
  * }
@@ -103,17 +109,17 @@ final class TablistContentCodec {
         List<AnimationDef> animations = AnimationDef.parseAll(root.node("animations"), log);
         ConfigurationNode formats = root.node("formats");
         if (!formats.virtual() && formats.isMap()) {
-            return new Parsed(readFormats(formats), animations, refreshInterval(root.node("refresh-ticks")));
+            return new Parsed(readFormats(formats, log), animations, refreshInterval(root.node("refresh-ticks")));
         }
         Parsed single = readSingleFormat(root.node("tablist"));
         return new Parsed(single.formats(), animations, single.refreshInterval());
     }
 
-    private static TablistFormatConfig readFormats(ConfigurationNode formats) {
+    private static TablistFormatConfig readFormats(ConfigurationNode formats, Logger log) {
         List<TablistFormat> parsed = new ArrayList<>();
         for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                 formats.childrenMap().entrySet()) {
-            readFormat(String.valueOf(entry.getKey()), entry.getValue()).ifPresent(parsed::add);
+            readFormat(String.valueOf(entry.getKey()), entry.getValue(), log).ifPresent(parsed::add);
         }
         // HOCON does not preserve declaration order, so sort by name to give TablistFormatConfig.select a
         // deterministic,
@@ -122,7 +128,7 @@ final class TablistContentCodec {
         return new TablistFormatConfig(parsed);
     }
 
-    private static Optional<TablistFormat> readFormat(String name, ConfigurationNode node) {
+    private static Optional<TablistFormat> readFormat(String name, ConfigurationNode node, Logger log) {
         if (node.virtual() || !node.isMap()) {
             return Optional.empty();
         }
@@ -130,14 +136,86 @@ final class TablistContentCodec {
         Optional<String> nameFormat = optionalString(node.node("name-format"));
         OptionalInt sortOrder = sortOrder(node.node("sort-order"));
         Optional<TablistSkinSource> skin = skinSource(node.node("skin"));
-        // A format that neither shows header/footer nor sets a name, order, or skin does nothing; drop it.
-        if (content.isBlank() && nameFormat.isEmpty() && sortOrder.isEmpty() && skin.isEmpty()) {
+        TablistLayout layout = layout(node.node("layout"), name, log);
+        // A format that neither shows header/footer nor sets a name, order, skin, nor paints fillers does nothing;
+        // drop.
+        if (content.isBlank() && nameFormat.isEmpty() && sortOrder.isEmpty() && skin.isEmpty() && layout.isEmpty()) {
             return Optional.empty();
         }
         DisplayCondition condition =
                 ConditionParser.parse(node.node("condition").getString());
         int priority = node.node("priority").getInt(0);
-        return Optional.of(new TablistFormat(name, condition, priority, content, nameFormat, sortOrder, skin));
+        return Optional.of(new TablistFormat(name, condition, priority, content, nameFormat, sortOrder, skin, layout));
+    }
+
+    /**
+     * Parse a format's optional fixed-slot filler grid:
+     *
+     * <pre>{@code
+     * layout {
+     *   rows = 20            # cells per column (the standard tab list is 4 columns of 20)
+     *   direction = "COLUMNS" # COLUMNS (down each column, the default) or ROWS (across each row)
+     *   fillers = [
+     *     { slot = 5, text = "<gray>play.example.net", skin = "player:Notch" }
+     *     { slot = 6, text = "<gold>Discord: discord.gg/x" }
+     *   ]
+     * }
+     * }</pre>
+     *
+     * <p>Tolerant like the rest of the codec: an absent {@code layout} or an empty/absent {@code fillers} list yields
+     * {@link TablistLayout#empty()} (no fillers, the native tab grid untouched), a filler with a non-positive or absent
+     * {@code slot} or a blank {@code text} is skipped and logged, an unrecognised {@code direction} falls back to
+     * {@code COLUMNS}, and a non-positive {@code rows} falls back to the standard twenty. A duplicate slot keeps the
+     * first and logs the rest so the grid never paints two rows into one cell.
+     */
+    private static TablistLayout layout(ConfigurationNode node, String formatName, Logger log) {
+        if (node.virtual() || !node.isMap()) {
+            return TablistLayout.empty();
+        }
+        TablistLayout.Direction direction = direction(node.node("direction"));
+        int rows = node.node("rows").getInt(TablistLayout.DEFAULT_GRID_ROWS);
+        if (rows <= 0) {
+            rows = TablistLayout.DEFAULT_GRID_ROWS;
+        }
+        List<TablistFiller> fillers = fillers(node.node("fillers"), formatName, log);
+        return fillers.isEmpty() ? TablistLayout.empty() : new TablistLayout(fillers, direction, rows);
+    }
+
+    private static List<TablistFiller> fillers(ConfigurationNode node, String formatName, Logger log) {
+        if (node.virtual() || !node.isList()) {
+            return List.of();
+        }
+        List<TablistFiller> parsed = new ArrayList<>();
+        Set<Integer> seenSlots = new LinkedHashSet<>();
+        for (ConfigurationNode child : node.childrenList()) {
+            filler(child, formatName, seenSlots, log).ifPresent(parsed::add);
+        }
+        return parsed;
+    }
+
+    private static Optional<TablistFiller> filler(
+            ConfigurationNode node, String formatName, Set<Integer> seenSlots, Logger log) {
+        int slot = node.node("slot").getInt(0);
+        String text = node.node("text").getString("");
+        if (slot <= 0 || text.isBlank()) {
+            log.warn("tablist_filler_skipped format={} slot={} reason=invalid-slot-or-text", formatName, slot);
+            return Optional.empty();
+        }
+        if (!seenSlots.add(slot)) {
+            log.warn("tablist_filler_skipped format={} slot={} reason=duplicate-slot", formatName, slot);
+            return Optional.empty();
+        }
+        return Optional.of(new TablistFiller(slot, text, skinSource(node.node("skin"))));
+    }
+
+    private static TablistLayout.Direction direction(ConfigurationNode node) {
+        String raw = node.getString("");
+        for (TablistLayout.Direction direction : TablistLayout.Direction.values()) {
+            if (direction.name().equalsIgnoreCase(raw.trim())) {
+                return direction;
+            }
+        }
+        return TablistLayout.Direction.COLUMNS;
     }
 
     /**

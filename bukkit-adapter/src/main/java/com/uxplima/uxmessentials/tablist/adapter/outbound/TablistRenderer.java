@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.tablist.adapter.outbound;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,8 +25,10 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
+import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
+import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import com.uxplima.uxmlib.hud.Tablist;
 import com.uxplima.uxmlib.packet.tablist.TabEntry;
@@ -89,6 +93,18 @@ import org.jspecify.annotations.NullMarked;
  * — a per-viewer placeholder expansion changing between ticks does not warrant a re-send, only an operator authoring a
  * new format does. The remembered values are dropped on clear/quit so a re-selected format re-applies from scratch.
  *
+ * <p><strong>Fixed-slot filler grid.</strong> A selected format may carry a {@link TablistLayout} of synthetic
+ * {@link TablistFiller} rows that fill the tab cells the real players do not. The real players keep the early slots —
+ * given the layout's {@link TablistLayout#realPlayerOrder() real-player order} (above every filler) unless the format
+ * authored an explicit {@link TablistFormat#sortOrder() sort order}, which is honoured — and each filler is painted
+ * through a packet at its {@link TablistLayout#slotToListOrder slot list-order}, per viewer, with its text resolved
+ * through the same pipeline and its skin through the {@link TablistSkinResolver}. Each filler entry carries a
+ * <em>deterministic</em> UUID derived from {@code (viewer, slot)} ({@link #fillerId}) so a re-paint updates the same
+ * entry and never leaks a fresh fake row per tick. The painted set is tracked per viewer ({@link #appliedFillers}) and
+ * diffed: a steady tick whose filler text and skin are unchanged re-sends nothing, while a switch away (a format with no
+ * or fewer fillers), a {@link #clear}/{@link #forget}/quit, or a disable removes the filler entries by their tracked
+ * UUIDs so no fake row is ever orphaned. Real-player suppression is deliberately not done here — real players still show.
+ *
  * <p>{@link #renderFor(Player)} touches the live player, so the caller must invoke it on the player's region/entity
  * thread — the render timer and the connection listener both hop there first.
  */
@@ -130,6 +146,17 @@ public final class TablistRenderer {
      * an offline skin fetch completing — re-paints. Cleared on revert/clear/quit so a re-selected skin format re-paints.
      */
     private final Map<UUID, AppliedSkin> appliedSkin = new ConcurrentHashMap<>();
+
+    /**
+     * The filler grid this renderer currently paints for each viewer, keyed by viewer UUID then by 1-based slot. The
+     * value remembers what was last sent for that (viewer, slot) cell — the rendered text source, list order, and skin
+     * source — so a steady-state tick whose cell is unchanged re-sends nothing (no flicker), while a switch to a format
+     * with a different/fewer fillers removes the cells that fell away by their deterministic {@link #fillerId} UUIDs. An
+     * absent viewer key means no fillers are painted for that viewer. The inner map is a {@link LinkedHashMap} guarded by
+     * the outer {@link ConcurrentHashMap}; every mutation runs on the viewer's region/entity thread under
+     * {@code compute}/direct access from that single thread, so the inner map needs no concurrency of its own.
+     */
+    private final Map<UUID, Map<Integer, AppliedFiller>> appliedFillers = new ConcurrentHashMap<>();
 
     /** Build a renderer with the full packet path. {@code viewers} supplies who a skin packet is broadcast to. */
     public TablistRenderer(
@@ -175,6 +202,7 @@ public final class TablistRenderer {
         }
         applyHeaderFooter(player, content, tick);
         applyRow(player, format, tick);
+        applyFillers(player, format.layout(), tick);
     }
 
     /**
@@ -219,15 +247,16 @@ public final class TablistRenderer {
         packets.send(viewer, packets.addOrUpdate(entry));
     }
 
-    /** Clear {@code player}'s header/footer and reset any list name/order/skin this renderer applied. */
+    /** Clear {@code player}'s header/footer and reset any list name/order/skin/fillers this renderer applied. */
     public void clear(Player player) {
         Objects.requireNonNull(player, "player");
         tablist.clear(player);
         appliedHeaderFooter.remove(player.getUniqueId());
+        clearFillers(player);
         resetRow(player);
     }
 
-    /** Clear {@code player}'s header/footer and forget their name/order/skin tracking on quit. */
+    /** Clear {@code player}'s header/footer and forget their name/order/skin/filler tracking on quit. */
     public void forget(Player player) {
         Objects.requireNonNull(player, "player");
         tablist.clear(player);
@@ -235,7 +264,16 @@ public final class TablistRenderer {
         // On quit the player's connection is gone; just drop the tracking. A native reset packet to a closing channel
         // is a no-op, so revert is skipped — only the tracking is forgotten so a relog re-paints from scratch.
         appliedSkin.remove(player.getUniqueId());
+        appliedFillers.remove(player.getUniqueId());
         resetNameAndOrder(player);
+    }
+
+    /** Remove every filler entry this renderer painted for {@code viewer}, and drop the viewer's filler tracking. */
+    private void clearFillers(Player viewer) {
+        Map<Integer, AppliedFiller> painted = appliedFillers.remove(viewer.getUniqueId());
+        if (painted != null) {
+            removeFillers(viewer, painted);
+        }
     }
 
     /**
@@ -249,10 +287,26 @@ public final class TablistRenderer {
             // No skin: native path, and revert any skin entry this renderer previously painted for the player.
             revertSkin(player);
             applyNameFormat(player, format.nameFormat(), tick);
-            applyOrder(player, format.sortOrder());
+            applyOrder(player, effectiveOrder(format));
             return;
         }
         applySkinRow(player, format, skinSource.get(), tick);
+    }
+
+    /**
+     * The list order the real player themselves should sit at for this format. The format's explicit
+     * {@link TablistFormat#sortOrder() sort order} always wins (so an operator's order is honoured even alongside a
+     * filler grid); otherwise, when the format paints a {@link TablistLayout#isEmpty() filler grid}, the player is given
+     * the {@link TablistLayout#realPlayerOrder() real-player order} so they sort above every filler into the early slots.
+     * A format with neither yields an empty order — the vanilla path, untouched.
+     */
+    private static OptionalInt effectiveOrder(TablistFormat format) {
+        if (format.sortOrder().isPresent()) {
+            return format.sortOrder();
+        }
+        return format.layout().isEmpty()
+                ? OptionalInt.empty()
+                : OptionalInt.of(format.layout().realPlayerOrder());
     }
 
     /**
@@ -267,12 +321,12 @@ public final class TablistRenderer {
             // The texture is not available yet; take the native path so the name/order still apply with no skin.
             revertSkin(player);
             applyNameFormat(player, format.nameFormat(), tick);
-            applyOrder(player, format.sortOrder());
+            applyOrder(player, effectiveOrder(format));
             return;
         }
         UUID uuid = player.getUniqueId();
         String nameSource = format.nameFormat().orElse("");
-        int order = format.sortOrder().orElse(0);
+        int order = effectiveOrder(format).orElse(0);
         AppliedSkin desired = new AppliedSkin(nameSource, order, skinSource);
         if (desired.equals(appliedSkin.get(uuid))) {
             return;
@@ -303,6 +357,101 @@ public final class TablistRenderer {
         }
         tablist.set(player, joinLines(player, content.header(), tick), joinLines(player, content.footer(), tick));
         appliedHeaderFooter.put(uuid, Boolean.TRUE);
+    }
+
+    /**
+     * Reconcile the filler grid this renderer paints for {@code viewer} with the selected format's {@link TablistLayout}.
+     * Each filler is painted at its slot's list-order through a packet sent to the one viewer, with its text and skin
+     * resolved per viewer. The painted set is diffed against {@link #appliedFillers}: an unchanged cell re-sends nothing,
+     * a changed cell is re-sent, and a cell that fell away (the new layout omits it) is removed by its deterministic
+     * {@link #fillerId} UUID so no fake row is orphaned. An empty layout removes every filler this viewer carried.
+     */
+    private void applyFillers(Player viewer, TablistLayout layout, long tick) {
+        UUID viewerId = viewer.getUniqueId();
+        Map<Integer, AppliedFiller> previous = appliedFillers.get(viewerId);
+        if (layout.isEmpty()) {
+            if (previous != null) {
+                removeFillers(viewer, previous);
+                appliedFillers.remove(viewerId);
+            }
+            return;
+        }
+        Map<Integer, AppliedFiller> next = new LinkedHashMap<>();
+        for (TablistFiller filler : layout.fillers()) {
+            paintFiller(viewer, layout, filler, tick, previous, next);
+        }
+        removeStaleFillers(viewer, previous, next.keySet());
+        appliedFillers.put(viewerId, next);
+    }
+
+    /**
+     * Paint one filler into {@code viewer}'s grid, re-sending only when its <em>resolved</em> text, order, or skin
+     * changed since the last tick. The text is keyed on the rendered component, not the raw source, so an animated or
+     * relational-placeholder filler re-sends as it changes (the animation steps) while a static filler re-sends nothing
+     * on a steady tick — the per-cell flicker guard. The entry id is the deterministic {@link #fillerId} so the same
+     * cell is always the same tab entry: an update targets it and a later removal removes it exactly.
+     */
+    private void paintFiller(
+            Player viewer,
+            TablistLayout layout,
+            TablistFiller filler,
+            long tick,
+            @org.jspecify.annotations.Nullable Map<Integer, AppliedFiller> previous,
+            Map<Integer, AppliedFiller> next) {
+        int slot = filler.slot();
+        int order = TablistLayout.slotToListOrder(slot, layout.direction(), layout.gridRows());
+        Optional<TablistSkinSource> skinSource = filler.skin();
+        TabSkin skin = skinSource.flatMap(skinResolver::resolve).orElse(null);
+        Component text = render(viewer, filler.text(), tick);
+        AppliedFiller desired = new AppliedFiller(text, order, skinSource.orElse(null));
+        AppliedFiller current = previous == null ? null : previous.get(slot);
+        if (current != null && desired.equals(current)) {
+            // Unchanged cell: keep the entry as-is, send nothing this tick (the flicker guard).
+            next.put(slot, current);
+            return;
+        }
+        UUID id = fillerId(viewer.getUniqueId(), slot);
+        packets.send(viewer, packets.addOrUpdate(new TabEntry(id, text, order, skin, "")));
+        next.put(slot, desired);
+    }
+
+    /** Remove the filler entries whose slots are no longer in {@code keptSlots} — the cells the new layout dropped. */
+    private void removeStaleFillers(
+            Player viewer,
+            @org.jspecify.annotations.Nullable Map<Integer, AppliedFiller> previous,
+            java.util.Set<Integer> keptSlots) {
+        if (previous == null) {
+            return;
+        }
+        List<UUID> stale = new ArrayList<>();
+        for (Integer slot : previous.keySet()) {
+            if (!keptSlots.contains(slot)) {
+                stale.add(fillerId(viewer.getUniqueId(), slot));
+            }
+        }
+        if (!stale.isEmpty()) {
+            packets.send(viewer, packets.remove(stale));
+        }
+    }
+
+    /** Remove every filler entry the viewer carried — used on a switch to an empty layout, clear, forget, or stop. */
+    private void removeFillers(Player viewer, Map<Integer, AppliedFiller> painted) {
+        List<UUID> ids = new ArrayList<>(painted.size());
+        for (Integer slot : painted.keySet()) {
+            ids.add(fillerId(viewer.getUniqueId(), slot));
+        }
+        if (!ids.isEmpty()) {
+            packets.send(viewer, packets.remove(ids));
+        }
+    }
+
+    /**
+     * The deterministic, stable UUID for a (viewer, slot) filler cell, so a re-paint updates the same tab entry and a
+     * removal targets it exactly — never a fresh random id per tick (which would leak a new fake row each refresh). The
+     * id is derived from the viewer's id and the slot, so the same cell is always the same entry across ticks and relogs.
+     */
+    private static UUID fillerId(UUID viewer, int slot) {
+        return UUID.nameUUIDFromBytes(("uxmf:" + viewer + ":" + slot).getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -444,4 +593,14 @@ public final class TablistRenderer {
      * being re-added every refresh tick (the flicker guard). A change in any field re-paints.
      */
     private record AppliedSkin(String nameSource, int order, TablistSkinSource skinSource) {}
+
+    /**
+     * The filler cell last painted for a (viewer, slot): its <em>rendered</em> text component, list order, and skin
+     * source (or {@code null} for no skin). Two paints with an equal tuple are the same cell, so the entry is not re-sent
+     * — the per-cell flicker guard. Keying on the rendered component (not the raw source) means an animated or relational
+     * filler re-sends as its frame/placeholder changes — acceptable, mirroring the scoreboard/header animation surface —
+     * while a static filler on a steady-state tick re-sends nothing. {@link Component} has a value-based {@code equals}.
+     */
+    private record AppliedFiller(
+            Component text, int order, @org.jspecify.annotations.Nullable TablistSkinSource skinSource) {}
 }

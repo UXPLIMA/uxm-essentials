@@ -111,7 +111,11 @@ public final class TablistWiring {
             renderTask.start();
         }
 
-        /** Stop the render timer and clear every active header/footer so a disable/reload leaves no stale tablist. */
+        /**
+         * Stop the render timer and clear every active header/footer, list name/order/skin, and filler entry so a
+         * disable/reload leaves no stale tablist and no orphaned filler row. {@link TablistRenderer#clear} removes the
+         * filler entries it painted for each viewer by their tracked UUIDs.
+         */
         public void stop() {
             running.set(false);
             for (Player player : Bukkit.getOnlinePlayers()) {

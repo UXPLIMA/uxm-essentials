@@ -30,6 +30,11 @@ import com.uxplima.uxmessentials.shared.display.DisplayCondition;
  * than the native list-name/order setters; when absent (the default) the renderer keeps the native path unchanged. The
  * display name and order still come from {@code nameFormat}/{@code sortOrder} — only the delivery changes, plus the skin.
  *
+ * <p>The optional {@code layout} is the fixed-slot filler grid: synthetic {@link TablistFiller} rows that occupy the tab
+ * cells the real players do not, each positioned by slot. When the layout {@link TablistLayout#isEmpty() carries fillers}
+ * the adapter paints them per viewer through packets (real players keep the early slots, the fillers fill the rest);
+ * {@link TablistLayout#empty() an empty layout} (the default) leaves the tab exactly as it was before fillers existed.
+ *
  * @param name the format name, non-blank (the config map key; used only for operator-facing identification and tie-break)
  * @param condition the per-viewer gate; {@link DisplayCondition#always()} for an unconditional format
  * @param priority the selection rank; higher wins, ties broken by name (see {@link TablistFormatConfig#select})
@@ -37,6 +42,7 @@ import com.uxplima.uxmessentials.shared.display.DisplayCondition;
  * @param nameFormat the per-viewer list-name template, or empty to leave the vanilla list name untouched
  * @param sortOrder the per-viewer {@code setPlayerListOrder} value, or empty to leave the vanilla sort order untouched
  * @param skin the custom-skin source, or empty to keep the native list-name/order delivery (the default, no skin)
+ * @param layout the fixed-slot filler grid, or {@link TablistLayout#empty()} for no fillers (the default)
  */
 public record TablistFormat(
         String name,
@@ -45,7 +51,8 @@ public record TablistFormat(
         TablistContent content,
         Optional<String> nameFormat,
         OptionalInt sortOrder,
-        Optional<TablistSkinSource> skin) {
+        Optional<TablistSkinSource> skin,
+        TablistLayout layout) {
 
     public TablistFormat {
         Objects.requireNonNull(name, "name");
@@ -54,12 +61,25 @@ public record TablistFormat(
         Objects.requireNonNull(nameFormat, "nameFormat");
         Objects.requireNonNull(sortOrder, "sortOrder");
         Objects.requireNonNull(skin, "skin");
+        Objects.requireNonNull(layout, "layout");
         if (name.isBlank()) {
             throw new IllegalArgumentException("a tablist format name must not be blank");
         }
     }
 
-    /** A format with no custom skin — the common case, preserving the native list-name/order delivery. */
+    /** A format with a custom skin but no filler layout — the skin path with the native tab grid untouched. */
+    public TablistFormat(
+            String name,
+            DisplayCondition condition,
+            int priority,
+            TablistContent content,
+            Optional<String> nameFormat,
+            OptionalInt sortOrder,
+            Optional<TablistSkinSource> skin) {
+        this(name, condition, priority, content, nameFormat, sortOrder, skin, TablistLayout.empty());
+    }
+
+    /** A format with no custom skin and no filler layout — the common case, the native list-name/order delivery. */
     public TablistFormat(
             String name,
             DisplayCondition condition,
@@ -67,6 +87,6 @@ public record TablistFormat(
             TablistContent content,
             Optional<String> nameFormat,
             OptionalInt sortOrder) {
-        this(name, condition, priority, content, nameFormat, sortOrder, Optional.empty());
+        this(name, condition, priority, content, nameFormat, sortOrder, Optional.empty(), TablistLayout.empty());
     }
 }

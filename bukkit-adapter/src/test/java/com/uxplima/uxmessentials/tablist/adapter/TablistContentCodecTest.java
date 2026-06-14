@@ -17,7 +17,9 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
+import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
+import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -171,6 +173,124 @@ class TablistContentCodecTest {
         TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
 
         assertThat(select(parsed, n -> true, "world").sortOrder()).isEmpty();
+    }
+
+    @Test
+    void parsesAFillerLayout(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default {
+                    condition = ""
+                    priority = 0
+                    header = [ "<gold>Welcome" ]
+                    layout {
+                      direction = "ROWS"
+                      rows = 20
+                      fillers = [
+                        { slot = 5, text = "<gray>play.example.net", skin = "player:Notch" }
+                        { slot = 6, text = "<gold>Discord" }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        TablistLayout layout = select(parsed, n -> true, "world").layout();
+        assertThat(layout.isEmpty()).isFalse();
+        assertThat(layout.direction()).isEqualTo(TablistLayout.Direction.ROWS);
+        assertThat(layout.gridRows()).isEqualTo(20);
+        assertThat(layout.fillers()).hasSize(2);
+        TablistFiller first = layout.fillers().get(0);
+        assertThat(first.slot()).isEqualTo(5);
+        assertThat(first.text()).isEqualTo("<gray>play.example.net");
+        assertThat(first.skin()).contains(new TablistSkinSource.PlayerName("Notch"));
+        assertThat(layout.fillers().get(1).skin()).isEmpty();
+    }
+
+    @Test
+    void aFormatWithOnlyAFillerLayoutIsKept(@TempDir Path dir) throws Exception {
+        // A format that sets no header/footer, name, order, or skin but does paint fillers still does something.
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  grid { condition = "", priority = 0, layout { fillers = [ { slot = 1, text = "<gold>x" } ] } }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(parsed.formats().formats()).hasSize(1);
+        assertThat(select(parsed, n -> true, "world").layout().fillers()).hasSize(1);
+    }
+
+    @Test
+    void aLayoutWithNoFillersIsEmptyAndDefaultDirection(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default { condition = "", priority = 0, header = [ "x" ], layout { fillers = [] } }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        TablistLayout layout = select(parsed, n -> true, "world").layout();
+        assertThat(layout.isEmpty()).isTrue();
+        assertThat(layout.direction()).isEqualTo(TablistLayout.Direction.COLUMNS);
+    }
+
+    @Test
+    void skipsAnInvalidOrDuplicateFillerSlot(@TempDir Path dir) throws Exception {
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default {
+                    condition = ""
+                    priority = 0
+                    header = [ "x" ]
+                    layout {
+                      fillers = [
+                        { slot = 0, text = "<gold>bad" }
+                        { slot = 3, text = "  " }
+                        { slot = 7, text = "<gold>good" }
+                        { slot = 7, text = "<gray>dup" }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, log);
+
+        TablistLayout layout = select(parsed, n -> true, "world").layout();
+        // Only the single valid, non-duplicate slot 7 survives; the bad slot, blank text, and duplicate are skipped.
+        assertThat(layout.fillers()).hasSize(1);
+        assertThat(layout.fillers().get(0).slot()).isEqualTo(7);
+        assertThat(log.warnings).anyMatch(w -> w.contains("tablist_filler_skipped") && w.contains("invalid"));
+        assertThat(log.warnings).anyMatch(w -> w.contains("tablist_filler_skipped") && w.contains("duplicate"));
+    }
+
+    @Test
+    void aFormatWithNoLayoutCarriesTheEmptyLayout(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default { condition = "", priority = 0, header = [ "<gold>Welcome" ] }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(select(parsed, n -> true, "world").layout().isEmpty()).isTrue();
     }
 
     @Test

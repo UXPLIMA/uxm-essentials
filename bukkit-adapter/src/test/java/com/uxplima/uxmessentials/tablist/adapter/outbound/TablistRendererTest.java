@@ -21,8 +21,10 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
+import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
+import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import com.uxplima.uxmlib.packet.tablist.TabEntry;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
@@ -488,6 +490,190 @@ class TablistRendererTest {
         assertThat(packets.entriesSentTo(b.getUniqueId())).isEmpty();
     }
 
+    @Test
+    void paintsAFillerEntryWithTheRightOrderTextAndSkin() {
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistSkinSource skin = new TablistSkinSource.Texture("ZmlsbA==", Optional.of("fsig"));
+        TablistFiller filler = new TablistFiller(5, "<gold>play.example.net", Optional.of(skin));
+        TablistRenderer renderer = rendererWith(packets, fillerFormat("default", layoutOf(filler)));
+
+        renderer.renderFor(viewer);
+
+        List<TabEntry> toViewer = packets.entriesSentTo(viewer.getUniqueId());
+        // One filler entry was sent to the viewer at slot 5's list order, carrying its text and skin.
+        TabEntry entry = toViewer.stream()
+                .filter(e -> e.id().equals(fillerId(viewer.getUniqueId(), 5)))
+                .findFirst()
+                .orElseThrow();
+        assertThat(entry.listOrder()).isEqualTo(TablistLayout.slotToListOrder(5, TablistLayout.Direction.COLUMNS, 20));
+        assertThat(plain(entry.displayName())).isEqualTo("play.example.net");
+        assertThat(entry.name()).isEmpty();
+        assertThat(skinOf(entry).textureValue()).isEqualTo("ZmlsbA==");
+        assertThat(skinOf(entry).signature()).isEqualTo("fsig");
+    }
+
+    @Test
+    void realPlayerSortsAboveTheFillersIntoTheEarlySlot() {
+        // With a filler grid and no explicit sort-order the viewer gets the real-player order (above every filler) so
+        // they occupy an early slot rather than being interleaved with the fillers.
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistFiller filler = new TablistFiller(1, "<gold>filler", Optional.empty());
+        TablistRenderer renderer = rendererWith(packets, fillerFormat("default", layoutOf(filler)));
+
+        renderer.renderFor(viewer);
+
+        assertThat(viewer.getPlayerListOrder()).isEqualTo(TablistLayout.REAL_PLAYER_ORDER);
+        int fillerOrder = TablistLayout.slotToListOrder(1, TablistLayout.Direction.COLUMNS, 20);
+        assertThat(viewer.getPlayerListOrder()).isGreaterThan(fillerOrder);
+    }
+
+    @Test
+    void usesAStableEntryIdAcrossUpdatesAndNeverLeaksAFreshRowPerTick() {
+        // The same (viewer, slot) cell must keep the SAME entry id across changing text, so an update targets one entry
+        // rather than leaking a new fake row each tick.
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        AtomicReference<TablistFormatConfig> ref = new AtomicReference<>(new TablistFormatConfig(
+                List.of(fillerFormat("default", layoutOf(new TablistFiller(2, "<gold>first", Optional.empty()))))));
+        TablistRenderer renderer = new TablistRenderer(
+                ref::get,
+                new AnimationRegistry(List.of()),
+                packets,
+                new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
+                server::getOnlinePlayers);
+
+        renderer.renderFor(viewer);
+        // Change the filler text at the same slot: the entry id must be identical, so it is an update, not a new row.
+        ref.set(new TablistFormatConfig(
+                List.of(fillerFormat("default", layoutOf(new TablistFiller(2, "<gold>second", Optional.empty()))))));
+        renderer.renderFor(viewer);
+
+        List<TabEntry> sent = packets.entriesSentTo(viewer.getUniqueId());
+        UUID id = fillerId(viewer.getUniqueId(), 2);
+        List<TabEntry> forSlot = sent.stream().filter(e -> e.id().equals(id)).toList();
+        // Two paints, two updates to the SAME id (not two different random ids).
+        assertThat(forSlot).hasSize(2);
+        assertThat(forSlot).extracting(TabEntry::id).containsOnly(id);
+        assertThat(plain(forSlot.get(0).displayName())).isEqualTo("first");
+        assertThat(plain(forSlot.get(1).displayName())).isEqualTo("second");
+    }
+
+    @Test
+    void doesNotReSendAnUnchangedFillerOnASteadyStateTick() {
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistFiller filler = new TablistFiller(3, "<gold>static", Optional.empty());
+        TablistRenderer renderer = rendererWith(packets, fillerFormat("default", layoutOf(filler)));
+
+        renderer.renderFor(viewer);
+        int after = packets.entriesSentTo(viewer.getUniqueId()).size();
+        renderer.renderFor(viewer);
+
+        // The second identical paint re-sends nothing for the unchanged filler cell.
+        assertThat(packets.entriesSentTo(viewer.getUniqueId())).hasSize(after);
+        assertThat(after).isEqualTo(1);
+    }
+
+    @Test
+    void removesAFillerWhenSwitchingToAFormatThatDropsIt() {
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        AtomicReference<TablistFormatConfig> ref = new AtomicReference<>(new TablistFormatConfig(
+                List.of(fillerFormat("default", layoutOf(new TablistFiller(4, "<gold>filler", Optional.empty()))))));
+        TablistRenderer renderer = new TablistRenderer(
+                ref::get,
+                new AnimationRegistry(List.of()),
+                packets,
+                new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
+                server::getOnlinePlayers);
+
+        renderer.renderFor(viewer);
+        // Switch to a format with no fillers: the previously-painted filler entry must be removed by its id.
+        ref.set(new TablistFormatConfig(List.of(format("default", DisplayCondition.always(), 0, "<gold>{player}", 5))));
+        renderer.renderFor(viewer);
+
+        assertThat(packets.removedFrom(viewer.getUniqueId())).contains(fillerId(viewer.getUniqueId(), 4));
+    }
+
+    @Test
+    void removesOnlyTheFillerCellsThatFellAwayOnALayoutChange() {
+        // Slot 1 stays, slot 2 is dropped: only slot 2's entry is removed, slot 1's stays painted.
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        AtomicReference<TablistFormatConfig> ref = new AtomicReference<>(new TablistFormatConfig(List.of(fillerFormat(
+                "default",
+                layoutOf(
+                        new TablistFiller(1, "<gold>one", Optional.empty()),
+                        new TablistFiller(2, "<gold>two", Optional.empty()))))));
+        TablistRenderer renderer = new TablistRenderer(
+                ref::get,
+                new AnimationRegistry(List.of()),
+                packets,
+                new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
+                server::getOnlinePlayers);
+
+        renderer.renderFor(viewer);
+        ref.set(new TablistFormatConfig(
+                List.of(fillerFormat("default", layoutOf(new TablistFiller(1, "<gold>one", Optional.empty()))))));
+        renderer.renderFor(viewer);
+
+        List<UUID> removed = packets.removedFrom(viewer.getUniqueId());
+        assertThat(removed).containsExactly(fillerId(viewer.getUniqueId(), 2));
+        assertThat(removed).doesNotContain(fillerId(viewer.getUniqueId(), 1));
+    }
+
+    @Test
+    void forgetDropsFillerTrackingWithoutASpuriousRemovePacket() {
+        // On quit the viewer's connection is closing, so — like the skin revert — forget drops the tracking without
+        // sending a remove packet to a dead channel. A relog then re-paints the grid from scratch. The next paint after
+        // a forget must therefore re-send the filler (the tracking was cleared), proving forget reset the state.
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistRenderer renderer = rendererWith(
+                packets, fillerFormat("default", layoutOf(new TablistFiller(6, "<gold>x", Optional.empty()))));
+
+        renderer.renderFor(viewer);
+        int beforeForget = packets.entriesSentTo(viewer.getUniqueId()).size();
+        renderer.forget(viewer);
+        // forget sends no remove packet (the channel is closing); it only drops the tracking.
+        assertThat(packets.removedFrom(viewer.getUniqueId())).isEmpty();
+
+        // Re-paint after forget: the filler is sent again because the tracking was cleared (a steady tick would not).
+        renderer.renderFor(viewer);
+        assertThat(packets.entriesSentTo(viewer.getUniqueId())).hasSize(beforeForget + 1);
+    }
+
+    @Test
+    void clearRemovesTheFillerEntries() {
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistRenderer renderer = rendererWith(
+                packets, fillerFormat("default", layoutOf(new TablistFiller(8, "<gold>x", Optional.empty()))));
+
+        renderer.renderFor(viewer);
+        renderer.clear(viewer);
+
+        assertThat(packets.removedFrom(viewer.getUniqueId())).contains(fillerId(viewer.getUniqueId(), 8));
+    }
+
+    @Test
+    void aNoFillerFormatPaintsNoFillerEntriesAndRemovesNothing() {
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistRenderer renderer =
+                rendererWith(packets, format("default", DisplayCondition.always(), 0, "<gold>{player}", 5));
+
+        renderer.renderFor(viewer);
+
+        assertThat(packets.added).isEmpty();
+        assertThat(packets.removedFrom(viewer.getUniqueId())).isEmpty();
+        // The no-filler format leaves the native name/order path untouched.
+        assertThat(plain(viewer.playerListName())).isEqualTo(viewer.getName());
+        assertThat(viewer.getPlayerListOrder()).isEqualTo(5);
+    }
+
     /**
      * A PlayerMock that records the header/footer components handed to {@code sendPlayerListHeaderAndFooter} and counts
      * the sends. The stock PlayerMock leaves that call a no-op, so this is the only way to observe whether the renderer
@@ -530,6 +716,7 @@ class TablistRendererTest {
     private static final class RecordingPackets implements TabListPackets {
         private final List<TabEntry> added = new ArrayList<>();
         private final List<Sent> sent = new ArrayList<>();
+        private final List<List<UUID>> removed = new ArrayList<>();
         private int sends;
 
         @Override
@@ -550,7 +737,9 @@ class TablistRendererTest {
 
         @Override
         public Object remove(List<UUID> ids) {
-            return ids;
+            Removal removal = new Removal(List.copyOf(ids));
+            removed.add(removal.ids());
+            return removal;
         }
 
         @Override
@@ -570,7 +759,20 @@ class TablistRendererTest {
             return entries;
         }
 
+        /** Every profile id that reached {@code viewer} through a remove packet, flattened across all removals. */
+        List<UUID> removedFrom(UUID viewer) {
+            List<UUID> ids = new ArrayList<>();
+            for (Sent s : sent) {
+                if (s.viewer().equals(viewer) && s.packet() instanceof Removal removal) {
+                    ids.addAll(removal.ids());
+                }
+            }
+            return ids;
+        }
+
         private record Sent(UUID viewer, Object packet) {}
+
+        private record Removal(List<UUID> ids) {}
     }
 
     /** A fake profile source: an online map for inline reads, a fetchable map for the "off-thread" fetch. */
@@ -707,6 +909,31 @@ class TablistRendererTest {
                 Optional.ofNullable(nameFormat),
                 sortOrder == null ? OptionalInt.empty() : OptionalInt.of(sortOrder),
                 Optional.of(skin));
+    }
+
+    /** A header-only format carrying a fixed-slot filler {@code layout} so the filler grid path is exercised. */
+    private static TablistFormat fillerFormat(String name, TablistLayout layout) {
+        TablistContent content =
+                new TablistContent(List.of("<gold>" + name), List.of(), Duration.ofSeconds(1L), Set.of());
+        return new TablistFormat(
+                name,
+                DisplayCondition.always(),
+                0,
+                content,
+                Optional.empty(),
+                OptionalInt.empty(),
+                Optional.empty(),
+                layout);
+    }
+
+    private static TablistLayout layoutOf(TablistFiller... fillers) {
+        return new TablistLayout(List.of(fillers), TablistLayout.Direction.COLUMNS, 20);
+    }
+
+    /** The deterministic filler entry id the renderer mints for a (viewer, slot) cell — mirrors TablistRenderer. */
+    private static UUID fillerId(UUID viewer, int slot) {
+        return UUID.nameUUIDFromBytes(
+                ("uxmf:" + viewer + ":" + slot).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private static TabSkin skinOf(TabEntry entry) {
