@@ -53,6 +53,7 @@ class NametagContentCodecTest {
                       show-when = "world:world"
                       hide-while-sneaking = true
                       respect-vanish = false
+                      viewer-distance = 64
                     }
                   }
                   default {
@@ -82,6 +83,8 @@ class NametagContentCodecTest {
         assertThat(staff.appearance().viewRange()).hasValue(2.0);
         assertThat(staff.visibility().hideWhileSneaking()).isTrue();
         assertThat(staff.visibility().respectVanish()).isFalse();
+        // viewer-distance is the cull block radius, parsed separately from the appearance view-range multiplier.
+        assertThat(staff.visibility().viewerDistance()).hasValue(64.0);
 
         NametagFormat fallback = select(parsed, n -> false, "world");
         assertThat(fallback.name()).isEqualTo("default");
@@ -89,6 +92,40 @@ class NametagContentCodecTest {
         // An unauthored appearance/visibility falls back to the safe defaults.
         assertThat(fallback.appearance().billboard()).isEqualTo("CENTER");
         assertThat(fallback.visibility().respectVanish()).isTrue();
+        // An unauthored viewer-distance is empty so the renderer applies its default cull radius.
+        assertThat(fallback.visibility().viewerDistance()).isEmpty();
+    }
+
+    @Test
+    void keepsAZeroViewerDistanceButTreatsANegativeOneAsAbsent(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  show-all {
+                    condition = ""
+                    priority = 0
+                    lines = [ "<white>{player}" ]
+                    visibility { viewer-distance = 0 }
+                  }
+                  typo {
+                    condition = "permission:uxmessentials.staff"
+                    priority = 10
+                    lines = [ "<red>{player}" ]
+                    visibility { viewer-distance = -5 }
+                  }
+                }
+                """);
+
+        NametagContentCodec.Parsed parsed = NametagContentCodec.read(root, LOG);
+
+        NametagFormat showAll = select(parsed, n -> false, "world");
+        // 0 is kept verbatim — it disables the renderer's distance cull (show to all online).
+        assertThat(showAll.visibility().viewerDistance()).hasValue(0.0);
+        NametagFormat typo = select(parsed, "uxmessentials.staff"::equals, "world");
+        // A negative authored value is treated as absent so a typo falls back to the default radius, never blanking
+        // nearby nametags.
+        assertThat(typo.visibility().viewerDistance()).isEmpty();
     }
 
     @Test

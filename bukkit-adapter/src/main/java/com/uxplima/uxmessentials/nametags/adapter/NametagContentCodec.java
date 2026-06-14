@@ -163,7 +163,19 @@ final class NametagContentCodec {
         return new NametagVisibility(
                 ConditionParser.parse(node.node("show-when").getString()),
                 node.node("hide-while-sneaking").getBoolean(defaults.hideWhileSneaking()),
-                node.node("respect-vanish").getBoolean(defaults.respectVanish()));
+                node.node("respect-vanish").getBoolean(defaults.respectVanish()),
+                viewerDistance(node.node("viewer-distance")));
+    }
+
+    // The viewer-distance is a flat block radius for the renderer's eligible-viewer cull (distinct from the
+    // appearance view-range, which is Paper's render-distance multiplier). A negative authored value is treated as
+    // absent so a typo never blanks every nearby nametag; 0 (no cull) is kept verbatim.
+    private static OptionalDouble viewerDistance(ConfigurationNode node) {
+        if (node.virtual()) {
+            return OptionalDouble.empty();
+        }
+        double blocks = node.getDouble();
+        return Double.isFinite(blocks) && blocks >= 0 ? OptionalDouble.of(blocks) : OptionalDouble.empty();
     }
 
     private static Duration refreshInterval(ConfigurationNode node) {

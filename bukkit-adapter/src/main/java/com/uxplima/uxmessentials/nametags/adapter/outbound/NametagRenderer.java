@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.nametags.application.port.NametagVanish;
 import com.uxplima.uxmessentials.nametags.domain.NametagAppearance;
 import com.uxplima.uxmessentials.nametags.domain.NametagConfig;
 import com.uxplima.uxmessentials.nametags.domain.NametagFormat;
+import com.uxplima.uxmessentials.nametags.domain.NametagVisibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
@@ -56,6 +57,10 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class NametagRenderer {
 
+    // The cull radius used when a format authors no viewer-distance: nametags past this many blocks are dropped from
+    // the per-tick refresh. Chosen above the usual entity-tracking range so a visible player keeps their nametag.
+    private static final double DEFAULT_VIEWER_DISTANCE_BLOCKS = 48.0;
+
     private final Plugin plugin;
     private final Supplier<NametagConfig> config;
     private final HologramManager manager;
@@ -88,6 +93,15 @@ public final class NametagRenderer {
     /** Spawn {@code wearer}'s nametag from the selected format. Must run on the wearer's region thread. */
     public void spawn(Player wearer, long tick) {
         Objects.requireNonNull(wearer, "wearer");
+        // A wearer already tracked (the render tick spawned for them, then a queued onJoin spawn arrives) must not be
+        // spawned a second time — that would orphan the live display and leak its follow task. Reconcile instead: on
+        // same-format update is a cheap text/viewer refresh, on a format change update's own branch does despawn+spawn.
+        // No infinite recursion: update's despawn removes the wearer from `live` synchronously before it re-spawns, so
+        // the re-entrant spawn sees an untracked wearer and proceeds.
+        if (live.containsKey(wearer.getUniqueId())) {
+            update(wearer, tick);
+            return;
+        }
         Optional<NametagFormat> selected = selectFor(wearer);
         if (selected.isEmpty()) {
             despawn(wearer.getUniqueId());
@@ -161,6 +175,26 @@ public final class NametagRenderer {
         return live.containsKey(uuid);
     }
 
+    /** How many wearers are currently tracked. Test/observability seam for the spawn-guard invariant. */
+    int trackedCount() {
+        return live.size();
+    }
+
+    /**
+     * Seed a tracked entry directly, bypassing the display spawn. Test-only seam: MockBukkit cannot spawn a real
+     * {@code TextDisplay}, so this lets a test put a wearer into the tracked state to exercise the spawn-when-tracked
+     * guard (which must reconcile, not spawn a second entity) without driving the un-mockable spawn path.
+     */
+    void trackForTest(
+            Player wearer,
+            Hologram hologram,
+            SelfHiddenNameplate nameplate,
+            TaskHandle followHandle,
+            Position spawnPos,
+            NametagFormat format) {
+        live.put(wearer.getUniqueId(), new Tracked(hologram, nameplate, followHandle, spawnPos, format));
+    }
+
     /**
      * The format this wearer should get, or empty when none applies. Package-private so the selection rule can be
      * tested directly: MockBukkit cannot spawn a real {@code TextDisplay} (its display setters are unimplemented), so
@@ -193,19 +227,24 @@ public final class NametagRenderer {
         return Component.join(JoinConfiguration.newlines(), rendered);
     }
 
-    // The eligible viewers for a wearer's nametag: online players other than the wearer, within the view range if one
-    // is set, that the vanish gate lets see the wearer — and, when the format hides on sneak and the wearer is
-    // sneaking, nobody (the nameplate then hides from all). SelfHiddenNameplate also drops the wearer, but excluding
-    // them here keeps the candidate set tight. Package-private so the cull is testable without spawning a display.
+    // The eligible viewers for a wearer's nametag: online players other than the wearer, within the format's
+    // viewer-distance cull (a flat block radius — distinct from the appearance view-range, which is Paper's
+    // render-distance multiplier applied to the Display itself), and — when the format respects vanish — that the
+    // vanish gate lets see the wearer. When the format hides on sneak and the wearer is sneaking, nobody (the nameplate
+    // then hides from all). SelfHiddenNameplate also drops the wearer, but excluding them here keeps the candidate set
+    // tight. Package-private so the cull is testable without spawning a display.
     List<Player> eligibleViewers(Player wearer, NametagFormat format) {
-        if (format.visibility().hideWhileSneaking() && wearer.isSneaking()) {
+        NametagVisibility visibility = format.visibility();
+        if (visibility.hideWhileSneaking() && wearer.isSneaking()) {
             return List.of();
         }
-        OptionalDouble viewRange = format.appearance().viewRange();
-        double maxSq = viewRange.isPresent() ? squareBlocks(viewRange.getAsDouble()) : Double.MAX_VALUE;
+        double maxSq = cullRadiusSquared(visibility.viewerDistance());
         List<Player> eligible = new ArrayList<>();
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (viewer.getUniqueId().equals(wearer.getUniqueId()) || !canSee(viewer, wearer)) {
+            if (viewer.getUniqueId().equals(wearer.getUniqueId())) {
+                continue;
+            }
+            if (visibility.respectVanish() && !canSee(viewer, wearer)) {
                 continue;
             }
             if (maxSq != Double.MAX_VALUE && !withinRange(viewer, wearer, maxSq)) {
@@ -232,10 +271,14 @@ public final class NametagRenderer {
         return viewerLocation.distanceSquared(wearerLocation) <= maxSq;
     }
 
-    // The view-range field is a render-distance multiplier (the same units the appearance carries); treat it as a
-    // block radius for the eligible-viewer cull so a far-away viewer is dropped from the per-tick refresh.
-    private static double squareBlocks(double range) {
-        double blocks = range <= 0 ? 0 : range;
+    // The squared cull radius for the eligible-viewer pass: an absent viewer-distance uses the renderer default radius,
+    // an authored 0 disables the cull (Double.MAX_VALUE → every online viewer is a candidate, falling back to Paper's
+    // native Display view-range for distance fading), and a positive value is that flat block radius.
+    private static double cullRadiusSquared(OptionalDouble viewerDistance) {
+        double blocks = viewerDistance.orElse(DEFAULT_VIEWER_DISTANCE_BLOCKS);
+        if (blocks <= 0) {
+            return Double.MAX_VALUE;
+        }
         return blocks * blocks;
     }
 
