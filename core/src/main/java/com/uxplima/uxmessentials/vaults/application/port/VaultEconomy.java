@@ -15,15 +15,18 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * <p>Soft coupling: this port is injected as a {@link java.util.Optional} into {@code VaultCharge}. When no
  * provider is present a configured cost is simply ignored at use time (vault actions are free, as if no cost
  * were configured) and a configured refund is never paid. When a provider is present {@code VaultCharge}
- * withdraws through it before a vault is allocated and deposits through it when a vault is deleted. A
- * {@code withdraw} the player cannot afford fails the action, and the charge happens only once every other
- * guard (the amount quota) has passed.
+ * withdraws through it before a vault is allocated and deposits through it when a vault is deleted. The
+ * {@code withdraw} is itself the guarded debit: it returns {@code false} when the funds were insufficient (or
+ * the guarded provider otherwise rejected), so there is no separate affordability gate before it and no
+ * check-then-charge window in which a concurrent spend could let a vault be allocated without payment. The
+ * charge fires only once every other guard (the amount quota) has passed.
  */
 public interface VaultEconomy {
 
     /**
-     * A no-op economy: affording is always true and a withdraw/deposit does nothing. Wired when economy is
-     * absent or disabled so a configured cost degrades to "free" without a special case at every call site.
+     * A no-op economy: affording is always true and a withdraw/deposit always "succeeds" without moving money.
+     * Wired when economy is absent or disabled so a configured cost degrades to "free" without a special case
+     * at every call site.
      */
     VaultEconomy NONE = new VaultEconomy() {
         @Override
@@ -32,22 +35,38 @@ public interface VaultEconomy {
         }
 
         @Override
-        public void withdraw(PlayerRef who, BigDecimal amount) {
-            // No economy backing: vault actions are free, so there is nothing to withdraw.
+        public boolean withdraw(PlayerRef who, BigDecimal amount) {
+            // No economy backing: vault actions are free, so the withdraw trivially "succeeds".
+            return true;
         }
 
         @Override
-        public void deposit(PlayerRef who, BigDecimal amount) {
-            // No economy backing: there was nothing charged, so there is nothing to refund.
+        public boolean deposit(PlayerRef who, BigDecimal amount) {
+            // No economy backing: there was nothing charged, so the refund trivially "succeeds".
+            return true;
         }
     };
 
-    /** True when {@code who} can afford {@code amount} in the server's default currency. */
+    /**
+     * True when {@code who} can afford {@code amount} in the server's default currency. This is a pre-check
+     * only (e.g. {@code /vault info}); it must never gate a {@link #withdraw} — the withdraw is the guarded
+     * debit and reports its own success, so a check-then-charge sequence would reintroduce a double-spend
+     * window.
+     */
     boolean canAfford(PlayerRef who, BigDecimal amount);
 
-    /** Withdraw {@code amount} from {@code who}'s balance — the create or open fee, charged after the quota gate. */
-    void withdraw(PlayerRef who, BigDecimal amount);
+    /**
+     * Withdraw {@code amount} from {@code who}'s balance — the create or open fee, charged after the quota
+     * gate. Returns {@code true} when the funds were debited and {@code false} when the balance was
+     * insufficient (or the guarded provider otherwise rejected). The result is the gate, not a preceding
+     * {@code canAfford}.
+     */
+    boolean withdraw(PlayerRef who, BigDecimal amount);
 
-    /** Deposit {@code amount} into {@code who}'s balance — the refund paid back when their vault is deleted. */
-    void deposit(PlayerRef who, BigDecimal amount);
+    /**
+     * Deposit {@code amount} into {@code who}'s balance — the refund paid back when their vault is deleted.
+     * Returns {@code true} when the funds were credited and {@code false} when the credit was rejected (e.g. a
+     * {@code max-balance} clamp), so a dropped refund can be surfaced rather than silently lost.
+     */
+    boolean deposit(PlayerRef who, BigDecimal amount);
 }

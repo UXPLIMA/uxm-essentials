@@ -22,8 +22,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit coverage of {@link ProviderVaultEconomy}: it bridges the vaults {@code VaultEconomy} seam onto the
  * resolved {@link EconomyProvider}, denominating the bare amount in the configured currency. {@code canAfford}
- * is a balance read against the fee, {@code withdraw} is a debit and {@code deposit} is a credit — each
- * delegated to the provider with the right currency, which a recording fake provider verifies.
+ * is a balance read against the fee, {@code withdraw} is the guarded debit and {@code deposit} is a credit —
+ * each delegated to the provider with the right currency, which a recording fake provider verifies.
+ * {@code withdraw}/{@code deposit} report the provider's {@code Result}: {@code true} on {@code isOk()},
+ * {@code false} when the guarded debit/credit was rejected.
  */
 class ProviderVaultEconomyTest {
 
@@ -42,25 +44,51 @@ class ProviderVaultEconomyTest {
     }
 
     @Test
-    void withdrawDebitsTheFeeInTheConfiguredCurrency() {
+    void withdrawDebitsTheFeeInTheConfiguredCurrencyAndReportsSuccess() {
         FakeProvider provider = new FakeProvider(new BigDecimal("100"));
         ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
 
-        economy.withdraw(WHO, new BigDecimal("25"));
+        boolean ok = economy.withdraw(WHO, new BigDecimal("25"));
 
+        assertThat(ok).isTrue();
         assertThat(provider.debited).isEqualTo(Money.of(COINS, new BigDecimal("25")));
         assertThat(provider.credited).isNull();
     }
 
     @Test
-    void depositCreditsTheRefundInTheConfiguredCurrency() {
+    void withdrawReportsFalseWhenTheGuardedDebitIsRejected() {
+        FakeProvider provider = new FakeProvider(new BigDecimal("100"));
+        provider.debitResult = Result.err(TransferError.INSUFFICIENT_FUNDS);
+        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
+
+        boolean ok = economy.withdraw(WHO, new BigDecimal("25"));
+
+        assertThat(ok).isFalse();
+        assertThat(provider.debited).isEqualTo(Money.of(COINS, new BigDecimal("25"))); // the debit was attempted
+    }
+
+    @Test
+    void depositCreditsTheRefundInTheConfiguredCurrencyAndReportsSuccess() {
         FakeProvider provider = new FakeProvider(new BigDecimal("100"));
         ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
 
-        economy.deposit(WHO, new BigDecimal("10"));
+        boolean ok = economy.deposit(WHO, new BigDecimal("10"));
 
+        assertThat(ok).isTrue();
         assertThat(provider.credited).isEqualTo(Money.of(COINS, new BigDecimal("10")));
         assertThat(provider.debited).isNull();
+    }
+
+    @Test
+    void depositReportsFalseWhenTheCreditIsRejected() {
+        FakeProvider provider = new FakeProvider(new BigDecimal("100"));
+        provider.creditResult = Result.err(TransferError.BALANCE_MAX_EXCEEDED);
+        ProviderVaultEconomy economy = new ProviderVaultEconomy(provider, COINS);
+
+        boolean ok = economy.deposit(WHO, new BigDecimal("10"));
+
+        assertThat(ok).isFalse();
+        assertThat(provider.credited).isEqualTo(Money.of(COINS, new BigDecimal("10"))); // the credit was attempted
     }
 
     /** A minimal recording {@link EconomyProvider}: answers {@code balance} from a fixed amount, records moves. */
@@ -68,6 +96,8 @@ class ProviderVaultEconomyTest {
         private final BigDecimal balance;
         private @Nullable Money debited;
         private @Nullable Money credited;
+        private Result<Unit, TransferError> debitResult = Result.ok();
+        private Result<Unit, TransferError> creditResult = Result.ok();
 
         private FakeProvider(BigDecimal balance) {
             this.balance = balance;
@@ -89,13 +119,13 @@ class ProviderVaultEconomyTest {
         @Override
         public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
             this.credited = amount;
-            return Result.ok();
+            return creditResult;
         }
 
         @Override
         public Result<Unit, TransferError> debit(PlayerRef owner, Money amount) {
             this.debited = amount;
-            return Result.ok();
+            return debitResult;
         }
 
         @Override

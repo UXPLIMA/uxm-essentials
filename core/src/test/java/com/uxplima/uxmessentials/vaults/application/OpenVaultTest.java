@@ -76,32 +76,34 @@ class OpenVaultTest {
     }
 
     @Test
-    void chargesTheCreateFeeWhenAllocatingANewVault() {
+    void chargesTheCombinedCreateAndOpenFeeInOneWithdrawWhenAllocatingANewVault() {
         FakeRepository repository = new FakeRepository();
         FixedQuotas permissions = new FixedQuotas(3, 6);
         CapturingEconomy economy = new CapturingEconomy(true);
-        OpenVault openVault = openVaultWith(repository, permissions, economy, VaultChargeSettings.of(100, 0, 0));
+        OpenVault openVault = openVaultWith(repository, permissions, economy, VaultChargeSettings.of(100, 50, 0));
 
         Result<Vault, VaultError> result = openVault.open(OWNER, 1);
 
         assertThat(result.isOk()).isTrue();
-        assertThat(economy.withdrawals).containsExactly(BigDecimal.valueOf(100.0));
+        // A new vault is one indivisible debit of create + open (150), never two separate withdrawals.
+        assertThat(economy.withdrawals).containsExactly(BigDecimal.valueOf(150.0));
         assertThat(repository.find(VaultId.of(OWNER, 1))).isPresent();
     }
 
     @Test
-    void refusesAllocationWhenTheCreateFeeIsUnaffordableAndWritesNothing() {
+    void refusesAllocationWhenTheGuardedDebitRejectsAndWritesNothing() {
+        // canAfford passes, but the guarded debit still rejects (concurrent spend / min-balance edge); the
+        // withdraw result is the gate, so the open fails and nothing is allocated or left half-charged.
         FakeRepository repository = new FakeRepository();
         FixedQuotas permissions = new FixedQuotas(3, 6);
-        CapturingEconomy economy = new CapturingEconomy(false);
-        OpenVault openVault = openVaultWith(repository, permissions, economy, VaultChargeSettings.of(100, 0, 0));
+        CapturingEconomy economy = new CapturingEconomy(true).withdrawAlwaysFails();
+        OpenVault openVault = openVaultWith(repository, permissions, economy, VaultChargeSettings.of(100, 50, 0));
 
         Result<Vault, VaultError> result = openVault.open(OWNER, 1);
 
         assertThat(result.isErr()).isTrue();
         assertThat(result.errorOrThrow()).isEqualTo(VaultError.CANNOT_AFFORD);
         assertThat(repository.find(VaultId.of(OWNER, 1))).isEmpty(); // no phantom row left behind
-        assertThat(economy.withdrawals).isEmpty();
     }
 
     @Test
@@ -159,10 +161,16 @@ class OpenVaultTest {
     private static final class CapturingEconomy
             implements com.uxplima.uxmessentials.vaults.application.port.VaultEconomy {
         private final boolean canAfford;
+        private boolean withdrawSucceeds = true;
         private final List<BigDecimal> withdrawals = new ArrayList<>();
 
         private CapturingEconomy(boolean canAfford) {
             this.canAfford = canAfford;
+        }
+
+        private CapturingEconomy withdrawAlwaysFails() {
+            this.withdrawSucceeds = false;
+            return this;
         }
 
         @Override
@@ -171,13 +179,15 @@ class OpenVaultTest {
         }
 
         @Override
-        public void withdraw(PlayerRef who, BigDecimal amount) {
+        public boolean withdraw(PlayerRef who, BigDecimal amount) {
             withdrawals.add(amount);
+            return withdrawSucceeds;
         }
 
         @Override
-        public void deposit(PlayerRef who, BigDecimal amount) {
+        public boolean deposit(PlayerRef who, BigDecimal amount) {
             // Not exercised by the open path.
+            return true;
         }
     }
 

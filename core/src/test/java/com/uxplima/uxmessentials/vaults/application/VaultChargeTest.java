@@ -21,9 +21,11 @@ import org.junit.jupiter.api.Test;
 /**
  * {@code VaultCharge} expresses the economy soft coupling: the charge is skipped entirely when the action is
  * free (zero cost), when no economy provider is wired, or when the player holds {@code uxmessentials.vault.free}
- * — and only otherwise does it consult {@link VaultEconomy}. An affordable fee is withdrawn and succeeds; an
- * unaffordable one fails with {@link VaultError#CANNOT_AFFORD} and withdraws nothing. The refund deposits only
- * when configured and the player was not bypassed. A capturing fake economy asserts the exact provider calls.
+ * — and only otherwise does it consult {@link VaultEconomy}. The withdraw is itself the guarded debit and is
+ * the gate: it succeeds and charges, or rejects with {@link VaultError#CANNOT_AFFORD}. A first allocation is a
+ * single combined create + open withdrawal so a new vault is never half-charged. The refund deposits only when
+ * configured and the player was not bypassed, and surfaces a dropped (capped) refund as {@code false}. A
+ * capturing fake economy asserts the exact provider calls.
  */
 class VaultChargeTest {
 
@@ -35,9 +37,9 @@ class VaultChargeTest {
         VaultCharge charge = new VaultCharge(
                 allow("uxmessentials.vault.free"), Optional.of(economy), VaultChargeSettings.of(100, 50, 25));
 
-        assertThat(charge.chargeCreate(WHO).isOk()).isTrue();
+        assertThat(charge.chargeAllocate(WHO).isOk()).isTrue();
         assertThat(charge.chargeOpen(WHO).isOk()).isTrue();
-        charge.refund(WHO);
+        assertThat(charge.refund(WHO)).isTrue();
 
         assertThat(economy.withdrawals).isEmpty();
         assertThat(economy.deposits).isEmpty();
@@ -47,9 +49,9 @@ class VaultChargeTest {
     void absentEconomyMakesEveryActionFreeEvenWithAConfiguredCost() {
         VaultCharge charge = new VaultCharge(denyAll(), Optional.empty(), VaultChargeSettings.of(100, 50, 25));
 
-        assertThat(charge.chargeCreate(WHO).isOk()).isTrue();
+        assertThat(charge.chargeAllocate(WHO).isOk()).isTrue();
         assertThat(charge.chargeOpen(WHO).isOk()).isTrue();
-        charge.refund(WHO); // no economy, nothing to deposit — must not throw
+        assertThat(charge.refund(WHO)).isTrue(); // no economy, nothing to deposit — must not throw
     }
 
     @Test
@@ -57,33 +59,46 @@ class VaultChargeTest {
         CapturingEconomy economy = new CapturingEconomy(true);
         VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.allFree());
 
-        assertThat(charge.chargeCreate(WHO).isOk()).isTrue();
+        assertThat(charge.chargeAllocate(WHO).isOk()).isTrue();
         assertThat(charge.chargeOpen(WHO).isOk()).isTrue();
 
         assertThat(economy.withdrawals).isEmpty();
     }
 
     @Test
-    void anAffordableFeeIsWithdrawnAndSucceeds() {
+    void allocateWithdrawsTheCombinedCreateAndOpenFeeInOneCall() {
         CapturingEconomy economy = new CapturingEconomy(true);
-        VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.of(100, 0, 0));
+        VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.of(100, 50, 0));
 
-        Result<Unit, VaultError> result = charge.chargeCreate(WHO);
+        Result<Unit, VaultError> result = charge.chargeAllocate(WHO);
 
         assertThat(result.isOk()).isTrue();
-        assertThat(economy.withdrawals).containsExactly(BigDecimal.valueOf(100.0));
+        // One indivisible debit of create + open (150), never two separate withdrawals.
+        assertThat(economy.withdrawals).containsExactly(BigDecimal.valueOf(150.0));
+    }
+
+    @Test
+    void anAffordableOpenFeeIsWithdrawnAndSucceeds() {
+        CapturingEconomy economy = new CapturingEconomy(true);
+        VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.of(0, 50, 0));
+
+        Result<Unit, VaultError> result = charge.chargeOpen(WHO);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(economy.withdrawals).containsExactly(BigDecimal.valueOf(50.0));
     }
 
     @Test
     void anUnaffordableFeeFailsWithCannotAffordAndWithdrawsNothing() {
-        CapturingEconomy economy = new CapturingEconomy(false);
-        VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.of(100, 0, 0));
+        // canAfford true, but the guarded debit still rejects (concurrent spend / min-balance edge): the
+        // withdraw result is the gate, so the charge must fail rather than allocate without payment.
+        CapturingEconomy economy = new CapturingEconomy(true).withdrawAlwaysFails();
+        VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.of(100, 50, 0));
 
-        Result<Unit, VaultError> result = charge.chargeCreate(WHO);
+        Result<Unit, VaultError> result = charge.chargeAllocate(WHO);
 
         assertThat(result.isErr()).isTrue();
         assertThat(result.errorOrThrow()).isEqualTo(VaultError.CANNOT_AFFORD);
-        assertThat(economy.withdrawals).isEmpty();
     }
 
     @Test
@@ -91,9 +106,20 @@ class VaultChargeTest {
         CapturingEconomy economy = new CapturingEconomy(true);
         VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.of(0, 0, 25));
 
-        charge.refund(WHO);
+        assertThat(charge.refund(WHO)).isTrue();
 
         assertThat(economy.deposits).containsExactly(BigDecimal.valueOf(25.0));
+    }
+
+    @Test
+    void refundReportsFalseWhenTheDepositIsRejected() {
+        // The refund was attempted but the provider capped it (e.g. max-balance); the boolean surfaces the
+        // dropped refund so a caller can log it.
+        CapturingEconomy economy = new CapturingEconomy(true).depositAlwaysFails();
+        VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.of(0, 0, 25));
+
+        assertThat(charge.refund(WHO)).isFalse();
+        assertThat(economy.deposits).containsExactly(BigDecimal.valueOf(25.0)); // the deposit was attempted
     }
 
     @Test
@@ -101,7 +127,7 @@ class VaultChargeTest {
         CapturingEconomy economy = new CapturingEconomy(true);
         VaultCharge charge = new VaultCharge(denyAll(), Optional.of(economy), VaultChargeSettings.of(100, 50, 0));
 
-        charge.refund(WHO);
+        assertThat(charge.refund(WHO)).isTrue();
 
         assertThat(economy.deposits).isEmpty();
     }
@@ -126,14 +152,30 @@ class VaultChargeTest {
         };
     }
 
-    /** A {@link VaultEconomy} recording every withdraw/deposit and answering {@code canAfford} from a flag. */
+    /**
+     * A {@link VaultEconomy} recording every withdraw/deposit and answering {@code canAfford} from a flag. The
+     * withdraw/deposit success is independently toggleable so the "affordable yet the guarded debit rejects"
+     * and "capped refund" paths can be exercised.
+     */
     private static final class CapturingEconomy implements VaultEconomy {
         private final boolean canAfford;
+        private boolean withdrawSucceeds = true;
+        private boolean depositSucceeds = true;
         private final List<BigDecimal> withdrawals = new ArrayList<>();
         private final List<BigDecimal> deposits = new ArrayList<>();
 
         private CapturingEconomy(boolean canAfford) {
             this.canAfford = canAfford;
+        }
+
+        private CapturingEconomy withdrawAlwaysFails() {
+            this.withdrawSucceeds = false;
+            return this;
+        }
+
+        private CapturingEconomy depositAlwaysFails() {
+            this.depositSucceeds = false;
+            return this;
         }
 
         @Override
@@ -142,13 +184,15 @@ class VaultChargeTest {
         }
 
         @Override
-        public void withdraw(PlayerRef who, BigDecimal amount) {
+        public boolean withdraw(PlayerRef who, BigDecimal amount) {
             withdrawals.add(amount);
+            return withdrawSucceeds;
         }
 
         @Override
-        public void deposit(PlayerRef who, BigDecimal amount) {
+        public boolean deposit(PlayerRef who, BigDecimal amount) {
             deposits.add(amount);
+            return depositSucceeds;
         }
     }
 }

@@ -47,6 +47,9 @@ public final class DeleteVault {
             return Result.err(VaultError.DELETE_UNKNOWN);
         }
         repository.delete(id);
+        // A capped/clamped refund returns false; the vault is already gone, so the delete still succeeds. The
+        // boolean is the dropped-refund seam (VaultCharge holds no logger); there is nothing more this pure
+        // use case can do, and the owner is told the vault was deleted either way.
         charge.refund(owner);
         notifier.deleted(owner, index);
         return Result.ok();

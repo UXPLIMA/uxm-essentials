@@ -23,9 +23,10 @@ import com.uxplima.uxmessentials.vaults.domain.VaultSize;
  *
  * <p>The economy charge is gated through {@link VaultCharge} in the same quota→charge→allocate order
  * {@code CreateHomeAtSlot} uses (the free quota check runs before the paid gate). A first allocation pays the
- * create fee then the per-open fee; re-opening an existing vault pays only the per-open fee. Each fee is free
- * unless its config cost is positive, so with economy disabled or unwired every open proceeds for free. A fee
- * the player cannot afford fails the open with {@link VaultError#CANNOT_AFFORD} and writes nothing.
+ * combined create + per-open fee in a single atomic withdrawal, so a new vault is never half-charged;
+ * re-opening an existing vault pays only the per-open fee. Each fee is free unless its config cost is
+ * positive, so with economy disabled or unwired every open proceeds for free. A fee the player cannot afford
+ * fails the open with {@link VaultError#CANNOT_AFFORD} and writes nothing.
  *
  * <p>This use case is pure: it loads or allocates the {@link Vault} and returns it (or a {@link VaultError}),
  * leaving the GUI open and the {@code VaultOpened} event to the adapter, which knows the live player. The
@@ -82,15 +83,12 @@ public final class OpenVault {
         if (!amount.allows(index)) {
             return Result.err(VaultError.AMOUNT_EXCEEDED);
         }
-        // Quota passed (the free check); charge the create then the per-open fee before allocating, so a
-        // player who cannot afford the vault never leaves a phantom row behind.
-        Result<Unit, VaultError> create = charge.chargeCreate(owner);
-        if (create.isErr()) {
-            return Result.err(create.errorOrThrow());
-        }
-        Result<Unit, VaultError> open = charge.chargeOpen(owner);
-        if (open.isErr()) {
-            return Result.err(open.errorOrThrow());
+        // Quota passed (the free check); charge the combined create + per-open fee in one atomic withdrawal
+        // before allocating, so a player who cannot afford the vault never leaves a phantom row behind and the
+        // create fee is never taken on its own when the open fee cannot be paid.
+        Result<Unit, VaultError> charged = charge.chargeAllocate(owner);
+        if (charged.isErr()) {
+            return Result.err(charged.errorOrThrow());
         }
         Vault allocated = Vault.allocate(id, size, clock.instant());
         repository.save(allocated);

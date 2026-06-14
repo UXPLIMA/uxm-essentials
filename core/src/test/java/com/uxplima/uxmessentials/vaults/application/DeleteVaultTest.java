@@ -172,13 +172,15 @@ class DeleteVaultTest {
         }
 
         @Override
-        public void withdraw(PlayerRef who, BigDecimal amount) {
+        public boolean withdraw(PlayerRef who, BigDecimal amount) {
             // Not exercised here.
+            return true;
         }
 
         @Override
-        public void deposit(PlayerRef who, BigDecimal amount) {
+        public boolean deposit(PlayerRef who, BigDecimal amount) {
             deposits.add(amount);
+            return true;
         }
     }
 

@@ -325,13 +325,15 @@ class VaultDeleteCommandTest {
         }
 
         @Override
-        public void withdraw(PlayerRef who, BigDecimal amount) {
+        public boolean withdraw(PlayerRef who, BigDecimal amount) {
             this.withdrawn = amount;
+            return true;
         }
 
         @Override
-        public void deposit(PlayerRef who, BigDecimal amount) {
+        public boolean deposit(PlayerRef who, BigDecimal amount) {
             this.deposited = amount;
+            return true;
         }
     }
 

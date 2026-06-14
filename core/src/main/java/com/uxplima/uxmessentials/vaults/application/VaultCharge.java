@@ -37,34 +37,43 @@ public final class VaultCharge {
     }
 
     /**
-     * Charge {@code who} the create fee. Returns success immediately when the fee is free, when no economy
-     * provider is present, or when the player holds the bypass node; otherwise withdraws the fee and returns
-     * {@link VaultError#CANNOT_AFFORD} when the balance was insufficient.
+     * Charge {@code who} the combined create + per-open fee in a single atomic withdrawal — the first-ever
+     * allocation of a vault index. Bundling both fees into one debit means a new vault is paid for in one
+     * indivisible move: it can never half-charge (take the create fee then fail to take the open fee, leaving
+     * the create fee lost with no vault). Returns success immediately when the combined fee is free, when no
+     * economy provider is present, or when the player holds the bypass node; otherwise withdraws the sum and
+     * returns {@link VaultError#CANNOT_AFFORD} when the balance was insufficient.
      */
-    public Result<Unit, VaultError> chargeCreate(PlayerRef who) {
-        return charge(who, settings.costToCreate());
+    public Result<Unit, VaultError> chargeAllocate(PlayerRef who) {
+        return charge(who, settings.costToCreate().add(settings.costToOpen()));
     }
 
     /**
-     * Charge {@code who} the per-open fee. Same gating as {@link #chargeCreate(PlayerRef)}; with a zero
-     * {@code cost-to-open} this is always free, so opening an existing vault never costs unless configured.
+     * Charge {@code who} the per-open fee — re-opening a vault index that already exists. Same gating as
+     * {@link #chargeAllocate(PlayerRef)}; with a zero {@code cost-to-open} this is always free, so re-opening
+     * an existing vault never costs unless configured.
      */
     public Result<Unit, VaultError> chargeOpen(PlayerRef who) {
         return charge(who, settings.costToOpen());
     }
 
     /**
-     * Refund {@code who} the configured delete refund. A no-op when no economy provider is present, when the
-     * refund is zero, or when the player holds the bypass node (they were never charged, so nothing is paid
-     * back). The deposit is the inverse of the create fee — it makes deleting a paid-for vault recoverable.
+     * Refund {@code who} the configured delete refund. A no-op (returning {@code true}) when no economy
+     * provider is present, when the refund is zero, or when the player holds the bypass node (they were never
+     * charged, so nothing is paid back). The deposit is the inverse of the create fee — it makes deleting a
+     * paid-for vault recoverable.
+     *
+     * <p>Returns {@code false} only when an economy refund was attempted but the provider rejected the credit
+     * (e.g. a {@code max-balance} clamp), so the caller can surface the dropped refund. {@code VaultCharge} is
+     * pure core and intentionally holds no logger; the boolean is the seam for the adapter to log against.
      */
-    public void refund(PlayerRef who) {
+    public boolean refund(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         BigDecimal refund = settings.refundOnDelete();
         if (economy.isEmpty() || refund.signum() <= 0 || permissions.has(who, BYPASS_NODE)) {
-            return;
+            return true;
         }
-        economy.get().deposit(who, refund);
+        return economy.get().deposit(who, refund);
     }
 
     private Result<Unit, VaultError> charge(PlayerRef who, BigDecimal amount) {
@@ -72,11 +81,9 @@ public final class VaultCharge {
         if (amount.signum() <= 0 || economy.isEmpty() || permissions.has(who, BYPASS_NODE)) {
             return Result.ok();
         }
-        VaultEconomy provider = economy.get();
-        if (!provider.canAfford(who, amount)) {
-            return Result.err(VaultError.CANNOT_AFFORD);
-        }
-        provider.withdraw(who, amount);
-        return Result.ok();
+        // The withdraw is the guarded debit and reports its own success — there is no preceding canAfford
+        // gate, so a concurrent spend (or a min-balance edge) that the guard rejects yields CANNOT_AFFORD
+        // rather than a vault allocated without payment.
+        return economy.get().withdraw(who, amount) ? Result.ok() : Result.err(VaultError.CANNOT_AFFORD);
     }
 }

@@ -20,8 +20,9 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>A vault cost is a bare {@link BigDecimal} in vaults' own terms; this adapter denominates it in the
  * configured default {@link Currency} before charging. {@code canAfford} is a balance read, {@code withdraw}
- * is the guarded debit (the {@code canAfford} check in {@code VaultCharge} precedes it), and {@code deposit}
- * is the single-sided credit that pays the delete refund back.
+ * is the guarded debit whose {@code isOk()} reports whether the funds sufficed (no separate {@code canAfford}
+ * gate precedes it), and {@code deposit} is the single-sided credit that pays the delete refund back, whose
+ * {@code isOk()} reports whether the refund landed.
  */
 @NullMarked
 public final class ProviderVaultEconomy implements VaultEconomy {
@@ -42,18 +43,19 @@ public final class ProviderVaultEconomy implements VaultEconomy {
     }
 
     @Override
-    public void withdraw(PlayerRef who, BigDecimal amount) {
+    public boolean withdraw(PlayerRef who, BigDecimal amount) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
-        // VaultCharge gates this behind canAfford, so the debit only fires when the funds are present; the
-        // guarded provider still rejects rather than going negative, which is the double-spend-safe path.
-        economy.debit(who, Money.of(currency, amount));
+        // The guarded debit is itself the gate: it rejects rather than going negative, so its result reports
+        // whether the funds sufficed. VaultCharge trusts this result instead of a preceding canAfford, which
+        // closes the check-then-charge double-spend window.
+        return economy.debit(who, Money.of(currency, amount)).isOk();
     }
 
     @Override
-    public void deposit(PlayerRef who, BigDecimal amount) {
+    public boolean deposit(PlayerRef who, BigDecimal amount) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
-        economy.credit(who, Money.of(currency, amount));
+        return economy.credit(who, Money.of(currency, amount)).isOk();
     }
 }
