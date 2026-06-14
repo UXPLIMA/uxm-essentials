@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.vaults.adapter.inbound.gui;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.vaults.application.OpenVault;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
+import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
@@ -50,6 +51,10 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class VaultSelectorView {
+
+    // A defensive clamp so an oversized stored name can never overflow the item label, independent of the
+    // command's configurable rename cap (a name may pre-date a lowered cap or arrive from another backend).
+    private static final int MAX_DISPLAY_NAME = 48;
 
     private final Messages messages;
     private final MessageSink sink;
@@ -95,9 +100,12 @@ public final class VaultSelectorView {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         scheduler.async(() -> {
-            Set<Integer> owned = Set.copyOf(listVaults.list(viewer).asValue().orElse(List.of()));
-            int cap = displayCap(viewer, owned);
-            scheduler.onEntity(viewer, () -> buildAndOpen(player, viewer, owned, cap));
+            List<VaultSummary> owned = listVaults.list(viewer).asValue().orElse(List.of());
+            // Index → summary, so the build pass can both test ownership and read the entry's name/icon in O(1).
+            Map<Integer, VaultSummary> byIndex =
+                    owned.stream().collect(Collectors.toMap(VaultSummary::index, summary -> summary));
+            int cap = displayCap(viewer, byIndex.keySet());
+            scheduler.onEntity(viewer, () -> buildAndOpen(player, viewer, byIndex, cap));
         });
     }
 
@@ -106,7 +114,7 @@ public final class VaultSelectorView {
      * already owns (so an owned vault is always shown even if the cap has since shrunk). An unlimited cap is
      * clamped to what the player owns, since an infinite locked tail cannot be rendered.
      */
-    private int displayCap(PlayerRef viewer, Set<Integer> owned) {
+    private int displayCap(PlayerRef viewer, java.util.Set<Integer> owned) {
         int highestOwned = owned.stream().mapToInt(Integer::intValue).max().orElse(0);
         VaultAmount amount = amountQuota.resolve(viewer);
         if (amount.unlimited()) {
@@ -115,10 +123,11 @@ public final class VaultSelectorView {
         return Math.max(highestOwned, amount.cap());
     }
 
-    private void buildAndOpen(Player player, PlayerRef viewer, Set<Integer> owned, int cap) {
+    private void buildAndOpen(Player player, PlayerRef viewer, Map<Integer, VaultSummary> owned, int cap) {
         PaginatedGui gui = build(viewer);
         for (int index = 1; index <= cap; index++) {
-            GuiItem item = owned.contains(index) ? ownedItem(player, viewer, gui, index) : lockedItem(viewer, index);
+            VaultSummary summary = owned.get(index);
+            GuiItem item = summary != null ? ownedItem(player, viewer, gui, summary) : lockedItem(viewer, index);
             if (item != null) {
                 gui.addPageItem(item);
             }
@@ -140,14 +149,38 @@ public final class VaultSelectorView {
         return builder.build();
     }
 
-    /** A filled icon for an owned vault; clicking it opens that vault through the {@code /vault <n>} path. */
-    private GuiItem ownedItem(Player player, PlayerRef viewer, PaginatedGui gui, int index) {
-        ItemStack icon = ItemBuilder.of(settings.ownedIcon())
-                .name(text(
-                        viewer, VaultsMessageKey.VAULT_SELECTOR_ENTRY_NAME, Map.of("index", Integer.toString(index))))
+    /**
+     * A filled icon for an owned vault; clicking it opens that vault through the {@code /vault <n>} path. The
+     * player's chosen icon material and display name override the defaults when set — an unknown material falls
+     * back to the configured owned icon, and the stored name is rendered as the {@code {name}} placeholder value
+     * (MiniMessage tags in it are escaped, and it is clamped) so a player can never inject markup into the menu.
+     */
+    private GuiItem ownedItem(Player player, PlayerRef viewer, PaginatedGui gui, VaultSummary summary) {
+        int index = summary.index();
+        Material material = settings.iconFor(summary.iconMaterial());
+        ItemStack icon = ItemBuilder.of(material)
+                .name(entryName(viewer, summary))
                 .lore(text(viewer, VaultsMessageKey.VAULT_SELECTOR_ENTRY_LORE, Map.of()))
                 .build();
         return GuiItem.button(icon, event -> openVaultAt(player, viewer, gui, index));
+    }
+
+    /** The button label: the player's clamped, tag-escaped display name when set, else the default entry name. */
+    private Component entryName(PlayerRef viewer, VaultSummary summary) {
+        String custom = summary.displayName();
+        if (custom == null || custom.isBlank()) {
+            return text(
+                    viewer,
+                    VaultsMessageKey.VAULT_SELECTOR_ENTRY_NAME,
+                    Map.of("index", Integer.toString(summary.index())));
+        }
+        return text(viewer, VaultsMessageKey.VAULT_SELECTOR_NAMED_ENTRY, Map.of("name", displaySafe(custom)));
+    }
+
+    /** Clamp the stored name to a sane menu width and escape MiniMessage tags so it cannot inject markup. */
+    private String displaySafe(String name) {
+        String clamped = name.length() > MAX_DISPLAY_NAME ? name.substring(0, MAX_DISPLAY_NAME) : name;
+        return miniMessage.escapeTags(clamped);
     }
 
     /**
@@ -200,6 +233,7 @@ public final class VaultSelectorView {
             case CANNOT_AFFORD -> notifier.cannotAfford(
                     viewer, chargeSettings.costToOpen().toPlainString());
             case DELETE_UNKNOWN -> notifier.deleteUnknown(viewer, index);
+            case VAULT_UNKNOWN -> notifier.renameUnknown(viewer, index);
         }
     }
 
@@ -229,6 +263,19 @@ public final class VaultSelectorView {
             Objects.requireNonNull(layout, "layout");
             Objects.requireNonNull(ownedIcon, "ownedIcon");
             Objects.requireNonNull(lockedIcon, "lockedIcon");
+        }
+
+        /**
+         * Resolve a per-vault icon material <em>name</em> to a {@code Material}, falling back to the configured
+         * owned icon for a {@code null}, blank, unknown, or air material. The lookup is on the menu-build path
+         * (the icon is per-vault dynamic data, not config), so it is bounded to one {@code matchMaterial} call.
+         */
+        public Material iconFor(@org.jspecify.annotations.Nullable String materialName) {
+            if (materialName == null || materialName.isBlank()) {
+                return ownedIcon;
+            }
+            Material parsed = Material.matchMaterial(materialName);
+            return parsed != null && !parsed.isAir() ? parsed : ownedIcon;
         }
     }
 }

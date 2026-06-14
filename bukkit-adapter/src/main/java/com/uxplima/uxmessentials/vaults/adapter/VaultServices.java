@@ -9,7 +9,9 @@ import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
+import com.uxplima.uxmessentials.vaults.application.RenameVault;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
+import com.uxplima.uxmessentials.vaults.application.SetVaultIcon;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
@@ -26,6 +28,8 @@ import org.jspecify.annotations.NullMarked;
  * @param listVaults the owned-vault listing
  * @param openAdminVault the audit-logged staff inspect override
  * @param deleteVault removes a vault row (own with refund, or the audited staff override)
+ * @param renameVault sets or clears a vault's player-chosen display name
+ * @param setVaultIcon sets or clears a vault's player-chosen icon material
  * @param saveVault the write-through on close
  * @param amountQuota the owner's vault-count cap, read by {@code /vault info}
  * @param sizeQuota the owner's per-vault row count, read by {@code /vault info}
@@ -33,6 +37,8 @@ import org.jspecify.annotations.NullMarked;
  * @param view the inventory-holder GUI builder
  * @param selector the paginated vault-picker the no-arg {@code /vault} opens when several vaults are owned
  * @param selectorEnabled whether {@code /vault} routes to the picker (else the chat list) for a multi-vault owner
+ * @param maxNameLength the longest custom vault name {@code /vault rename} accepts (a longer name is rejected)
+ * @param allowCustomIcon whether {@code /vault icon} may set a custom per-vault icon at all
  * @param chargeSettings the create/open fees and delete refund, so the cannot-afford notice can name the cost
  * @param kernel the shared outbound ports (scheduler, player lookup, events)
  */
@@ -42,6 +48,8 @@ public record VaultServices(
         ListVaults listVaults,
         OpenAdminVault openAdminVault,
         DeleteVault deleteVault,
+        RenameVault renameVault,
+        SetVaultIcon setVaultIcon,
         SaveVault saveVault,
         VaultAmountQuota amountQuota,
         VaultSizeQuota sizeQuota,
@@ -49,6 +57,8 @@ public record VaultServices(
         VaultView view,
         VaultSelectorView selector,
         boolean selectorEnabled,
+        int maxNameLength,
+        boolean allowCustomIcon,
         VaultChargeSettings chargeSettings,
         KernelPorts kernel) {
 
@@ -57,6 +67,8 @@ public record VaultServices(
         Objects.requireNonNull(listVaults, "listVaults");
         Objects.requireNonNull(openAdminVault, "openAdminVault");
         Objects.requireNonNull(deleteVault, "deleteVault");
+        Objects.requireNonNull(renameVault, "renameVault");
+        Objects.requireNonNull(setVaultIcon, "setVaultIcon");
         Objects.requireNonNull(saveVault, "saveVault");
         Objects.requireNonNull(amountQuota, "amountQuota");
         Objects.requireNonNull(sizeQuota, "sizeQuota");

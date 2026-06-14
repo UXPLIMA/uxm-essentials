@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.persistence.vaults.CachedVaultRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.VaultChanged;
+import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
@@ -72,6 +73,11 @@ public final class VaultSync {
         @Override
         public List<Integer> ownedIndices(PlayerRef owner) {
             return delegate.ownedIndices(owner);
+        }
+
+        @Override
+        public List<VaultSummary> summaries(PlayerRef owner) {
+            return delegate.summaries(owner);
         }
 
         @Override

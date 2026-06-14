@@ -135,6 +135,57 @@ class VaultSelectorTest {
         assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(PaginatedGui.class);
     }
 
+    @Test
+    void anOwnedVaultRendersItsCustomIconWhenTheSummaryCarriesOne() {
+        repository.allocate(1);
+        repository.allocate(2);
+        repository.setIcon(2, "DIAMOND");
+        selector(4).open(player, ref());
+
+        Inventory menu = player.getOpenInventory().getTopInventory();
+        // Content slots 0 and 1 hold the two owned vaults (vault 1, then vault 2 with the custom icon).
+        assertThat(menu.getItem(0)).isNotNull();
+        assertThat(menu.getItem(0).getType()).isEqualTo(org.bukkit.Material.CHEST);
+        assertThat(menu.getItem(1)).isNotNull();
+        assertThat(menu.getItem(1).getType()).isEqualTo(org.bukkit.Material.DIAMOND);
+    }
+
+    @Test
+    void anUnknownCustomIconFallsBackToTheConfiguredOwnedIcon() {
+        repository.allocate(1);
+        repository.setIcon(1, "NOT_A_REAL_MATERIAL");
+        selector(4).open(player, ref());
+
+        Inventory menu = player.getOpenInventory().getTopInventory();
+        assertThat(menu.getItem(0)).isNotNull();
+        assertThat(menu.getItem(0).getType()).isEqualTo(org.bukkit.Material.CHEST);
+    }
+
+    @Test
+    void anOwnedVaultRendersItsCustomNameWhenTheSummaryCarriesOne() {
+        repository.allocate(1);
+        repository.setName(1, "Treasure");
+        selector(4).open(player, ref());
+
+        Inventory menu = player.getOpenInventory().getTopInventory();
+        String rendered = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(menu.getItem(0).getItemMeta().displayName());
+        assertThat(rendered).contains("Treasure");
+    }
+
+    @Test
+    void aCustomNameWithMiniMessageTagsIsEscapedNotInterpreted() {
+        repository.allocate(1);
+        repository.setName(1, "<red>hax</red>");
+        selector(4).open(player, ref());
+
+        Inventory menu = player.getOpenInventory().getTopInventory();
+        // The literal tag text survives (escaped) rather than being parsed into a colour, so no injection.
+        String rendered = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(menu.getItem(0).getItemMeta().displayName());
+        assertThat(rendered).contains("<red>").contains("hax");
+    }
+
     /** Left-click the given content slot of the open menu through the installed listener. */
     private void fireClick(int slot) {
         InventoryView view = player.getOpenInventory();
@@ -183,6 +234,14 @@ class VaultSelectorTest {
             vaults.put(index, Vault.allocate(VaultId.of(ref(), index), VaultSize.ofClamped(6), Instant.now()));
         }
 
+        void setName(int index, String name) {
+            vaults.computeIfPresent(index, (idx, vault) -> vault.renamedTo(name));
+        }
+
+        void setIcon(int index, String materialName) {
+            vaults.computeIfPresent(index, (idx, vault) -> vault.iconSet(materialName));
+        }
+
         @Override
         public Optional<Vault> find(VaultId id) {
             return Optional.ofNullable(vaults.get(id.index()));
@@ -193,6 +252,17 @@ class VaultSelectorTest {
             List<Integer> indices = new ArrayList<>(vaults.keySet());
             indices.sort(Integer::compareTo);
             return indices;
+        }
+
+        @Override
+        public List<com.uxplima.uxmessentials.vaults.application.VaultSummary> summaries(PlayerRef owner) {
+            List<com.uxplima.uxmessentials.vaults.application.VaultSummary> out = new ArrayList<>();
+            for (int index : ownedIndices(owner)) {
+                Vault vault = vaults.get(index);
+                out.add(new com.uxplima.uxmessentials.vaults.application.VaultSummary(
+                        index, vault.displayName(), vault.iconMaterial()));
+            }
+            return out;
         }
 
         @Override
@@ -221,6 +291,11 @@ class VaultSelectorTest {
     private static final class KeyMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            // The named-entry button label renders the stored name as the {name} value; surface that value so a
+            // test can assert the custom name reaches the icon. Every other key returns its bare key as before.
+            if (key == VaultsMessageKey.VAULT_SELECTOR_NAMED_ENTRY) {
+                return placeholders.getOrDefault("name", "");
+            }
             return key.key();
         }
     }

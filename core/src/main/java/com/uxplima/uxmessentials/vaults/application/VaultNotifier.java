@@ -104,6 +104,26 @@ public final class VaultNotifier {
         send(viewer, VaultsMessageKey.VAULT_RENAME_UNKNOWN, Map.of("index", Integer.toString(index)));
     }
 
+    /** Tell {@code viewer} the name they gave is longer than the configured {@code max} characters. */
+    public void nameTooLong(PlayerRef viewer, int max) {
+        send(viewer, VaultsMessageKey.VAULT_NAME_TOO_LONG, Map.of("max", Integer.toString(max)));
+    }
+
+    /** Tell {@code viewer} the material they named for an icon is not a known Bukkit material. */
+    public void unknownMaterial(PlayerRef viewer, String material) {
+        send(viewer, VaultsMessageKey.VAULT_UNKNOWN_MATERIAL, Map.of("material", material));
+    }
+
+    /** Tell {@code viewer} custom vault icons are turned off by the operator. */
+    public void iconNotAllowed(PlayerRef viewer) {
+        send(viewer, VaultsMessageKey.VAULT_ICON_NOT_ALLOWED, Map.of());
+    }
+
+    /** Tell {@code viewer} they must hold an item to use it as a vault icon. */
+    public void iconNoHeldItem(PlayerRef viewer) {
+        send(viewer, VaultsMessageKey.VAULT_ICON_NO_HELD_ITEM, Map.of());
+    }
+
     /** Tell {@code viewer} they cannot afford the vault fee of {@code cost}. */
     public void cannotAfford(PlayerRef viewer, String cost) {
         send(viewer, VaultsMessageKey.VAULT_CANNOT_AFFORD, Map.of("cost", cost));

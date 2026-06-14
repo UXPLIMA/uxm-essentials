@@ -117,6 +117,39 @@ class VaultSettingsTest {
     }
 
     @Test
+    void appearanceShipsWithDocumentedDefaults() {
+        VaultSettings settings = new VaultSettings(new MapConfigStore(Map.of()));
+
+        assertThat(settings.maxNameLength()).isEqualTo(32);
+        assertThat(settings.allowCustomIcon()).isTrue();
+    }
+
+    @Test
+    void aConfiguredAppearanceBlockIsParsed() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("appearance.max-name-length", 12);
+        values.put("appearance.allow-custom-icon", false);
+        VaultSettings settings = new VaultSettings(new MapConfigStore(values));
+
+        assertThat(settings.maxNameLength()).isEqualTo(12);
+        assertThat(settings.allowCustomIcon()).isFalse();
+    }
+
+    @Test
+    void aNonPositiveMaxNameLengthIsFlooredToOneSoSomeNameIsAlwaysAccepted() {
+        VaultSettings settings = new VaultSettings(new MapConfigStore(Map.of("appearance.max-name-length", 0)));
+
+        assertThat(settings.maxNameLength()).isEqualTo(1);
+    }
+
+    @Test
+    void anOversizedMaxNameLengthIsCappedAtTheDomainCeiling() {
+        VaultSettings settings = new VaultSettings(new MapConfigStore(Map.of("appearance.max-name-length", 9999)));
+
+        assertThat(settings.maxNameLength()).isEqualTo(256);
+    }
+
+    @Test
     void theOpenSoundDefaultsToBlankAndIsTrimmed() {
         assertThat(new VaultSettings(new MapConfigStore(Map.of())).openSound()).isEmpty();
         assertThat(new VaultSettings(new MapConfigStore(Map.of("open-sound", "  block.chest.open  "))).openSound())

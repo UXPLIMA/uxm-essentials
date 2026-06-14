@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -28,6 +29,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
+import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
 import org.jspecify.annotations.NullMarked;
@@ -44,6 +46,12 @@ import org.jspecify.annotations.Nullable;
  * and pays no refund. Deletion is direct — like PlayerVaultsX it does not prompt for confirmation — and always
  * audited, so a destructive staff override is replayable from the audit channel.
  *
+ * <p>{@code rename <n> [name]} and {@code icon <n> [material]} set a vault's presentation in the selector menu:
+ * a name (or no name, to clear it) gated by {@code uxmessentials.vault.rename}, and an icon material — explicit
+ * or the caller's held item, gated by {@code uxmessentials.vault.icon} and the {@code appearance.allow-custom-icon}
+ * config switch. The name is length-checked against {@code appearance.max-name-length} and an icon material is
+ * validated against the real material registry before the write, so a bad value is refused up front.
+ *
  * <p>This handler maps the Bukkit source to the kernel value objects and hands off to the use cases. The GUI
  * open is entity-bound, so it is scheduled on the viewer's region thread through the kernel {@code Scheduler};
  * the delete touches the database, so it runs off the tick thread through {@link Scheduler#async}. The admin
@@ -56,6 +64,8 @@ public final class VaultCommand implements CommandRegistration {
     private static final String USE = "uxmessentials.vault.use";
     private static final String OTHERS = "uxmessentials.vault.others";
     private static final String ADMIN_DELETE = "uxmessentials.vault.admin.delete";
+    private static final String RENAME = "uxmessentials.vault.rename";
+    private static final String ICON = "uxmessentials.vault.icon";
     private static final int DEFAULT_INDEX = 1;
 
     private final VaultServices services;
@@ -82,6 +92,24 @@ public final class VaultCommand implements CommandRegistration {
                                 .suggests(onlinePlayerSuggestions())
                                 .then(Commands.argument("idx", IntegerArgumentType.integer(1))
                                         .executes(ctx -> deleteOther(ctx, ctx.getArgument("idx", Integer.class))))))
+                .then(Commands.literal("rename")
+                        .requires(src -> src.getSender().hasPermission(RENAME))
+                        .then(Commands.argument("n", IntegerArgumentType.integer(1))
+                                .executes(ctx -> renameOwn(ctx, ctx.getArgument("n", Integer.class), null))
+                                .then(Commands.argument("name", StringArgumentType.greedyString())
+                                        .executes(ctx -> renameOwn(
+                                                ctx,
+                                                ctx.getArgument("n", Integer.class),
+                                                StringArgumentType.getString(ctx, "name"))))))
+                .then(Commands.literal("icon")
+                        .requires(src -> src.getSender().hasPermission(ICON))
+                        .then(Commands.argument("n", IntegerArgumentType.integer(1))
+                                .executes(ctx -> iconHeld(ctx, ctx.getArgument("n", Integer.class)))
+                                .then(Commands.argument("material", StringArgumentType.word())
+                                        .executes(ctx -> iconNamed(
+                                                ctx,
+                                                ctx.getArgument("n", Integer.class),
+                                                StringArgumentType.getString(ctx, "material"))))))
                 .then(Commands.argument("n", IntegerArgumentType.integer(1))
                         .executes(ctx -> openOwn(ctx, ctx.getArgument("n", Integer.class))))
                 .then(Commands.argument("player", ArgumentTypes.player())
@@ -103,7 +131,7 @@ public final class VaultCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef viewer = BukkitRefs.toRef(player);
-        List<Integer> owned = services.listVaults().list(viewer).asValue().orElse(List.of());
+        List<Integer> owned = ownedIndices(viewer);
         // With several vaults owned, open the picker menu (or fall back to the chat list when it is disabled);
         // a single owned vault (or none) opens vault 1 directly, as before.
         if (owned.size() > 1) {
@@ -117,13 +145,20 @@ public final class VaultCommand implements CommandRegistration {
         return openOwn(ctx, owned.isEmpty() ? DEFAULT_INDEX : owned.get(0));
     }
 
+    /** The ascending one-based indices of {@code viewer}'s vaults, read from the summary listing. */
+    private List<Integer> ownedIndices(PlayerRef viewer) {
+        return services.listVaults().list(viewer).asValue().orElse(List.of()).stream()
+                .map(VaultSummary::index)
+                .toList();
+    }
+
     private int info(CommandContext<CommandSourceStack> ctx) {
         Player player = playerOrReject(ctx);
         if (player == null) {
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef viewer = BukkitRefs.toRef(player);
-        List<Integer> owned = services.listVaults().list(viewer).asValue().orElse(List.of());
+        List<Integer> owned = ownedIndices(viewer);
         notifier.showInfo(
                 viewer,
                 owned.size(),
@@ -192,6 +227,74 @@ public final class VaultCommand implements CommandRegistration {
         return Command.SINGLE_SUCCESS;
     }
 
+    private int renameOwn(CommandContext<CommandSourceStack> ctx, int index, @Nullable String rawName) {
+        Player player = playerOrReject(ctx);
+        if (player == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef owner = BukkitRefs.toRef(player);
+        @Nullable String name = normalizeName(rawName);
+        if (name != null && name.length() > services.maxNameLength()) {
+            notifier.nameTooLong(owner, services.maxNameLength());
+            return Command.SINGLE_SUCCESS;
+        }
+        // A DB write — run it off the tick thread; the use case notifies the player of the set/clear outcome.
+        scheduler.async(() -> services.renameVault().rename(owner, index, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int iconNamed(CommandContext<CommandSourceStack> ctx, int index, String rawMaterial) {
+        Player player = playerOrReject(ctx);
+        if (player == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef owner = BukkitRefs.toRef(player);
+        if (!services.allowCustomIcon()) {
+            notifier.iconNotAllowed(owner);
+            return Command.SINGLE_SUCCESS;
+        }
+        Material material = Material.matchMaterial(rawMaterial);
+        if (material == null || material.isAir()) {
+            notifier.unknownMaterial(owner, rawMaterial);
+            return Command.SINGLE_SUCCESS;
+        }
+        applyIcon(owner, index, material);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int iconHeld(CommandContext<CommandSourceStack> ctx, int index) {
+        Player player = playerOrReject(ctx);
+        if (player == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        PlayerRef owner = BukkitRefs.toRef(player);
+        if (!services.allowCustomIcon()) {
+            notifier.iconNotAllowed(owner);
+            return Command.SINGLE_SUCCESS;
+        }
+        Material held = player.getInventory().getItemInMainHand().getType();
+        if (held.isAir()) {
+            notifier.iconNoHeldItem(owner);
+            return Command.SINGLE_SUCCESS;
+        }
+        applyIcon(owner, index, held);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void applyIcon(PlayerRef owner, int index, Material material) {
+        // A DB write — run it off the tick thread; the use case confirms the new icon to the player itself.
+        scheduler.async(() -> services.setVaultIcon().setIcon(owner, index, material.name()));
+    }
+
+    /** Trim a rename argument; a blank (or absent) name clears the display name rather than setting it. */
+    private static @Nullable String normalizeName(@Nullable String rawName) {
+        if (rawName == null) {
+            return null;
+        }
+        String trimmed = rawName.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx, PlayerRef actor) {
         try {
             PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
@@ -243,6 +346,7 @@ public final class VaultCommand implements CommandRegistration {
             case CANNOT_AFFORD -> notifier.cannotAfford(
                     viewer, services.chargeSettings().costToCreate().toPlainString());
             case DELETE_UNKNOWN -> notifier.deleteUnknown(viewer, index);
+            case VAULT_UNKNOWN -> notifier.renameUnknown(viewer, index);
         }
     }
 

@@ -42,6 +42,10 @@ public enum VaultsMessageKey implements MessageKey {
     VAULT_NAME_CLEARED("vaults.name-cleared"),
     VAULT_ICON_SET("vaults.icon-set"),
     VAULT_RENAME_UNKNOWN("vaults.rename-unknown"),
+    VAULT_NAME_TOO_LONG("vaults.name-too-long"),
+    VAULT_UNKNOWN_MATERIAL("vaults.unknown-material"),
+    VAULT_ICON_NOT_ALLOWED("vaults.icon-not-allowed"),
+    VAULT_ICON_NO_HELD_ITEM("vaults.icon-no-held-item"),
 
     // item blacklist (items refused on save and returned to the player)
     VAULT_ITEM_BLOCKED("vaults.item-blocked"),
@@ -52,6 +56,7 @@ public enum VaultsMessageKey implements MessageKey {
     // vault-selector GUI (/vault with several owned): one icon per index, owned vs locked
     VAULT_SELECTOR_TITLE("vaults.selector.title"),
     VAULT_SELECTOR_ENTRY_NAME("vaults.selector.entry.name"),
+    VAULT_SELECTOR_NAMED_ENTRY("vaults.selector.named-entry"),
     VAULT_SELECTOR_ENTRY_LORE("vaults.selector.entry.lore"),
     VAULT_SELECTOR_LOCKED_NAME("vaults.selector.locked.name"),
     VAULT_SELECTOR_LOCKED_LORE("vaults.selector.locked.lore"),

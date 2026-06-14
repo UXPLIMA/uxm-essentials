@@ -31,6 +31,9 @@ public final class VaultSettings {
     private static final int DEFAULT_AMOUNT = 1;
     private static final int DEFAULT_SIZE = 6;
     private static final int DEFAULT_SELECTOR_ROWS = 3;
+    private static final int DEFAULT_MAX_NAME_LENGTH = 32;
+    // The aggregate rejects a name beyond this many characters; the configurable cap is never looser than it.
+    private static final int DOMAIN_NAME_CEILING = 256;
     private static final int DEFAULT_CLEANUP_INACTIVE_DAYS = 30;
     private static final int DEFAULT_CLEANUP_INTERVAL_HOURS = 24;
     private static final Material DEFAULT_OWNED_ICON = Material.CHEST;
@@ -43,6 +46,8 @@ public final class VaultSettings {
     private final VaultItemPolicy itemPolicy;
     private final boolean selectorEnabled;
     private final VaultSelectorSettings selectorSettings;
+    private final int maxNameLength;
+    private final boolean allowCustomIcon;
     private final boolean cleanupEnabled;
     private final Duration cleanupInactive;
     private final Duration cleanupInterval;
@@ -60,6 +65,11 @@ public final class VaultSettings {
         this.itemPolicy = new VaultItemPolicy(Set.copyOf(config.getStringList("blacklist-materials", List.of())));
         this.selectorEnabled = config.getBoolean("selector.enabled", true);
         this.selectorSettings = parseSelector(config);
+        // Floor at one so a misconfigured zero/negative cap can never reject every name; ceil at the domain
+        // sanity guard so the adapter cap is never looser than the aggregate's own limit.
+        this.maxNameLength = Math.max(
+                1, Math.min(DOMAIN_NAME_CEILING, config.getInt("appearance.max-name-length", DEFAULT_MAX_NAME_LENGTH)));
+        this.allowCustomIcon = config.getBoolean("appearance.allow-custom-icon", true);
         this.cleanupEnabled = config.getBoolean("cleanup.enabled", false);
         // Floor at one day: an enabled sweep with inactive-days = 0 would purge against a now cutoff and wipe
         // essentially every vault, so an operator typo (or reading 0 as "disabled") can never trigger that.
@@ -103,6 +113,19 @@ public final class VaultSettings {
     /** The picker-menu presentation (layout, icons, show-locked) parsed once from the {@code selector} block. */
     public VaultSelectorSettings selectorSettings() {
         return selectorSettings;
+    }
+
+    /**
+     * The longest custom vault name {@code /vault rename} accepts ({@code appearance.max-name-length}), floored
+     * at one and never looser than the aggregate's own sanity guard so a too-long name is rejected up front.
+     */
+    public int maxNameLength() {
+        return maxNameLength;
+    }
+
+    /** Whether {@code /vault icon} may set a custom per-vault icon ({@code appearance.allow-custom-icon}). */
+    public boolean allowCustomIcon() {
+        return allowCustomIcon;
     }
 
     /** Whether the {@code cleanup} block opts the inactive-vault purge sweep in (off by default). */

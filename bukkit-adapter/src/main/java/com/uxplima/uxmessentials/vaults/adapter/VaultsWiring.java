@@ -31,7 +31,9 @@ import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
 import com.uxplima.uxmessentials.vaults.application.PurgeInactiveVaults;
+import com.uxplima.uxmessentials.vaults.application.RenameVault;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
+import com.uxplima.uxmessentials.vaults.application.SetVaultIcon;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultCharge;
 import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
@@ -169,6 +171,8 @@ public final class VaultsWiring {
                 listVaults,
                 new OpenAdminVault(repository, sizeQuota, audit, clock),
                 new DeleteVault(repository, charge, audit, notifier),
+                new RenameVault(repository, notifier),
+                new SetVaultIcon(repository, notifier),
                 saveVault,
                 amountQuota,
                 sizeQuota,
@@ -176,6 +180,8 @@ public final class VaultsWiring {
                 view,
                 selector,
                 settings.selectorEnabled(),
+                settings.maxNameLength(),
+                settings.allowCustomIcon(),
                 settings.chargeSettings(),
                 kernel);
     }

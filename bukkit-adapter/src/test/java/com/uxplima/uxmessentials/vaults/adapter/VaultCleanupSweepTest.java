@@ -168,6 +168,11 @@ class VaultCleanupSweepTest {
         }
 
         @Override
+        public List<com.uxplima.uxmessentials.vaults.application.VaultSummary> summaries(PlayerRef owner) {
+            return List.of();
+        }
+
+        @Override
         public int count(PlayerRef owner) {
             return 0;
         }

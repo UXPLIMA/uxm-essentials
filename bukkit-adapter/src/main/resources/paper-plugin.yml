@@ -750,6 +750,12 @@ permissions:
   uxmessentials.vault.use:
     description: '/vault to open your default vault (or list them), /vault <n> to open the Nth, and /vault delete <n> to delete your own.'
     default: true
+  uxmessentials.vault.rename:
+    description: '/vault rename <n> [name] — set or clear the display name of your own vault.'
+    default: true
+  uxmessentials.vault.icon:
+    description: '/vault icon <n> [material] — set or clear the icon of your own vault (held item if omitted).'
+    default: true
   uxmessentials.vault.others:
     description: '/vault <player> [n] — open and audit another player''s vault (audit-logged).'
     default: op

@@ -219,7 +219,7 @@ class VaultOverflowTest {
     }
 
     private Vault vaultOf(VaultSize size, VaultContents contents) {
-        return Vault.of(VaultId.of(ref(), 1), size, contents, Instant.now());
+        return Vault.of(VaultId.of(ref(), 1), size, contents, null, null, Instant.now());
     }
 
     private PlayerRef ref() {
@@ -265,6 +265,11 @@ class VaultOverflowTest {
 
         @Override
         public List<Integer> ownedIndices(PlayerRef owner) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.uxplima.uxmessentials.vaults.application.VaultSummary> summaries(PlayerRef owner) {
             return List.of();
         }
 
