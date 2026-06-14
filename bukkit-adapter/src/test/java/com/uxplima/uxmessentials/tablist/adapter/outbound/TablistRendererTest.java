@@ -387,6 +387,86 @@ class TablistRendererTest {
         assertThat(plain(player.playerListName())).isEqualTo(player.getName());
     }
 
+    @Test
+    void repaintsASkinnedPlayersEntryToALateJoiner() {
+        // A is skinned while alone, then B joins later. Native name/order replicate to B, but the custom-skin packet
+        // does not — so the join-time repaint must re-send A's custom-skin entry to B (and only B).
+        PlayerMock a = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistSkinSource skin = new TablistSkinSource.Texture("YS10ZXg=", Optional.of("asig"));
+        TablistRenderer renderer = rendererWith(packets, skinFormat("default", "<gold>{player}", 6, skin));
+
+        renderer.renderFor(a);
+        // B joins after A was skinned: the steady tick would early-return for A (unchanged tuple), so without the
+        // repaint B never receives A's custom skin.
+        PlayerMock b = server.addPlayer();
+        renderer.repaintSkinsFor(b);
+
+        List<TabEntry> toB = packets.entriesSentTo(b.getUniqueId());
+        assertThat(toB).hasSize(1);
+        TabEntry entry = toB.get(0);
+        assertThat(entry.id()).isEqualTo(a.getUniqueId());
+        assertThat(entry.listOrder()).isEqualTo(6);
+        // The name format renders against A (the target), with the {player} token resolved to A's name.
+        assertThat(plain(entry.displayName())).isEqualTo(a.getName());
+        TabSkin painted = skinOf(entry);
+        assertThat(painted.textureValue()).isEqualTo("YS10ZXg=");
+        assertThat(painted.signature()).isEqualTo("asig");
+    }
+
+    @Test
+    void aLateJoinerGetsTheirOwnSkinnedEntry() {
+        // The joining viewer's own format carries a skin: renderFor paints it (broadcast to all viewers incl. self) and
+        // the repaint re-sends it to self too, so a late joiner always sees their own custom skin.
+        PlayerMock joiner = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistSkinSource skin = new TablistSkinSource.Texture("c2VsZg==", Optional.empty());
+        TablistRenderer renderer = rendererWith(packets, skinFormat("default", "<gold>{player}", 3, skin));
+
+        renderer.renderFor(joiner);
+        renderer.repaintSkinsFor(joiner);
+
+        List<TabEntry> toSelf = packets.entriesSentTo(joiner.getUniqueId());
+        assertThat(toSelf).isNotEmpty();
+        TabEntry own = toSelf.get(toSelf.size() - 1);
+        assertThat(own.id()).isEqualTo(joiner.getUniqueId());
+        assertThat(skinOf(own).textureValue()).isEqualTo("c2VsZg==");
+    }
+
+    @Test
+    void doesNotRepaintAnUnskinnedPlayerToALateJoiner() {
+        // A is on the native (no-skin) path, so the repaint must send nothing to a late joiner — only skinned targets
+        // are repainted.
+        PlayerMock a = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistRenderer renderer =
+                rendererWith(packets, format("default", DisplayCondition.always(), 0, "<gold>{player}", 5));
+
+        renderer.renderFor(a);
+        PlayerMock b = server.addPlayer();
+        renderer.repaintSkinsFor(b);
+
+        assertThat(packets.entriesSentTo(b.getUniqueId())).isEmpty();
+    }
+
+    @Test
+    void doesNotRepaintAnOfflineSkinnedTargetToALateJoiner() {
+        // A is skinned, then quits (forget drops their tracking). A late joiner must not be repainted A's entry — only
+        // currently-online skinned targets are repainted.
+        PlayerMock a = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        TablistSkinSource skin = new TablistSkinSource.Texture("Z29uZQ==", Optional.empty());
+        TablistRenderer renderer = rendererWith(packets, skinFormat("default", "<gold>{player}", 1, skin));
+
+        renderer.renderFor(a);
+        renderer.forget(a);
+        a.disconnect();
+        PlayerMock b = server.addPlayer();
+        renderer.repaintSkinsFor(b);
+
+        assertThat(packets.entriesSentTo(b.getUniqueId())).isEmpty();
+    }
+
     /**
      * A PlayerMock that records the header/footer components handed to {@code sendPlayerListHeaderAndFooter} and counts
      * the sends. The stock PlayerMock leaves that call a no-op, so this is the only way to observe whether the renderer
@@ -421,9 +501,14 @@ class TablistRendererTest {
         }
     }
 
-    /** A fake {@link TabListPackets} that records each built add entry and counts sends. The packet object is the entry. */
+    /**
+     * A fake {@link TabListPackets} that records each built add entry and counts sends. The packet object is the entry,
+     * so a recorded {@code (viewer, packet)} send pair carries the {@link TabEntry} that reached that viewer — this lets
+     * a late-joiner test assert which entries a single viewer received.
+     */
     private static final class RecordingPackets implements TabListPackets {
         private final List<TabEntry> added = new ArrayList<>();
+        private final List<Sent> sent = new ArrayList<>();
         private int sends;
 
         @Override
@@ -450,7 +535,21 @@ class TablistRendererTest {
         @Override
         public void send(org.bukkit.entity.Player viewer, Object packet) {
             sends++;
+            sent.add(new Sent(viewer.getUniqueId(), packet));
         }
+
+        /** The add entries that reached a single viewer, in send order. */
+        List<TabEntry> entriesSentTo(UUID viewer) {
+            List<TabEntry> entries = new ArrayList<>();
+            for (Sent s : sent) {
+                if (s.viewer().equals(viewer) && s.packet() instanceof TabEntry entry) {
+                    entries.add(entry);
+                }
+            }
+            return entries;
+        }
+
+        private record Sent(UUID viewer, Object packet) {}
     }
 
     /** A fake profile source: an online map for inline reads, a fetchable map for the "off-thread" fetch. */

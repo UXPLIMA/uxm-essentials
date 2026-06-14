@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.tablist.adapter.outbound;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.Bukkit;
@@ -7,6 +8,7 @@ import org.bukkit.entity.Player;
 
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.destroystokyo.paper.profile.ProfileProperty;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -17,11 +19,21 @@ import org.jspecify.annotations.Nullable;
  * {@link PlayerProfile#complete() completes} it against Mojang — a blocking call the resolver only makes on the async
  * scheduler. Every read fails closed: an unknown name, an absent {@code textures} property, or a fetch failure returns
  * empty so the resolver falls back to the no-skin native path.
+ *
+ * <p>A fetch failure (a misspelled {@code player:<name>}, a Mojang rate-limit, a network outage) is logged at debug
+ * before the empty fall-back so the failure leaves an operator signal without spamming the default log — a bad name is
+ * not worth a warning, and the tablist still renders fine on the native path.
  */
 @NullMarked
 public final class BukkitMojangProfileSource implements MojangProfileSource {
 
     private static final String TEXTURES_PROPERTY = "textures";
+
+    private final Logger log;
+
+    public BukkitMojangProfileSource(Logger log) {
+        this.log = Objects.requireNonNull(log, "log");
+    }
 
     @Override
     public Optional<TabSkin> onlineTexture(String name) {
@@ -42,6 +54,9 @@ public final class BukkitMojangProfileSource implements MojangProfileSource {
             return textureOf(profile);
         } catch (RuntimeException failure) {
             // A network failure or rate-limit must not blank the tablist: fall back to no skin (the native path).
+            // Debug,
+            // not warn, so a single bad name does not spam the log while the operator still gets a signal to grep.
+            log.debug("tablist skin fetch failed for {}: {}", name, failure);
             return Optional.empty();
         }
     }

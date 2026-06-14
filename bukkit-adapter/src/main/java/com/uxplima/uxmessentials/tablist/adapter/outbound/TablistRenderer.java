@@ -177,6 +177,48 @@ public final class TablistRenderer {
         applyRow(player, format, tick);
     }
 
+    /**
+     * Re-send every currently-skinned online player's packet entry to a single newly-joined {@code viewer}, so a late
+     * joiner sees the custom skins the steady-state tick would not repaint for them.
+     *
+     * <p>Native Paper replicates a player's list name and sort order to every viewer, including late joiners, so those
+     * need no special handling. The packet skin path does <em>not</em>: the server adds an already-online skinned player
+     * to the joiner's tab with that player's <em>real</em> profile, and the renderer's steady-state tick re-sends nothing
+     * for an unchanged tuple — so without this the joiner would see real skins forever. For each skinned target still
+     * online (including the joining viewer themselves, whose own format may carry a skin) the same tuple the steady state
+     * holds ({@link AppliedSkin}) is rebuilt into a {@link TabEntry} and sent to the one joining viewer only — never a
+     * full broadcast. A target whose skin is still resolving was never recorded in {@link #appliedSkin}, so it is simply
+     * skipped here; the next steady tick repaints it to all viewers once the texture lands.
+     *
+     * <p>Must run on the joining {@code viewer}'s region/entity thread, like {@link #renderFor(Player)} — the connection
+     * listener hops there first.
+     */
+    public void repaintSkinsFor(Player viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        for (Map.Entry<UUID, AppliedSkin> painted : appliedSkin.entrySet()) {
+            Player target = Bukkit.getPlayer(painted.getKey());
+            if (target == null) {
+                // The skinned target logged off between paint and this join; their entry no longer exists to repaint.
+                continue;
+            }
+            repaintSkinFor(viewer, target, painted.getValue());
+        }
+    }
+
+    /** Rebuild {@code target}'s skin row from the tuple the steady state holds and send it to the one {@code viewer}. */
+    private void repaintSkinFor(Player viewer, Player target, AppliedSkin painted) {
+        Optional<TabSkin> skin = skinResolver.resolve(painted.skinSource());
+        if (skin.isEmpty()) {
+            // The texture has fallen out of cache since the paint; the next steady tick will repaint it to all viewers.
+            return;
+        }
+        long tick = animations.tick();
+        Component name =
+                painted.nameSource().isEmpty() ? displayName(target) : renderName(target, painted.nameSource(), tick);
+        TabEntry entry = new TabEntry(target.getUniqueId(), name, painted.order(), skin.get(), target.getName());
+        packets.send(viewer, packets.addOrUpdate(entry));
+    }
+
     /** Clear {@code player}'s header/footer and reset any list name/order/skin this renderer applied. */
     public void clear(Player player) {
         Objects.requireNonNull(player, "player");

@@ -68,7 +68,8 @@ public final class TablistWiring {
         // the nametag wiring. The skin resolver reads online textures inline and fetches offline names off the tick
         // thread through the kernel Scheduler, caching the result.
         TabListPackets packets = new NmsTabListPackets(new PacketSender(new ChannelResolver()));
-        TablistSkinResolver skinResolver = new TablistSkinResolver(new BukkitMojangProfileSource(), kernel.scheduler());
+        TablistSkinResolver skinResolver =
+                new TablistSkinResolver(new BukkitMojangProfileSource(kernel.log()), kernel.scheduler());
         TablistRenderer renderer = new TablistRenderer(settings::formats, animations, packets, skinResolver);
         TablistRenderTask renderTask = new TablistRenderTask(
                 kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
