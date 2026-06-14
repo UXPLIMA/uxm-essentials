@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.staff.domain.LoadoutBlob;
 import com.uxplima.uxmessentials.staff.domain.SavedLoadout;
 import com.uxplima.uxmessentials.staff.domain.event.StaffModeExited;
 import org.junit.jupiter.api.Test;
@@ -48,5 +49,49 @@ class ExitStaffModeTest {
         assertThat(fakes.calls).isEmpty();
         assertThat(fakes.events.published).isEmpty();
         assertThat(fakes.sentKeys).isEmpty();
+    }
+
+    @Test
+    void offlineRestoreDoesNotDeleteTheRow() {
+        // A disconnect race: the player is gone by the time the restore runs, so it reaches no one and reports
+        // false. The row must NOT be deleted — it is the only copy of the real loadout — but the marker is cleared
+        // so the join-recovery path re-arms.
+        StaffTestFakes fakes = new StaffTestFakes();
+        fakes.store.active.put(ACTOR.uuid(), "default");
+        fakes.repository.rows.put(ACTOR.uuid(), StaffTestFakes.sampleLoadout());
+        fakes.capture.restoreReachesPlayer = false;
+
+        var result = exitMode(fakes).exit(ACTOR);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(fakes.calls).doesNotContain("delete");
+        assertThat(fakes.repository.rows).containsKey(ACTOR.uuid());
+        assertThat(fakes.store.isActive(ACTOR)).isFalse();
+    }
+
+    @Test
+    void restoresThePreModeVanishStateRatherThanRevealing() {
+        // A player vanished via /vanish BEFORE entering stays vanished on exit — exit sets vanishedBefore, not false.
+        StaffTestFakes fakes = new StaffTestFakes();
+        fakes.store.active.put(ACTOR.uuid(), "default");
+        fakes.repository.rows.put(ACTOR.uuid(), loadoutVanishedBefore(true));
+
+        exitMode(fakes).exit(ACTOR);
+
+        assertThat(fakes.vanish.states).containsExactly(true);
+    }
+
+    private static SavedLoadout loadoutVanishedBefore(boolean vanished) {
+        return new SavedLoadout(
+                LoadoutBlob.of(new byte[] {1}),
+                LoadoutBlob.empty(),
+                LoadoutBlob.empty(),
+                0,
+                0,
+                0f,
+                "SURVIVAL",
+                false,
+                LoadoutBlob.empty(),
+                vanished);
     }
 }

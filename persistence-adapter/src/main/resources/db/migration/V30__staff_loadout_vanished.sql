@@ -1,0 +1,12 @@
+-- Add the captured pre-staff-mode vanish state to staff_loadout. Staff mode reveals a
+-- player on exit, but a player vanished via /vanish BEFORE entering must stay vanished on
+-- exit (and on a crash-recovery restore), so the flag they had before entering is captured
+-- alongside the rest of their loadout and restored rather than hard-revealed.
+--
+-- Same portability contract as V29: a SMALLINT (0/1) rather than a BOOLEAN so there is no
+-- dialect-specific boolean handling (matching the flying flag in V29 and the read flag in
+-- V4). NOT NULL with a DEFAULT 0 so the column adds cleanly to any rows left behind by a
+-- pre-V30 staff mode — an orphaned row from before this migration recovers as not-vanished,
+-- the safe default. jOOQ's DDLDatabase parses this file alongside V1-V29 at build time, so
+-- the generated STAFF_LOADOUT class always matches the runtime schema.
+ALTER TABLE staff_loadout ADD COLUMN vanished_before SMALLINT NOT NULL DEFAULT 0;

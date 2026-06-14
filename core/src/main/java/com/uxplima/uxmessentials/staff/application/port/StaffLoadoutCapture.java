@@ -19,8 +19,14 @@ public interface StaffLoadoutCapture {
     /** Snapshot {@code who}'s current loadout into a pure {@link SavedLoadout}. */
     SavedLoadout capture(PlayerRef who);
 
-    /** Restore {@code loadout} onto {@code who}, replacing whatever they are currently holding. */
-    void restore(PlayerRef who, SavedLoadout loadout);
+    /**
+     * Restore {@code loadout} onto {@code who}, replacing whatever they are currently holding. Returns whether
+     * the restore actually reached an online player: {@code true} when {@code who} was online and the items
+     * were written back, {@code false} when they were offline (a disconnect race) and nothing was restored. The
+     * exit use case keys its delete-the-durable-copy step on this — the row is dropped only on a {@code true},
+     * so a player who vanished off the server between the schedule and the restore keeps their recoverable row.
+     */
+    boolean restore(PlayerRef who, SavedLoadout loadout);
 
     /** Clear {@code who}'s inventory and lay out the gadget hotbar for the {@code modeName} profile. */
     void applyGadgetHotbar(PlayerRef who, String modeName);

@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCaptur
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffModeStoreImpl;
 import com.uxplima.uxmessentials.staff.application.EnterStaffMode;
 import com.uxplima.uxmessentials.staff.application.ExitStaffMode;
+import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
 import com.uxplima.uxmessentials.staff.domain.SavedLoadout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,13 +59,15 @@ class StaffModeItemSafetyTest {
         who = new PlayerRef(player.getUniqueId(), player.getName());
         settings = StaffAdapterFakes.defaultSettings();
         gadgetItems = new StaffGadgetItems(MockBukkit.createMockPlugin("uxmEssentials"));
-        capture = new BukkitStaffLoadoutCapture(settings, gadgetItems);
+        vanish = new RecordingVanish();
+        capture = new BukkitStaffLoadoutCapture(settings, gadgetItems, vanish);
         store = new StaffModeStoreImpl();
         repository = new RecordingRepository();
-        vanish = new RecordingVanish();
         events = new RecordingEvents();
+        RecoverStaffLoadout recover =
+                new RecoverStaffLoadout(store, repository, capture, vanish, StaffAdapterFakes.notifier());
         enter = new EnterStaffMode(
-                store, repository, capture, vanish, StaffAdapterFakes.notifier(), events, "default", true);
+                store, repository, capture, vanish, StaffAdapterFakes.notifier(), events, recover, "default", true);
         exit = new ExitStaffMode(store, repository, capture, vanish, StaffAdapterFakes.notifier(), events);
     }
 
@@ -91,8 +94,9 @@ class StaffModeItemSafetyTest {
         assertThat(gadgetItems.gadgetOf(player.getInventory().getItem(0))).contains(StaffGadget.VANISH);
         assertThat(gadgetItems.gadgetOf(player.getInventory().getItem(1))).contains(StaffGadget.EXAMINE);
 
-        // The save lands before the hotbar swap; there is exactly one save and it is the first repository call.
-        assertThat(repository.calls).first().isEqualTo("save");
+        // The first repository call is the enter-never-overwrites guard load (no prior row), then exactly one
+        // save — and it commits before the hotbar swap (the live inventory above already holds the gadgets).
+        assertThat(repository.calls).containsExactly("load", "save");
         assertThat(store.isActive(who)).isTrue();
         assertThat(vanish.states).containsExactly(true);
     }
@@ -134,6 +138,34 @@ class StaffModeItemSafetyTest {
         assertThat(player.getInventory().getItem(0)).isNotNull();
         assertThat(player.getInventory().getItem(0).getType()).isEqualTo(Material.DIAMOND_SWORD);
         assertThat(repository.rows).doesNotContainKey(who.uuid());
+    }
+
+    @Test
+    void aPreEnterVanishedPlayerIsStillVanishedAfterAToggle() {
+        giveRealLoadout();
+        vanish.setVanished(who, true); // vanished via /vanish BEFORE entering
+        vanish.states.clear(); // ignore that setup toggle; assert only what enter/exit do
+
+        enter.enter(who);
+        exit.exit(who);
+
+        // The captured loadout recorded vanishedBefore, so exit restores vanished=true rather than revealing.
+        assertThat(vanish.states).containsExactly(true, true);
+    }
+
+    @Test
+    void enterClosesAnOpenInventorySoTheCursorItemIsNotOrphaned() {
+        giveRealLoadout();
+        // A /staffmode run with a held cursor item: the enter flow closes the inventory FIRST. On a real server
+        // closing returns the cursor item to a free slot (so the following capture snapshots it, rather than the
+        // gadget-hotbar clear dropping it). The observable seam here is that capture closed the inventory — after
+        // enter the cursor is no longer holding the item. (MockBukkit's closeInventory clears the cursor rather
+        // than returning it to a slot, so item-survival itself is only assertable against a live server.)
+        player.setItemOnCursor(new ItemStack(Material.EMERALD, 3));
+
+        enter.enter(who);
+
+        assertThat(player.getItemOnCursor().getType()).isEqualTo(Material.AIR);
     }
 
     private void giveRealLoadout() {

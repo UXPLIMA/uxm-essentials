@@ -36,4 +36,10 @@ public final class PresenceStaffVanish implements StaffVanish {
             toggleVanish.toggle(who);
         }
     }
+
+    @Override
+    public boolean isVanished(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        return store.current(who).vanished();
+    }
 }

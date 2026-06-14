@@ -14,9 +14,26 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface StaffVanish {
 
-    /** A no-op vanish — the binding when presence is disabled. */
-    StaffVanish NONE = (who, vanished) -> {};
+    /** A no-op vanish — the binding when presence is disabled; reads as never-vanished. */
+    StaffVanish NONE = new StaffVanish() {
+        @Override
+        public void setVanished(PlayerRef who, boolean vanished) {}
+
+        @Override
+        public boolean isVanished(PlayerRef who) {
+            return false;
+        }
+    };
 
     /** Set {@code who}'s vanish state to {@code vanished}. */
     void setVanished(PlayerRef who, boolean vanished);
+
+    /**
+     * Whether {@code who} is currently vanished. Read on enter so the pre-mode vanish state can be captured and
+     * restored on exit (rather than hard-revealing a player who was already vanished via {@code /vanish}). The
+     * {@link #NONE} binding — and the default — reports never-vanished.
+     */
+    default boolean isVanished(PlayerRef who) {
+        return false;
+    }
 }

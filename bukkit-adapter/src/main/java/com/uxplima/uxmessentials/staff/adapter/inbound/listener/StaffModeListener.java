@@ -11,6 +11,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -31,8 +32,9 @@ import org.jspecify.annotations.NullMarked;
  *       material or name) and fires it: the VANISH gadget flips vanish through the soft-coupled {@link StaffVanish}
  *       (no-op without presence), the EXAMINE gadget opens the online-player picker. The interaction is cancelled
  *       so the gadget item never also places/uses.
- *   <li><b>No leak.</b> Dropping a gadget item, or moving it in any inventory view, is cancelled — so a gadget can
- *       never reach the ground or survive into the restored real inventory.
+ *   <li><b>No leak.</b> Dropping a gadget item, moving it in any inventory view, or F-key swapping it into the
+ *       off-hand is cancelled — so a gadget can never reach the ground, the off-hand, or survive into the restored
+ *       real inventory.
  *   <li><b>Quit safety.</b> On quit while in staff mode the real loadout is restored straight away (the quit event
  *       still has a usable player on its own region thread), so a player never logs out stranded in the gadget
  *       hotbar. If the process dies before that runs, the committed loadout row is the item-loss-safe net and is
@@ -84,6 +86,15 @@ public final class StaffModeListener implements Listener {
     public void onClick(InventoryClickEvent event) {
         if (gadgetItems.isGadget(event.getCurrentItem()) || gadgetItems.isGadget(event.getCursor())) {
             // Cancel any move of a gadget item so it cannot be shuffled into a slot the restore would keep.
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onSwapHand(PlayerSwapHandItemsEvent event) {
+        if (gadgetItems.isGadget(event.getMainHandItem()) || gadgetItems.isGadget(event.getOffHandItem())) {
+            // The F-key off-hand swap would strand a gadget in the off-hand (outside the hotbar the exit clears);
+            // cancel it so a gadget never escapes into a slot the restore would keep.
             event.setCancelled(true);
         }
     }

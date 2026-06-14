@@ -17,7 +17,8 @@ class SavedLoadoutTest {
                 0.25f,
                 "CREATIVE",
                 true,
-                LoadoutBlob.of(new byte[] {5}));
+                LoadoutBlob.of(new byte[] {5}),
+                true);
     }
 
     @Test
@@ -52,7 +53,8 @@ class SavedLoadoutTest {
                         0f,
                         "SURVIVAL",
                         false,
-                        LoadoutBlob.empty()))
+                        LoadoutBlob.empty(),
+                        false))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new SavedLoadout(
                         LoadoutBlob.empty(),
@@ -63,7 +65,8 @@ class SavedLoadoutTest {
                         0f,
                         "SURVIVAL",
                         false,
-                        LoadoutBlob.empty()))
+                        LoadoutBlob.empty(),
+                        false))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -78,7 +81,8 @@ class SavedLoadoutTest {
                         0f,
                         "  ",
                         false,
-                        LoadoutBlob.empty()))
+                        LoadoutBlob.empty(),
+                        false))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

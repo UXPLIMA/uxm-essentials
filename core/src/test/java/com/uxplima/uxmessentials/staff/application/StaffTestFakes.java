@@ -48,7 +48,8 @@ final class StaffTestFakes {
                 0.5f,
                 "SURVIVAL",
                 false,
-                LoadoutBlob.of(new byte[] {6, 7}));
+                LoadoutBlob.of(new byte[] {6, 7}),
+                false);
     }
 
     /** A {@link StaffNotifier} wired over collecting message ports, so tests can read what was sent. */
@@ -104,6 +105,8 @@ final class StaffTestFakes {
     final class RecordingCapture implements StaffLoadoutCapture {
         SavedLoadout toCapture = sampleLoadout();
         final List<SavedLoadout> restored = new ArrayList<>();
+        // The restore-reach the offline-race tests flip false to assert exit/recovery keep the row.
+        boolean restoreReachesPlayer = true;
 
         @Override
         public SavedLoadout capture(PlayerRef who) {
@@ -112,9 +115,10 @@ final class StaffTestFakes {
         }
 
         @Override
-        public void restore(PlayerRef who, SavedLoadout loadout) {
+        public boolean restore(PlayerRef who, SavedLoadout loadout) {
             calls.add("restore");
             restored.add(loadout);
+            return restoreReachesPlayer;
         }
 
         @Override
@@ -125,11 +129,18 @@ final class StaffTestFakes {
 
     final class RecordingVanish implements StaffVanish {
         final List<Boolean> states = new ArrayList<>();
+        // The pre-enter vanish state capture() reads; tests set this to assert it rides into the saved loadout.
+        boolean vanished = false;
 
         @Override
         public void setVanished(PlayerRef who, boolean vanished) {
             calls.add("vanish:" + vanished);
             states.add(vanished);
+        }
+
+        @Override
+        public boolean isVanished(PlayerRef who) {
+            return vanished;
         }
     }
 

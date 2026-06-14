@@ -23,6 +23,11 @@ public final class MutableStaffVanish implements StaffVanish {
         Objects.requireNonNull(delegate.get(), "delegate").setVanished(who, vanished);
     }
 
+    @Override
+    public boolean isVanished(PlayerRef who) {
+        return Objects.requireNonNull(delegate.get(), "delegate").isVanished(who);
+    }
+
     /** Rebind to the real presence-provided vanish; called once when the presence context is enabled. */
     public void bind(StaffVanish real) {
         delegate.set(Objects.requireNonNull(real, "real"));

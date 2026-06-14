@@ -35,7 +35,8 @@ final class StaffLoadoutRows {
                 row.get(STAFF_LOADOUT.EXP_PROGRESS),
                 row.get(STAFF_LOADOUT.GAME_MODE),
                 row.get(STAFF_LOADOUT.FLYING) != 0,
-                decode(row.get(STAFF_LOADOUT.POTION_EFFECTS)));
+                decode(row.get(STAFF_LOADOUT.POTION_EFFECTS)),
+                row.get(STAFF_LOADOUT.VANISHED_BEFORE) != 0);
     }
 
     /** Populate a {@link StaffLoadoutRecord} from a domain {@link SavedLoadout} for an upsert. */
@@ -50,6 +51,7 @@ final class StaffLoadoutRows {
                 .setExpProgress(loadout.expProgress())
                 .setGameMode(loadout.gameMode())
                 .setFlying((short) (loadout.flying() ? 1 : 0))
+                .setVanishedBefore((short) (loadout.vanishedBefore() ? 1 : 0))
                 .setEnteredAt(enteredAt);
     }
 

@@ -13,6 +13,7 @@ import org.bukkit.event.Event;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -112,6 +113,27 @@ class StaffModeListenerTest {
         assertThat(event.isCancelled()).isFalse();
     }
 
+    @Test
+    void swappingAGadgetIntoTheOffHandIsCancelled() {
+        ItemStack gadget = gadgetItems.build(vanishSpec());
+        // F-key swap with a gadget in hand: the swap must be cancelled so a gadget never strands in the off-hand.
+        PlayerSwapHandItemsEvent event = new PlayerSwapHandItemsEvent(player, new ItemStack(Material.AIR), gadget);
+
+        listener.onSwapHand(event);
+
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
+    void swappingOrdinaryItemsIsLeftAlone() {
+        PlayerSwapHandItemsEvent event =
+                new PlayerSwapHandItemsEvent(player, new ItemStack(Material.DIRT), new ItemStack(Material.STONE));
+
+        listener.onSwapHand(event);
+
+        assertThat(event.isCancelled()).isFalse();
+    }
+
     private PlayerInteractEvent interact(ItemStack hand) {
         return new PlayerInteractEvent(player, Action.RIGHT_CLICK_AIR, hand, null, null, EquipmentSlot.HAND);
     }
@@ -125,24 +147,30 @@ class StaffModeListenerTest {
 
     private StaffServices services() {
         StaffModeStoreImpl store = new StaffModeStoreImpl();
+        StaffAdapterFakes.RecordingRepository repository = new StaffAdapterFakes.RecordingRepository();
+        var capture = new com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture(
+                settings, gadgetItems, vanish);
+        var recover = new com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout(
+                store, repository, capture, vanish, StaffAdapterFakes.notifier());
         EnterStaffMode enter = new EnterStaffMode(
                 store,
-                new StaffAdapterFakes.RecordingRepository(),
-                new com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture(settings, gadgetItems),
+                repository,
+                capture,
                 vanish,
                 StaffAdapterFakes.notifier(),
                 new StaffAdapterFakes.RecordingEvents(),
+                recover,
                 "default",
                 true);
         ExitStaffMode exit = new ExitStaffMode(
                 store,
-                new StaffAdapterFakes.RecordingRepository(),
-                new com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture(settings, gadgetItems),
+                repository,
+                capture,
                 vanish,
                 StaffAdapterFakes.notifier(),
                 new StaffAdapterFakes.RecordingEvents());
         SendStaffChat chat = new SendStaffChat(StaffChannel.NONE, new StaffAdapterFakes.RecordingEvents());
-        return new StaffServices(enter, exit, chat, inspector, store);
+        return new StaffServices(enter, exit, recover, chat, inspector, store);
     }
 
     private StaffExamineView examineView() {

@@ -57,11 +57,35 @@ class JooqStaffLoadoutRepositoryTest {
                 0.75f,
                 "CREATIVE",
                 true,
-                LoadoutBlob.of(new byte[] {7, 8, 9, (byte) 250}));
+                LoadoutBlob.of(new byte[] {7, 8, 9, (byte) 250}),
+                true);
 
         repository.save(owner, loadout);
 
         SavedLoadout loaded = repository.load(owner).orElseThrow();
+        assertThat(loaded).isEqualTo(loadout);
+        // The pre-mode vanish flag survives the SMALLINT column round-trip.
+        assertThat(loaded.vanishedBefore()).isTrue();
+    }
+
+    @Test
+    void aNotVanishedBeforeFlagRoundTripsBackToFalse() {
+        SavedLoadout loadout = new SavedLoadout(
+                LoadoutBlob.of(new byte[] {1}),
+                LoadoutBlob.empty(),
+                LoadoutBlob.empty(),
+                0,
+                0,
+                0f,
+                "SURVIVAL",
+                false,
+                LoadoutBlob.empty(),
+                false);
+
+        repository.save(owner, loadout);
+
+        SavedLoadout loaded = repository.load(owner).orElseThrow();
+        assertThat(loaded.vanishedBefore()).isFalse();
         assertThat(loaded).isEqualTo(loadout);
     }
 
@@ -76,7 +100,8 @@ class JooqStaffLoadoutRepositoryTest {
                 0.0f,
                 "SURVIVAL",
                 false,
-                LoadoutBlob.empty());
+                LoadoutBlob.empty(),
+                false);
 
         repository.save(owner, loadout);
 
@@ -129,7 +154,8 @@ class JooqStaffLoadoutRepositoryTest {
                 0.5f,
                 gameMode,
                 flying,
-                LoadoutBlob.of(new byte[] {7}));
+                LoadoutBlob.of(new byte[] {7}),
+                flying);
     }
 
     /** A config that selects the embedded SQLite backend with every default — no network coordinates. */

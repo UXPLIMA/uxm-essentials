@@ -35,6 +35,14 @@ import com.uxplima.uxmessentials.staff.domain.event.StaffModeEntered;
  *
  * <p>Entering while already in staff mode is a no-op: no second capture, no second save, no double-swap —
  * the existing committed loadout is the one true copy and must not be overwritten by the gadget hotbar.
+ *
+ * <p><b>Enter never overwrites an existing row (crash safety).</b> The in-memory active marker is lost on a
+ * hard crash, but the loadout row survives. A player who crashed mid-mode rejoins holding the gadget hotbar
+ * (autosaved) with the active marker gone; a plain {@code enter} would then capture that gadget hotbar as
+ * "real" and overwrite the one true copy — permanent loss. So {@code enter} checks the repository first: when a
+ * row already exists it is an un-restored loadout from an interrupted exit, and rather than capturing anything
+ * it hands off to {@link RecoverStaffLoadout} to finish that exit (restore the real loadout, delete the row,
+ * reveal). The capture path runs only when there is genuinely no prior row to protect.
  */
 public final class EnterStaffMode {
 
@@ -44,6 +52,7 @@ public final class EnterStaffMode {
     private final StaffVanish vanish;
     private final StaffNotifier notifier;
     private final DomainEventPublisher events;
+    private final RecoverStaffLoadout recover;
     private final String modeName;
     private final boolean vanishOnEnter;
 
@@ -54,6 +63,7 @@ public final class EnterStaffMode {
             StaffVanish vanish,
             StaffNotifier notifier,
             DomainEventPublisher events,
+            RecoverStaffLoadout recover,
             String modeName,
             boolean vanishOnEnter) {
         this.store = Objects.requireNonNull(store, "store");
@@ -62,6 +72,7 @@ public final class EnterStaffMode {
         this.vanish = Objects.requireNonNull(vanish, "vanish");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.recover = Objects.requireNonNull(recover, "recover");
         this.modeName = Objects.requireNonNull(modeName, "modeName");
         this.vanishOnEnter = vanishOnEnter;
         if (modeName.isBlank()) {
@@ -75,6 +86,12 @@ public final class EnterStaffMode {
         if (store.isActive(actor)) {
             // Already in staff mode: do nothing destructive — the committed loadout is the one true copy.
             notifier.send(actor, StaffMessageKey.STAFF_MODE_ALREADY);
+            return Result.err(Unit.INSTANCE);
+        }
+        if (loadoutRepository.load(actor.uuid()).isPresent()) {
+            // A row with no active marker is an un-restored loadout from an interrupted exit / crash. NEVER
+            // capture over it — recover the real loadout instead, so the one true copy is never overwritten.
+            recover.recover(actor);
             return Result.err(Unit.INSTANCE);
         }
         SavedLoadout loadout = capture.capture(actor);

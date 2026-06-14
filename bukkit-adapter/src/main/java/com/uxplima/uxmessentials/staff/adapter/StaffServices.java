@@ -5,6 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffModeStoreImpl;
 import com.uxplima.uxmessentials.staff.application.EnterStaffMode;
 import com.uxplima.uxmessentials.staff.application.ExitStaffMode;
+import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
 import com.uxplima.uxmessentials.staff.application.SendStaffChat;
 import com.uxplima.uxmessentials.staff.application.port.StaffInspector;
 import org.jspecify.annotations.NullMarked;
@@ -18,6 +19,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * @param enter {@code /staffmode} entering — capture, persist, then swap to the gadget hotbar
  * @param exit {@code /staffmode} leaving — restore the real loadout, then delete the stored copy
+ * @param recover finish an interrupted exit — restore an orphaned loadout row on enter or on join
  * @param staffChat {@code /staffchat} and {@code /sc}
  * @param inspector the EXAMINE gadget's inventory-open seam
  * @param store the active-staff marker, enumerated on disable to exit everyone still in staff mode
@@ -26,6 +28,7 @@ import org.jspecify.annotations.NullMarked;
 public record StaffServices(
         EnterStaffMode enter,
         ExitStaffMode exit,
+        RecoverStaffLoadout recover,
         SendStaffChat staffChat,
         StaffInspector inspector,
         StaffModeStoreImpl store) {
@@ -33,6 +36,7 @@ public record StaffServices(
     public StaffServices {
         Objects.requireNonNull(enter, "enter");
         Objects.requireNonNull(exit, "exit");
+        Objects.requireNonNull(recover, "recover");
         Objects.requireNonNull(staffChat, "staffChat");
         Objects.requireNonNull(inspector, "inspector");
         Objects.requireNonNull(store, "store");

@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffGadgetItems;
 import com.uxplima.uxmessentials.staff.adapter.StaffSettings;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutCapture;
+import com.uxplima.uxmessentials.staff.application.port.StaffVanish;
 import com.uxplima.uxmessentials.staff.domain.LoadoutBlob;
 import com.uxplima.uxmessentials.staff.domain.SavedLoadout;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec;
@@ -31,8 +32,9 @@ import org.jspecify.annotations.NullMarked;
  * invoking these; this class assumes it already owns the entity.
  *
  * <p>An offline player cannot be snapshotted or swapped, so {@link #capture} of an absent player yields an
- * empty-but-valid loadout and {@link #restore}/{@link #applyGadgetHotbar} are silent no-ops — the persisted DB
- * row remains the item-loss-safe net, restored when the player is next reachable.
+ * empty-but-valid loadout and {@link #applyGadgetHotbar} is a silent no-op. {@link #restore} of an absent
+ * player returns {@code false} (nothing written back) so the exit use case keeps the durable DB row — the
+ * item-loss-safe net — for the join-recovery path rather than deleting it over a non-restore.
  */
 @NullMarked
 public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
@@ -41,10 +43,12 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
 
     private final StaffSettings settings;
     private final StaffGadgetItems gadgetItems;
+    private final StaffVanish vanish;
 
-    public BukkitStaffLoadoutCapture(StaffSettings settings, StaffGadgetItems gadgetItems) {
+    public BukkitStaffLoadoutCapture(StaffSettings settings, StaffGadgetItems gadgetItems, StaffVanish vanish) {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.gadgetItems = Objects.requireNonNull(gadgetItems, "gadgetItems");
+        this.vanish = Objects.requireNonNull(vanish, "vanish");
     }
 
     @Override
@@ -55,6 +59,9 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
             // Offline at capture: hand back a valid empty loadout so the use case still has something durable.
             return emptyLoadout();
         }
+        // Return any cursor item (a held-on-cursor stack from an open inventory) to the inventory before the
+        // snapshot, so it is captured rather than dropped when the gadget hotbar clears the inventory (FIX 5).
+        player.closeInventory();
         PlayerInventory inventory = player.getInventory();
         return new SavedLoadout(
                 blob(inventory.getStorageContents()),
@@ -65,16 +72,19 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
                 player.getExp(),
                 player.getGameMode().name(),
                 player.getAllowFlight() && player.isFlying(),
-                StaffEffectCodec.encode(player.getActivePotionEffects()));
+                StaffEffectCodec.encode(player.getActivePotionEffects()),
+                vanish.isVanished(who));
     }
 
     @Override
-    public void restore(PlayerRef who, SavedLoadout loadout) {
+    public boolean restore(PlayerRef who, SavedLoadout loadout) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(loadout, "loadout");
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null) {
-            return;
+            // Offline at restore (a disconnect race): nothing was written back, so report failure — the use case
+            // keeps the durable row for the join-recovery path rather than deleting it over a non-restore.
+            return false;
         }
         PlayerInventory inventory = player.getInventory();
         inventory.clear();
@@ -88,6 +98,7 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
         restoreEffects(player, loadout);
         restoreGameMode(player, loadout);
         player.updateInventory();
+        return true;
     }
 
     @Override
@@ -116,7 +127,8 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
                 0.0f,
                 GameMode.SURVIVAL.name(),
                 false,
-                LoadoutBlob.empty());
+                LoadoutBlob.empty(),
+                false);
     }
 
     private static LoadoutBlob blob(ItemStack[] contents) {

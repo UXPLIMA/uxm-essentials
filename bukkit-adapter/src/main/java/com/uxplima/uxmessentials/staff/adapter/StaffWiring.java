@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffChatCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffModeCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffJoinListener;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffModeListener;
 import com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture;
 import com.uxplima.uxmessentials.staff.adapter.outbound.MessagingStaffChannel;
@@ -33,6 +34,7 @@ import com.uxplima.uxmessentials.staff.adapter.outbound.PresenceStaffVanish;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffModeStoreImpl;
 import com.uxplima.uxmessentials.staff.application.EnterStaffMode;
 import com.uxplima.uxmessentials.staff.application.ExitStaffMode;
+import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
 import com.uxplima.uxmessentials.staff.application.SendStaffChat;
 import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
@@ -70,14 +72,17 @@ public final class StaffWiring {
         StaffGadgetItems gadgetItems = new StaffGadgetItems(plugin);
         StaffModeStoreImpl store = new StaffModeStoreImpl();
         StaffLoadoutRepository repository = StaffStores.loadouts(persistence, Clock.systemUTC());
-        BukkitStaffLoadoutCapture capture = new BukkitStaffLoadoutCapture(settings, gadgetItems);
         StaffNotifier notifier = new StaffNotifier(kernel.messages(), kernel.messageSink());
 
+        // vanish is built (and the seams bound) before the capture, because the capture reads the pre-mode
+        // vanish state through it so the player's vanish flag is part of the captured loadout.
         MutableStaffVanish vanish = new MutableStaffVanish();
         MutableStaffInspector inspector = new MutableStaffInspector();
         MutableStaffChannel channel = new MutableStaffChannel();
         bindSeams(seams, kernel, settings, vanish, inspector, channel);
 
+        BukkitStaffLoadoutCapture capture = new BukkitStaffLoadoutCapture(settings, gadgetItems, vanish);
+        RecoverStaffLoadout recover = new RecoverStaffLoadout(store, repository, capture, vanish, notifier);
         EnterStaffMode enter = new EnterStaffMode(
                 store,
                 repository,
@@ -85,11 +90,12 @@ public final class StaffWiring {
                 vanish,
                 notifier,
                 kernel.events(),
+                recover,
                 StaffSettings.DEFAULT_MODE,
                 settings.vanishOnEnter());
         ExitStaffMode exit = new ExitStaffMode(store, repository, capture, vanish, notifier, kernel.events());
         SendStaffChat staffChat = new SendStaffChat(channel, kernel.events());
-        StaffServices services = new StaffServices(enter, exit, staffChat, inspector, store);
+        StaffServices services = new StaffServices(enter, exit, recover, staffChat, inspector, store);
 
         StaffExamineView examineView =
                 new StaffExamineView(kernel.messages(), kernel.messageSink(), kernel.scheduler(), services);
@@ -97,7 +103,9 @@ public final class StaffWiring {
                 new StaffModeCommand(
                         services, kernel.messages(), kernel.scheduler(), kernel.playerLookup(), running::get),
                 new StaffChatCommand(services, kernel.messages()));
-        List<Listener> listeners = List.of(new StaffModeListener(services, gadgetItems, vanish, examineView));
+        List<Listener> listeners = List.of(
+                new StaffModeListener(services, gadgetItems, vanish, examineView),
+                new StaffJoinListener(services, repository, kernel.scheduler()));
         return new Wired(commands, listeners, services, kernel.scheduler(), running);
     }
 

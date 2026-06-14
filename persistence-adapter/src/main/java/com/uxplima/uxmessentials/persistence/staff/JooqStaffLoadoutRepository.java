@@ -80,6 +80,7 @@ public final class JooqStaffLoadoutRepository extends JooqRepository implements 
                 .set(STAFF_LOADOUT.EXP_PROGRESS, record.getExpProgress())
                 .set(STAFF_LOADOUT.GAME_MODE, record.getGameMode())
                 .set(STAFF_LOADOUT.FLYING, record.getFlying())
+                .set(STAFF_LOADOUT.VANISHED_BEFORE, record.getVanishedBefore())
                 .set(STAFF_LOADOUT.ENTERED_AT, record.getEnteredAt())
                 .execute();
     }

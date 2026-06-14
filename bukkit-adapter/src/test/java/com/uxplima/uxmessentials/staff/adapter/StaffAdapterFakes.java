@@ -92,13 +92,20 @@ final class StaffAdapterFakes {
         }
     }
 
-    /** A vanish that records the absolute states it is asked to set. */
+    /** A vanish that records the absolute states it is asked to set and reports a settable current state. */
     static final class RecordingVanish implements StaffVanish {
         final List<Boolean> states = new ArrayList<>();
+        boolean vanished = false;
 
         @Override
         public void setVanished(PlayerRef who, boolean vanished) {
+            this.vanished = vanished;
             states.add(vanished);
+        }
+
+        @Override
+        public boolean isVanished(PlayerRef who) {
+            return vanished;
         }
     }
 

@@ -17,6 +17,10 @@ import java.util.Objects;
  * are wrapped in {@link LoadoutBlob} value objects rather than raw {@code byte[]} so the record stays a clean
  * value type.
  *
+ * <p>{@code vanishedBefore} captures the player's vanish state as it was <i>before</i> they entered staff mode,
+ * so leaving (or being recovered) restores that exact state rather than hard-revealing. A player who was already
+ * vanished via {@code /vanish} before entering stays vanished on exit; one who was visible is revealed.
+ *
  * @param inventory encoded main inventory contents (slots 0..35)
  * @param armor encoded armour contents (boots/leggings/chestplate/helmet)
  * @param offhand encoded off-hand item
@@ -26,6 +30,7 @@ import java.util.Objects;
  * @param gameMode the game-mode name (e.g. {@code SURVIVAL}); never blank
  * @param flying whether the player was flying
  * @param potionEffects encoded active potion effects
+ * @param vanishedBefore whether the player was vanished before entering staff mode
  */
 public record SavedLoadout(
         LoadoutBlob inventory,
@@ -36,7 +41,8 @@ public record SavedLoadout(
         float expProgress,
         String gameMode,
         boolean flying,
-        LoadoutBlob potionEffects) {
+        LoadoutBlob potionEffects,
+        boolean vanishedBefore) {
 
     public SavedLoadout {
         Objects.requireNonNull(inventory, "inventory");
