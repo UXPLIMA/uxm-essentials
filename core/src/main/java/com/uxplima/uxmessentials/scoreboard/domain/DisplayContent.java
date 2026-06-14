@@ -16,13 +16,22 @@ import java.util.Set;
  * enforces), so {@code lines} over that bound is rejected at construction rather than silently truncated downstream.
  * The refresh interval must be strictly positive — a zero or negative cadence would busy-spin the render timer.
  *
+ * <p>{@code hideScoreNumbers} hides the red per-line score numbers vanilla draws down the right edge of the sidebar
+ * (the adapter applies a blank number format to the objective). It defaults on — the clean, modern look operators
+ * expect — and is purely a render concern, not a structural one, so it never affects {@link #isBlank()}.
+ *
  * @param title the sidebar title source, empty when the operator left it blank (the sidebar then has no heading)
  * @param lines the sidebar line sources, top to bottom, at most {@link #MAX_LINES}
+ * @param hideScoreNumbers whether to suppress the red right-edge score numbers; on for the modern look
  * @param refreshInterval how often the render timer re-renders every viewer; strictly positive
  * @param worldBlacklist world names where the sidebar is suppressed entirely
  */
 public record DisplayContent(
-        Optional<String> title, List<String> lines, Duration refreshInterval, Set<String> worldBlacklist) {
+        Optional<String> title,
+        List<String> lines,
+        boolean hideScoreNumbers,
+        Duration refreshInterval,
+        Set<String> worldBlacklist) {
 
     /** The maximum number of sidebar lines a vanilla scoreboard can show; mirrors uxmLib {@code Sidebar.MAX_LINES}. */
     public static final int MAX_LINES = 15;
@@ -49,7 +58,7 @@ public record DisplayContent(
      * nowhere, refreshing once a second. An operator sees no visible change until they author content.
      */
     public static DisplayContent inert() {
-        return new DisplayContent(Optional.empty(), List.of(), DEFAULT_INTERVAL, Set.of());
+        return new DisplayContent(Optional.empty(), List.of(), true, DEFAULT_INTERVAL, Set.of());
     }
 
     /** True when {@code worldName} is on the blacklist and the sidebar must be suppressed there. */
