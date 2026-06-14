@@ -5,11 +5,11 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -51,7 +51,7 @@ public final class PdcScoreboardVisibilityStore implements ScoreboardVisibilityS
             return false; // nothing to flip for an offline player; report shown
         }
         boolean nowHidden = !isHidden(player);
-        player.getPersistentDataContainer().set(hiddenKey, PersistentDataType.BYTE, nowHidden ? (byte) 1 : (byte) 0);
+        PdcFlag.set(player.getPersistentDataContainer(), hiddenKey, nowHidden);
         return nowHidden;
     }
 
@@ -63,6 +63,6 @@ public final class PdcScoreboardVisibilityStore implements ScoreboardVisibilityS
     }
 
     private boolean isHidden(Player player) {
-        return player.getPersistentDataContainer().getOrDefault(hiddenKey, PersistentDataType.BYTE, (byte) 0) == 1;
+        return PdcFlag.get(player.getPersistentDataContainer(), hiddenKey);
     }
 }

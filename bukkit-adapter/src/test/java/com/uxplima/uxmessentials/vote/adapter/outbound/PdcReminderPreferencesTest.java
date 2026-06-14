@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.vote.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -82,6 +84,17 @@ class PdcReminderPreferencesTest {
 
         // Toggle for an offline player is a no-op and returns true.
         assertThat(prefs.toggle(ghost)).isTrue();
+    }
+
+    @Test
+    void readsBackAFlagStampedWithTheRawByteIdiom() {
+        PlayerRef ref = ref(player);
+        // A flag persisted before this store delegated to PdcFlag was stamped as a raw BYTE 1 under the same key.
+        NamespacedKey legacyKey = new NamespacedKey(plugin, "vote-remind-off");
+        player.getPersistentDataContainer().set(legacyKey, PersistentDataType.BYTE, (byte) 1);
+
+        // The new read path must still see the opt-out: byte-identical encoding.
+        assertThat(prefs.wantsReminders(ref)).isFalse();
     }
 
     private static PlayerRef ref(PlayerMock p) {

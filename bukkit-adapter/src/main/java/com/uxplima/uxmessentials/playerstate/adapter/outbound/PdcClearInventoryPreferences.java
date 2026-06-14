@@ -5,10 +5,10 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataType;
 
 import com.uxplima.uxmessentials.playerstate.application.port.ClearInventoryPreferences;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -36,8 +36,7 @@ public final class PdcClearInventoryPreferences implements ClearInventoryPrefere
         if (player == null) {
             return false; // an offline player defaults to confirm-off; nothing to read
         }
-        byte on = player.getPersistentDataContainer().getOrDefault(CONFIRM_KEY, PersistentDataType.BYTE, (byte) 0);
-        return on == 1;
+        return PdcFlag.get(player.getPersistentDataContainer(), CONFIRM_KEY);
     }
 
     @Override
@@ -48,7 +47,7 @@ public final class PdcClearInventoryPreferences implements ClearInventoryPrefere
             return false;
         }
         boolean nowOn = !confirmEnabled(who);
-        player.getPersistentDataContainer().set(CONFIRM_KEY, PersistentDataType.BYTE, nowOn ? (byte) 1 : (byte) 0);
+        PdcFlag.set(player.getPersistentDataContainer(), CONFIRM_KEY, nowOn);
         return nowOn;
     }
 }

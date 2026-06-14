@@ -5,11 +5,11 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -38,8 +38,7 @@ public final class PdcMessageToggleStore implements MessageToggleStore {
         if (player == null) {
             return false; // an offline target cannot receive a real-time message anyway
         }
-        byte off = player.getPersistentDataContainer().getOrDefault(toggleKey, PersistentDataType.BYTE, (byte) 0);
-        return off == 0;
+        return accepts(player);
     }
 
     @Override
@@ -50,11 +49,11 @@ public final class PdcMessageToggleStore implements MessageToggleStore {
             return true;
         }
         boolean nowAccepting = !accepts(player);
-        player.getPersistentDataContainer().set(toggleKey, PersistentDataType.BYTE, nowAccepting ? (byte) 0 : (byte) 1);
+        PdcFlag.set(player.getPersistentDataContainer(), toggleKey, !nowAccepting);
         return nowAccepting;
     }
 
     private boolean accepts(Player player) {
-        return player.getPersistentDataContainer().getOrDefault(toggleKey, PersistentDataType.BYTE, (byte) 0) == 0;
+        return !PdcFlag.get(player.getPersistentDataContainer(), toggleKey);
     }
 }

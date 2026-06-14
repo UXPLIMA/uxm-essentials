@@ -5,11 +5,11 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -53,13 +53,11 @@ public final class PdcBroadcastVisibility implements BroadcastVisibility {
             return true; // safe default; no PDC to write
         }
         boolean nowReceives = !currentlyReceives(player);
-        player.getPersistentDataContainer()
-                .set(broadcastOffKey, PersistentDataType.BYTE, nowReceives ? (byte) 0 : (byte) 1);
+        PdcFlag.set(player.getPersistentDataContainer(), broadcastOffKey, !nowReceives);
         return nowReceives;
     }
 
     private boolean currentlyReceives(Player player) {
-        return player.getPersistentDataContainer().getOrDefault(broadcastOffKey, PersistentDataType.BYTE, (byte) 0)
-                == 0;
+        return !PdcFlag.get(player.getPersistentDataContainer(), broadcastOffKey);
     }
 }

@@ -5,11 +5,11 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -50,7 +50,7 @@ public final class PdcBroadcastOptOutStore implements BroadcastOptOutStore {
             return false; // nothing to flip for an offline player; report opted-in
         }
         boolean nowOptedOut = !optedOut(player);
-        player.getPersistentDataContainer().set(optOutKey, PersistentDataType.BYTE, nowOptedOut ? (byte) 1 : (byte) 0);
+        PdcFlag.set(player.getPersistentDataContainer(), optOutKey, nowOptedOut);
         return nowOptedOut;
     }
 
@@ -62,6 +62,6 @@ public final class PdcBroadcastOptOutStore implements BroadcastOptOutStore {
     }
 
     private boolean optedOut(Player player) {
-        return player.getPersistentDataContainer().getOrDefault(optOutKey, PersistentDataType.BYTE, (byte) 0) == 1;
+        return PdcFlag.get(player.getPersistentDataContainer(), optOutKey);
     }
 }

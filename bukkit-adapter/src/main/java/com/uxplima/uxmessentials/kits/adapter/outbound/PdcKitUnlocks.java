@@ -7,12 +7,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.kits.application.port.KitUnlockStore;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -48,7 +48,7 @@ public final class PdcKitUnlocks implements KitUnlockStore {
         if (player == null) {
             return false;
         }
-        return player.getPersistentDataContainer().has(keyFor(kit), PersistentDataType.BYTE);
+        return PdcFlag.has(player.getPersistentDataContainer(), keyFor(kit));
     }
 
     @Override
@@ -59,7 +59,7 @@ public final class PdcKitUnlocks implements KitUnlockStore {
         if (player == null) {
             return;
         }
-        player.getPersistentDataContainer().set(keyFor(kit), PersistentDataType.BYTE, (byte) 1);
+        PdcFlag.set(player.getPersistentDataContainer(), keyFor(kit), true);
     }
 
     private NamespacedKey keyFor(KitId kit) {

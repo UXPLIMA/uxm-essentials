@@ -18,6 +18,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -55,7 +56,7 @@ public final class PdcKitClaims implements KitClaimStore {
         if (player == null) {
             return false;
         }
-        return player.getPersistentDataContainer().has(keyFor(kit), PersistentDataType.BYTE);
+        return PdcFlag.has(player.getPersistentDataContainer(), keyFor(kit));
     }
 
     @Override
@@ -67,7 +68,7 @@ public final class PdcKitClaims implements KitClaimStore {
             return;
         }
         PersistentDataContainer pdc = player.getPersistentDataContainer();
-        pdc.set(keyFor(kit), PersistentDataType.BYTE, (byte) 1);
+        PdcFlag.set(pdc, keyFor(kit), true);
         writeIndex(pdc, add(readIndex(pdc), kit.value()));
     }
 
@@ -80,7 +81,7 @@ public final class PdcKitClaims implements KitClaimStore {
             return;
         }
         PersistentDataContainer pdc = player.getPersistentDataContainer();
-        pdc.remove(keyFor(kit));
+        PdcFlag.remove(pdc, keyFor(kit));
         writeIndex(pdc, remove(readIndex(pdc), kit.value()));
     }
 
@@ -93,7 +94,7 @@ public final class PdcKitClaims implements KitClaimStore {
         }
         PersistentDataContainer pdc = player.getPersistentDataContainer();
         for (String id : readIndex(pdc)) {
-            pdc.remove(keyFor(KitId.of(id)));
+            PdcFlag.remove(pdc, keyFor(KitId.of(id)));
         }
         pdc.remove(indexKey);
     }

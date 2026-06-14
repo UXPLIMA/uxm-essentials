@@ -8,11 +8,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFlags;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -46,8 +46,7 @@ public final class PdcTeleportFlags implements TeleportFlags {
         if (player == null) {
             return true; // an offline target cannot be requested anyway; default to accepting
         }
-        byte off = player.getPersistentDataContainer().getOrDefault(toggleKey, PersistentDataType.BYTE, (byte) 0);
-        return off == 0;
+        return !PdcFlag.get(player.getPersistentDataContainer(), toggleKey);
     }
 
     @Override
@@ -58,8 +57,7 @@ public final class PdcTeleportFlags implements TeleportFlags {
             return true;
         }
         boolean nowAccepting = !acceptsRequests(who);
-        byte off = nowAccepting ? (byte) 0 : (byte) 1;
-        player.getPersistentDataContainer().set(toggleKey, PersistentDataType.BYTE, off);
+        PdcFlag.set(player.getPersistentDataContainer(), toggleKey, !nowAccepting);
         return nowAccepting;
     }
 
@@ -70,8 +68,7 @@ public final class PdcTeleportFlags implements TeleportFlags {
         if (player == null) {
             return; // an offline player defaults to accepting; nothing to stamp
         }
-        byte off = accepting ? (byte) 0 : (byte) 1;
-        player.getPersistentDataContainer().set(toggleKey, PersistentDataType.BYTE, off);
+        PdcFlag.set(player.getPersistentDataContainer(), toggleKey, !accepting);
     }
 
     @Override
@@ -81,8 +78,7 @@ public final class PdcTeleportFlags implements TeleportFlags {
         if (player == null) {
             return false; // an offline target cannot be requested anyway; default to not auto-accepting
         }
-        byte on = player.getPersistentDataContainer().getOrDefault(autoKey, PersistentDataType.BYTE, (byte) 0);
-        return on == 1;
+        return PdcFlag.get(player.getPersistentDataContainer(), autoKey);
     }
 
     @Override
@@ -93,7 +89,7 @@ public final class PdcTeleportFlags implements TeleportFlags {
             return false;
         }
         boolean nowAuto = !autoAccepts(who);
-        player.getPersistentDataContainer().set(autoKey, PersistentDataType.BYTE, nowAuto ? (byte) 1 : (byte) 0);
+        PdcFlag.set(player.getPersistentDataContainer(), autoKey, nowAuto);
         return nowAuto;
     }
 

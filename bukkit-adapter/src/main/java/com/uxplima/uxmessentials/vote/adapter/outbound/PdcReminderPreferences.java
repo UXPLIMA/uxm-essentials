@@ -5,11 +5,11 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
+import com.uxplima.uxmlib.item.PdcFlag;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -40,8 +40,7 @@ public final class PdcReminderPreferences implements ReminderPreferences {
             // Offline — cannot read PDC; assume they want reminders (safe default).
             return true;
         }
-        byte off = player.getPersistentDataContainer().getOrDefault(remindOffKey, PersistentDataType.BYTE, (byte) 0);
-        return off == 0;
+        return currentlyWants(player);
     }
 
     @Override
@@ -52,11 +51,11 @@ public final class PdcReminderPreferences implements ReminderPreferences {
             return true; // safe default; no PDC to write
         }
         boolean nowWants = !currentlyWants(player);
-        player.getPersistentDataContainer().set(remindOffKey, PersistentDataType.BYTE, nowWants ? (byte) 0 : (byte) 1);
+        PdcFlag.set(player.getPersistentDataContainer(), remindOffKey, !nowWants);
         return nowWants;
     }
 
     private boolean currentlyWants(Player player) {
-        return player.getPersistentDataContainer().getOrDefault(remindOffKey, PersistentDataType.BYTE, (byte) 0) == 0;
+        return !PdcFlag.get(player.getPersistentDataContainer(), remindOffKey);
     }
 }
