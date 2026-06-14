@@ -61,8 +61,10 @@ public final class VaultSettings {
         this.selectorEnabled = config.getBoolean("selector.enabled", true);
         this.selectorSettings = parseSelector(config);
         this.cleanupEnabled = config.getBoolean("cleanup.enabled", false);
+        // Floor at one day: an enabled sweep with inactive-days = 0 would purge against a now cutoff and wipe
+        // essentially every vault, so an operator typo (or reading 0 as "disabled") can never trigger that.
         this.cleanupInactive =
-                Duration.ofDays(Math.max(0, config.getInt("cleanup.inactive-days", DEFAULT_CLEANUP_INACTIVE_DAYS)));
+                Duration.ofDays(Math.max(1, config.getInt("cleanup.inactive-days", DEFAULT_CLEANUP_INACTIVE_DAYS)));
         this.cleanupInterval =
                 Duration.ofHours(Math.max(1, config.getInt("cleanup.interval-hours", DEFAULT_CLEANUP_INTERVAL_HOURS)));
         this.openSound = config.getString("open-sound", "").trim();
@@ -108,7 +110,10 @@ public final class VaultSettings {
         return cleanupEnabled;
     }
 
-    /** How long a vault may go untouched before the cleanup sweep purges it ({@code cleanup.inactive-days}). */
+    /**
+     * How long a vault may go untouched before the cleanup sweep purges it ({@code cleanup.inactive-days}),
+     * floored at one day so an enabled sweep can never run against a zero/now cutoff and wipe every vault.
+     */
     public Duration cleanupInactive() {
         return cleanupInactive;
     }

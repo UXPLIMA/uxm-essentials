@@ -104,11 +104,67 @@ class VaultOverflowTest {
         assertThat(sink.keys).contains(VaultsMessageKey.VAULT_OVERFLOW_RETURNED);
         assertThat(sink.lastOverflowCount).isEqualTo("7");
 
-        // Closing the window persists only the in-range contents: the diamond stays, the emerald is gone.
+        // The rescue persisted the truncated contents immediately — before any close — so a crash here cannot
+        // leave the overflow in the DB row for the next open to rescue and hand out again. The saved snapshot is
+        // already the in-range-only contents: the diamond stays, the emerald is gone.
+        assertThat(repository.saves).isEqualTo(1);
+        ItemStack[] savedOnOpen = repository.lastSaved;
+        assertThat(savedOnOpen).isNotNull();
+        assertThat(materialsIn(savedOnOpen)).contains(Material.DIAMOND).doesNotContain(Material.EMERALD);
+
+        // Closing the window persists again, idempotently — the live GUI by now equals the truncated contents.
         server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
         ItemStack[] saved = repository.lastSaved;
         assertThat(saved).isNotNull();
         assertThat(materialsIn(saved)).contains(Material.DIAMOND).doesNotContain(Material.EMERALD);
+    }
+
+    @Test
+    void aNormalOpenWithNoOverflowDoesNotPersistUntilClose() {
+        // Contents that fit the live size: nothing to rescue, so the open path must not save — the existing
+        // close-only persistence is unchanged for the common case.
+        ItemStack[] stored = new ItemStack[9];
+        stored[0] = new ItemStack(Material.DIAMOND, 4);
+        Vault vault = vaultOf(VaultSize.ofClamped(1), VaultItemCodec.encode(stored));
+
+        VaultView view = view(VaultItemPolicy.allowAll());
+        view.open(player, ref(), ref(), vault);
+
+        assertThat(repository.saves).isZero();
+
+        // The close still persists exactly once, as before.
+        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
+        assertThat(repository.saves).isEqualTo(1);
+    }
+
+    @Test
+    void reOpeningAfterARescueWithNoCloseSaveDoesNotReRescueOrReDupe() {
+        // First open rescues the overflow and persists the truncated row immediately. Simulate a crash before
+        // close (no close-save) by re-opening straight from the persisted vault: the row no longer carries the
+        // overflow, so the second open must rescue nothing and hand the player no further items.
+        ItemStack[] stored = new ItemStack[54];
+        stored[0] = new ItemStack(Material.DIAMOND, 4);
+        stored[20] = new ItemStack(Material.EMERALD, 7);
+        Vault vault = vaultOf(VaultSize.ofClamped(1), VaultItemCodec.encode(stored));
+
+        VaultView view = view(VaultItemPolicy.allowAll());
+        view.open(player, ref(), ref(), vault);
+
+        assertThat(countOf(player.getInventory().getContents(), Material.EMERALD))
+                .isEqualTo(7);
+        Vault persisted = repository.lastSavedVault;
+        assertThat(persisted).isNotNull();
+        sink.keys.clear();
+
+        // Re-open from the already-truncated persisted row (the close-save was "lost").
+        view.open(player, ref(), ref(), persisted);
+
+        // No second rescue: the player still holds only the single emerald stack, and no notice fired again.
+        // (Re-opening auto-closes the first still-open window, which persists it once more — idempotent, same
+        // truncated contents — so the no-dupe guarantee is the unchanged emerald count and the absent notice.)
+        assertThat(countOf(player.getInventory().getContents(), Material.EMERALD))
+                .isEqualTo(7);
+        assertThat(sink.keys).doesNotContain(VaultsMessageKey.VAULT_OVERFLOW_RETURNED);
     }
 
     @Test
@@ -192,9 +248,15 @@ class VaultOverflowTest {
         return total;
     }
 
-    /** Captures the last contents written through so the next-save consistency is assertable. */
+    /**
+     * Captures the last contents written through so the next-save consistency is assertable, counts the saves so
+     * an open that persists immediately is distinguishable from one that defers to close, and retains the last
+     * saved {@link Vault} so a re-open from the persisted (already-truncated) row can be simulated.
+     */
     private static final class RecordingRepository implements VaultRepository {
         private @Nullable ItemStack[] lastSaved;
+        private @Nullable Vault lastSavedVault;
+        private int saves;
 
         @Override
         public Optional<Vault> find(VaultId id) {
@@ -213,6 +275,8 @@ class VaultOverflowTest {
 
         @Override
         public void save(Vault vault) {
+            saves++;
+            lastSavedVault = vault;
             lastSaved = VaultItemCodec.decode(vault.contents(), vault.size().slots());
         }
 

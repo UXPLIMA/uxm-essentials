@@ -54,9 +54,11 @@ import org.jspecify.annotations.Nullable;
  * shrank since the vault was last saved — are visible rather than silently dropped. Only the first {@code size}
  * slots seed the GUI; any occupied overflow slot is handed back to the opener (added to their inventory,
  * remainder dropped at their feet — the same give-or-drop helper the blacklist uses) and counted into one
- * {@code VAULT_OVERFLOW_RETURNED} notice. The next close then persists only the live-size contents, so the
- * overflow is gone from the vault and safely with the player — no loss, no dupe. When staff open another
- * player's vault the overflow returns to the staff opener, consistent with the blacklist's admin semantics.
+ * {@code VAULT_OVERFLOW_RETURNED} notice. When overflow is rescued the truncated (live-size) contents are
+ * persisted immediately — not just on close — so a crash before the window closes cannot leave the overflow in
+ * the DB row for the next open to rescue and hand out a second time. The overflow is gone from the vault and
+ * safely with the player — no loss, no dupe. When staff open another player's vault the overflow returns to the
+ * staff opener, consistent with the blacklist's admin semantics.
  *
  * <p>A non-blank {@code open-sound} is played to the opener as the window opens (resolved once at wire time, so
  * the open path never touches the registry). An unknown sound resolves to {@code null} and is simply not played.
@@ -115,8 +117,13 @@ public final class VaultView {
         // first `size` slots seed the GUI, any occupied overflow slot is rescued back to the opener.
         ItemStack[] stored = VaultItemCodec.decodeAll(vault.contents());
         gui.setContents(stored);
-        rescueOverflow(player, viewer, stored, size);
         OpenWindow window = new OpenWindow(owner, vault, gui);
+        int rescued = rescueOverflow(player, viewer, stored, size);
+        if (rescued > 0) {
+            // The overflow is now safely with the player, but the DB row still carries it; persist the truncated
+            // (in-range) GUI immediately so a crash before close cannot re-run the rescue and hand it out again.
+            persist(window);
+        }
         open.add(window);
         gui.onClose(event -> {
             if (open.remove(window)) {
@@ -133,10 +140,12 @@ public final class VaultView {
      * the window — and notify {@code viewer} once with the rescued count. The size quota shrank below the stored
      * slot count since the last save, so {@code decodeAll} surfaced these out-of-range items; they are handed
      * back (added to the opener's inventory, remainder dropped at their feet) instead of being silently dropped.
-     * The next close persists only the live-size GUI, so the overflow is gone from the vault and safely with the
-     * player — no loss, no dupe. A vault whose contents fit the live size has no overflow and triggers no notice.
+     * The caller persists the truncated GUI immediately when this returns a non-zero count, so the overflow is
+     * gone from the vault and safely with the player — no loss, no dupe, and no crash window that could re-rescue.
+     * A vault whose contents fit the live size has no overflow and triggers no notice. Returns the total item
+     * amount handed back, so the caller knows whether an immediate persist is needed.
      */
-    private void rescueOverflow(Player opener, PlayerRef viewer, ItemStack[] stored, int size) {
+    private int rescueOverflow(Player opener, PlayerRef viewer, ItemStack[] stored, int size) {
         int returned = 0;
         for (int slot = size; slot < stored.length; slot++) {
             ItemStack stack = stored[slot];
@@ -149,6 +158,7 @@ public final class VaultView {
         if (returned > 0) {
             notifyOverflow(viewer, returned);
         }
+        return returned;
     }
 
     private void playOpenSound(Player player) {

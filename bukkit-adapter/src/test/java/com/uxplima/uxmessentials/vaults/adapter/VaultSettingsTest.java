@@ -96,6 +96,27 @@ class VaultSettingsTest {
     }
 
     @Test
+    void aZeroInactiveDaysIsFlooredToOneDaySoAnEnabledSweepNeverWipesEveryVault() {
+        VaultSettings settings = new VaultSettings(new MapConfigStore(Map.of("cleanup.inactive-days", 0)));
+
+        assertThat(settings.cleanupInactive()).isEqualTo(java.time.Duration.ofDays(1));
+    }
+
+    @Test
+    void aNegativeInactiveDaysIsFlooredToOneDay() {
+        VaultSettings settings = new VaultSettings(new MapConfigStore(Map.of("cleanup.inactive-days", -5)));
+
+        assertThat(settings.cleanupInactive()).isEqualTo(java.time.Duration.ofDays(1));
+    }
+
+    @Test
+    void aNormalInactiveDaysValuePassesThrough() {
+        VaultSettings settings = new VaultSettings(new MapConfigStore(Map.of("cleanup.inactive-days", 14)));
+
+        assertThat(settings.cleanupInactive()).isEqualTo(java.time.Duration.ofDays(14));
+    }
+
+    @Test
     void theOpenSoundDefaultsToBlankAndIsTrimmed() {
         assertThat(new VaultSettings(new MapConfigStore(Map.of())).openSound()).isEmpty();
         assertThat(new VaultSettings(new MapConfigStore(Map.of("open-sound", "  block.chest.open  "))).openSound())
