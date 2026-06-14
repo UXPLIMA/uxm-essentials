@@ -18,8 +18,9 @@ import org.jspecify.annotations.NullMarked;
  *
  * <ul>
  *   <li><b>Outbound</b>: {@link #repository(CachedVaultRepository, BusPublisher)} wraps the cached repository
- *       so every local vault save (a vault window closed and written through) publishes a {@link VaultChanged}
- *       frame after the durable write commits — peers learn that owner's vault changed.
+ *       so every local vault save (a vault window closed and written through) <em>or delete</em> publishes a
+ *       {@link VaultChanged} frame after the durable write commits — peers learn that owner's vault changed and
+ *       drop their cached copy (a deleted vault read from the shared DB now resolves empty).
  *   <li><b>Inbound</b>: {@link #listener(CachedVaultRepository)} returns a {@link RemoteSyncListener} that, on a
  *       remote {@code VaultChanged}, invalidates exactly that {@code (owner, index)} so the next open on this
  *       backend reads the fresh contents from the shared DB.
@@ -35,7 +36,7 @@ public final class VaultSync {
 
     private VaultSync() {}
 
-    /** A {@link VaultRepository} that broadcasts a {@link VaultChanged} after every local save. */
+    /** A {@link VaultRepository} that broadcasts a {@link VaultChanged} after every local save or delete. */
     public static VaultRepository repository(CachedVaultRepository delegate, BusPublisher bus) {
         Objects.requireNonNull(delegate, "delegate");
         Objects.requireNonNull(bus, "bus");
@@ -52,7 +53,7 @@ public final class VaultSync {
         };
     }
 
-    /** Forwards every call to the cached delegate, then announces each save on the bus. */
+    /** Forwards every call to the cached delegate, then announces each save and delete on the bus. */
     private static final class Broadcasting implements VaultRepository {
 
         private final VaultRepository delegate;
@@ -82,6 +83,12 @@ public final class VaultSync {
         public void save(Vault vault) {
             delegate.save(vault);
             announce(vault.id());
+        }
+
+        @Override
+        public void delete(VaultId id) {
+            delegate.delete(id);
+            announce(id);
         }
 
         private void announce(VaultId id) {

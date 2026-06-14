@@ -19,8 +19,9 @@ import org.jooq.DSLContext;
  * owner's vault by the {@code (owner, idx)} primary key; the listing reads an owner's indices in ascending
  * order off the {@code idx_vaults_owner} index; the count is a {@code COUNT(*)} so the amount-quota check never
  * materialises the rows. A {@code save} upserts on the primary key — a re-save of the same vault overwrites its
- * size, contents and last-touched in place — so a close-save never inserts a duplicate row. Every statement is
- * typed jOOQ DSL; no SQL is ever string-concatenated.
+ * size, contents and last-touched in place — so a close-save never inserts a duplicate row. A {@code delete}
+ * removes the one {@code (owner, idx)} row, freeing the owner's quota slot; deleting an id with no row affects
+ * zero rows and is a silent no-op. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
  */
 public final class JooqVaultRepository extends JooqRepository implements VaultRepository {
 
@@ -59,6 +60,18 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
         Objects.requireNonNull(vault, "vault");
         write(dsl -> {
             upsert(dsl, vault);
+            return null;
+        });
+    }
+
+    @Override
+    public void delete(VaultId id) {
+        Objects.requireNonNull(id, "id");
+        write(dsl -> {
+            dsl.deleteFrom(VAULTS)
+                    .where(VAULTS.OWNER.eq(id.owner().toString()))
+                    .and(VAULTS.IDX.eq(id.index()))
+                    .execute();
             return null;
         });
     }

@@ -25,8 +25,9 @@ import org.junit.jupiter.api.io.TempDir;
  * Flyway V6 vaults table applied — the tested default of the backend-parity matrix. It proves the round-trip
  * (save → find), that the opaque serialized contents survive the base64 TEXT column byte-for-byte, that an
  * empty vault stores a null {@code contents} cell and round-trips back to empty, that a re-save upserts on the
- * {@code (owner, idx)} key rather than inserting, that the per-owner index listing reads ascending, and that
- * the count the amount quota relies on reflects the rows.
+ * {@code (owner, idx)} key rather than inserting, that the per-owner index listing reads ascending, that the
+ * count the amount quota relies on reflects the rows, and that a delete removes exactly the one row (freeing the
+ * quota slot, idempotent on a missing row, leaving the owner's other vaults intact).
  */
 class JooqVaultRepositoryTest {
 
@@ -98,6 +99,37 @@ class JooqVaultRepositoryTest {
     void findIsEmptyForAnUnopenedVault() {
         assertThat(repository.find(VaultId.of(owner, 9))).isEmpty();
         assertThat(repository.ownedIndices(owner)).isEmpty();
+    }
+
+    @Test
+    void deleteRemovesTheRowAndFreesTheQuotaSlot() {
+        repository.save(vault(1, 6, VaultContents.of(new byte[] {1, 2, 3})));
+
+        repository.delete(VaultId.of(owner, 1));
+
+        assertThat(repository.find(VaultId.of(owner, 1))).isEmpty();
+        assertThat(repository.ownedIndices(owner)).isEmpty();
+        assertThat(repository.count(owner)).isZero();
+    }
+
+    @Test
+    void deletingANonExistentVaultIsANoOp() {
+        repository.delete(VaultId.of(owner, 7)); // never opened — no row to remove
+
+        assertThat(repository.count(owner)).isZero();
+    }
+
+    @Test
+    void deletingOneVaultLeavesTheOwnersOtherVaultsIntact() {
+        repository.save(vault(1, 6, VaultContents.of(new byte[] {1})));
+        repository.save(vault(2, 3, VaultContents.of(new byte[] {2})));
+
+        repository.delete(VaultId.of(owner, 1));
+
+        assertThat(repository.find(VaultId.of(owner, 1))).isEmpty();
+        assertThat(repository.find(VaultId.of(owner, 2))).isPresent();
+        assertThat(repository.ownedIndices(owner)).containsExactly(2);
+        assertThat(repository.count(owner)).isEqualTo(1);
     }
 
     private Vault vault(int index, int rows, VaultContents contents) {

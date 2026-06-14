@@ -22,7 +22,8 @@ import com.uxplima.uxmessentials.vaults.domain.VaultId;
  * <p>Only the keyed {@link #find} read is cached: a vault is opened far more often than its owner's index
  * listing changes, and the {@link #ownedIndices}/{@link #count} reads are cheap index scans that must stay
  * fresh the instant a new vault is allocated, so they pass straight through. A {@link #save} invalidates the
- * saved id only; a different vault of the same owner keeps its cached payload.
+ * saved id only, and a {@link #delete} the deleted id only; a different vault of the same owner keeps its
+ * cached payload.
  */
 public final class CachedVaultRepository implements VaultRepository {
 
@@ -66,6 +67,13 @@ public final class CachedVaultRepository implements VaultRepository {
         Objects.requireNonNull(vault, "vault");
         delegate.save(vault);
         cache.invalidate(vault.id());
+    }
+
+    @Override
+    public void delete(VaultId id) {
+        Objects.requireNonNull(id, "id");
+        delegate.delete(id);
+        cache.invalidate(id);
     }
 
     /** Drop every cached vault; call on a module reload. */
