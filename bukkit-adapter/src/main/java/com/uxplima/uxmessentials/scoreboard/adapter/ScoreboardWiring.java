@@ -56,7 +56,7 @@ public final class ScoreboardWiring {
         AtomicBoolean running = new AtomicBoolean(true);
 
         ScoreboardVisibilityStore visibility = new PdcScoreboardVisibilityStore(plugin);
-        ScoreboardRenderer renderer = new ScoreboardRenderer(sidebarManager(), visibility, settings::content);
+        ScoreboardRenderer renderer = new ScoreboardRenderer(sidebarManager(), visibility, settings::boards);
         ScoreboardNotifier notifier = new ScoreboardNotifier(kernel.messages(), kernel.messageSink());
         ToggleScoreboard toggle = new ToggleScoreboard(visibility, notifier, kernel.events());
         ScoreboardRenderTask renderTask =

@@ -19,7 +19,10 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
+import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
+import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.AfterEach;
@@ -59,14 +62,14 @@ class ScoreboardConnectionListenerTest {
         World origin = player.getWorld();
         WorldMock blacklisted = server.addSimpleWorld("world_blacklisted");
         // Start with nothing blacklisted so the board paints, then move into a world the live content blacklists.
-        AtomicReference<DisplayContent> live = new AtomicReference<>(content(Set.of()));
+        AtomicReference<SidebarConfig> live = new AtomicReference<>(config(Set.of()));
         ScoreboardRenderer renderer = new ScoreboardRenderer(sidebars, alwaysShown(), live::get);
 
         renderer.renderFor(player);
         assertThat(sidebars.count()).isEqualTo(1);
 
         player.teleport(blacklisted.getSpawnLocation());
-        live.set(content(Set.of(blacklisted.getName())));
+        live.set(config(Set.of(blacklisted.getName())));
         ScoreboardConnectionListener listener = new ScoreboardConnectionListener(renderer, new SyncScheduler());
         listener.onWorldChange(new PlayerChangedWorldEvent(player, origin));
 
@@ -86,8 +89,13 @@ class ScoreboardConnectionListenerTest {
     }
 
     private ScoreboardRenderer renderer(Set<String> blacklist) {
-        AtomicReference<DisplayContent> ref = new AtomicReference<>(content(blacklist));
+        AtomicReference<SidebarConfig> ref = new AtomicReference<>(config(blacklist));
         return new ScoreboardRenderer(sidebars, alwaysShown(), ref::get);
+    }
+
+    private static SidebarConfig config(Set<String> blacklist) {
+        return new SidebarConfig(
+                List.of(new SidebarBoard("default", content(blacklist), DisplayCondition.always(), 0)));
     }
 
     private static DisplayContent content(Set<String> blacklist) {
