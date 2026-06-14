@@ -9,6 +9,7 @@ import org.bukkit.potion.PotionEffectType;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingVanish;
 import com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture;
+import com.uxplima.uxmessentials.staff.domain.LoadoutBlob;
 import com.uxplima.uxmessentials.staff.domain.SavedLoadout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,5 +104,31 @@ class BukkitStaffModePerksTest {
 
         // The captured allowFlight was true, so the player keeps their real flight allowance on exit.
         assertThat(player.getAllowFlight()).isTrue();
+    }
+
+    @Test
+    void restoreOfALegacyFlyingRowWithoutTheAllowanceDoesNotThrow() {
+        // The shape a pre-STAFF-C row takes after the V31 ADD COLUMN allow_flight DEFAULT 0 migration: a survival
+        // player who used /fly mid-air captured flying=true, and the new column defaults the allowance to false.
+        // Restoring that must drop the flight rather than calling setFlying(true) with the allowance off, which
+        // Paper rejects with an IllegalArgumentException and would brick every later join.
+        SavedLoadout legacy = new SavedLoadout(
+                LoadoutBlob.empty(),
+                LoadoutBlob.empty(),
+                LoadoutBlob.empty(),
+                0,
+                0,
+                0.0f,
+                GameMode.SURVIVAL.name(),
+                true,
+                false,
+                LoadoutBlob.empty(),
+                false);
+
+        boolean restored = capture.restore(who, legacy);
+
+        assertThat(restored).isTrue();
+        assertThat(player.getAllowFlight()).isFalse();
+        assertThat(player.isFlying()).isFalse();
     }
 }

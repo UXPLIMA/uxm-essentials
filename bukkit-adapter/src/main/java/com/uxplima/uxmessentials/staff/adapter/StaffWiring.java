@@ -37,7 +37,6 @@ import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActio
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffJoinListener;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffModeListener;
 import com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture;
-import com.uxplima.uxmessentials.staff.adapter.outbound.MessagingStaffAlerts;
 import com.uxplima.uxmessentials.staff.adapter.outbound.MessagingStaffChannel;
 import com.uxplima.uxmessentials.staff.adapter.outbound.ModerationStaffFreeze;
 import com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector;
@@ -51,8 +50,6 @@ import com.uxplima.uxmessentials.staff.application.RecoverStaffLoadout;
 import com.uxplima.uxmessentials.staff.application.SendStaffChat;
 import com.uxplima.uxmessentials.staff.application.StaffNotifier;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
-import com.uxplima.uxmessentials.staff.domain.event.StaffModeEntered;
-import com.uxplima.uxmessentials.staff.domain.event.StaffModeExited;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -153,30 +150,11 @@ public final class StaffWiring {
                 new StaffModeListener(services, gadgetItems, followService, actions),
                 new StaffJoinListener(services, repository, kernel.scheduler()));
 
-        // Roster alerts ride the messaging staff-chat audience, so they are only wired when messaging is enabled.
-        // EnterStaffMode/ExitStaffMode publish the toggle events; RecoverStaffLoadout publishes neither, so a
-        // crash recovery on join never broadcasts an alert. The subscriber is dropped on stop to avoid a leak.
-        @Nullable Consumer<DomainEvent> alertSubscriber = subscribeAlerts(seams, settings, kernel, events);
+        // Roster alerts are wired (and unsubscribed on stop) by StaffAlertWiring; they exist only when messaging is
+        // enabled, and RecoverStaffLoadout publishes no toggle event, so a crash recovery on join never alerts.
+        @Nullable Consumer<DomainEvent> alertSubscriber = StaffAlertWiring.subscribe(seams, settings, kernel, events);
         return new Wired(
                 commands, listeners, services, followService, kernel.scheduler(), running, events, alertSubscriber);
-    }
-
-    private static @Nullable Consumer<DomainEvent> subscribeAlerts(
-            StaffSeams seams, StaffSettings settings, KernelPorts kernel, InProcessDomainEventPublisher events) {
-        if (seams.staffAudience().isEmpty()) {
-            return null;
-        }
-        MessagingStaffAlerts alerts = new MessagingStaffAlerts(
-                seams.staffAudience().get(), kernel.messageSink(), kernel.messages(), settings.staffChatNode());
-        Consumer<DomainEvent> subscriber = event -> {
-            if (event instanceof StaffModeEntered entered) {
-                alerts.announceEnter(entered.staff());
-            } else if (event instanceof StaffModeExited exited) {
-                alerts.announceExit(exited.staff());
-            }
-        };
-        events.subscribe(subscriber);
-        return subscriber;
     }
 
     private static void bindSeams(

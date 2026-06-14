@@ -181,8 +181,11 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
         // Honour the captured allowance so a real pre-mode fly permission is preserved while a staff-granted one
         // (captured allowFlight=false for a survival player) is removed on exit. Creative/spectator always fly.
         boolean flightCapable = mode == GameMode.CREATIVE || mode == GameMode.SPECTATOR;
-        player.setAllowFlight(flightCapable || loadout.allowFlight());
-        player.setFlying(loadout.flying());
+        boolean allowed = flightCapable || loadout.allowFlight();
+        player.setAllowFlight(allowed);
+        // A legacy row can carry flying=true with allowFlight=false (a survival player who used /fly mid-air before
+        // STAFF-C added the allowance column); setFlying(true) without the matching allowance throws, so gate it.
+        player.setFlying(allowed && loadout.flying());
     }
 
     private static GameMode parseGameMode(String name) {
