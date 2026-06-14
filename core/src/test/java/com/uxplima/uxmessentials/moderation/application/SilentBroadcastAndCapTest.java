@@ -307,8 +307,8 @@ class SilentBroadcastAndCapTest {
                 limit,
                 broadcast,
                 clock);
-        Kick kick = new Kick(new FakeSanctions(TARGET), guard, notifier, audit, broadcast);
+        Kick kick = new Kick(new FakeSanctions(TARGET), guard, notifier, audit, history, broadcast);
         WarnEscalator escalator = new WarnEscalator(ladder, mute, tempBan, ban, kick, notifier);
-        return new IssueWarn(repository, guard, notifier, audit, events, broadcast, escalator, clock);
+        return new IssueWarn(repository, guard, notifier, audit, events, history, broadcast, escalator, clock);
     }
 }

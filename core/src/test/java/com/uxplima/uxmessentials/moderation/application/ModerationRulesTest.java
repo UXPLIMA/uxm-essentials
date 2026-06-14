@@ -224,6 +224,7 @@ class ModerationRulesTest {
                 ModerationFakes.notifier(),
                 audit,
                 events,
+                history,
                 ModerationFakes.broadcast(),
                 noEscalation(),
                 clock);
@@ -236,6 +237,7 @@ class ModerationRulesTest {
                 ModerationFakes.notifier(),
                 audit,
                 events,
+                history,
                 ModerationFakes.broadcast(),
                 noEscalation(),
                 clock);
@@ -266,8 +268,8 @@ class ModerationRulesTest {
                 limit,
                 ModerationFakes.broadcast(),
                 clock);
-        Kick kick =
-                new Kick(new FakeSanctions(), guard, ModerationFakes.notifier(), audit, ModerationFakes.broadcast());
+        Kick kick = new Kick(
+                new FakeSanctions(), guard, ModerationFakes.notifier(), audit, history, ModerationFakes.broadcast());
         return new WarnEscalator(
                 com.uxplima.uxmessentials.moderation.domain.WarnEscalation.NONE,
                 mute,

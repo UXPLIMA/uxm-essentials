@@ -13,17 +13,21 @@ import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
+import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@code /banhistory} and {@code /mutehistory}: read-only reviews of a player's full sanction history. An
- * empty history renders the empty notice; a populated one renders a header with the count then one entry per
- * row, scoped to the right family (ban-family vs mute-family) and newest-first.
+ * {@code /banhistory}, {@code /mutehistory}, {@code /history} and {@code /staffhistory}: read-only reviews of
+ * the append-only sanction history. An empty history renders the empty notice; a populated one renders a header
+ * with the count then one entry per row, scoped to the right slice — the family reviews stay ban- or
+ * mute-family, the unified {@code /history} folds every kind for one target newest-first, and
+ * {@code /staffhistory} folds every kind issued by one staff member.
  */
 class SanctionHistoryReviewTest {
 
@@ -86,9 +90,70 @@ class SanctionHistoryReviewTest {
                         "moderation.mutehistory.entry");
     }
 
+    @Test
+    void unifiedHistoryWithNoRowsRendersEmpty() {
+        new ReviewSanctionHistory(history, notifier.notifier()).show(staff, target);
+
+        assertThat(notifier.keys).containsExactly("moderation.history.empty");
+    }
+
+    @Test
+    void unifiedHistoryFoldsEveryKindNewestFirst() {
+        append(SanctionAction.WARN, T0, Optional.of("first warning"));
+        append(SanctionAction.KICK, T0.plusSeconds(30), Optional.empty());
+        append(SanctionAction.BAN, T0.plusSeconds(60), Optional.of("grief"));
+        append(SanctionAction.MUTE, T0.plusSeconds(90), Optional.of("spam"));
+
+        new ReviewSanctionHistory(history, notifier.notifier()).show(staff, target);
+
+        assertThat(notifier.keys)
+                .containsExactly(
+                        "moderation.history.header",
+                        "moderation.history.entry",
+                        "moderation.history.entry",
+                        "moderation.history.entry",
+                        "moderation.history.entry");
+    }
+
+    @Test
+    void staffHistoryWithNoRowsRendersEmpty() {
+        new ReviewStaffHistory(history, players(), notifier.notifier()).show(staff, staff);
+
+        assertThat(notifier.keys).containsExactly("moderation.staffhistory.empty");
+    }
+
+    @Test
+    void staffHistoryFoldsEveryKindIssuedByTheActor() {
+        appendBy(staff, SanctionAction.WARN, T0, Optional.of("by staff"));
+        appendBy(staff, SanctionAction.KICK, T0.plusSeconds(30), Optional.empty());
+        // A sanction issued by a different staff member must not bleed into this review.
+        appendBy(
+                new PlayerRef(UUID.randomUUID(), "OtherStaff"),
+                SanctionAction.BAN,
+                T0.plusSeconds(60),
+                Optional.empty());
+
+        new ReviewStaffHistory(history, players(), notifier.notifier()).show(staff, staff);
+
+        assertThat(notifier.keys)
+                .containsExactly(
+                        "moderation.staffhistory.header",
+                        "moderation.staffhistory.entry",
+                        "moderation.staffhistory.entry");
+    }
+
     private void append(SanctionAction action, Instant at, Optional<String> reason) {
         history.append(new SanctionHistoryEntry(
                 action, target.uuid(), Issuer.console("Staff"), reason, at, Optional.empty(), Optional.empty()));
+    }
+
+    private void appendBy(PlayerRef actor, SanctionAction action, Instant at, Optional<String> reason) {
+        history.append(new SanctionHistoryEntry(
+                action, target.uuid(), Issuer.of(actor), reason, at, Optional.empty(), Optional.empty()));
+    }
+
+    private PlayerLookup players() {
+        return new ModerationFakes.FixedPlayers(java.util.Map.of(target.uuid(), target), java.util.Set.of());
     }
 
     private static final class CapturingNotifier {

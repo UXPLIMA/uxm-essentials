@@ -122,6 +122,42 @@ class SanctionHistoryRecorderTest {
         assertThat(row.target()).isEqualTo(TARGET.uuid());
     }
 
+    @Test
+    void standingWarnRecordsWarnWithNoExpiry() {
+        recorder.warn(ACTOR, TARGET, Optional.of("spam"), Optional.empty());
+
+        SanctionHistoryEntry row = single();
+        assertThat(row.action()).isEqualTo(SanctionAction.WARN);
+        assertThat(row.target()).isEqualTo(TARGET.uuid());
+        assertThat(row.actor().uuid()).contains(ACTOR.uuid());
+        assertThat(row.reason()).contains("spam");
+        assertThat(row.expiry()).isEmpty();
+        assertThat(row.ip()).isEmpty();
+    }
+
+    @Test
+    void tempWarnRecordsWarnWithLapseExpiry() {
+        Instant lapse = NOW.plus(Duration.ofDays(7));
+        recorder.warn(ACTOR, TARGET, Optional.empty(), Optional.of(lapse));
+
+        SanctionHistoryEntry row = single();
+        assertThat(row.action()).isEqualTo(SanctionAction.WARN);
+        assertThat(row.expiry()).contains(lapse);
+    }
+
+    @Test
+    void kickRecordsKickWithNoExpiryAndNoIp() {
+        recorder.kick(ACTOR, TARGET, Optional.of("afk"));
+
+        SanctionHistoryEntry row = single();
+        assertThat(row.action()).isEqualTo(SanctionAction.KICK);
+        assertThat(row.target()).isEqualTo(TARGET.uuid());
+        assertThat(row.actor().uuid()).contains(ACTOR.uuid());
+        assertThat(row.reason()).contains("afk");
+        assertThat(row.expiry()).isEmpty();
+        assertThat(row.ip()).isEmpty();
+    }
+
     private SanctionHistoryEntry single() {
         assertThat(store.appended).hasSize(1);
         return store.appended.get(0);

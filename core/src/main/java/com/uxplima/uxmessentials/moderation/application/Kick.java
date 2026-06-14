@@ -20,7 +20,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  *
  * <p>Unless the kick is silent ({@code /kick -s}), the staff broadcast announces it to everyone holding the
  * moderation broadcast node; a silent kick suppresses only that announcement, leaving the actor confirmation
- * and the target's kick screen intact.
+ * and the target's kick screen intact. A successful kick is recorded in the append-only sanction history so it
+ * surfaces in {@code /history} and {@code /staffhistory} — a kick carries no expiry.
  */
 public final class Kick {
 
@@ -28,6 +29,7 @@ public final class Kick {
     private final ModerationGuard guard;
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
+    private final SanctionHistoryRecorder history;
     private final SanctionBroadcast broadcast;
 
     public Kick(
@@ -35,11 +37,13 @@ public final class Kick {
             ModerationGuard guard,
             ModerationNotifier notifier,
             ModerationAudit audit,
+            SanctionHistoryRecorder history,
             SanctionBroadcast broadcast) {
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
+        this.history = Objects.requireNonNull(history, "history");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
     }
 
@@ -56,6 +60,7 @@ public final class Kick {
         }
         MessageKey key = ModerationMessageKey.KICK_KICKED;
         sanctions.kick(target, key, notifier.render(target, key, Map.of("reason", reason.orElse(""))));
+        history.kick(actor, target, reason);
         audit.kicked(actor, target, true, reason);
         notifier.send(actor, ModerationMessageKey.KICK_APPLIED, Map.of("player", target.name()));
         if (!silent) {

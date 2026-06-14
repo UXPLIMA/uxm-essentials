@@ -13,8 +13,8 @@ import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * The single collaborator the ban/mute use cases call to append a {@link SanctionHistoryEntry} the moment a
- * sanction has been saved. Folding the eight mapping blocks into one focused class keeps each use case's
+ * The single collaborator the ban/mute/warn/kick use cases call to append a {@link SanctionHistoryEntry} the
+ * moment a sanction has been saved. Folding the mapping blocks into one focused class keeps each use case's
  * success path a single line ({@code history.ban(...)}) and the action→entry translation in one place.
  *
  * <p>Every method stamps the entry with the recorder's {@link Clock} at the call instant and builds the
@@ -70,6 +70,18 @@ public final class SanctionHistoryRecorder {
     public void unmute(PlayerRef actor, PlayerRef target) {
         Objects.requireNonNull(target, "target");
         append(SanctionAction.UNMUTE, target.uuid(), actor, Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    /** Record a warning of {@code target} ({@code expiry} present for a tempwarn's lapse, empty for a standing warn). */
+    public void warn(PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Instant> expiry) {
+        Objects.requireNonNull(target, "target");
+        append(SanctionAction.WARN, target.uuid(), actor, reason, expiry, Optional.empty());
+    }
+
+    /** Record a kick of {@code target} (a live disconnect — never a stored expiry, never IP-scoped). */
+    public void kick(PlayerRef actor, PlayerRef target, Optional<String> reason) {
+        Objects.requireNonNull(target, "target");
+        append(SanctionAction.KICK, target.uuid(), actor, reason, Optional.empty(), Optional.empty());
     }
 
     private void append(

@@ -19,7 +19,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@code /tempmute} is the explicit-duration alias of {@code /mute}, {@code /kickall} shares the kick node,
  * {@code /warns} and {@code /unwarn} share the warn node, {@code /jails}, {@code /jailedplayers},
  * {@code /setjail} and {@code /deljail} share the jail node, {@code /tempbanip} and {@code /unbanip} share the
- * banip node, and {@code /unfreeze} shares the freeze node — matching the node table.
+ * banip node, {@code /unfreeze} shares the freeze node, and {@code /checkban} and {@code /checkmute} share the
+ * check node — matching the node table.
  */
 final class ModerationCommandSurface {
 
@@ -44,6 +45,13 @@ final class ModerationCommandSurface {
                 spec("mutelist", "uxmessentials.moderation.mutelist", "Review currently muted players"),
                 spec("banhistory", "uxmessentials.moderation.ban", "Review a player's ban history"),
                 spec("mutehistory", "uxmessentials.moderation.mute", "Review a player's mute history"),
+                spec("history", "uxmessentials.moderation.history", "Review a player's full sanction history"),
+                spec(
+                        "staffhistory",
+                        "uxmessentials.moderation.staffhistory",
+                        "Review the sanctions a staff member issued"),
+                spec("checkban", "uxmessentials.moderation.check", "Check whether a player is banned"),
+                spec("checkmute", "uxmessentials.moderation.check", "Check whether a player is muted"),
                 spec("kick", "uxmessentials.moderation.kick", "Kick a player"),
                 spec("kickall", "uxmessentials.moderation.kick", "Kick all non-exempt players"),
                 spec("warn", "uxmessentials.moderation.warn", "Warn a player"),

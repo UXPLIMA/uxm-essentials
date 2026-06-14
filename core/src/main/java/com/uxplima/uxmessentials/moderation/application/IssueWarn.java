@@ -35,6 +35,7 @@ public final class IssueWarn {
     private final ModerationNotifier notifier;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
+    private final SanctionHistoryRecorder history;
     private final SanctionBroadcast broadcast;
     private final WarnEscalator escalator;
     private final Clock clock;
@@ -45,6 +46,7 @@ public final class IssueWarn {
             ModerationNotifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
+            SanctionHistoryRecorder history,
             SanctionBroadcast broadcast,
             WarnEscalator escalator,
             Clock clock) {
@@ -53,6 +55,7 @@ public final class IssueWarn {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
+        this.history = Objects.requireNonNull(history, "history");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
         this.escalator = Objects.requireNonNull(escalator, "escalator");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -74,6 +77,7 @@ public final class IssueWarn {
         repository.ensureUserExists(target, now);
         int total = repository.appendWarn(target, warn);
         PlayerWarned event = new PlayerWarned(target, warn, total);
+        history.warn(actor, target, reason, Optional.empty());
         notifier.send(target, ModerationMessageKey.WARN_NOTIFY_TARGET, Map.of("reason", reason.orElse("")));
         events.publish(event);
         audit.warned(actor, target, true, reason);

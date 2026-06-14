@@ -83,6 +83,22 @@ public enum ModerationMessageKey implements MessageKey {
     MUTEHISTORY_ENTRY("moderation.mutehistory.entry"),
     MUTEHISTORY_EMPTY("moderation.mutehistory.empty"),
 
+    // /history — a player's full sanction history of every kind (newest-first)
+    MOD_HISTORY_HEADER("moderation.history.header"),
+    MOD_HISTORY_ENTRY("moderation.history.entry"),
+    MOD_HISTORY_EMPTY("moderation.history.empty"),
+
+    // /staffhistory — the sanctions a staff member has issued (newest-first)
+    MOD_STAFFHISTORY_HEADER("moderation.staffhistory.header"),
+    MOD_STAFFHISTORY_ENTRY("moderation.staffhistory.entry"),
+    MOD_STAFFHISTORY_EMPTY("moderation.staffhistory.empty"),
+
+    // /checkban, /checkmute — present-tense "is this player banned/muted?" checks
+    MOD_CHECK_BANNED("moderation.check.banned"),
+    MOD_CHECK_NOT_BANNED("moderation.check.not-banned"),
+    MOD_CHECK_MUTED("moderation.check.muted"),
+    MOD_CHECK_NOT_MUTED("moderation.check.not-muted"),
+
     // /kick, /kickall
     KICK_APPLIED("moderation.kick.applied"),
     KICK_KICKED("moderation.kick.kicked"),
