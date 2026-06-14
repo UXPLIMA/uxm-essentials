@@ -360,6 +360,9 @@ public final class PluginModule {
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.teleportEngine = wired.services().engine();
+        // Captured for staff (wired last), which binds its COMPASS gadget and /stafflist to this admin engine.
+        links.staffTeleport = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.TeleportSeam(
+                wired.services().engine());
         // Captured for moderation, which lands later and rebinds this jail gate to the real jail policy.
         links.jailGate = wired.jailGate();
         // Captured for homes, which lands later and rebinds this seam so the respawn chain's HOME step resolves.
@@ -500,6 +503,10 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         links.placeholders.moderation(new GateModerationPlaceholders(wired.mutePolicy(), wired.jailGate()));
+        // Captured for staff (wired last), which binds its FREEZE gadget to the audited freeze use case and the
+        // live freeze-state read (BukkitSanctions is the Sanctions adapter).
+        links.staffModerationFreeze = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.ModerationFreezeSeam(
+                wired.freeze(), wired.sanctions());
     }
 
     private static void wireItemworld(
@@ -677,7 +684,9 @@ public final class PluginModule {
         StaffWiring.StaffSeams seams = new StaffWiring.StaffSeams(
                 Optional.ofNullable(links.staffPresenceVanish),
                 Optional.ofNullable(links.staffOpenContainer),
-                Optional.ofNullable(links.staffAudience));
+                Optional.ofNullable(links.staffAudience),
+                Optional.ofNullable(links.staffModerationFreeze),
+                Optional.ofNullable(links.staffTeleport));
         StaffWiring.Wired wired = StaffWiring.wire(plugin, ctx, persistence, seams);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -765,6 +774,10 @@ public final class PluginModule {
                 staffOpenContainer;
         private com.uxplima.uxmessentials.messaging.application.port.@org.jspecify.annotations.Nullable StaffAudience
                 staffAudience;
+        private com.uxplima.uxmessentials.staff.adapter.StaffWiring.@org.jspecify.annotations.Nullable ModerationFreezeSeam
+                staffModerationFreeze;
+        private com.uxplima.uxmessentials.staff.adapter.StaffWiring.@org.jspecify.annotations.Nullable TeleportSeam
+                staffTeleport;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
     }

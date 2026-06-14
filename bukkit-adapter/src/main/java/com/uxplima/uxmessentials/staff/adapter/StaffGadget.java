@@ -9,8 +9,10 @@ import org.jspecify.annotations.NullMarked;
  * item through the staff PDC key so the right-click listener can tell which gadget was used without matching on
  * material or display name (which an operator may freely re-skin in config).
  *
- * <p>STAFF-MODE ONLY: the gadgets orchestrate the existing presence and playerstate modules — VANISH toggles
- * vanish, EXAMINE opens an online player's inventory — and never carry a sanction.
+ * <p>STAFF-MODE ONLY: the gadgets orchestrate the existing presence, playerstate, moderation, and teleport
+ * modules — VANISH toggles vanish, EXAMINE opens an online player's inventory, FREEZE toggles a target's
+ * freeze through moderation, COMPASS teleports to a target, FOLLOW keeps the staff member on a target — and
+ * never carry a sanction beyond what moderation's freeze use case already audits.
  */
 @NullMarked
 public enum StaffGadget {
@@ -19,7 +21,16 @@ public enum StaffGadget {
     VANISH("vanish"),
 
     /** Pick an online player and open their inventory. */
-    EXAMINE("examine");
+    EXAMINE("examine"),
+
+    /** Right-click a player to freeze or unfreeze them through the moderation freeze use case. */
+    FREEZE("freeze"),
+
+    /** Pick (or right-click) a player and teleport to them as an admin teleport. */
+    COMPASS("compass"),
+
+    /** Right-click a player to start or stop continuously following them. */
+    FOLLOW("follow");
 
     private final String tag;
 

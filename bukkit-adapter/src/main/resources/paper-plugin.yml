@@ -884,3 +884,6 @@ permissions:
   uxmessentials.staff.chat:
     description: '/staffchat (alias /sc) to send and receive lines on the staff-only chat channel.'
     default: op
+  uxmessentials.staff.list:
+    description: '/stafflist to open the online-staff GUI (vanish-aware) and click a head to teleport to that staff member.'
+    default: op

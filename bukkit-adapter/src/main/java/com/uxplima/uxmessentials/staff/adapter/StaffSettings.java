@@ -27,21 +27,30 @@ public final class StaffSettings {
     public static final String DEFAULT_MODE = "default";
 
     private static final int HOTBAR_SLOTS = 9;
+    private static final int DEFAULT_FOLLOW_INTERVAL_TICKS = 10;
     private static final Material DEFAULT_VANISH_MATERIAL = Material.SLIME_BALL;
     private static final Material DEFAULT_EXAMINE_MATERIAL = Material.BOOK;
+    private static final Material DEFAULT_FREEZE_MATERIAL = Material.PACKED_ICE;
+    private static final Material DEFAULT_COMPASS_MATERIAL = Material.COMPASS;
+    private static final Material DEFAULT_FOLLOW_MATERIAL = Material.LEAD;
     private static final String DEFAULT_VANISH_NAME = "<aqua>Vanish";
     private static final String DEFAULT_EXAMINE_NAME = "<gold>Examine";
+    private static final String DEFAULT_FREEZE_NAME = "<blue>Freeze";
+    private static final String DEFAULT_COMPASS_NAME = "<yellow>Navigator";
+    private static final String DEFAULT_FOLLOW_NAME = "<green>Follow";
     private static final String DEFAULT_STAFF_CHAT_NODE = "uxmessentials.staff.chat";
 
     private final boolean vanishOnEnter;
     private final List<GadgetSpec> gadgets;
     private final String staffChatNode;
+    private final int followIntervalTicks;
 
     public StaffSettings(ConfigStore config, Logger log) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(log, "log");
         this.vanishOnEnter = config.getBoolean("vanish-on-enter", true);
         this.staffChatNode = config.getString("staff-chat.receive-node", DEFAULT_STAFF_CHAT_NODE);
+        this.followIntervalTicks = Math.max(1, config.getInt("follow.interval-ticks", DEFAULT_FOLLOW_INTERVAL_TICKS));
         this.gadgets = List.copyOf(parseGadgets(config, log));
     }
 
@@ -60,11 +69,22 @@ public final class StaffSettings {
         return staffChatNode;
     }
 
+    /** How often (in ticks) the FOLLOW task re-teleports a following staff member onto their target. */
+    public int followIntervalTicks() {
+        return followIntervalTicks;
+    }
+
     private static List<GadgetSpec> parseGadgets(ConfigStore config, Logger log) {
         List<GadgetSpec> specs = new ArrayList<>();
         parseGadget(config, log, StaffGadget.VANISH, "vanish", 0, DEFAULT_VANISH_MATERIAL, DEFAULT_VANISH_NAME)
                 .ifPresent(specs::add);
         parseGadget(config, log, StaffGadget.EXAMINE, "examine", 1, DEFAULT_EXAMINE_MATERIAL, DEFAULT_EXAMINE_NAME)
+                .ifPresent(specs::add);
+        parseGadget(config, log, StaffGadget.FREEZE, "freeze", 2, DEFAULT_FREEZE_MATERIAL, DEFAULT_FREEZE_NAME)
+                .ifPresent(specs::add);
+        parseGadget(config, log, StaffGadget.COMPASS, "compass", 3, DEFAULT_COMPASS_MATERIAL, DEFAULT_COMPASS_NAME)
+                .ifPresent(specs::add);
+        parseGadget(config, log, StaffGadget.FOLLOW, "follow", 4, DEFAULT_FOLLOW_MATERIAL, DEFAULT_FOLLOW_NAME)
                 .ifPresent(specs::add);
         return specs;
     }

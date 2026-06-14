@@ -472,12 +472,13 @@ class FeatureModuleRegistryDriftTest {
                 .collect(Collectors.toSet());
         assertThat(on).contains("staff", "teleport", "holograms");
 
-        // Enabled, staff contributes exactly /staffmode and /staffchat (the /sc alias is not a separate literal) and
-        // owns no extra Flyway location (its staff_loadout table is in the persistence V29 baseline, always applied),
-        // so it declares no MigrationSet of its own. STAFF-MODE ONLY: no sanction command is published.
+        // Enabled, staff contributes /staffmode, /staffchat (the /sc alias is not a separate literal) and
+        // /stafflist (the online-staff GUI), and owns no extra Flyway location (its staff_loadout table is in the
+        // persistence V29 baseline, always applied), so it declares no MigrationSet of its own. STAFF-MODE ONLY:
+        // no sanction command is published.
         Set<String> literals =
                 staff.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
-        assertThat(literals).containsExactlyInAnyOrder("staffmode", "staffchat");
+        assertThat(literals).containsExactlyInAnyOrder("staffmode", "staffchat", "stafflist");
         assertThat(staff.migrations()).isEmpty();
     }
 

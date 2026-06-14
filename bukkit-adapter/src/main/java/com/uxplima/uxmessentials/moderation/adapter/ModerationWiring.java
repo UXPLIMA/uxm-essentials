@@ -149,7 +149,8 @@ public final class ModerationWiring {
                 sanctions,
                 commandSpyStore,
                 mutePolicy,
-                jailGate);
+                jailGate,
+                services.freeze());
     }
 
     private static ModerationServices assemble(
@@ -302,6 +303,8 @@ public final class ModerationWiring {
      * @param commandSpyStore the session-scoped commandspy set, for the stop-time drain
      * @param mutePolicy the mute read side the {@code muted} placeholder queries
      * @param jailGate the jail read side the {@code jailed} placeholder queries
+     * @param freeze the audited freeze use case the staff FREEZE gadget orchestrates (with {@link #sanctions} as
+     *     the live freeze-state read)
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -309,7 +312,8 @@ public final class ModerationWiring {
             BukkitSanctions sanctions,
             InMemoryCommandSpyStore commandSpyStore,
             RepositoryMutePolicy mutePolicy,
-            RepositoryJailGate jailGate) {
+            RepositoryJailGate jailGate,
+            Freeze freeze) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -318,6 +322,7 @@ public final class ModerationWiring {
             Objects.requireNonNull(commandSpyStore, "commandSpyStore");
             Objects.requireNonNull(mutePolicy, "mutePolicy");
             Objects.requireNonNull(jailGate, "jailGate");
+            Objects.requireNonNull(freeze, "freeze");
         }
 
         /** Drop the session-scoped freeze and commandspy sets. Called on module stop. */

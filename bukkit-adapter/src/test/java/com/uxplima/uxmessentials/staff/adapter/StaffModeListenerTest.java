@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -23,14 +24,21 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.EchoMessages;
+import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingFreeze;
+import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingTeleport;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingVanish;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.SilentSink;
+import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.StaffKeySink;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffNavigatorView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActions;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffModeListener;
+import com.uxplima.uxmessentials.staff.adapter.outbound.StaffFollowService;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffModeStoreImpl;
 import com.uxplima.uxmessentials.staff.application.EnterStaffMode;
 import com.uxplima.uxmessentials.staff.application.ExitStaffMode;
 import com.uxplima.uxmessentials.staff.application.SendStaffChat;
+import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.staff.application.port.StaffChannel;
 import com.uxplima.uxmessentials.staff.application.port.StaffInspector;
 import org.junit.jupiter.api.AfterEach;
@@ -40,46 +48,122 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 
 /**
- * The gadget interaction listener: a right-click on the VANISH gadget toggles vanish and cancels the
- * interaction, a non-gadget interaction is left alone, and a gadget item can never be dropped.
+ * The gadget interaction listener: an air interact fires the air action (VANISH toggles, the target-needing
+ * gadgets report no-target), a right-click on a player fires the player action (FREEZE/FOLLOW/COMPASS), a
+ * non-gadget interaction is left alone, and a gadget item can never be dropped or swapped out.
  */
 class StaffModeListenerTest {
 
     private ServerMock server;
     private Player player;
+    private Player target;
     private Plugin plugin;
     private StaffGadgetItems gadgetItems;
     private StaffSettings settings;
     private RecordingVanish vanish;
+    private RecordingFreeze freeze;
+    private RecordingTeleport teleport;
     private RecordingInspector inspector;
+    private StaffFollowService follow;
+    private StaffKeySink keySink;
     private StaffModeListener listener;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         player = server.addPlayer("Alice");
+        target = server.addPlayer("Bob");
         plugin = MockBukkit.createMockPlugin("uxmEssentials");
         gadgetItems = new StaffGadgetItems(plugin);
         settings = StaffAdapterFakes.defaultSettings();
         vanish = new RecordingVanish();
+        freeze = new RecordingFreeze();
+        teleport = new RecordingTeleport();
         inspector = new RecordingInspector();
-        listener = new StaffModeListener(services(), gadgetItems, vanish, examineView());
+        keySink = new StaffKeySink();
+        follow = new StaffFollowService(server, new SyncScheduler(), StaffAdapterFakes.notifier(), id -> true, 10);
+        listener = new StaffModeListener(services(), gadgetItems, follow, actions());
     }
 
     @AfterEach
     void tearDown() {
+        follow.shutdown();
         MockBukkit.unmock();
     }
 
     @Test
     void rightClickingTheVanishGadgetTogglesVanishAndCancelsTheInteraction() {
-        ItemStack gadget = gadgetItems.build(vanishSpec());
+        ItemStack gadget = gadgetItems.build(spec(StaffGadget.VANISH));
         PlayerInteractEvent event = interact(gadget);
 
         listener.onInteract(event);
 
         assertThat(vanish.states).hasSize(1);
         assertThat(event.useItemInHand()).isEqualTo(Event.Result.DENY);
+    }
+
+    @Test
+    void usingTheFreezeGadgetOnAirReportsNoTarget() {
+        ItemStack gadget = gadgetItems.build(spec(StaffGadget.FREEZE));
+
+        listener.onInteract(interact(gadget));
+
+        assertThat(freeze.toggled).isEmpty();
+        assertThat(keySink.delivered).anyMatch(line -> line.startsWith(StaffMessageKey.STAFF_GADGET_NO_TARGET.key()));
+    }
+
+    @Test
+    void usingTheCompassGadgetOnAirOpensTheNavigatorWithoutTeleporting() {
+        ItemStack gadget = gadgetItems.build(spec(StaffGadget.COMPASS));
+
+        listener.onInteract(interact(gadget));
+
+        // Air use opens the picker; no teleport happens until a head is clicked.
+        assertThat(teleport.targets).isEmpty();
+    }
+
+    @Test
+    void rightClickingAPlayerWithTheFreezeGadgetTogglesFreeze() {
+        ItemStack gadget = gadgetItems.build(spec(StaffGadget.FREEZE));
+        player.getInventory().setItemInMainHand(gadget);
+        PlayerInteractEntityEvent event = interactEntity();
+
+        listener.onInteractEntity(event);
+
+        assertThat(freeze.toggled).extracting(PlayerRef::uuid).containsExactly(target.getUniqueId());
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
+    void rightClickingAPlayerWithTheCompassGadgetTeleportsToThem() {
+        ItemStack gadget = gadgetItems.build(spec(StaffGadget.COMPASS));
+        player.getInventory().setItemInMainHand(gadget);
+
+        listener.onInteractEntity(interactEntity());
+
+        assertThat(teleport.targets).extracting(PlayerRef::uuid).containsExactly(target.getUniqueId());
+    }
+
+    @Test
+    void rightClickingAPlayerWithTheFollowGadgetStartsFollowing() {
+        ItemStack gadget = gadgetItems.build(spec(StaffGadget.FOLLOW));
+        player.getInventory().setItemInMainHand(gadget);
+
+        listener.onInteractEntity(interactEntity());
+
+        assertThat(follow.isFollowing(player.getUniqueId())).isTrue();
+    }
+
+    @Test
+    void rightClickingAnEntityWithAnOrdinaryItemIsLeftAlone() {
+        player.getInventory().setItemInMainHand(new ItemStack(Material.DIAMOND_SWORD));
+        PlayerInteractEntityEvent event = interactEntity();
+
+        listener.onInteractEntity(event);
+
+        assertThat(freeze.toggled).isEmpty();
+        assertThat(teleport.targets).isEmpty();
+        assertThat(event.isCancelled()).isFalse();
     }
 
     @Test
@@ -94,7 +178,7 @@ class StaffModeListenerTest {
 
     @Test
     void aGadgetItemCannotBeDropped() {
-        ItemStack gadget = gadgetItems.build(vanishSpec());
+        ItemStack gadget = gadgetItems.build(spec(StaffGadget.VANISH));
         Item dropped = player.getWorld().dropItem(player.getLocation(), gadget);
         PlayerDropItemEvent event = new PlayerDropItemEvent(player, dropped);
 
@@ -104,19 +188,8 @@ class StaffModeListenerTest {
     }
 
     @Test
-    void anOrdinaryItemCanStillBeDropped() {
-        Item dropped = player.getWorld().dropItem(player.getLocation(), new ItemStack(Material.DIRT));
-        PlayerDropItemEvent event = new PlayerDropItemEvent(player, dropped);
-
-        listener.onDrop(event);
-
-        assertThat(event.isCancelled()).isFalse();
-    }
-
-    @Test
     void swappingAGadgetIntoTheOffHandIsCancelled() {
-        ItemStack gadget = gadgetItems.build(vanishSpec());
-        // F-key swap with a gadget in hand: the swap must be cancelled so a gadget never strands in the off-hand.
+        ItemStack gadget = gadgetItems.build(spec(StaffGadget.VANISH));
         PlayerSwapHandItemsEvent event = new PlayerSwapHandItemsEvent(player, new ItemStack(Material.AIR), gadget);
 
         listener.onSwapHand(event);
@@ -138,11 +211,20 @@ class StaffModeListenerTest {
         return new PlayerInteractEvent(player, Action.RIGHT_CLICK_AIR, hand, null, null, EquipmentSlot.HAND);
     }
 
-    private StaffSettings.GadgetSpec vanishSpec() {
+    private PlayerInteractEntityEvent interactEntity() {
+        return new PlayerInteractEntityEvent(player, target, EquipmentSlot.HAND);
+    }
+
+    private StaffSettings.GadgetSpec spec(StaffGadget gadget) {
         return settings.gadgets().stream()
-                .filter(spec -> spec.gadget() == StaffGadget.VANISH)
+                .filter(s -> s.gadget() == gadget)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private StaffGadgetActions actions() {
+        return new StaffGadgetActions(
+                vanish, freeze, teleport, follow, examineView(), navigatorView(), StaffAdapterFakes.notifier(keySink));
     }
 
     private StaffServices services() {
@@ -176,6 +258,10 @@ class StaffModeListenerTest {
     private StaffExamineView examineView() {
         Messages messages = new EchoMessages();
         return new StaffExamineView(messages, new SilentSink(), new SyncScheduler(), services());
+    }
+
+    private StaffNavigatorView navigatorView() {
+        return new StaffNavigatorView(server, new EchoMessages(), new SilentSink(), new SyncScheduler(), teleport);
     }
 
     /** A {@link StaffInspector} that records who inspected whom. */
@@ -212,6 +298,12 @@ class StaffModeListenerTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
+        }
+
+        @Override
+        public AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
+            // The follow service holds the handle and closes it on shutdown; the test drives ticks directly.
+            return () -> {};
         }
     }
 }

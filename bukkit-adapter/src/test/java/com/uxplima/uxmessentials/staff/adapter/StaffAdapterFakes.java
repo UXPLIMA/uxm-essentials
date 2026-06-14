@@ -16,7 +16,9 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.application.StaffNotifier;
+import com.uxplima.uxmessentials.staff.application.port.StaffFreeze;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
+import com.uxplima.uxmessentials.staff.application.port.StaffTeleport;
 import com.uxplima.uxmessentials.staff.application.port.StaffVanish;
 import com.uxplima.uxmessentials.staff.domain.SavedLoadout;
 
@@ -109,9 +111,44 @@ final class StaffAdapterFakes {
         }
     }
 
+    /** A freeze that records the toggles it was asked for and returns a settable outcome. */
+    static final class RecordingFreeze implements StaffFreeze {
+        final List<PlayerRef> toggled = new ArrayList<>();
+        FreezeOutcome outcome = FreezeOutcome.FROZEN;
+        boolean frozen = false;
+
+        @Override
+        public FreezeOutcome toggle(PlayerRef actor, PlayerRef target) {
+            toggled.add(target);
+            return outcome;
+        }
+
+        @Override
+        public boolean isFrozen(PlayerRef target) {
+            return frozen;
+        }
+    }
+
+    /** A teleport that records the targets it was asked to send to and returns a settable result. */
+    static final class RecordingTeleport implements StaffTeleport {
+        final List<PlayerRef> targets = new ArrayList<>();
+        boolean ok = true;
+
+        @Override
+        public boolean teleportTo(PlayerRef staff, PlayerRef target) {
+            targets.add(target);
+            return ok;
+        }
+    }
+
     /** A notifier over echoing ports, so a test could read the keys sent (unused assertions aside). */
     static StaffNotifier notifier() {
         return new StaffNotifier(new EchoMessages(), new SilentSink());
+    }
+
+    /** A notifier whose delivered, rendered lines a test can read (key plus folded placeholders). */
+    static StaffNotifier notifier(StaffKeySink sink) {
+        return new StaffNotifier(new EchoMessages(), sink);
     }
 
     /** An event publisher that collects what it published. */
