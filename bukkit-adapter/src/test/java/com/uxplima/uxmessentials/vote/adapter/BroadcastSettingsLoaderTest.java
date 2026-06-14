@@ -10,8 +10,8 @@ import java.time.Duration;
 import net.kyori.adventure.bossbar.BossBar;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
-import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.domain.BroadcastType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

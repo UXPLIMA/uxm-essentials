@@ -6,7 +6,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.domain.BroadcastType;
 
 /**

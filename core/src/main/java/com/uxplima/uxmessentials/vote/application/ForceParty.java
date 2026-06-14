@@ -4,12 +4,12 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
-import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
 
 /**
  * Admin use case: fire the vote party immediately, regardless of the current counter value. Uses

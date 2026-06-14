@@ -7,14 +7,19 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.communication.application.port.RandomSource;
 import com.uxplima.uxmessentials.communication.application.port.SequenceCounter;
-import com.uxplima.uxmessentials.communication.domain.AnnouncerSchedule;
+import com.uxplima.uxmessentials.communication.domain.Announcement;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.communication.domain.Ordering;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
+import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -22,7 +27,8 @@ import org.junit.jupiter.api.Test;
  * same wiring the connection listeners and the announcer timer drive, minus Bukkit. It pins the headline rules:
  * a join channel's {@code MessagePolicy} decides whether the plugin renders a substituted template, suppresses
  * the line, or defers to vanilla; the sequential ordering walks the templates in author order; the announcer's
- * {@code NextAnnouncement} honours the min-players gate and never repeats the previous random line back-to-back.
+ * {@code NextAnnouncement} honours the min-players gate and never repeats the previous random announcement
+ * back-to-back.
  */
 class CommunicationResolutionTest {
 
@@ -69,31 +75,47 @@ class CommunicationResolutionTest {
 
     @Test
     void theAnnouncerSkipsTheTickBelowTheMinPlayersGate() {
-        AnnouncerSchedule schedule =
-                new AnnouncerSchedule(Duration.ofMinutes(5), 3, Ordering.SEQUENTIAL, List.of("tip one", "tip two"));
-        NextAnnouncement announcer = new NextAnnouncement(new AtomicReference<>(schedule)::get, fixedRandom(0));
+        AnnouncerConfig config = new AnnouncerConfig(
+                Duration.ofMinutes(5), 3, Ordering.SEQUENTIAL, List.of(line("tip one"), line("tip two")));
+        NextAnnouncement announcer = new NextAnnouncement(new AtomicReference<>(config)::get, fixedRandom(0));
 
         assertThat(announcer.pick(2)).isEmpty(); // below the gate of 3 — skipped
-        assertThat(announcer.pick(3)).contains("tip one"); // at the gate — fires
+        assertThat(pickedId(announcer.pick(3))).contains("tip one"); // at the gate — fires
     }
 
     @Test
-    void theAnnouncerNeverRepeatsThePreviousRandomLineBackToBack() {
-        AnnouncerSchedule schedule =
-                new AnnouncerSchedule(Duration.ofMinutes(5), 0, Ordering.RANDOM, List.of("a", "b", "c"));
+    void theAnnouncerNeverRepeatsThePreviousRandomAnnouncementBackToBack() {
+        AnnouncerConfig config = new AnnouncerConfig(
+                Duration.ofMinutes(5), 0, Ordering.RANDOM, List.of(line("a"), line("b"), line("c")));
         // The RNG draws 0, then 0 again: the second draw collides with the previous index and is nudged forward.
-        NextAnnouncement announcer = new NextAnnouncement(new AtomicReference<>(schedule)::get, sequenceRandom(0, 0));
+        NextAnnouncement announcer = new NextAnnouncement(new AtomicReference<>(config)::get, sequenceRandom(0, 0));
 
-        assertThat(announcer.pick(1)).contains("a"); // first draw -> index 0
-        assertThat(announcer.pick(1)).contains("b"); // second draw collides on 0 -> nudged to index 1
+        assertThat(pickedId(announcer.pick(1))).contains("a"); // first draw -> index 0
+        assertThat(pickedId(announcer.pick(1))).contains("b"); // second draw collides on 0 -> nudged to index 1
     }
 
     @Test
-    void theAnnouncerIsSilentWithNoLines() {
-        AnnouncerSchedule schedule = AnnouncerSchedule.silent(Duration.ofMinutes(5));
-        NextAnnouncement announcer = new NextAnnouncement(new AtomicReference<>(schedule)::get, fixedRandom(0));
+    void theAnnouncerIsSilentWithNoAnnouncements() {
+        AnnouncerConfig config = AnnouncerConfig.empty();
+        NextAnnouncement announcer = new NextAnnouncement(new AtomicReference<>(config)::get, fixedRandom(0));
 
         assertThat(announcer.pick(50)).isEmpty();
+    }
+
+    /** A single-line, chat-only, unconditional announcement whose id is the line text — convenient for assertions. */
+    private static Announcement line(String text) {
+        return new Announcement(
+                text,
+                List.of(text),
+                DisplayCondition.always(),
+                Optional.empty(),
+                Set.of(BroadcastChannel.CHAT),
+                Optional.empty(),
+                false);
+    }
+
+    private static Optional<String> pickedId(Optional<Announcement> picked) {
+        return picked.map(Announcement::id);
     }
 
     private static ResolveJoinMessage joinWith(MessagePolicy policy) {

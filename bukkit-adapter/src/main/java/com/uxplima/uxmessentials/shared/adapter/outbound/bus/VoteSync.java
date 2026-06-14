@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
@@ -18,7 +19,6 @@ import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
-import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;

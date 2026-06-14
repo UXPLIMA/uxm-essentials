@@ -7,6 +7,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
+import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerSchedule;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
@@ -23,6 +24,10 @@ import org.jspecify.annotations.NullMarked;
  * re-arming the task. The task observes the module's {@code running} flag and exits cleanly on disable; the
  * broadcast scan reads the live online set off the tick thread and delivers through the sink, which hops to each
  * viewer's region thread, so no Bukkit entity is touched on the async loop itself.
+ *
+ * <p>An announcement now carries one or more lines; this task joins them with a newline and broadcasts the block
+ * on the chat channel. Per-channel delivery, per-viewer condition gating, and per-announcement interval overrides
+ * are the follow-up adapter task; here the legacy single-block chat behaviour is preserved.
  */
 @NullMarked
 public final class AnnouncerTask {
@@ -63,8 +68,8 @@ public final class AnnouncerTask {
         if (!running.getAsBoolean()) {
             return;
         }
-        Optional<String> line = nextAnnouncement.pick(broadcaster.onlineCount());
-        line.ifPresent(broadcaster::broadcast);
+        Optional<Announcement> announcement = nextAnnouncement.pick(broadcaster.onlineCount());
+        announcement.ifPresent(picked -> broadcaster.broadcast(String.join("\n", picked.lines())));
         scheduleNext();
     }
 }

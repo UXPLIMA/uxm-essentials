@@ -3,6 +3,11 @@ package com.uxplima.uxmessentials.communication.domain;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
+import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 
 /**
  * The cadence and content of the rotating announcer. It carries the {@link #interval} between broadcasts, the
@@ -10,6 +15,11 @@ import java.util.Objects;
  * the {@link #minOnlinePlayers} gate below which a tick is skipped — an empty or near-empty server is not spammed
  * with broadcasts no one reads. The schedule is pure data: the {@code NextAnnouncement} use case reads it to
  * decide whether this tick fires and which line it picks, advancing an {@link AnnouncerCursor} across ticks.
+ *
+ * <p>The flat list-of-lines shape is the back-compatible legacy form. The richer {@link AnnouncerConfig} —
+ * a list of per-announcement {@link Announcement}s, each with its own condition, channels, sound, and optional
+ * interval — supersedes it; {@link #asConfig()} bridges a flat schedule to one default announcement so the legacy
+ * config keeps working until the codec produces an {@code AnnouncerConfig} directly.
  *
  * <p>The schedule is rebuilt atomically on reload (a new {@code AtomicReference<AnnouncerSchedule>} swapped in);
  * the adapter's timer reads the current schedule each tick, so an interval or line change takes effect on the
@@ -65,5 +75,26 @@ public record AnnouncerSchedule(Duration interval, int minOnlinePlayers, Orderin
     public String lineAt(int index) {
         Objects.checkIndex(index, lines.size());
         return lines.get(index);
+    }
+
+    /**
+     * Bridge this flat schedule to the richer {@link AnnouncerConfig}: an empty schedule maps to
+     * {@link AnnouncerConfig#empty()}, and a schedule with lines maps to a single unconditional {@code "default"}
+     * announcement carrying all of them on the {@link BroadcastChannel#CHAT} channel. This preserves the legacy
+     * single-announcement behaviour while the {@code NextAnnouncement} use case selects over announcements.
+     */
+    public AnnouncerConfig asConfig() {
+        if (!hasLines()) {
+            return new AnnouncerConfig(interval, minOnlinePlayers, ordering, List.of());
+        }
+        Announcement single = new Announcement(
+                "default",
+                lines,
+                DisplayCondition.always(),
+                Optional.empty(),
+                Set.of(BroadcastChannel.CHAT),
+                Optional.empty(),
+                false);
+        return new AnnouncerConfig(interval, minOnlinePlayers, ordering, List.of(single));
     }
 }

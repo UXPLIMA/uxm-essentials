@@ -7,12 +7,12 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
-import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 

@@ -14,9 +14,9 @@ import org.bukkit.Sound;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteBroadcaster.BroadcastDisplay;
 import com.uxplima.uxmessentials.vote.application.BroadcastSettings;
-import com.uxplima.uxmessentials.vote.domain.BroadcastChannel;
 import com.uxplima.uxmessentials.vote.domain.BroadcastType;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;

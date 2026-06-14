@@ -102,7 +102,7 @@ public final class CommunicationWiring {
                 new ResolveJoinMessage(engine, settings::joinPolicy),
                 new ResolveQuitMessage(engine, settings::quitPolicy),
                 new ResolveDeathMessage(engine, settings::deathPolicy),
-                new NextAnnouncement(settings::announcerSchedule, random),
+                new NextAnnouncement(() -> settings.announcerSchedule().asConfig(), random),
                 new BroadcastOptOut(optOutStore, notifier, kernel.events(), Clock.systemUTC()));
     }
 
