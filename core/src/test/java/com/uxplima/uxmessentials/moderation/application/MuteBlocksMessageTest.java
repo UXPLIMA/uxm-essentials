@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.messaging.application.SendMessage;
@@ -179,8 +180,18 @@ class MuteBlocksMessageTest {
         }
 
         @Override
+        public boolean toggleTarget(PlayerRef spy, PlayerRef target) {
+            return false;
+        }
+
+        @Override
         public List<PlayerRef> activeSpies() {
             return List.of();
+        }
+
+        @Override
+        public Set<PlayerRef> observersOf(PlayerRef sender, PlayerRef target) {
+            return Set.of();
         }
     }
 

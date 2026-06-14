@@ -33,7 +33,10 @@ final class MessagingCommandSurface {
                 spec("ignore", "uxmessentials.msg.ignore", command("ignore", "Ignore a player")),
                 spec("unignore", "uxmessentials.msg.ignore", command("unignore", "Stop ignoring a player")),
                 spec("ignorelist", "uxmessentials.msg.ignore", command("ignorelist", "List the players you ignore")),
-                spec("socialspy", "uxmessentials.msg.socialspy", command("socialspy", "Observe private messages")),
+                spec(
+                        "socialspy",
+                        "uxmessentials.msg.socialspy",
+                        command("socialspy", "Observe private messages, globally or for one player")),
                 spec("mailclear", "uxmessentials.mail.use", command("mailclear", "Clear your mailbox")),
                 spec("helpop", "uxmessentials.helpop.use", command("helpop", "Open a staff support request")));
     }

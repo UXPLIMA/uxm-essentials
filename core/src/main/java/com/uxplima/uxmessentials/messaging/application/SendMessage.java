@@ -190,7 +190,9 @@ public final class SendMessage {
     }
 
     private void fanOutSpies(PlayerRef sender, PlayerRef target, MessageBody body) {
-        for (PlayerRef observer : socialSpy.activeSpies()) {
+        // Every global ALL spy plus every targeted spy watching either party. A targeted spy never sees an
+        // unrelated conversation; a global spy sees them all, unchanged. A spy who is a party is skipped.
+        for (PlayerRef observer : socialSpy.observersOf(sender, target)) {
             if (!observer.equals(sender) && !observer.equals(target)) {
                 delivery.deliverSpy(observer, sender, target, body);
             }

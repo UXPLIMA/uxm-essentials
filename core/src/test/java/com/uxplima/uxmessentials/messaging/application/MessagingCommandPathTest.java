@@ -7,9 +7,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -51,6 +53,9 @@ class MessagingCommandPathTest {
 
     private final PlayerRef alice = new PlayerRef(UUID.randomUUID(), "Alice");
     private final PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
+    private final PlayerRef carol = new PlayerRef(UUID.randomUUID(), "Carol");
+    private final PlayerRef dave = new PlayerRef(UUID.randomUUID(), "Dave");
+    private final PlayerRef spy = new PlayerRef(UUID.randomUUID(), "Spy");
     private final MessageBody hello = MessageBody.of("hello");
 
     private FakeDelivery delivery;
@@ -273,11 +278,81 @@ class MessagingCommandPathTest {
         assertThat(mail.appended).isEmpty();
     }
 
+    @Test
+    void aGlobalSpySeesEveryPrivateMessage() {
+        new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), new NoopSink())).toggle(spy);
+
+        sendMessage.send(alice, bob, hello);
+        sendMessage.send(carol, dave, hello);
+
+        assertThat(delivery.spied).containsExactlyInAnyOrder("Spy<-Alice:Bob:hello", "Spy<-Carol:Dave:hello");
+    }
+
+    @Test
+    void aTargetedSpyOnlySeesConversationsItsTargetIsAPartyTo() {
+        SocialSpy spies = new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), new NoopSink()));
+        spies.watch(spy, bob); // watch Bob only
+
+        sendMessage.send(alice, bob, hello); // Bob is the recipient — matches
+        sendMessage.send(bob, carol, hello); // Bob is the sender — matches
+        sendMessage.send(carol, dave, hello); // neither party is Bob — must not match
+
+        assertThat(delivery.spied).containsExactlyInAnyOrder("Spy<-Alice:Bob:hello", "Spy<-Bob:Carol:hello");
+    }
+
+    @Test
+    void aTargetedSpyDoesNotSeeUnrelatedMessages() {
+        new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), new NoopSink())).watch(spy, bob);
+
+        sendMessage.send(carol, dave, hello); // Bob is not a party
+
+        assertThat(delivery.spied).isEmpty();
+    }
+
+    @Test
+    void aSpyWhoIsAPartyToTheConversationDoesNotGetASpyLine() {
+        new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), new NoopSink())).toggle(spy);
+
+        sendMessage.send(spy, bob, hello); // the spy sends — must not also be spied
+
+        assertThat(delivery.spied).isEmpty();
+    }
+
+    @Test
+    void observersOfReturnsAllSpiesPlusMatchingTargetSpies() {
+        socialSpy.toggle(alice); // Alice is a global ALL spy
+        socialSpy.toggleTarget(spy, bob); // Spy watches Bob only
+
+        assertThat(socialSpy.observersOf(carol, bob)).containsExactlyInAnyOrder(alice, spy);
+        assertThat(socialSpy.observersOf(carol, dave)).containsExactly(alice); // only the ALL spy
+    }
+
+    @Test
+    void watchTogglesATargetAndNotifies() {
+        SocialSpy spies = new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), senderNotices));
+
+        assertThat(spies.watch(spy, bob)).isTrue(); // added
+        assertThat(senderNotices.keys).contains(MessagingMessageKey.SOCIALSPY_WATCHING.key());
+        assertThat(spies.watch(spy, bob)).isFalse(); // removed
+        assertThat(senderNotices.keys).contains(MessagingMessageKey.SOCIALSPY_UNWATCHED.key());
+    }
+
+    @Test
+    void theGlobalToggleStillFlipsAndNotifies() {
+        SocialSpy spies = new SocialSpy(socialSpy, new MessagingNotifier(new KeyMessages(), senderNotices));
+
+        assertThat(spies.toggle(spy)).isTrue();
+        assertThat(senderNotices.keys).contains(MessagingMessageKey.SOCIALSPY_ON.key());
+        assertThat(spies.toggle(spy)).isFalse();
+        assertThat(senderNotices.keys).contains(MessagingMessageKey.SOCIALSPY_OFF.key());
+    }
+
     // --- fakes -------------------------------------------------------------------------------------------
 
     private static final class FakeDelivery implements MessageDelivery {
         final List<String> delivered = new ArrayList<>();
         final List<String> echoed = new ArrayList<>();
+        final List<String> spied = new ArrayList<>();
 
         @Override
         public void deliverMessage(PlayerRef sender, PlayerRef recipient, MessageBody body) {
@@ -299,7 +374,9 @@ class MessagingCommandPathTest {
         public void deliverHelpOp(PlayerRef requester, PlayerRef viewer, MessageBody body) {}
 
         @Override
-        public void deliverSpy(PlayerRef observer, PlayerRef sender, PlayerRef recipient, MessageBody body) {}
+        public void deliverSpy(PlayerRef observer, PlayerRef sender, PlayerRef recipient, MessageBody body) {
+            spied.add(observer.name() + "<-" + sender.name() + ":" + recipient.name() + ":" + body.value());
+        }
     }
 
     private static final class FakeIgnoreStore implements IgnoreStore {
@@ -381,20 +458,52 @@ class MessagingCommandPathTest {
         }
     }
 
+    /** A targeting-aware spy store: a global ALL set plus per-spy target sets, resolving every spy as online. */
     private static final class FakeSocialSpy implements SocialSpyStore {
+        final java.util.Map<UUID, PlayerRef> all = new java.util.HashMap<>();
+        final java.util.Map<UUID, PlayerRef> spyRefs = new java.util.HashMap<>();
+        final java.util.Map<UUID, Set<UUID>> targets = new java.util.HashMap<>();
+
         @Override
         public boolean isSpying(PlayerRef who) {
-            return false;
+            return all.containsKey(who.uuid());
         }
 
         @Override
         public boolean toggle(PlayerRef who) {
-            return false;
+            spyRefs.put(who.uuid(), who);
+            if (all.remove(who.uuid()) != null) {
+                return false;
+            }
+            all.put(who.uuid(), who);
+            return true;
+        }
+
+        @Override
+        public boolean toggleTarget(PlayerRef spy, PlayerRef target) {
+            spyRefs.put(spy.uuid(), spy);
+            Set<UUID> watched = targets.computeIfAbsent(spy.uuid(), id -> new HashSet<>());
+            if (watched.remove(target.uuid())) {
+                return false;
+            }
+            watched.add(target.uuid());
+            return true;
         }
 
         @Override
         public List<PlayerRef> activeSpies() {
-            return List.of();
+            return List.copyOf(all.values());
+        }
+
+        @Override
+        public Set<PlayerRef> observersOf(PlayerRef sender, PlayerRef target) {
+            Set<PlayerRef> observers = new HashSet<>(all.values());
+            targets.forEach((spy, watched) -> {
+                if (watched.contains(sender.uuid()) || watched.contains(target.uuid())) {
+                    observers.add(spyRefs.get(spy));
+                }
+            });
+            return observers;
         }
     }
 

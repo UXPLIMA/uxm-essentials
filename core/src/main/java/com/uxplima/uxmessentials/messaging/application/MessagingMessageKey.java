@@ -46,6 +46,8 @@ public enum MessagingMessageKey implements MessageKey {
     // /socialspy
     SOCIALSPY_ON("socialspy.on"),
     SOCIALSPY_OFF("socialspy.off"),
+    SOCIALSPY_WATCHING("socialspy.watching"),
+    SOCIALSPY_UNWATCHED("socialspy.unwatched"),
 
     // /mail
     MAIL_SENT("mail.sent"),
