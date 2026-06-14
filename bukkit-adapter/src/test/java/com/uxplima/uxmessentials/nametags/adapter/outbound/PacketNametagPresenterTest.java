@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.nametags.domain.NametagConfig;
 import com.uxplima.uxmessentials.nametags.domain.NametagFormat;
 import com.uxplima.uxmessentials.nametags.domain.NametagVisibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmlib.nametag.Appearance;
 import com.uxplima.uxmlib.nametag.NametagPackets;
@@ -238,12 +239,103 @@ class PacketNametagPresenterTest {
         assertThat(presenter.trackedCount()).isZero();
     }
 
+    @Test
+    void showHidesTheWearersVanillaNameWhenHideVanillaNameIsOn() {
+        PlayerMock wearer = server.addPlayer();
+        server.addPlayer();
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        PacketNametagPresenter presenter =
+                presenter(singleFormat("default", DisplayCondition.always()), alwaysVisible(), coordinator, true);
+
+        presenter.show(wearer);
+
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isTrue();
+        var team = wearer.getScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
+        assertThat(team).isNotNull();
+        assertThat(team.hasEntry(wearer.getName())).isTrue();
+    }
+
+    @Test
+    void showLeavesTheVanillaNameWhenHideVanillaNameIsOff() {
+        PlayerMock wearer = server.addPlayer();
+        server.addPlayer();
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        PacketNametagPresenter presenter =
+                presenter(singleFormat("default", DisplayCondition.always()), alwaysVisible(), coordinator, false);
+
+        presenter.show(wearer);
+
+        // The nametag is still live, but the vanilla name is untouched: no hide-team and no hidden mark.
+        assertThat(presenter.isTracked(wearer.getUniqueId())).isTrue();
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isFalse();
+        assertThat(wearer.getScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME))
+                .isNull();
+    }
+
+    @Test
+    void updateRestoresTheVanillaNameWhenNoFormatAppliesAnyMore() {
+        PlayerMock wearer = server.addPlayer();
+        server.addPlayer();
+        var attachment = wearer.addAttachment(MockBukkit.createMockPlugin(), STAFF_NODE, true);
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        PacketNametagPresenter presenter = presenter(
+                singleFormat("staff", new DisplayCondition.Permission(STAFF_NODE)), alwaysVisible(), coordinator, true);
+        presenter.show(wearer);
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isTrue();
+
+        wearer.removeAttachment(attachment);
+        presenter.update(wearer);
+
+        assertThat(presenter.isTracked(wearer.getUniqueId())).isFalse();
+        assertThat(coordinator.isHidden(wearer.getUniqueId())).isFalse();
+        var team = wearer.getScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
+        assertThat(team).isNotNull();
+        assertThat(team.hasEntry(wearer.getName())).isFalse();
+    }
+
+    @Test
+    void theHideTeamSurvivesAScoreboardBoardSwitchViaTheReapplyCallback() {
+        PlayerMock wearer = server.addPlayer();
+        server.addPlayer();
+        NameVisibilityCoordinator coordinator = new NameVisibilityCoordinator();
+        PacketNametagPresenter presenter =
+                presenter(singleFormat("default", DisplayCondition.always()), alwaysVisible(), coordinator, true);
+        presenter.show(wearer);
+
+        // The scoreboard module hands the player a fresh per-player board on every sidebar create; setScoreboard
+        // resets the client team registry, so the new board has no hide-team. uxmLib's SidebarManager fires its
+        // onBoardSwitch callback (wired to coordinator::reapply) right after, which re-creates it on the new board.
+        var freshBoard = server.getScoreboardManager().getNewScoreboard();
+        wearer.setScoreboard(freshBoard);
+        assertThat(freshBoard.getTeam(NameVisibilityCoordinator.TEAM_NAME)).isNull();
+
+        coordinator.reapply(wearer, wearer.getScoreboard());
+
+        var team = wearer.getScoreboard().getTeam(NameVisibilityCoordinator.TEAM_NAME);
+        assertThat(team).isNotNull();
+        assertThat(team.hasEntry(wearer.getName())).isTrue();
+    }
+
     private PacketNametagPresenter presenter(NametagConfig config, NametagVanish vanish) {
+        return presenter(config, vanish, new NameVisibilityCoordinator(), false);
+    }
+
+    private PacketNametagPresenter presenter(
+            NametagConfig config,
+            NametagVanish vanish,
+            NameVisibilityCoordinator coordinator,
+            boolean hideVanillaName) {
         // Never obstructed: the default appearance does not fade through blocks anyway, so the line-of-sight check is
         // not even invoked, but a benign fake keeps the wiring explicit.
         NametagRenderer libRenderer = new NametagRenderer(packets, scheduler, (player, entity) -> false);
         return new PacketNametagPresenter(
-                () -> config, libRenderer, new AnimationRegistry(List.of()), vanish, () -> Duration.ofSeconds(1));
+                () -> config,
+                libRenderer,
+                new AnimationRegistry(List.of()),
+                vanish,
+                () -> Duration.ofSeconds(1),
+                coordinator,
+                () -> hideVanillaName);
     }
 
     private static NametagConfig singleFormat(String name, DisplayCondition condition) {

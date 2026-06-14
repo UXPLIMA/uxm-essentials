@@ -419,7 +419,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void nametagsShipsDisabledAndPublishesNoCommandSurface() {
+    void nametagsShipsEnabledAndPublishesNoCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule nametags = registry.byId(ModuleId.of("nametags"))
                 .orElseThrow(() -> new AssertionError("nametags is not registered"));
@@ -428,18 +428,19 @@ class FeatureModuleRegistryDriftTest {
         // The later staff context now lands last, so nametags must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
 
-        // It ships DISABLED (like scoreboard/tablist, its formats are operator data): with no modules.conf override it
-        // is absent from the enabled set while every steady-state sibling stays on. Explicitly enabling exactly it
-        // brings only it on; disabling it leaves every sibling untouched.
+        // It now ships ENABLED: the bundled config carries a single plain-name format and hides the vanilla name under
+        // it through a shared scoreboard-team coordinator, so the default surface is one clean custom nametag. With no
+        // modules.conf override it is in the enabled set alongside its steady-state siblings; disabling exactly it
+        // removes only it while every sibling stays on.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).doesNotContain("nametags");
-        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps", "discordlink");
-        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.nametags.enabled", true))).stream()
+        assertThat(defaults).contains("nametags", "teleport", "economy", "holograms", "playerwarps", "discordlink");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.nametags.enabled", false))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(on).contains("nametags", "teleport", "holograms");
+        assertThat(off).doesNotContain("nametags");
+        assertThat(off).contains("teleport", "holograms");
 
         // The nametag is always-on for every wearer when enabled — there is no per-player visibility toggle — so it
         // publishes no command, and it persists nothing (the formats are config-authored), so it declares no

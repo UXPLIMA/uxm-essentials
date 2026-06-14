@@ -11,6 +11,7 @@ import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
@@ -26,6 +27,7 @@ import com.uxplima.uxmessentials.nametags.domain.NametagVisibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmlib.nametag.Appearance;
@@ -72,6 +74,8 @@ public final class PacketNametagPresenter {
     private final AnimationRegistry animations;
     private final NametagVanish vanish;
     private final Supplier<Duration> refreshPeriod;
+    private final NameVisibilityCoordinator nameVisibility;
+    private final BooleanSupplier hideVanillaName;
     private final Map<UUID, Tracked> live = new ConcurrentHashMap<>();
 
     public PacketNametagPresenter(
@@ -79,12 +83,16 @@ public final class PacketNametagPresenter {
             NametagRenderer libRenderer,
             AnimationRegistry animations,
             NametagVanish vanish,
-            Supplier<Duration> refreshPeriod) {
+            Supplier<Duration> refreshPeriod,
+            NameVisibilityCoordinator nameVisibility,
+            BooleanSupplier hideVanillaName) {
         this.config = Objects.requireNonNull(config, "config");
         this.libRenderer = Objects.requireNonNull(libRenderer, "libRenderer");
         this.animations = Objects.requireNonNull(animations, "animations");
         this.vanish = Objects.requireNonNull(vanish, "vanish");
         this.refreshPeriod = Objects.requireNonNull(refreshPeriod, "refreshPeriod");
+        this.nameVisibility = Objects.requireNonNull(nameVisibility, "nameVisibility");
+        this.hideVanillaName = Objects.requireNonNull(hideVanillaName, "hideVanillaName");
     }
 
     /** Show {@code wearer}'s nametag from the selected format. Must run on the wearer's region thread. */
@@ -113,6 +121,12 @@ public final class PacketNametagPresenter {
                 perViewerText(format, wearer, lineCache),
                 Objects.requireNonNull(refreshPeriod.get(), "refreshPeriod"));
         live.put(wearer.getUniqueId(), new Tracked(handle, format));
+        // With a custom nametag now live, hide the vanilla above-head name globally (a team with NEVER name-tag
+        // visibility) so a viewer does not see both. Minor known interaction: a viewer just outside the packet
+        // nametag's view-range sees no name at all rather than the vanilla one. We are on the wearer's region thread.
+        if (hideVanillaName.getAsBoolean()) {
+            nameVisibility.hide(wearer);
+        }
     }
 
     /** Reconcile {@code wearer}'s nametag with the selected format. Must run on the wearer's region thread. */
@@ -126,6 +140,9 @@ public final class PacketNametagPresenter {
         Optional<NametagFormat> selected = selectFor(wearer);
         if (selected.isEmpty()) {
             remove(wearer.getUniqueId());
+            // No format applies any more, so the wearer should show their vanilla name again. We have the live player
+            // on their region thread here, so restore it directly (remove(uuid) only clears the bookkeeping).
+            nameVisibility.show(wearer);
             return;
         }
         NametagFormat format = selected.get();
@@ -139,18 +156,32 @@ public final class PacketNametagPresenter {
         }
     }
 
-    /** Remove {@code uuid}'s nametag if it has one, sending the lib's remove packets to every viewer. */
+    /**
+     * Remove {@code uuid}'s nametag if it has one, sending the lib's remove packets to every viewer. Clears the
+     * vanilla-name-hide bookkeeping too — a pure map mutation, safe from the quit thread (the hide-team entry dies with
+     * the player on quit; a world-change remove is followed by a re-show that re-hides). The vanilla name is restored
+     * on the board only at the region-thread call sites that still hold the live player ({@link #update}'s no-format
+     * branch and module stop), since touching a {@link org.bukkit.scoreboard.Team} off the region thread is unsafe.
+     */
     public void remove(UUID uuid) {
         Objects.requireNonNull(uuid, "uuid");
         Tracked tracked = live.remove(uuid);
         if (tracked != null) {
             tracked.handle().remove();
         }
+        nameVisibility.clear(uuid);
     }
 
     /** Remove every tracked nametag now — call on module stop so no nametag leaks. */
     public void removeAll() {
         for (UUID uuid : List.copyOf(live.keySet())) {
+            // Restore the vanilla name for any wearer still online before dropping the handle, so a disable/reload
+            // does not strand an online player nameless. An offline wearer's hide-team entry was already dropped when
+            // they left, so resolving null is a no-op the clear in remove(uuid) covers.
+            Player wearer = Bukkit.getPlayer(uuid);
+            if (wearer != null) {
+                nameVisibility.show(wearer);
+            }
             remove(uuid);
         }
     }

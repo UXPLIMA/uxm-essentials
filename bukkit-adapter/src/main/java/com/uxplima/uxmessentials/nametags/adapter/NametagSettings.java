@@ -59,6 +59,11 @@ public final class NametagSettings {
         return Objects.requireNonNull(parsed.get(), "parsed").refreshInterval();
     }
 
+    /** Whether a wearer's vanilla above-head name is hidden while their custom nametag is live; read fresh per show. */
+    public boolean hideVanillaName() {
+        return Objects.requireNonNull(parsed.get(), "parsed").hideVanillaName();
+    }
+
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
         parsed.set(NametagContentCodec.read(load(moduleDir, log), log));

@@ -47,14 +47,17 @@ final class NametagContentCodec {
 
     private static final long DEFAULT_REFRESH_TICKS = 20L;
     private static final long MILLIS_PER_TICK = 50L;
+    private static final boolean DEFAULT_HIDE_VANILLA_NAME = true;
 
     private NametagContentCodec() {}
 
     /**
      * The parsed nametag config: the named formats the renderer selects among, the named animations the renderer
-     * expands {@code %anim_<name>%} tokens against, and the global render cadence the timer re-reads each reschedule.
+     * expands {@code %anim_<name>%} tokens against, the global render cadence the timer re-reads each reschedule, and
+     * whether a wearer's vanilla above-head name is hidden while their custom nametag is live.
      */
-    record Parsed(NametagConfig formats, List<AnimationDef> animations, Duration refreshInterval) {
+    record Parsed(
+            NametagConfig formats, List<AnimationDef> animations, Duration refreshInterval, boolean hideVanillaName) {
         Parsed {
             Objects.requireNonNull(formats, "formats");
             animations = List.copyOf(Objects.requireNonNull(animations, "animations"));
@@ -64,7 +67,10 @@ final class NametagContentCodec {
         /** The do-nothing default an absent or unreadable config yields: no formats, no animations, once a second. */
         static Parsed inert() {
             return new Parsed(
-                    NametagConfig.empty(), List.of(), Duration.ofMillis(DEFAULT_REFRESH_TICKS * MILLIS_PER_TICK));
+                    NametagConfig.empty(),
+                    List.of(),
+                    Duration.ofMillis(DEFAULT_REFRESH_TICKS * MILLIS_PER_TICK),
+                    DEFAULT_HIDE_VANILLA_NAME);
         }
     }
 
@@ -76,11 +82,12 @@ final class NametagContentCodec {
         }
         List<AnimationDef> animations = AnimationDef.parseAll(root.node("animations"), log);
         Duration interval = refreshInterval(root.node("refresh-ticks"));
+        boolean hideVanillaName = root.node("hide-vanilla-name").getBoolean(DEFAULT_HIDE_VANILLA_NAME);
         ConfigurationNode formats = root.node("formats");
         if (!formats.virtual() && formats.isMap()) {
-            return new Parsed(readFormats(formats, log), animations, interval);
+            return new Parsed(readFormats(formats, log), animations, interval, hideVanillaName);
         }
-        return new Parsed(readSingleFormat(root.node("nametag"), log), animations, interval);
+        return new Parsed(readSingleFormat(root.node("nametag"), log), animations, interval, hideVanillaName);
     }
 
     private static NametagConfig readFormats(ConfigurationNode formats, Logger log) {

@@ -61,6 +61,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitCooldownPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
@@ -334,7 +335,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
             wirePlayerwarps(ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
-            wireScoreboard(plugin, ctx, resources);
+            wireScoreboard(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
             wireTablist(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
@@ -342,7 +343,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
             wireDiscordlink(plugin, ctx, persistence, resources);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
-            wireNametags(plugin, ctx, resources);
+            wireNametags(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("staff"))) {
             wireStaff(plugin, ctx, persistence, resources, links);
         }
@@ -630,13 +631,15 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
     }
 
-    private static void wireScoreboard(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireScoreboard(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // scoreboard persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the sidebar /
-        // tablist content is config-authored under modules/scoreboard/config.conf. It carries no cross-context bridge
-        // — its only collaborators are the shared Scheduler, messages/messageSink, and event ports — so nothing is
-        // captured for a later context. The renderer dogfoods uxmlib-hud's SidebarManager; the render timer
+        // tablist content is config-authored under modules/scoreboard/config.conf. Its one cross-context handle is the
+        // shared NameVisibilityCoordinator: the SidebarManager re-applies the vanilla-name-hide team after every board
+        // switch through it (the setScoreboard team-registry reset would otherwise drop it), so a nametag wearer keeps
+        // their name hidden across board switches. The renderer dogfoods uxmlib-hud's SidebarManager; the render timer
         // on the Scheduler port is stopped and every active board torn down on disable.
-        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx);
+        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.nameVisibility);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -656,16 +659,19 @@ public final class PluginModule {
         resources.onClose(wired::stop);
     }
 
-    private static void wireNametags(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireNametags(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // nametags persists nothing: the per-wearer formats are config-authored under modules/nametags/config.conf. It
         // soft-couples to presence (vanish-aware viewer culling through Bukkit's canSee graph, degrading to "everyone
-        // can see everyone" with presence off), so nothing is captured for a later context and there is no hard edge.
-        // The nametag is always-on (no per-player toggle) so it publishes no command. Rendering goes through uxmLib's
+        // can see everyone" with presence off). Its one cross-context handle is the shared NameVisibilityCoordinator:
+        // the presenter hides a wearer's vanilla above-head name through it while the custom nametag is live (and the
+        // scoreboard SidebarManager re-applies that hide-team after every board switch through the same instance). The
+        // nametag is always-on (no per-player toggle) so it publishes no command. Rendering goes through uxmLib's
         // packet NametagRenderer: per-viewer spawn/metadata/remove bundles with no real entity, and a per-wearer
-        // refresh
-        // loop the lib owns. On disable the reconcile timer on the Scheduler port is stopped and presenter.removeAll()
-        // sends every wearer's remove packets and cancels each lib refresh task, so a disable/reload leaves no orphan.
-        NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx);
+        // refresh loop the lib owns. On disable the reconcile timer on the Scheduler port is stopped and
+        // presenter.removeAll() restores every online wearer's vanilla name, sends every wearer's remove packets, and
+        // cancels each lib refresh task, so a disable/reload leaves no orphan.
+        NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx, links.nameVisibility);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -788,6 +794,11 @@ public final class PluginModule {
                 staffTeleport;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
+        // Built once and shared by the scoreboard and nametags wirings (in either registry order): the nametags
+        // presenter hides a wearer's vanilla name through it, the scoreboard SidebarManager re-applies the hide-team
+        // after every board switch through it. Inert until a nametags hide call marks a player, so it costs nothing
+        // when either module is off.
+        private final NameVisibilityCoordinator nameVisibility = new NameVisibilityCoordinator();
     }
 
     private static boolean skippedByCapability(FeatureModule module, ModuleContext ctx, Logger log) {

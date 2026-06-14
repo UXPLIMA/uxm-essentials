@@ -118,17 +118,17 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // ENABLED, so it lands last after vote.
         delegate.register(new DiscordlinkModule());
         // nametags is the 19th context — a per-wearer above-head TextDisplay nametag rendered on the Scheduler refresh
-        // timer over uxmLib's native-display hologram stack. It soft-couples to presence (vanish-aware viewer culling
-        // through the canSee graph, degrading to "everyone can see everyone" when presence is off), so it carries no
-        // hard dependency edge, and like scoreboard/tablist it ships DISABLED by default (its formats are operator
-        // data), so it wires nothing until enabled in modules.conf. It lands last after discordlink.
+        // timer over uxmLib's packet nametag stack. It soft-couples to presence (vanish-aware viewer culling through
+        // the canSee graph, degrading to "everyone can see everyone" when presence is off), so it carries no hard
+        // dependency edge. It ships ENABLED by default with a single plain-name format and hides the vanilla above-head
+        // name under it through a shared scoreboard-team coordinator (re-applied after every per-player board switch),
+        // so the default surface is one clean custom nametag per wearer. It lands last after discordlink.
         delegate.register(new NametagsModule());
         // staff is the 20th context — a STAFF-MODE-ONLY toolkit (the /staffmode toggle with an item-loss-safe DB-backed
         // loadout swap, the VANISH + EXAMINE gadget hotbar, and staff chat). The gadgets orchestrate the existing
         // presence/playerstate modules through soft-couple ports that degrade to no-ops when those modules are off, and
-        // staff chat fans out through messaging's staff audience, so staff carries no hard dependency edge; like
-        // scoreboard/tablist/nametags it ships DISABLED by default (its gadget hotbar is operator-authored), so it
-        // wires nothing until enabled in modules.conf. It lands last after nametags.
+        // staff chat fans out through messaging's staff audience, so staff carries no hard dependency edge. It lands
+        // last after nametags. Every command and gadget is permission-gated, so a regular player sees nothing change.
         delegate.register(new StaffModule());
         // The shared kernel is not a module and never appears here.
     }

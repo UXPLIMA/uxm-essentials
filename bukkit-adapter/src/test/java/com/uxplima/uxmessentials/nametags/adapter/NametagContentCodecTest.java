@@ -182,6 +182,26 @@ class NametagContentCodecTest {
         assertThat(parsed.formats().formats()).isEmpty();
         assertThat(parsed.formats().select(ctx(n -> true, "world"))).isEmpty();
         assertThat(parsed.refreshInterval()).isPositive();
+        // The vanilla-name hide defaults on, so out of the box one custom nametag shows without a double name.
+        assertThat(parsed.hideVanillaName()).isTrue();
+    }
+
+    @Test
+    void hideVanillaNameDefaultsOnAndIsOverridableToOff(@TempDir Path dir) throws Exception {
+        ConfigurationNode unset = load(
+                dir,
+                """
+                formats { default { condition = "", lines = [ "<white>{player}" ] } }
+                """);
+        assertThat(NametagContentCodec.read(unset, LOG).hideVanillaName()).isTrue();
+
+        ConfigurationNode off = load(
+                dir,
+                """
+                hide-vanilla-name = false
+                formats { default { condition = "", lines = [ "<white>{player}" ] } }
+                """);
+        assertThat(NametagContentCodec.read(off, LOG).hideVanillaName()).isFalse();
     }
 
     @Test

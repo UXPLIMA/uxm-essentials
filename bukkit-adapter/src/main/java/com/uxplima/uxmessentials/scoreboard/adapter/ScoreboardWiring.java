@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmlib.hud.scoreboard.SidebarManager;
@@ -47,10 +48,17 @@ public final class ScoreboardWiring {
 
     private ScoreboardWiring() {}
 
-    /** Build the scoreboard adapters and use case from {@code plugin} and {@code ctx}, ready to register. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx) {
+    /**
+     * Build the scoreboard adapters and use case from {@code plugin} and {@code ctx}, ready to register. The shared
+     * {@code nameVisibility} coordinator (built once in the bootstrap and also handed to the nametags wiring) is
+     * re-applied after every per-player board switch through the {@code SidebarManager} board-switch callback, so a
+     * wearer whose vanilla name is hidden keeps the hide-team after the {@code setScoreboard} that resets the client
+     * team registry.
+     */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, NameVisibilityCoordinator nameVisibility) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(nameVisibility, "nameVisibility");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
         ScoreboardSettings settings = new ScoreboardSettings(dir, kernel.log());
@@ -61,7 +69,7 @@ public final class ScoreboardWiring {
         // shared by the renderer (which reads frames) and the render task (which advances the clock once a tick).
         AnimationRegistry animations = new AnimationRegistry(settings.animations());
         ScoreboardRenderer renderer =
-                new ScoreboardRenderer(sidebarManager(), visibility, settings::boards, animations);
+                new ScoreboardRenderer(sidebarManager(nameVisibility), visibility, settings::boards, animations);
         ScoreboardNotifier notifier = new ScoreboardNotifier(kernel.messages(), kernel.messageSink());
         ToggleScoreboard toggle = new ToggleScoreboard(visibility, notifier, kernel.events());
         ScoreboardRenderTask renderTask = new ScoreboardRenderTask(
@@ -73,10 +81,15 @@ public final class ScoreboardWiring {
         return new Wired(commands, listeners, renderer, renderTask, running);
     }
 
-    private static SidebarManager sidebarManager() {
+    private static SidebarManager sidebarManager(NameVisibilityCoordinator nameVisibility) {
         ScoreboardManager manager =
                 Objects.requireNonNull(Bukkit.getScoreboardManager(), "the server scoreboard manager is unavailable");
-        return new SidebarManager(manager);
+        SidebarManager sidebars = new SidebarManager(manager);
+        // After every board switch (create/show or remove/restore) the client's team registry is reset, so re-apply
+        // the vanilla-name-hide team on the player's new current board — survival of the per-player board switch is the
+        // whole reason the lib exposes this callback. A no-op for any player without an active hidden nametag.
+        sidebars.onBoardSwitch(nameVisibility::reapply);
+        return sidebars;
     }
 
     /**

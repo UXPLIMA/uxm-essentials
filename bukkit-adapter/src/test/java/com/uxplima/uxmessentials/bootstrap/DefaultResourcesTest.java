@@ -54,8 +54,8 @@ class DefaultResourcesTest {
         assertThat(config.getBoolean("modules.scoreboard.enabled", false)).isTrue();
         assertThat(config.getBoolean("modules.tablist.enabled", false)).isTrue();
         assertThat(config.getBoolean("modules.staff.enabled", false)).isTrue();
-        // nametags stays off: its default renders a custom name above the vanilla one until name-hiding lands.
-        assertThat(config.getBoolean("modules.nametags.enabled", true)).isFalse();
+        // nametags now ships on: its default renders one clean custom name with the vanilla name hidden under it.
+        assertThat(config.getBoolean("modules.nametags.enabled", false)).isTrue();
         assertThat(config.getBoolean("modules.migration.enabled", true)).isFalse();
     }
 

@@ -17,14 +17,15 @@ class NametagsModuleTest {
     }
 
     @Test
-    void shipsDisabledByDefault() {
+    void shipsEnabledByDefault() {
         NametagsModule module = new NametagsModule();
 
-        // With no override the module is off — the operator authors the formats before enabling.
-        assertThat(module.enabled(new FixedConfig(Map.of()))).isFalse();
-        // An explicit enable in modules.conf turns it on.
-        assertThat(module.enabled(new FixedConfig(Map.of("modules.nametags.enabled", true))))
-                .isTrue();
+        // With no override the module is on — the bundled config ships a single plain-name format and hides the
+        // vanilla name under it, so the default surface is one clean custom nametag per wearer.
+        assertThat(module.enabled(new FixedConfig(Map.of()))).isTrue();
+        // An explicit disable in modules.conf turns it off.
+        assertThat(module.enabled(new FixedConfig(Map.of("modules.nametags.enabled", false))))
+                .isFalse();
     }
 
     @Test

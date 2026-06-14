@@ -19,11 +19,11 @@ import org.jspecify.annotations.NullMarked;
  * pipeline. The renderer sends a per-viewer packet text-display stack riding each wearer; that Bukkit-facing
  * machinery lands with the adapter wiring.
  *
- * <p><b>Ships disabled by default.</b> The nametag lines are operator data, so out of the box this context shows
- * nothing — an operator authors the formats and then flips {@code modules.nametags.enabled = true}. The
- * {@link #enabled(ConfigStore)} gate therefore defaults to {@code false} (like {@code tablist} and
- * {@code scoreboard}, unlike the steady-state contexts that default on). It persists nothing: the nametag is
- * entirely config-authored, so the module owns no Flyway location.
+ * <p><b>Ships enabled by default.</b> The bundled config ships a single plain-name format and the vanilla above-head
+ * name is hidden under it through a shared scoreboard-team coordinator, so out of the box every wearer shows one clean
+ * custom nametag; an operator edits the format or flips {@code modules.nametags.enabled = false} to turn it off. The
+ * {@link #enabled(ConfigStore)} gate therefore defaults to {@code true} (like the steady-state contexts). It persists
+ * nothing: the nametag is entirely config-authored, so the module owns no Flyway location.
  *
  * <p>The nametag is always-on for every eligible wearer when enabled — there is no per-player visibility toggle and
  * so the module publishes no command. The render timer, the connection listener, and the renderer are constructed in
@@ -72,9 +72,11 @@ public final class NametagsModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // The nametag lines are operator data, so the module ships disabled — it is off until an operator authors
-        // the formats and opts in via modules.conf. The default here is false (the steady-state contexts default on).
-        return config.getBoolean(configRoot() + ".enabled", false);
+        // The module ships enabled: the bundled config carries a single plain-name format and hides the vanilla name
+        // under it (a shared scoreboard-team coordinator), so the default surface is one clean custom nametag per
+        // wearer. The default here is true (the steady-state contexts default on); an operator opts out via
+        // modules.conf.
+        return config.getBoolean(configRoot() + ".enabled", true);
     }
 
     @Override

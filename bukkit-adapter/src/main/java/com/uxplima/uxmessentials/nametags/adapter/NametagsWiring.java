@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.nametags.adapter.outbound.PacketNametagPresente
 import com.uxplima.uxmessentials.nametags.application.port.NametagVanish;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmlib.nametag.NametagPackets;
@@ -48,10 +49,15 @@ public final class NametagsWiring {
 
     private NametagsWiring() {}
 
-    /** Build the nametags adapters from {@code plugin} and {@code ctx}, ready to register. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx) {
+    /**
+     * Build the nametags adapters from {@code plugin} and {@code ctx}, ready to register. The shared
+     * {@code nameVisibility} coordinator (built once in the bootstrap and also handed to the scoreboard wiring) hides
+     * the vanilla above-head name while a custom nametag is live.
+     */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, NameVisibilityCoordinator nameVisibility) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(nameVisibility, "nameVisibility");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
         NametagSettings settings = new NametagSettings(dir, kernel.log());
@@ -77,7 +83,13 @@ public final class NametagsWiring {
         // cadence and the animation clock in lockstep — the lib loop reads the period once per show, and a
         // format/appearance change re-shows, so a reload's new cadence takes effect on the next re-show.
         PacketNametagPresenter presenter = new PacketNametagPresenter(
-                settings::formats, libRenderer, animations, vanish, settings::refreshInterval);
+                settings::formats,
+                libRenderer,
+                animations,
+                vanish,
+                settings::refreshInterval,
+                nameVisibility,
+                settings::hideVanillaName);
         NametagRenderTask renderTask = new NametagRenderTask(
                 kernel.scheduler(), presenter, animations, settings::refreshInterval, running::get);
 
