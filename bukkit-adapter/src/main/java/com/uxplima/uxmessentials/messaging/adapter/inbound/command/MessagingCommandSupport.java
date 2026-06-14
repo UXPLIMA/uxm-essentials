@@ -80,18 +80,18 @@ abstract class MessagingCommandSupport {
     }
 
     /**
-     * Apply the vanish gate to a {@code resolved} player a selector argument ({@code @p}, a name) already
-     * matched: a target {@code sender} cannot see is reported as offline (never as present), so the selector
-     * never leaks a hidden player's presence. The selector type guarantees the player is online, so only the
-     * visibility check remains.
+     * Apply the vanish gate to a {@code resolved} player a name lookup already matched as online: a target
+     * {@code sender} cannot see is reported as offline (never as present), so the lookup never leaks a hidden
+     * player's presence — the same {@code canSee} seam teleport's {@code /tpa} applies. The caller has
+     * established the player is online, so only the visibility check remains; a hidden target yields empty so
+     * the message is never delivered and never routed to mail.
      */
-    final Optional<PlayerRef> visibleTarget(PlayerRef sender, Player resolved) {
-        PlayerRef target = ref(resolved);
-        if (services.vanish().isHiddenFrom(sender, target)) {
-            notify(sender, MessagingMessageKey.MSG_TARGET_OFFLINE, Map.of("player", resolved.getName()));
+    final Optional<PlayerRef> visibleTarget(PlayerRef sender, PlayerRef resolved) {
+        if (services.vanish().isHiddenFrom(sender, resolved)) {
+            notify(sender, MessagingMessageKey.MSG_TARGET_OFFLINE, Map.of("player", resolved.name()));
             return Optional.empty();
         }
-        return Optional.of(target);
+        return Optional.of(resolved);
     }
 
     /** Render {@code key} for {@code viewer} with {@code placeholders} and deliver it through the sink. */

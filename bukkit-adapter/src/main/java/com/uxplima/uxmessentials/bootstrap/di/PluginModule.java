@@ -39,7 +39,9 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldWiring;
 import com.uxplima.uxmessentials.kits.adapter.KitsWiring;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingWiring;
+import com.uxplima.uxmessentials.messaging.adapter.MutableAfkStatus;
 import com.uxplima.uxmessentials.messaging.adapter.MutableMutePolicy;
+import com.uxplima.uxmessentials.messaging.adapter.outbound.PresenceAfkStatus;
 import com.uxplima.uxmessentials.migration.MigrationModule;
 import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
@@ -469,6 +471,7 @@ public final class PluginModule {
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.mutePolicy = wired.mutePolicy();
+        links.afkStatus = wired.afkStatus();
     }
 
     private static void wireModeration(
@@ -537,17 +540,29 @@ public final class PluginModule {
         }
     }
 
+    private static void bindAfk(
+            ContextLinks links, com.uxplima.uxmessentials.messaging.application.port.AfkStatus status) {
+        MutableAfkStatus holder = links.afkStatus;
+        if (holder != null) {
+            holder.bind(status);
+        }
+    }
+
     private static void wirePresence(
             JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Its
         // BukkitVisibilityApplier drives the canSee graph that messaging's /msg resolution and teleport's /tpa
-        // listing already read, so the vanish soft-couple needs no extra cross-context handle wired here.
+        // listing already read, so the vanish soft-couple needs no extra cross-context handle wired here. The
+        // AFK soft-couple does need one: presence rebinds messaging's MutableAfkStatus (captured during the
+        // earlier messaging wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy
+        // notice. When messaging is disabled the holder is absent and the bind is a no-op.
         PresenceWiring.Wired wired = PresenceWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.placeholders.presence(new StorePresencePlaceholders(wired.store(), wired.clock()));
+        bindAfk(links, new PresenceAfkStatus(wired.store()));
     }
 
     private static void wireCommunication(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
@@ -692,6 +707,7 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
+        private @org.jspecify.annotations.Nullable MutableAfkStatus afkStatus;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
         private @org.jspecify.annotations.Nullable MutableHomeRespawnLocator homeRespawnLocator;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView

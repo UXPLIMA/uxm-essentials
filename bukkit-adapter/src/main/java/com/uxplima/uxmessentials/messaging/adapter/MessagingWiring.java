@@ -27,9 +27,11 @@ import com.uxplima.uxmessentials.messaging.application.ReadMail;
 import com.uxplima.uxmessentials.messaging.application.Reply;
 import com.uxplima.uxmessentials.messaging.application.ReplyToggle;
 import com.uxplima.uxmessentials.messaging.application.SendMail;
+import com.uxplima.uxmessentials.messaging.application.SendMailToAll;
 import com.uxplima.uxmessentials.messaging.application.SendMessage;
 import com.uxplima.uxmessentials.messaging.application.SocialSpy;
 import com.uxplima.uxmessentials.messaging.application.Unignore;
+import com.uxplima.uxmessentials.messaging.application.port.AfkStatus;
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
@@ -48,9 +50,11 @@ import org.jspecify.annotations.NullMarked;
  * self-rescheduling mail-expiry sweep. This is the one place the messaging context is wired — nothing else
  * news up its classes.
  *
- * <p>Two cross-context gates are soft-coupled here: the mute gate is bound to {@link MutePolicy#NEVER} until
- * the moderation context lands (the caller may hand a real policy through {@code wire}), and vanish-aware
- * visibility is the {@code canSee}-based adapter that degrades to "fully visible" when presence is disabled.
+ * <p>Three cross-context gates are soft-coupled here: the mute gate is bound to {@link MutePolicy#NEVER} until
+ * the moderation context lands (the caller may hand a real policy through {@code wire}); vanish-aware
+ * visibility is the {@code canSee}-based adapter that degrades to "fully visible" when presence is disabled;
+ * and the AFK status is a {@link MutableAfkStatus} bound to {@code AfkStatus.NEVER} until the presence context
+ * lands and rebinds it (presence wires after messaging, so the binding arrives through the rebindable holder).
  * The mail repository is the plain jOOQ adapter; the ignore store is the Caffeine-cached jOOQ adapter; the
  * reply, socialspy, and toggle stores are in-memory/PDC (transient session state).
  */
@@ -73,7 +77,10 @@ public final class MessagingWiring {
         // a real policy is already available it is bound up front; otherwise moderation binds it on wire.
         MutableMutePolicy mutePolicy = new MutableMutePolicy();
         mute.ifPresent(mutePolicy::bind);
-        MessagingServices services = assemble(kernel, settings, stores, mutePolicy, Clock.systemUTC());
+        // The AFK status starts on AfkStatus.NEVER; presence rebinds it through this holder when it wires
+        // (presence is wired after messaging), and stays NEVER when presence is disabled (soft couple).
+        MutableAfkStatus afkStatus = new MutableAfkStatus();
+        MessagingServices services = assemble(kernel, settings, stores, mutePolicy, afkStatus, Clock.systemUTC());
         MailExpirySweep sweep = new MailExpirySweep(
                 kernel.scheduler(),
                 stores.mail(),
@@ -83,11 +90,16 @@ public final class MessagingWiring {
                 kernel.log(),
                 Clock.systemUTC());
         List<CommandRegistration> commands = MessagingCommands.all(services, kernel.messages(), kernel.messageSink());
-        return new Wired(commands, sweep, stores, mutePolicy, running);
+        return new Wired(commands, sweep, stores, mutePolicy, afkStatus, running);
     }
 
     private static MessagingServices assemble(
-            KernelPorts kernel, MessagingSettings settings, Stores stores, MutePolicy mute, Clock clock) {
+            KernelPorts kernel,
+            MessagingSettings settings,
+            Stores stores,
+            MutePolicy mute,
+            AfkStatus afk,
+            Clock clock) {
         MessagingNotifier notifier = new MessagingNotifier(kernel.messages(), kernel.messageSink());
         MessageDelivery delivery = new BukkitMessageDelivery(kernel.messages(), kernel.messageSink());
         VanishVisibility vanish = new CanSeeVanishVisibility();
@@ -98,6 +110,9 @@ public final class MessagingWiring {
                 stores.toggles(),
                 stores.socialSpy(),
                 mute,
+                afk,
+                stores.mail(),
+                settings.offlineToMail(),
                 notifier,
                 kernel.events(),
                 clock);
@@ -113,6 +128,7 @@ public final class MessagingWiring {
                         settings.replyTtl(),
                         clock),
                 new SendMail(stores.mail(), stores.ignores(), delivery, mute, notifier, kernel.events(), clock),
+                new SendMailToAll(stores.mail(), clock),
                 new ReadMail(stores.mail(), delivery, notifier),
                 new ClearMail(stores.mail(), notifier),
                 new MsgToggle(stores.toggles(), notifier),
@@ -123,7 +139,8 @@ public final class MessagingWiring {
                 new SocialSpy(stores.socialSpy(), notifier),
                 new HelpOp(new BukkitStaffAudience(), delivery, mute, notifier, kernel.events(), clock),
                 kernel.playerLookup(),
-                vanish);
+                vanish,
+                kernel.scheduler());
     }
 
     private static Stores stores(Plugin plugin, Persistence persistence) {
@@ -154,6 +171,7 @@ public final class MessagingWiring {
      * @param expirySweep the self-rescheduling mail-expiry sweep, armed by the caller
      * @param stores the constructed stores, for the stop-time drain of the transient ones
      * @param mutePolicy the rebindable mute gate the moderation context fills in when it wires
+     * @param afkStatus the rebindable AFK status the presence context fills in when it wires
      * @param running the flag flipped false on stop so the sweep exits
      */
     public record Wired(
@@ -161,6 +179,7 @@ public final class MessagingWiring {
             MailExpirySweep expirySweep,
             Stores stores,
             MutableMutePolicy mutePolicy,
+            MutableAfkStatus afkStatus,
             AtomicBoolean running) {
 
         public Wired {
@@ -168,6 +187,7 @@ public final class MessagingWiring {
             Objects.requireNonNull(expirySweep, "expirySweep");
             Objects.requireNonNull(stores, "stores");
             Objects.requireNonNull(mutePolicy, "mutePolicy");
+            Objects.requireNonNull(afkStatus, "afkStatus");
             Objects.requireNonNull(running, "running");
         }
 

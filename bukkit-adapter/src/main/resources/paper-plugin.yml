@@ -411,6 +411,9 @@ permissions:
   uxmessentials.mail.use:
     description: '/mail read / /mail send <player> <text> / /mail clear (/mailclear) — persistent offline mail.'
     default: true
+  uxmessentials.mail.sendall:
+    description: '/mail sendall <text> to broadcast mail to every online player (staff).'
+    default: op
   uxmessentials.helpop.use:
     description: '/helpop <text> to open a player-to-staff support request.'
     default: true
