@@ -10,18 +10,21 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
+import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationSanctionHistoryRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import org.jooq.DSLContext;
+import org.jooq.TableField;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * The jOOQ-backed {@link SanctionHistory} over the generated V11 history table. {@link #append} is a single
  * insert with a synthetic {@code max(id)+1} key (the V5 warn-history pattern), so the table is only ever
- * inserted into and read back — never updated. The two read methods scope to a family by {@code action},
- * order newest-first off the {@code (target, ts DESC)} index, and cap at the supplied limit. Every statement
- * is typed jOOQ DSL — no SQL is ever string-concatenated — and writes go through the transactional
- * {@code write} seam.
+ * inserted into and read back — never updated. The family reads scope to a family by {@code action} and read
+ * newest-first off the {@code (target, ts DESC)} index; the unified {@link #recentForTarget} read drops the
+ * action filter so every kind folds into one timeline; {@link #recentByActor} scopes by {@code actor} (V28
+ * index) for {@code /staffhistory}. Every read caps at the supplied limit. Every statement is typed jOOQ DSL —
+ * no SQL is ever string-concatenated — and writes go through the transactional {@code write} seam.
  */
 @NullMarked
 public final class JooqSanctionHistory extends JooqRepository implements SanctionHistory {
@@ -60,10 +63,32 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
         return scoped(target, limit, SanctionAction.MUTE, SanctionAction.UNMUTE);
     }
 
+    @Override
+    public List<SanctionHistoryEntry> recentForTarget(UUID target, int limit) {
+        Objects.requireNonNull(target, "target");
+        return recentBy(MODERATION_SANCTION_HISTORY.TARGET, target, limit);
+    }
+
+    @Override
+    public List<SanctionHistoryEntry> recentByActor(UUID actor, int limit) {
+        Objects.requireNonNull(actor, "actor");
+        return recentBy(MODERATION_SANCTION_HISTORY.ACTOR, actor, limit);
+    }
+
     private List<SanctionHistoryEntry> scoped(UUID target, int limit, SanctionAction a, SanctionAction b) {
         return read(dsl -> dsl.selectFrom(MODERATION_SANCTION_HISTORY)
                 .where(MODERATION_SANCTION_HISTORY.TARGET.eq(target.toString()))
                 .and(MODERATION_SANCTION_HISTORY.ACTION.in(a.name(), b.name()))
+                .orderBy(MODERATION_SANCTION_HISTORY.TS.desc(), MODERATION_SANCTION_HISTORY.ID.desc())
+                .limit(Math.max(0, limit))
+                .fetch()
+                .map(SanctionHistoryRows::toEntry));
+    }
+
+    private List<SanctionHistoryEntry> recentBy(
+            TableField<ModerationSanctionHistoryRecord, String> column, UUID id, int limit) {
+        return read(dsl -> dsl.selectFrom(MODERATION_SANCTION_HISTORY)
+                .where(column.eq(id.toString()))
                 .orderBy(MODERATION_SANCTION_HISTORY.TS.desc(), MODERATION_SANCTION_HISTORY.ID.desc())
                 .limit(Math.max(0, limit))
                 .fetch()
