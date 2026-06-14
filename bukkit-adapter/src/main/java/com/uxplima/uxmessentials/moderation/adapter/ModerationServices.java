@@ -4,6 +4,8 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.CheckBan;
+import com.uxplima.uxmessentials.moderation.application.CheckMute;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
 import com.uxplima.uxmessentials.moderation.application.CommandSpy;
 import com.uxplima.uxmessentials.moderation.application.DelJail;
@@ -22,6 +24,8 @@ import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
+import com.uxplima.uxmessentials.moderation.application.ReviewSanctionHistory;
+import com.uxplima.uxmessentials.moderation.application.ReviewStaffHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
@@ -70,6 +74,10 @@ public final class ModerationServices {
     private final ListMutes listMutes;
     private final ReviewBanHistory reviewBanHistory;
     private final ReviewMuteHistory reviewMuteHistory;
+    private final ReviewSanctionHistory reviewSanctionHistory;
+    private final ReviewStaffHistory reviewStaffHistory;
+    private final CheckBan checkBan;
+    private final CheckMute checkMute;
     private final BanIp banIp;
     private final TempBanIp tempBanIp;
     private final UnbanIp unbanIp;
@@ -107,6 +115,10 @@ public final class ModerationServices {
         this.listMutes = Objects.requireNonNull(builder.listMutes, "listMutes");
         this.reviewBanHistory = Objects.requireNonNull(builder.reviewBanHistory, "reviewBanHistory");
         this.reviewMuteHistory = Objects.requireNonNull(builder.reviewMuteHistory, "reviewMuteHistory");
+        this.reviewSanctionHistory = Objects.requireNonNull(builder.reviewSanctionHistory, "reviewSanctionHistory");
+        this.reviewStaffHistory = Objects.requireNonNull(builder.reviewStaffHistory, "reviewStaffHistory");
+        this.checkBan = Objects.requireNonNull(builder.checkBan, "checkBan");
+        this.checkMute = Objects.requireNonNull(builder.checkMute, "checkMute");
         this.banIp = Objects.requireNonNull(builder.banIp, "banIp");
         this.tempBanIp = Objects.requireNonNull(builder.tempBanIp, "tempBanIp");
         this.unbanIp = Objects.requireNonNull(builder.unbanIp, "unbanIp");
@@ -213,6 +225,22 @@ public final class ModerationServices {
         return reviewMuteHistory;
     }
 
+    public ReviewSanctionHistory reviewSanctionHistory() {
+        return reviewSanctionHistory;
+    }
+
+    public ReviewStaffHistory reviewStaffHistory() {
+        return reviewStaffHistory;
+    }
+
+    public CheckBan checkBan() {
+        return checkBan;
+    }
+
+    public CheckMute checkMute() {
+        return checkMute;
+    }
+
     public BanIp banIp() {
         return banIp;
     }
@@ -287,6 +315,10 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable ListMutes listMutes;
         private @org.jspecify.annotations.Nullable ReviewBanHistory reviewBanHistory;
         private @org.jspecify.annotations.Nullable ReviewMuteHistory reviewMuteHistory;
+        private @org.jspecify.annotations.Nullable ReviewSanctionHistory reviewSanctionHistory;
+        private @org.jspecify.annotations.Nullable ReviewStaffHistory reviewStaffHistory;
+        private @org.jspecify.annotations.Nullable CheckBan checkBan;
+        private @org.jspecify.annotations.Nullable CheckMute checkMute;
         private @org.jspecify.annotations.Nullable BanIp banIp;
         private @org.jspecify.annotations.Nullable TempBanIp tempBanIp;
         private @org.jspecify.annotations.Nullable UnbanIp unbanIp;
@@ -412,6 +444,26 @@ public final class ModerationServices {
 
         Builder reviewMuteHistory(ReviewMuteHistory value) {
             this.reviewMuteHistory = value;
+            return this;
+        }
+
+        Builder reviewSanctionHistory(ReviewSanctionHistory value) {
+            this.reviewSanctionHistory = value;
+            return this;
+        }
+
+        Builder reviewStaffHistory(ReviewStaffHistory value) {
+            this.reviewStaffHistory = value;
+            return this;
+        }
+
+        Builder checkBan(CheckBan value) {
+            this.checkBan = value;
+            return this;
+        }
+
+        Builder checkMute(CheckMute value) {
+            this.checkMute = value;
             return this;
         }
 

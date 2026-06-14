@@ -22,6 +22,8 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAu
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
+import com.uxplima.uxmessentials.moderation.application.CheckBan;
+import com.uxplima.uxmessentials.moderation.application.CheckMute;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
 import com.uxplima.uxmessentials.moderation.application.CommandSpy;
 import com.uxplima.uxmessentials.moderation.application.DelJail;
@@ -45,6 +47,8 @@ import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
 import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
+import com.uxplima.uxmessentials.moderation.application.ReviewSanctionHistory;
+import com.uxplima.uxmessentials.moderation.application.ReviewStaffHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
 import com.uxplima.uxmessentials.moderation.application.SanctionDurationLimit;
 import com.uxplima.uxmessentials.moderation.application.SanctionHistoryRecorder;
@@ -180,7 +184,7 @@ public final class ModerationWiring {
                 repository, sanctionPort, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
         Ban ban = new Ban(
                 repository, sanctionPort, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
-        Kick kick = new Kick(sanctionPort, guard, notifier, audit, broadcast);
+        Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast);
         WarnEscalator escalator = new WarnEscalator(settings.warnEscalation(), mute, tempBan, ban, kick, notifier);
         return new ModerationServices.Builder()
                 .mute(mute)
@@ -193,9 +197,10 @@ public final class ModerationWiring {
                 .unban(new Unban(repository, notifier, audit, history))
                 .kick(kick)
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
-                .warn(new IssueWarn(repository, guard, notifier, audit, kernel.events(), broadcast, escalator, clock))
-                .tempWarn(
-                        new TempWarn(repository, guard, notifier, audit, kernel.events(), broadcast, escalator, clock))
+                .warn(new IssueWarn(
+                        repository, guard, notifier, audit, kernel.events(), history, broadcast, escalator, clock))
+                .tempWarn(new TempWarn(
+                        repository, guard, notifier, audit, kernel.events(), history, broadcast, escalator, clock))
                 .reviewWarns(new ReviewWarns(repository, notifier, clock))
                 .clearWarns(new ClearWarns(repository, notifier, audit))
                 .sanctionSummary(new SanctionSummary(repository, notifier, clock))
@@ -207,6 +212,10 @@ public final class ModerationWiring {
                 .listMutes(new ListMutes(repository, kernel.playerLookup(), notifier, clock))
                 .reviewBanHistory(new ReviewBanHistory(sanctionHistory, notifier))
                 .reviewMuteHistory(new ReviewMuteHistory(sanctionHistory, notifier))
+                .reviewSanctionHistory(new ReviewSanctionHistory(sanctionHistory, notifier))
+                .reviewStaffHistory(new ReviewStaffHistory(sanctionHistory, kernel.playerLookup(), notifier))
+                .checkBan(new CheckBan(repository, notifier))
+                .checkMute(new CheckMute(repository, notifier, clock))
                 .banIp(new BanIp(repository, notifier, audit, kernel.events(), history, clock))
                 .tempBanIp(new TempBanIp(repository, notifier, audit, kernel.events(), history, clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit, history))

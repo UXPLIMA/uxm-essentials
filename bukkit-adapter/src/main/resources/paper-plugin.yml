@@ -501,6 +501,15 @@ permissions:
   uxmessentials.moderation.mutelist:
     description: '/mutelist to review the players currently muted.'
     default: op
+  uxmessentials.moderation.history:
+    description: '/history <player> — review a player''s full disciplinary record (ban/mute/warn/kick) newest-first.'
+    default: op
+  uxmessentials.moderation.staffhistory:
+    description: '/staffhistory <staff> — review the sanctions a staff member has issued, newest-first.'
+    default: op
+  uxmessentials.moderation.check:
+    description: '/checkban <player> and /checkmute <player> — report whether a player is currently banned or muted.'
+    default: op
   uxmessentials.moderation.kick:
     description: '/kick <player> [reason]; /kickall [reason] to clear non-exempt players.'
     default: op
