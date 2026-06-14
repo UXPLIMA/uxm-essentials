@@ -37,6 +37,9 @@ public enum VaultsMessageKey implements MessageKey {
     VAULT_DELETE_UNKNOWN("vaults.delete-unknown"),
     VAULT_CANNOT_AFFORD("vaults.cannot-afford"),
 
+    // item blacklist (items refused on save and returned to the player)
+    VAULT_ITEM_BLOCKED("vaults.item-blocked"),
+
     // shared
     VAULT_SAVED("vaults.saved"),
     VAULT_PLAYERS_ONLY("vaults.players-only");
