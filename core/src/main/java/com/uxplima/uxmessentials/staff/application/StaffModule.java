@@ -22,11 +22,11 @@ import org.jspecify.annotations.NullMarked;
  * to no-ops when those modules are off, and staff chat fans out through the messaging context's staff
  * audience.
  *
- * <p><b>Ships disabled by default.</b> Staff mode is an opt-in operator tool with operator-authored gadget
- * items, so out of the box this context does nothing — an operator authors the gadget hotbar and then flips
- * {@code modules.staff.enabled = true}. The {@link #enabled(ConfigStore)} gate therefore defaults to
- * {@code false} (like {@code nametags} and {@code tablist}, unlike the steady-state contexts that default
- * on).
+ * <p><b>Ships enabled by default.</b> Every command and gadget is permission-gated ({@code /staffmode} and the
+ * gadgets need the staff nodes), so a regular player sees nothing change, and the module ships a sensible default
+ * gadget hotbar. An operator who wants staff mode therefore needs only to grant the permissions. The
+ * {@link #enabled(ConfigStore)} gate therefore defaults to {@code true} (like the steady-state contexts; unlike
+ * {@code nametags}, which ships off until name-hiding lands).
  *
  * <p>It persists the captured loadout — but that {@code staff_loadout} table ships in a persistence Flyway
  * migration the persistence layer always applies, so the module declares no extra migration location of its
@@ -74,10 +74,10 @@ public final class StaffModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // Staff mode is an opt-in tool with operator-authored gadget items, so the module ships disabled —
-        // it is off until an operator authors the gadget hotbar and opts in via modules.conf. The default
-        // here is false (the steady-state contexts default on).
-        return config.getBoolean(configRoot() + ".enabled", false);
+        // The module ships ENABLED with a sensible default gadget hotbar. Every command and gadget is
+        // permission-gated, so a regular player sees nothing change; an operator grants the staff nodes to use it.
+        // The default here is true (the steady-state contexts default on); an operator opts out via modules.conf.
+        return config.getBoolean(configRoot() + ".enabled", true);
     }
 
     @Override

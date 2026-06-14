@@ -17,14 +17,15 @@ class TablistModuleTest {
     }
 
     @Test
-    void shipsDisabledByDefault() {
+    void shipsEnabledByDefault() {
         TablistModule module = new TablistModule();
 
-        // With no override the module is off — the operator authors the header/footer before enabling.
-        assertThat(module.enabled(new FixedConfig(Map.of()))).isFalse();
-        // An explicit enable in modules.conf turns it on.
-        assertThat(module.enabled(new FixedConfig(Map.of("modules.tablist.enabled", true))))
-                .isTrue();
+        // With no override the module is on — a fresh install bundles an example header/footer (built-in {tokens}, no
+        // PlaceholderAPI required) so a new operator sees a working tab out of the box.
+        assertThat(module.enabled(new FixedConfig(Map.of()))).isTrue();
+        // An explicit disable in modules.conf turns it off.
+        assertThat(module.enabled(new FixedConfig(Map.of("modules.tablist.enabled", false))))
+                .isFalse();
     }
 
     @Test

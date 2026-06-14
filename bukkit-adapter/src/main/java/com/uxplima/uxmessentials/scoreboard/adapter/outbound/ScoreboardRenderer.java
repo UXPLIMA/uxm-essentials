@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
@@ -42,11 +43,13 @@ import org.jspecify.annotations.NullMarked;
  * real values. When no board matches, the sidebar is torn down.
  *
  * <p>Each source string of the selected board is first run through the {@link AnimationRegistry} — expanding any
- * {@code %anim_<name>%} token to the named animation's current frame at the global render tick — and then through
- * {@link HudText} — the per-viewer PlaceholderAPI bridge ({@code %papi%} expansion, identity without PlaceholderAPI)
- * then {@code MiniMessage} parse, the same two-step transform the message sink uses — so operator content may embed both
- * animations and third-party placeholders. The animation token is expanded <em>before</em> PlaceholderAPI and
- * MiniMessage so an animation frame may itself carry colour tags or placeholders. The sidebar is reused across ticks
+ * {@code %anim_<name>%} token to the named animation's current frame at the global render tick — then through
+ * {@link BuiltinTokens} — resolving the built-in {@code {player}} / {@code {online}} / {@code {world}} style tokens off
+ * the live player so the board shows real values with or without PlaceholderAPI — and finally through {@link HudText} —
+ * the per-viewer PlaceholderAPI bridge ({@code %papi%} expansion, identity without PlaceholderAPI) then
+ * {@code MiniMessage} parse, the same two-step transform the message sink uses — so operator content may embed
+ * animations, built-in tokens, and third-party placeholders. The animation token is expanded <em>before</em> the
+ * built-in tokens and PlaceholderAPI so an animation frame may itself carry tokens or placeholders. The sidebar is reused across ticks
  * when it already exists (its {@code lines}/{@code title} diff flicker-free), created on first render, and torn down
  * when the player has hidden it, no board matches, or the selected board blacklists their world.
  *
@@ -240,6 +243,10 @@ public final class ScoreboardRenderer {
     }
 
     private Component render(Player player, String source, long tick) {
-        return HudText.render(player.getUniqueId(), animations.resolve(source, tick));
+        // Built-in {tokens} (e.g. {player}, {online}, {world}) resolve here off the live player, BEFORE the
+        // PlaceholderAPI bridge and MiniMessage, so the shipped sidebar shows real values with or without
+        // PlaceholderAPI. The animation %anim_<name>% pass runs first so an animation frame may itself carry tokens.
+        String withTokens = BuiltinTokens.apply(player, animations.resolve(source, tick));
+        return HudText.render(player.getUniqueId(), withTokens);
     }
 }

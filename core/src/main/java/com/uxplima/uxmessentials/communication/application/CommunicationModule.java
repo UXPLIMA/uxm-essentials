@@ -21,10 +21,12 @@ import org.jspecify.annotations.NullMarked;
  * {@code /broadcasttoggle} commands, and the operator-configured info pages ({@code /rules}, {@code /motd},
  * {@code /info}) registered dynamically from the {@code InfoRegistry}.
  *
- * <p><b>Ships disabled by default.</b> A newly introduced module is off until an operator enables it in
- * {@code modules.conf}, so out of the box this context changes nothing: no listeners, no announcer timer, no
- * dynamic commands. The {@link #enabled(ConfigStore)} gate therefore defaults to {@code false} (unlike the
- * landed contexts, which default to on), and the four-way module guard keys off {@code modules.communication}.
+ * <p><b>Ships enabled by default.</b> Every content file ships inert — the join/quit/death channels default to
+ * the vanilla message (DEFAULT mode), the first-join line and death info page are blank, and the announcer has no
+ * announcements — so out of the box this context changes nothing visible even while enabled: no message is overridden,
+ * no announcer line fires. An operator authors the templates/announcements they want and they take effect with no
+ * further toggle. The {@link #enabled(ConfigStore)} gate therefore defaults to {@code true} (like the
+ * landed contexts), and the four-way module guard keys off {@code modules.communication}.
  *
  * <p>The split between the plugin's own strings and operator content is owned here: {@code /broadcasttoggle}
  * confirmations, the missing-info-page error, and the announcer-reloaded notice are {@code CommunicationMessageKey}s
@@ -77,9 +79,10 @@ public final class CommunicationModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // A newly introduced module ships disabled — it is off until an operator opts in via modules.conf, so the
-        // default here is false (the landed contexts default to true). Out of the box communication wires nothing.
-        return config.getBoolean(configRoot() + ".enabled", false);
+        // The module ships ENABLED, but every content file ships inert (channels keep the vanilla message, the
+        // announcer has no lines), so being on changes nothing until an operator authors templates. The default here
+        // is true (the landed contexts default to on); an operator opts out via modules.conf.
+        return config.getBoolean(configRoot() + ".enabled", true);
     }
 
     @Override

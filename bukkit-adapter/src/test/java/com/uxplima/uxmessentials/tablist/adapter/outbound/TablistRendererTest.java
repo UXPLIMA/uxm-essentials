@@ -188,6 +188,27 @@ class TablistRendererTest {
     }
 
     @Test
+    void aBuiltInTokenInTheHeaderAndFooterRendersTheLiveValue() {
+        // The built-in {online}/{world} tokens resolve off the live player/server with no PlaceholderAPI present, so
+        // the
+        // shipped header/footer show real values out of the box.
+        CapturingPlayerMock player = new CapturingPlayerMock(server, "builtin");
+        server.addPlayer(player);
+        TablistContent content = new TablistContent(
+                List.of("<gray>Online {online}"), List.of("<gray>World {world}"), Duration.ofSeconds(1L), Set.of());
+        TablistFormatConfig config = new TablistFormatConfig(List.of(new TablistFormat(
+                "default", DisplayCondition.always(), 0, content, Optional.empty(), OptionalInt.empty())));
+        TablistRenderer renderer = rendererOf(
+                new AtomicReference<>(config)::get, new AnimationRegistry(List.of()), new RecordingPackets());
+
+        renderer.renderFor(player);
+
+        assertThat(plain(player.header())).isEqualTo("Online 1");
+        assertThat(plain(player.footer()))
+                .isEqualTo("World " + player.getWorld().getName());
+    }
+
+    @Test
     void aNameOnlyFormatDoesNotBlankTheHeaderOrFooterButAppliesTheName() {
         // A format with an EMPTY header AND footer must NOT call sendPlayerListHeaderAndFooter at all — uxmLib's
         // Tablist.set sends both together, so sending an empty pair would wipe whatever vanilla or another plugin set.

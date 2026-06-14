@@ -48,7 +48,14 @@ class DefaultResourcesTest {
                 .isEqualTo("coins");
         assertThat(config.getInt("modules.vaults.default-size", -1)).isEqualTo(6);
         assertThat(config.getBoolean("modules.teleport.enabled", false)).isTrue();
-        assertThat(config.getBoolean("modules.communication.enabled", true)).isFalse();
+        // communication now ships enabled (inert by default): the display/communication contexts default on so a fresh
+        // install shows a working experience out of the box.
+        assertThat(config.getBoolean("modules.communication.enabled", false)).isTrue();
+        assertThat(config.getBoolean("modules.scoreboard.enabled", false)).isTrue();
+        assertThat(config.getBoolean("modules.tablist.enabled", false)).isTrue();
+        assertThat(config.getBoolean("modules.staff.enabled", false)).isTrue();
+        // nametags stays off: its default renders a custom name above the vanilla one until name-hiding lands.
+        assertThat(config.getBoolean("modules.nametags.enabled", true)).isFalse();
         assertThat(config.getBoolean("modules.migration.enabled", true)).isFalse();
     }
 

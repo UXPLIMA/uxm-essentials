@@ -197,25 +197,26 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void communicationShipsDisabledAndPublishesItsStaticSurface() {
+    void communicationShipsEnabledAndPublishesItsStaticSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule communication = registry.byId(ModuleId.of("communication"))
                 .orElseThrow(() -> new AssertionError("communication is not registered"));
 
-        // communication is the round-3 feature context; it ships DISABLED. With no modules.conf override it is
-        // absent from the enabled set while every landed sibling (which defaults to on) stays enabled.
+        // communication now ships ENABLED, but inert: every content file defaults to the vanilla behaviour, so being
+        // on changes nothing until an operator authors a template. With no modules.conf override it is on, and
+        // disabling exactly it removes only it while every sibling stays on.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).doesNotContain("communication");
-        assertThat(defaults).contains("teleport", "economy", "moderation", "itemworld", "vaults");
+        assertThat(defaults).contains("communication", "teleport", "economy", "moderation", "itemworld", "vaults");
 
-        // Explicitly enabling exactly communication brings only it on; the rest are unchanged.
-        Set<String> on =
-                registry.enabledModules(new FixedConfig(Map.of("modules.communication.enabled", true))).stream()
+        // Explicitly disabling exactly communication removes only it; the rest are unchanged.
+        Set<String> off =
+                registry.enabledModules(new FixedConfig(Map.of("modules.communication.enabled", false))).stream()
                         .map(m -> m.id().value())
                         .collect(Collectors.toSet());
-        assertThat(on).contains("communication", "teleport", "vaults");
+        assertThat(off).doesNotContain("communication");
+        assertThat(off).contains("teleport", "vaults");
 
         // Its static surface is the plugin's own /broadcast, /broadcastworld, /me, /broadcasttoggle, /clearchat,
         // and /togglechat; the operator-configured info-page commands (/rules, /motd, …) are dynamic and not part
@@ -292,7 +293,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void scoreboardShipsDisabledAndPublishesItsSurface() {
+    void scoreboardShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule scoreboard = registry.byId(ModuleId.of("scoreboard"))
                 .orElseThrow(() -> new AssertionError("scoreboard is not registered"));
@@ -302,18 +303,18 @@ class FeatureModuleRegistryDriftTest {
         // last.
         assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
 
-        // It ships DISABLED (like communication, its content is operator data): with no modules.conf override it is
-        // absent from the enabled set while every steady-state sibling stays on. Explicitly enabling exactly it
-        // brings only it on.
+        // It ships ENABLED: a fresh install bundles an example board authored with built-in {tokens} (no PlaceholderAPI
+        // required), so with no modules.conf override it is on. Disabling exactly it removes only it while every
+        // steady-state sibling stays on.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).doesNotContain("scoreboard");
-        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps");
-        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.scoreboard.enabled", true))).stream()
+        assertThat(defaults).contains("scoreboard", "teleport", "economy", "holograms", "playerwarps");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.scoreboard.enabled", false))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(on).contains("scoreboard", "teleport", "holograms");
+        assertThat(off).doesNotContain("scoreboard");
+        assertThat(off).contains("teleport", "holograms");
 
         // Enabled, scoreboard contributes its single /scoreboard command and persists nothing (the display content
         // is config-authored and the per-player visibility bit is PDC-backed), so it declares no MigrationSet.
@@ -324,7 +325,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void tablistShipsDisabledAndPublishesNoCommandSurface() {
+    void tablistShipsEnabledAndPublishesNoCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule tablist = registry.byId(ModuleId.of("tablist"))
                 .orElseThrow(() -> new AssertionError("tablist is not registered"));
@@ -333,19 +334,18 @@ class FeatureModuleRegistryDriftTest {
         // enable, author, and refresh independently. It is registered next to scoreboard.
         assertThat(registry.byId(ModuleId.of("tablist"))).isPresent();
 
-        // It ships DISABLED (like scoreboard, its content is operator data): with no modules.conf override it is
-        // absent from the enabled set while every steady-state sibling stays on, and crucially scoreboard and tablist
-        // toggle independently — disabling exactly tablist leaves scoreboard's gate untouched and vice versa.
+        // It ships ENABLED (like scoreboard, with a bundled example header/footer using built-in {tokens}): with no
+        // modules.conf override it is on, and crucially scoreboard and tablist toggle independently — disabling exactly
+        // tablist leaves scoreboard's gate untouched and vice versa.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).doesNotContain("tablist", "scoreboard");
-        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps");
-        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.tablist.enabled", true))).stream()
+        assertThat(defaults).contains("tablist", "scoreboard", "teleport", "economy", "holograms", "playerwarps");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.tablist.enabled", false))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(on).contains("tablist", "teleport", "holograms");
-        assertThat(on).doesNotContain("scoreboard");
+        assertThat(off).doesNotContain("tablist");
+        assertThat(off).contains("scoreboard", "teleport", "holograms");
 
         // The tablist is always-on for every viewer when enabled — there is no per-player visibility toggle — so it
         // publishes no command, and it persists nothing (the header/footer is config-authored), so it declares no
@@ -449,7 +449,7 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void staffIsTheLastModuleShipsDisabledAndPublishesItsSurface() {
+    void staffIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule staff =
                 registry.byId(ModuleId.of("staff")).orElseThrow(() -> new AssertionError("staff is not registered"));
@@ -458,19 +458,18 @@ class FeatureModuleRegistryDriftTest {
         // registered last after the nineteen prior modules.
         assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("staff");
 
-        // It ships DISABLED (like scoreboard/tablist/nametags, its gadget hotbar is operator data): with no
-        // modules.conf
-        // override it is absent from the enabled set while every steady-state sibling stays on. Explicitly enabling
-        // exactly it brings only it on; disabling it leaves every sibling untouched.
+        // It ships ENABLED with a default gadget hotbar; every command and gadget is permission-gated, so a regular
+        // player sees nothing change. With no modules.conf override it is on, and disabling exactly it removes only it
+        // while every sibling stays on.
         Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(defaults).doesNotContain("staff");
-        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps", "discordlink");
-        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.staff.enabled", true))).stream()
+        assertThat(defaults).contains("staff", "teleport", "economy", "holograms", "playerwarps", "discordlink");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.staff.enabled", false))).stream()
                 .map(m -> m.id().value())
                 .collect(Collectors.toSet());
-        assertThat(on).contains("staff", "teleport", "holograms");
+        assertThat(off).doesNotContain("staff");
+        assertThat(off).contains("teleport", "holograms");
 
         // Enabled, staff contributes /staffmode, /staffchat (the /sc alias is not a separate literal) and
         // /stafflist (the online-staff GUI), and owns no extra Flyway location (its staff_loadout table is in the

@@ -19,14 +19,15 @@ class ScoreboardModuleTest {
     }
 
     @Test
-    void shipsDisabledByDefault() {
+    void shipsEnabledByDefault() {
         ScoreboardModule module = new ScoreboardModule();
 
-        // With no override the module is off — the operator authors the sidebar before enabling.
-        assertThat(module.enabled(new FixedConfig(Map.of()))).isFalse();
-        // An explicit enable in modules.conf turns it on.
-        assertThat(module.enabled(new FixedConfig(Map.of("modules.scoreboard.enabled", true))))
-                .isTrue();
+        // With no override the module is on — a fresh install bundles an example sidebar (built-in {tokens}, no
+        // PlaceholderAPI required) so a new operator sees a working board out of the box.
+        assertThat(module.enabled(new FixedConfig(Map.of()))).isTrue();
+        // An explicit disable in modules.conf turns it off.
+        assertThat(module.enabled(new FixedConfig(Map.of("modules.scoreboard.enabled", false))))
+                .isFalse();
     }
 
     @Test

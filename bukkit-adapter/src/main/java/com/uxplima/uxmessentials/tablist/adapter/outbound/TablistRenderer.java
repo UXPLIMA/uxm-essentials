@@ -18,6 +18,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
@@ -53,15 +54,17 @@ import org.jspecify.annotations.NullMarked;
  *
  * <ul>
  *   <li>its {@link TablistContent} header/footer line lists, each source first run through the {@link AnimationRegistry}
- *       (expanding any {@code %anim_<name>%} token to the named animation's current frame at the global render tick) then
- *       through {@link HudText} (the per-viewer PlaceholderAPI bridge then MiniMessage parse) and joined with newlines.
- *       The animation token is expanded <em>before</em> PlaceholderAPI and MiniMessage so a frame may itself carry colour
- *       tags or placeholders, the same two-step transform the scoreboard sidebar uses;</li>
+ *       (expanding any {@code %anim_<name>%} token to the named animation's current frame at the global render tick), then
+ *       through {@link BuiltinTokens} (resolving the built-in {@code {player}} / {@code {online}} / {@code {world}} style
+ *       tokens off the live player), then through {@link HudText} (the per-viewer PlaceholderAPI bridge then MiniMessage
+ *       parse) and joined with newlines. The animation token is expanded <em>before</em> the built-in tokens and
+ *       PlaceholderAPI so a frame may itself carry tokens or placeholders, the same pipeline the scoreboard sidebar
+ *       uses;</li>
  *   <li>its {@link TablistFormat#nameFormat() name format}, when present, applied as the viewer's tab-list name via
- *       {@link Player#playerListName(Component)} — how the viewer appears to everyone. The {@code {player}} token is
- *       substituted with the viewer's name before the {@link HudText} transform, so {@code "<red>[Staff] {player}"}
- *       renders the player's name; PlaceholderAPI tokens (e.g. {@code %player_name%}) are expanded by {@code HudText}
- *       as usual;</li>
+ *       {@link Player#playerListName(Component)} — how the viewer appears to everyone. It runs through the same pipeline,
+ *       so the built-in {@code {player}} token resolves to the viewer's name ({@code "<red>[Staff] {player}"} renders the
+ *       player's name) and PlaceholderAPI tokens (e.g. {@code %player_name%}) are expanded by {@code HudText} as
+ *       usual;</li>
  *   <li>its {@link TablistFormat#sortOrder() sort order}, when present, applied via {@link Player#setPlayerListOrder(int)}
  *       (Paper 1.21.2+). The value is a positive integer; a higher value sorts the player higher in the tab list, ties
  *       broken alphabetically by name by the client. An absent order leaves the vanilla order untouched.</li>
@@ -91,9 +94,6 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class TablistRenderer {
-
-    /** The token in a name-format substituted with the viewer's own name before the {@link HudText} transform. */
-    private static final String PLAYER_TOKEN = "{player}";
 
     private final Tablist tablist;
     private final Supplier<TablistFormatConfig> formats;
@@ -412,11 +412,9 @@ public final class TablistRenderer {
     }
 
     private Component renderName(Player player, String source, long tick) {
-        // The {player} convenience token is ours, so substitute it first; then expand any %anim_<name>% token to the
-        // current frame BEFORE HudText runs PlaceholderAPI + MiniMessage, so a frame may itself carry
-        // tags/placeholders.
-        String withName = source.replace(PLAYER_TOKEN, player.getName());
-        return render(player, withName, tick);
+        // A name format renders through the same pipeline as the header/footer; the {player} convenience token is one
+        // of the built-in tokens resolved inside render() (along with {online}, {world}, …) off the live player.
+        return render(player, source, tick);
     }
 
     private Component joinLines(Player player, List<String> sources, long tick) {
@@ -432,7 +430,12 @@ public final class TablistRenderer {
     }
 
     private Component render(Player player, String source, long tick) {
-        return HudText.render(player.getUniqueId(), animations.resolve(source, tick));
+        // Built-in {tokens} ({player}, {online}, {world}, …) resolve here off the live player, BEFORE the
+        // PlaceholderAPI
+        // bridge and MiniMessage, so the shipped header/footer/name-format show real values with or without
+        // PlaceholderAPI. The animation %anim_<name>% pass runs first so a frame may itself carry tokens.
+        String withTokens = BuiltinTokens.apply(player, animations.resolve(source, tick));
+        return HudText.render(player.getUniqueId(), withTokens);
     }
 
     /**

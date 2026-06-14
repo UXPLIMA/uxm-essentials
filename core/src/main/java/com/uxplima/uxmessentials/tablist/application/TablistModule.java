@@ -19,10 +19,11 @@ import org.jspecify.annotations.NullMarked;
  * pipeline. It owns the self-rescheduling render timer on the {@code Scheduler} port that re-renders every viewer each
  * configured refresh interval; the render/join/quit machinery is Bukkit-facing and lands with the adapter wiring.
  *
- * <p><b>Ships disabled by default.</b> The header/footer content is operator data, so out of the box this context
- * shows nothing — an operator authors the lines and then flips {@code modules.tablist.enabled = true}. The
- * {@link #enabled(ConfigStore)} gate therefore defaults to {@code false} (like {@code scoreboard}, unlike the
- * steady-state contexts that default on). It persists nothing: the tablist is entirely config-authored, so the module
+ * <p><b>Ships enabled by default.</b> A fresh install bundles an example header/footer authored with the built-in
+ * {@code {online}}/{@code {max_players}} tokens (no PlaceholderAPI required), so out of the box a new operator sees a
+ * working tab and brands or disables it from there. The
+ * {@link #enabled(ConfigStore)} gate therefore defaults to {@code true} (like the
+ * steady-state contexts). It persists nothing: the tablist is entirely config-authored, so the module
  * owns no Flyway location.
  *
  * <p>The tablist is always-on for every viewer when enabled — there is no per-player visibility toggle and so the
@@ -72,10 +73,10 @@ public final class TablistModule implements FeatureModule {
 
     @Override
     public boolean enabled(ConfigStore config) {
-        // The header/footer content is operator data, so the module ships disabled — it is off until an operator
-        // authors the lines and opts in via modules.conf. The default here is false (the steady-state contexts
-        // default on).
-        return config.getBoolean(configRoot() + ".enabled", false);
+        // The module ships ENABLED: a fresh install bundles an example header/footer (built-in {tokens}, no
+        // PlaceholderAPI required), so a new operator sees a working tab out of the box and opts out via modules.conf
+        // if unwanted.
+        return config.getBoolean(configRoot() + ".enabled", true);
     }
 
     @Override

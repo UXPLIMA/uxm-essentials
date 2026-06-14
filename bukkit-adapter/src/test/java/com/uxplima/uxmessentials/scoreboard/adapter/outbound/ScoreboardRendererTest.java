@@ -218,6 +218,28 @@ class ScoreboardRendererTest {
         assertThat(lineText(player, 0)).isEqualTo("State: OFF");
     }
 
+    @Test
+    void aBuiltInTokenInALineRendersTheLiveValue() {
+        PlayerMock player = server.addPlayer();
+        SidebarConfig config = single(new SidebarBoard(
+                "default",
+                new DisplayContent(
+                        Optional.of("<gold>T"),
+                        List.of("<white>{player}", "<white>{online}"),
+                        false,
+                        Duration.ofSeconds(1L),
+                        Set.of()),
+                DisplayCondition.always(),
+                0));
+        ScoreboardRenderer renderer = new ScoreboardRenderer(
+                sidebars, alwaysShown(), new AtomicReference<>(config)::get, new AnimationRegistry(List.of()));
+
+        // The {player} and {online} built-in tokens resolve off the live player/server with no PlaceholderAPI present.
+        renderer.renderFor(player);
+        assertThat(lineText(player, 0)).isEqualTo(player.getName());
+        assertThat(lineText(player, 1)).isEqualTo("1");
+    }
+
     private String lineText(PlayerMock player, int index) {
         com.uxplima.uxmlib.hud.scoreboard.Sidebar sidebar =
                 java.util.Objects.requireNonNull(sidebars.get(player.getUniqueId()), "sidebar");
