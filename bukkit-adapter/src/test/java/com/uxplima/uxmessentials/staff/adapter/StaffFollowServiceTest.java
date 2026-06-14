@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -20,7 +22,8 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * {@link StaffFollowService}: toggling starts then stops a session, a tick teleports the staff onto a live
- * target, and a tick auto-ends a session whose target has gone offline or whose staff has left staff mode.
+ * target, and a tick auto-ends a session whose target has gone offline, whose staff has left staff mode, or
+ * whose target the staff can no longer see. A staff member cannot follow themselves.
  */
 class StaffFollowServiceTest {
 
@@ -38,7 +41,12 @@ class StaffFollowServiceTest {
         inMode = new HashSet<>();
         inMode.add(staff.getUniqueId());
         follow = new StaffFollowService(
-                server, new ImmediateScheduler(), StaffAdapterFakes.notifier(), inMode::contains, 10);
+                server,
+                new EntityAwareScheduler(server),
+                StaffAdapterFakes.notifier(),
+                new StaffAdapterFakes.NoopLogger(),
+                inMode::contains,
+                10);
     }
 
     @AfterEach
@@ -53,6 +61,12 @@ class StaffFollowServiceTest {
         assertThat(follow.isFollowing(staff.getUniqueId())).isTrue();
 
         assertThat(follow.toggle(staff, target)).isFalse();
+        assertThat(follow.isFollowing(staff.getUniqueId())).isFalse();
+    }
+
+    @Test
+    void selfFollowIsRejectedAndStartsNothing() {
+        assertThat(follow.toggle(staff, staff)).isFalse();
         assertThat(follow.isFollowing(staff.getUniqueId())).isFalse();
     }
 
@@ -90,6 +104,16 @@ class StaffFollowServiceTest {
     }
 
     @Test
+    void aTickEndsTheSessionWhenTheStaffCanNoLongerSeeTheTarget() {
+        follow.toggle(staff, target);
+        staff.hidePlayer(MockBukkit.createMockPlugin(), target);
+
+        follow.tick();
+
+        assertThat(follow.isFollowing(staff.getUniqueId())).isFalse();
+    }
+
+    @Test
     void stopEndsASession() {
         follow.toggle(staff, target);
 
@@ -98,8 +122,18 @@ class StaffFollowServiceTest {
         assertThat(follow.isFollowing(staff.getUniqueId())).isFalse();
     }
 
-    /** A scheduler that runs everything inline and hands back a no-op repeating handle. */
-    private static final class ImmediateScheduler implements Scheduler {
+    /**
+     * A scheduler that runs everything inline but honours entity retirement: an {@code onEntity} hop for an
+     * offline player runs its {@code retired} callback instead of the task, exactly as the Folia adapter does, so
+     * the follow tick's two hops drive the same end-on-offline path the production scheduler would.
+     */
+    private static final class EntityAwareScheduler implements Scheduler {
+        private final ServerMock server;
+
+        EntityAwareScheduler(ServerMock server) {
+            this.server = server;
+        }
+
         @Override
         public void onGlobal(Runnable task) {
             task.run();
@@ -112,7 +146,20 @@ class StaffFollowServiceTest {
 
         @Override
         public void onEntity(PlayerRef player, Runnable task) {
-            task.run();
+            Player bukkit = server.getPlayer(player.uuid());
+            if (bukkit != null && bukkit.isOnline()) {
+                task.run();
+            }
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+            Player bukkit = server.getPlayer(player.uuid());
+            if (bukkit != null && bukkit.isOnline()) {
+                task.run();
+            } else {
+                retired.run();
+            }
         }
 
         @Override

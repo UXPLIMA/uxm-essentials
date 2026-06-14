@@ -28,11 +28,6 @@ public enum StaffMessageKey implements MessageKey {
     // EXAMINE gadget info line — {target}{ping}{gamemode}{health}{world}
     STAFF_EXAMINE_INFO("staff.examine.info"),
 
-    // FREEZE gadget feedback — target frozen, unfrozen, or exempt from being frozen
-    STAFF_FREEZE_ON("staff.freeze.on"),
-    STAFF_FREEZE_OFF("staff.freeze.off"),
-    STAFF_FREEZE_EXEMPT("staff.freeze.exempt"),
-
     // shared gadget feedback — a gadget was used while not looking at a player
     STAFF_GADGET_NO_TARGET("staff.gadget.no-target"),
 

@@ -114,6 +114,7 @@ public final class StaffWiring {
                 plugin.getServer(),
                 kernel.scheduler(),
                 notifier,
+                kernel.log(),
                 staffId -> store.activePlayers().contains(staffId),
                 settings.followIntervalTicks());
         StaffExamineView examineView =
@@ -212,9 +213,9 @@ public final class StaffWiring {
 
     /**
      * Everything the staff module contributes once wired: the Brigadier commands, the gadget/connection
-     * listener, and the FOLLOW gadget's repeating task. {@link #stop()} cancels that task and exits every staff
-     * member still in staff mode, restoring their real loadout so a disable/reload never strands anyone in the
-     * gadget hotbar or leaves a follow running.
+     * listener, and the FOLLOW gadget's repeating task. {@link #stop()} exits every staff member still in staff
+     * mode — restoring their real loadout — and then cancels the follow task, in that order so a follow-shutdown
+     * failure never aborts the loadout restore and strands anyone in the gadget hotbar or leaves a follow running.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the gadget interaction and quit listener to register
@@ -243,7 +244,8 @@ public final class StaffWiring {
         /** Exit every online staff member still in staff mode, restoring their real loadout on their entity thread. */
         public void stop() {
             running.set(false);
-            followService.shutdown();
+            // Restore every staff member's real loadout first, then stop the follow runtime: a follow-shutdown
+            // failure must never abort the loadout restore and strand staff in the gadget hotbar on disable.
             for (UUID id : services.store().activePlayers()) {
                 Player player = Bukkit.getPlayer(id);
                 if (player == null) {
@@ -252,6 +254,7 @@ public final class StaffWiring {
                 PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
                 scheduler.onEntity(who, () -> services.exit().exit(who));
             }
+            followService.shutdown();
         }
     }
 }

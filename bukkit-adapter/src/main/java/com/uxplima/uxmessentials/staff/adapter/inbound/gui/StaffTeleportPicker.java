@@ -74,13 +74,13 @@ abstract class StaffTeleportPicker {
      * empty-roster case (the staff list) overrides this to send a line instead of opening an empty window.
      */
     void onOpen(Player looker, PlayerRef lookerRef) {
-        buildAndOpen(looker, lookerRef);
+        buildAndOpen(looker, lookerRef, candidates(looker));
     }
 
-    final void buildAndOpen(Player looker, PlayerRef lookerRef) {
+    final void buildAndOpen(Player looker, PlayerRef lookerRef, List<Player> roster) {
         PaginatedGui gui =
                 Guis.paginated().title(title(lookerRef)).rows(PICKER_ROWS).build();
-        for (Player candidate : candidates(looker)) {
+        for (Player candidate : roster) {
             gui.addPageItem(headFor(looker, lookerRef, gui, candidate));
         }
         gui.open(looker);

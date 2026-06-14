@@ -23,6 +23,10 @@ import org.jspecify.annotations.NullMarked;
  * {@link #onAir} for an interact that hit no player (VANISH/EXAMINE/COMPASS act, FREEZE/FOLLOW report "look at a
  * player"), and {@link #onPlayer} for a right-click landing on a player entity (FREEZE/FOLLOW/COMPASS act,
  * VANISH/EXAMINE fall back to their air behaviour). Each soft-coupled port degrades on its {@code NONE} binding.
+ *
+ * <p>The FREEZE gadget delegates straight to the moderation freeze use case and shows no line of its own — that
+ * use case already confirms to the actor (and tells an exempt target it cannot be frozen), exactly as
+ * {@code /freeze} does, so the gadget would otherwise double-notify.
  */
 @NullMarked
 public final class StaffGadgetActions {
@@ -65,7 +69,7 @@ public final class StaffGadgetActions {
     /** A gadget right-clicked directly onto {@code targetPlayer}. */
     void onPlayer(StaffGadget gadget, Player actor, PlayerRef who, Player targetPlayer, PlayerRef targetRef) {
         switch (gadget) {
-            case FREEZE -> freeze(who, targetRef);
+            case FREEZE -> freeze.toggle(who, targetRef);
             case FOLLOW -> follow(actor, who, targetPlayer);
             case COMPASS -> teleport(who, targetPlayer, targetRef);
             case VANISH -> vanish.setVanished(who, !actor.isInvisible());
@@ -73,20 +77,10 @@ public final class StaffGadgetActions {
         }
     }
 
-    private void freeze(PlayerRef who, PlayerRef targetRef) {
-        StaffMessageKey key =
-                switch (freeze.toggle(who, targetRef)) {
-                    case FROZEN -> StaffMessageKey.STAFF_FREEZE_ON;
-                    case UNFROZEN -> StaffMessageKey.STAFF_FREEZE_OFF;
-                    case EXEMPT -> StaffMessageKey.STAFF_FREEZE_EXEMPT;
-                    case UNAVAILABLE -> null;
-                };
-        if (key != null) {
-            notifier.send(who, key, Map.of("target", targetRef.name()));
-        }
-    }
-
     private void follow(Player actor, PlayerRef who, Player targetPlayer) {
+        if (actor.getUniqueId().equals(targetPlayer.getUniqueId())) {
+            return; // a staff member cannot follow themselves; start nothing and say nothing
+        }
         boolean started = follow.toggle(actor, targetPlayer);
         StaffMessageKey key = started ? StaffMessageKey.STAFF_FOLLOW_ON : StaffMessageKey.STAFF_FOLLOW_OFF;
         notifier.send(who, key, Map.of("target", targetPlayer.getName()));

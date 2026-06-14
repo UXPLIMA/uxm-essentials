@@ -81,7 +81,13 @@ class StaffModeListenerTest {
         teleport = new RecordingTeleport();
         inspector = new RecordingInspector();
         keySink = new StaffKeySink();
-        follow = new StaffFollowService(server, new SyncScheduler(), StaffAdapterFakes.notifier(), id -> true, 10);
+        follow = new StaffFollowService(
+                server,
+                new SyncScheduler(),
+                StaffAdapterFakes.notifier(),
+                new StaffAdapterFakes.NoopLogger(),
+                id -> true,
+                10);
         listener = new StaffModeListener(services(), gadgetItems, follow, actions());
     }
 

@@ -48,10 +48,11 @@ public final class StaffListView extends StaffTeleportPicker {
 
     @Override
     void onOpen(Player looker, PlayerRef lookerRef) {
-        if (candidates(looker).isEmpty()) {
+        List<Player> roster = candidates(looker);
+        if (roster.isEmpty()) {
             sendChat(lookerRef, StaffMessageKey.STAFF_LIST_EMPTY);
             return;
         }
-        buildAndOpen(looker, lookerRef);
+        buildAndOpen(looker, lookerRef, roster);
     }
 }
