@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
@@ -89,6 +90,7 @@ class SilentBroadcastAndCapTest {
                         history,
                         new SanctionDurationLimit(ModerationFakes.exempt()),
                         broadcast,
+                        SanctionSync.NONE,
                         AddressStrictness.NORMAL,
                         clock)
                 .ban(ACTOR, TARGET, Optional.of("griefing"), true);
@@ -148,6 +150,7 @@ class SilentBroadcastAndCapTest {
                         history,
                         new SanctionDurationLimit(ModerationFakes.capping(3600)),
                         broadcast,
+                        SanctionSync.NONE,
                         clock)
                 .tempban(ACTOR, TARGET, "1d", Optional.of("cheating"), false);
 
@@ -172,6 +175,7 @@ class SilentBroadcastAndCapTest {
                         history,
                         new SanctionDurationLimit(ModerationFakes.exempt()),
                         broadcast,
+                        SanctionSync.NONE,
                         clock)
                 .tempban(ACTOR, TARGET, "1d", Optional.of("cheating"), false);
 
@@ -193,6 +197,7 @@ class SilentBroadcastAndCapTest {
                         history,
                         new SanctionDurationLimit(ModerationFakes.capping(3600)),
                         broadcast,
+                        SanctionSync.NONE,
                         AddressStrictness.NORMAL,
                         clock)
                 .ban(ACTOR, TARGET, Optional.of("griefing"), false);
@@ -269,6 +274,7 @@ class SilentBroadcastAndCapTest {
                 history,
                 new SanctionDurationLimit(perms),
                 broadcast,
+                SanctionSync.NONE,
                 AddressStrictness.NORMAL,
                 clock);
     }
@@ -283,12 +289,14 @@ class SilentBroadcastAndCapTest {
                 history,
                 new SanctionDurationLimit(perms),
                 broadcast,
+                SanctionSync.NONE,
                 clock);
     }
 
     private IssueWarn issueWarn(WarnEscalation ladder) {
         SanctionDurationLimit limit = new SanctionDurationLimit(ModerationFakes.exempt());
-        Mute mute = new Mute(repository, guard, notifier, audit, events, history, limit, broadcast, clock);
+        Mute mute = new Mute(
+                repository, guard, notifier, audit, events, history, limit, broadcast, SanctionSync.NONE, clock);
         TempBan tempBan = new TempBan(
                 repository,
                 new FakeSanctions(TARGET),
@@ -299,6 +307,7 @@ class SilentBroadcastAndCapTest {
                 history,
                 limit,
                 broadcast,
+                SanctionSync.NONE,
                 clock);
         Ban ban = new Ban(
                 repository,
@@ -310,6 +319,7 @@ class SilentBroadcastAndCapTest {
                 history,
                 limit,
                 broadcast,
+                SanctionSync.NONE,
                 AddressStrictness.NORMAL,
                 clock);
         Kick kick = new Kick(new FakeSanctions(TARGET), guard, notifier, audit, history, broadcast);

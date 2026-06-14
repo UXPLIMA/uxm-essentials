@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.moderation.application.CheckMute;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
 import com.uxplima.uxmessentials.moderation.application.CommandSpy;
 import com.uxplima.uxmessentials.moderation.application.DelJail;
+import com.uxplima.uxmessentials.moderation.application.EnforceRemoteBan;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
@@ -71,10 +72,13 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -107,12 +111,24 @@ public final class ModerationWiring {
 
     private ModerationWiring() {}
 
-    /** Build the moderation adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the gate sinks. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, GateSinks gates) {
+    /**
+     * Build the moderation adapters and use cases from {@code ctx}, the {@code persistence} DSL, the gate sinks
+     * and the cross-server {@code bus}.
+     *
+     * <p>Cross-server live enforcement rides the {@link Bus} handle: a successful {@code /ban}/{@code /tempban}
+     * publishes a {@code BanChanged} (and {@code /mute} a {@code MuteChanged}) through the
+     * {@link SanctionSync} bound to the bus publisher, and the wiring registers a {@link ModerationSync}
+     * listener that kicks a player a peer just banned if they are online here. The durable enforcement is free
+     * already (shared DB re-read on every login); this only closes the live gap. With the bus disabled the
+     * publisher is {@link SanctionSync#NONE} and the listener is never invoked, so the single-server path is
+     * unchanged.
+     */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, GateSinks gates, Bus bus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(gates, "gates");
+        Objects.requireNonNull(bus, "bus");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
@@ -124,6 +140,7 @@ public final class ModerationWiring {
                 new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings, jailLocations);
         ModerationGuard guard = new ModerationGuard(kernel.permissions());
         InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
+        SanctionSync sync = ModerationSync.publisher(bus.publisher());
         ModerationServices services = assemble(
                 plugin,
                 kernel,
@@ -135,7 +152,18 @@ public final class ModerationWiring {
                 sanctions,
                 guard,
                 commandSpyStore,
+                sync,
                 clock);
+        // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
+        // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
+        // already kicked) never double-kicks; with the bus disabled this listener is never invoked.
+        EnforceRemoteBan enforce = new EnforceRemoteBan(
+                repository,
+                kernel.playerLookup(),
+                sanctions,
+                new ModerationNotifier(kernel.messages(), kernel.messageSink()),
+                clock);
+        bus.registry().register(ModerationSync.listener(enforce::onRemoteBan));
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
@@ -166,6 +194,7 @@ public final class ModerationWiring {
             BukkitSanctions sanctions,
             ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
+            SanctionSync sync,
             Clock clock) {
         ModerationNotifier notifier = new ModerationNotifier(kernel.messages(), kernel.messageSink());
         ModerationAudit audit = new LoggingModerationAudit(auditLogger());
@@ -182,9 +211,20 @@ public final class ModerationWiring {
         SanctionDurationLimit limit = new SanctionDurationLimit(kernel.permissions());
         // The escalated sanctions a warning auto-applies run through their own use cases, never back through a
         // warn, so escalation cannot recurse; they are built first so the escalator can drive them.
-        Mute mute = new Mute(repository, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
+        Mute mute =
+                new Mute(repository, guard, notifier, audit, kernel.events(), history, limit, broadcast, sync, clock);
         TempBan tempBan = new TempBan(
-                repository, sanctionPort, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
+                repository,
+                sanctionPort,
+                guard,
+                notifier,
+                audit,
+                kernel.events(),
+                history,
+                limit,
+                broadcast,
+                sync,
+                clock);
         Ban ban = new Ban(
                 repository,
                 sanctionPort,
@@ -195,6 +235,7 @@ public final class ModerationWiring {
                 history,
                 limit,
                 broadcast,
+                sync,
                 settings.addressStrictness(),
                 clock);
         Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast);

@@ -10,6 +10,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -43,6 +44,7 @@ public final class TempBan {
     private final SanctionHistoryRecorder history;
     private final SanctionDurationLimit limit;
     private final SanctionBroadcast broadcast;
+    private final SanctionSync sync;
     private final Clock clock;
 
     public TempBan(
@@ -55,6 +57,7 @@ public final class TempBan {
             SanctionHistoryRecorder history,
             SanctionDurationLimit limit,
             SanctionBroadcast broadcast,
+            SanctionSync sync,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
@@ -65,6 +68,7 @@ public final class TempBan {
         this.history = Objects.requireNonNull(history, "history");
         this.limit = Objects.requireNonNull(limit, "limit");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
+        this.sync = Objects.requireNonNull(sync, "sync");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -97,6 +101,8 @@ public final class TempBan {
         repository.saveTempban(target, ban);
         history.ban(actor, target, reason, Optional.of(now.plus(span)));
         kickNow(target, span, reason);
+        // The local kick removed the target here; this wakes peers that have them online (a no-op with no bus).
+        sync.banChanged(target);
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, SanctionDuration.format(span), true, reason);
         if (capped) {

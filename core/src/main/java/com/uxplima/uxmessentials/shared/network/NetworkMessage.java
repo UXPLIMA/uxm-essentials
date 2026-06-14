@@ -19,7 +19,15 @@ package com.uxplima.uxmessentials.shared.network;
  * carries a full aggregate to be written blindly — that would race the DB and risk a lost update.
  */
 public sealed interface NetworkMessage
-        permits BalanceChanged, HomeChanged, WarpChanged, VaultChanged, ServerPing, VotePartyFired, VoteCounterChanged {
+        permits BalanceChanged,
+                HomeChanged,
+                WarpChanged,
+                VaultChanged,
+                BanChanged,
+                MuteChanged,
+                ServerPing,
+                VotePartyFired,
+                VoteCounterChanged {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -39,7 +47,9 @@ public sealed interface NetworkMessage
         VAULT_CHANGED(4),
         SERVER_PING(5),
         VOTE_PARTY_FIRED(6),
-        VOTE_COUNTER_CHANGED(7);
+        VOTE_COUNTER_CHANGED(7),
+        BAN_CHANGED(8),
+        MUTE_CHANGED(9);
 
         private final byte wireTag;
 

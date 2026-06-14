@@ -10,6 +10,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
@@ -41,6 +42,7 @@ public final class Mute {
     private final SanctionHistoryRecorder history;
     private final SanctionDurationLimit limit;
     private final SanctionBroadcast broadcast;
+    private final SanctionSync sync;
     private final Clock clock;
 
     public Mute(
@@ -52,6 +54,7 @@ public final class Mute {
             SanctionHistoryRecorder history,
             SanctionDurationLimit limit,
             SanctionBroadcast broadcast,
+            SanctionSync sync,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.guard = Objects.requireNonNull(guard, "guard");
@@ -61,6 +64,7 @@ public final class Mute {
         this.history = Objects.requireNonNull(history, "history");
         this.limit = Objects.requireNonNull(limit, "limit");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
+        this.sync = Objects.requireNonNull(sync, "sync");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -100,6 +104,9 @@ public final class Mute {
         Optional<Duration> effective = timed ? Optional.of(span) : Optional.empty();
         history.mute(actor, target, reason, effective.map(now::plus));
         notifyTarget(target, effective, reason);
+        // A peer re-reads the mute from the shared DB on the next chat attempt; this frame is published so a
+        // future mute-caching peer has an invalidation hook (a no-op today and with no bus).
+        sync.muteChanged(target);
         events.publish(new PlayerMuted(target, mute, now));
         audit.muted(actor, target, effective.map(SanctionDuration::format), true, reason);
         if (capped) {

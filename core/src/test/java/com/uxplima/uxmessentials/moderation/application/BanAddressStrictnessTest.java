@@ -40,6 +40,7 @@ class BanAddressStrictnessTest {
                 new SanctionHistoryRecorder(new FakeSanctionHistory(), Clock.fixed(NOW, ZoneOffset.UTC)),
                 new SanctionDurationLimit(ModerationFakes.exempt()),
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 strictness,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }

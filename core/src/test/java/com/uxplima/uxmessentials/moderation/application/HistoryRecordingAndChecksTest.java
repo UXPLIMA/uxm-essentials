@@ -242,7 +242,17 @@ class HistoryRecordingAndChecksTest {
 
     private WarnEscalator escalator(WarnEscalation ladder) {
         SanctionDurationLimit limit = new SanctionDurationLimit(ModerationFakes.exempt());
-        Mute mute = new Mute(repository, guard, notifier, audit, events, recorder, limit, broadcast, clock);
+        Mute mute = new Mute(
+                repository,
+                guard,
+                notifier,
+                audit,
+                events,
+                recorder,
+                limit,
+                broadcast,
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
+                clock);
         TempBan tempBan = new TempBan(
                 repository,
                 new FakeSanctions(TARGET),
@@ -253,6 +263,7 @@ class HistoryRecordingAndChecksTest {
                 recorder,
                 limit,
                 broadcast,
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 clock);
         Ban ban = new Ban(
                 repository,
@@ -264,6 +275,7 @@ class HistoryRecordingAndChecksTest {
                 recorder,
                 limit,
                 broadcast,
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
                 clock);
         Kick kick = new Kick(new FakeSanctions(TARGET), guard, notifier, audit, recorder, broadcast);

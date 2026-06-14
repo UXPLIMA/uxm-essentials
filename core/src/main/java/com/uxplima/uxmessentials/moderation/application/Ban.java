@@ -11,6 +11,7 @@ import java.util.Set;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
@@ -61,6 +62,7 @@ public final class Ban {
     private final SanctionHistoryRecorder history;
     private final SanctionDurationLimit limit;
     private final SanctionBroadcast broadcast;
+    private final SanctionSync sync;
     private final AddressStrictness strictness;
     private final Clock clock;
 
@@ -74,6 +76,7 @@ public final class Ban {
             SanctionHistoryRecorder history,
             SanctionDurationLimit limit,
             SanctionBroadcast broadcast,
+            SanctionSync sync,
             AddressStrictness strictness,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -85,6 +88,7 @@ public final class Ban {
         this.history = Objects.requireNonNull(history, "history");
         this.limit = Objects.requireNonNull(limit, "limit");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
+        this.sync = Objects.requireNonNull(sync, "sync");
         this.strictness = Objects.requireNonNull(strictness, "strictness");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -122,6 +126,9 @@ public final class Ban {
             notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, capLabel(effective));
         }
         fanOutToIps(actor, target, reason, now);
+        // The local kick above already removed the target here; this wakes peers that have them online so the
+        // ban takes live effect cluster-wide rather than only on each peer's next login (a no-op with no bus).
+        sync.banChanged(target);
         if (!silent) {
             broadcast.announce(broadcastKey(capped), broadcastPlaceholders(actor, target, reason, capped, effective));
         }

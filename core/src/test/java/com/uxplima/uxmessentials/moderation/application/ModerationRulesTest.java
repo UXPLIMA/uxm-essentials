@@ -118,6 +118,7 @@ class ModerationRulesTest {
                 history,
                 new SanctionDurationLimit(ModerationFakes.exempt()),
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 clock);
 
         assertThat(tempBan.tempban(ADMIN, TARGET, "", Optional.empty(), false).errorOrThrow())
@@ -214,6 +215,7 @@ class ModerationRulesTest {
                 history,
                 new SanctionDurationLimit(ModerationFakes.exempt()),
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 clock);
     }
 
@@ -256,6 +258,7 @@ class ModerationRulesTest {
                 history,
                 limit,
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 clock);
         Ban ban = new Ban(
                 repository,
@@ -267,6 +270,7 @@ class ModerationRulesTest {
                 history,
                 limit,
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
                 clock);
         Kick kick = new Kick(

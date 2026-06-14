@@ -80,6 +80,8 @@ public final class NetworkMessageCodec {
                 writeUuid(out, vault.owner());
                 out.writeInt(vault.vaultIndex());
             }
+            case BanChanged ban -> writeUuid(out, ban.target());
+            case MuteChanged mute -> writeUuid(out, mute.target());
             case ServerPing ping -> out.writeLong(ping.epochMillis());
             case VotePartyFired party -> out.writeInt(party.threshold());
             case VoteCounterChanged counter -> {
@@ -95,6 +97,8 @@ public final class NetworkMessageCodec {
             case HOME_CHANGED -> new HomeChanged(origin, readUuid(in));
             case WARP_CHANGED -> new WarpChanged(origin, in.readUTF());
             case VAULT_CHANGED -> new VaultChanged(origin, readUuid(in), in.readInt());
+            case BAN_CHANGED -> new BanChanged(origin, readUuid(in));
+            case MUTE_CHANGED -> new MuteChanged(origin, readUuid(in));
             case SERVER_PING -> new ServerPing(origin, in.readLong());
             case VOTE_PARTY_FIRED -> new VotePartyFired(origin, in.readInt());
             case VOTE_COUNTER_CHANGED -> new VoteCounterChanged(origin);

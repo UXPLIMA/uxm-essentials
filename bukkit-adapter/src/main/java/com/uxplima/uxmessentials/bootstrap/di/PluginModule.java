@@ -322,7 +322,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
-            wireModeration(plugin, ctx, persistence, resources, links);
+            wireModeration(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources, guiLayouts);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
@@ -491,14 +491,17 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            Bus bus) {
         // moderation builds its jOOQ ModerationRepository over persistence.dsl(), the audit logger on the
         // dedicated audit channel, and the login/join/freeze listeners. It rebinds the messaging mute gate and
         // the teleport jail gate captured during their wiring to the real policies — when either context is
-        // disabled its holder is absent, so the bind is a no-op and that gate stays NEVER.
+        // disabled its holder is absent, so the bind is a no-op and that gate stays NEVER. It opts into
+        // cross-server live enforcement through the bus handle: a ban on a peer kicks the player here if they
+        // are online (the durable ban is already enforced on every backend's login regardless of the bus).
         ModerationWiring.GateSinks gates =
                 new ModerationWiring.GateSinks(policy -> bindMute(links, policy), gate -> bindJail(links, gate));
-        ModerationWiring.Wired wired = ModerationWiring.wire(plugin, ctx, persistence, gates);
+        ModerationWiring.Wired wired = ModerationWiring.wire(plugin, ctx, persistence, gates, bus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

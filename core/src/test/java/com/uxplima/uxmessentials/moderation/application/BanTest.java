@@ -51,6 +51,7 @@ class BanTest {
                 new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 new SanctionDurationLimit(ModerationFakes.exempt()),
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
@@ -88,6 +89,7 @@ class BanTest {
                 new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 new SanctionDurationLimit(ModerationFakes.exempt()),
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
