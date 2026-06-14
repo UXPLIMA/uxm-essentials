@@ -16,8 +16,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The nametags bounded context as a first-class {@link FeatureModule}: a per-player, above-head nametag rendered
  * from operator-authored MiniMessage content under {@code modules/nametags/config.conf} through the placeholder
- * pipeline. The renderer spawns a viewer-restricted {@code TextDisplay} hologram per wearer and follows them; that
- * Bukkit-facing machinery lands with the adapter wiring.
+ * pipeline. The renderer sends a per-viewer packet text-display stack riding each wearer; that Bukkit-facing
+ * machinery lands with the adapter wiring.
  *
  * <p><b>Ships disabled by default.</b> The nametag lines are operator data, so out of the box this context shows
  * nothing — an operator authors the formats and then flips {@code modules.nametags.enabled = true}. The
@@ -80,9 +80,9 @@ public final class NametagsModule implements FeatureModule {
     @Override
     public void start(ModuleContext ctx) {
         this.running = true;
-        // The render timer on the Scheduler port, the connection listener, and the renderer over uxmLib's hologram
-        // stack are constructed over ctx.kernel() in the adapter wiring; the lifecycle bookkeeping (running flag,
-        // in-flight counter) is armed here so stop() is already honest.
+        // The reconcile timer on the Scheduler port, the connection listener, and the presenter over uxmLib's packet
+        // nametag renderer are constructed over ctx.kernel() in the adapter wiring; the lifecycle bookkeeping (running
+        // flag, in-flight counter) is armed here so stop() is already honest.
     }
 
     @Override

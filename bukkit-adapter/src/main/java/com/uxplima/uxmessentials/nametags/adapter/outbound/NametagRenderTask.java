@@ -14,45 +14,48 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The per-wearer nametag render loop: a self-rescheduling task on the {@link Scheduler} port (docs/02-concurrency.md
- * §6.10 self-rescheduling-loop pattern, matching the tablist and scoreboard render timers). Each tick scans the live
- * online set off the tick thread and, for each player, hops to that player's region/entity thread before touching the
- * live {@code Player} or its display entity through the {@link NametagRenderer} — no Bukkit entity is touched on the
- * async loop itself.
+ * The nametags reconcile-and-animate timer: a self-rescheduling task on the {@link Scheduler} port
+ * (docs/02-concurrency.md §6.10 self-rescheduling-loop pattern, matching the tablist and scoreboard render timers).
+ * With the packet renderer owning each wearer's per-viewer text/viewer/line-of-sight refresh (one {@code entityTimer}
+ * per wearer inside uxmLib), this task no longer renders. It does the two things the lib loop cannot:
  *
- * <p>Re-selecting the format every tick is what makes a permission, world, gamemode, sneak, or vanish change take
- * effect: {@link NametagRenderer#update} re-selects and respawns when the selected format (or its appearance) changed,
- * recomputes the animated text otherwise, and refreshes the eligible viewer set. The interval is read fresh each
- * reschedule, so a reload that swaps a new cadence in changes the refresh rate on the next tick. The task observes the
- * module's {@code running} flag and exits cleanly on disable.
+ * <ul>
+ *   <li><strong>Format selection.</strong> A permission, world, gamemode, sneak, or show-when change re-selects the
+ *       wearer's format. Each tick this hops to every online player's entity thread and calls
+ *       {@link PacketNametagPresenter#update}, which re-selects and (when the selected format or its appearance changed)
+ *       removes-then-re-shows, or removes the nametag when no format applies any more.</li>
+ *   <li><strong>The global animation clock.</strong> The animation clock is global, not per-wearer: this loop calls
+ *       {@link AnimationRegistry#advance()} exactly once per tick on the loop thread — stepping every named animation to
+ *       the tick's frame — so an animation advances at most once per tick no matter how many wearers are online, and the
+ *       lib's per-wearer text callbacks then read the same current frame.</li>
+ * </ul>
  *
- * <p>The animation clock is global, not per-player: this loop calls {@link AnimationRegistry#advance()} exactly once
- * per tick on the loop thread — stepping every named animation to the tick's frame — before the per-player fan-out, so
- * an animation advances at most once per tick no matter how many wearers are online (mirrors the other HUD timers).
+ * <p>The interval is read fresh each reschedule, so a reload that swaps a new cadence in changes the reconcile rate on
+ * the next tick. The task observes the module's {@code running} flag and exits cleanly on disable.
  */
 @NullMarked
 public final class NametagRenderTask {
 
     private final Scheduler scheduler;
-    private final NametagRenderer renderer;
+    private final PacketNametagPresenter presenter;
     private final AnimationRegistry animations;
     private final Supplier<Duration> interval;
     private final BooleanSupplier running;
 
     public NametagRenderTask(
             Scheduler scheduler,
-            NametagRenderer renderer,
+            PacketNametagPresenter presenter,
             AnimationRegistry animations,
             Supplier<Duration> interval,
             BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.renderer = Objects.requireNonNull(renderer, "renderer");
+        this.presenter = Objects.requireNonNull(presenter, "presenter");
         this.animations = Objects.requireNonNull(animations, "animations");
         this.interval = Objects.requireNonNull(interval, "interval");
         this.running = Objects.requireNonNull(running, "running");
     }
 
-    /** Arm the first render tick; subsequent ticks reschedule themselves until the module stops. */
+    /** Arm the first reconcile tick; subsequent ticks reschedule themselves until the module stops. */
     public void start() {
         scheduleNext();
     }
@@ -68,12 +71,11 @@ public final class NametagRenderTask {
         if (!running.getAsBoolean()) {
             return;
         }
-        // Advance the global animation clock once, on this loop thread, before fanning out so every per-wearer render
-        // below reads the same frame for this tick.
+        // Advance the global animation clock once, on this loop thread, before fanning out so every per-wearer text
+        // callback the lib invokes this period reads the same frame.
         animations.advance();
-        long frame = animations.tick();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            scheduler.onEntity(BukkitRefs.toRef(player), () -> renderer.update(player, frame));
+            scheduler.onEntity(BukkitRefs.toRef(player), () -> presenter.update(player));
         }
         scheduleNext();
     }

@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.nametags.adapter;
 
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -12,39 +11,40 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.nametags.adapter.inbound.listener.NametagLifecycleListener;
 import com.uxplima.uxmessentials.nametags.adapter.outbound.CanSeeNametagVanish;
 import com.uxplima.uxmessentials.nametags.adapter.outbound.NametagRenderTask;
-import com.uxplima.uxmessentials.nametags.adapter.outbound.NametagRenderer;
+import com.uxplima.uxmessentials.nametags.adapter.outbound.PacketNametagPresenter;
 import com.uxplima.uxmessentials.nametags.application.port.NametagVanish;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
-import com.uxplima.uxmlib.hologram.HologramManager;
-import com.uxplima.uxmlib.hologram.follow.HologramFollow;
+import com.uxplima.uxmlib.nametag.NametagPackets;
+import com.uxplima.uxmlib.nametag.NametagRenderer;
+import com.uxplima.uxmlib.nametag.internal.NmsNametagPackets;
+import com.uxplima.uxmlib.npc.ChannelResolver;
+import com.uxplima.uxmlib.npc.PacketSender;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Constructs the nametags context's adapters over the injected kernel ports and the operator content under
  * {@code modules/nametags/config.conf}, and produces everything the plugin must register: the join/quit/world-change
- * lifecycle listener and the self-rescheduling render timer on the {@code Scheduler} port. This is the one place the
- * nametags context is wired.
+ * lifecycle listener and the self-rescheduling reconcile/animation timer on the {@code Scheduler} port. This is the one
+ * place the nametags context is wired.
  *
  * <p>The nametag is always-on for every eligible wearer when enabled — there is no per-player visibility toggle, so
- * the context publishes no command. It persists nothing: the formats are config-authored. The renderer spawns a
- * viewer-restricted {@code TextDisplay} per wearer over uxmLib's {@link HologramManager}; the {@link HologramFollow}
- * that keeps each nametag above the head needs uxmLib's own Folia-aware {@code Scheduler}, obtained as a
- * {@link PaperScheduler} over the plugin exactly as the integration-wiring obtains it for the update notifier (the
- * kernel {@code Scheduler} port drives the render timer and every display mutation hop). The render timer is stopped
- * and every spawned nametag despawned on disable so a disable or reload tears down cleanly with no orphan entity.
+ * the context publishes no command. It persists nothing: the formats are config-authored. Rendering goes through
+ * uxmLib's packet {@link NametagRenderer}: a {@link ChannelResolver} → {@link PacketSender} → {@link NmsNametagPackets}
+ * stack sends per-viewer spawn/metadata/remove bundles, and the lib owns a per-wearer refresh task (an entity timer)
+ * that re-resolves text, diffs the viewer set, and applies line-of-sight fading. That lib task needs uxmLib's own
+ * Folia-aware {@code Scheduler}, obtained as a {@link PaperScheduler} over the plugin exactly as the integration-wiring
+ * obtains it elsewhere (the kernel {@code Scheduler} port drives the reconcile timer and the entity-thread hops). The
+ * reconcile timer is stopped and every shown nametag removed on disable so a disable or reload tears down cleanly with
+ * no orphan nametag.
  */
 @NullMarked
 public final class NametagsWiring {
 
     private static final String MODULE_DIR = "modules/nametags";
-
-    // The follow task interpolation cadence: how often the nametag re-homes above the wearer's head. One tick keeps it
-    // glued to fast movement; this is the uxmLib follow period, independent of the content render cadence.
-    private static final Duration FOLLOW_PERIOD = Duration.ofMillis(50L);
 
     private NametagsWiring() {}
 
@@ -58,60 +58,66 @@ public final class NametagsWiring {
         AtomicBoolean running = new AtomicBoolean(true);
 
         // The animation registry holds the stateful uxmLib animators, so it is built once from the load-time catalog,
-        // shared by the renderer (which reads frames) and the render task (which advances the clock once a tick).
+        // shared by the presenter (whose per-viewer text callback reads frames) and the reconcile task (which advances
+        // the global clock once a tick).
         AnimationRegistry animations = new AnimationRegistry(settings.animations());
-        HologramManager manager = new HologramManager();
-        manager.installLifecycleListener(plugin);
-        HologramFollow follow = new HologramFollow(new PaperScheduler(plugin));
+
+        // The packet stack: the channel resolver finds each viewer's Netty channel, the sender writes bundles to it,
+        // and the NMS port builds the spawn/metadata/remove packets the lib renderer sends. The lib renderer owns the
+        // per-wearer refresh loop on uxmLib's own Folia-aware scheduler, the same PaperScheduler the other contexts
+        // use.
+        NametagPackets packets = new NmsNametagPackets(new PacketSender(new ChannelResolver()));
+        NametagRenderer libRenderer = new NametagRenderer(packets, new PaperScheduler(plugin));
+
         // Vanish is soft-coupled through Bukkit's canSee graph; it degrades to "everyone can see everyone" when the
         // presence module is off, so no nametag-side branch is needed for the presence-disabled case.
         NametagVanish vanish = new CanSeeNametagVanish();
-        NametagRenderer renderer = new NametagRenderer(
-                plugin, settings::formats, manager, follow, kernel.scheduler(), animations, vanish, FOLLOW_PERIOD);
+        PacketNametagPresenter presenter =
+                new PacketNametagPresenter(settings::formats, libRenderer, animations, vanish);
         NametagRenderTask renderTask = new NametagRenderTask(
-                kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
+                kernel.scheduler(), presenter, animations, settings::refreshInterval, running::get);
 
         List<CommandRegistration> commands = List.of();
-        List<Listener> listeners = List.of(new NametagLifecycleListener(renderer, kernel.scheduler(), animations));
-        return new Wired(commands, listeners, renderer, renderTask, running);
+        List<Listener> listeners = List.of(new NametagLifecycleListener(presenter, kernel.scheduler()));
+        return new Wired(commands, listeners, presenter, renderTask, running);
     }
 
     /**
-     * Everything the nametags module contributes once wired: the connection listener, the self-rescheduling render
-     * timer, and the {@code running} flag the timer observes. The renderer is held so {@link #stop()} can despawn
-     * every spawned nametag. The command list is always empty — the nametag has no per-player toggle — but it is kept
-     * to mirror the other contexts' {@code Wired} shape so the bootstrap wires every context the same way.
+     * Everything the nametags module contributes once wired: the connection listener, the self-rescheduling reconcile
+     * timer, and the {@code running} flag the timer observes. The presenter is held so {@link #stop()} can remove every
+     * shown nametag. The command list is always empty — the nametag has no per-player toggle — but it is kept to mirror
+     * the other contexts' {@code Wired} shape so the bootstrap wires every context the same way.
      *
      * @param commands the Brigadier command registrations to publish (always empty for nametags)
      * @param listeners the join/quit/world-change listener to register
-     * @param renderer the per-wearer renderer, used to despawn every nametag on stop
-     * @param renderTask the self-rescheduling render timer, armed by the caller
-     * @param running the flag flipped false on stop so the render timer exits
+     * @param presenter the per-wearer presenter, used to remove every nametag on stop
+     * @param renderTask the self-rescheduling reconcile timer, armed by the caller
+     * @param running the flag flipped false on stop so the reconcile timer exits
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
-            NametagRenderer renderer,
+            PacketNametagPresenter presenter,
             NametagRenderTask renderTask,
             AtomicBoolean running) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
-            Objects.requireNonNull(renderer, "renderer");
+            Objects.requireNonNull(presenter, "presenter");
             Objects.requireNonNull(renderTask, "renderTask");
             Objects.requireNonNull(running, "running");
         }
 
-        /** Arm the render timer. */
+        /** Arm the reconcile timer. */
         public void startBackgroundWork() {
             renderTask.start();
         }
 
-        /** Stop the render timer and despawn every spawned nametag so a disable/reload leaves no orphan entity. */
+        /** Stop the reconcile timer and remove every shown nametag so a disable/reload leaves no orphan. */
         public void stop() {
             running.set(false);
-            renderer.despawnAll();
+            presenter.removeAll();
         }
     }
 }

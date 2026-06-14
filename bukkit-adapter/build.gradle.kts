@@ -61,6 +61,15 @@ dependencies {
     implementation("com.uxplima.uxmlib:uxmlib-integration:0.1.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")
     }
+    // uxmLib packet-nametag toolkit (dogfood) — the per-viewer packet renderer the nametags context draws on. It is a
+    // Mojang-mapped NMS module (rides along Mojang-mapped in the shaded jar, like the offline-inventory adapter), and
+    // it sends through uxmlib-npc's channel sender.
+    implementation("com.uxplima.uxmlib:uxmlib-nametags:0.1.0-SNAPSHOT") {
+        exclude(group = "org.spongepowered")
+    }
+    implementation("com.uxplima.uxmlib:uxmlib-npc:0.1.0-SNAPSHOT") {
+        exclude(group = "org.spongepowered")
+    }
     // uxmLib update toolkit (dogfood) — the opt-in release update-checker. Pulls uxmlib-common only.
     implementation("com.uxplima.uxmlib:uxmlib-update:0.1.0-SNAPSHOT") {
         exclude(group = "org.spongepowered")

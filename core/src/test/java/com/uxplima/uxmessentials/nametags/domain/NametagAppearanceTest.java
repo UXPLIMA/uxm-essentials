@@ -25,6 +25,8 @@ class NametagAppearanceTest {
         assertThat(defaults.viewRange()).isEmpty();
         assertThat(defaults.scale()).isEqualTo(1.0);
         assertThat(defaults.yOffset()).isEqualTo(0.3);
+        assertThat(defaults.hideThroughBlocks()).isFalse();
+        assertThat(defaults.obscuredOpacity()).isEmpty();
     }
 
     @Test
@@ -39,7 +41,9 @@ class NametagAppearanceTest {
                 OptionalInt.of(200),
                 OptionalDouble.of(48.0),
                 1.5,
-                0.5);
+                0.5,
+                true,
+                OptionalInt.of(32));
 
         assertThat(appearance.billboard()).isEqualTo("FIXED");
         assertThat(appearance.seeThrough()).isTrue();
@@ -51,6 +55,8 @@ class NametagAppearanceTest {
         assertThat(appearance.viewRange()).hasValue(48.0);
         assertThat(appearance.scale()).isEqualTo(1.5);
         assertThat(appearance.yOffset()).isEqualTo(0.5);
+        assertThat(appearance.hideThroughBlocks()).isTrue();
+        assertThat(appearance.obscuredOpacity()).hasValue(32);
     }
 
     @Test
@@ -72,6 +78,12 @@ class NametagAppearanceTest {
     }
 
     @Test
+    void rejectsObscuredOpacityOutsideZeroToTwoFiftyFive() {
+        assertThatThrownBy(() -> appearanceWithObscuredOpacity(-1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> appearanceWithObscuredOpacity(256)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void rejectsANonFiniteYOffset() {
         assertThatThrownBy(() -> appearanceWithYOffset(Double.NaN)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> appearanceWithYOffset(Double.POSITIVE_INFINITY))
@@ -89,7 +101,9 @@ class NametagAppearanceTest {
                 OptionalInt.empty(),
                 OptionalDouble.empty(),
                 scale,
-                0.3);
+                0.3,
+                false,
+                OptionalInt.empty());
     }
 
     private static NametagAppearance appearanceWithOpacity(int opacity) {
@@ -103,7 +117,25 @@ class NametagAppearanceTest {
                 OptionalInt.empty(),
                 OptionalDouble.empty(),
                 1.0,
-                0.3);
+                0.3,
+                false,
+                OptionalInt.empty());
+    }
+
+    private static NametagAppearance appearanceWithObscuredOpacity(int opacity) {
+        return new NametagAppearance(
+                "CENTER",
+                false,
+                Optional.empty(),
+                OptionalInt.empty(),
+                false,
+                Optional.empty(),
+                OptionalInt.empty(),
+                OptionalDouble.empty(),
+                1.0,
+                0.3,
+                true,
+                OptionalInt.of(opacity));
     }
 
     private static NametagAppearance appearanceWithYOffset(double yOffset) {
@@ -117,6 +149,8 @@ class NametagAppearanceTest {
                 OptionalInt.empty(),
                 OptionalDouble.empty(),
                 1.0,
-                yOffset);
+                yOffset,
+                false,
+                OptionalInt.empty());
     }
 }

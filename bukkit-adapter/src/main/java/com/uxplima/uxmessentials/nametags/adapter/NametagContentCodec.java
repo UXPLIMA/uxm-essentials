@@ -146,7 +146,9 @@ final class NametagContentCodec {
                     optionalInt(node.node("line-width")),
                     optionalDouble(node.node("view-range")),
                     node.node("scale").getDouble(defaults.scale()),
-                    node.node("y-offset").getDouble(defaults.yOffset())));
+                    node.node("y-offset").getDouble(defaults.yOffset()),
+                    node.node("hide-through-blocks").getBoolean(defaults.hideThroughBlocks()),
+                    optionalInt(node.node("obscured-opacity"))));
         } catch (IllegalArgumentException invalid) {
             // A range/structural violation (e.g. scale <= 0, opacity out of 0..255) falls back to the safe default
             // appearance rather than failing the whole format; the format still renders with sane visuals.
