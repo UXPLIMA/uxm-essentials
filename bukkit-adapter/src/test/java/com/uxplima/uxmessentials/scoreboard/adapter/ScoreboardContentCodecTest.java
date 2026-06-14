@@ -6,13 +6,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationDef;
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,6 +26,8 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 class ScoreboardContentCodecTest {
+
+    private static final Logger LOG = new NoopLogger();
 
     private static ConditionContext ctx(Predicate<String> hasPermission, String world, String gamemode) {
         Function<String, String> resolve = s -> Map.<String, String>of().getOrDefault(s, s);
@@ -43,7 +50,7 @@ class ScoreboardContentCodecTest {
                 }
                 """);
 
-        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root);
+        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root, LOG);
 
         // 40 ticks at 50ms each is two seconds — the global cadence comes from scoreboard.refresh-ticks here.
         assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofSeconds(2L));
@@ -85,7 +92,7 @@ class ScoreboardContentCodecTest {
                 }
                 """);
 
-        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root);
+        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root, LOG);
 
         // The global cadence is the top-level refresh-ticks (10 ticks = 500ms).
         assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofMillis(500L));
@@ -105,7 +112,7 @@ class ScoreboardContentCodecTest {
 
     @Test
     void anEmptyRootYieldsNoBoards(@TempDir Path dir) throws Exception {
-        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(load(dir, "enabled = false\n"));
+        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(load(dir, "enabled = false\n"), LOG);
 
         assertThat(parsed.boards().boards()).isEmpty();
         assertThat(parsed.refreshInterval()).isPositive();
@@ -115,7 +122,7 @@ class ScoreboardContentCodecTest {
     void aBlankSingleBoardYieldsNoBoards(@TempDir Path dir) throws Exception {
         // The shipped inert default: a scoreboard block with no title and no lines authors nothing.
         ScoreboardContentCodec.Parsed parsed =
-                ScoreboardContentCodec.read(load(dir, "scoreboard {\n  title = \"\"\n  lines = []\n}\n"));
+                ScoreboardContentCodec.read(load(dir, "scoreboard {\n  title = \"\"\n  lines = []\n}\n"), LOG);
 
         assertThat(parsed.boards().boards()).isEmpty();
     }
@@ -130,7 +137,7 @@ class ScoreboardContentCodecTest {
         ConfigurationNode root =
                 load(dir, "scoreboard {\n  title = \"<gold>T\"\n  " + lines + "\n  refresh-ticks = 0\n}\n");
 
-        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root);
+        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root, LOG);
 
         SidebarBoard board = parsed.boards().boards().get(0);
         assertThat(board.content().lines()).hasSize(DisplayContent.MAX_LINES);
@@ -140,9 +147,85 @@ class ScoreboardContentCodecTest {
         assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofSeconds(1L));
     }
 
+    @Test
+    void parsesFramesAndScrollAnimationsAndSkipsAnUnknownType(@TempDir Path dir) throws Exception {
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(
+                dir,
+                """
+                enabled = true
+                animations {
+                  blink { type = "FRAMES", frames = [ "ON", "OFF" ], interval-ticks = 10 }
+                  marquee { type = "SCROLL", frames = [ "welcome to the server" ], interval-ticks = 2, window = 8, separator = " * " }
+                  bogus { type = "WOBBLE", frames = [ "x" ] }
+                }
+                scoreboard { title = "<gold>T", lines = [ "<gray>L" ] }
+                """);
+
+        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root, log);
+
+        // The two valid animations are parsed (sorted by HOCON's alphabetical key order); the unknown type is skipped.
+        assertThat(parsed.animations()).extracting(d -> d.spec().name()).containsExactlyInAnyOrder("blink", "marquee");
+        AnimationDef blink = byName(parsed.animations(), "blink");
+        assertThat(blink.spec().type()).isEqualTo(AnimationSpec.AnimationType.FRAMES);
+        assertThat(blink.spec().frames()).containsExactly("ON", "OFF");
+        assertThat(blink.spec().intervalTicks()).isEqualTo(10);
+        AnimationDef marquee = byName(parsed.animations(), "marquee");
+        assertThat(marquee.spec().type()).isEqualTo(AnimationSpec.AnimationType.SCROLL);
+        assertThat(marquee.scroll()).hasValueSatisfying(s -> {
+            assertThat(s.window()).isEqualTo(8);
+            assertThat(s.separator()).isEqualTo(" * ");
+        });
+        // The skip is logged once with the bad type and name so an operator can spot the typo.
+        assertThat(log.warnings).anyMatch(w -> w.contains("scoreboard_animation_skipped") && w.contains("bogus"));
+    }
+
+    private static AnimationDef byName(List<AnimationDef> defs, String name) {
+        return defs.stream()
+                .filter(d -> d.spec().name().equals(name))
+                .findFirst()
+                .orElseThrow();
+    }
+
     private static ConfigurationNode load(Path dir, String hocon) throws ConfigurateException, IOException {
         Path file = dir.resolve("config.conf");
         Files.writeString(file, hocon);
         return HoconConfigurationLoader.builder().path(file).build().load();
+    }
+
+    private static class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
+    /** A logger that captures formatted {@code warn} lines so a test can assert a skip was reported. */
+    private static final class RecordingLogger extends NoopLogger {
+        private final List<String> warnings = new ArrayList<>();
+
+        @Override
+        public void warn(String message, Object... args) {
+            warnings.add(format(message, args));
+        }
+
+        private static String format(String message, Object... args) {
+            String out = message;
+            for (Object arg : args) {
+                int at = out.indexOf("{}");
+                if (at < 0) {
+                    break;
+                }
+                out = out.substring(0, at) + arg + out.substring(at + 2);
+            }
+            return out;
+        }
     }
 }

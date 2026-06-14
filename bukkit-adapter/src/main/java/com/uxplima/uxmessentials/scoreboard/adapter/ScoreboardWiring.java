@@ -13,6 +13,7 @@ import org.bukkit.scoreboard.ScoreboardManager;
 
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.command.ScoreboardCommand;
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.listener.ScoreboardConnectionListener;
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationRegistry;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.PdcScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderTask;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
@@ -56,11 +57,15 @@ public final class ScoreboardWiring {
         AtomicBoolean running = new AtomicBoolean(true);
 
         ScoreboardVisibilityStore visibility = new PdcScoreboardVisibilityStore(plugin);
-        ScoreboardRenderer renderer = new ScoreboardRenderer(sidebarManager(), visibility, settings::boards);
+        // The animation registry holds the stateful uxmLib animators, so it is built once from the load-time catalog,
+        // shared by the renderer (which reads frames) and the render task (which advances the clock once a tick).
+        AnimationRegistry animations = new AnimationRegistry(settings.animations());
+        ScoreboardRenderer renderer =
+                new ScoreboardRenderer(sidebarManager(), visibility, settings::boards, animations);
         ScoreboardNotifier notifier = new ScoreboardNotifier(kernel.messages(), kernel.messageSink());
         ToggleScoreboard toggle = new ToggleScoreboard(visibility, notifier, kernel.events());
-        ScoreboardRenderTask renderTask =
-                new ScoreboardRenderTask(kernel.scheduler(), renderer, settings::refreshInterval, running::get);
+        ScoreboardRenderTask renderTask = new ScoreboardRenderTask(
+                kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
 
         List<CommandRegistration> commands =
                 List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages()));

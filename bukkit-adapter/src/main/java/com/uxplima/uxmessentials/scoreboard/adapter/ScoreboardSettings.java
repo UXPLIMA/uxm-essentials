@@ -3,9 +3,11 @@ package com.uxplima.uxmessentials.scoreboard.adapter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationDef;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
@@ -40,12 +42,21 @@ public final class ScoreboardSettings {
     public ScoreboardSettings(Path moduleDir, Logger log) {
         this.moduleDir = Objects.requireNonNull(moduleDir, "moduleDir");
         this.log = Objects.requireNonNull(log, "log");
-        this.parsed = new AtomicReference<>(ScoreboardContentCodec.read(load(moduleDir, log)));
+        this.parsed = new AtomicReference<>(ScoreboardContentCodec.read(load(moduleDir, log), log));
     }
 
     /** The live named-board set; read fresh by the renderer each tick to select a board per viewer. */
     public SidebarConfig boards() {
         return Objects.requireNonNull(parsed.get(), "parsed").boards();
+    }
+
+    /**
+     * The named animations parsed at load. These are read once at wiring time to build the
+     * {@link com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationRegistry} — the registry holds the stateful
+     * uxmLib animators, so it is not rebuilt on a content reload (the animation catalog is fixed for a session).
+     */
+    public List<AnimationDef> animations() {
+        return Objects.requireNonNull(parsed.get(), "parsed").animations();
     }
 
     /** The live global refresh interval the render timer re-reads each reschedule. */
@@ -55,7 +66,7 @@ public final class ScoreboardSettings {
 
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
-        parsed.set(ScoreboardContentCodec.read(load(moduleDir, log)));
+        parsed.set(ScoreboardContentCodec.read(load(moduleDir, log), log));
     }
 
     private static ConfigurationNode load(Path moduleDir, Logger log) {

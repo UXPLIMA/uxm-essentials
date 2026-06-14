@@ -6,14 +6,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
+import com.uxplima.uxmessentials.shared.display.AnimationSpec;
+import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.AfterEach;
@@ -118,9 +123,71 @@ class ScoreboardRendererTest {
         assertThat(sidebars.count()).isZero();
     }
 
+    @Test
+    void aConditionalLineIsHiddenWhenTheConditionFailsAndShownWhenItPasses() {
+        // The pure per-line condition filter: a line prefixed with "<condition> | " is kept only when the condition
+        // matches the viewer, and the condition prefix is stripped off the kept text.
+        List<String> sources =
+                List.of("<gray>Always", "permission:" + STAFF_NODE + " | <gold>Staff perks", "<gray>Also always");
+
+        List<String> forStaff = ScoreboardRenderer.visibleLines(sources, ctx(STAFF_NODE::equals));
+        List<String> forRegular = ScoreboardRenderer.visibleLines(sources, ctx(n -> false));
+
+        // The staff viewer keeps the gated line (with its condition prefix stripped); the regular viewer drops it.
+        assertThat(forStaff).containsExactly("<gray>Always", "<gold>Staff perks", "<gray>Also always");
+        assertThat(forRegular).containsExactly("<gray>Always", "<gray>Also always");
+    }
+
+    @Test
+    void onlyTheFirstSeparatorSplitsSoTextMayContainThePipe() {
+        // A line whose text legitimately holds " | " keeps everything after the first separator as the text.
+        List<String> sources = List.of("permission:" + STAFF_NODE + " | <gold>A | B");
+
+        assertThat(ScoreboardRenderer.visibleLines(sources, ctx(STAFF_NODE::equals)))
+                .containsExactly("<gold>A | B");
+    }
+
+    @Test
+    void anAnimationTokenInALineRendersTheCurrentFrame() {
+        PlayerMock player = server.addPlayer();
+        AnimationRegistry registry = new AnimationRegistry(List.of(AnimationDef.frames(
+                new AnimationSpec("blink", AnimationSpec.AnimationType.FRAMES, List.of("ON", "OFF"), 1))));
+        SidebarConfig config = single(new SidebarBoard(
+                "default",
+                new DisplayContent(
+                        Optional.of("<gold>T"),
+                        List.of("<gray>State: %anim_blink%"),
+                        false,
+                        Duration.ofSeconds(1L),
+                        Set.of()),
+                DisplayCondition.always(),
+                0));
+        ScoreboardRenderer renderer =
+                new ScoreboardRenderer(sidebars, alwaysShown(), new AtomicReference<>(config)::get, registry);
+
+        // tick 0 → frame index 0 ("ON"); advance once → frame index 1 ("OFF"). The rendered line carries the frame.
+        renderer.renderFor(player);
+        assertThat(lineText(player, 0)).isEqualTo("State: ON");
+        registry.advance();
+        renderer.renderFor(player);
+        assertThat(lineText(player, 0)).isEqualTo("State: OFF");
+    }
+
+    private String lineText(PlayerMock player, int index) {
+        com.uxplima.uxmlib.hud.scoreboard.Sidebar sidebar =
+                java.util.Objects.requireNonNull(sidebars.get(player.getUniqueId()), "sidebar");
+        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(sidebar.currentLines().get(index));
+    }
+
+    private static ConditionContext ctx(Predicate<String> hasPermission) {
+        Function<String, String> resolve = s -> Map.<String, String>of().getOrDefault(s, s);
+        return new ConditionContext(hasPermission, "world", "SURVIVAL", resolve);
+    }
+
     private ScoreboardRenderer renderer(SidebarConfig config) {
         AtomicReference<SidebarConfig> ref = new AtomicReference<>(config);
-        return new ScoreboardRenderer(sidebars, alwaysShown(), ref::get);
+        return new ScoreboardRenderer(sidebars, alwaysShown(), ref::get, new AnimationRegistry(List.of()));
     }
 
     private static SidebarConfig single(SidebarBoard board) {

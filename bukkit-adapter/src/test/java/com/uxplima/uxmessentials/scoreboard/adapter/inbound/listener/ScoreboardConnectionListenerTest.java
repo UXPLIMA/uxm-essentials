@@ -16,6 +16,7 @@ import org.bukkit.event.player.PlayerGameModeChangeEvent;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationRegistry;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
@@ -63,7 +64,7 @@ class ScoreboardConnectionListenerTest {
         WorldMock blacklisted = server.addSimpleWorld("world_blacklisted");
         // Start with nothing blacklisted so the board paints, then move into a world the live content blacklists.
         AtomicReference<SidebarConfig> live = new AtomicReference<>(config(Set.of()));
-        ScoreboardRenderer renderer = new ScoreboardRenderer(sidebars, alwaysShown(), live::get);
+        ScoreboardRenderer renderer = new ScoreboardRenderer(sidebars, alwaysShown(), live::get, noAnimations());
 
         renderer.renderFor(player);
         assertThat(sidebars.count()).isEqualTo(1);
@@ -90,7 +91,11 @@ class ScoreboardConnectionListenerTest {
 
     private ScoreboardRenderer renderer(Set<String> blacklist) {
         AtomicReference<SidebarConfig> ref = new AtomicReference<>(config(blacklist));
-        return new ScoreboardRenderer(sidebars, alwaysShown(), ref::get);
+        return new ScoreboardRenderer(sidebars, alwaysShown(), ref::get, noAnimations());
+    }
+
+    private static AnimationRegistry noAnimations() {
+        return new AnimationRegistry(List.of());
     }
 
     private static SidebarConfig config(Set<String> blacklist) {

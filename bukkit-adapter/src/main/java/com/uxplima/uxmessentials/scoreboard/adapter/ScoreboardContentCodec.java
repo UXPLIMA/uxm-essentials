@@ -5,17 +5,22 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationDef;
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.ConditionParser;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurationNode;
 
 /**
@@ -65,31 +70,36 @@ final class ScoreboardContentCodec {
     private ScoreboardContentCodec() {}
 
     /**
-     * The parsed scoreboard config: the named boards the renderer selects among, and the global render cadence the
-     * timer re-reads each reschedule.
+     * The parsed scoreboard config: the named boards the renderer selects among, the named animations the renderer
+     * expands {@code %anim_<name>%} tokens against, and the global render cadence the timer re-reads each reschedule.
      */
-    record Parsed(SidebarConfig boards, Duration refreshInterval) {
+    record Parsed(SidebarConfig boards, List<AnimationDef> animations, Duration refreshInterval) {
         Parsed {
             Objects.requireNonNull(boards, "boards");
+            animations = List.copyOf(Objects.requireNonNull(animations, "animations"));
             Objects.requireNonNull(refreshInterval, "refreshInterval");
         }
 
-        /** The do-nothing default an absent or unreadable config yields: no boards, refreshing once a second. */
+        /** The do-nothing default an absent or unreadable config yields: no boards, no animations, once a second. */
         static Parsed inert() {
-            return new Parsed(SidebarConfig.empty(), Duration.ofMillis(DEFAULT_REFRESH_TICKS * MILLIS_PER_TICK));
+            return new Parsed(
+                    SidebarConfig.empty(), List.of(), Duration.ofMillis(DEFAULT_REFRESH_TICKS * MILLIS_PER_TICK));
         }
     }
 
-    /** Parse {@code root}; an empty or virtual root yields {@link Parsed#inert()}. */
-    static Parsed read(ConfigurationNode root) {
+    /** Parse {@code root}; an empty or virtual root yields {@link Parsed#inert()}. {@code log} reports skipped entries. */
+    static Parsed read(ConfigurationNode root, Logger log) {
+        Objects.requireNonNull(log, "log");
         if (root.virtual() || root.empty()) {
             return Parsed.inert();
         }
+        List<AnimationDef> animations = readAnimations(root.node("animations"), log);
         ConfigurationNode boards = root.node("boards");
         if (!boards.virtual() && boards.isMap()) {
-            return new Parsed(readBoards(boards), refreshInterval(root.node("refresh-ticks")));
+            return new Parsed(readBoards(boards), animations, refreshInterval(root.node("refresh-ticks")));
         }
-        return readSingleBoard(root.node("scoreboard"));
+        Parsed single = readSingleBoard(root.node("scoreboard"));
+        return new Parsed(single.boards(), animations, single.refreshInterval());
     }
 
     private static SidebarConfig readBoards(ConfigurationNode boards) {
@@ -122,16 +132,17 @@ final class ScoreboardContentCodec {
 
     /**
      * Back-compat: wrap a top-level {@code scoreboard { … }} block as the single implicit {@code default} board with an
-     * always-true condition and priority {@code 0}. A blank block yields no boards.
+     * always-true condition and priority {@code 0}. A blank block yields no boards. Animations are read separately by
+     * {@link #read} and merged in there, so the returned {@code animations} list is always empty.
      */
     private static Parsed readSingleBoard(ConfigurationNode board) {
         Duration interval = refreshInterval(board.node("refresh-ticks"));
         DisplayContent content = displayContent(board);
         if (content.isBlank()) {
-            return new Parsed(SidebarConfig.empty(), interval);
+            return new Parsed(SidebarConfig.empty(), List.of(), interval);
         }
         SidebarBoard single = new SidebarBoard("default", content, DisplayCondition.always(), 0);
-        return new Parsed(new SidebarConfig(List.of(single)), interval);
+        return new Parsed(new SidebarConfig(List.of(single)), List.of(), interval);
     }
 
     private static DisplayContent displayContent(ConfigurationNode board) {
@@ -156,6 +167,81 @@ final class ScoreboardContentCodec {
             return lines;
         }
         return List.copyOf(lines.subList(0, DisplayContent.MAX_LINES));
+    }
+
+    /**
+     * Parse the {@code animations { <name> { type, frames, interval-ticks, … } }} block into {@link AnimationDef}s.
+     * Tolerant: an entry with an unknown {@code type}, no frames, or invalid params is skipped with a one-line warning
+     * rather than failing the whole parse, so a single bad animation never blanks the board. An absent block yields no
+     * animations.
+     */
+    private static List<AnimationDef> readAnimations(ConfigurationNode node, Logger log) {
+        if (node.virtual() || !node.isMap()) {
+            return List.of();
+        }
+        List<AnimationDef> defs = new ArrayList<>();
+        for (Map.Entry<Object, ? extends ConfigurationNode> entry :
+                node.childrenMap().entrySet()) {
+            String name = String.valueOf(entry.getKey());
+            readAnimation(name, entry.getValue(), log).ifPresent(defs::add);
+        }
+        return defs;
+    }
+
+    private static Optional<AnimationDef> readAnimation(String name, ConfigurationNode node, Logger log) {
+        if (node.virtual() || !node.isMap()) {
+            return Optional.empty();
+        }
+        AnimationSpec.AnimationType type = animationType(node.node("type"));
+        if (type == null) {
+            log.warn(
+                    "event=scoreboard_animation_skipped name={} reason=unknown_type type={}",
+                    name,
+                    node.node("type").getString(""));
+            return Optional.empty();
+        }
+        List<String> frames = strings(node.node("frames"));
+        int interval = animationInterval(node.node("interval-ticks"));
+        try {
+            AnimationSpec spec = new AnimationSpec(name, type, frames, interval);
+            return Optional.of(animationDef(spec, node));
+        } catch (IllegalArgumentException invalid) {
+            log.warn(
+                    "event=scoreboard_animation_skipped name={} reason={}", name, String.valueOf(invalid.getMessage()));
+            return Optional.empty();
+        }
+    }
+
+    private static AnimationDef animationDef(AnimationSpec spec, ConfigurationNode node) {
+        return switch (spec.type()) {
+            case FRAMES -> AnimationDef.frames(spec);
+            case SCROLL -> AnimationDef.scroll(
+                    spec,
+                    new AnimationDef.Scroll(
+                            node.node("window").getInt(16),
+                            node.node("separator").getString(" ")));
+            case GRADIENT -> AnimationDef.gradient(
+                    spec,
+                    new AnimationDef.Gradient(
+                            strings(node.node("colors")), node.node("steps").getInt(20)));
+        };
+    }
+
+    private static AnimationSpec.@Nullable AnimationType animationType(ConfigurationNode node) {
+        String raw = node.getString("");
+        if (raw.isBlank()) {
+            return null;
+        }
+        try {
+            return AnimationSpec.AnimationType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
+    }
+
+    private static int animationInterval(ConfigurationNode node) {
+        int interval = node.getInt(1);
+        return interval < 1 ? 1 : interval;
     }
 
     private static Set<String> worldBlacklist(ConfigurationNode node) {
