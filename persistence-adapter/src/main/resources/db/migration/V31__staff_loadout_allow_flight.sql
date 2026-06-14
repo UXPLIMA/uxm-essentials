@@ -1,0 +1,12 @@
+-- Add the captured pre-staff-mode flight allowance to staff_loadout. Granting a staff
+-- member flight while in staff mode must not silently strip it on exit (or on a crash-recovery
+-- restore): the player's real allowFlight is captured before entering and restored alongside
+-- the rest of their loadout, rather than always switching flight off.
+--
+-- Same portability contract as V29/V30: a SMALLINT (0/1) rather than a BOOLEAN so there is no
+-- dialect-specific boolean handling (matching the flying and vanished_before flags). NOT NULL
+-- with a DEFAULT 0 so the column adds cleanly to any rows left behind by a pre-V31 staff mode —
+-- an orphaned row from before this migration recovers as flight-not-allowed, the safe default.
+-- jOOQ's DDLDatabase parses this file alongside V1-V30 at build time, so the generated
+-- STAFF_LOADOUT class always matches the runtime schema.
+ALTER TABLE staff_loadout ADD COLUMN allow_flight SMALLINT NOT NULL DEFAULT 0;

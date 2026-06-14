@@ -57,6 +57,7 @@ class JooqStaffLoadoutRepositoryTest {
                 0.75f,
                 "CREATIVE",
                 true,
+                true,
                 LoadoutBlob.of(new byte[] {7, 8, 9, (byte) 250}),
                 true);
 
@@ -64,8 +65,9 @@ class JooqStaffLoadoutRepositoryTest {
 
         SavedLoadout loaded = repository.load(owner).orElseThrow();
         assertThat(loaded).isEqualTo(loadout);
-        // The pre-mode vanish flag survives the SMALLINT column round-trip.
+        // The pre-mode vanish and flight-allowance flags survive the SMALLINT column round-trip.
         assertThat(loaded.vanishedBefore()).isTrue();
+        assertThat(loaded.allowFlight()).isTrue();
     }
 
     @Test
@@ -79,6 +81,7 @@ class JooqStaffLoadoutRepositoryTest {
                 0f,
                 "SURVIVAL",
                 false,
+                false,
                 LoadoutBlob.empty(),
                 false);
 
@@ -86,6 +89,7 @@ class JooqStaffLoadoutRepositoryTest {
 
         SavedLoadout loaded = repository.load(owner).orElseThrow();
         assertThat(loaded.vanishedBefore()).isFalse();
+        assertThat(loaded.allowFlight()).isFalse();
         assertThat(loaded).isEqualTo(loadout);
     }
 
@@ -99,6 +103,7 @@ class JooqStaffLoadoutRepositoryTest {
                 0,
                 0.0f,
                 "SURVIVAL",
+                false,
                 false,
                 LoadoutBlob.empty(),
                 false);
@@ -153,6 +158,7 @@ class JooqStaffLoadoutRepositoryTest {
                 15,
                 0.5f,
                 gameMode,
+                flying,
                 flying,
                 LoadoutBlob.of(new byte[] {7}),
                 flying);
