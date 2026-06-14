@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
+import com.uxplima.uxmessentials.tablist.application.TablistModule;
 import com.uxplima.uxmessentials.teleport.application.TeleportModule;
 import com.uxplima.uxmessentials.vaults.application.VaultsModule;
 import com.uxplima.uxmessentials.vote.application.VoteModule;
@@ -92,19 +93,23 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // other hard dependency edge (its only collaborators are the shared persistence DSL, the Permissions
         // reducer, and the teleport engine), and like warps/holograms it ships ENABLED, so it lands last.
         delegate.register(new PlayerwarpsModule());
-        // scoreboard is the 15th context — a per-player sidebar plus a tablist header/footer rendered from
-        // operator-authored MiniMessage content on the Scheduler refresh timer, dogfooding uxmlib-hud's
-        // SidebarManager and Tablist (already used for the teleport arrival title). Like communication it carries no
-        // hard dependency edge (its only collaborators are the shared Scheduler, messages, and event ports) and
-        // ships DISABLED by default — operators author the lines before enabling — so it lands last and wires
-        // nothing until enabled in modules.conf.
+        // scoreboard is the 15th context — a per-player sidebar rendered from operator-authored MiniMessage content on
+        // the Scheduler refresh timer, dogfooding uxmlib-hud's SidebarManager (already used for the teleport arrival
+        // title). Like communication it carries no hard dependency edge (its only collaborators are the shared
+        // Scheduler, messages, and event ports) and ships DISABLED by default — operators author the lines before
+        // enabling — so it wires nothing until enabled in modules.conf.
         delegate.register(new ScoreboardModule());
-        // vote is the 16th context — a Votifier-bridged vote-rewards and vote-party feature. It carries no hard
+        // tablist is the 16th context — the per-player tab-list header/footer split out of scoreboard so the sidebar
+        // and the tablist enable, author, and refresh independently. It owns its own Scheduler refresh timer over
+        // uxmlib-hud's Tablist, carries no hard dependency edge, and like scoreboard ships DISABLED by default (its
+        // content is operator data), so it wires nothing until enabled in modules.conf. It lands next to scoreboard.
+        delegate.register(new TablistModule());
+        // vote is the 17th context — a Votifier-bridged vote-rewards and vote-party feature. It carries no hard
         // dependency edge (its only collaborators are the shared persistence DSL, the Scheduler, messages, and
         // event ports, plus a console-dispatch port), and like the steady-state features it ships ENABLED but
-        // inert until rewards/links are authored, so it lands last after scoreboard.
+        // inert until rewards/links are authored, so it lands last after tablist.
         delegate.register(new VoteModule());
-        // discordlink is the 17th context — Discord account linking (/discordlink in game, /link in the bridge).
+        // discordlink is the 18th context — Discord account linking (/discordlink in game, /link in the bridge).
         // It carries no hard dependency edge (its only collaborators are the shared persistence DSL, messages,
         // and the player lookup), and the host exposes its ConfirmLink use case through the ServicesManager so the
         // optional Discord jar can redeem a code with no compile-time link. Like the steady-state features it ships

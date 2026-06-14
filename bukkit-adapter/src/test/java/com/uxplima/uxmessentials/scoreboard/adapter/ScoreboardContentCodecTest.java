@@ -18,6 +18,8 @@ class ScoreboardContentCodecTest {
 
     @Test
     void parsesTheFullAuthoredShape(@TempDir Path dir) throws Exception {
+        // The tablist header/footer is a separate module now (modules/tablist/config.conf); a tablist block here is
+        // simply ignored — only the scoreboard sidebar block is parsed.
         ConfigurationNode root = load(
                 dir,
                 """
@@ -38,8 +40,6 @@ class ScoreboardContentCodecTest {
 
         assertThat(content.title()).contains("<gold>My Server");
         assertThat(content.lines()).containsExactly("<gray>Online: <white>%server_online%", "");
-        assertThat(content.header()).containsExactly("<gold>Welcome");
-        assertThat(content.footer()).containsExactly("<gray>play.example.net");
         // 40 ticks at 50ms each is two seconds.
         assertThat(content.refreshInterval()).isEqualTo(Duration.ofSeconds(2L));
         assertThat(content.worldBlacklist()).containsExactlyInAnyOrder("world_the_end", "world_nether");

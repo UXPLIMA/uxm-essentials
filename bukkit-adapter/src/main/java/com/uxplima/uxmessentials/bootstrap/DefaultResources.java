@@ -56,6 +56,7 @@ final class DefaultResources {
             "modules/holograms/config.conf",
             "modules/playerwarps/config.conf",
             "modules/scoreboard/config.conf",
+            "modules/tablist/config.conf",
             "modules/migration/config.conf",
             "modules/kits/gui/kits-menu.conf",
             "modules/kits/gui/kits-manager.conf",

@@ -82,6 +82,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.tablist.adapter.TablistWiring;
 import com.uxplima.uxmessentials.teleport.adapter.MutableHomeRespawnLocator;
 import com.uxplima.uxmessentials.teleport.adapter.MutableJailGate;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportWiring;
@@ -330,6 +331,8 @@ public final class PluginModule {
             wirePlayerwarps(ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
             wireScoreboard(plugin, ctx, resources);
+        } else if (module.id().equals(ModuleId.of("tablist"))) {
+            wireTablist(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
@@ -591,6 +594,19 @@ public final class PluginModule {
         // captured for a later context. The renderer dogfoods uxmlib-hud's SidebarManager/Tablist; the render timer
         // on the Scheduler port is stopped and every active board torn down on disable.
         ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
+    }
+
+    private static void wireTablist(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // tablist persists nothing: the header/footer content is config-authored under modules/tablist/config.conf. It
+        // carries no cross-context bridge — its only collaborators are the shared Scheduler and log ports — so nothing
+        // is captured for a later context, and the tablist is always-on (no per-player toggle) so it publishes no
+        // command. The renderer dogfoods uxmlib-hud's Tablist; the render timer on the Scheduler port is stopped and
+        // every active header/footer cleared on disable.
+        TablistWiring.Wired wired = TablistWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

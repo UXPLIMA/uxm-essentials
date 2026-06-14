@@ -33,10 +33,11 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The context persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the display content
  * is config-authored. The renderer dogfoods uxmLib's {@link SidebarManager} (built over the server's
- * {@code ScoreboardManager}) and {@code Tablist}. The {@code /scoreboard} confirmations are {@code MessageKey}s
- * through the {@link ScoreboardNotifier}; the sidebar/tablist content is raw operator MiniMessage, keeping the
- * parity-checked keys and the unchecked operator content apart. On stop the render timer is halted and every active
- * board is restored so a disable or reload tears down cleanly.
+ * {@code ScoreboardManager}). The tablist header/footer is a separate module now, so this context owns only the
+ * sidebar. The {@code /scoreboard} confirmations are {@code MessageKey}s through the {@link ScoreboardNotifier}; the
+ * sidebar content is raw operator MiniMessage, keeping the parity-checked keys and the unchecked operator content
+ * apart. On stop the render timer is halted and every active board is restored so a disable or reload tears down
+ * cleanly.
  */
 @NullMarked
 public final class ScoreboardWiring {

@@ -63,6 +63,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("holograms"))).isPresent();
         assertThat(registry.byId(ModuleId.of("playerwarps"))).isPresent();
         assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("tablist"))).isPresent();
         assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
         assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
@@ -82,6 +83,7 @@ class FeatureModuleRegistryDriftTest {
                         "holograms",
                         "playerwarps",
                         "scoreboard",
+                        "tablist",
                         "vote",
                         "discordlink");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
@@ -291,8 +293,9 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule scoreboard = registry.byId(ModuleId.of("scoreboard"))
                 .orElseThrow(() -> new AssertionError("scoreboard is not registered"));
 
-        // scoreboard is the 15th context — a per-player sidebar plus a tablist header/footer on uxmlib-hud. The
-        // later vote context now lands last, so scoreboard must merely be registered, not last.
+        // scoreboard is the 15th context — a per-player sidebar on uxmlib-hud (the tablist header/footer is its own
+        // context now). The later tablist/vote contexts land after it, so scoreboard must merely be registered, not
+        // last.
         assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
 
         // It ships DISABLED (like communication, its content is operator data): with no modules.conf override it is
@@ -317,12 +320,43 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
+    void tablistShipsDisabledAndPublishesNoCommandSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule tablist = registry.byId(ModuleId.of("tablist"))
+                .orElseThrow(() -> new AssertionError("tablist is not registered"));
+
+        // tablist is the 16th context — the per-player tab-list header/footer split out of scoreboard so the two
+        // enable, author, and refresh independently. It is registered next to scoreboard.
+        assertThat(registry.byId(ModuleId.of("tablist"))).isPresent();
+
+        // It ships DISABLED (like scoreboard, its content is operator data): with no modules.conf override it is
+        // absent from the enabled set while every steady-state sibling stays on, and crucially scoreboard and tablist
+        // toggle independently — disabling exactly tablist leaves scoreboard's gate untouched and vice versa.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).doesNotContain("tablist", "scoreboard");
+        assertThat(defaults).contains("teleport", "economy", "holograms", "playerwarps");
+        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.tablist.enabled", true))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(on).contains("tablist", "teleport", "holograms");
+        assertThat(on).doesNotContain("scoreboard");
+
+        // The tablist is always-on for every viewer when enabled — there is no per-player visibility toggle — so it
+        // publishes no command, and it persists nothing (the header/footer is config-authored), so it declares no
+        // MigrationSet.
+        assertThat(tablist.commands()).isEmpty();
+        assertThat(tablist.migrations()).isEmpty();
+    }
+
+    @Test
     void voteShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule vote =
                 registry.byId(ModuleId.of("vote")).orElseThrow(() -> new AssertionError("vote is not registered"));
 
-        // vote is the 16th context — a Votifier-bridged vote-rewards and vote-party feature. The later
+        // vote is the 17th context — a Votifier-bridged vote-rewards and vote-party feature. The later
         // discordlink context now lands last, so vote must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
 
@@ -353,7 +387,7 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule discordlink = registry.byId(ModuleId.of("discordlink"))
                 .orElseThrow(() -> new AssertionError("discordlink is not registered"));
 
-        // discordlink is the 17th context — Discord account linking — registered last after the sixteen prior
+        // discordlink is the 18th context — Discord account linking — registered last after the seventeen prior
         // modules.
         assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("discordlink");
 

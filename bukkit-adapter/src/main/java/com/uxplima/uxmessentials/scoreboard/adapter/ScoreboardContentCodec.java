@@ -23,17 +23,14 @@ import org.spongepowered.configurate.ConfigurationNode;
  *   refresh-ticks = 20            # one tick = 1/20s; 20 = once a second
  *   world-blacklist = [ "world_the_end" ]
  * }
- * tablist {
- *   header = [ "<gold>Welcome" ]
- *   footer = [ "<gray>play.example.net" ]
- * }
  * }</pre>
  *
- * <p>Every value is operator content rendered through MiniMessage and the placeholder pipeline later, never a
- * {@code MessageKey}. A blank title yields an empty {@link DisplayContent#title()}; lines beyond
- * {@link DisplayContent#MAX_LINES} are truncated to the limit so an over-long config degrades rather than failing the
- * load; a non-positive {@code refresh-ticks} falls back to one second so the render timer never busy-spins. An empty
- * or virtual root yields {@link DisplayContent#inert()} — the do-nothing default.
+ * <p>The tablist header/footer is a separate module now ({@code modules/tablist/config.conf}), so this codec parses
+ * only the {@code scoreboard} sidebar block. Every value is operator content rendered through MiniMessage and the
+ * placeholder pipeline later, never a {@code MessageKey}. A blank title yields an empty {@link DisplayContent#title()};
+ * lines beyond {@link DisplayContent#MAX_LINES} are truncated to the limit so an over-long config degrades rather than
+ * failing the load; a non-positive {@code refresh-ticks} falls back to one second so the render timer never
+ * busy-spins. An empty or virtual root yields {@link DisplayContent#inert()} — the do-nothing default.
  */
 @NullMarked
 final class ScoreboardContentCodec {
@@ -49,12 +46,9 @@ final class ScoreboardContentCodec {
             return DisplayContent.inert();
         }
         ConfigurationNode board = root.node("scoreboard");
-        ConfigurationNode tab = root.node("tablist");
         return new DisplayContent(
                 optionalString(board.node("title")),
                 cappedLines(strings(board.node("lines"))),
-                strings(tab.node("header")),
-                strings(tab.node("footer")),
                 refreshInterval(board.node("refresh-ticks")),
                 worldBlacklist(board.node("world-blacklist")));
     }
