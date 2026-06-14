@@ -92,6 +92,11 @@ abstract class UnsupportedModerationRepository implements ModerationRepository {
     }
 
     @Override
+    public int clearWarnsByActor(PlayerRef target, PlayerRef actor) {
+        throw unsupported();
+    }
+
+    @Override
     public void saveIpBan(IpBan ban) {
         throw unsupported();
     }

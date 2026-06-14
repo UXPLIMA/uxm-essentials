@@ -30,6 +30,14 @@ class BanAddressStrictnessTest {
     private static final PlayerRef TARGET = new PlayerRef(UUID.randomUUID(), "griefer");
 
     private Ban ban(AddressStrictness strictness, ModerationGuard guard, FakeModerationRepository repository) {
+        return ban(strictness, guard, repository, new SanctionDurationLimit(ModerationFakes.exempt()));
+    }
+
+    private Ban ban(
+            AddressStrictness strictness,
+            ModerationGuard guard,
+            FakeModerationRepository repository,
+            SanctionDurationLimit limit) {
         return new Ban(
                 repository,
                 new FakeSanctions(TARGET),
@@ -38,7 +46,7 @@ class BanAddressStrictnessTest {
                 new RecordingModerationAudit(),
                 new ModerationFakes.RecordingEvents(),
                 new SanctionHistoryRecorder(new FakeSanctionHistory(), Clock.fixed(NOW, ZoneOffset.UTC)),
-                new SanctionDurationLimit(ModerationFakes.exempt()),
+                limit,
                 ModerationFakes.broadcast(),
                 com.uxplima.uxmessentials.moderation.application.port.SanctionSync.NONE,
                 strictness,
@@ -61,6 +69,42 @@ class BanAddressStrictnessTest {
             assertThat(b.until()).isEmpty();
         });
         assertThat(repository.activeIpBan("198.51.100.5", NOW)).isPresent();
+    }
+
+    @Test
+    void strictBanCappedToATempbanGivesTheIpBanTheSameExpiryNotPermanent() {
+        FakeModerationRepository repository = new FakeModerationRepository();
+        repository.recordSeen(TARGET, Optional.of("203.0.113.7"), NOW);
+        repository.recordIpSeen(TARGET.uuid(), "203.0.113.7", NOW);
+        // A 1-hour maxduration tier reduces the /ban (a permanent request) to a 1-hour tempban.
+        long capSeconds = java.time.Duration.ofHours(1).toSeconds();
+        SanctionDurationLimit limit = new SanctionDurationLimit(ModerationFakes.capping(capSeconds));
+
+        var result = ban(AddressStrictness.STRICT, new ModerationGuard(ModerationFakes.exempt()), repository, limit)
+                .ban(ACTOR, TARGET, Optional.of("cheating"), false);
+
+        assertThat(result.isOk()).isTrue();
+        Instant cappedExpiry = NOW.plusSeconds(capSeconds);
+        // The capped UUID ban's expiry...
+        assertThat(repository.loadTempban(TARGET).expiry()).contains(cappedExpiry);
+        // ...is exactly the IP ban's expiry — not a permanent (empty) IP ban that would outlive the sanction.
+        assertThat(repository.activeIpBan("203.0.113.7", NOW)).isPresent().get().satisfies(b -> {
+            assertThat(b.until()).contains(cappedExpiry);
+            assertThat(b.target()).contains(TARGET.uuid());
+        });
+    }
+
+    @Test
+    void strictPermanentBanGivesPermanentIpBans() {
+        FakeModerationRepository repository = new FakeModerationRepository();
+        repository.recordSeen(TARGET, Optional.of("203.0.113.7"), NOW);
+        repository.recordIpSeen(TARGET.uuid(), "203.0.113.7", NOW);
+        // No cap (exempt() resolver is unlimited): the ban stays permanent, so the IP ban is permanent too.
+        ban(AddressStrictness.STRICT, new ModerationGuard(ModerationFakes.exempt()), repository)
+                .ban(ACTOR, TARGET, Optional.of("cheating"), false);
+
+        assertThat(repository.activeIpBan("203.0.113.7", NOW)).isPresent().get().satisfies(b -> assertThat(b.until())
+                .isEmpty());
     }
 
     @Test

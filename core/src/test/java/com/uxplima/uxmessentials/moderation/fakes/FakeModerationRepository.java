@@ -138,6 +138,20 @@ public final class FakeModerationRepository implements ModerationRepository {
     }
 
     @Override
+    public int clearWarnsByActor(PlayerRef target, PlayerRef actor) {
+        List<Warn> list = warns.get(target.uuid());
+        if (list == null) {
+            return 0;
+        }
+        int before = list.size();
+        list.removeIf(warn -> warn.issuer().uuid().filter(actor.uuid()::equals).isPresent());
+        if (list.isEmpty()) {
+            warns.remove(target.uuid());
+        }
+        return before - list.size();
+    }
+
+    @Override
     public void saveIpBan(IpBan ban) {
         ipBans.put(ban.ip(), ban);
     }

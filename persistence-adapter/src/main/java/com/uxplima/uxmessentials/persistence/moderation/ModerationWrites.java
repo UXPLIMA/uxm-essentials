@@ -142,6 +142,15 @@ final class ModerationWrites {
         return removed;
     }
 
+    static int clearWarnsByActor(DSLContext dsl, PlayerRef target, PlayerRef actor) {
+        String key = target.uuid().toString();
+        String issuer = actor.uuid().toString();
+        org.jooq.Condition by = MODERATION_WARNS.TARGET.eq(key).and(MODERATION_WARNS.WARNED_BY.eq(issuer));
+        int removed = dsl.fetchCount(MODERATION_WARNS, by);
+        dsl.deleteFrom(MODERATION_WARNS).where(by).execute();
+        return removed;
+    }
+
     private static long nextWarnId(DSLContext dsl) {
         Long maxId =
                 dsl.select(DSL.max(MODERATION_WARNS.ID)).from(MODERATION_WARNS).fetchOne(0, Long.class);

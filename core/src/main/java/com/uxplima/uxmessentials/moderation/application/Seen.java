@@ -73,9 +73,16 @@ public final class Seen {
             return ip;
         }
         int firstDot = ip.indexOf('.');
+        if (firstDot > 0) {
+            // IPv4 (or an IPv4-mapped literal): keep the leading octet, mask the rest in dotted notation.
+            return ip.substring(0, firstDot) + ".*.*.*";
+        }
         int firstColon = ip.indexOf(':');
-        int cut = firstDot >= 0 ? firstDot : firstColon;
-        return cut > 0 ? ip.substring(0, cut) + ".*.*.*" : "*.*.*.*";
+        if (firstColon > 0) {
+            // IPv6: keep the leading hextet and mask the remainder in colon notation, not dotted.
+            return ip.substring(0, firstColon) + ":*";
+        }
+        return "*.*.*.*";
     }
 
     private void reportAlts(PlayerRef actor, String ip, UUID self) {

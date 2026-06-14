@@ -6,7 +6,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,11 +18,9 @@ import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
 import com.uxplima.uxmessentials.moderation.fakes.FakeSanctionHistory;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
-import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.FixedPlayers;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes.RecordingSink;
 import com.uxplima.uxmessentials.moderation.fakes.RecordingModerationAudit;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +37,7 @@ class StaffRollbackTest {
     private static final PlayerRef ACTOR = new PlayerRef(UUID.randomUUID(), "operator");
     private static final UUID STAFF_UUID = UUID.randomUUID();
     private static final PlayerRef STAFF = new PlayerRef(STAFF_UUID, "rogue");
+    private static final PlayerRef OTHER_STAFF = new PlayerRef(UUID.randomUUID(), "colleague");
 
     private FakeModerationRepository repository;
     private FakeSanctionHistory history;
@@ -49,8 +47,6 @@ class StaffRollbackTest {
     private ModerationNotifier notifier;
     private RecordingSink sink;
     private Clock clock;
-
-    private final java.util.Map<UUID, PlayerRef> directory = new java.util.HashMap<>();
 
     @BeforeEach
     void setUp() {
@@ -62,20 +58,17 @@ class StaffRollbackTest {
         recorder = new SanctionHistoryRecorder(history, clock);
         sink = new RecordingSink();
         notifier = ModerationFakes.recordingNotifier(sink);
-        directory.put(STAFF_UUID, STAFF);
     }
 
     private StaffRollback rollback() {
-        PlayerLookup players = new FixedPlayers(Map.copyOf(directory), java.util.Set.of());
         Unban unban = new Unban(repository, notifier, audit, recorder);
         Unmute unmute = new Unmute(repository, notifier, audit, events, recorder, clock);
-        ClearWarns clearWarns = new ClearWarns(repository, notifier, audit);
-        return new StaffRollback(history, repository, players, unban, unmute, clearWarns, notifier, clock);
+        return new StaffRollback(history, repository, unban, unmute, notifier, audit, clock);
     }
 
     private PlayerRef target(String name) {
         PlayerRef ref = new PlayerRef(UUID.randomUUID(), name);
-        directory.put(ref.uuid(), ref);
+        repository.recordSeen(ref, Optional.empty(), NOW);
         return ref;
     }
 
@@ -123,6 +116,19 @@ class StaffRollbackTest {
 
     private void activeWarn(PlayerRef victim) {
         repository.appendWarn(victim, Warn.standing(Issuer.of(STAFF), Optional.empty(), NOW));
+    }
+
+    private void activeBanBy(PlayerRef victim, PlayerRef issuer) {
+        repository.saveTempban(
+                victim, TempbanState.active(NOW.plus(Duration.ofDays(7)), Issuer.of(issuer), Optional.empty(), NOW));
+    }
+
+    private void activeMuteBy(PlayerRef victim, PlayerRef issuer) {
+        repository.saveMute(victim, MuteState.permanent(Issuer.of(issuer), Optional.empty(), NOW));
+    }
+
+    private void activeWarnBy(PlayerRef victim, PlayerRef issuer) {
+        repository.appendWarn(victim, Warn.standing(Issuer.of(issuer), Optional.empty(), NOW));
     }
 
     @Test
@@ -301,5 +307,90 @@ class StaffRollbackTest {
         assertThat(summary.total()).isZero();
         assertThat(sink.sent(ACTOR, ModerationMessageKey.MOD_STAFFROLLBACK_NONE))
                 .isTrue();
+    }
+
+    @Test
+    void doesNotLiftABanNowStandingUnderAnotherStaffMember() {
+        PlayerRef victim = target("griefer");
+        // The rolled-back staff banned the victim, but another staff member re-banned them afterwards — the
+        // active ban's issuer is the colleague, so rolling back the rogue must leave it in place.
+        recordStaffBan(victim);
+        activeBanBy(victim, OTHER_STAFF);
+
+        StaffRollback.RollbackSummary summary = rollback().rollback(ACTOR, STAFF, 100);
+
+        assertThat(summary.bans()).isZero();
+        assertThat(repository.loadTempban(victim)).isInstanceOf(TempbanState.Active.class);
+    }
+
+    @Test
+    void doesNotLiftAMuteNowStandingUnderAnotherStaffMember() {
+        PlayerRef victim = target("spammer");
+        recordStaffMute(victim);
+        activeMuteBy(victim, OTHER_STAFF);
+
+        StaffRollback.RollbackSummary summary = rollback().rollback(ACTOR, STAFF, 100);
+
+        assertThat(summary.mutes()).isZero();
+        assertThat(repository.loadMute(victim).isActiveAt(NOW)).isTrue();
+    }
+
+    @Test
+    void doesNotWipeAnotherStaffMembersWarnsWhenRollingBackTheRogue() {
+        PlayerRef victim = target("rulebreaker");
+        // The rogue and a colleague each warned the victim; rolling back the rogue must drop only the rogue's.
+        recordStaffWarn(victim);
+        activeWarn(victim);
+        activeWarnBy(victim, OTHER_STAFF);
+
+        StaffRollback.RollbackSummary summary = rollback().rollback(ACTOR, STAFF, 100);
+
+        assertThat(summary.warns()).isEqualTo(1);
+        assertThat(repository.warns(victim, NOW)).hasSize(1);
+        assertThat(repository.warns(victim, NOW).get(0).issuer().uuid()).contains(OTHER_STAFF.uuid());
+    }
+
+    @Test
+    void doesNotClearWarnsWhenOnlyAnotherStaffMembersWarnIsActive() {
+        PlayerRef victim = target("rulebreaker");
+        // The rogue's warn row attributes to them, but the only warn now on the victim was issued by a colleague.
+        recordStaffWarn(victim);
+        activeWarnBy(victim, OTHER_STAFF);
+
+        StaffRollback.RollbackSummary summary = rollback().rollback(ACTOR, STAFF, 100);
+
+        assertThat(summary.warns()).isZero();
+        assertThat(repository.warns(victim, NOW)).hasSize(1);
+    }
+
+    @Test
+    void doesNotLiftABanNowStandingUnderConsole() {
+        PlayerRef victim = target("griefer");
+        recordStaffBan(victim);
+        // The active ban was re-applied by a console/system actor (no issuer UUID) — never matches a staff UUID.
+        repository.saveTempban(
+                victim,
+                TempbanState.active(NOW.plus(Duration.ofDays(7)), Issuer.console("console"), Optional.empty(), NOW));
+
+        StaffRollback.RollbackSummary summary = rollback().rollback(ACTOR, STAFF, 100);
+
+        assertThat(summary.bans()).isZero();
+        assertThat(repository.loadTempban(victim)).isInstanceOf(TempbanState.Active.class);
+    }
+
+    @Test
+    void stillLiftsTheRoguesOwnBanWhenAnotherTargetIsUnderSomeoneElse() {
+        PlayerRef mine = target("mine");
+        PlayerRef theirs = target("theirs");
+        recordStaffBan(mine);
+        activeBan(mine);
+        recordStaffBan(theirs);
+        activeBanBy(theirs, OTHER_STAFF);
+
+        StaffRollback.RollbackSummary summary = rollback().rollback(ACTOR, STAFF, 100);
+
+        assertThat(summary.bans()).isEqualTo(1);
+        assertThat(repository.loadTempban(mine)).isInstanceOf(TempbanState.None.class);
+        assertThat(repository.loadTempban(theirs)).isInstanceOf(TempbanState.Active.class);
     }
 }

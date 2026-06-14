@@ -158,11 +158,7 @@ public final class ModerationWiring {
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
         // already kicked) never double-kicks; with the bus disabled this listener is never invoked.
         EnforceRemoteBan enforce = new EnforceRemoteBan(
-                repository,
-                kernel.playerLookup(),
-                sanctions,
-                new ModerationNotifier(kernel.messages(), kernel.messageSink()),
-                clock);
+                repository, sanctions, new ModerationNotifier(kernel.messages(), kernel.messageSink()), clock);
         bus.registry().register(ModerationSync.listener(enforce::onRemoteBan));
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
@@ -245,8 +241,8 @@ public final class ModerationWiring {
         Unmute unmute = new Unmute(repository, notifier, audit, kernel.events(), history, clock);
         Unban unban = new Unban(repository, notifier, audit, history);
         ClearWarns clearWarns = new ClearWarns(repository, notifier, audit);
-        StaffRollback staffRollback = new StaffRollback(
-                sanctionHistory, repository, kernel.playerLookup(), unban, unmute, clearWarns, notifier, clock);
+        StaffRollback staffRollback =
+                new StaffRollback(sanctionHistory, repository, unban, unmute, notifier, audit, clock);
         return new ModerationServices.Builder()
                 .mute(mute)
                 .unmute(unmute)

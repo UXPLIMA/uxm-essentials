@@ -125,7 +125,9 @@ public final class Ban {
         if (capped) {
             notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, capLabel(effective));
         }
-        fanOutToIps(actor, target, reason, now);
+        // A capped /ban lands a timed UUID ban, so its IP collateral must expire with it; a true permanent ban
+        // (no cap) fans out permanent IP bans. Empty until = permanent, mirroring the UUID ban's own expiry.
+        fanOutToIps(actor, target, reason, capped ? Optional.of(expiry) : Optional.empty(), now);
         // The local kick above already removed the target here; this wakes peers that have them online so the
         // ban takes live effect cluster-wide rather than only on each peer's next login (a no-op with no bus).
         sync.banChanged(target);
@@ -139,9 +141,12 @@ public final class Ban {
      * Under STRICT, IP-ban every address the target is known to have connected from so a banned account
      * cannot return on a fresh one from the same connection. Skipped for an exempt target (a defensive second
      * guard so STRICT never collaterally IP-bans an exempt player's shared connection) and fail-safe: an empty
-     * IP set leaves the UUID ban as the only effect.
+     * IP set leaves the UUID ban as the only effect. The IP bans carry the UUID ban's own effective expiry
+     * ({@code until}) — permanent when the ban is permanent, the capped expiry when a {@code maxduration} tier
+     * reduced the ban to a tempban — so the collateral never outlives the sanction that triggered it.
      */
-    private void fanOutToIps(PlayerRef actor, PlayerRef target, Optional<String> reason, Instant now) {
+    private void fanOutToIps(
+            PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Instant> until, Instant now) {
         if (!strictness.fansOutToIps() || guard.isExempt(target)) {
             return;
         }
@@ -149,10 +154,10 @@ public final class Ban {
         if (ips.isEmpty()) {
             return;
         }
+        Optional<String> durationLabel = until.map(end -> SanctionDuration.format(Duration.between(now, end)));
         for (String ip : ips) {
-            repository.saveIpBan(
-                    new IpBan(ip, Optional.empty(), reason, Optional.of(target.uuid()), Issuer.of(actor), now));
-            audit.ipBanned(actor, ip, Optional.of(target.uuid()), Optional.empty(), true, reason);
+            repository.saveIpBan(new IpBan(ip, until, reason, Optional.of(target.uuid()), Issuer.of(actor), now));
+            audit.ipBanned(actor, ip, Optional.of(target.uuid()), durationLabel, true, reason);
         }
         notifier.send(actor, ModerationMessageKey.MOD_BAN_STRICT_IP, Map.of("count", Integer.toString(ips.size())));
     }

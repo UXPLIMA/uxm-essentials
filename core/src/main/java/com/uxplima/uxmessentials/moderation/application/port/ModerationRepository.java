@@ -86,6 +86,14 @@ public interface ModerationRepository {
     /** Remove all of {@code target}'s warnings; returns the number removed. */
     int clearWarns(PlayerRef target);
 
+    /**
+     * Remove only the warnings on {@code target} that {@code actor} issued (matched on the warn's
+     * {@code warned_by} UUID), leaving every other staff member's warnings on {@code target} intact; returns
+     * the number removed. A console/system actor (no UUID) matches no row. This is what {@code /staffrollback}
+     * uses so rolling back one staff member never wipes another's warnings.
+     */
+    int clearWarnsByActor(PlayerRef target, PlayerRef actor);
+
     /** Upsert an IP ban (keyed by address); a re-ban of the same address overwrites. */
     void saveIpBan(IpBan ban);
 
