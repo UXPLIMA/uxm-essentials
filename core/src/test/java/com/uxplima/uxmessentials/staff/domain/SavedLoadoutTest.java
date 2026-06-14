@@ -17,6 +17,7 @@ class SavedLoadoutTest {
                 0.25f,
                 "CREATIVE",
                 true,
+                true,
                 LoadoutBlob.of(new byte[] {5}),
                 true);
     }
@@ -53,6 +54,7 @@ class SavedLoadoutTest {
                         0f,
                         "SURVIVAL",
                         false,
+                        false,
                         LoadoutBlob.empty(),
                         false))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -64,6 +66,7 @@ class SavedLoadoutTest {
                         0,
                         0f,
                         "SURVIVAL",
+                        false,
                         false,
                         LoadoutBlob.empty(),
                         false))
@@ -80,6 +83,7 @@ class SavedLoadoutTest {
                         0,
                         0f,
                         "  ",
+                        false,
                         false,
                         LoadoutBlob.empty(),
                         false))

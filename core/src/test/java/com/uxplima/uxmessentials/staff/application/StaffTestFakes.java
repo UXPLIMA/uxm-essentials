@@ -48,6 +48,7 @@ final class StaffTestFakes {
                 0.5f,
                 "SURVIVAL",
                 false,
+                false,
                 LoadoutBlob.of(new byte[] {6, 7}),
                 false);
     }

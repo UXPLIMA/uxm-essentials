@@ -22,6 +22,10 @@ public enum StaffMessageKey implements MessageKey {
     // recovery feedback — an orphaned loadout row (crash / interrupted exit) was restored on enter or on join
     STAFF_MODE_RECOVERED("staff.mode.recovered"),
 
+    // staff-roster alerts broadcast to other staff when someone enters or leaves staff mode — {player}
+    STAFF_ALERT_ENTER("staff.alert.enter"),
+    STAFF_ALERT_EXIT("staff.alert.exit"),
+
     // staff-chat broadcast format — {player}{message}
     STAFF_CHAT_FORMAT("staff.chat.format"),
 

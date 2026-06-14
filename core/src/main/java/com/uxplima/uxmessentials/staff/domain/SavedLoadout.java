@@ -29,6 +29,8 @@ import java.util.Objects;
  * @param expProgress the fractional progress towards the next level, {@code 0.0..1.0}
  * @param gameMode the game-mode name (e.g. {@code SURVIVAL}); never blank
  * @param flying whether the player was flying
+ * @param allowFlight whether the player was allowed to fly before entering staff mode, kept so granting
+ *     flight during staff mode reverts to the player's real allowance rather than always switching it off
  * @param potionEffects encoded active potion effects
  * @param vanishedBefore whether the player was vanished before entering staff mode
  */
@@ -41,6 +43,7 @@ public record SavedLoadout(
         float expProgress,
         String gameMode,
         boolean flying,
+        boolean allowFlight,
         LoadoutBlob potionEffects,
         boolean vanishedBefore) {
 

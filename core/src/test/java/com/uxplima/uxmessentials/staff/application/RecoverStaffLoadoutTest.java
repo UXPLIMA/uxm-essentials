@@ -79,6 +79,7 @@ class RecoverStaffLoadoutTest {
                 0f,
                 "SURVIVAL",
                 false,
+                false,
                 LoadoutBlob.empty(),
                 vanished);
     }

@@ -91,6 +91,7 @@ class ExitStaffModeTest {
                 0f,
                 "SURVIVAL",
                 false,
+                false,
                 LoadoutBlob.empty(),
                 vanished);
     }
