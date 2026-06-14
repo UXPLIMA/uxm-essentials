@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.moderation.fakes;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -9,6 +11,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.ModerationNotifier;
 import com.uxplima.uxmessentials.moderation.application.port.JailDirectory;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -24,8 +27,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * The lightweight test doubles shared across the moderation application tests: a key-echoing {@link Messages},
  * a no-op {@link MessageSink}, a recording {@link DomainEventPublisher}, an exempt-set {@link Permissions}, a
- * configured {@link JailDirectory}, and an online-set {@link PlayerLookup}. Bundled in one place so each test
- * news up only what it needs.
+ * configured {@link JailDirectory}, an online-set {@link PlayerLookup}, and a capturing {@link
+ * SanctionBroadcast}. Bundled in one place so each test news up only what it needs.
  */
 public final class ModerationFakes {
 
@@ -36,10 +39,29 @@ public final class ModerationFakes {
         return new ModerationNotifier(new KeyMessages(), new NoopSink());
     }
 
+    /** A {@link ModerationNotifier} backed by a {@link RecordingSink}, so a test can assert who was told what. */
+    public static ModerationNotifier recordingNotifier(RecordingSink sink) {
+        return new ModerationNotifier(new KeyMessages(), sink);
+    }
+
+    /** A capturing {@link SanctionBroadcast} exposing every announced key + placeholder map. */
+    public static RecordingBroadcast broadcast() {
+        return new RecordingBroadcast();
+    }
+
     /** A {@link Permissions} where the given UUIDs hold the exempt node and nothing else matters. */
     public static Permissions exempt(UUID... exemptUuids) {
         Set<UUID> set = new HashSet<>(java.util.List.of(exemptUuids));
         return new ExemptPermissions(set);
+    }
+
+    /**
+     * A {@link Permissions} whose quota reducer always returns {@code capSeconds} — a fixed
+     * {@code maxduration} tier for testing {@link com.uxplima.uxmessentials.moderation.application
+     * .SanctionDurationLimit} reduce-to-limit. The exempt node is never held.
+     */
+    public static Permissions capping(long capSeconds) {
+        return new CappingPermissions(capSeconds);
     }
 
     /** A {@link JailDirectory} where the named jails exist; {@code wallClock} marks the wall-clock ones. */
@@ -87,6 +109,19 @@ public final class ModerationFakes {
         }
     }
 
+    /** A capturing {@link SanctionBroadcast}: every {@link #announce} call lands as an {@link Announced} row. */
+    public static final class RecordingBroadcast implements SanctionBroadcast {
+        public final List<Announced> announced = new ArrayList<>();
+
+        @Override
+        public void announce(MessageKey key, Map<String, String> placeholders) {
+            announced.add(new Announced(key, Map.copyOf(placeholders)));
+        }
+
+        /** One captured broadcast: the key and the placeholders it was rendered with. */
+        public record Announced(MessageKey key, Map<String, String> placeholders) {}
+    }
+
     /** A {@link PlayerLookup} backed by an explicit online set. */
     public static final class FixedPlayers implements PlayerLookup {
         private final Map<UUID, PlayerRef> byUuid;
@@ -127,6 +162,29 @@ public final class ModerationFakes {
         public void deliver(PlayerRef viewer, String renderedText) {}
     }
 
+    /**
+     * A {@link MessageSink} recording every delivery as a {@code (viewer, key)} pair — since the messages fake
+     * echoes the key as the rendered text, {@code renderedText} is the catalog key, so a test can assert that
+     * a given viewer was sent a given {@link MessageKey}.
+     */
+    public static final class RecordingSink implements MessageSink {
+        public final List<Delivery> delivered = new ArrayList<>();
+
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            delivered.add(new Delivery(viewer, renderedText));
+        }
+
+        /** True when {@code viewer} was sent {@code key}. */
+        public boolean sent(PlayerRef viewer, MessageKey key) {
+            return delivered.stream()
+                    .anyMatch(d -> d.viewer().equals(viewer) && d.key().equals(key.key()));
+        }
+
+        /** One captured delivery: the recipient and the (echoed) catalog key. */
+        public record Delivery(PlayerRef viewer, String key) {}
+    }
+
     private record ExemptPermissions(Set<UUID> exemptUuids) implements Permissions {
         @Override
         public boolean has(PlayerRef who, String node) {
@@ -137,6 +195,19 @@ public final class ModerationFakes {
         public QuotaResult resolveQuota(
                 PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
             return QuotaResult.limited(configDefault);
+        }
+    }
+
+    private record CappingPermissions(long capSeconds) implements Permissions {
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return false;
+        }
+
+        @Override
+        public QuotaResult resolveQuota(
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+            return QuotaResult.limited(capSeconds);
         }
     }
 

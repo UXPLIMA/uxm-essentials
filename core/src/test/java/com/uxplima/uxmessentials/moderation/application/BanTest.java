@@ -49,9 +49,11 @@ class BanTest {
                 audit,
                 events,
                 new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)),
+                new SanctionDurationLimit(ModerationFakes.exempt()),
+                ModerationFakes.broadcast(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
-        var result = ban.ban(ACTOR, TARGET, Optional.of("griefing"));
+        var result = ban.ban(ACTOR, TARGET, Optional.of("griefing"), false);
 
         assertThat(result.isOk()).isTrue();
         TempbanState stored = repository.loadTempban(TARGET);
@@ -83,9 +85,11 @@ class BanTest {
                 audit,
                 events,
                 new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)),
+                new SanctionDurationLimit(ModerationFakes.exempt()),
+                ModerationFakes.broadcast(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
-        var result = ban.ban(ACTOR, TARGET, Optional.empty());
+        var result = ban.ban(ACTOR, TARGET, Optional.empty(), false);
 
         assertThat(result.isErr()).isTrue();
         assertThat(result.errorOrThrow()).isEqualTo(ModerationError.TARGET_EXEMPT);

@@ -55,9 +55,9 @@ class ModerationRulesTest {
 
     @Test
     void timedMuteIsStoredAuditedAndMaterializesAnOfflineRow() {
-        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, history, clock);
+        Mute mute = mute();
 
-        var result = mute.mute(ADMIN, TARGET, "1h30m", Optional.of("spam"));
+        var result = mute.mute(ADMIN, TARGET, "1h30m", Optional.of("spam"), false);
 
         assertThat(result.isOk()).isTrue();
         assertThat(repository.loadMute(TARGET)).isInstanceOf(MuteState.Timed.class);
@@ -73,9 +73,9 @@ class ModerationRulesTest {
 
     @Test
     void exemptTargetCannotBeMutedAndTheRefusalIsAudited() {
-        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, history, clock);
+        Mute mute = mute();
 
-        var result = mute.mute(ADMIN, EXEMPT, "", Optional.empty());
+        var result = mute.mute(ADMIN, EXEMPT, "", Optional.empty(), false);
 
         assertThat(result.isErr()).isTrue();
         assertThat(result.errorOrThrow()).isEqualTo(ModerationError.TARGET_EXEMPT);
@@ -86,9 +86,9 @@ class ModerationRulesTest {
 
     @Test
     void malformedMuteDurationIsRejected() {
-        Mute mute = new Mute(repository, guard, ModerationFakes.notifier(), audit, events, history, clock);
+        Mute mute = mute();
 
-        var result = mute.mute(ADMIN, TARGET, "10x", Optional.empty());
+        var result = mute.mute(ADMIN, TARGET, "10x", Optional.empty(), false);
 
         assertThat(result.errorOrThrow()).isEqualTo(ModerationError.BAD_DURATION);
         assertThat(repository.loadMute(TARGET)).isInstanceOf(MuteState.None.class);
@@ -108,13 +108,22 @@ class ModerationRulesTest {
     @Test
     void tempbanRequiresADurationAndKicksAnOnlineTarget() {
         FakeSanctions sanctions = new FakeSanctions(TARGET);
-        TempBan tempBan =
-                new TempBan(repository, sanctions, guard, ModerationFakes.notifier(), audit, events, history, clock);
+        TempBan tempBan = new TempBan(
+                repository,
+                sanctions,
+                guard,
+                ModerationFakes.notifier(),
+                audit,
+                events,
+                history,
+                new SanctionDurationLimit(ModerationFakes.exempt()),
+                ModerationFakes.broadcast(),
+                clock);
 
-        assertThat(tempBan.tempban(ADMIN, TARGET, "", Optional.empty()).errorOrThrow())
+        assertThat(tempBan.tempban(ADMIN, TARGET, "", Optional.empty(), false).errorOrThrow())
                 .isEqualTo(ModerationError.BAD_DURATION);
 
-        var ok = tempBan.tempban(ADMIN, TARGET, "2h", Optional.of("cheating"));
+        var ok = tempBan.tempban(ADMIN, TARGET, "2h", Optional.of("cheating"), false);
         assertThat(ok.isOk()).isTrue();
         assertThat(repository.loadTempban(TARGET)).isInstanceOf(TempbanState.Active.class);
         assertThat(sanctions.kicked).containsExactly(TARGET);
@@ -162,10 +171,10 @@ class ModerationRulesTest {
 
     @Test
     void warnAppendsToHistoryAndReportsTheRunningTotal() {
-        IssueWarn warn = new IssueWarn(repository, guard, ModerationFakes.notifier(), audit, events, clock);
+        IssueWarn warn = issueWarn();
 
-        warn.warn(ADMIN, TARGET, Optional.of("first"));
-        var second = warn.warn(ADMIN, TARGET, Optional.of("second"));
+        warn.warn(ADMIN, TARGET, Optional.of("first"), false);
+        var second = warn.warn(ADMIN, TARGET, Optional.of("second"), false);
 
         assertThat(second.orElseThrow().totalWarnings()).isEqualTo(2);
         assertThat(repository.warns(TARGET, T0)).hasSize(2);
@@ -175,9 +184,9 @@ class ModerationRulesTest {
 
     @Test
     void tempWarnAppendsATimedWarningThatLapsesOutOfTheReadAtExpiry() {
-        TempWarn tempWarn = new TempWarn(repository, guard, ModerationFakes.notifier(), audit, events, clock);
+        TempWarn tempWarn = tempWarn();
 
-        var result = tempWarn.warn(ADMIN, TARGET, "1h", Optional.of("cooldown"));
+        var result = tempWarn.warn(ADMIN, TARGET, "1h", Optional.of("cooldown"), false);
 
         assertThat(result.isOk()).isTrue();
         assertThat(repository.warns(TARGET, T0.plus(Duration.ofMinutes(30)))).hasSize(1);
@@ -187,11 +196,84 @@ class ModerationRulesTest {
 
     @Test
     void tempWarnWithoutADurationIsRejected() {
-        TempWarn tempWarn = new TempWarn(repository, guard, ModerationFakes.notifier(), audit, events, clock);
+        TempWarn tempWarn = tempWarn();
 
-        var result = tempWarn.warn(ADMIN, TARGET, "", Optional.empty());
+        var result = tempWarn.warn(ADMIN, TARGET, "", Optional.empty(), false);
 
         assertThat(result.errorOrThrow()).isEqualTo(ModerationError.BAD_DURATION);
         assertThat(repository.warns(TARGET, T0)).isEmpty();
+    }
+
+    private Mute mute() {
+        return new Mute(
+                repository,
+                guard,
+                ModerationFakes.notifier(),
+                audit,
+                events,
+                history,
+                new SanctionDurationLimit(ModerationFakes.exempt()),
+                ModerationFakes.broadcast(),
+                clock);
+    }
+
+    private IssueWarn issueWarn() {
+        return new IssueWarn(
+                repository,
+                guard,
+                ModerationFakes.notifier(),
+                audit,
+                events,
+                ModerationFakes.broadcast(),
+                noEscalation(),
+                clock);
+    }
+
+    private TempWarn tempWarn() {
+        return new TempWarn(
+                repository,
+                guard,
+                ModerationFakes.notifier(),
+                audit,
+                events,
+                ModerationFakes.broadcast(),
+                noEscalation(),
+                clock);
+    }
+
+    private WarnEscalator noEscalation() {
+        Mute mute = mute();
+        SanctionDurationLimit limit = new SanctionDurationLimit(ModerationFakes.exempt());
+        TempBan tempBan = new TempBan(
+                repository,
+                new FakeSanctions(),
+                guard,
+                ModerationFakes.notifier(),
+                audit,
+                events,
+                history,
+                limit,
+                ModerationFakes.broadcast(),
+                clock);
+        Ban ban = new Ban(
+                repository,
+                new FakeSanctions(),
+                guard,
+                ModerationFakes.notifier(),
+                audit,
+                events,
+                history,
+                limit,
+                ModerationFakes.broadcast(),
+                clock);
+        Kick kick =
+                new Kick(new FakeSanctions(), guard, ModerationFakes.notifier(), audit, ModerationFakes.broadcast());
+        return new WarnEscalator(
+                com.uxplima.uxmessentials.moderation.domain.WarnEscalation.NONE,
+                mute,
+                tempBan,
+                ban,
+                kick,
+                ModerationFakes.notifier());
     }
 }

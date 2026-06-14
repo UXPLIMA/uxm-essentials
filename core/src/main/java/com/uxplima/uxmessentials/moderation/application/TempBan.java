@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -26,6 +27,10 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * blank/malformed/zero duration is refused. The exempt target is refused. On success the tempban row is
  * upserted, an online target is kicked immediately via {@link Sanctions}, {@code PlayerTempbanned} is
  * published, and the ban-on-login listener bars their reconnection until the expiry passes.
+ *
+ * <p>The requested span is first clamped to the actor's {@code ban.maxduration} tier ({@link
+ * SanctionDurationLimit}); when it is reduced the actor is told {@code MOD_DURATION_CAPPED}. Unless the ban is
+ * silent ({@code /tempban -s}), the staff broadcast announces it.
  */
 public final class TempBan {
 
@@ -36,6 +41,8 @@ public final class TempBan {
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
     private final SanctionHistoryRecorder history;
+    private final SanctionDurationLimit limit;
+    private final SanctionBroadcast broadcast;
     private final Clock clock;
 
     public TempBan(
@@ -46,6 +53,8 @@ public final class TempBan {
             ModerationAudit audit,
             DomainEventPublisher events,
             SanctionHistoryRecorder history,
+            SanctionDurationLimit limit,
+            SanctionBroadcast broadcast,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
@@ -54,12 +63,14 @@ public final class TempBan {
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
         this.history = Objects.requireNonNull(history, "history");
+        this.limit = Objects.requireNonNull(limit, "limit");
+        this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /** Tempban {@code target} for the parsed span of {@code rawDuration}. */
     public Result<TempbanState.Active, ModerationError> tempban(
-            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason) {
+            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(rawDuration, "rawDuration");
@@ -72,12 +83,14 @@ public final class TempBan {
             // A tempban must be timed: a permanent or malformed input is BAD_DURATION (no permanent tempban).
             return reject(actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
-        return apply(actor, target, span.get(), reason);
+        return apply(actor, target, span.get(), reason, silent);
     }
 
     private Result<TempbanState.Active, ModerationError> apply(
-            PlayerRef actor, PlayerRef target, Duration span, Optional<String> reason) {
+            PlayerRef actor, PlayerRef target, Duration requested, Optional<String> reason, boolean silent) {
         Instant now = clock.instant();
+        Duration span = limit.cap(actor, "ban", requested);
+        boolean capped = span.compareTo(requested) < 0;
         TempbanState.Active ban =
                 (TempbanState.Active) TempbanState.active(now.plus(span), Issuer.of(actor), reason, now);
         repository.ensureUserExists(target, now);
@@ -86,6 +99,19 @@ public final class TempBan {
         kickNow(target, span, reason);
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, SanctionDuration.format(span), true, reason);
+        if (capped) {
+            notifier.send(
+                    actor, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
+        }
+        if (!silent) {
+            broadcast.announce(
+                    ModerationMessageKey.MOD_BROADCAST_TEMPBAN,
+                    Map.of(
+                            "actor", actor.name(),
+                            "target", target.name(),
+                            "reason", reason.orElse(""),
+                            "duration", SanctionDuration.format(span)));
+        }
         return Result.ok(ban);
     }
 

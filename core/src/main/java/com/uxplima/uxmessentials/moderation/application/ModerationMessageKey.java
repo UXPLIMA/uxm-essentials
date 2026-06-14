@@ -134,6 +134,15 @@ public enum ModerationMessageKey implements MessageKey {
     SEENIP_ALTS("moderation.seenip.alts"),
     SEENIP_NO_IP("moderation.seenip.no-ip"),
 
+    // staff broadcast (the -s/silent flag suppresses these), duration tier cap, warn escalation
+    MOD_BROADCAST_BAN("moderation.broadcast.ban"),
+    MOD_BROADCAST_TEMPBAN("moderation.broadcast.tempban"),
+    MOD_BROADCAST_MUTE("moderation.broadcast.mute"),
+    MOD_BROADCAST_KICK("moderation.broadcast.kick"),
+    MOD_BROADCAST_WARN("moderation.broadcast.warn"),
+    MOD_DURATION_CAPPED("moderation.duration-capped"),
+    MOD_WARN_ESCALATED("moderation.warn-escalated"),
+
     // shared moderation failures
     TARGET_EXEMPT("moderation.target-exempt"),
     BAD_DURATION("moderation.bad-duration"),
