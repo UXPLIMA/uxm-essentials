@@ -37,6 +37,12 @@ public enum VaultsMessageKey implements MessageKey {
     VAULT_DELETE_UNKNOWN("vaults.delete-unknown"),
     VAULT_CANNOT_AFFORD("vaults.cannot-afford"),
 
+    // /vault rename <n> [name], /vault icon <n> [material]
+    VAULT_RENAMED("vaults.renamed"),
+    VAULT_NAME_CLEARED("vaults.name-cleared"),
+    VAULT_ICON_SET("vaults.icon-set"),
+    VAULT_RENAME_UNKNOWN("vaults.rename-unknown"),
+
     // item blacklist (items refused on save and returned to the player)
     VAULT_ITEM_BLOCKED("vaults.item-blocked"),
 

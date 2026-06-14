@@ -79,7 +79,8 @@ class VaultQuotaTest {
 
     @Test
     void openAtADifferentSizeAdoptsTheNewHeightKeepingContents() {
-        Vault vault = Vault.of(VaultId.of(OWNER, 1), new VaultSize(3), VaultContents.of(new byte[] {1, 2}), NOW);
+        Vault vault =
+                Vault.of(VaultId.of(OWNER, 1), new VaultSize(3), VaultContents.of(new byte[] {1, 2}), null, null, NOW);
 
         Vault wider = vault.openedAt(new VaultSize(6));
 

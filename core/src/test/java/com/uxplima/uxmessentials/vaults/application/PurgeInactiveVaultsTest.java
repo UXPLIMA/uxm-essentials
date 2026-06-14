@@ -81,6 +81,11 @@ class PurgeInactiveVaultsTest {
         }
 
         @Override
+        public List<VaultSummary> summaries(PlayerRef owner) {
+            throw new UnsupportedOperationException("not exercised");
+        }
+
+        @Override
         public int count(PlayerRef owner) {
             throw new UnsupportedOperationException("not exercised");
         }

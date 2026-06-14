@@ -17,5 +17,11 @@ public enum VaultError {
     CANNOT_AFFORD,
 
     /** A {@code /vault delete <n>} of an index the owner has no vault row for — there is nothing to remove. */
-    DELETE_UNKNOWN
+    DELETE_UNKNOWN,
+
+    /**
+     * A presentation change ({@code /vault rename}, {@code /vault icon}) targeting an index the owner has no
+     * vault row for — there is nothing to rename or re-icon.
+     */
+    VAULT_UNKNOWN
 }

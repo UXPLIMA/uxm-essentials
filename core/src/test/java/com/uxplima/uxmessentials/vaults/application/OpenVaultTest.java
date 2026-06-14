@@ -232,6 +232,16 @@ class OpenVaultTest {
         }
 
         @Override
+        public List<VaultSummary> summaries(PlayerRef owner) {
+            List<VaultSummary> out = new ArrayList<>();
+            rows.values().stream()
+                    .filter(v -> v.owner().equals(owner.uuid()))
+                    .sorted((a, b) -> Integer.compare(a.index(), b.index()))
+                    .forEach(v -> out.add(new VaultSummary(v.index(), v.displayName(), v.iconMaterial())));
+            return out;
+        }
+
+        @Override
         public int count(PlayerRef owner) {
             return (int) rows.keySet().stream()
                     .filter(id -> id.owner().equals(owner.uuid()))

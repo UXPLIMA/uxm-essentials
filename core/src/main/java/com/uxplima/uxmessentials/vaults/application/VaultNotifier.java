@@ -84,6 +84,26 @@ public final class VaultNotifier {
         send(viewer, VaultsMessageKey.VAULT_DELETE_UNKNOWN, Map.of("index", Integer.toString(index)));
     }
 
+    /** Tell {@code viewer} the vault at {@code index} was renamed to {@code name}. */
+    public void renamed(PlayerRef viewer, int index, String name) {
+        send(viewer, VaultsMessageKey.VAULT_RENAMED, Map.of("index", Integer.toString(index), "name", name));
+    }
+
+    /** Tell {@code viewer} the vault at {@code index} had its display name cleared. */
+    public void nameCleared(PlayerRef viewer, int index) {
+        send(viewer, VaultsMessageKey.VAULT_NAME_CLEARED, Map.of("index", Integer.toString(index)));
+    }
+
+    /** Tell {@code viewer} the vault at {@code index} had its icon set to {@code material}. */
+    public void iconSet(PlayerRef viewer, int index, String material) {
+        send(viewer, VaultsMessageKey.VAULT_ICON_SET, Map.of("index", Integer.toString(index), "material", material));
+    }
+
+    /** Tell {@code viewer} there is no vault at {@code index} to rename or re-icon. */
+    public void renameUnknown(PlayerRef viewer, int index) {
+        send(viewer, VaultsMessageKey.VAULT_RENAME_UNKNOWN, Map.of("index", Integer.toString(index)));
+    }
+
     /** Tell {@code viewer} they cannot afford the vault fee of {@code cost}. */
     public void cannotAfford(PlayerRef viewer, String cost) {
         send(viewer, VaultsMessageKey.VAULT_CANNOT_AFFORD, Map.of("cost", cost));
