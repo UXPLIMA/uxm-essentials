@@ -28,8 +28,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 /**
  * {@code /msg <player> <text>}: send a private message, applying every delivery gate in order. The target is
  * already resolved by the command adapter, whose lookup is vanish-aware (a vanished target the sender cannot
- * see is offered as unknown, so its presence is never leaked — the same {@code canSee} seam the teleport
- * context applies to {@code /tpa}). This use case then gates on mute (the moderation soft-couple), self,
+ * see is handed to this use case as offline — {@code targetOnline=false} — so its presence is never leaked,
+ * the same {@code canSee} seam the teleport context applies to {@code /tpa}). This use case then gates on the
+ * online branch on mute (the moderation soft-couple), self,
  * toggle, and ignore: a target who toggled DMs off rejects with a visible reason; a target who ignores the
  * sender silently declines — the sender's echo still says delivered, so an ignore is not observable,
  * matching the ignore-aware contract.
@@ -48,11 +49,12 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * append path {@link SendMail} uses) and the sender is told it became mail; with the policy off the existing
  * {@code TARGET_OFFLINE} rejection stands.
  *
- * <p><strong>Vanish privacy is untouched.</strong> A vanished target the sender cannot see is resolved as
- * "offline/unknown" at the command boundary ({@code MessagingCommandSupport#visibleTarget}), which never
- * calls this use case for that target — so a hidden player is never routed to mail and their presence is
- * never leaked. The offline → mail fallback applies only to a genuinely-offline target the adapter passes in
- * with {@code targetOnline=false}; the existing not-found semantics for a hidden target are preserved exactly.
+ * <p><strong>Vanish privacy is untouched.</strong> A vanished target the sender cannot see is routed by the
+ * command adapter ({@code MsgCommand}) through the same {@code targetOnline=false} offline path as a genuinely
+ * offline player — so this use case treats it exactly as offline: it stores mail when {@code offlineToMail} is
+ * on (the note waits in the vanished player's box) and renders the {@code TARGET_OFFLINE} rejection when it is
+ * off. A hidden target never takes the live delivery branch, so their presence is never leaked and the sender's
+ * feedback is byte-identical to that for a real offline target in both config modes.
  */
 public final class SendMessage {
 
@@ -109,8 +111,8 @@ public final class SendMessage {
      * Send {@code body} from {@code sender} to {@code target}, applying every gate. When {@code targetOnline}
      * is false the target is genuinely offline: with the offline-to-mail policy on the message is stored as
      * mail and the sender is told; with it off the {@code TARGET_OFFLINE} rejection stands. (A vanished,
-     * unseeable target is reported as offline at the command boundary and never reaches here — see the class
-     * note on vanish privacy.)
+     * unseeable target is routed here on this same {@code targetOnline=false} branch, so it is handled exactly
+     * as a genuinely-offline target — see the class note on vanish privacy.)
      */
     public Result<Unit, MessagingError> send(
             PlayerRef sender, PlayerRef target, MessageBody body, boolean targetOnline) {

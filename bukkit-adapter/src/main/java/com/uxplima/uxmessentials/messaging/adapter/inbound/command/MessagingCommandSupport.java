@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.messaging.adapter.inbound.command;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -11,7 +10,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
-import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -30,9 +28,10 @@ import org.jspecify.annotations.Nullable;
  * {@code MessageDelivery}). Concrete command classes extend this so each stays focused on building its node
  * and mapping its arguments to one use-case call.
  *
- * <p>{@link #visibleTarget} is the vanish-aware target gate {@code /msg} applies after a selector argument
- * matches a player: a target the sender cannot see is reported as offline, so a vanished player's presence is
- * never leaked — the same {@code canSee} seam the teleport context applies to {@code /tpa}.
+ * <p>The vanish-aware target gate {@code /msg} applies lives in the command itself: a target the sender cannot
+ * see is routed through the offline path (so it is indistinguishable from a genuinely-offline player and a
+ * vanished player's presence is never leaked) — the same {@code canSee} seam the teleport context applies to
+ * {@code /tpa}.
  */
 @NullMarked
 abstract class MessagingCommandSupport {
@@ -77,21 +76,6 @@ abstract class MessagingCommandSupport {
         } catch (IllegalArgumentException invalid) {
             return null;
         }
-    }
-
-    /**
-     * Apply the vanish gate to a {@code resolved} player a name lookup already matched as online: a target
-     * {@code sender} cannot see is reported as offline (never as present), so the lookup never leaks a hidden
-     * player's presence — the same {@code canSee} seam teleport's {@code /tpa} applies. The caller has
-     * established the player is online, so only the visibility check remains; a hidden target yields empty so
-     * the message is never delivered and never routed to mail.
-     */
-    final Optional<PlayerRef> visibleTarget(PlayerRef sender, PlayerRef resolved) {
-        if (services.vanish().isHiddenFrom(sender, resolved)) {
-            notify(sender, MessagingMessageKey.MSG_TARGET_OFFLINE, Map.of("player", resolved.name()));
-            return Optional.empty();
-        }
-        return Optional.of(resolved);
     }
 
     /** Render {@code key} for {@code viewer} with {@code placeholders} and deliver it through the sink. */

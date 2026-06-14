@@ -30,10 +30,15 @@ import org.jspecify.annotations.NullMarked;
  * {@code send(..., targetOnline=false)} so the use case's offline → mail fallback runs (config-gated by
  * {@code offline-to-mail}).
  *
- * <p>The vanish privacy seam is preserved exactly: an online target the sender cannot see is gated by
- * {@link #visibleTarget} to {@code MSG_TARGET_OFFLINE} and is never delivered <em>and never routed to mail</em>
- * — a hidden player's presence is never leaked, and they are not silently turned into a mail recipient. Only a
- * name that resolves to no online player and no played-before profile is rejected as unknown.
+ * <p>The vanish privacy seam is preserved exactly, and is made <em>indistinguishable</em> from a genuine
+ * offline: an online target the sender cannot see (the {@code vanish} gate reports hidden) is never delivered
+ * live, but rather than short-circuiting with a hidden-only response it is routed through the same 4-arg
+ * {@code send(..., targetOnline=false)} as a genuinely-offline player. So with {@code offline-to-mail} on the
+ * sender gets {@code MSG_SENT_TO_MAIL} and the note waits in the vanished player's box; with it off the sender
+ * gets {@code MSG_TARGET_OFFLINE} — byte-identical to a real offline target in both config modes, so the
+ * sender can never infer "online-but-hidden" from the feedback. A hidden player's presence is never leaked and
+ * they never receive a live delivery. Only a name that resolves to no online player and no played-before
+ * profile is rejected as unknown.
  */
 @NullMarked
 public final class MsgCommand extends MessagingCommandSupport implements CommandRegistration {
@@ -72,10 +77,16 @@ public final class MsgCommand extends MessagingCommandSupport implements Command
         String name = ctx.getArgument("player", String.class);
         Optional<PlayerRef> online = services.players().findOnlineByName(name);
         if (online.isPresent()) {
-            // The online path: gate vanish privacy first (a hidden target reports offline and is not routed to
-            // mail), then deliver live through the 3-arg send (targetOnline=true).
-            visibleTarget(from, online.get())
-                    .ifPresent(to -> services.sendMessage().send(from, to, text));
+            PlayerRef target = online.get();
+            if (services.vanish().isHiddenFrom(from, target)) {
+                // The target is online but the sender cannot see them. Route through the offline path so the
+                // outcome is identical to a genuinely-offline target (mail when offline-to-mail is on, the
+                // TARGET_OFFLINE rejection when it is off) — never a live delivery, never a hidden-only tell.
+                services.sendMessage().send(from, target, text, false);
+                return Command.SINGLE_SUCCESS;
+            }
+            // The online path: a visible target takes the live delivery through the 3-arg send (targetOnline=true).
+            services.sendMessage().send(from, target, text);
             return Command.SINGLE_SUCCESS;
         }
         Optional<PlayerRef> offline = services.players().findByName(name);

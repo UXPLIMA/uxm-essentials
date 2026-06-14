@@ -91,6 +91,8 @@ class MessagingSendPathTest {
     private InMemoryPresenceStore presence;
     private MutableAfkStatus afk;
     private CountingScheduler scheduler;
+    private VanishVisibility vanish;
+    private boolean offlineToMail;
 
     @BeforeEach
     void setUp() {
@@ -101,6 +103,8 @@ class MessagingSendPathTest {
         presence = new InMemoryPresenceStore(Clock.fixed(T0, ZoneOffset.UTC));
         afk = new MutableAfkStatus();
         scheduler = new CountingScheduler();
+        vanish = (viewer, target) -> false; // no one hidden unless a test opts in
+        offlineToMail = true; // the shipped default; a test flips it to exercise the policy-off branch
     }
 
     @AfterEach
@@ -149,6 +153,42 @@ class MessagingSendPathTest {
         // Delivered live (no mail), and the sender additionally got the AFK courtesy notice.
         assertThat(mail.appended).isEmpty();
         assertThat(sink.keys).contains(MessagingMessageKey.MSG_TARGET_AFK);
+    }
+
+    @Test
+    void msgToAHiddenOnlineTargetIsIndistinguishableFromOfflineWhenMailIsOn() {
+        PlayerMock alice = server.addPlayer("Alice");
+        alice.setOp(true); // holds uxmessentials.msg.use
+        PlayerMock bob = server.addPlayer("Bob");
+        vanish = (viewer, target) -> true; // Bob is online but unseeable by Alice
+
+        executeMsg(alice, "msg Bob you there?");
+
+        // No live delivery (neither the sender echo nor the recipient line), but a mail was stored for Bob and
+        // the sender got MSG_SENT_TO_MAIL — byte-identical to messaging a genuinely-offline player.
+        assertThat(sink.keys).doesNotContain(MessagingMessageKey.MSG_RECEIVED, MessagingMessageKey.MSG_SENT);
+        assertThat(mail.appended).hasSize(1);
+        MailItem stored = mail.appended.get(0);
+        assertThat(stored.recipient().name()).isEqualTo("Bob");
+        assertThat(stored.recipient().uuid()).isEqualTo(bob.getUniqueId()); // mailed to Bob's real ref
+        assertThat(stored.body().value()).isEqualTo("you there?");
+        assertThat(sink.keys).contains(MessagingMessageKey.MSG_SENT_TO_MAIL);
+    }
+
+    @Test
+    void msgToAHiddenOnlineTargetIsIndistinguishableFromOfflineWhenMailIsOff() {
+        offlineToMail = false; // policy off: a hidden target must look exactly like an offline one
+        PlayerMock alice = server.addPlayer("Alice");
+        alice.setOp(true); // holds uxmessentials.msg.use
+        server.addPlayer("Bob");
+        vanish = (viewer, target) -> true; // Bob is online but unseeable by Alice
+
+        executeMsg(alice, "msg Bob you there?");
+
+        // Same as a genuinely-offline target with the policy off: TARGET_OFFLINE, no live delivery, no mail.
+        assertThat(sink.keys).contains(MessagingMessageKey.MSG_TARGET_OFFLINE);
+        assertThat(sink.keys).doesNotContain(MessagingMessageKey.MSG_RECEIVED, MessagingMessageKey.MSG_SENT);
+        assertThat(mail.appended).isEmpty();
     }
 
     @Test
@@ -214,7 +254,6 @@ class MessagingSendPathTest {
         MessagingNotifier notifier = new MessagingNotifier(messages, sink);
         MessageDelivery delivery = new BukkitMessageDelivery(messages, sink);
         MutePolicy mute = MutePolicy.NEVER;
-        VanishVisibility vanish = (viewer, target) -> false;
         PlayerLookup players = new CapturingLookup(server);
         ConversationStore conversations = new InMemoryConversationStore();
         ReplyRoutingStore replies = new AcceptingReplies();
@@ -231,7 +270,7 @@ class MessagingSendPathTest {
                 mute,
                 afk,
                 mail,
-                true,
+                offlineToMail,
                 notifier,
                 events,
                 clock);
