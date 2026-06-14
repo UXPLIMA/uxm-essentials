@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.nametags.adapter.outbound;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,9 +43,11 @@ import org.jspecify.annotations.NullMarked;
  *
  * <h2>Who owns which loop</h2>
  *
- * The lib's {@code show(...)} starts a region-thread refresh task per wearer that re-asks the viewer supplier for the
- * live audience, diffs it (spawn newcomers, drop departed, refresh the rest), re-resolves the per-viewer text, and
- * re-applies line-of-sight fading — so this class runs <em>no</em> render loop of its own. What this class still owns is
+ * The lib's {@code show(...)} starts a region-thread refresh task per wearer — at the operator's configured
+ * {@code refresh-ticks} period, the same interval that drives this context's animation clock — that re-asks the viewer
+ * supplier for the live audience, diffs it (spawn newcomers, drop departed, refresh the rest), re-resolves the
+ * per-viewer text, and re-applies line-of-sight fading — so this class runs <em>no</em> render loop of its own. What
+ * this class still owns is
  * <em>format selection</em>: a permission/world/gamemode/sneak/show-when change is not something the lib loop sees, so
  * {@link #update} re-selects the wearer's format each reconcile tick and removes-then-re-shows when the selected format
  * (or its appearance) changed. A wearer who matches no format has their handle removed; the eligible-viewer cull
@@ -68,17 +71,20 @@ public final class PacketNametagPresenter {
     private final NametagRenderer libRenderer;
     private final AnimationRegistry animations;
     private final NametagVanish vanish;
+    private final Supplier<Duration> refreshPeriod;
     private final Map<UUID, Tracked> live = new ConcurrentHashMap<>();
 
     public PacketNametagPresenter(
             Supplier<NametagConfig> config,
             NametagRenderer libRenderer,
             AnimationRegistry animations,
-            NametagVanish vanish) {
+            NametagVanish vanish,
+            Supplier<Duration> refreshPeriod) {
         this.config = Objects.requireNonNull(config, "config");
         this.libRenderer = Objects.requireNonNull(libRenderer, "libRenderer");
         this.animations = Objects.requireNonNull(animations, "animations");
         this.vanish = Objects.requireNonNull(vanish, "vanish");
+        this.refreshPeriod = Objects.requireNonNull(refreshPeriod, "refreshPeriod");
     }
 
     /** Show {@code wearer}'s nametag from the selected format. Must run on the wearer's region thread. */
@@ -96,8 +102,16 @@ public final class PacketNametagPresenter {
         }
         NametagFormat format = selected.get();
         Appearance appearance = NametagAppearanceMapper.toAppearance(format.appearance());
-        NametagHandle handle =
-                libRenderer.show(wearer, appearance, viewerSupplier(wearer, format), perViewerText(format, wearer));
+        // One line cache per wearer-show: the lib loop calls the per-viewer text callback once per viewer each refresh,
+        // and every viewer resolves to identical lines for a given animation frame today, so the cache parses the frame
+        // once and hands the same list to every viewer until the frame advances.
+        LineCache lineCache = new LineCache();
+        NametagHandle handle = libRenderer.show(
+                wearer,
+                appearance,
+                viewerSupplier(wearer, format),
+                perViewerText(format, wearer, lineCache),
+                Objects.requireNonNull(refreshPeriod.get(), "refreshPeriod"));
         live.put(wearer.getUniqueId(), new Tracked(handle, format));
     }
 
@@ -179,11 +193,14 @@ public final class PacketNametagPresenter {
 
     // The per-viewer text the lib re-asks for every refresh: resolve the wearer's lines for this specific viewer,
     // reading the live animation frame at call time so the lib's refresh loop animates without a plugin render loop.
-    // The lines carry no relational (viewer-aware) placeholder today, so every viewer resolves to identical text, but
-    // the resolution still flows through the per-viewer callback so a relational placeholder added later needs no
-    // wiring change here — only the viewer would be threaded into the PAPI bridge.
-    private PerViewerText perViewerText(NametagFormat format, Player wearer) {
-        return viewer -> renderLines(format, wearer);
+    // The lines carry no relational (viewer-aware) placeholder today, so every viewer resolves to identical text and
+    // the
+    // per-wearer LineCache parses each frame once and replays it to every viewer. The resolution still flows through
+    // the
+    // per-viewer callback so a relational placeholder added later needs no wiring change — that change would bypass the
+    // cache for the placeholder-bearing lines and thread the viewer into the PAPI bridge.
+    private PerViewerText perViewerText(NametagFormat format, Player wearer, LineCache lineCache) {
+        return viewer -> lineCache.linesFor(animations.tick(), () -> renderLines(format, wearer));
     }
 
     private List<Component> renderLines(NametagFormat format, Player wearer) {
@@ -274,4 +291,31 @@ public final class PacketNametagPresenter {
      * and triggers a re-show).
      */
     private record Tracked(NametagHandle handle, NametagFormat format) {}
+
+    /**
+     * A per-wearer, per-frame memo of the rendered lines. The lib's refresh loop calls the per-viewer text callback once
+     * per viewer on the wearer's region thread; every viewer resolves to identical lines for a given animation frame, so
+     * the first call of a frame renders the lines (one PAPI-expand + MiniMessage parse per line) and caches them keyed by
+     * that frame, and every later viewer in the same frame replays the cached list. A new frame (the global animation
+     * clock advanced) misses the cache and renders once more, so a frame's parse cost is one regardless of audience size.
+     *
+     * <p>Not shared across wearers and only touched from one wearer's region thread per show, so the holder needs no
+     * synchronisation. A format/appearance change discards this cache with the old handle (the re-show builds a fresh
+     * one), so there is no stale-content path.
+     */
+    private static final class LineCache {
+
+        private static final long NO_FRAME = Long.MIN_VALUE;
+
+        private long cachedFrame = NO_FRAME;
+        private List<Component> cachedLines = List.of();
+
+        List<Component> linesFor(long frame, Supplier<List<Component>> render) {
+            if (frame != cachedFrame) {
+                cachedLines = render.get();
+                cachedFrame = frame;
+            }
+            return cachedLines;
+        }
+    }
 }

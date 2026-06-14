@@ -242,7 +242,8 @@ class PacketNametagPresenterTest {
         // Never obstructed: the default appearance does not fade through blocks anyway, so the line-of-sight check is
         // not even invoked, but a benign fake keeps the wiring explicit.
         NametagRenderer libRenderer = new NametagRenderer(packets, scheduler, (player, entity) -> false);
-        return new PacketNametagPresenter(() -> config, libRenderer, new AnimationRegistry(List.of()), vanish);
+        return new PacketNametagPresenter(
+                () -> config, libRenderer, new AnimationRegistry(List.of()), vanish, () -> Duration.ofSeconds(1));
     }
 
     private static NametagConfig singleFormat(String name, DisplayCondition condition) {

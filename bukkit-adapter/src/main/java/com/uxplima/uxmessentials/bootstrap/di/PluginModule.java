@@ -657,10 +657,11 @@ public final class PluginModule {
         // nametags persists nothing: the per-wearer formats are config-authored under modules/nametags/config.conf. It
         // soft-couples to presence (vanish-aware viewer culling through Bukkit's canSee graph, degrading to "everyone
         // can see everyone" with presence off), so nothing is captured for a later context and there is no hard edge.
-        // The nametag is always-on (no per-player toggle) so it publishes no command. The renderer spawns a
-        // viewer-restricted TextDisplay per wearer over uxmLib's native-display stack; the render timer on the
-        // Scheduler port is stopped and every spawned nametag despawned on disable so a disable/reload leaves no
-        // orphan.
+        // The nametag is always-on (no per-player toggle) so it publishes no command. Rendering goes through uxmLib's
+        // packet NametagRenderer: per-viewer spawn/metadata/remove bundles with no real entity, and a per-wearer
+        // refresh
+        // loop the lib owns. On disable the reconcile timer on the Scheduler port is stopped and presenter.removeAll()
+        // sends every wearer's remove packets and cancels each lib refresh task, so a disable/reload leaves no orphan.
         NametagsWiring.Wired wired = NametagsWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);

@@ -72,8 +72,12 @@ public final class NametagsWiring {
         // Vanish is soft-coupled through Bukkit's canSee graph; it degrades to "everyone can see everyone" when the
         // presence module is off, so no nametag-side branch is needed for the presence-disabled case.
         NametagVanish vanish = new CanSeeNametagVanish();
-        PacketNametagPresenter presenter =
-                new PacketNametagPresenter(settings::formats, libRenderer, animations, vanish);
+        // The presenter passes the same configured refresh interval into the lib's per-wearer refresh loop that drives
+        // the reconcile/animation timer below, so a refresh-ticks change moves the lib's text/viewer/line-of-sight
+        // cadence and the animation clock in lockstep — the lib loop reads the period once per show, and a
+        // format/appearance change re-shows, so a reload's new cadence takes effect on the next re-show.
+        PacketNametagPresenter presenter = new PacketNametagPresenter(
+                settings::formats, libRenderer, animations, vanish, settings::refreshInterval);
         NametagRenderTask renderTask = new NametagRenderTask(
                 kernel.scheduler(), presenter, animations, settings::refreshInterval, running::get);
 
