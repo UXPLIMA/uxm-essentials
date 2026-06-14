@@ -146,7 +146,23 @@ class HistoryRecordingAndChecksTest {
                         NOW));
         RecordingSink sink = new RecordingSink();
 
-        new CheckBan(repository, ModerationFakes.recordingNotifier(sink)).show(ACTOR, TARGET);
+        new CheckBan(repository, ModerationFakes.recordingNotifier(sink), clock).show(ACTOR, TARGET);
+
+        assertThat(sink.sent(ACTOR, ModerationMessageKey.MOD_CHECK_BANNED)).isTrue();
+    }
+
+    @Test
+    void checkBanReportsBannedForAPermanentBan() {
+        repository.saveTempban(
+                TARGET,
+                TempbanState.active(
+                        Instant.MAX,
+                        com.uxplima.uxmessentials.moderation.domain.Issuer.of(ACTOR),
+                        Optional.of("grief"),
+                        NOW));
+        RecordingSink sink = new RecordingSink();
+
+        new CheckBan(repository, ModerationFakes.recordingNotifier(sink), clock).show(ACTOR, TARGET);
 
         assertThat(sink.sent(ACTOR, ModerationMessageKey.MOD_CHECK_BANNED)).isTrue();
     }
@@ -155,7 +171,23 @@ class HistoryRecordingAndChecksTest {
     void checkBanReportsNotBannedWhenThereIsNoBan() {
         RecordingSink sink = new RecordingSink();
 
-        new CheckBan(repository, ModerationFakes.recordingNotifier(sink)).show(ACTOR, TARGET);
+        new CheckBan(repository, ModerationFakes.recordingNotifier(sink), clock).show(ACTOR, TARGET);
+
+        assertThat(sink.sent(ACTOR, ModerationMessageKey.MOD_CHECK_NOT_BANNED)).isTrue();
+    }
+
+    @Test
+    void checkBanReportsNotBannedWhenTheTimedBanHasLapsed() {
+        repository.saveTempban(
+                TARGET,
+                TempbanState.active(
+                        NOW.minus(Duration.ofMinutes(1)),
+                        com.uxplima.uxmessentials.moderation.domain.Issuer.of(ACTOR),
+                        Optional.of("grief"),
+                        NOW.minus(Duration.ofHours(1))));
+        RecordingSink sink = new RecordingSink();
+
+        new CheckBan(repository, ModerationFakes.recordingNotifier(sink), clock).show(ACTOR, TARGET);
 
         assertThat(sink.sent(ACTOR, ModerationMessageKey.MOD_CHECK_NOT_BANNED)).isTrue();
     }

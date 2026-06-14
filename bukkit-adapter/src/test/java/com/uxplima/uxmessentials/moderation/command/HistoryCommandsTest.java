@@ -94,7 +94,7 @@ class HistoryCommandsTest {
         lenient().when(services.targets()).thenReturn(targets);
         lenient().when(services.reviewSanctionHistory()).thenReturn(new ReviewSanctionHistory(history, notifier));
         lenient().when(services.reviewStaffHistory()).thenReturn(new ReviewStaffHistory(history, lookup, notifier));
-        lenient().when(services.checkBan()).thenReturn(new CheckBan(repository, notifier));
+        lenient().when(services.checkBan()).thenReturn(new CheckBan(repository, notifier, clock));
         lenient().when(services.checkMute()).thenReturn(new CheckMute(repository, notifier, clock));
     }
 

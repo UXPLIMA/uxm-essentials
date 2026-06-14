@@ -214,7 +214,7 @@ public final class ModerationWiring {
                 .reviewMuteHistory(new ReviewMuteHistory(sanctionHistory, notifier))
                 .reviewSanctionHistory(new ReviewSanctionHistory(sanctionHistory, notifier))
                 .reviewStaffHistory(new ReviewStaffHistory(sanctionHistory, kernel.playerLookup(), notifier))
-                .checkBan(new CheckBan(repository, notifier))
+                .checkBan(new CheckBan(repository, notifier, clock))
                 .checkMute(new CheckMute(repository, notifier, clock))
                 .banIp(new BanIp(repository, notifier, audit, kernel.events(), history, clock))
                 .tempBanIp(new TempBanIp(repository, notifier, audit, kernel.events(), history, clock))
