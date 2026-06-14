@@ -40,6 +40,16 @@ public enum VaultsMessageKey implements MessageKey {
     // item blacklist (items refused on save and returned to the player)
     VAULT_ITEM_BLOCKED("vaults.item-blocked"),
 
+    // vault-selector GUI (/vault with several owned): one icon per index, owned vs locked
+    VAULT_SELECTOR_TITLE("vaults.selector.title"),
+    VAULT_SELECTOR_ENTRY_NAME("vaults.selector.entry.name"),
+    VAULT_SELECTOR_ENTRY_LORE("vaults.selector.entry.lore"),
+    VAULT_SELECTOR_LOCKED_NAME("vaults.selector.locked.name"),
+    VAULT_SELECTOR_LOCKED_LORE("vaults.selector.locked.lore"),
+    VAULT_SELECTOR_LOCKED_CLICK("vaults.selector.locked.click"),
+    VAULT_SELECTOR_PREV("vaults.selector.prev"),
+    VAULT_SELECTOR_NEXT("vaults.selector.next"),
+
     // shared
     VAULT_SAVED("vaults.saved"),
     VAULT_PLAYERS_ONLY("vaults.players-only");

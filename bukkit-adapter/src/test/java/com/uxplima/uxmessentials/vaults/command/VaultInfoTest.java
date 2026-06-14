@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommand;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
@@ -143,11 +144,15 @@ class VaultInfoTest {
         VaultChargeSettings chargeSettings = VaultChargeSettings.allFree();
         VaultCharge charge = new VaultCharge(kernel.permissions(), Optional.empty(), chargeSettings);
         SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
-        VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
+        VaultView view = VaultViews.view(kernel, saveVault);
         VaultAudit audit = new NoAudit();
+        OpenVault openVault = new OpenVault(repository, amount, size, charge, Clock.systemUTC());
+        ListVaults listVaults = new ListVaults(repository);
+        VaultSelectorView selector =
+                VaultViews.selector(kernel, listVaults, amount, openVault, view, notifier, chargeSettings);
         return new VaultServices(
-                new OpenVault(repository, amount, size, charge, Clock.systemUTC()),
-                new ListVaults(repository),
+                openVault,
+                listVaults,
                 new OpenAdminVault(repository, size, audit, Clock.systemUTC()),
                 new DeleteVault(repository, charge, audit, notifier),
                 saveVault,
@@ -155,6 +160,8 @@ class VaultInfoTest {
                 size,
                 notifier,
                 view,
+                selector,
+                true,
                 chargeSettings,
                 kernel);
     }

@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommands;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.LoggingVaultAudit;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
@@ -109,10 +110,29 @@ public final class VaultsWiring {
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
         VaultCharge charge = buildCharge(kernel, settings, vaultEconomy);
         SaveVault saveVault = new SaveVault(repository, kernel.events(), clock);
-        VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
+        VaultView view = new VaultView(
+                kernel.messages(),
+                kernel.messageSink(),
+                saveVault,
+                kernel.scheduler(),
+                kernel.permissions(),
+                settings.itemPolicy());
+        OpenVault openVault = new OpenVault(repository, amountQuota, sizeQuota, charge, clock);
+        ListVaults listVaults = new ListVaults(repository);
+        VaultSelectorView selector = new VaultSelectorView(
+                kernel.messages(),
+                kernel.messageSink(),
+                kernel.scheduler(),
+                listVaults,
+                amountQuota,
+                openVault,
+                view,
+                notifier,
+                settings.chargeSettings(),
+                settings.selectorSettings());
         return new VaultServices(
-                new OpenVault(repository, amountQuota, sizeQuota, charge, clock),
-                new ListVaults(repository),
+                openVault,
+                listVaults,
                 new OpenAdminVault(repository, sizeQuota, audit, clock),
                 new DeleteVault(repository, charge, audit, notifier),
                 saveVault,
@@ -120,6 +140,8 @@ public final class VaultsWiring {
                 sizeQuota,
                 notifier,
                 view,
+                selector,
+                settings.selectorEnabled(),
                 settings.chargeSettings(),
                 kernel);
     }

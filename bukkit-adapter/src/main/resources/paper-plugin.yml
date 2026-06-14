@@ -747,6 +747,9 @@ permissions:
   uxmessentials.vault.free:
     description: 'Bypass every vault economy fee (create/open); no refund is paid on delete.'
     default: false
+  uxmessentials.vault.bypass-blacklist:
+    description: 'Store any item in a vault, ignoring the blacklist-materials list (items are not returned).'
+    default: op
   # communication context (docs/permissions.md "Communication"). The operator's broadcast surface:
   # connection-message policies, the rotating announcer, and the info pages. The per-page nodes
   # uxmessentials.communication.info.<name> (one per configured info page: /rules, /motd, /info, …) are an open

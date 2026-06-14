@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommand;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
@@ -147,6 +148,21 @@ class VaultGuiPathTest {
         assertThat(sink.keys).contains(com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_OPENED);
     }
 
+    @Test
+    void openWithNoIndexOpensTheSelectorWhenSeveralVaultsAreOwned() {
+        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand();
+        // Allocate two vaults so the no-arg path crosses the >1 selector threshold.
+        execute(dispatcher, "vault 1");
+        player.closeInventory();
+        execute(dispatcher, "vault 2");
+        player.closeInventory();
+
+        execute(dispatcher, "vault");
+
+        assertThat(player.getOpenInventory().getTopInventory().getHolder())
+                .isInstanceOf(com.uxplima.uxmlib.gui.PaginatedGui.class);
+    }
+
     private CommandDispatcher<CommandSourceStack> registerCommand() {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(new VaultCommand(services).build());
@@ -173,11 +189,15 @@ class VaultGuiPathTest {
         VaultChargeSettings chargeSettings = VaultChargeSettings.allFree();
         VaultCharge charge = new VaultCharge(kernel.permissions(), Optional.empty(), chargeSettings);
         SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
-        VaultView view = new VaultView(kernel.messages(), saveVault, kernel.scheduler());
+        VaultView view = VaultViews.view(kernel, saveVault);
         VaultAudit audit = new NoAudit();
+        OpenVault openVault = new OpenVault(repository, amount, size, charge, Clock.systemUTC());
+        ListVaults listVaults = new ListVaults(repository);
+        VaultSelectorView selector =
+                VaultViews.selector(kernel, listVaults, amount, openVault, view, notifier, chargeSettings);
         return new VaultServices(
-                new OpenVault(repository, amount, size, charge, Clock.systemUTC()),
-                new ListVaults(repository),
+                openVault,
+                listVaults,
                 new OpenAdminVault(repository, size, audit, Clock.systemUTC()),
                 new DeleteVault(repository, charge, audit, notifier),
                 saveVault,
@@ -185,6 +205,8 @@ class VaultGuiPathTest {
                 size,
                 notifier,
                 view,
+                selector,
+                true,
                 chargeSettings,
                 kernel);
     }

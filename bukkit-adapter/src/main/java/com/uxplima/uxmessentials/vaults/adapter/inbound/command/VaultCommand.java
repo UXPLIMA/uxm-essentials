@@ -104,8 +104,14 @@ public final class VaultCommand implements CommandRegistration {
         }
         PlayerRef viewer = BukkitRefs.toRef(player);
         List<Integer> owned = services.listVaults().list(viewer).asValue().orElse(List.of());
+        // With several vaults owned, open the picker menu (or fall back to the chat list when it is disabled);
+        // a single owned vault (or none) opens vault 1 directly, as before.
         if (owned.size() > 1) {
-            notifier.list(viewer, owned);
+            if (services.selectorEnabled()) {
+                services.selector().open(player, viewer);
+            } else {
+                notifier.list(viewer, owned);
+            }
             return Command.SINGLE_SUCCESS;
         }
         return openOwn(ctx, owned.isEmpty() ? DEFAULT_INDEX : owned.get(0));

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vaults.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
@@ -30,6 +31,8 @@ import org.jspecify.annotations.NullMarked;
  * @param sizeQuota the owner's per-vault row count, read by {@code /vault info}
  * @param notifier player-facing feedback
  * @param view the inventory-holder GUI builder
+ * @param selector the paginated vault-picker the no-arg {@code /vault} opens when several vaults are owned
+ * @param selectorEnabled whether {@code /vault} routes to the picker (else the chat list) for a multi-vault owner
  * @param chargeSettings the create/open fees and delete refund, so the cannot-afford notice can name the cost
  * @param kernel the shared outbound ports (scheduler, player lookup, events)
  */
@@ -44,6 +47,8 @@ public record VaultServices(
         VaultSizeQuota sizeQuota,
         VaultNotifier notifier,
         VaultView view,
+        VaultSelectorView selector,
+        boolean selectorEnabled,
         VaultChargeSettings chargeSettings,
         KernelPorts kernel) {
 
@@ -57,6 +62,7 @@ public record VaultServices(
         Objects.requireNonNull(sizeQuota, "sizeQuota");
         Objects.requireNonNull(notifier, "notifier");
         Objects.requireNonNull(view, "view");
+        Objects.requireNonNull(selector, "selector");
         Objects.requireNonNull(chargeSettings, "chargeSettings");
         Objects.requireNonNull(kernel, "kernel");
     }
