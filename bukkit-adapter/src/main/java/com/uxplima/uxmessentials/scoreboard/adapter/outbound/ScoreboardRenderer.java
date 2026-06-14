@@ -6,6 +6,10 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+
+import io.papermc.paper.scoreboard.numbers.NumberFormat;
 
 import net.kyori.adventure.text.Component;
 
@@ -25,6 +29,12 @@ import org.jspecify.annotations.NullMarked;
  * so operator content may embed third-party placeholders. The sidebar is reused across ticks when it already exists
  * (its {@code lines}/{@code title} diff flicker-free), created on first render, and torn down when the player has
  * hidden it or stands in a blacklisted world.
+ *
+ * <p>When {@link DisplayContent#hideScoreNumbers()} is set the renderer drops the red per-line score numbers vanilla
+ * draws down the right edge by applying a {@linkplain NumberFormat#blank() blank number format} to the sidebar
+ * objective. uxmLib's {@code Sidebar} owns its objective on its own native scoreboard and does not expose it, so the
+ * objective is reached through the player's now-active scoreboard ({@code getObjective(DisplaySlot.SIDEBAR)}); the
+ * format is applied once when the board is first created, never re-applied on a steady-state tick.
  *
  * <p>The tablist header/footer is a separate context now: {@code tablist} owns it through its own renderer and refresh
  * timer, so this renderer touches only the sidebar.
@@ -80,10 +90,27 @@ public final class ScoreboardRenderer {
         Sidebar sidebar = sidebars.get(player.getUniqueId());
         if (sidebar == null) {
             sidebar = sidebars.create(player, title);
+            applyNumberFormat(player, live);
         } else {
             sidebar.title(title);
         }
         sidebar.lines(renderAll(player, live.lines()));
+    }
+
+    /**
+     * Apply the operator's number-format choice to the freshly created sidebar objective. uxmLib's {@code Sidebar}
+     * keeps its objective private and shows its own scoreboard on {@code create}, so the live objective is read back
+     * from the player's now-active scoreboard. Done once at creation — a steady-state tick reuses the same board and
+     * the same format, so there is nothing to re-apply.
+     */
+    private void applyNumberFormat(Player player, DisplayContent live) {
+        if (!live.hideScoreNumbers()) {
+            return;
+        }
+        Objective objective = player.getScoreboard().getObjective(DisplaySlot.SIDEBAR);
+        if (objective != null) {
+            objective.numberFormat(NumberFormat.blank());
+        }
     }
 
     private List<Component> renderAll(Player player, List<String> sources) {

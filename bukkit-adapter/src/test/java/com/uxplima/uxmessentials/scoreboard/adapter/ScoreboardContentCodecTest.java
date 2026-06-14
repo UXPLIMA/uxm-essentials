@@ -27,6 +27,7 @@ class ScoreboardContentCodecTest {
                 scoreboard {
                   title = "<gold>My Server"
                   lines = [ "<gray>Online: <white>%server_online%", "" ]
+                  hide-score-numbers = false
                   refresh-ticks = 40
                   world-blacklist = [ "world_the_end", "world_nether" ]
                 }
@@ -40,6 +41,7 @@ class ScoreboardContentCodecTest {
 
         assertThat(content.title()).contains("<gold>My Server");
         assertThat(content.lines()).containsExactly("<gray>Online: <white>%server_online%", "");
+        assertThat(content.hideScoreNumbers()).isFalse();
         // 40 ticks at 50ms each is two seconds.
         assertThat(content.refreshInterval()).isEqualTo(Duration.ofSeconds(2L));
         assertThat(content.worldBlacklist()).containsExactlyInAnyOrder("world_the_end", "world_nether");
@@ -66,6 +68,8 @@ class ScoreboardContentCodecTest {
 
         assertThat(content.title()).isEmpty();
         assertThat(content.lines()).hasSize(DisplayContent.MAX_LINES);
+        // An absent hide-score-numbers defaults to true — the modern look.
+        assertThat(content.hideScoreNumbers()).isTrue();
         // A non-positive refresh-ticks falls back to one second (20 ticks) rather than busy-spinning.
         assertThat(content.refreshInterval()).isEqualTo(Duration.ofSeconds(1L));
     }

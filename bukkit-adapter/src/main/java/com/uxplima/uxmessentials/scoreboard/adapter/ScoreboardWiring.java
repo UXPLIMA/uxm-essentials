@@ -64,7 +64,7 @@ public final class ScoreboardWiring {
 
         List<CommandRegistration> commands =
                 List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages()));
-        List<Listener> listeners = List.of(new ScoreboardConnectionListener(renderer));
+        List<Listener> listeners = List.of(new ScoreboardConnectionListener(renderer, kernel.scheduler()));
         return new Wired(commands, listeners, renderer, renderTask, running);
     }
 

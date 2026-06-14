@@ -20,6 +20,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  * scoreboard {
  *   title = "<gold>My Server"
  *   lines = [ "<gray>Online: <white>%server_online%", "" ]
+ *   hide-score-numbers = true     # hide the red right-edge score numbers (the modern look)
  *   refresh-ticks = 20            # one tick = 1/20s; 20 = once a second
  *   world-blacklist = [ "world_the_end" ]
  * }
@@ -30,7 +31,8 @@ import org.spongepowered.configurate.ConfigurationNode;
  * placeholder pipeline later, never a {@code MessageKey}. A blank title yields an empty {@link DisplayContent#title()};
  * lines beyond {@link DisplayContent#MAX_LINES} are truncated to the limit so an over-long config degrades rather than
  * failing the load; a non-positive {@code refresh-ticks} falls back to one second so the render timer never
- * busy-spins. An empty or virtual root yields {@link DisplayContent#inert()} — the do-nothing default.
+ * busy-spins. An absent {@code hide-score-numbers} defaults to {@code true} — the modern look that drops the red
+ * right-edge numbers. An empty or virtual root yields {@link DisplayContent#inert()} — the do-nothing default.
  */
 @NullMarked
 final class ScoreboardContentCodec {
@@ -49,6 +51,7 @@ final class ScoreboardContentCodec {
         return new DisplayContent(
                 optionalString(board.node("title")),
                 cappedLines(strings(board.node("lines"))),
+                board.node("hide-score-numbers").getBoolean(true),
                 refreshInterval(board.node("refresh-ticks")),
                 worldBlacklist(board.node("world-blacklist")));
     }
