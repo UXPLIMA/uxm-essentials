@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import org.bukkit.Material;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -25,10 +25,12 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
+import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
+import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultItemPolicy;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
@@ -42,19 +44,15 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the vault item-blacklist filter that runs when a vault window closes. A vault holding a
- * blacklisted item is closed; the blocked item is stripped from the saved contents and returned to the player
- * (with the {@code VAULT_ITEM_BLOCKED} notice), while a non-blocked item is left untouched — no item is lost or
- * duplicated. A player holding {@code uxmessentials.vault.bypass-blacklist} keeps every item and gets no notice.
- *
- * <p>The {@link VaultView} is opened directly (the same path {@code /vault} drives) and the close is dispatched
- * as a real {@link InventoryCloseEvent} through the installed uxmLib menu listener, so the GUI's own close
- * handler runs the filter exactly as it would in production. The scheduler is a synchronous double so the
- * return and the async save run inline.
+ * MockBukkit coverage of the overflow-rescue-on-open path. A vault is saved with items in slots beyond what the
+ * current size quota now allows (the quota shrank since the last save); when the owner opens it the
+ * out-of-range items are handed back to them (added to their inventory, remainder dropped at their feet), the
+ * {@code VAULT_OVERFLOW_RETURNED} notice is sent with the rescued count, the GUI exposes only the in-range
+ * slots, and the next close persists only the in-range contents — so the overflow is gone from the vault and
+ * safely with the player, with no item lost or duplicated. A vault whose contents fit the live size triggers no
+ * rescue and no notice.
  */
-class VaultBlacklistTest {
-
-    private static final String BYPASS = "uxmessentials.vault.bypass-blacklist";
+class VaultOverflowTest {
 
     private ServerMock server;
     private Plugin plugin;
@@ -80,65 +78,92 @@ class VaultBlacklistTest {
     }
 
     @Test
-    void aBlockedItemIsStrippedReturnedAndNotifiedWhileANormalItemIsKept() {
-        VaultView view = view(new GrantNone(), policyBlocking("bedrock"));
-        view.open(player, ref(), ref(), emptyVault());
-        Inventory vault = player.getOpenInventory().getTopInventory();
-        vault.setItem(0, new ItemStack(Material.BEDROCK, 3));
-        vault.setItem(1, new ItemStack(Material.DIAMOND, 5));
+    void shrunkSizeReturnsTheOverflowNotifiesAndPersistsOnlyTheInRangeContents() {
+        // A vault saved at six rows (54 slots) with a diamond in slot 0 (in range for a one-row vault) and an
+        // emerald in slot 20 (overflow for a one-row vault). It is opened at one row (9 slots) — the quota
+        // shrank — so slot 20 is out of range and must be rescued.
+        ItemStack[] stored = new ItemStack[54];
+        stored[0] = new ItemStack(Material.DIAMOND, 4);
+        stored[20] = new ItemStack(Material.EMERALD, 7);
+        Vault vault = vaultOf(VaultSize.ofClamped(1), VaultItemCodec.encode(stored));
 
+        VaultView view = view(VaultItemPolicy.allowAll());
+        view.open(player, ref(), ref(), vault);
+
+        // The GUI is sized to the live one-row quota and exposes only the in-range slot.
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        assertThat(gui.getSize()).isEqualTo(9);
+        assertThat(gui.getItem(0)).isNotNull();
+        assertThat(gui.getItem(0).getType()).isEqualTo(Material.DIAMOND);
+
+        // The overflow emerald came back to the player — nothing lost or duplicated — and the notice fired.
+        assertThat(countOf(player.getInventory().getContents(), Material.EMERALD))
+                .isEqualTo(7);
+        assertThat(countOf(player.getInventory().getContents(), Material.DIAMOND))
+                .isZero();
+        assertThat(sink.keys).contains(VaultsMessageKey.VAULT_OVERFLOW_RETURNED);
+        assertThat(sink.lastOverflowCount).isEqualTo("7");
+
+        // Closing the window persists only the in-range contents: the diamond stays, the emerald is gone.
         server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
-
-        // The blocked stack is gone from the saved contents but the diamond stays.
         ItemStack[] saved = repository.lastSaved;
         assertThat(saved).isNotNull();
-        assertThat(materialsIn(saved)).contains(Material.DIAMOND).doesNotContain(Material.BEDROCK);
-        // The bedrock came back to the player — nothing was lost or duplicated.
-        assertThat(countOf(player.getInventory().getContents(), Material.BEDROCK))
-                .isEqualTo(3);
-        assertThat(sink.keys).contains(VaultsMessageKey.VAULT_ITEM_BLOCKED);
-        assertThat(sink.lastBlockedCount).isEqualTo("3");
+        assertThat(materialsIn(saved)).contains(Material.DIAMOND).doesNotContain(Material.EMERALD);
     }
 
     @Test
-    void aBypassingPlayerKeepsTheBlockedItemAndGetsNoNotice() {
-        VaultView view = view(new GrantNode(BYPASS), policyBlocking("bedrock"));
-        view.open(player, ref(), ref(), emptyVault());
-        Inventory vault = player.getOpenInventory().getTopInventory();
-        vault.setItem(0, new ItemStack(Material.BEDROCK, 3));
+    void aConfiguredOpenSoundPlaysWithoutThrowingAndAnUnknownNameIsTolerated() {
+        // A resolved sound opens cleanly; an unknown name resolves to null at wire time, so the view simply
+        // plays nothing — neither path throws.
+        org.bukkit.Sound resolved =
+                com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys.resolveSound("block.chest.open");
+        assertThat(resolved).isNotNull();
+        assertThat(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys.resolveSound(
+                        "not.a.real.sound"))
+                .isNull();
 
-        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
-
-        assertThat(materialsIn(repository.lastSaved)).contains(Material.BEDROCK);
-        assertThat(countOf(player.getInventory().getContents(), Material.BEDROCK))
-                .isZero();
-        assertThat(sink.keys).doesNotContain(VaultsMessageKey.VAULT_ITEM_BLOCKED);
-    }
-
-    @Test
-    void anEmptyPolicyLeavesEveryItemUntouched() {
-        VaultView view = view(new GrantNone(), VaultItemPolicy.allowAll());
-        view.open(player, ref(), ref(), emptyVault());
-        Inventory vault = player.getOpenInventory().getTopInventory();
-        vault.setItem(0, new ItemStack(Material.BEDROCK, 3));
-
-        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
-
-        assertThat(materialsIn(repository.lastSaved)).contains(Material.BEDROCK);
-        assertThat(sink.keys).doesNotContain(VaultsMessageKey.VAULT_ITEM_BLOCKED);
-    }
-
-    private VaultView view(Permissions permissions, VaultItemPolicy policy) {
+        ItemStack[] stored = new ItemStack[9];
+        stored[0] = new ItemStack(Material.DIAMOND, 1);
+        Vault vault = vaultOf(VaultSize.ofClamped(1), VaultItemCodec.encode(stored));
         SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
-        return new VaultView(new KeyMessages(), sink, saveVault, new SyncScheduler(), permissions, policy, null);
+        VaultView withSound = new VaultView(
+                new KeyMessages(),
+                sink,
+                saveVault,
+                new SyncScheduler(),
+                new GrantNone(),
+                VaultItemPolicy.allowAll(),
+                resolved);
+
+        withSound.open(player, ref(), ref(), vault);
+
+        assertThat(player.getOpenInventory().getTopInventory().getSize()).isEqualTo(9);
     }
 
-    private static VaultItemPolicy policyBlocking(String material) {
-        return new VaultItemPolicy(Set.of(material));
+    @Test
+    void contentsThatFitTheLiveSizeTriggerNoRescueAndNoNotice() {
+        ItemStack[] stored = new ItemStack[9];
+        stored[0] = new ItemStack(Material.DIAMOND, 4);
+        Vault vault = vaultOf(VaultSize.ofClamped(1), VaultItemCodec.encode(stored));
+
+        VaultView view = view(VaultItemPolicy.allowAll());
+        view.open(player, ref(), ref(), vault);
+
+        assertThat(countOf(player.getInventory().getContents(), Material.DIAMOND))
+                .isZero();
+        assertThat(sink.keys).doesNotContain(VaultsMessageKey.VAULT_OVERFLOW_RETURNED);
+        Inventory gui = player.getOpenInventory().getTopInventory();
+        assertThat(gui.getItem(0)).isNotNull();
+        assertThat(gui.getItem(0).getType()).isEqualTo(Material.DIAMOND);
     }
 
-    private Vault emptyVault() {
-        return Vault.allocate(VaultId.of(ref(), 1), VaultSize.ofClamped(6), java.time.Instant.now());
+    private VaultView view(VaultItemPolicy policy) {
+        SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
+        return new VaultView(new KeyMessages(), sink, saveVault, new SyncScheduler(), new GrantNone(), policy, null);
+    }
+
+    private Vault vaultOf(VaultSize size, VaultContents contents) {
+        return Vault.of(VaultId.of(ref(), 1), size, contents, Instant.now());
     }
 
     private PlayerRef ref() {
@@ -167,7 +192,7 @@ class VaultBlacklistTest {
         return total;
     }
 
-    /** Captures the last contents written through so the filter's effect on the saved data is assertable. */
+    /** Captures the last contents written through so the next-save consistency is assertable. */
     private static final class RecordingRepository implements VaultRepository {
         private @Nullable ItemStack[] lastSaved;
 
@@ -188,9 +213,7 @@ class VaultBlacklistTest {
 
         @Override
         public void save(Vault vault) {
-            // VaultItemCodec.decode round-trips the bytes back into a slot array for the assertion.
-            lastSaved = com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec.decode(
-                    vault.contents(), vault.size().slots());
+            lastSaved = VaultItemCodec.decode(vault.contents(), vault.size().slots());
         }
 
         @Override
@@ -205,8 +228,8 @@ class VaultBlacklistTest {
     private final class KeyMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            if (key == VaultsMessageKey.VAULT_ITEM_BLOCKED) {
-                sink.lastBlockedCount = placeholders.get("count");
+            if (key == VaultsMessageKey.VAULT_OVERFLOW_RETURNED) {
+                sink.lastOverflowCount = placeholders.get("count");
             }
             return key.key();
         }
@@ -214,11 +237,10 @@ class VaultBlacklistTest {
 
     private static final class RecordingSink implements MessageSink {
         private final List<MessageKey> keys = new ArrayList<>();
-        private @Nullable String lastBlockedCount;
+        private @Nullable String lastOverflowCount;
 
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
-            // renderedText is the key() string (see KeyMessages); the recorded keys drive the asserts
             for (VaultsMessageKey key : VaultsMessageKey.values()) {
                 if (key.key().equals(renderedText)) {
                     keys.add(key);
@@ -254,31 +276,10 @@ class VaultBlacklistTest {
         }
     }
 
-    /** Grants no node — the blacklist applies. */
     private static final class GrantNone implements Permissions {
         @Override
         public boolean has(PlayerRef who, String node) {
             return false;
-        }
-
-        @Override
-        public QuotaResult resolveQuota(
-                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
-            return QuotaResult.limited(configDefault);
-        }
-    }
-
-    /** Grants exactly one node — used to grant the bypass. */
-    private static final class GrantNode implements Permissions {
-        private final String granted;
-
-        private GrantNode(String granted) {
-            this.granted = granted;
-        }
-
-        @Override
-        public boolean has(PlayerRef who, String node) {
-            return granted.equals(node);
         }
 
         @Override

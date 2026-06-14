@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.bukkit.Sound;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
@@ -12,6 +14,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.vaults.CachedVaultRepository;
 import com.uxplima.uxmessentials.persistence.vaults.VaultRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VaultSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
@@ -22,10 +25,12 @@ import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommands;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.LoggingVaultAudit;
+import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultCleanupSweep;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
+import com.uxplima.uxmessentials.vaults.application.PurgeInactiveVaults;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultCharge;
@@ -36,6 +41,7 @@ import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -94,8 +100,34 @@ public final class VaultsWiring {
         CachedVaultRepository cached = VaultRepositories.cachedConcrete(persistence);
         bus.registry().register(VaultSync.listener(cached));
         VaultRepository repository = VaultSync.repository(cached, bus.publisher());
-        VaultServices services = assemble(kernel, settings, repository, clock, vaultEconomy);
-        return new Wired(VaultCommands.all(services), List.of(), services.view(), repository);
+        VaultAudit audit = new LoggingVaultAudit(auditLogger());
+        VaultServices services = assemble(kernel, settings, repository, clock, vaultEconomy, audit);
+        // The cleanup sweep is opt-in: when cleanup.enabled is false it is never built, so a disabled module
+        // arms zero background work. The running flag is flipped on stop so the self-rescheduling loop exits.
+        AtomicBoolean running = new AtomicBoolean(true);
+        Optional<VaultCleanupSweep> sweep = cleanupSweep(kernel, settings, repository, audit, running, clock);
+        return new Wired(VaultCommands.all(services), List.of(), services.view(), repository, sweep, running);
+    }
+
+    private static Optional<VaultCleanupSweep> cleanupSweep(
+            KernelPorts kernel,
+            VaultSettings settings,
+            VaultRepository repository,
+            VaultAudit audit,
+            AtomicBoolean running,
+            Clock clock) {
+        if (!settings.cleanupEnabled()) {
+            return Optional.empty();
+        }
+        return Optional.of(new VaultCleanupSweep(
+                kernel.scheduler(),
+                new PurgeInactiveVaults(repository),
+                audit,
+                settings.cleanupInterval(),
+                settings.cleanupInactive(),
+                running::get,
+                kernel.log(),
+                clock));
     }
 
     private static VaultServices assemble(
@@ -103,20 +135,22 @@ public final class VaultsWiring {
             VaultSettings settings,
             VaultRepository repository,
             Clock clock,
-            Optional<VaultEconomy> vaultEconomy) {
+            Optional<VaultEconomy> vaultEconomy,
+            VaultAudit audit) {
         VaultAmountQuota amountQuota = new VaultAmountQuota(kernel.permissions(), settings.defaultAmount());
         VaultSizeQuota sizeQuota = new VaultSizeQuota(kernel.permissions(), settings.defaultSize());
-        VaultAudit audit = new LoggingVaultAudit(auditLogger());
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
         VaultCharge charge = buildCharge(kernel, settings, vaultEconomy);
         SaveVault saveVault = new SaveVault(repository, kernel.events(), clock);
+        @Nullable Sound openSound = BukkitRegistryKeys.resolveSound(settings.openSound());
         VaultView view = new VaultView(
                 kernel.messages(),
                 kernel.messageSink(),
                 saveVault,
                 kernel.scheduler(),
                 kernel.permissions(),
-                settings.itemPolicy());
+                settings.itemPolicy(),
+                openSound);
         OpenVault openVault = new OpenVault(repository, amountQuota, sizeQuota, charge, clock);
         ListVaults listVaults = new ListVaults(repository);
         VaultSelectorView selector = new VaultSelectorView(
@@ -162,7 +196,8 @@ public final class VaultsWiring {
     /**
      * Everything the vaults module contributes once wired: the Brigadier {@code /vault} command and the
      * {@link VaultView} held so {@code stop()} flushes every still-open vault before the pool closes (the
-     * {@code open-guis=N} the doctor line reports). The menu close events are routed by uxmLib's own menu
+     * {@code open-guis=N} the doctor line reports), plus the optional self-rescheduling inactive-vault cleanup
+     * sweep (present only when {@code cleanup.enabled}). The menu close events are routed by uxmLib's own menu
      * listener (installed once in the plugin bootstrap), so this module registers no inventory listener of its
      * own.
      *
@@ -170,19 +205,34 @@ public final class VaultsWiring {
      * @param listeners the Bukkit listeners to register (none here; the menu listener is uxmLib's)
      * @param view the GUI, held for the stop-time flush
      * @param repository the vault store the {@code vaults_count} placeholder reads
+     * @param cleanupSweep the inactive-vault cleanup sweep, armed by {@link #startBackgroundWork} (empty when off)
+     * @param running the flag flipped false on stop so the sweep's self-rescheduling loop exits
      */
     public record Wired(
-            List<CommandRegistration> commands, List<Listener> listeners, VaultView view, VaultRepository repository) {
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            VaultView view,
+            VaultRepository repository,
+            Optional<VaultCleanupSweep> cleanupSweep,
+            AtomicBoolean running) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(view, "view");
             Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(cleanupSweep, "cleanupSweep");
+            Objects.requireNonNull(running, "running");
         }
 
-        /** Save every still-open vault window before the pool closes. Called on module stop. */
+        /** Arm the inactive-vault cleanup sweep (a no-op when cleanup is disabled). Called on module enable. */
+        public void startBackgroundWork() {
+            cleanupSweep.ifPresent(VaultCleanupSweep::start);
+        }
+
+        /** Stop the cleanup sweep and save every still-open vault window before the pool closes. On module stop. */
         public void stop() {
+            running.set(false);
             view.flushAll();
         }
     }

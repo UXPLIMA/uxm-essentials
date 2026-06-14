@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.vaults.adapter;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -30,6 +31,8 @@ public final class VaultSettings {
     private static final int DEFAULT_AMOUNT = 1;
     private static final int DEFAULT_SIZE = 6;
     private static final int DEFAULT_SELECTOR_ROWS = 3;
+    private static final int DEFAULT_CLEANUP_INACTIVE_DAYS = 30;
+    private static final int DEFAULT_CLEANUP_INTERVAL_HOURS = 24;
     private static final Material DEFAULT_OWNED_ICON = Material.CHEST;
     private static final Material DEFAULT_LOCKED_ICON = Material.GRAY_STAINED_GLASS_PANE;
 
@@ -40,6 +43,10 @@ public final class VaultSettings {
     private final VaultItemPolicy itemPolicy;
     private final boolean selectorEnabled;
     private final VaultSelectorSettings selectorSettings;
+    private final boolean cleanupEnabled;
+    private final Duration cleanupInactive;
+    private final Duration cleanupInterval;
+    private final String openSound;
 
     public VaultSettings(ConfigStore config) {
         Objects.requireNonNull(config, "config");
@@ -53,6 +60,12 @@ public final class VaultSettings {
         this.itemPolicy = new VaultItemPolicy(Set.copyOf(config.getStringList("blacklist-materials", List.of())));
         this.selectorEnabled = config.getBoolean("selector.enabled", true);
         this.selectorSettings = parseSelector(config);
+        this.cleanupEnabled = config.getBoolean("cleanup.enabled", false);
+        this.cleanupInactive =
+                Duration.ofDays(Math.max(0, config.getInt("cleanup.inactive-days", DEFAULT_CLEANUP_INACTIVE_DAYS)));
+        this.cleanupInterval =
+                Duration.ofHours(Math.max(1, config.getInt("cleanup.interval-hours", DEFAULT_CLEANUP_INTERVAL_HOURS)));
+        this.openSound = config.getString("open-sound", "").trim();
     }
 
     /** The config fallback for the {@code uxmessentials.vault.amount.<n>} quota. */
@@ -88,6 +101,26 @@ public final class VaultSettings {
     /** The picker-menu presentation (layout, icons, show-locked) parsed once from the {@code selector} block. */
     public VaultSelectorSettings selectorSettings() {
         return selectorSettings;
+    }
+
+    /** Whether the {@code cleanup} block opts the inactive-vault purge sweep in (off by default). */
+    public boolean cleanupEnabled() {
+        return cleanupEnabled;
+    }
+
+    /** How long a vault may go untouched before the cleanup sweep purges it ({@code cleanup.inactive-days}). */
+    public Duration cleanupInactive() {
+        return cleanupInactive;
+    }
+
+    /** How often the cleanup sweep runs ({@code cleanup.interval-hours}, at least one hour). */
+    public Duration cleanupInterval() {
+        return cleanupInterval;
+    }
+
+    /** The raw {@code open-sound} config value (blank = no sound), resolved to a {@code Sound} at wire time. */
+    public String openSound() {
+        return openSound;
     }
 
     private VaultSelectorSettings parseSelector(ConfigStore config) {

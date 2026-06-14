@@ -48,4 +48,9 @@ public final class LoggingVaultAudit implements VaultAudit {
                 owner.name(),
                 index);
     }
+
+    @Override
+    public void purged(int count) {
+        audit.info("event=vault_purge actor=system count={}", count);
+    }
 }

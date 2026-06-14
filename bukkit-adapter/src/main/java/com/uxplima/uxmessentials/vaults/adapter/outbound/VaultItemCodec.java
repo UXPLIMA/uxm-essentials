@@ -66,6 +66,18 @@ public final class VaultItemCodec {
         return slots;
     }
 
+    /**
+     * Deserialize {@code contents} into a {@code ItemStack[]} sized to the stored slot count (the array length
+     * written by {@link #encode}), so every saved slot is visible — nothing is truncated. The overflow rescue
+     * needs this: when the size quota has shrunk below the stored slot count, the items in the now-out-of-range
+     * slots must be seen to be handed back rather than silently dropped by a size-bounded {@link #decode}. An
+     * empty payload yields a zero-length array.
+     */
+    public static ItemStack[] decodeAll(VaultContents contents) {
+        Objects.requireNonNull(contents, "contents");
+        return contents.payload().map(VaultItemCodec::readAll).orElseGet(() -> new ItemStack[0]);
+    }
+
     private static void writeSlot(DataOutputStream out, int slot, @Nullable ItemStack stack) throws IOException {
         if (stack == null || stack.getType().isAir()) {
             return;
@@ -87,6 +99,24 @@ public final class VaultItemCodec {
                     slots[slot] = ItemStack.deserializeBytes(item);
                 }
             }
+        } catch (IOException io) {
+            throw new UncheckedIOException("vault contents could not be deserialized", io);
+        }
+    }
+
+    private static ItemStack[] readAll(byte[] payload) {
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
+            int stored = Math.max(0, in.readInt()); // the array length encode() wrote — the true stored slot count
+            ItemStack[] slots = new ItemStack[stored];
+            int slot;
+            while ((slot = in.readInt()) != -1) {
+                int length = in.readInt();
+                byte[] item = in.readNBytes(length);
+                if (slot >= 0 && slot < slots.length) {
+                    slots[slot] = ItemStack.deserializeBytes(item);
+                }
+            }
+            return slots;
         } catch (IOException io) {
             throw new UncheckedIOException("vault contents could not be deserialized", io);
         }

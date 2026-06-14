@@ -25,10 +25,16 @@ final class VaultViews {
 
     private VaultViews() {}
 
-    /** A {@link VaultView} with the given blacklist policy, wired off the kernel doubles. */
+    /** A {@link VaultView} with the given blacklist policy, wired off the kernel doubles, no open sound. */
     static VaultView view(KernelPorts kernel, SaveVault saveVault, VaultItemPolicy policy) {
         return new VaultView(
-                kernel.messages(), kernel.messageSink(), saveVault, kernel.scheduler(), kernel.permissions(), policy);
+                kernel.messages(),
+                kernel.messageSink(),
+                saveVault,
+                kernel.scheduler(),
+                kernel.permissions(),
+                policy,
+                null);
     }
 
     /** A {@link VaultView} that blocks nothing — the default for tests not exercising the blacklist. */

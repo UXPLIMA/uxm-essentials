@@ -66,6 +66,42 @@ class VaultSettingsTest {
         assertThat(settings.selectorEnabled()).isFalse();
     }
 
+    @Test
+    void cleanupShipsDisabledWithDocumentedDefaults() {
+        VaultSettings settings = new VaultSettings(new MapConfigStore(Map.of()));
+
+        assertThat(settings.cleanupEnabled()).isFalse();
+        assertThat(settings.cleanupInactive()).isEqualTo(java.time.Duration.ofDays(30));
+        assertThat(settings.cleanupInterval()).isEqualTo(java.time.Duration.ofHours(24));
+    }
+
+    @Test
+    void aConfiguredCleanupBlockIsParsed() {
+        Map<String, Object> values = new HashMap<>();
+        values.put("cleanup.enabled", true);
+        values.put("cleanup.inactive-days", 7);
+        values.put("cleanup.interval-hours", 6);
+        VaultSettings settings = new VaultSettings(new MapConfigStore(values));
+
+        assertThat(settings.cleanupEnabled()).isTrue();
+        assertThat(settings.cleanupInactive()).isEqualTo(java.time.Duration.ofDays(7));
+        assertThat(settings.cleanupInterval()).isEqualTo(java.time.Duration.ofHours(6));
+    }
+
+    @Test
+    void aNonPositiveCleanupIntervalIsClampedToAtLeastOneHour() {
+        VaultSettings settings = new VaultSettings(new MapConfigStore(Map.of("cleanup.interval-hours", 0)));
+
+        assertThat(settings.cleanupInterval()).isEqualTo(java.time.Duration.ofHours(1));
+    }
+
+    @Test
+    void theOpenSoundDefaultsToBlankAndIsTrimmed() {
+        assertThat(new VaultSettings(new MapConfigStore(Map.of())).openSound()).isEmpty();
+        assertThat(new VaultSettings(new MapConfigStore(Map.of("open-sound", "  block.chest.open  "))).openSound())
+                .isEqualTo("block.chest.open");
+    }
+
     private static final class MapConfigStore implements ConfigStore {
         private final Map<String, Object> values;
 

@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.bukkit.Sound;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -29,6 +30,7 @@ import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.StorageGui;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Opens a vault as a uxmLib {@link StorageGui}: a storage menu sized to the vault's resolved {@link VaultSize}
@@ -47,6 +49,18 @@ import org.jspecify.annotations.NullMarked;
  * the filter and keeps every item. The filter runs in the close handler, where the live closer is known, so the
  * return and the {@code VAULT_ITEM_BLOCKED} notice happen on that player's region thread.
  *
+ * <p>Overflow is rescued on open. The stored contents are decoded in full ({@link VaultItemCodec#decodeAll}),
+ * not truncated to the live size, so items left in slots beyond the current {@link VaultSize} — the size quota
+ * shrank since the vault was last saved — are visible rather than silently dropped. Only the first {@code size}
+ * slots seed the GUI; any occupied overflow slot is handed back to the opener (added to their inventory,
+ * remainder dropped at their feet — the same give-or-drop helper the blacklist uses) and counted into one
+ * {@code VAULT_OVERFLOW_RETURNED} notice. The next close then persists only the live-size contents, so the
+ * overflow is gone from the vault and safely with the player — no loss, no dupe. When staff open another
+ * player's vault the overflow returns to the staff opener, consistent with the blacklist's admin semantics.
+ *
+ * <p>A non-blank {@code open-sound} is played to the opener as the window opens (resolved once at wire time, so
+ * the open path never touches the registry). An unknown sound resolves to {@code null} and is simply not played.
+ *
  * <p>{@link #open} touches the live player, so it must run on the player's region thread; the caller schedules
  * it through the kernel {@code Scheduler}. The write-back is dispatched async off that same scheduler.
  */
@@ -61,6 +75,7 @@ public final class VaultView {
     private final Scheduler scheduler;
     private final Permissions permissions;
     private final VaultItemPolicy itemPolicy;
+    private final @Nullable Sound openSound;
     private final MiniMessage miniMessage;
     private final Set<OpenWindow> open = ConcurrentHashMap.newKeySet();
 
@@ -70,13 +85,15 @@ public final class VaultView {
             SaveVault saveVault,
             Scheduler scheduler,
             Permissions permissions,
-            VaultItemPolicy itemPolicy) {
+            VaultItemPolicy itemPolicy,
+            @Nullable Sound openSound) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.saveVault = Objects.requireNonNull(saveVault, "saveVault");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.itemPolicy = Objects.requireNonNull(itemPolicy, "itemPolicy");
+        this.openSound = openSound;
         this.miniMessage = MiniMessage.miniMessage();
     }
 
@@ -89,11 +106,16 @@ public final class VaultView {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
+        int size = vault.size().slots();
         StorageGui gui = Guis.storage()
                 .title(title(viewer, owner, vault.index()))
-                .rows(vault.size().slots() / 9)
+                .rows(size / 9)
                 .build();
-        gui.setContents(VaultItemCodec.decode(vault.contents(), vault.size().slots()));
+        // Decode the full stored contents so a slot beyond the (possibly shrunken) live size is visible: the
+        // first `size` slots seed the GUI, any occupied overflow slot is rescued back to the opener.
+        ItemStack[] stored = VaultItemCodec.decodeAll(vault.contents());
+        gui.setContents(stored);
+        rescueOverflow(player, viewer, stored, size);
         OpenWindow window = new OpenWindow(owner, vault, gui);
         open.add(window);
         gui.onClose(event -> {
@@ -103,6 +125,38 @@ public final class VaultView {
             }
         });
         gui.open(player);
+        playOpenSound(player);
+    }
+
+    /**
+     * Return any item left in a slot at or beyond {@code size} to {@code opener} — the live player who opened
+     * the window — and notify {@code viewer} once with the rescued count. The size quota shrank below the stored
+     * slot count since the last save, so {@code decodeAll} surfaced these out-of-range items; they are handed
+     * back (added to the opener's inventory, remainder dropped at their feet) instead of being silently dropped.
+     * The next close persists only the live-size GUI, so the overflow is gone from the vault and safely with the
+     * player — no loss, no dupe. A vault whose contents fit the live size has no overflow and triggers no notice.
+     */
+    private void rescueOverflow(Player opener, PlayerRef viewer, ItemStack[] stored, int size) {
+        int returned = 0;
+        for (int slot = size; slot < stored.length; slot++) {
+            ItemStack stack = stored[slot];
+            if (stack == null || stack.getType().isAir()) {
+                continue;
+            }
+            returnToPlayer(opener, stack);
+            returned += stack.getAmount();
+        }
+        if (returned > 0) {
+            notifyOverflow(viewer, returned);
+        }
+    }
+
+    private void playOpenSound(Player player) {
+        if (openSound == null) {
+            return;
+        }
+        // open() already runs on the opener's region thread (the caller schedules it), so play directly.
+        player.playSound(Objects.requireNonNull(player.getLocation(), "player location"), openSound, 1.0f, 1.0f);
     }
 
     /** Save every still-open vault and forget it; called on module stop so none is lost on disable. */
@@ -161,6 +215,14 @@ public final class VaultView {
                 viewer,
                 messages.resolve(
                         viewer, VaultsMessageKey.VAULT_ITEM_BLOCKED, Map.of("count", Integer.toString(count))));
+    }
+
+    private void notifyOverflow(PlayerRef viewer, int count) {
+        // The sink bridges delivery to the viewer's region thread itself, so this needs no extra scheduling.
+        sink.deliver(
+                viewer,
+                messages.resolve(
+                        viewer, VaultsMessageKey.VAULT_OVERFLOW_RETURNED, Map.of("count", Integer.toString(count))));
     }
 
     private void persist(OpenWindow window) {

@@ -34,4 +34,13 @@ public interface VaultAudit {
      * @param index the one-based vault number deleted
      */
     void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index);
+
+    /**
+     * {@code event=vault_purge} — the inactive-vault cleanup sweep removed {@code count} long-untouched vault
+     * rows. Driven by the server, not a player, so no actor is logged; the count makes the reclaim auditable.
+     * Emitted once per sweep that actually deleted rows (a sweep that finds nothing to purge emits nothing).
+     *
+     * @param count the number of vault rows the sweep deleted (always positive when this is called)
+     */
+    void purged(int count);
 }

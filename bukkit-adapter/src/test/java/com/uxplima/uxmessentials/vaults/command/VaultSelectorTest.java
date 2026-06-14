@@ -154,7 +154,8 @@ class VaultSelectorTest {
         VaultChargeSettings chargeSettings = VaultChargeSettings.allFree();
         VaultCharge charge = new VaultCharge(permissions, Optional.<VaultEconomy>empty(), chargeSettings);
         SaveVault saveVault = new SaveVault(repository, new NoEvents(), Clock.systemUTC());
-        VaultView view = new VaultView(messages, sink, saveVault, scheduler, permissions, VaultItemPolicy.allowAll());
+        VaultView view =
+                new VaultView(messages, sink, saveVault, scheduler, permissions, VaultItemPolicy.allowAll(), null);
         OpenVault openVault = new OpenVault(repository, amount, size, charge, Clock.systemUTC());
         ListVaults listVaults = new ListVaults(repository);
         return new VaultSelectorView(
@@ -207,6 +208,13 @@ class VaultSelectorTest {
         @Override
         public void delete(VaultId id) {
             vaults.remove(id.index());
+        }
+
+        @Override
+        public int deleteUntouchedBefore(Instant cutoff) {
+            int before = vaults.size();
+            vaults.values().removeIf(vault -> vault.lastTouched().isBefore(cutoff));
+            return before - vaults.size();
         }
     }
 

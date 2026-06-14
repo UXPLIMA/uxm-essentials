@@ -91,6 +91,15 @@ public final class VaultSync {
             announce(id);
         }
 
+        @Override
+        public int deleteUntouchedBefore(java.time.Instant cutoff) {
+            // A bulk inactive-vault purge against the one shared DB: the cached delegate clears its cache, and a
+            // peer that next opens one of the purged ids re-reads an empty vault straight from the backend. The
+            // purged ids are not known per-row, so there is no per-vault VaultChanged to announce — the shared
+            // store is the source of truth, which keeps this correct everywhere without a broadcast.
+            return delegate.deleteUntouchedBefore(cutoff);
+        }
+
         private void announce(VaultId id) {
             bus.publish(new VaultChanged(bus.serverId(), id.owner(), id.index()));
         }

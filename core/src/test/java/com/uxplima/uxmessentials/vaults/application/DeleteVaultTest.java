@@ -161,6 +161,11 @@ class DeleteVaultTest {
         public void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {
             deletions.add(new Deletion(actor, owner, ownerUuid, index));
         }
+
+        @Override
+        public void purged(int count) {
+            // Not exercised here.
+        }
     }
 
     private static final class CapturingEconomy implements VaultEconomy {

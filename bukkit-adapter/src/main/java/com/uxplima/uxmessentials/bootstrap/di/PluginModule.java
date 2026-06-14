@@ -524,6 +524,7 @@ public final class PluginModule {
                 VaultsWiring.wire(plugin, ctx, persistence, bus, Optional.ofNullable(links.vaultEconomy));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.placeholders.vaults(new RepositoryVaultsPlaceholders(wired.repository()));
     }

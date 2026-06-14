@@ -319,6 +319,9 @@ class VaultDeleteCommandTest {
         public void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {
             deletedOwners.add(ownerUuid);
         }
+
+        @Override
+        public void purged(int count) {}
     }
 
     /** Records the most recent withdraw and deposit so the charge/refund wiring is asserted. */

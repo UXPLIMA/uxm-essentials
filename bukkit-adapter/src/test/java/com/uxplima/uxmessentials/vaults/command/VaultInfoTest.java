@@ -335,6 +335,9 @@ class VaultInfoTest {
 
         @Override
         public void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index) {}
+
+        @Override
+        public void purged(int count) {}
     }
 
     private static final class NoopLogger implements Logger {
