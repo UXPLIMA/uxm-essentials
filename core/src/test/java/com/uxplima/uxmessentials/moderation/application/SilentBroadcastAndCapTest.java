@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
@@ -88,6 +89,7 @@ class SilentBroadcastAndCapTest {
                         history,
                         new SanctionDurationLimit(ModerationFakes.exempt()),
                         broadcast,
+                        AddressStrictness.NORMAL,
                         clock)
                 .ban(ACTOR, TARGET, Optional.of("griefing"), true);
 
@@ -191,6 +193,7 @@ class SilentBroadcastAndCapTest {
                         history,
                         new SanctionDurationLimit(ModerationFakes.capping(3600)),
                         broadcast,
+                        AddressStrictness.NORMAL,
                         clock)
                 .ban(ACTOR, TARGET, Optional.of("griefing"), false);
 
@@ -266,6 +269,7 @@ class SilentBroadcastAndCapTest {
                 history,
                 new SanctionDurationLimit(perms),
                 broadcast,
+                AddressStrictness.NORMAL,
                 clock);
     }
 
@@ -306,6 +310,7 @@ class SilentBroadcastAndCapTest {
                 history,
                 limit,
                 broadcast,
+                AddressStrictness.NORMAL,
                 clock);
         Kick kick = new Kick(new FakeSanctions(TARGET), guard, notifier, audit, history, broadcast);
         WarnEscalator escalator = new WarnEscalator(ladder, mute, tempBan, ban, kick, notifier);

@@ -83,6 +83,9 @@ public final class LoginEnforcement {
 
     private void recordAndDetect(PlayerRef who, String ip, Instant now, boolean kicked) {
         repository.recordSeen(who, Optional.of(ip), now);
+        repository.recordIpSeen(who.uuid(), ip, now);
+        // Alt-detection at login keys off the connecting address — the broadened /alts surface walks a
+        // player's full history, but a login is a single address, so this stays the per-address lookup.
         List<UUID> alts = repository.altsByIp(ip, who.uuid());
         if (kicked || !alts.isEmpty()) {
             audit.altDetected(who.uuid(), ip, alts, kicked);

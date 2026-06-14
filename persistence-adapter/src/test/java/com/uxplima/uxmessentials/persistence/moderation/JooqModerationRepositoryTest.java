@@ -165,6 +165,38 @@ class JooqModerationRepositoryTest {
     }
 
     @Test
+    void ipHistoryAccruesPerJoinAndDeduplicatesByAddress() {
+        repository.recordIpSeen(alice.uuid(), "203.0.113.7", T0);
+        // A repeat connection from a known address bumps last_seen rather than inserting a duplicate row.
+        repository.recordIpSeen(alice.uuid(), "203.0.113.7", T0.plusSeconds(60));
+        repository.recordIpSeen(alice.uuid(), "198.51.100.5", T0.plusSeconds(120));
+
+        assertThat(repository.ipHistory(alice.uuid())).containsExactlyInAnyOrder("203.0.113.7", "198.51.100.5");
+    }
+
+    @Test
+    void ipHistoryUnionsTheHistoryWithTheLastSeenIp() {
+        // A player seen before V34 has only a last_ip; ipHistory still resolves it for /alts and STRICT.
+        repository.recordSeen(alice, Optional.of("10.0.0.1"), T0);
+        repository.recordIpSeen(alice.uuid(), "10.0.0.2", T0.plusSeconds(10));
+
+        assertThat(repository.ipHistory(alice.uuid())).containsExactlyInAnyOrder("10.0.0.1", "10.0.0.2");
+    }
+
+    @Test
+    void altsByAnyIpMatchesAcrossBothTheLastSeenIpAndTheHistory() {
+        // Bob shares a HISTORICAL address with Alice though his current last_ip differs.
+        repository.recordIpSeen(alice.uuid(), "198.51.100.5", T0);
+        repository.recordSeen(bob, Optional.of("203.0.113.9"), T0);
+        repository.recordIpSeen(bob.uuid(), "198.51.100.5", T0);
+
+        assertThat(repository.altsByAnyIp(java.util.Set.of("198.51.100.5"), alice.uuid()))
+                .containsExactly(bob.uuid());
+        // An empty address set yields no alts (the STRICT/alts no-IP path).
+        assertThat(repository.altsByAnyIp(java.util.Set.of(), alice.uuid())).isEmpty();
+    }
+
+    @Test
     void lockdownFlagDefaultsOffAndRoundTripsBothWays() {
         // The V33 seed row makes a fresh database read not-locked without an upsert.
         assertThat(repository.isLockedDown()).isFalse();

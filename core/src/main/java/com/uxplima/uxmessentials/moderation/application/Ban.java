@@ -6,11 +6,14 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
+import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
@@ -34,6 +37,13 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * {@link #PERMANENT_SPAN}, so an actor whose {@code ban.maxduration} cap is finite has the ban reduced to that
  * cap (a timed ban) and is told {@code MOD_DURATION_CAPPED}. An actor with no cap (the default) keeps the
  * permanent ban. Unless the ban is silent ({@code /ban -s}), the staff broadcast announces it.
+ *
+ * <p>Address-strictness: under {@link AddressStrictness#STRICT} (opt-in; default {@link AddressStrictness#NORMAL}
+ * is zero behaviour change) a successful UUID ban additionally IP-bans every address the target is known to
+ * have connected from, so a banned account cannot return on a fresh one from the same connection. The fan-out
+ * is fail-safe — if no IP is on record the UUID ban still succeeds — and never runs against an exempt target
+ * (the exempt gate already refused them above; this is a second guard so STRICT never IP-bans an exempt
+ * player's shared connection collaterally).
  */
 public final class Ban {
 
@@ -51,6 +61,7 @@ public final class Ban {
     private final SanctionHistoryRecorder history;
     private final SanctionDurationLimit limit;
     private final SanctionBroadcast broadcast;
+    private final AddressStrictness strictness;
     private final Clock clock;
 
     public Ban(
@@ -63,6 +74,7 @@ public final class Ban {
             SanctionHistoryRecorder history,
             SanctionDurationLimit limit,
             SanctionBroadcast broadcast,
+            AddressStrictness strictness,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
@@ -73,6 +85,7 @@ public final class Ban {
         this.history = Objects.requireNonNull(history, "history");
         this.limit = Objects.requireNonNull(limit, "limit");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
+        this.strictness = Objects.requireNonNull(strictness, "strictness");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -108,10 +121,33 @@ public final class Ban {
         if (capped) {
             notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, capLabel(effective));
         }
+        fanOutToIps(actor, target, reason, now);
         if (!silent) {
             broadcast.announce(broadcastKey(capped), broadcastPlaceholders(actor, target, reason, capped, effective));
         }
         return Result.ok(ban);
+    }
+
+    /**
+     * Under STRICT, IP-ban every address the target is known to have connected from so a banned account
+     * cannot return on a fresh one from the same connection. Skipped for an exempt target (a defensive second
+     * guard so STRICT never collaterally IP-bans an exempt player's shared connection) and fail-safe: an empty
+     * IP set leaves the UUID ban as the only effect.
+     */
+    private void fanOutToIps(PlayerRef actor, PlayerRef target, Optional<String> reason, Instant now) {
+        if (!strictness.fansOutToIps() || guard.isExempt(target)) {
+            return;
+        }
+        Set<String> ips = repository.ipHistory(target.uuid());
+        if (ips.isEmpty()) {
+            return;
+        }
+        for (String ip : ips) {
+            repository.saveIpBan(
+                    new IpBan(ip, Optional.empty(), reason, Optional.of(target.uuid()), Issuer.of(actor), now));
+            audit.ipBanned(actor, ip, Optional.of(target.uuid()), Optional.empty(), true, reason);
+        }
+        notifier.send(actor, ModerationMessageKey.MOD_BAN_STRICT_IP, Map.of("count", Integer.toString(ips.size())));
     }
 
     private void kickNow(PlayerRef target, boolean capped, Duration effective, Optional<String> reason) {

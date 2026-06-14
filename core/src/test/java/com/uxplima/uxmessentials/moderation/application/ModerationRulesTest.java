@@ -267,6 +267,7 @@ class ModerationRulesTest {
                 history,
                 limit,
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
                 clock);
         Kick kick = new Kick(
                 new FakeSanctions(), guard, ModerationFakes.notifier(), audit, history, ModerationFakes.broadcast());

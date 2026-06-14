@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.persistence.moderation;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationIpBans.MODERATION_IP_BANS;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationIpHistory.MODERATION_IP_HISTORY;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationJails.MODERATION_JAILS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationLockdown.MODERATION_LOCKDOWN;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationMutes.MODERATION_MUTES;
@@ -9,9 +10,12 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationTempba
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationWarns.MODERATION_WARNS;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -196,6 +200,14 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
+    public void recordIpSeen(UUID uuid, String ip, Instant now) {
+        Objects.requireNonNull(uuid, "uuid");
+        Objects.requireNonNull(ip, "ip");
+        Objects.requireNonNull(now, "now");
+        write(dsl -> ModerationWrites.recordIpSeen(dsl, uuid, ip, now));
+    }
+
+    @Override
     public Optional<SeenRecord> seen(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         return read(dsl -> Optional.ofNullable(dsl.selectFrom(MODERATION_SEEN)
@@ -205,14 +217,53 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
+    public Set<String> ipHistory(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        String key = uuid.toString();
+        return read(dsl -> {
+            Set<String> ips = new HashSet<>(dsl.select(MODERATION_IP_HISTORY.IP)
+                    .from(MODERATION_IP_HISTORY)
+                    .where(MODERATION_IP_HISTORY.UUID.eq(key))
+                    .fetch(MODERATION_IP_HISTORY.IP));
+            // The last-seen IP is folded in so a player seen before V34 (history empty, last_ip set) still
+            // resolves an address for /alts and the STRICT fan-out.
+            Optional.ofNullable(dsl.select(MODERATION_SEEN.LAST_IP)
+                            .from(MODERATION_SEEN)
+                            .where(MODERATION_SEEN.UUID.eq(key))
+                            .fetchOne(MODERATION_SEEN.LAST_IP))
+                    .ifPresent(ips::add);
+            return Set.copyOf(ips);
+        });
+    }
+
+    @Override
     public List<UUID> altsByIp(String ip, UUID self) {
         Objects.requireNonNull(ip, "ip");
         Objects.requireNonNull(self, "self");
-        return read(dsl -> dsl.select(MODERATION_SEEN.UUID)
-                .from(MODERATION_SEEN)
-                .where(MODERATION_SEEN.LAST_IP.eq(ip))
-                .and(MODERATION_SEEN.UUID.ne(self.toString()))
-                .fetch(MODERATION_SEEN.UUID, UUID.class));
+        return altsByAnyIp(Set.of(ip), self);
+    }
+
+    @Override
+    public List<UUID> altsByAnyIp(Set<String> ips, UUID self) {
+        Objects.requireNonNull(ips, "ips");
+        Objects.requireNonNull(self, "self");
+        if (ips.isEmpty()) {
+            return List.of();
+        }
+        String selfKey = self.toString();
+        return read(dsl -> {
+            Set<UUID> alts = new LinkedHashSet<>(dsl.select(MODERATION_SEEN.UUID)
+                    .from(MODERATION_SEEN)
+                    .where(MODERATION_SEEN.LAST_IP.in(ips))
+                    .and(MODERATION_SEEN.UUID.ne(selfKey))
+                    .fetch(MODERATION_SEEN.UUID, UUID.class));
+            alts.addAll(dsl.selectDistinct(MODERATION_IP_HISTORY.UUID)
+                    .from(MODERATION_IP_HISTORY)
+                    .where(MODERATION_IP_HISTORY.IP.in(ips))
+                    .and(MODERATION_IP_HISTORY.UUID.ne(selfKey))
+                    .fetch(MODERATION_IP_HISTORY.UUID, UUID.class));
+            return List.copyOf(alts);
+        });
     }
 
     @Override

@@ -264,6 +264,7 @@ class HistoryRecordingAndChecksTest {
                 recorder,
                 limit,
                 broadcast,
+                com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
                 clock);
         Kick kick = new Kick(new FakeSanctions(TARGET), guard, notifier, audit, recorder, broadcast);
         return new WarnEscalator(ladder, mute, tempBan, ban, kick, notifier);

@@ -51,6 +51,7 @@ class BanTest {
                 new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 new SanctionDurationLimit(ModerationFakes.exempt()),
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         var result = ban.ban(ACTOR, TARGET, Optional.of("griefing"), false);
@@ -87,6 +88,7 @@ class BanTest {
                 new SanctionHistoryRecorder(history, Clock.fixed(NOW, ZoneOffset.UTC)),
                 new SanctionDurationLimit(ModerationFakes.exempt()),
                 ModerationFakes.broadcast(),
+                com.uxplima.uxmessentials.moderation.domain.AddressStrictness.NORMAL,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         var result = ban.ban(ACTOR, TARGET, Optional.empty(), false);

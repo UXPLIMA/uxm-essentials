@@ -54,7 +54,9 @@ public final class ModerationJoinListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         PlayerRef who = BukkitRefs.toRef(event.getPlayer());
         Instant now = clock.instant();
-        repository.recordSeen(who, ip(event), now);
+        Optional<String> ip = ip(event);
+        repository.recordSeen(who, ip, now);
+        ip.ifPresent(address -> repository.recordIpSeen(who.uuid(), address, now));
         countdown.onJoin(who);
         sessionStart.put(who.uuid(), now);
     }

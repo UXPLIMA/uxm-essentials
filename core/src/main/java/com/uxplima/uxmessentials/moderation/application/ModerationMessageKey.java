@@ -59,6 +59,8 @@ public enum ModerationMessageKey implements MessageKey {
 
     // /ban, /unban — permanent UUID ban and its lift
     BAN_APPLIED("moderation.ban.applied"),
+    // STRICT address-strictness: a UUID ban also IP-banned the target's known addresses ({count} of them)
+    MOD_BAN_STRICT_IP("moderation.ban.strict-ip"),
     BAN_KICK("moderation.ban.kick"),
     BAN_LIFTED("moderation.unban.applied"),
     BAN_NOT_BANNED("moderation.unban.not-banned"),

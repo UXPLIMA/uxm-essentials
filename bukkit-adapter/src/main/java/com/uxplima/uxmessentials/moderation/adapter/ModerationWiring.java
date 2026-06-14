@@ -186,7 +186,17 @@ public final class ModerationWiring {
         TempBan tempBan = new TempBan(
                 repository, sanctionPort, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
         Ban ban = new Ban(
-                repository, sanctionPort, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
+                repository,
+                sanctionPort,
+                guard,
+                notifier,
+                audit,
+                kernel.events(),
+                history,
+                limit,
+                broadcast,
+                settings.addressStrictness(),
+                clock);
         Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast);
         WarnEscalator escalator = new WarnEscalator(settings.warnEscalation(), mute, tempBan, ban, kick, notifier);
         // The revoke use cases are built as named locals so /staffrollback drives the same instances the
@@ -230,7 +240,7 @@ public final class ModerationWiring {
                 .tempBanIp(new TempBanIp(repository, notifier, audit, kernel.events(), history, clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit, history))
                 .freeze(new Freeze(sanctionPort, guard, notifier, audit))
-                .seen(new Seen(repository, kernel.playerLookup(), notifier, clock))
+                .seen(new Seen(repository, kernel.playerLookup(), notifier, settings.censorIpAddresses(), clock))
                 .listAlts(new ListAlts(repository, kernel.playerLookup(), notifier))
                 .commandSpy(new CommandSpy(commandSpyStore, notifier))
                 .staffRollback(staffRollback)

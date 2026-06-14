@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationAction;
@@ -43,6 +44,8 @@ public final class ModerationSettings {
     private final Set<String> mutedBlockedCommands;
     private final WarnEscalation warnEscalation;
     private final boolean silentByDefault;
+    private final AddressStrictness addressStrictness;
+    private final boolean censorIpAddresses;
 
     public ModerationSettings(ConfigStore config, Logger log) {
         this.config = Objects.requireNonNull(config, "config");
@@ -56,6 +59,8 @@ public final class ModerationSettings {
                 .collect(Collectors.toUnmodifiableSet());
         this.warnEscalation = parseEscalation(config.getStringList("warnings.actions", DEFAULT_ESCALATION), log);
         this.silentByDefault = config.getBoolean("broadcast.silent-by-default", false);
+        this.addressStrictness = AddressStrictness.parse(config.getString("address-strictness", "NORMAL"));
+        this.censorIpAddresses = config.getBoolean("censor-ip-addresses", false);
     }
 
     /** The command labels a muted player may not run (the mute-bypass guard list), case-folded. */
@@ -71,6 +76,20 @@ public final class ModerationSettings {
     /** Whether a sanction's broadcast is suppressed by default (the {@code -s} flag's default state). */
     public boolean silentByDefault() {
         return silentByDefault;
+    }
+
+    /**
+     * How far a UUID ban reaches across the target's known addresses. {@code NORMAL} (the default) bans the
+     * one account; {@code STRICT} also IP-bans every address the target has connected from (opt-in — it
+     * broadens IP retention and catches anyone sharing the connection).
+     */
+    public AddressStrictness addressStrictness() {
+        return addressStrictness;
+    }
+
+    /** Whether {@code /alts} and {@code /seenip} mask the addresses they render (privacy; off by default). */
+    public boolean censorIpAddresses() {
+        return censorIpAddresses;
     }
 
     /**

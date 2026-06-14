@@ -25,12 +25,19 @@ public final class Seen {
     private final ModerationRepository repository;
     private final PlayerLookup players;
     private final ModerationNotifier notifier;
+    private final boolean censorIp;
     private final Clock clock;
 
-    public Seen(ModerationRepository repository, PlayerLookup players, ModerationNotifier notifier, Clock clock) {
+    public Seen(
+            ModerationRepository repository,
+            PlayerLookup players,
+            ModerationNotifier notifier,
+            boolean censorIp,
+            Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.players = Objects.requireNonNull(players, "players");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.censorIp = censorIp;
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -55,8 +62,20 @@ public final class Seen {
             notifier.send(actor, ModerationMessageKey.SEENIP_NO_IP, Map.of("player", target.name()));
             return;
         }
-        notifier.send(actor, ModerationMessageKey.SEENIP_REPORT, Map.of("player", target.name(), "ip", ip.get()));
+        notifier.send(
+                actor, ModerationMessageKey.SEENIP_REPORT, Map.of("player", target.name(), "ip", render(ip.get())));
         reportAlts(actor, ip.get(), target.uuid());
+    }
+
+    /** Mask an address when censoring is on (LiteBans-style), keeping only the leading octet/segment. */
+    private String render(String ip) {
+        if (!censorIp) {
+            return ip;
+        }
+        int firstDot = ip.indexOf('.');
+        int firstColon = ip.indexOf(':');
+        int cut = firstDot >= 0 ? firstDot : firstColon;
+        return cut > 0 ? ip.substring(0, cut) + ".*.*.*" : "*.*.*.*";
     }
 
     private void reportAlts(PlayerRef actor, String ip, UUID self) {

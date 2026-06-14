@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.moderation.application.port;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
@@ -97,11 +98,29 @@ public interface ModerationRepository {
     /** Record or advance {@code who}'s last-seen/last-IP on join/quit. */
     void recordSeen(PlayerRef who, Optional<String> ip, Instant at);
 
+    /**
+     * Append {@code ip} to {@code who}'s IP history (every address they connect from, not only the latest):
+     * an insert for a new address, or a {@code last_seen} bump on a repeat connection from a known one
+     * (keyed on {@code (uuid, ip)} so a repeat never duplicates a row). Called beside {@link #recordSeen} on
+     * join so history accrues per connection.
+     */
+    void recordIpSeen(UUID uuid, String ip, Instant now);
+
     /** {@code who}'s last-seen/last-IP record, if ever recorded. */
     Optional<SeenRecord> seen(PlayerRef who);
 
+    /** Every address {@code uuid} is known to have connected from (the IP history union the last-seen IP). */
+    Set<String> ipHistory(UUID uuid);
+
     /** Other UUIDs that have connected from {@code ip} (the alt set), excluding {@code self}. */
     List<UUID> altsByIp(String ip, UUID self);
+
+    /**
+     * Other UUIDs that have ever connected from any address in {@code ips} (the broadened alt set), matched
+     * across both the last-seen IP and the full IP history, excluding {@code self}. An empty {@code ips}
+     * yields no alts.
+     */
+    List<UUID> altsByAnyIp(Set<String> ips, UUID self);
 
     /** Lazily materialize {@code target}'s seen row so an offline FK-bearing write never breaks integrity. */
     void ensureUserExists(PlayerRef target, Instant at);
