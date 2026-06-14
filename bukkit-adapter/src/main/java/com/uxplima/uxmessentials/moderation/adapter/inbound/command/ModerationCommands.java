@@ -25,10 +25,14 @@ public final class ModerationCommands {
 
     /** Every moderation command, in surface order. */
     public static List<CommandRegistration> all(
-            ModerationServices services, Messages messages, MessageSink sink, Scheduler scheduler) {
+            ModerationServices services,
+            Messages messages,
+            MessageSink sink,
+            Scheduler scheduler,
+            boolean silentByDefault) {
         return List.of(
-                new MuteCommand(services, messages, sink),
-                new TempmuteCommand(services, messages, sink),
+                new MuteCommand(services, messages, sink, silentByDefault),
+                new TempmuteCommand(services, messages, sink, silentByDefault),
                 target(
                         "unmute",
                         "uxmessentials.moderation.unmute",
@@ -51,17 +55,17 @@ public final class ModerationCommands {
                 new JailedPlayersCommand(services, messages, sink, scheduler),
                 new SetJailCommand(services, messages, sink),
                 new DelJailCommand(services, messages, sink),
-                new TempbanCommand(services, messages, sink),
-                new BanCommand(services, messages, sink),
+                new TempbanCommand(services, messages, sink, silentByDefault),
+                new BanCommand(services, messages, sink, silentByDefault),
                 new UnbanCommand(services, messages, sink),
                 new BanListCommand(services, messages, sink, scheduler),
                 new MuteListCommand(services, messages, sink, scheduler),
                 new BanHistoryCommand(services, messages, sink, scheduler),
                 new MuteHistoryCommand(services, messages, sink, scheduler),
-                new KickCommand(services, messages, sink),
+                new KickCommand(services, messages, sink, silentByDefault),
                 new KickallCommand(services, messages, sink),
-                new WarnCommand(services, messages, sink),
-                new TempwarnCommand(services, messages, sink),
+                new WarnCommand(services, messages, sink, silentByDefault),
+                new TempwarnCommand(services, messages, sink, silentByDefault),
                 new UnwarnCommand(services, messages, sink),
                 target(
                         "warns",

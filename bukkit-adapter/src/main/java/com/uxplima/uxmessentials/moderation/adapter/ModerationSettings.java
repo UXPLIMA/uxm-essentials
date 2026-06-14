@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.moderation.adapter;
 
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -7,7 +9,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
+import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
+import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationAction;
+import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationStep;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -27,13 +34,19 @@ public final class ModerationSettings {
     private static final List<String> DEFAULT_BLOCKED_COMMANDS =
             List.of("me", "msg", "tell", "w", "whisper", "mail", "helpop", "r", "reply");
 
+    /** The default escalation ladder shipped in the config: tempmute on the 3rd warning, tempban on the 5th. */
+    private static final List<String> DEFAULT_ESCALATION = List.of("3:tempmute:1h", "5:tempban:1d");
+
     private final ConfigStore config;
     private final List<String> jails;
     private final boolean wallClockDefault;
     private final Set<String> mutedBlockedCommands;
+    private final WarnEscalation warnEscalation;
+    private final boolean silentByDefault;
 
-    public ModerationSettings(ConfigStore config) {
+    public ModerationSettings(ConfigStore config, Logger log) {
         this.config = Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(log, "log");
         this.jails = config.getStringList("jails", List.of()).stream()
                 .map(name -> name.toLowerCase(Locale.ROOT))
                 .toList();
@@ -41,11 +54,82 @@ public final class ModerationSettings {
         this.mutedBlockedCommands = config.getStringList("muted-blocked-commands", DEFAULT_BLOCKED_COMMANDS).stream()
                 .map(name -> name.toLowerCase(Locale.ROOT))
                 .collect(Collectors.toUnmodifiableSet());
+        this.warnEscalation = parseEscalation(config.getStringList("warnings.actions", DEFAULT_ESCALATION), log);
+        this.silentByDefault = config.getBoolean("broadcast.silent-by-default", false);
     }
 
     /** The command labels a muted player may not run (the mute-bypass guard list), case-folded. */
     public Set<String> mutedBlockedCommands() {
         return mutedBlockedCommands;
+    }
+
+    /** The configured warn-escalation ladder ({@code count:action:duration} rungs), parsed at wire time. */
+    public WarnEscalation warnEscalation() {
+        return warnEscalation;
+    }
+
+    /** Whether a sanction's broadcast is suppressed by default (the {@code -s} flag's default state). */
+    public boolean silentByDefault() {
+        return silentByDefault;
+    }
+
+    /**
+     * Parse each configured {@code count:action:duration} rung into an {@link EscalationStep}, skipping (with a
+     * warning) any malformed entry rather than failing the whole module. {@code action} is case-insensitive and
+     * one of mute/tempmute/kick/tempban/ban; {@code duration} is required for the timed actions
+     * ({@code tempmute}, {@code tempban}) and ignored for the rest.
+     */
+    private static WarnEscalation parseEscalation(List<String> raw, Logger log) {
+        List<EscalationStep> steps = new ArrayList<>();
+        for (String entry : raw) {
+            parseStep(entry, log).ifPresent(steps::add);
+        }
+        return steps.isEmpty() ? WarnEscalation.NONE : new WarnEscalation(steps);
+    }
+
+    private static Optional<EscalationStep> parseStep(String entry, Logger log) {
+        String[] parts = entry.split(":", 3);
+        if (parts.length < 2) {
+            log.warn("Ignoring malformed warn-escalation rung '{}' (expected count:action[:duration])", entry);
+            return Optional.empty();
+        }
+        Optional<Integer> count = parseCount(parts[0]);
+        Optional<EscalationAction> action = parseAction(parts[1]);
+        if (count.isEmpty() || action.isEmpty()) {
+            log.warn("Ignoring warn-escalation rung '{}' (bad count or action)", entry);
+            return Optional.empty();
+        }
+        boolean timed = action.get() == EscalationAction.TEMPMUTE || action.get() == EscalationAction.TEMPBAN;
+        Optional<Duration> duration = parseDuration(parts.length == 3 ? parts[2] : "");
+        if (timed && duration.isEmpty()) {
+            log.warn("Ignoring warn-escalation rung '{}' ({} needs a duration)", entry, parts[1]);
+            return Optional.empty();
+        }
+        return Optional.of(new EscalationStep(count.get(), action.get(), timed ? duration : Optional.empty()));
+    }
+
+    private static Optional<Integer> parseCount(String raw) {
+        try {
+            int count = Integer.parseInt(raw.trim());
+            return count >= 1 ? Optional.of(count) : Optional.empty();
+        } catch (NumberFormatException notANumber) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<EscalationAction> parseAction(String raw) {
+        try {
+            return Optional.of(EscalationAction.valueOf(raw.trim().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException unknownAction) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<Duration> parseDuration(String raw) {
+        if (raw.isBlank()) {
+            return Optional.empty();
+        }
+        return SanctionDuration.parse(raw.trim()).duration();
     }
 
     /** The configured jail names, sorted, for {@code /jails} to list (already lower-cased and immutable). */

@@ -26,8 +26,16 @@ public final class SanctionDurationLimit {
     private static final String NODE_PREFIX = "uxmessentials.moderation.";
     private static final String NODE_SUFFIX = ".maxduration";
 
-    /** The config-default sentinel handed to the reducer: {@code -1} resolves to unlimited (no cap). */
-    private static final long UNLIMITED_DEFAULT = -1L;
+    /**
+     * The "no node held" fallback handed to the reducer as its config default. It must be negative (so the
+     * {@code capSeconds < 0} branch below reads it as unlimited) but <em>not</em> the {@code -1} unlimited
+     * sentinel: the MAX reducer short-circuits to unlimited the instant it accepts {@code -1}, and the config
+     * default is seeded before any held node is folded in — seeding {@code -1} would latch unlimited and a real
+     * {@code maxduration.<seconds>} node could never cap anything. {@code Long.MIN_VALUE} loses every {@code MAX}
+     * fold to a real node, so a held cap wins, while a player with no node still resolves to this negative
+     * fallback and is treated as unlimited.
+     */
+    private static final long NO_NODE_FALLBACK = Long.MIN_VALUE;
 
     private final Permissions permissions;
 
@@ -44,13 +52,13 @@ public final class SanctionDurationLimit {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(requested, "requested");
         QuotaFamily family = QuotaFamily.quota(NODE_PREFIX + kind + NODE_SUFFIX);
-        QuotaResult resolved = permissions.resolveQuota(actor, family, null, UNLIMITED_DEFAULT);
+        QuotaResult resolved = permissions.resolveQuota(actor, family, null, NO_NODE_FALLBACK);
         if (resolved.isUnlimited()) {
             return requested;
         }
-        long capSeconds = resolved.orElse(UNLIMITED_DEFAULT);
+        long capSeconds = resolved.orElse(NO_NODE_FALLBACK);
         if (capSeconds < 0) {
-            // A negative concrete value is treated as the unlimited sentinel: no cap.
+            // No node held (the negative fallback) or an explicit negative tier: treat as unlimited, no cap.
             return requested;
         }
         Duration cap = Duration.ofSeconds(capSeconds);

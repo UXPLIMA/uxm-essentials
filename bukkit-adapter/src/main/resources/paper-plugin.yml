@@ -528,6 +528,9 @@ permissions:
   uxmessentials.moderation.exempt:
     description: 'Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff.'
     default: op
+  uxmessentials.moderation.broadcast.receive:
+    description: 'Receive the staff sanction broadcast — the one-line announcement a non-silent /ban /mute /kick /warn emits. The -s flag (or broadcast.silent-by-default) suppresses it. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited).'
+    default: op
   # itemworld context (docs/permissions.md "Itemworld"). The largest module — the full EssentialsX item/world
   # surface (~40 verbs) split into sub-feature groups, each independently disableable from itemworld.conf and
   # each command additionally disableable per-command (modules.itemworld.groups.<group>.enabled and

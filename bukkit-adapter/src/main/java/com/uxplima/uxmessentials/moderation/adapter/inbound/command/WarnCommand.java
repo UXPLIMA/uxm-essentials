@@ -18,16 +18,20 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /warn <player> [reason]}: append a warning to a player's history. The exempt gate, the append and
- * the audit line are the {@code IssueWarn} use case's job; the target may be offline.
+ * {@code /warn <player> [-s] [reason]}: append a warning to a player's history. The exempt gate, the append and
+ * the audit line are the {@code IssueWarn} use case's job; the target may be offline. A leading {@code -s} in
+ * the reason suppresses the staff broadcast (and any escalation it triggers runs silently too).
  */
 @NullMarked
 public final class WarnCommand extends ModerationCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.moderation.warn";
 
-    public WarnCommand(ModerationServices services, Messages messages, MessageSink sink) {
+    private final boolean silentByDefault;
+
+    public WarnCommand(ModerationServices services, Messages messages, MessageSink sink, boolean silentByDefault) {
         super(services, messages, sink);
+        this.silentByDefault = silentByDefault;
     }
 
     @Override
@@ -43,13 +47,14 @@ public final class WarnCommand extends ModerationCommandSupport implements Comma
 
     @Override
     public String description() {
-        return "Warn a player.";
+        return "Warn a player (prefix the reason with -s to warn silently).";
     }
 
     private int run(CommandContext<CommandSourceStack> ctx, Optional<String> reason) {
         PlayerRef actor = actor(ctx);
+        SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.warn().warn(actor, to, reason));
+        target.ifPresent(to -> services.warn().warn(actor, to, parsed.reason(), parsed.silent()));
         return Command.SINGLE_SUCCESS;
     }
 }

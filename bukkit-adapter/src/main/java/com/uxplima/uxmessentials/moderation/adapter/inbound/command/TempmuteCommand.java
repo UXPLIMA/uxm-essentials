@@ -18,16 +18,20 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /tempmute <player> <duration> [reason]}: the explicit-duration alias of {@code /mute}. The duration
- * is mandatory here; otherwise it shares the {@code Mute} use case and the same {@code moderation.mute} node.
+ * {@code /tempmute <player> <duration> [-s] [reason]}: the explicit-duration alias of {@code /mute}. The
+ * duration is mandatory here; otherwise it shares the {@code Mute} use case and the same {@code moderation.mute}
+ * node. A leading {@code -s} in the reason suppresses the staff broadcast.
  */
 @NullMarked
 public final class TempmuteCommand extends ModerationCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.moderation.mute";
 
-    public TempmuteCommand(ModerationServices services, Messages messages, MessageSink sink) {
+    private final boolean silentByDefault;
+
+    public TempmuteCommand(ModerationServices services, Messages messages, MessageSink sink, boolean silentByDefault) {
         super(services, messages, sink);
+        this.silentByDefault = silentByDefault;
     }
 
     @Override
@@ -44,14 +48,15 @@ public final class TempmuteCommand extends ModerationCommandSupport implements C
 
     @Override
     public String description() {
-        return "Mute a player for a duration.";
+        return "Mute a player for a duration (prefix the reason with -s to mute silently).";
     }
 
     private int run(CommandContext<CommandSourceStack> ctx, Optional<String> reason) {
         PlayerRef actor = actor(ctx);
         String duration = ctx.getArgument("duration", String.class);
+        SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.mute().mute(actor, to, duration, reason));
+        target.ifPresent(to -> services.mute().mute(actor, to, duration, parsed.reason(), parsed.silent()));
         return Command.SINGLE_SUCCESS;
     }
 }

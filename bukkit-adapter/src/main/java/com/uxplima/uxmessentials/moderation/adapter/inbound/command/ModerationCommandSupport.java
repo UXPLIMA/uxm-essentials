@@ -76,6 +76,40 @@ abstract class ModerationCommandSupport {
         }
     }
 
+    /** The {@code -s} token a staff member prefixes a sanction reason with to suppress the staff broadcast. */
+    static final String SILENT_TOKEN = "-s";
+
+    /**
+     * Split a leading {@code -s} silent flag off the greedy reason. A sanction's broadcast is suppressed when
+     * the reason begins with {@code -s} (mirroring LiteBans) or when the module defaults to silent; the token is
+     * stripped so it never leaks into the stored reason or the target's notice.
+     *
+     * @param reason the raw greedy reason as typed (may carry a leading {@code -s})
+     * @param silentByDefault the module default applied when no flag is present
+     */
+    static SilentReason silentReason(Optional<String> reason, boolean silentByDefault) {
+        if (reason.isEmpty()) {
+            return new SilentReason(silentByDefault, Optional.empty());
+        }
+        String raw = reason.get().trim();
+        if (raw.equals(SILENT_TOKEN)) {
+            return new SilentReason(true, Optional.empty());
+        }
+        if (raw.startsWith(SILENT_TOKEN + " ")) {
+            String stripped = raw.substring(SILENT_TOKEN.length()).trim();
+            return new SilentReason(true, stripped.isBlank() ? Optional.empty() : Optional.of(stripped));
+        }
+        return new SilentReason(silentByDefault, Optional.of(raw));
+    }
+
+    /** A parsed sanction reason: whether the broadcast is suppressed, and the reason with any {@code -s} removed. */
+    record SilentReason(boolean silent, Optional<String> reason) {
+
+        SilentReason {
+            Objects.requireNonNull(reason, "reason");
+        }
+    }
+
     /** Send {@code key} to the command sender, rendered in their locale. */
     final void notify(CommandContext<CommandSourceStack> ctx, MessageKey key, Map<String, String> placeholders) {
         sink.deliver(actor(ctx), messages.resolve(actor(ctx), key, placeholders));

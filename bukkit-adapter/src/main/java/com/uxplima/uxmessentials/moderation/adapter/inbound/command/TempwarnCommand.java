@@ -22,15 +22,19 @@ import org.jspecify.annotations.NullMarked;
  * of {@code /warn}. The duration is mandatory (a permanent warning is {@code /warn}); the {@code TempWarn} use
  * case applies the exempt gate, the duration parse and the audit line, and the target may be offline. It
  * shares the {@code uxmessentials.moderation.warn} node. This handler maps the name, the duration and the
- * greedy reason.
+ * greedy reason; a leading {@code -s} in the reason suppresses the staff broadcast (and any escalation runs
+ * silently too).
  */
 @NullMarked
 public final class TempwarnCommand extends ModerationCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.moderation.warn";
 
-    public TempwarnCommand(ModerationServices services, Messages messages, MessageSink sink) {
+    private final boolean silentByDefault;
+
+    public TempwarnCommand(ModerationServices services, Messages messages, MessageSink sink, boolean silentByDefault) {
         super(services, messages, sink);
+        this.silentByDefault = silentByDefault;
     }
 
     @Override
@@ -47,14 +51,15 @@ public final class TempwarnCommand extends ModerationCommandSupport implements C
 
     @Override
     public String description() {
-        return "Warn a player for a duration.";
+        return "Warn a player for a duration (prefix the reason with -s to warn silently).";
     }
 
     private int run(CommandContext<CommandSourceStack> ctx, Optional<String> reason) {
         PlayerRef actor = actor(ctx);
         String duration = ctx.getArgument("duration", String.class);
+        SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.tempWarn().warn(actor, to, duration, reason));
+        target.ifPresent(to -> services.tempWarn().warn(actor, to, duration, parsed.reason(), parsed.silent()));
         return Command.SINGLE_SUCCESS;
     }
 }

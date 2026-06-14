@@ -18,16 +18,20 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /kick <player> [reason]}: eject a connected player. A kick acts on a live session, so the target is
- * resolved online; the exempt gate and audit line are the {@code Kick} use case's job.
+ * {@code /kick <player> [-s] [reason]}: eject a connected player. A kick acts on a live session, so the target
+ * is resolved online; the exempt gate and audit line are the {@code Kick} use case's job. A leading {@code -s}
+ * in the reason suppresses the staff broadcast.
  */
 @NullMarked
 public final class KickCommand extends ModerationCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.moderation.kick";
 
-    public KickCommand(ModerationServices services, Messages messages, MessageSink sink) {
+    private final boolean silentByDefault;
+
+    public KickCommand(ModerationServices services, Messages messages, MessageSink sink, boolean silentByDefault) {
         super(services, messages, sink);
+        this.silentByDefault = silentByDefault;
     }
 
     @Override
@@ -43,13 +47,14 @@ public final class KickCommand extends ModerationCommandSupport implements Comma
 
     @Override
     public String description() {
-        return "Kick a player.";
+        return "Kick a player (prefix the reason with -s to kick silently).";
     }
 
     private int run(CommandContext<CommandSourceStack> ctx, Optional<String> reason) {
         PlayerRef actor = actor(ctx);
+        SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.kick().kick(actor, to, reason));
+        target.ifPresent(to -> services.kick().kick(actor, to, parsed.reason(), parsed.silent()));
         return Command.SINGLE_SUCCESS;
     }
 }

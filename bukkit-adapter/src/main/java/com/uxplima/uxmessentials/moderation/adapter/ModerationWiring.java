@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirecto
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyStore;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.ClearWarns;
@@ -45,6 +46,7 @@ import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewWarns;
+import com.uxplima.uxmessentials.moderation.application.SanctionDurationLimit;
 import com.uxplima.uxmessentials.moderation.application.SanctionHistoryRecorder;
 import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
@@ -57,9 +59,11 @@ import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
+import com.uxplima.uxmessentials.moderation.application.WarnEscalator;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
@@ -91,6 +95,10 @@ public final class ModerationWiring {
 
     private static final String AUDIT_CHANNEL = "com.uxplima.uxmessentials.audit";
 
+    /** The locale dimension the shared chat prefix is resolved against — the console has no per-viewer locale. */
+    private static final com.uxplima.uxmessentials.shared.domain.PlayerRef BROADCAST_PREFIX_VIEWER =
+            new com.uxplima.uxmessentials.shared.domain.PlayerRef(new java.util.UUID(0L, 0L), "console");
+
     private ModerationWiring() {}
 
     /** Build the moderation adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the gate sinks. */
@@ -101,7 +109,7 @@ public final class ModerationWiring {
         Objects.requireNonNull(gates, "gates");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
-        ModerationSettings settings = new ModerationSettings(ctx.config());
+        ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
         ModerationRepository repository = ModerationStores.repository(persistence);
         JailLocationStore jailLocations = ModerationStores.jailLocationStore(persistence);
         SanctionHistory sanctionHistory = ModerationStores.sanctionHistory(persistence);
@@ -127,7 +135,12 @@ public final class ModerationWiring {
         gates.bindMute(mutePolicy);
         gates.bindJail(jailGate);
         return new Wired(
-                ModerationCommands.all(services, kernel.messages(), kernel.messageSink(), kernel.scheduler()),
+                ModerationCommands.all(
+                        services,
+                        kernel.messages(),
+                        kernel.messageSink(),
+                        kernel.scheduler(),
+                        settings.silentByDefault()),
                 listeners(services, sanctions, repository, kernel, settings, guard, commandSpyStore, clock),
                 sanctions,
                 commandSpyStore,
@@ -153,19 +166,36 @@ public final class ModerationWiring {
         Sanctions sanctionPort = sanctions;
         Jail jail = new Jail(repository, jails, sanctionPort, guard, notifier, audit, kernel.events(), clock);
         Unjail unjail = new Unjail(repository, sanctionPort, notifier, audit, kernel.events(), clock);
+        SanctionBroadcast broadcast = new PermissionSanctionBroadcast(
+                plugin.getServer(),
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink(),
+                broadcastPrefix(kernel));
+        SanctionDurationLimit limit = new SanctionDurationLimit(kernel.permissions());
+        // The escalated sanctions a warning auto-applies run through their own use cases, never back through a
+        // warn, so escalation cannot recurse; they are built first so the escalator can drive them.
+        Mute mute = new Mute(repository, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
+        TempBan tempBan = new TempBan(
+                repository, sanctionPort, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
+        Ban ban = new Ban(
+                repository, sanctionPort, guard, notifier, audit, kernel.events(), history, limit, broadcast, clock);
+        Kick kick = new Kick(sanctionPort, guard, notifier, audit, broadcast);
+        WarnEscalator escalator = new WarnEscalator(settings.warnEscalation(), mute, tempBan, ban, kick, notifier);
         return new ModerationServices.Builder()
-                .mute(new Mute(repository, guard, notifier, audit, kernel.events(), history, clock))
+                .mute(mute)
                 .unmute(new Unmute(repository, notifier, audit, kernel.events(), history, clock))
                 .jail(jail)
                 .unjail(unjail)
                 .toggleJail(new ToggleJail(repository, jails, jail, unjail))
-                .tempBan(new TempBan(repository, sanctionPort, guard, notifier, audit, kernel.events(), history, clock))
-                .ban(new Ban(repository, sanctionPort, guard, notifier, audit, kernel.events(), history, clock))
+                .tempBan(tempBan)
+                .ban(ban)
                 .unban(new Unban(repository, notifier, audit, history))
-                .kick(new Kick(sanctionPort, guard, notifier, audit))
+                .kick(kick)
                 .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
-                .warn(new IssueWarn(repository, guard, notifier, audit, kernel.events(), clock))
-                .tempWarn(new TempWarn(repository, guard, notifier, audit, kernel.events(), clock))
+                .warn(new IssueWarn(repository, guard, notifier, audit, kernel.events(), broadcast, escalator, clock))
+                .tempWarn(
+                        new TempWarn(repository, guard, notifier, audit, kernel.events(), broadcast, escalator, clock))
                 .reviewWarns(new ReviewWarns(repository, notifier, clock))
                 .clearWarns(new ClearWarns(repository, notifier, audit))
                 .sanctionSummary(new SanctionSummary(repository, notifier, clock))
@@ -213,6 +243,17 @@ public final class ModerationWiring {
 
     private static Logger auditLogger() {
         return new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL));
+    }
+
+    /**
+     * The shared chat {@code <prefix>} template, resolved through the kernel {@link
+     * com.uxplima.uxmessentials.shared.application.port.Messages} catalog so the console-facing broadcast line
+     * frames identically to the player-facing one (which the {@code MessageSink} prefixes on the player path).
+     * {@code Messages.resolve} substitutes only {@code {name}} placeholders, leaving MiniMessage tags intact, so
+     * this returns the raw prefix source string.
+     */
+    private static String broadcastPrefix(KernelPorts kernel) {
+        return kernel.messages().resolve(BROADCAST_PREFIX_VIEWER, () -> "prefix", java.util.Map.of());
     }
 
     /**
