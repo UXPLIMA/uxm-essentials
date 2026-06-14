@@ -8,26 +8,27 @@ import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
-import com.uxplima.uxmessentials.communication.domain.AnnouncerSchedule;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The rotating announcer: a self-rescheduling task on the {@link Scheduler} port (docs/02-concurrency.md §6.10
- * self-rescheduling-loop pattern, matching the presence AFK sweep and the messaging mail-expiry sweep). Each tick
- * asks {@link NextAnnouncement#pick(int)} for the next line given the current online count; when a line is
- * returned it is broadcast to every opted-in player through the {@link BukkitAnnouncerBroadcaster}, otherwise the
- * tick is skipped (no line configured, or below the min-players gate).
+ * The rotating announcer: self-rescheduling tasks on the {@link Scheduler} port (docs/02-concurrency.md §6.10
+ * self-rescheduling-loop pattern, matching the presence AFK sweep and the messaging mail-expiry sweep).
  *
- * <p>The interval is read fresh from the live {@link AnnouncerSchedule} each reschedule, so a
- * {@code /uxmess reload communication} that swaps a new schedule in changes the cadence on the next tick without
- * re-arming the task. The task observes the module's {@code running} flag and exits cleanly on disable; the
- * broadcast scan reads the live online set off the tick thread and delivers through the sink, which hops to each
- * viewer's region thread, so no Bukkit entity is touched on the async loop itself.
+ * <p>There are two cadences. Announcements <em>without</em> an interval override rotate together on the config-wide
+ * default interval: each default tick asks {@link NextAnnouncement#pick(int)} (the cursor + ordering + no-repeat
+ * rule, gated by min-players) for the next one and broadcasts it. Each announcement that declares its own
+ * {@code interval-seconds} runs on its <em>own</em> independent loop at that cadence, re-resolved from the live
+ * config by id each tick (so a reload that changes its interval or drops it is honoured) and gated by the same
+ * min-players check. An override announcement is therefore not part of the shared rotation.
  *
- * <p>An announcement now carries one or more lines; this task joins them with a newline and broadcasts the block
- * on the chat channel. Per-channel delivery, per-viewer condition gating, and per-announcement interval overrides
- * are the follow-up adapter task; here the legacy single-block chat behaviour is preserved.
+ * <p>The default interval and the per-announcement overrides are read fresh from the live {@link AnnouncerConfig}
+ * each reschedule, so a {@code /announce reload} (or {@code /uxmess reload communication}) that swaps a new config
+ * in changes a cadence on the next tick without re-arming the task. Every loop observes the module's {@code running}
+ * flag and exits cleanly on disable. Delivery flows through the {@link BukkitAnnouncerBroadcaster}, which enumerates
+ * the online set on the global thread and hops to each viewer's region thread, gating by opt-out and the
+ * announcement's display condition; no Bukkit entity is touched on the async loop itself.
  */
 @NullMarked
 public final class AnnouncerTask {
@@ -35,41 +36,78 @@ public final class AnnouncerTask {
     private final Scheduler scheduler;
     private final NextAnnouncement nextAnnouncement;
     private final BukkitAnnouncerBroadcaster broadcaster;
-    private final Supplier<AnnouncerSchedule> schedule;
+    private final Supplier<AnnouncerConfig> config;
     private final BooleanSupplier running;
 
     public AnnouncerTask(
             Scheduler scheduler,
             NextAnnouncement nextAnnouncement,
             BukkitAnnouncerBroadcaster broadcaster,
-            Supplier<AnnouncerSchedule> schedule,
+            Supplier<AnnouncerConfig> config,
             BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.nextAnnouncement = Objects.requireNonNull(nextAnnouncement, "nextAnnouncement");
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
-        this.schedule = Objects.requireNonNull(schedule, "schedule");
+        this.config = Objects.requireNonNull(config, "config");
         this.running = Objects.requireNonNull(running, "running");
     }
 
-    /** Arm the first announcer tick; subsequent ticks reschedule themselves until the module stops. */
+    /**
+     * Arm the default rotation loop and one independent loop per override announcement present at start. A reload
+     * that introduces a new override announcement is picked up on the next module wiring; within a running task an
+     * override loop re-resolves its announcement from the live config each tick, so an interval change takes effect
+     * without re-arming.
+     */
     public void start() {
-        scheduleNext();
+        scheduleDefaultRotation();
+        for (Announcement announcement : config.get().announcements()) {
+            announcement.intervalOverride().ifPresent(interval -> scheduleOverride(announcement.id(), interval));
+        }
     }
 
-    private void scheduleNext() {
+    private void scheduleDefaultRotation() {
         if (!running.getAsBoolean()) {
             return;
         }
-        Duration interval = Objects.requireNonNull(schedule.get(), "schedule").interval();
-        scheduler.asyncAfter(interval, this::tick);
+        Duration interval = config.get().defaultInterval();
+        scheduler.asyncAfter(interval, this::tickDefaultRotation);
     }
 
-    private void tick() {
+    private void tickDefaultRotation() {
         if (!running.getAsBoolean()) {
             return;
         }
-        Optional<Announcement> announcement = nextAnnouncement.pick(broadcaster.onlineCount());
-        announcement.ifPresent(picked -> broadcaster.broadcast(String.join("\n", picked.lines())));
-        scheduleNext();
+        Optional<Announcement> picked = nextAnnouncement.pick(broadcaster.onlineCount());
+        picked.ifPresent(broadcaster::broadcast);
+        scheduleDefaultRotation();
+    }
+
+    private void scheduleOverride(String id, Duration interval) {
+        if (!running.getAsBoolean()) {
+            return;
+        }
+        scheduler.asyncAfter(interval, () -> tickOverride(id));
+    }
+
+    private void tickOverride(String id) {
+        if (!running.getAsBoolean()) {
+            return;
+        }
+        AnnouncerConfig live = config.get();
+        Optional<Announcement> current = find(live, id);
+        if (current.isEmpty() || current.get().intervalOverride().isEmpty()) {
+            return; // the announcement was dropped or lost its override on reload; let this loop die
+        }
+        Announcement announcement = current.get();
+        if (live.shouldFire(broadcaster.onlineCount())) {
+            broadcaster.broadcast(announcement);
+        }
+        scheduleOverride(id, announcement.intervalOverride().orElseThrow());
+    }
+
+    private static Optional<Announcement> find(AnnouncerConfig config, String id) {
+        return config.announcements().stream()
+                .filter(announcement -> announcement.id().equals(id))
+                .findFirst();
     }
 }

@@ -42,8 +42,16 @@ public enum CommunicationMessageKey implements MessageKey {
     CHAT_LOCK_OFF("communication.chat-lock.off"),
     CHAT_LOCKED("communication.chat-lock.locked"),
 
-    // /uxmess reload communication — the announcer schedule was reloaded.
-    ANNOUNCER_RELOADED("communication.announcer-reloaded");
+    // /uxmess reload communication, /announce reload — the announcer config was reloaded.
+    ANNOUNCER_RELOADED("communication.announcer-reloaded"),
+
+    // /announce list — the header above the announcement list, one entry per announcement, and the empty notice.
+    ANNOUNCE_LIST_HEADER("communication.announce.list-header"),
+    ANNOUNCE_LIST_ENTRY("communication.announce.list-entry"),
+    ANNOUNCE_LIST_EMPTY("communication.announce.list-empty"),
+
+    // /announce preview <id> — the requested announcement id is not configured.
+    ANNOUNCE_PREVIEW_UNKNOWN("communication.announce.preview-unknown");
 
     private final String key;
 

@@ -8,9 +8,9 @@ import java.util.Objects;
  * The rotating announcer's full configuration: the config-wide {@link #defaultInterval} between ticks, the
  * {@link #minOnlinePlayers} gate below which a tick is skipped (an empty or near-empty server is not spammed), the
  * {@link #ordering} that selects among announcements, and the operator-authored {@link #announcements} the cursor
- * rotates through. It supersedes the flat {@code AnnouncerSchedule}: where a schedule held a list of raw lines, a
- * config holds a list of rich {@link Announcement}s, each with its own condition, channels, sound, and optional
- * interval override.
+ * rotates through. It holds a list of rich {@link Announcement}s, each with its own condition, channels, sound,
+ * and optional interval override; the codec parses {@code announcer.conf} straight into it (a legacy flat
+ * {@code lines = [ ... ]} block maps to a single default CHAT announcement).
  *
  * <p>The config is pure data, rebuilt atomically on reload (a new {@code AtomicReference<AnnouncerConfig>} swapped
  * in); the adapter's timer reads the current config each tick, so an interval or announcement change takes effect
@@ -73,5 +73,18 @@ public record AnnouncerConfig(
     public Announcement announcementAt(int index) {
         Objects.checkIndex(index, announcements.size());
         return announcements.get(index);
+    }
+
+    /**
+     * The same config restricted to the announcements that rotate on the default cadence — those <em>without</em> an
+     * {@link Announcement#intervalOverride() interval override}. The adapter drives the shared rotation cursor over
+     * this view; each override announcement runs on its own independent timer outside the rotation, so it must not
+     * also appear in the cursor's selection set. Preserves the interval, gate, and ordering.
+     */
+    public AnnouncerConfig rotating() {
+        List<Announcement> withoutOverride = announcements.stream()
+                .filter(announcement -> announcement.intervalOverride().isEmpty())
+                .toList();
+        return new AnnouncerConfig(defaultInterval, minOnlinePlayers, ordering, withoutOverride);
     }
 }

@@ -748,6 +748,9 @@ permissions:
   uxmessentials.communication.broadcasttoggle:
     description: '/broadcasttoggle to stop or resume receiving the rotating server announcements.'
     default: true
+  uxmessentials.announce.admin:
+    description: '/announce reload|list|preview|toggle to manage the rotating announcer.'
+    default: op
   # Info pages auto-register a /<name> command (one node uxmessentials.communication.info.<name> per page). The
   # value space is open — a custom page an operator adds is op-only until its node is granted — so only the three
   # shipped public pages (/info, /rules, /motd) are enumerated here, defaulting to everyone.

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
@@ -30,15 +31,20 @@ import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.application.port.RandomSource;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Constructs the communication context's adapters and use cases over the injected kernel ports and the operator
  * content under {@code modules/communication/}, and produces everything the plugin must register: the Brigadier command
- * list (the static {@code /broadcasttoggle} plus the config-derived info-page commands), the join/quit/death
- * connection listeners, and the self-rescheduling announcer timer on the {@code Scheduler} port. This is the one
+ * list (the static {@code /broadcast}, {@code /broadcasttoggle}, and {@code /announce} plus the config-derived
+ * info-page commands), the join/quit/death connection listeners, and the self-rescheduling announcer timer on the
+ * {@code Scheduler} port. The announcer fans out through the shared {@link ChannelBroadcaster} so its multi-channel
+ * delivery, PlaceholderAPI expansion, and per-viewer condition gating match vote's broadcaster. This is the one
  * place the communication context is wired — nothing else news up its classes.
  *
  * <p>The context persists nothing: the per-player opt-out bit is PDC-backed (survives relog), the sequence
@@ -71,13 +77,11 @@ public final class CommunicationWiring {
         ChatLock chatLock = new ChatLock();
 
         CommunicationServices services = assemble(kernel, settings, optOutStore, random, notifier);
-        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(kernel.messageSink(), optOutStore);
+        ChannelBroadcaster channelBroadcaster = new ChannelBroadcaster(kernel.scheduler(), settings.announcerDisplay());
+        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
+                kernel.messageSink(), optOutStore, channelBroadcaster, CommunicationWiring::conditionContext);
         AnnouncerTask announcer = new AnnouncerTask(
-                kernel.scheduler(),
-                services.nextAnnouncement(),
-                broadcaster,
-                settings::announcerSchedule,
-                running::get);
+                kernel.scheduler(), services.nextAnnouncement(), broadcaster, settings::announcerConfig, running::get);
         List<CommandRegistration> commands = CommunicationCommands.all(
                 services.broadcastOptOut(),
                 registry,
@@ -86,9 +90,23 @@ public final class CommunicationWiring {
                 kernel.messages(),
                 broadcaster,
                 kernel.messageSink(),
-                chatLock);
+                chatLock,
+                settings);
         List<Listener> listeners = listeners(services, registry, infoSender, settings, chatLock, notifier);
         return new Wired(commands, listeners, announcer, running);
+    }
+
+    /**
+     * Gather everything an announcement's display condition needs from the live player — their permission check,
+     * world and gamemode names, and the per-viewer PlaceholderAPI bridge so a {@code %papi%} comparison expands the
+     * same way the rendered announcement lines do. Mirrors the scoreboard/tablist renderers' condition context.
+     */
+    private static ConditionContext conditionContext(Player player) {
+        return new ConditionContext(
+                player::hasPermission,
+                player.getWorld().getName(),
+                player.getGameMode().name(),
+                PlaceholderApiSupport.messageBridge(player.getUniqueId()));
     }
 
     private static CommunicationServices assemble(
@@ -102,7 +120,9 @@ public final class CommunicationWiring {
                 new ResolveJoinMessage(engine, settings::joinPolicy),
                 new ResolveQuitMessage(engine, settings::quitPolicy),
                 new ResolveDeathMessage(engine, settings::deathPolicy),
-                new NextAnnouncement(() -> settings.announcerSchedule().asConfig(), random),
+                // The rotation cursor selects only over announcements WITHOUT an interval override; each override
+                // announcement runs on its own independent timer driven by the AnnouncerTask.
+                new NextAnnouncement(() -> settings.announcerConfig().rotating(), random),
                 new BroadcastOptOut(optOutStore, notifier, kernel.events(), Clock.systemUTC()));
     }
 

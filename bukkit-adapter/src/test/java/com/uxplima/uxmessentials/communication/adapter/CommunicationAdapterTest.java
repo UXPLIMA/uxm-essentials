@@ -35,13 +35,17 @@ import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -210,6 +214,7 @@ class CommunicationAdapterTest {
                         "broadcast",
                         "broadcastworld",
                         "broadcasttoggle",
+                        "announce",
                         "me",
                         "clearchat",
                         "togglechat",
@@ -262,7 +267,7 @@ class CommunicationAdapterTest {
         CommunicationNotifier notifier = new CommunicationNotifier(sink, sink);
         BroadcastOptOut optOut = new BroadcastOptOut(optOutStore, notifier, new NoEvents(), Clock.systemUTC());
         InfoRegistry registry = settings.infoRegistry();
-        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(sink, optOutStore);
+        BukkitAnnouncerBroadcaster broadcaster = announcerBroadcaster();
         return CommunicationCommands.all(
                 optOut,
                 registry,
@@ -271,7 +276,21 @@ class CommunicationAdapterTest {
                 sink,
                 broadcaster,
                 sink,
-                new com.uxplima.uxmessentials.communication.adapter.ChatLock());
+                new com.uxplima.uxmessentials.communication.adapter.ChatLock(),
+                settings);
+    }
+
+    private BukkitAnnouncerBroadcaster announcerBroadcaster() {
+        ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), settings.announcerDisplay());
+        return new BukkitAnnouncerBroadcaster(sink, optOutStore, channels, this::conditionContext);
+    }
+
+    private ConditionContext conditionContext(org.bukkit.entity.Player who) {
+        return new ConditionContext(
+                who::hasPermission,
+                who.getWorld().getName(),
+                who.getGameMode().name(),
+                java.util.function.UnaryOperator.identity());
     }
 
     private com.uxplima.uxmessentials.communication.application.port.RandomSource random() {
@@ -355,5 +374,33 @@ class CommunicationAdapterTest {
 
         @Override
         public void debug(String message, Object... args) {}
+    }
+
+    /** Runs every hop inline so the entity-thread and async-after work executes within the test. */
+    private static final class SyncScheduler implements Scheduler {
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(java.time.Duration delay, Runnable task) {
+            task.run();
+        }
     }
 }

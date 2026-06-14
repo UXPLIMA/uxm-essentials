@@ -12,7 +12,8 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRando
 import com.uxplima.uxmessentials.communication.application.ResolveConnectionMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolvedMessage;
-import com.uxplima.uxmessentials.communication.domain.AnnouncerSchedule;
+import com.uxplima.uxmessentials.communication.domain.Announcement;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
 import com.uxplima.uxmessentials.communication.domain.PolicyMode;
@@ -38,9 +39,13 @@ class CommunicationSettingsSplitTest {
         assertThat(join.template()).contains("welcome Alice");
         assertThat(settings.quitPolicy().mode()).isEqualTo(PolicyMode.DEFAULT);
         assertThat(settings.deathPolicy().mode()).isEqualTo(PolicyMode.DEFAULT);
-        AnnouncerSchedule announcer = settings.announcerSchedule();
-        assertThat(announcer.lines()).containsExactly("tip a", "tip b");
-        assertThat(announcer.interval().toSeconds()).isEqualTo(60L);
+        AnnouncerConfig announcer = settings.announcerConfig();
+        // The legacy flat lines map to one unconditional "default" CHAT announcement carrying them.
+        assertThat(announcer.announcements()).singleElement().satisfies(announcement -> {
+            assertThat(announcement.id()).isEqualTo("default");
+            assertThat(announcement.lines()).containsExactly("tip a", "tip b");
+        });
+        assertThat(announcer.defaultInterval().toSeconds()).isEqualTo(60L);
         assertThat(announcer.minOnlinePlayers()).isZero();
         assertThat(settings.firstJoinTemplate()).contains("hi {player}");
         assertThat(settings.deathInfoPage()).contains("rules");
@@ -84,7 +89,7 @@ class CommunicationSettingsSplitTest {
         assertThat(settings.joinPolicy().mode()).isEqualTo(PolicyMode.DEFAULT);
         assertThat(settings.quitPolicy().mode()).isEqualTo(PolicyMode.DEFAULT);
         assertThat(settings.deathPolicy().mode()).isEqualTo(PolicyMode.DEFAULT);
-        assertThat(settings.announcerSchedule().lines()).isEmpty();
+        assertThat(settings.announcerConfig().announcements()).isEmpty();
         assertThat(settings.firstJoinTemplate()).isEmpty();
         assertThat(settings.deathInfoPage()).isEmpty();
         assertThat(settings.infoRegistry().isEmpty()).isTrue();
@@ -94,15 +99,66 @@ class CommunicationSettingsSplitTest {
     void reloadSwapsTheAnnouncerLinesAfterRewritingTheSiblingFile(@TempDir Path dir) throws Exception {
         writeSplitFiles(dir);
         CommunicationSettings settings = new CommunicationSettings(dir, new NoopLogger());
-        assertThat(settings.announcerSchedule().lines()).containsExactly("tip a", "tip b");
+        assertThat(firstAnnouncement(settings).lines()).containsExactly("tip a", "tip b");
 
         Files.writeString(
                 dir.resolve("announcer.conf"),
                 "announcer { interval-seconds = 120, min-players = 2, ordering = SEQUENTIAL, lines = [ \"fresh tip\" ] }\n");
         settings.reload();
 
-        assertThat(settings.announcerSchedule().lines()).containsExactly("fresh tip");
-        assertThat(settings.announcerSchedule().interval().toSeconds()).isEqualTo(120L);
+        assertThat(firstAnnouncement(settings).lines()).containsExactly("fresh tip");
+        assertThat(settings.announcerConfig().defaultInterval().toSeconds()).isEqualTo(120L);
+    }
+
+    @Test
+    void parsesTheRichPerAnnouncementForm(@TempDir Path dir) throws Exception {
+        Files.createDirectories(dir);
+        Files.writeString(
+                dir.resolve("announcer.conf"),
+                """
+                announcer {
+                  default-interval-seconds = 200
+                  min-players = 3
+                  ordering = SEQUENTIAL
+                  announcements = [
+                    { id = "tips", channels = [ "CHAT" ], lines = [ "a", "b" ] }
+                    {
+                      id = "vip", channels = [ "TITLE", "ACTION_BAR" ], lines = [ "vip" ]
+                      condition = "permission:uxmessentials.vip", interval-seconds = 600
+                      sound = "entity.player.levelup", centered = true
+                    }
+                  ]
+                }
+                """);
+
+        CommunicationSettings settings = new CommunicationSettings(dir, new NoopLogger());
+        AnnouncerConfig config = settings.announcerConfig();
+
+        assertThat(config.defaultInterval().toSeconds()).isEqualTo(200L);
+        assertThat(config.minOnlinePlayers()).isEqualTo(3);
+        assertThat(config.announcements()).hasSize(2);
+        Announcement tips = config.announcements().get(0);
+        assertThat(tips.id()).isEqualTo("tips");
+        assertThat(tips.lines()).containsExactly("a", "b");
+        assertThat(tips.intervalOverride()).isEmpty();
+        Announcement vip = config.announcements().get(1);
+        assertThat(vip.channels())
+                .containsExactlyInAnyOrder(
+                        com.uxplima.uxmessentials.shared.display.BroadcastChannel.TITLE,
+                        com.uxplima.uxmessentials.shared.display.BroadcastChannel.ACTION_BAR);
+        assertThat(vip.intervalOverride()).map(java.time.Duration::toSeconds).contains(600L);
+        assertThat(vip.sound()).contains("entity.player.levelup");
+        assertThat(vip.centered()).isTrue();
+        // The rotation view excludes the override announcement, leaving only the default-cadence one.
+        assertThat(config.rotating().announcements())
+                .extracting(Announcement::id)
+                .containsExactly("tips");
+    }
+
+    private static Announcement firstAnnouncement(CommunicationSettings settings) {
+        return settings.announcerConfig().announcements().stream()
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("expected an announcement"));
     }
 
     private static void writeSplitFiles(Path dir) throws Exception {

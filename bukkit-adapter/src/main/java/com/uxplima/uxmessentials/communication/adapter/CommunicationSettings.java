@@ -2,15 +2,15 @@ package com.uxplima.uxmessentials.communication.adapter;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
-import com.uxplima.uxmessentials.communication.domain.AnnouncerSchedule;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.CommentedConfigurationNode;
@@ -62,9 +62,14 @@ public final class CommunicationSettings {
         return current().death();
     }
 
-    /** The live announcer schedule; read fresh by the announcer timer each tick. */
-    public AnnouncerSchedule announcerSchedule() {
+    /** The live announcer config; read fresh by the announcer timer each tick. */
+    public AnnouncerConfig announcerConfig() {
         return current().announcer();
+    }
+
+    /** The announcer's title/boss-bar display timing; read once at wiring time to build the channel broadcaster. */
+    public ChannelDisplay announcerDisplay() {
+        return current().announcerDisplay();
     }
 
     /** The optional first-join welcome template, broadcast only on a player's first-ever join. */
@@ -109,9 +114,5 @@ public final class CommunicationSettings {
         } catch (ConfigurateException failure) {
             log.error("failed to load " + file + "; communication runs inert", failure);
         }
-    }
-
-    static Duration defaultAnnouncerInterval() {
-        return Duration.ofMinutes(5);
     }
 }

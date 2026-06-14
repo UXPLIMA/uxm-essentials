@@ -1,0 +1,261 @@
+package com.uxplima.uxmessentials.communication.adapter.outbound;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import org.bukkit.entity.Player;
+
+import net.kyori.adventure.bossbar.BossBar;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
+import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
+import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
+import com.uxplima.uxmessentials.communication.application.port.RandomSource;
+import com.uxplima.uxmessentials.communication.domain.Announcement;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
+import com.uxplima.uxmessentials.communication.domain.Ordering;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
+import com.uxplima.uxmessentials.shared.display.ConditionContext;
+import com.uxplima.uxmessentials.shared.display.DisplayCondition;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.entity.PlayerMock;
+
+/**
+ * MockBukkit coverage of the {@link AnnouncerTask} default-rotation loop end-to-end through the real
+ * {@link NextAnnouncement} cursor and {@link BukkitAnnouncerBroadcaster}: the min-players gate skips a tick below
+ * the threshold, a passing tick picks an announcement and delivers it to a matching opted-in player, and the
+ * opt-out / condition gates suppress a recipient. The scheduler queues each {@code asyncAfter} so the test drains
+ * exactly one tick at a time rather than letting the loop reschedule forever.
+ */
+class AnnouncerTaskTest {
+
+    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
+
+    private ServerMock server;
+    private PlayerMock alice;
+    private FakeOptOut optOut;
+    private QueueScheduler scheduler;
+
+    @BeforeEach
+    void setUp() {
+        server = MockBukkit.mock();
+        MockBukkit.createMockPlugin();
+        server.addSimpleWorld("world");
+        alice = server.addPlayer("Alice");
+        optOut = new FakeOptOut();
+        scheduler = new QueueScheduler();
+    }
+
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
+    }
+
+    @Test
+    void aTickBelowTheMinPlayersGateDeliversNothing() {
+        // min-players = 5, one player online → the gate fails and no announcement is picked.
+        AnnouncerConfig config = config(5, chat("a", "hi"));
+        AnnouncerTask task = task(config);
+
+        task.start();
+        scheduler.drainOne(); // the first default-rotation tick
+
+        assertThat(alice.nextComponentMessage()).isNull();
+    }
+
+    @Test
+    void aPassingTickDeliversToAMatchingOptedInPlayer() {
+        AnnouncerConfig config = config(0, chat("a", "<gold>welcome"));
+        AnnouncerTask task = task(config);
+
+        task.start();
+        scheduler.drainOne();
+
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("welcome");
+    }
+
+    @Test
+    void anOptedOutPlayerGetsNothingOnAPassingTick() {
+        optOut.optOut(alice.getUniqueId());
+        AnnouncerConfig config = config(0, chat("a", "hi"));
+        AnnouncerTask task = task(config);
+
+        task.start();
+        scheduler.drainOne();
+
+        assertThat(alice.nextComponentMessage()).isNull();
+    }
+
+    @Test
+    void aConditionThatDoesNotMatchSuppressesTheRecipient() {
+        Announcement gated = new Announcement(
+                "vip",
+                List.of("vip"),
+                new DisplayCondition.Permission("uxmessentials.vip"),
+                Optional.empty(),
+                Set.of(BroadcastChannel.CHAT),
+                Optional.empty(),
+                false);
+        AnnouncerTask task = task(config(0, gated));
+
+        task.start();
+        scheduler.drainOne();
+
+        assertThat(alice.nextComponentMessage()).isNull();
+    }
+
+    private AnnouncerTask task(AnnouncerConfig config) {
+        ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
+        BukkitAnnouncerBroadcaster broadcaster =
+                new BukkitAnnouncerBroadcaster(new ThrowingSink(), optOut, channels, this::context);
+        NextAnnouncement next = new NextAnnouncement(config::rotating, new ZeroRandom());
+        return new AnnouncerTask(scheduler, next, broadcaster, () -> config, () -> true);
+    }
+
+    private ConditionContext context(Player player) {
+        return new ConditionContext(
+                player::hasPermission,
+                player.getWorld().getName(),
+                player.getGameMode().name(),
+                java.util.function.UnaryOperator.identity());
+    }
+
+    private static AnnouncerConfig config(int minPlayers, Announcement... announcements) {
+        return new AnnouncerConfig(Duration.ofSeconds(60), minPlayers, Ordering.SEQUENTIAL, List.of(announcements));
+    }
+
+    private static Announcement chat(String id, String line) {
+        return new Announcement(
+                id,
+                List.of(line),
+                DisplayCondition.always(),
+                Optional.empty(),
+                Set.of(BroadcastChannel.CHAT),
+                Optional.empty(),
+                false);
+    }
+
+    private static ChannelDisplay display() {
+        return new ChannelDisplay(100, 500, 100, BossBar.Color.PURPLE, BossBar.Overlay.PROGRESS, 1);
+    }
+
+    private static final class ZeroRandom implements RandomSource {
+        @Override
+        public int nextBounded(int bound) {
+            return 0;
+        }
+    }
+
+    private static final class FakeOptOut implements BroadcastOptOutStore {
+        private final Set<java.util.UUID> out = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+        void optOut(java.util.UUID uuid) {
+            out.add(uuid);
+        }
+
+        @Override
+        public boolean receivesBroadcasts(PlayerRef who) {
+            return !out.contains(who.uuid());
+        }
+
+        @Override
+        public boolean toggle(PlayerRef who) {
+            return out.add(who.uuid());
+        }
+
+        @Override
+        public void forget(PlayerRef who) {
+            out.remove(who.uuid());
+        }
+    }
+
+    private static final class ThrowingSink implements com.uxplima.uxmessentials.shared.application.port.MessageSink {
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            throw new AssertionError("the rich announcement path must not use the MessageSink");
+        }
+    }
+
+    /**
+     * Queues {@code asyncAfter} tasks instead of running them, so {@link #drainOne()} executes exactly one tick;
+     * the loop's reschedule lands back in the queue and is left undrained. Synchronous hops run inline.
+     */
+    private static final class QueueScheduler implements Scheduler {
+        private final Deque<Runnable> queue = new ArrayDeque<>();
+
+        void drainOne() {
+            Runnable next = queue.poll();
+            if (next != null) {
+                next.run();
+            }
+        }
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            queue.add(task);
+        }
+    }
+
+    /** Synchronous scheduler for the inner ChannelBroadcaster fan-out (its hops must run inline within a tick). */
+    private static final class SyncScheduler implements Scheduler {
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+}

@@ -1,12 +1,10 @@
 package com.uxplima.uxmessentials.vote.adapter.outbound;
 
-import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
@@ -16,6 +14,8 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -23,28 +23,20 @@ import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.BroadcastVisibility;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
-import com.uxplima.uxmlib.hud.Titles;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
  * The Bukkit {@link VoteBroadcaster}: fans one of the plugin's own {@link MessageKey} strings out to every
- * receiving online player across the configured {@link BroadcastChannel surfaces}, mirroring the channel
- * dispatch in {@code TeleportArrivalHud} — CHAT to {@code sendMessage}, ACTION_BAR to {@code sendActionBar},
- * TITLE/SUBTITLE through uxmLib's {@link Titles} with the configured timing, and BOSS_BAR via an
- * Adventure {@link BossBar} hidden after the configured seconds.
+ * receiving online player across the configured {@link BroadcastChannel surfaces} through the shared
+ * {@link ChannelBroadcaster}. The broadcaster owns the channel dispatch (CHAT, ACTION_BAR, TITLE/SUBTITLE,
+ * BOSS_BAR) and the Folia-safe global-enumerate / per-entity-deliver / scheduled boss-bar-hide dance; this class
+ * supplies the per-viewer render and the visibility gate.
  *
- * <p>For each online player the recipient loop hops onto that player's entity region thread (so the PDC
- * opt-out read and every live API touch are region-correct), checks {@link BroadcastVisibility} for the
- * hidden flag, resolves the catalog {@code key} in that viewer's locale — folding the shared {@code <prefix>}
- * tag in exactly as {@code CommandFeedback} does — and delivers it on every requested channel, then plays the
- * configured broadcast sound. Every parse is tolerant: an unknown channel falls back to CHAT and an
- * unresolvable sound or boss-bar colour/overlay is skipped, never thrown, so one config typo cannot abort a
- * broadcast.
- *
- * <h2>Concurrency</h2>
- * The boss-bar hide is scheduled off-tick via {@link Scheduler#asyncAfter} and then hops back onto the
- * recipient's entity thread to call {@code hideBossBar} — never the legacy {@code BukkitScheduler}.
+ * <p>The render function checks {@link BroadcastVisibility} for the hidden flag — returning {@code null} to skip a
+ * player who hid broadcasts — and otherwise resolves the catalog {@code key} in that viewer's locale, folding the
+ * shared {@code <prefix>} tag in exactly as {@code CommandFeedback} does. The configured broadcast sound is passed
+ * straight through to the broadcaster.
  */
 @NullMarked
 public final class BukkitVoteBroadcaster implements VoteBroadcaster {
@@ -52,109 +44,52 @@ public final class BukkitVoteBroadcaster implements VoteBroadcaster {
     /** The catalog key for the shared chat prefix the {@code <prefix>} tag expands to. */
     private static final MessageKey PREFIX = () -> "prefix";
 
-    private final Scheduler scheduler;
     private final Messages messages;
     private final BroadcastVisibility visibility;
-    private final BroadcastDisplay display;
+    private final ChannelBroadcaster channels;
+    private final @Nullable Sound sound;
     private final MiniMessage miniMessage;
-    private final Titles titles;
 
     public BukkitVoteBroadcaster(
             Scheduler scheduler, Messages messages, BroadcastVisibility visibility, BroadcastDisplay display) {
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(display, "display");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.visibility = Objects.requireNonNull(visibility, "visibility");
-        this.display = Objects.requireNonNull(display, "display");
+        this.channels = new ChannelBroadcaster(scheduler, display.toChannelDisplay());
+        this.sound = display.sound();
         this.miniMessage = MiniMessage.miniMessage();
-        this.titles = new Titles();
     }
 
     @Override
-    public void broadcast(MessageKey key, Map<String, String> placeholders, Set<BroadcastChannel> channels) {
+    public void broadcast(MessageKey key, Map<String, String> placeholders, Set<BroadcastChannel> targets) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(placeholders, "placeholders");
-        Objects.requireNonNull(channels, "channels");
-        if (channels.isEmpty()) {
+        Objects.requireNonNull(targets, "channels");
+        if (targets.isEmpty()) {
             return;
         }
         Map<String, String> safePlaceholders = Map.copyOf(placeholders);
-        Set<BroadcastChannel> safeChannels = Set.copyOf(channels);
-        // Enumerate the live online view on the global region thread, then hop per-recipient — broadcast()
-        // is called off-tick from the vote handler, and Bukkit.getOnlinePlayers() is not safe to iterate
-        // off-thread. Mirrors BukkitRewardApplier.broadcast.
-        scheduler.onGlobal(() -> {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
-                scheduler.onEntity(who, () -> deliverTo(who, key, safePlaceholders, safeChannels));
-            }
-        });
+        channels.broadcast(player -> render(player, key, safePlaceholders), targets, sound);
     }
 
-    private void deliverTo(
-            PlayerRef who, MessageKey key, Map<String, String> placeholders, Set<BroadcastChannel> channels) {
-        @Nullable Player player = Bukkit.getPlayer(who.uuid());
-        if (player == null || !player.isOnline() || !visibility.receivesBroadcasts(who)) {
-            return;
+    /** Build the chat-prefixed component for {@code player}, or {@code null} when they have hidden broadcasts. */
+    private @Nullable Component render(Player player, MessageKey key, Map<String, String> placeholders) {
+        PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
+        if (!visibility.receivesBroadcasts(who)) {
+            return null;
         }
-        Component component = resolve(who, key, placeholders);
-        for (BroadcastChannel channel : channels) {
-            deliverChannel(who, player, channel, component);
-        }
-        playSound(player);
-    }
-
-    private void deliverChannel(PlayerRef who, Player player, BroadcastChannel channel, Component component) {
-        switch (channel) {
-            case CHAT -> player.sendMessage(component);
-            case ACTION_BAR -> player.sendActionBar(component);
-            case TITLE -> showTitle(player, component, Component.empty());
-            case SUBTITLE -> showTitle(player, Component.empty(), component);
-            case BOSS_BAR -> showBossBar(who, player, component);
-        }
-    }
-
-    private void showTitle(Player player, Component title, Component subtitle) {
-        titles.show(
-                player,
-                title,
-                subtitle,
-                Duration.ofMillis(display.titleFadeInMs()),
-                Duration.ofMillis(display.titleStayMs()),
-                Duration.ofMillis(display.titleFadeOutMs()));
-    }
-
-    private void showBossBar(PlayerRef who, Player player, Component component) {
-        BossBar bar = BossBar.bossBar(component, 1.0f, display.bossBarColor(), display.bossBarOverlay());
-        player.showBossBar(bar);
-        scheduler.asyncAfter(
-                Duration.ofSeconds(display.bossBarSeconds()),
-                () -> scheduler.onEntity(who, () -> {
-                    @Nullable Player live = Bukkit.getPlayer(who.uuid());
-                    if (live != null && live.isOnline()) {
-                        live.hideBossBar(bar);
-                    }
-                }));
-    }
-
-    private void playSound(Player player) {
-        @Nullable Sound sound = display.sound();
-        if (sound == null) {
-            return;
-        }
-        player.playSound(Objects.requireNonNull(player.getLocation(), "player location"), sound, 1.0f, 1.0f);
-    }
-
-    private Component resolve(PlayerRef who, MessageKey key, Map<String, String> placeholders) {
         String rendered = messages.resolve(who, key, placeholders);
         TagResolver prefix = Placeholder.parsed("prefix", messages.resolve(who, PREFIX, Map.of()));
         return miniMessage.deserialize(rendered, prefix);
     }
 
     /**
-     * The adapter-side broadcast display config: the title fade/stay/fade timing, the boss-bar colour,
-     * overlay, and visible-seconds, and the optional broadcast {@link Sound}. The boss-bar colour and
-     * overlay are pre-resolved (with their tolerant fallbacks) by {@code BroadcastSettingsLoader}, and the
-     * sound is {@code null} when none is configured or the name does not resolve.
+     * The adapter-side broadcast display config: the {@link ChannelDisplay} timing (title fade/stay/fade, boss-bar
+     * colour, overlay, and visible-seconds) plus the optional broadcast {@link Sound}. The boss-bar colour and
+     * overlay are pre-resolved (with their tolerant fallbacks) by {@code BroadcastSettingsLoader}, and the sound is
+     * {@code null} when none is configured or the name does not resolve. Kept as the vote-config-facing record;
+     * {@link #toChannelDisplay()} hands the timing to the shared {@link ChannelBroadcaster}.
      *
      * @param titleFadeInMs the title fade-in in milliseconds
      * @param titleStayMs the title stay in milliseconds
@@ -179,6 +114,12 @@ public final class BukkitVoteBroadcaster implements VoteBroadcaster {
             if (bossBarSeconds < 1) {
                 bossBarSeconds = 1;
             }
+        }
+
+        /** The timing-only view handed to the shared {@link ChannelBroadcaster} (the sound is passed separately). */
+        public ChannelDisplay toChannelDisplay() {
+            return new ChannelDisplay(
+                    titleFadeInMs, titleStayMs, titleFadeOutMs, bossBarColor, bossBarOverlay, bossBarSeconds);
         }
 
         /** Resolve a {@link BossBar.Color} name tolerant of case; unknown names fall back to {@code PURPLE}. */
