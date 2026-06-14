@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.plugin.Plugin;
 
@@ -29,6 +30,8 @@ import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
+import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConfig;
+import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
 import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
@@ -86,7 +89,7 @@ public final class MigrationWiring {
         Objects.requireNonNull(economyConfig, "economyConfig");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
-        SourceRegistry registry = sourceRegistry(plugin, economyConfig, log);
+        SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(), backup(plugin, log), log);
         Writers writers = writers(plugin, persistence, economyConfig, log);
         ImportOptions options = options(plugin, migrationConfig);
@@ -94,7 +97,8 @@ public final class MigrationWiring {
                 registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
     }
 
-    private static SourceRegistry sourceRegistry(Plugin plugin, ConfigStore economyConfig, Logger log) {
+    private static SourceRegistry sourceRegistry(
+            Plugin plugin, ConfigStore migrationConfig, ConfigStore economyConfig, Logger log) {
         WorldNameResolver worlds = new BukkitWorldNameResolver(plugin.getServer());
         Currency defaultCurrency = new EconomyConfig(economyConfig).currencies().defaultCurrency();
         List<Convert> built = new ArrayList<>();
@@ -109,7 +113,20 @@ public final class MigrationWiring {
                 "PlayerPoints",
                 "the live PlayerPoints plugin",
                 new PlayerPointsBalanceFeed(plugin, log)));
+        built.add(new LiteBansConvert(liteBansConfig(plugin, migrationConfig), log));
         return new SourceRegistry(built);
+    }
+
+    /** Read the {@code modules.migration.litebans} subtree into the source's connection config. */
+    private static LiteBansConfig liteBansConfig(Plugin plugin, ConfigStore migrationConfig) {
+        ConfigStore litebans = migrationConfig.scoped("litebans");
+        String jdbcUrl = litebans.getString("jdbc-url", "");
+        String username = litebans.getString("username", "");
+        String password = litebans.getString("password", "");
+        String tablePrefix = litebans.getString("table-prefix", "litebans_");
+        Path pluginsDir = plugin.getDataFolder().toPath().getParent();
+        return new LiteBansConfig(
+                Optional.of(jdbcUrl), username, password, tablePrefix, Optional.ofNullable(pluginsDir));
     }
 
     private static Writers writers(Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log) {

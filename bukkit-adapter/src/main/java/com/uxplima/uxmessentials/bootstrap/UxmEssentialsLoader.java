@@ -30,6 +30,9 @@ public final class UxmEssentialsLoader implements PluginLoader {
         resolver.addDependency(new Dependency(new DefaultArtifact("org.xerial:sqlite-jdbc:3.49.1.0"), null));
         resolver.addDependency(new Dependency(new DefaultArtifact("org.mariadb.jdbc:mariadb-java-client:3.5.3"), null));
         resolver.addDependency(new Dependency(new DefaultArtifact("org.postgresql:postgresql:42.7.4"), null));
+        // H2 is the LiteBans importer's JDBC source driver (LiteBans' file default and a connectable URL
+        // option). It is needed only when /uxmess import litebans runs, but the resolver pins it at boot.
+        resolver.addDependency(new Dependency(new DefaultArtifact("com.h2database:h2:2.4.240"), null));
         resolver.addDependency(new Dependency(new DefaultArtifact("org.flywaydb:flyway-core:10.19.0"), null));
         resolver.addDependency(
                 new Dependency(new DefaultArtifact("org.flywaydb:flyway-database-postgresql:10.19.0"), null));

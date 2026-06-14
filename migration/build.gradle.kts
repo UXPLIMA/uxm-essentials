@@ -17,8 +17,13 @@ dependencies {
 
     compileOnly(libs.configurate.yaml) // EssentialsX userdata/warps/kits YAML — adapter-only
     compileOnly(libs.slf4j.api)
+    // The LiteBans JDBC source reads through java.sql only; the H2 driver is needed at runtime (the
+    // import runs on the bukkit-adapter, which provides it via the Paper library loader) and in the
+    // in-process fixture below, never to compile this module.
+    compileOnly(libs.h2)
 
     testImplementation(libs.jqwik)
     testImplementation(libs.configurate.yaml)
     testImplementation(libs.configurate.hocon) // config-version ladder fixtures
+    testImplementation(libs.h2) // in-process H2 fixture for the LiteBans reader round-trip
 }

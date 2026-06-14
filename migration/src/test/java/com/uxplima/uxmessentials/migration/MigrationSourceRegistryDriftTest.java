@@ -10,9 +10,12 @@ import com.uxplima.uxmessentials.migration.convert.Convert;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
+import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConfig;
+import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
 import com.uxplima.uxmessentials.migration.convert.live.BalanceFeed;
 import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,18 +27,37 @@ import org.junit.jupiter.api.Test;
  */
 class MigrationSourceRegistryDriftTest {
 
-    /** The reserved ids of the planned sources — documented in §1.2, deliberately not built. */
+    /**
+     * The reserved ids of the planned sources — documented in §1.2, deliberately not built. {@code libertybans}
+     * is reserved here as the next moderation JDBC source after LiteBans (deferred): planned, never stubbed,
+     * so it must not resolve and must contribute no rows until it is built.
+     */
     private static final List<String> PLANNED =
-            List.of("cmi", "huskhomes", "playervaultx", "coinsengine", "sunlight", "axvault");
+            List.of("cmi", "huskhomes", "playervaultx", "coinsengine", "sunlight", "axvault", "libertybans");
 
     private final SourceRegistry registry = new SourceRegistry(List.of(
             new EssentialsXConvert(name -> Optional.empty()),
             new LiveBalanceConvert(SourceId.of("vault"), "Vault", "the live Vault economy provider", emptyFeed()),
             new LiveBalanceConvert(
-                    SourceId.of("playerpoints"),
-                    "PlayerPoints",
-                    "the live PlayerPoints economy provider",
-                    emptyFeed())));
+                    SourceId.of("playerpoints"), "PlayerPoints", "the live PlayerPoints economy provider", emptyFeed()),
+            new LiteBansConvert(
+                    new LiteBansConfig(Optional.empty(), "", "", "litebans_", Optional.empty()), noOpLogger())));
+
+    private static Logger noOpLogger() {
+        return new Logger() {
+            @Override
+            public void info(String message, Object... args) {}
+
+            @Override
+            public void warn(String message, Object... args) {}
+
+            @Override
+            public void error(String message, Throwable cause) {}
+
+            @Override
+            public void debug(String message, Object... args) {}
+        };
+    }
 
     private static BalanceFeed emptyFeed() {
         return new BalanceFeed() {
@@ -52,13 +74,17 @@ class MigrationSourceRegistryDriftTest {
     }
 
     @Test
-    void theBuiltSourcesAreEssentialsxVaultAndPlayerpointsAndResolve() {
+    void theBuiltSourcesAreEssentialsxVaultPlayerpointsAndLitebansAndResolve() {
         assertThat(registry.builtIds())
                 .containsExactlyInAnyOrder(
-                        SourceId.of("essentialsx"), SourceId.of("vault"), SourceId.of("playerpoints"));
+                        SourceId.of("essentialsx"),
+                        SourceId.of("vault"),
+                        SourceId.of("playerpoints"),
+                        SourceId.of("litebans"));
         assertThat(registry.resolve(SourceId.of("essentialsx")))
                 .map(Convert::id)
                 .contains(SourceId.of("essentialsx"));
+        assertThat(registry.resolve(SourceId.of("litebans"))).map(Convert::id).contains(SourceId.of("litebans"));
     }
 
     @Test

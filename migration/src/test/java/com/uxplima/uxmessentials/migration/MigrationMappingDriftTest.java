@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXMappings;
+import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansMappings;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -82,6 +83,21 @@ class MigrationMappingDriftTest {
             assertThat(row.mapper()).isNotBlank();
             assertThat(row.conflictUnit()).isNotBlank();
             assertThat(row.context()).isNotBlank();
+        }
+    }
+
+    @Test
+    void liteBansIsRegisteredAndMapsTheModerationSurfaces() {
+        assertThat(SupportedMappings.builtSources()).contains(SourceId.of("litebans"));
+        assertThat(SupportedMappings.rows(SourceId.of("litebans"))).isEqualTo(LiteBansMappings.rows());
+        Set<String> targets =
+                LiteBansMappings.rows().stream().map(MappingRow::target).collect(Collectors.toSet());
+        // The LiteBans source seeds only the moderation context's sanction aggregates (docs/12-migration §5.4).
+        assertThat(targets).containsExactlyInAnyOrder("TempbanState", "IpBan", "ModerationProfile", "Warn");
+        for (MappingRow row : LiteBansMappings.rows()) {
+            assertThat(row.context()).isEqualTo("moderation");
+            assertThat(row.mapper()).isNotBlank();
+            assertThat(row.conflictUnit()).isNotBlank();
         }
     }
 

@@ -20,6 +20,7 @@ slf4j          = "2.0.16"
 # MySQL/MariaDB and PostgreSQL are network options (see docs/adr/0003).
 sqlite-jdbc    = "3.49.1.0"     # org.xerial:sqlite-jdbc — Maven Central (verified 2026-05-30)
 mariadb-jdbc   = "3.5.3"        # org.mariadb.jdbc:mariadb-java-client — Maven Central; also speaks the MySQL wire protocol (verified 2026-05-30)
+h2             = "2.4.240"       # com.h2database:h2 — latest stable on Maven Central (verified 2026-06-14); LiteBans-importer JDBC source only
 
 # adapter integrations
 velocity       = "3.4.0"
@@ -73,6 +74,7 @@ hikari            = { module = "com.zaxxer:HikariCP",                           
 postgresql        = { module = "org.postgresql:postgresql",                      version.ref = "postgresql" }
 sqlite-jdbc       = { module = "org.xerial:sqlite-jdbc",                         version.ref = "sqlite-jdbc" }
 mariadb-jdbc      = { module = "org.mariadb.jdbc:mariadb-java-client",           version.ref = "mariadb-jdbc" }
+h2                = { module = "com.h2database:h2",                              version.ref = "h2" }
 flyway-core       = { module = "org.flywaydb:flyway-core",                       version.ref = "flyway" }
 flyway-pg         = { module = "org.flywaydb:flyway-database-postgresql",        version.ref = "flyway" }
 flyway-mysql      = { module = "org.flywaydb:flyway-mysql",                      version.ref = "flyway" }
