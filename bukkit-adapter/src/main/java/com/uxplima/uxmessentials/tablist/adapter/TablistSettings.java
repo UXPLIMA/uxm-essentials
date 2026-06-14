@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.tablist.domain.TablistContent;
+import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurateException;
@@ -16,14 +16,16 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * The tablist context's operator content, loaded once at wiring time from {@code modules/tablist/config.conf} and held
- * in an {@link AtomicReference} so a reload swaps a fresh {@link TablistContent} whole — readers see either the
- * previous or the new content, never a half-applied tree (CLAUDE.md "swapped atomically via AtomicReference on
- * reload"). An absent or unreadable file yields {@link TablistContent#inert()}, so a server that enables the module
- * without authoring the file gets the do-nothing default: no header/footer change.
+ * in an {@link AtomicReference} so a reload swaps a fresh parse whole — readers see either the previous or the new
+ * content, never a half-applied tree (CLAUDE.md "swapped atomically via AtomicReference on reload"). An absent or
+ * unreadable file yields the inert default, so a server that enables the module without authoring the file gets the
+ * do-nothing default: no formats, no header/footer change.
  *
- * <p>The {@link #content()} and {@link #refreshInterval()} suppliers read the live content on each call, so a reload
- * takes effect on the next render tick with no re-wiring. The content is operator data the renderer parses through
- * MiniMessage and the placeholder pipeline; nothing here is a {@code MessageKey} or parity-checked.
+ * <p>The {@link #formats()} and {@link #refreshInterval()} suppliers read the live parse on each call, so a reload takes
+ * effect on the next render tick with no re-wiring. {@link #formats()} is the named-format set the renderer selects among
+ * per viewer; {@link #refreshInterval()} is the single global render cadence the timer re-reads each reschedule. The
+ * content is operator data the renderer parses through MiniMessage and the placeholder pipeline; nothing here is a
+ * {@code MessageKey} or parity-checked.
  */
 @NullMarked
 public final class TablistSettings {
@@ -32,27 +34,27 @@ public final class TablistSettings {
 
     private final Path moduleDir;
     private final Logger log;
-    private final AtomicReference<TablistContent> content;
+    private final AtomicReference<TablistContentCodec.Parsed> parsed;
 
     public TablistSettings(Path moduleDir, Logger log) {
         this.moduleDir = Objects.requireNonNull(moduleDir, "moduleDir");
         this.log = Objects.requireNonNull(log, "log");
-        this.content = new AtomicReference<>(TablistContentCodec.read(load(moduleDir, log)));
+        this.parsed = new AtomicReference<>(TablistContentCodec.read(load(moduleDir, log)));
     }
 
-    /** The live tablist content; read fresh by the renderer each tick. */
-    public TablistContent content() {
-        return Objects.requireNonNull(content.get(), "content");
+    /** The live named-format set; read fresh by the renderer each tick to select a format per viewer. */
+    public TablistFormatConfig formats() {
+        return Objects.requireNonNull(parsed.get(), "parsed").formats();
     }
 
-    /** The live refresh interval the render timer re-reads each reschedule. */
+    /** The live global refresh interval the render timer re-reads each reschedule. */
     public Duration refreshInterval() {
-        return content().refreshInterval();
+        return Objects.requireNonNull(parsed.get(), "parsed").refreshInterval();
     }
 
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
-        content.set(TablistContentCodec.read(load(moduleDir, log)));
+        parsed.set(TablistContentCodec.read(load(moduleDir, log)));
     }
 
     private static ConfigurationNode load(Path moduleDir, Logger log) {

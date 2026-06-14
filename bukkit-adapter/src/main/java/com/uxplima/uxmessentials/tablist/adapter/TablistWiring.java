@@ -47,7 +47,7 @@ public final class TablistWiring {
         TablistSettings settings = new TablistSettings(dir, kernel.log());
         AtomicBoolean running = new AtomicBoolean(true);
 
-        TablistRenderer renderer = new TablistRenderer(settings::content);
+        TablistRenderer renderer = new TablistRenderer(settings::formats);
         TablistRenderTask renderTask =
                 new TablistRenderTask(kernel.scheduler(), renderer, settings::refreshInterval, running::get);
 
