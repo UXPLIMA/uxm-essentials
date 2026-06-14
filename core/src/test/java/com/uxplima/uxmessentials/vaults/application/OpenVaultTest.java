@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vaults.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -74,10 +75,110 @@ class OpenVaultTest {
         assertThat(result.orElseThrow().size().rows()).isEqualTo(6); // re-open adopts the current size quota
     }
 
+    @Test
+    void chargesTheCreateFeeWhenAllocatingANewVault() {
+        FakeRepository repository = new FakeRepository();
+        FixedQuotas permissions = new FixedQuotas(3, 6);
+        CapturingEconomy economy = new CapturingEconomy(true);
+        OpenVault openVault = openVaultWith(repository, permissions, economy, VaultChargeSettings.of(100, 0, 0));
+
+        Result<Vault, VaultError> result = openVault.open(OWNER, 1);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(economy.withdrawals).containsExactly(BigDecimal.valueOf(100.0));
+        assertThat(repository.find(VaultId.of(OWNER, 1))).isPresent();
+    }
+
+    @Test
+    void refusesAllocationWhenTheCreateFeeIsUnaffordableAndWritesNothing() {
+        FakeRepository repository = new FakeRepository();
+        FixedQuotas permissions = new FixedQuotas(3, 6);
+        CapturingEconomy economy = new CapturingEconomy(false);
+        OpenVault openVault = openVaultWith(repository, permissions, economy, VaultChargeSettings.of(100, 0, 0));
+
+        Result<Vault, VaultError> result = openVault.open(OWNER, 1);
+
+        assertThat(result.isErr()).isTrue();
+        assertThat(result.errorOrThrow()).isEqualTo(VaultError.CANNOT_AFFORD);
+        assertThat(repository.find(VaultId.of(OWNER, 1))).isEmpty(); // no phantom row left behind
+        assertThat(economy.withdrawals).isEmpty();
+    }
+
+    @Test
+    void reopeningAnExistingVaultIsFreeWhenThereIsNoPerOpenFee() {
+        FakeRepository repository = new FakeRepository();
+        repository.save(Vault.allocate(
+                VaultId.of(OWNER, 1), new com.uxplima.uxmessentials.vaults.domain.VaultSize(6), CLOCK.instant()));
+        FixedQuotas permissions = new FixedQuotas(3, 6);
+        CapturingEconomy economy = new CapturingEconomy(true);
+        OpenVault openVault = openVaultWith(repository, permissions, economy, VaultChargeSettings.of(100, 0, 0));
+
+        Result<Vault, VaultError> result = openVault.open(OWNER, 1);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(economy.withdrawals).isEmpty(); // create fee does not apply to an existing vault
+    }
+
+    @Test
+    void reopeningAnExistingVaultChargesThePerOpenFeeWhenConfigured() {
+        FakeRepository repository = new FakeRepository();
+        repository.save(Vault.allocate(
+                VaultId.of(OWNER, 1), new com.uxplima.uxmessentials.vaults.domain.VaultSize(6), CLOCK.instant()));
+        FixedQuotas permissions = new FixedQuotas(3, 6);
+        CapturingEconomy economy = new CapturingEconomy(true);
+        OpenVault openVault = openVaultWith(repository, permissions, economy, VaultChargeSettings.of(0, 50, 0));
+
+        Result<Vault, VaultError> result = openVault.open(OWNER, 1);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(economy.withdrawals).containsExactly(BigDecimal.valueOf(50.0));
+    }
+
     private static OpenVault openVaultWith(VaultRepository repository, int amount, int size) {
         FixedQuotas permissions = new FixedQuotas(amount, size);
+        VaultCharge freeCharge = new VaultCharge(permissions, Optional.empty(), VaultChargeSettings.allFree());
         return new OpenVault(
-                repository, new VaultAmountQuota(permissions, 0), new VaultSizeQuota(permissions, 1), CLOCK);
+                repository,
+                new VaultAmountQuota(permissions, 0),
+                new VaultSizeQuota(permissions, 1),
+                freeCharge,
+                CLOCK);
+    }
+
+    private static OpenVault openVaultWith(
+            VaultRepository repository,
+            FixedQuotas permissions,
+            CapturingEconomy economy,
+            VaultChargeSettings settings) {
+        VaultCharge charge = new VaultCharge(permissions, Optional.of(economy), settings);
+        return new OpenVault(
+                repository, new VaultAmountQuota(permissions, 0), new VaultSizeQuota(permissions, 1), charge, CLOCK);
+    }
+
+    /** A {@link com.uxplima.uxmessentials.vaults.application.port.VaultEconomy} recording withdrawals. */
+    private static final class CapturingEconomy
+            implements com.uxplima.uxmessentials.vaults.application.port.VaultEconomy {
+        private final boolean canAfford;
+        private final List<BigDecimal> withdrawals = new ArrayList<>();
+
+        private CapturingEconomy(boolean canAfford) {
+            this.canAfford = canAfford;
+        }
+
+        @Override
+        public boolean canAfford(PlayerRef who, BigDecimal amount) {
+            return canAfford;
+        }
+
+        @Override
+        public void withdraw(PlayerRef who, BigDecimal amount) {
+            withdrawals.add(amount);
+        }
+
+        @Override
+        public void deposit(PlayerRef who, BigDecimal amount) {
+            // Not exercised by the open path.
+        }
     }
 
     /** A {@code Permissions} that returns a fixed amount/size for the two vault families and denies plain nodes. */
@@ -130,6 +231,11 @@ class OpenVaultTest {
         @Override
         public void save(Vault vault) {
             rows.put(vault.id(), vault);
+        }
+
+        @Override
+        public void delete(VaultId id) {
+            rows.remove(id);
         }
     }
 }

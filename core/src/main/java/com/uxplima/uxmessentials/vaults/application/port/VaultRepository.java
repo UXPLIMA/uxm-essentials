@@ -31,4 +31,11 @@ public interface VaultRepository {
      * write-through every {@code InventoryClose} save and every fresh allocation goes through.
      */
     void save(Vault vault);
+
+    /**
+     * Remove the vault row at {@code id}, freeing the owner's quota slot. Idempotent: deleting an id with no
+     * row is a no-op, never an error. The cache invalidation and cross-server {@code VaultChanged} emit are
+     * the adapter's concern; the use case depends only on this contract.
+     */
+    void delete(VaultId id);
 }

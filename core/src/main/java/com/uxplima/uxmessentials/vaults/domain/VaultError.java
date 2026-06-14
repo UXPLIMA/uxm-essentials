@@ -11,5 +11,11 @@ public enum VaultError {
     AMOUNT_EXCEEDED,
 
     /** The owner owns no vaults yet, so {@code /vault} with no index has nothing to list or default to. */
-    NONE_OWNED
+    NONE_OWNED,
+
+    /** The per-action economy fee (create or open) exceeds the player's balance, so the action is refused. */
+    CANNOT_AFFORD,
+
+    /** A {@code /vault delete <n>} of an index the owner has no vault row for — there is nothing to remove. */
+    DELETE_UNKNOWN
 }

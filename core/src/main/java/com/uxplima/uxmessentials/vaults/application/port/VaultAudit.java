@@ -23,4 +23,15 @@ public interface VaultAudit {
      * @param index the one-based vault number opened
      */
     void adminOpened(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index);
+
+    /**
+     * {@code event=vault_admin_delete} — a {@code /vault delete <player> <n>} staff deletion of another
+     * player's vault. Logged so a destructive override is always replayable from the audit channel.
+     *
+     * @param actor the staff member performing the deletion
+     * @param owner the audited player whose vault was deleted
+     * @param ownerUuid the audited player's uuid (logged for stable identity even after a rename)
+     * @param index the one-based vault number deleted
+     */
+    void adminDeleted(PlayerRef actor, PlayerRef owner, UUID ownerUuid, int index);
 }

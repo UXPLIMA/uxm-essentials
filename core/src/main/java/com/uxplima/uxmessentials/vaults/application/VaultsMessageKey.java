@@ -32,6 +32,11 @@ public enum VaultsMessageKey implements MessageKey {
     VAULT_ADMIN_OPENED("vaults.admin.opened"),
     VAULT_ADMIN_UNKNOWN_TARGET("vaults.admin.unknown-target"),
 
+    // /vault delete <n>, /vault delete <player> <n>
+    VAULT_DELETED("vaults.deleted"),
+    VAULT_DELETE_UNKNOWN("vaults.delete-unknown"),
+    VAULT_CANNOT_AFFORD("vaults.cannot-afford"),
+
     // shared
     VAULT_SAVED("vaults.saved"),
     VAULT_PLAYERS_ONLY("vaults.players-only");

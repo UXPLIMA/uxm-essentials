@@ -74,6 +74,21 @@ public final class VaultNotifier {
         send(viewer, VaultsMessageKey.VAULT_AMOUNT_EXCEEDED, Map.of("index", Integer.toString(index)));
     }
 
+    /** Tell {@code viewer} the vault at {@code index} was deleted. */
+    public void deleted(PlayerRef viewer, int index) {
+        send(viewer, VaultsMessageKey.VAULT_DELETED, Map.of("index", Integer.toString(index)));
+    }
+
+    /** Tell {@code viewer} there is no vault at {@code index} to delete. */
+    public void deleteUnknown(PlayerRef viewer, int index) {
+        send(viewer, VaultsMessageKey.VAULT_DELETE_UNKNOWN, Map.of("index", Integer.toString(index)));
+    }
+
+    /** Tell {@code viewer} they cannot afford the vault fee of {@code cost}. */
+    public void cannotAfford(PlayerRef viewer, String cost) {
+        send(viewer, VaultsMessageKey.VAULT_CANNOT_AFFORD, Map.of("cost", cost));
+    }
+
     /** Tell {@code actor} the audited player name resolved to nobody. */
     public void unknownTarget(PlayerRef actor, String name) {
         send(actor, VaultsMessageKey.VAULT_ADMIN_UNKNOWN_TARGET, Map.of("player", name));
