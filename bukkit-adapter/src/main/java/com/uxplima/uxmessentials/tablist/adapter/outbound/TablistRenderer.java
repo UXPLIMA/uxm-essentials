@@ -9,7 +9,6 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
@@ -19,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Renders the per-player tablist header and footer from the live {@link TablistContent}, dogfooding uxmLib's
  * {@link Tablist}. Each source string is run through {@link HudText} — the per-viewer PlaceholderAPI bridge
- * ({@code %papi%} expansion, identity without PlaceholderAPI) then {@link MiniMessage} parse, the same two-step
+ * ({@code %papi%} expansion, identity without PlaceholderAPI) then {@code MiniMessage} parse, the same two-step
  * transform the message sink uses — so operator content may embed third-party placeholders. The header and footer
  * line lists are joined with newlines before delivery, exactly as the old combined scoreboard renderer did.
  *

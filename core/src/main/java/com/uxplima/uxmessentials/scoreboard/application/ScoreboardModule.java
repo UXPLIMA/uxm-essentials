@@ -85,7 +85,7 @@ public final class ScoreboardModule implements FeatureModule {
     public void start(ModuleContext ctx) {
         this.running = true;
         // The ToggleScoreboard use case, the render timer on the Scheduler port, the connection listener, the
-        // renderer over uxmLib's SidebarManager/Tablist, and the PDC visibility store are constructed over
+        // renderer over uxmLib's SidebarManager, and the PDC visibility store are constructed over
         // ctx.kernel() in the adapter wiring; the lifecycle bookkeeping (running flag, in-flight counter) is armed
         // here so stop() is already honest.
     }

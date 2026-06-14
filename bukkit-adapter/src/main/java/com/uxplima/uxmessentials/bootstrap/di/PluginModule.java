@@ -591,7 +591,7 @@ public final class PluginModule {
         // scoreboard persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the sidebar /
         // tablist content is config-authored under modules/scoreboard/config.conf. It carries no cross-context bridge
         // — its only collaborators are the shared Scheduler, messages/messageSink, and event ports — so nothing is
-        // captured for a later context. The renderer dogfoods uxmlib-hud's SidebarManager/Tablist; the render timer
+        // captured for a later context. The renderer dogfoods uxmlib-hud's SidebarManager; the render timer
         // on the Scheduler port is stopped and every active board torn down on disable.
         ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx);
         wired.commands().forEach(resources::addCommand);

@@ -8,7 +8,6 @@ import java.util.function.Supplier;
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
@@ -22,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Renders the per-player sidebar from the live {@link DisplayContent}, dogfooding uxmLib's {@link SidebarManager}.
  * Each source string is run through {@link HudText} — the per-viewer PlaceholderAPI bridge ({@code %papi%} expansion,
- * identity without PlaceholderAPI) then {@link MiniMessage} parse, the same two-step transform the message sink uses —
+ * identity without PlaceholderAPI) then {@code MiniMessage} parse, the same two-step transform the message sink uses —
  * so operator content may embed third-party placeholders. The sidebar is reused across ticks when it already exists
  * (its {@code lines}/{@code title} diff flicker-free), created on first render, and torn down when the player has
  * hidden it or stands in a blacklisted world.
