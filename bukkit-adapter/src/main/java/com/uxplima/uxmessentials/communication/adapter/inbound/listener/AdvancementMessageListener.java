@@ -1,0 +1,133 @@
+package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
+
+import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+
+import org.bukkit.Sound;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerAdvancementDoneEvent;
+
+import io.papermc.paper.advancement.AdvancementDisplay;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
+import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
+import com.uxplima.uxmessentials.communication.domain.AdvancementFilter;
+import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Broadcasts a player earning an advancement using the operator's own template instead of (or alongside) the vanilla
+ * chat line, gated by the configured {@link AdvancementNoticeConfig} filtering. It mirrors the death/connection
+ * listeners: it reads the live config, decides via the pure {@link AdvancementFilter}, edits the vanilla event
+ * message, and fans the custom notice out across the configured channels through the shared
+ * {@link ChannelBroadcaster}.
+ *
+ * <p><b>Vanilla-message suppression.</b> The vanilla advancement chat line is cleared ({@code event.message(null)})
+ * in exactly two cases: (1) the earner is vanished — we hide the achievement entirely, matching EssentialsX; and
+ * (2) we are announcing our own notice — so the player does not see a duplicate (vanilla line plus our broadcast).
+ * When the filter says do-not-announce for any other reason (feature disabled, a recipe, not announce-to-chat,
+ * deny-listed, outside a non-empty allow-list) the vanilla line is left untouched, so turning the feature off is
+ * fully transparent.
+ *
+ * <p><b>Vanish.</b> Whether the earner is vanished is asked of an injected {@link Predicate} so the listener stays
+ * decoupled from the presence context; the wiring supplies the soft-coupled check (Bukkit's {@code Player#canSee}
+ * visibility graph, the same seam messaging and nametags use), which degrades to "never vanished" when presence is
+ * absent. A vanished earner's advancement is suppressed and never broadcast.
+ *
+ * <p><b>Template.</b> The operator template (a per-advancement override or the global one) is rendered per viewer:
+ * {@code {player}} is the earner's name, {@code {advancement}} the namespaced key, {@code {title}} and
+ * {@code {description}} the advancement display's title/description flattened to plain text via
+ * {@link PlainTextComponentSerializer} so they compose cleanly inside the MiniMessage template, then the result runs
+ * through {@link HudText} (per-viewer PlaceholderAPI then MiniMessage). A viewer who opted out of broadcasts via
+ * {@code /broadcasttoggle} renders {@code null} and is skipped — advancement notices are broadcasts.
+ *
+ * <p>The event fires on the earner's region thread; the {@link ChannelBroadcaster} performs its own
+ * global-enumerate then per-entity hops, so the handler just builds the per-viewer render and hands it over.
+ */
+@NullMarked
+public final class AdvancementMessageListener implements Listener {
+
+    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
+    private static final String RECIPE_INFIX = ":recipes/";
+
+    private final Supplier<AdvancementNoticeConfig> config;
+    private final ChannelBroadcaster channels;
+    private final BroadcastOptOutStore optOut;
+    private final Predicate<Player> vanished;
+
+    public AdvancementMessageListener(
+            Supplier<AdvancementNoticeConfig> config,
+            ChannelBroadcaster channels,
+            BroadcastOptOutStore optOut,
+            Predicate<Player> vanished) {
+        this.config = Objects.requireNonNull(config, "config");
+        this.channels = Objects.requireNonNull(channels, "channels");
+        this.optOut = Objects.requireNonNull(optOut, "optOut");
+        this.vanished = Objects.requireNonNull(vanished, "vanished");
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onAdvancement(PlayerAdvancementDoneEvent event) {
+        AdvancementNoticeConfig cfg = config.get();
+        Player earner = event.getPlayer();
+        String key = event.getAdvancement().getKey().toString();
+        @Nullable AdvancementDisplay display = event.getAdvancement().getDisplay();
+        boolean announceable = display != null && display.doesAnnounceToChat();
+        if (!AdvancementFilter.shouldAnnounce(cfg, key, isRecipe(key), announceable)) {
+            return;
+        }
+        // A vanished earner's advancement is hidden entirely: drop the vanilla line and do not broadcast.
+        if (vanished.test(earner)) {
+            event.message(null);
+            return;
+        }
+        // We are announcing our own notice — clear the vanilla line so the player does not see it twice.
+        event.message(null);
+        String template = substitute(AdvancementFilter.templateFor(cfg, key), earner.getName(), key, display);
+        @Nullable Sound sound = cfg.sound().map(BukkitRegistryKeys::resolveSound).orElse(null);
+        channels.broadcast(viewer -> render(viewer, template), cfg.channels(), sound);
+    }
+
+    /** The per-viewer notice, or {@code null} to skip a viewer who has opted out of broadcasts. */
+    private @Nullable Component render(Player viewer, String template) {
+        PlayerRef who = BukkitRefs.toRef(viewer);
+        if (!optOut.receivesBroadcasts(who)) {
+            return null;
+        }
+        return HudText.render(who.uuid(), template);
+    }
+
+    /** Whether {@code key} names a recipe-unlock advancement ({@code <namespace>:recipes/…}). */
+    static boolean isRecipe(String key) {
+        return key.contains(RECIPE_INFIX);
+    }
+
+    /**
+     * Substitute the advancement placeholders into {@code template}: {@code {player}} → the earner's name,
+     * {@code {advancement}} → the namespaced {@code key}, and {@code {title}}/{@code {description}} → the display's
+     * title/description flattened to plain text. A {@code null} display (recipes and some hidden advancements have
+     * none) substitutes an empty title and description rather than failing, so a template referencing them still
+     * renders. Package-private so it can be exercised directly: MockBukkit cannot construct a real
+     * {@code Advancement}/{@code AdvancementDisplay}, so the substitution is tested through this seam.
+     */
+    static String substitute(String template, String player, String key, @Nullable AdvancementDisplay display) {
+        String title = display == null ? "" : PLAIN.serialize(display.title());
+        String description = display == null ? "" : PLAIN.serialize(display.description());
+        return template.replace("{player}", player)
+                .replace("{advancement}", key)
+                .replace("{title}", title)
+                .replace("{description}", description);
+    }
+}

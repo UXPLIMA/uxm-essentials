@@ -29,6 +29,8 @@ class DefaultResourcesLayoutTest {
                 .isTrue();
         assertThat(Files.exists(dir.resolve("modules/communication/announcer.conf")))
                 .isTrue();
+        assertThat(Files.exists(dir.resolve("modules/communication/advancements.conf")))
+                .isTrue();
         assertThat(Files.exists(dir.resolve("modules/communication/info-pages.conf")))
                 .isTrue();
         assertThat(Files.exists(dir.resolve("modules/holograms/config.conf"))).isTrue();

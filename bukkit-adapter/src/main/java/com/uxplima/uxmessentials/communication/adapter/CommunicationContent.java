@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
@@ -27,6 +28,7 @@ import org.jspecify.annotations.NullMarked;
  * @param death the death channel's policy
  * @param announcer the rotating announcer config
  * @param announcerDisplay the title/boss-bar timing the announcer's non-chat channels render with
+ * @param advancements the advancement-notification config (filtering, template, channels, sound)
  * @param firstJoinTemplate the optional broadcast shown only on a player's first-ever join
  * @param deathInfoPage the optional info-page name shown to a dying player
  * @param infoPages the operator's info pages (one auto-registered command each)
@@ -38,6 +40,7 @@ public record CommunicationContent(
         MessagePolicy death,
         AnnouncerConfig announcer,
         ChannelDisplay announcerDisplay,
+        AdvancementNoticeConfig advancements,
         Optional<String> firstJoinTemplate,
         Optional<String> deathInfoPage,
         List<InfoPage> infoPages) {
@@ -48,6 +51,7 @@ public record CommunicationContent(
         Objects.requireNonNull(death, "death");
         Objects.requireNonNull(announcer, "announcer");
         Objects.requireNonNull(announcerDisplay, "announcerDisplay");
+        Objects.requireNonNull(advancements, "advancements");
         Objects.requireNonNull(firstJoinTemplate, "firstJoinTemplate");
         Objects.requireNonNull(deathInfoPage, "deathInfoPage");
         infoPages = List.copyOf(Objects.requireNonNull(infoPages, "infoPages"));
@@ -61,6 +65,7 @@ public record CommunicationContent(
                 MessagePolicy.vanilla(),
                 AnnouncerConfig.empty(),
                 CommunicationContentCodec.defaultDisplay(),
+                AdvancementNoticeConfig.disabled(),
                 Optional.empty(),
                 Optional.empty(),
                 List.of());

@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
+import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
@@ -20,7 +21,8 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 /**
  * The communication context's operator content, loaded once at wiring time from the {@code join-quit.conf},
- * {@code announcer.conf}, and {@code info-pages.conf} siblings under {@code modules/communication/} and held in an
+ * {@code announcer.conf}, {@code advancements.conf}, and {@code info-pages.conf} siblings under
+ * {@code modules/communication/} and held in an
  * {@link AtomicReference} so a reload swaps a fresh {@link CommunicationContent} whole — readers see either the
  * previous or the new content, never a half-applied tree (CLAUDE.md "swapped atomically via AtomicReference on
  * reload"). The three files are merged at the root into one tree before the codec reads them, so the parsed model
@@ -35,7 +37,8 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 @NullMarked
 public final class CommunicationSettings {
 
-    private static final List<String> CONTENT_FILES = List.of("join-quit.conf", "announcer.conf", "info-pages.conf");
+    private static final List<String> CONTENT_FILES =
+            List.of("join-quit.conf", "announcer.conf", "advancements.conf", "info-pages.conf");
 
     private final Path moduleDir;
     private final Logger log;
@@ -70,6 +73,11 @@ public final class CommunicationSettings {
     /** The announcer's title/boss-bar display timing; read once at wiring time to build the channel broadcaster. */
     public ChannelDisplay announcerDisplay() {
         return current().announcerDisplay();
+    }
+
+    /** The live advancement-notification config; read fresh by the advancement listener on each earned advancement. */
+    public AdvancementNoticeConfig advancementNotices() {
+        return current().advancements();
     }
 
     /** The optional first-join welcome template, broadcast only on a player's first-ever join. */

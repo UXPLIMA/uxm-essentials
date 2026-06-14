@@ -11,6 +11,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationCommands;
+import com.uxplima.uxmessentials.communication.adapter.inbound.listener.AdvancementMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ChatLockListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ConnectionMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.DeathMessageListener;
@@ -42,10 +43,12 @@ import org.jspecify.annotations.NullMarked;
  * Constructs the communication context's adapters and use cases over the injected kernel ports and the operator
  * content under {@code modules/communication/}, and produces everything the plugin must register: the Brigadier command
  * list (the static {@code /broadcast}, {@code /broadcasttoggle}, and {@code /announce} plus the config-derived
- * info-page commands), the join/quit/death connection listeners, and the self-rescheduling announcer timer on the
- * {@code Scheduler} port. The announcer fans out through the shared {@link ChannelBroadcaster} so its multi-channel
- * delivery, PlaceholderAPI expansion, and per-viewer condition gating match vote's broadcaster. This is the one
- * place the communication context is wired — nothing else news up its classes.
+ * info-page commands), the join/quit/death connection listeners, the advancement-notification listener, and the
+ * self-rescheduling announcer timer on the {@code Scheduler} port. The announcer and the advancement listener fan
+ * out through the shared {@link ChannelBroadcaster} so their multi-channel delivery, PlaceholderAPI expansion, and
+ * per-viewer opt-out gating match vote's broadcaster. The advancement listener is registered unconditionally and
+ * gated by its live config, so {@code /uxmess reload communication} can enable it without re-registration. This is
+ * the one place the communication context is wired — nothing else news up its classes.
  *
  * <p>The context persists nothing: the per-player opt-out bit is PDC-backed (survives relog), the sequence
  * counters are transient, and the announcer schedule and info pages are config-authored. The operator content is
@@ -94,7 +97,8 @@ public final class CommunicationWiring {
                 kernel.messageSink(),
                 chatLock,
                 settings);
-        List<Listener> listeners = listeners(services, registry, infoSender, settings, chatLock, notifier);
+        List<Listener> listeners = listeners(
+                services, registry, infoSender, settings, chatLock, notifier, channelBroadcaster, optOutStore);
         return new Wired(commands, listeners, announcer, running);
     }
 
@@ -134,11 +138,33 @@ public final class CommunicationWiring {
             BukkitInfoSender infoSender,
             CommunicationSettings settings,
             ChatLock chatLock,
-            CommunicationNotifier notifier) {
+            CommunicationNotifier notifier,
+            ChannelBroadcaster channelBroadcaster,
+            BroadcastOptOutStore optOutStore) {
         return List.of(
                 new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings),
                 new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
+                new AdvancementMessageListener(
+                        settings::advancementNotices, channelBroadcaster, optOutStore, CommunicationWiring::isVanished),
                 new ChatLockListener(chatLock, notifier));
+    }
+
+    /**
+     * Whether {@code earner} is currently vanished, derived from Bukkit's own {@code Player#canSee} visibility graph —
+     * the same soft-coupling seam messaging's {@code CanSeeVanishVisibility}, nametags, and teleport's {@code /tpa}
+     * use. The presence module hides a vanished player from those without the vanish-see node, so an earner whom at
+     * least one other online player cannot see is treated as vanished and their advancement is suppressed. When
+     * presence is disabled nobody is hidden, {@code canSee} is always true, and the earner is never resolved as
+     * vanished, so the feature degrades to "broadcast everyone's advancement" without depending on presence directly.
+     * A solo earner (no other online player) is never vanished here — there is no one to be hidden from.
+     */
+    private static boolean isVanished(Player earner) {
+        for (Player other : earner.getServer().getOnlinePlayers()) {
+            if (!other.equals(earner) && !other.canSee(earner)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

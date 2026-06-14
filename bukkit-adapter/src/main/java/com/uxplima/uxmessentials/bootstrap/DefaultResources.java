@@ -51,6 +51,7 @@ final class DefaultResources {
             "modules/communication/config.conf",
             "modules/communication/join-quit.conf",
             "modules/communication/announcer.conf",
+            "modules/communication/advancements.conf",
             "modules/communication/info-pages.conf",
             "modules/vote/config.conf",
             "modules/holograms/config.conf",

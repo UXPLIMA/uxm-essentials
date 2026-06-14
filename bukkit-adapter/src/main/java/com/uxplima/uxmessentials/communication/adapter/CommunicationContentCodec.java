@@ -2,12 +2,15 @@ package com.uxplima.uxmessentials.communication.adapter;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
@@ -78,9 +81,45 @@ final class CommunicationContentCodec {
                 policy(root.node("death")),
                 announcer(announcer),
                 display(announcer.node("display")),
+                advancements(root.node("advancements")),
                 optionalString(root.node("first-join")),
                 optionalString(root.node("death-info-page")).map(name -> name.toLowerCase(Locale.ROOT)),
                 infoPages(root.node("info-pages")));
+    }
+
+    /**
+     * Parse the {@code advancements} block into an {@link AdvancementNoticeConfig}. The feature ships off
+     * ({@code enabled = false}); recipes are excluded and only announce-to-chat advancements considered by default,
+     * matching vanilla. The allow/deny lists and the per-advancement template map are read leniently — blank entries
+     * are dropped, and the domain record lowercases every key. Channels are parsed by the shared {@link #channels}
+     * helper (unknown channels skipped, empty defaults to {@code CHAT}); a blank sound key stays absent.
+     */
+    private static AdvancementNoticeConfig advancements(ConfigurationNode node) {
+        if (node.virtual()) {
+            return AdvancementNoticeConfig.disabled();
+        }
+        return new AdvancementNoticeConfig(
+                node.node("enabled").getBoolean(false),
+                node.node("exclude-recipes").getBoolean(true),
+                node.node("only-announceable").getBoolean(true),
+                Set.copyOf(strings(node.node("allow"))),
+                Set.copyOf(strings(node.node("deny"))),
+                node.node("template").getString(""),
+                perAdvancementTemplates(node.node("per-advancement")),
+                channels(node.node("channels")),
+                optionalString(node.node("sound")));
+    }
+
+    /** The per-advancement template overrides — a key→template map; a blank template value drops that entry. */
+    private static Map<String, String> perAdvancementTemplates(ConfigurationNode node) {
+        Map<String, String> overrides = new LinkedHashMap<>();
+        node.childrenMap().forEach((key, child) -> {
+            String template = child.getString("");
+            if (!template.isBlank()) {
+                overrides.put(String.valueOf(key), template);
+            }
+        });
+        return Map.copyOf(overrides);
     }
 
     /**
