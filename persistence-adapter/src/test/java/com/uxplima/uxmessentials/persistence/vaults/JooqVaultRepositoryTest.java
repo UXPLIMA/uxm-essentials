@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
@@ -24,7 +25,9 @@ import org.junit.jupiter.api.io.TempDir;
  * End-to-end coverage of {@link JooqVaultRepository} against the default embedded SQLite backend with the
  * Flyway V6 vaults table applied — the tested default of the backend-parity matrix. It proves the round-trip
  * (save → find), that the opaque serialized contents survive the base64 TEXT column byte-for-byte, that an
- * empty vault stores a null {@code contents} cell and round-trips back to empty, that a re-save upserts on the
+ * empty vault stores a null {@code contents} cell and round-trips back to empty, that the optional per-vault
+ * display name and icon persist (and round-trip to null when unset, updating in place on a re-save), that the
+ * presentation {@code summaries} read returns index, name and icon ascending, that a re-save upserts on the
  * {@code (owner, idx)} key rather than inserting, that the per-owner index listing reads ascending, that the
  * count the amount quota relies on reflects the rows, and that a delete removes exactly the one row (freeing the
  * quota slot, idempotent on a missing row, leaving the owner's other vaults intact). It also proves the
@@ -85,6 +88,55 @@ class JooqVaultRepositoryTest {
                 .get()
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.BYTE_ARRAY)
                 .containsExactly(9, 9);
+    }
+
+    @Test
+    void savesAndLoadsThePerVaultDisplayNameAndIcon() {
+        repository.save(named(1, "Loot Stash", "ENDER_CHEST"));
+
+        Vault loaded = repository.find(VaultId.of(owner, 1)).orElseThrow();
+
+        assertThat(loaded.displayName()).isEqualTo("Loot Stash");
+        assertThat(loaded.iconMaterial()).isEqualTo("ENDER_CHEST");
+    }
+
+    @Test
+    void aVaultWithoutAppearanceStoresNullColumnsAndRoundTripsToNull() {
+        repository.save(vault(1, 6, VaultContents.empty()));
+
+        Vault loaded = repository.find(VaultId.of(owner, 1)).orElseThrow();
+
+        assertThat(loaded.displayName()).isNull();
+        assertThat(loaded.iconMaterial()).isNull();
+    }
+
+    @Test
+    void reSavingUpdatesTheDisplayNameAndIconOnTheUpsertPath() {
+        repository.save(named(1, "Old Name", "CHEST"));
+        repository.save(named(1, "New Name", "BARREL")); // same (owner, idx) — a re-save through onConflict
+
+        assertThat(repository.count(owner)).isEqualTo(1);
+        Vault reloaded = repository.find(VaultId.of(owner, 1)).orElseThrow();
+        assertThat(reloaded.displayName()).isEqualTo("New Name");
+        assertThat(reloaded.iconMaterial()).isEqualTo("BARREL");
+    }
+
+    @Test
+    void summariesReturnTheIndexNameAndIconAscendingByIndex() {
+        repository.save(named(3, "Gear", "DIAMOND_CHESTPLATE"));
+        repository.save(named(1, "Loot", "ENDER_CHEST"));
+        repository.save(vault(2, 6, VaultContents.empty())); // no appearance set — null name and icon
+
+        assertThat(repository.summaries(owner))
+                .containsExactly(
+                        new VaultSummary(1, "Loot", "ENDER_CHEST"),
+                        new VaultSummary(2, null, null),
+                        new VaultSummary(3, "Gear", "DIAMOND_CHESTPLATE"));
+    }
+
+    @Test
+    void summariesAreEmptyForAnOwnerWithNoVaults() {
+        assertThat(repository.summaries(owner)).isEmpty();
     }
 
     @Test
@@ -174,7 +226,12 @@ class JooqVaultRepositoryTest {
     void deleteUntouchedBeforeKeepsAKeptRowFullyReadable() {
         byte[] payload = {7, 8, 9};
         repository.save(Vault.of(
-                VaultId.of(owner, 1), new VaultSize(6), VaultContents.of(payload), Instant.ofEpochMilli(9_000)));
+                VaultId.of(owner, 1),
+                new VaultSize(6),
+                VaultContents.of(payload),
+                null,
+                null,
+                Instant.ofEpochMilli(9_000)));
 
         repository.deleteUntouchedBefore(Instant.ofEpochMilli(5_000));
 
@@ -187,11 +244,22 @@ class JooqVaultRepositoryTest {
     }
 
     private Vault vault(int index, int rows, VaultContents contents) {
-        return Vault.of(VaultId.of(owner, index), new VaultSize(rows), contents, Instant.ofEpochMilli(1_000));
+        return Vault.of(
+                VaultId.of(owner, index), new VaultSize(rows), contents, null, null, Instant.ofEpochMilli(1_000));
     }
 
     private Vault vaultTouchedAt(int index, Instant lastTouched) {
-        return Vault.of(VaultId.of(owner, index), new VaultSize(6), VaultContents.empty(), lastTouched);
+        return Vault.of(VaultId.of(owner, index), new VaultSize(6), VaultContents.empty(), null, null, lastTouched);
+    }
+
+    private Vault named(int index, String displayName, String iconMaterial) {
+        return Vault.of(
+                VaultId.of(owner, index),
+                new VaultSize(6),
+                VaultContents.empty(),
+                displayName,
+                iconMaterial,
+                Instant.ofEpochMilli(1_000));
     }
 
     /** A config that selects the embedded SQLite backend with every default — no network coordinates. */

@@ -9,6 +9,7 @@ import java.util.Optional;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
@@ -21,8 +22,9 @@ import com.uxplima.uxmessentials.vaults.domain.VaultId;
  * vault's payload when a player re-opens it.
  *
  * <p>Only the keyed {@link #find} read is cached: a vault is opened far more often than its owner's index
- * listing changes, and the {@link #ownedIndices}/{@link #count} reads are cheap index scans that must stay
- * fresh the instant a new vault is allocated, so they pass straight through. A {@link #save} invalidates the
+ * listing changes, and the {@link #ownedIndices}/{@link #summaries}/{@link #count} reads are cheap index scans
+ * that must stay fresh the instant a new vault is allocated or its name/icon changes, so they pass straight
+ * through. A {@link #save} invalidates the
  * saved id only, and a {@link #delete} the deleted id only; a different vault of the same owner keeps its
  * cached payload.
  */
@@ -56,6 +58,11 @@ public final class CachedVaultRepository implements VaultRepository {
     @Override
     public List<Integer> ownedIndices(PlayerRef owner) {
         return delegate.ownedIndices(owner);
+    }
+
+    @Override
+    public List<VaultSummary> summaries(PlayerRef owner) {
+        return delegate.summaries(owner);
     }
 
     @Override

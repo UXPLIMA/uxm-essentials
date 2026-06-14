@@ -35,7 +35,7 @@ final class VaultRows {
         VaultSize size = new VaultSize(row.get(vaults.SIZE));
         VaultContents contents = decode(row.get(vaults.CONTENTS));
         Instant lastTouched = Instant.ofEpochMilli(row.get(vaults.LAST_TOUCHED));
-        return Vault.of(id, size, contents, lastTouched);
+        return Vault.of(id, size, contents, row.get(vaults.DISPLAY_NAME), row.get(vaults.ICON), lastTouched);
     }
 
     /** Populate a {@link VaultsRecord} from a domain {@link Vault} for an upsert. */
@@ -44,7 +44,9 @@ final class VaultRows {
                 .setIdx(vault.index())
                 .setSize((short) vault.size().rows())
                 .setLastTouched(vault.lastTouched().toEpochMilli())
-                .setContents(encode(vault.contents()));
+                .setContents(encode(vault.contents()))
+                .setDisplayName(vault.displayName())
+                .setIcon(vault.iconMaterial());
     }
 
     /** Base64 the opaque payload, or {@code null} for an empty vault so no blob is written. */

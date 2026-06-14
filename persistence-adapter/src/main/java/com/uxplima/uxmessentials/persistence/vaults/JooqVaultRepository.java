@@ -10,6 +10,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.VaultsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
@@ -50,6 +51,16 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
                 .where(VAULTS.OWNER.eq(owner.uuid().toString()))
                 .orderBy(VAULTS.IDX.asc())
                 .fetch(VAULTS.IDX));
+    }
+
+    @Override
+    public List<VaultSummary> summaries(PlayerRef owner) {
+        Objects.requireNonNull(owner, "owner");
+        return read(dsl -> dsl.select(VAULTS.IDX, VAULTS.DISPLAY_NAME, VAULTS.ICON)
+                .from(VAULTS)
+                .where(VAULTS.OWNER.eq(owner.uuid().toString()))
+                .orderBy(VAULTS.IDX.asc())
+                .fetch(r -> new VaultSummary(r.value1(), r.value2(), r.value3())));
     }
 
     @Override
@@ -97,6 +108,8 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
                 .set(VAULTS.SIZE, record.getSize())
                 .set(VAULTS.LAST_TOUCHED, record.getLastTouched())
                 .set(VAULTS.CONTENTS, record.getContents())
+                .set(VAULTS.DISPLAY_NAME, record.getDisplayName())
+                .set(VAULTS.ICON, record.getIcon())
                 .execute();
     }
 }
