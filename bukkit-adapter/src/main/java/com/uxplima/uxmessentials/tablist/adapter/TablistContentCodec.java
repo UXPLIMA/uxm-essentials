@@ -11,6 +11,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.display.ConditionParser;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
@@ -48,6 +50,11 @@ import org.spongepowered.configurate.ConfigurationNode;
  * always-true condition, priority {@code 0}, and no name/order override, reproducing the historical single-tablist
  * behaviour. The global refresh cadence then comes from {@code tablist.refresh-ticks}.
  *
+ * <p>An optional top-level {@code animations { <name> { type, frames, interval-ticks, … } }} block declares named
+ * animations a header/footer line references as {@code %anim_<name>%}. It is parsed by the shared
+ * {@link AnimationDef#parseAll} the scoreboard codec uses, so the animation grammar is identical across both HUD
+ * modules and never drifts.
+ *
  * <p>Every value is operator content rendered through MiniMessage and the placeholder pipeline later, never a
  * {@code MessageKey}. The parse is tolerant: an absent or non-positive {@code refresh-ticks} falls back to one second so
  * the render timer never busy-spins, a non-positive {@code sort-order} is treated as absent (the API requires a positive
@@ -68,31 +75,36 @@ final class TablistContentCodec {
     private TablistContentCodec() {}
 
     /**
-     * The parsed tablist config: the named formats the renderer selects among, and the global render cadence the timer
-     * re-reads each reschedule.
+     * The parsed tablist config: the named formats the renderer selects among, the named animations the renderer
+     * expands {@code %anim_<name>%} tokens against, and the global render cadence the timer re-reads each reschedule.
      */
-    record Parsed(TablistFormatConfig formats, Duration refreshInterval) {
+    record Parsed(TablistFormatConfig formats, List<AnimationDef> animations, Duration refreshInterval) {
         Parsed {
             Objects.requireNonNull(formats, "formats");
+            animations = List.copyOf(Objects.requireNonNull(animations, "animations"));
             Objects.requireNonNull(refreshInterval, "refreshInterval");
         }
 
-        /** The do-nothing default an absent or unreadable config yields: no formats, once a second. */
+        /** The do-nothing default an absent or unreadable config yields: no formats, no animations, once a second. */
         static Parsed inert() {
-            return new Parsed(TablistFormatConfig.empty(), Duration.ofMillis(DEFAULT_REFRESH_TICKS * MILLIS_PER_TICK));
+            return new Parsed(
+                    TablistFormatConfig.empty(), List.of(), Duration.ofMillis(DEFAULT_REFRESH_TICKS * MILLIS_PER_TICK));
         }
     }
 
-    /** Parse {@code root}; an empty or virtual root yields {@link Parsed#inert()}. */
-    static Parsed read(ConfigurationNode root) {
+    /** Parse {@code root}; an empty or virtual root yields {@link Parsed#inert()}. {@code log} reports skipped entries. */
+    static Parsed read(ConfigurationNode root, Logger log) {
+        Objects.requireNonNull(log, "log");
         if (root.virtual() || root.empty()) {
             return Parsed.inert();
         }
+        List<AnimationDef> animations = AnimationDef.parseAll(root.node("animations"), log);
         ConfigurationNode formats = root.node("formats");
         if (!formats.virtual() && formats.isMap()) {
-            return new Parsed(readFormats(formats), refreshInterval(root.node("refresh-ticks")));
+            return new Parsed(readFormats(formats), animations, refreshInterval(root.node("refresh-ticks")));
         }
-        return readSingleFormat(root.node("tablist"));
+        Parsed single = readSingleFormat(root.node("tablist"));
+        return new Parsed(single.formats(), animations, single.refreshInterval());
     }
 
     private static TablistFormatConfig readFormats(ConfigurationNode formats) {
@@ -128,17 +140,18 @@ final class TablistContentCodec {
     /**
      * Back-compat: wrap a top-level {@code tablist { … }} block as the single implicit {@code default} format with an
      * always-true condition, priority {@code 0}, and no name/order override. A blank block yields no formats. The global
-     * refresh cadence comes from {@code tablist.refresh-ticks}.
+     * refresh cadence comes from {@code tablist.refresh-ticks}. Animations are read separately by {@link #read} and
+     * merged in there, so the returned {@code animations} list is always empty.
      */
     private static Parsed readSingleFormat(ConfigurationNode tab) {
         Duration interval = refreshInterval(tab.node("refresh-ticks"));
         TablistContent content = tablistContent(tab);
         if (content.isBlank()) {
-            return new Parsed(TablistFormatConfig.empty(), interval);
+            return new Parsed(TablistFormatConfig.empty(), List.of(), interval);
         }
         TablistFormat single = new TablistFormat(
                 "default", DisplayCondition.always(), 0, content, Optional.empty(), OptionalInt.empty());
-        return new Parsed(new TablistFormatConfig(List.of(single)), interval);
+        return new Parsed(new TablistFormatConfig(List.of(single)), List.of(), interval);
     }
 
     private static TablistContent tablistContent(ConfigurationNode node) {

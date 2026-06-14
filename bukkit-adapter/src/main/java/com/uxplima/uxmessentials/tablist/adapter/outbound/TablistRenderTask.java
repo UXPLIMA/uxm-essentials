@@ -9,6 +9,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
@@ -21,19 +22,30 @@ import org.jspecify.annotations.NullMarked;
  * <p>The interval is read fresh from the live {@link com.uxplima.uxmessentials.tablist.domain.TablistContent} each
  * reschedule, so a {@code /uxmess reload tablist} that swaps a new cadence in changes the refresh rate on the next
  * tick without re-arming the task. The task observes the module's {@code running} flag and exits cleanly on disable.
+ *
+ * <p>The animation clock is global, not per-player: this loop calls {@link AnimationRegistry#advance()} exactly once per
+ * tick on the loop thread — stepping every named animation to the tick's frame — <em>before</em> the per-player fan-out.
+ * Each player then renders against the same captured frame, so an animation advances at most once per tick no matter how
+ * many viewers are online and never flickers between viewers within a tick (mirrors the scoreboard render timer).
  */
 @NullMarked
 public final class TablistRenderTask {
 
     private final Scheduler scheduler;
     private final TablistRenderer renderer;
+    private final AnimationRegistry animations;
     private final Supplier<Duration> interval;
     private final BooleanSupplier running;
 
     public TablistRenderTask(
-            Scheduler scheduler, TablistRenderer renderer, Supplier<Duration> interval, BooleanSupplier running) {
+            Scheduler scheduler,
+            TablistRenderer renderer,
+            AnimationRegistry animations,
+            Supplier<Duration> interval,
+            BooleanSupplier running) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
+        this.animations = Objects.requireNonNull(animations, "animations");
         this.interval = Objects.requireNonNull(interval, "interval");
         this.running = Objects.requireNonNull(running, "running");
     }
@@ -54,6 +66,9 @@ public final class TablistRenderTask {
         if (!running.getAsBoolean()) {
             return;
         }
+        // Advance the global animation clock once, on this loop thread, before fanning out. Every per-player render
+        // below then reads the same frame for this tick.
+        animations.advance();
         for (Player player : Bukkit.getOnlinePlayers()) {
             scheduler.onEntity(BukkitRefs.toRef(player), () -> renderer.renderFor(player));
         }

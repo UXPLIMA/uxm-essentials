@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.scoreboard.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.hud;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,17 +21,17 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Expands {@code %anim_<name>%} tokens in operator-authored sidebar sources to the current frame of a named animation.
- * The catalog is built once at wiring time from the parsed {@code animations { … }} block ({@link AnimationDef}s) and
- * the registry then drives one animation frame per name on the shared render tick:
+ * Expands {@code %anim_<name>%} tokens in operator-authored HUD sources (scoreboard sidebar lines, tablist
+ * header/footer) to the current frame of a named animation. The catalog is built once at wiring time from the parsed
+ * {@code animations { … }} block ({@link AnimationDef}s) and the registry then drives one animation frame per name on
+ * the shared render tick:
  *
  * <ul>
  *   <li>{@link AnimationSpec.AnimationType#FRAMES FRAMES} are resolved purely by {@link AnimationSpec#frameAt(long)} —
  *       a plain frame index from the tick, with no state to advance.</li>
  *   <li>{@link AnimationSpec.AnimationType#SCROLL SCROLL} and {@link AnimationSpec.AnimationType#GRADIENT GRADIENT} bind
  *       a stateful uxmLib {@link TextAnimator} ({@code ScrollingText}/{@code GradientText}); its frame is a
- *       {@link Component} re-serialised back to MiniMessage so it survives the later {@link com.uxplima.uxmessentials
- *       .shared.adapter.outbound.hud.HudText} parse.</li>
+ *       {@link Component} re-serialised back to MiniMessage so it survives the later {@link HudText} parse.</li>
  * </ul>
  *
  * <h2>One global tick, captured once, read by every viewer</h2>

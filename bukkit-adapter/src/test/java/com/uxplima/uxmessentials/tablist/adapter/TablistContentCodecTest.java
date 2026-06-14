@@ -6,10 +6,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
@@ -20,6 +25,8 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
 class TablistContentCodecTest {
+
+    private static final Logger LOG = new NoopLogger();
 
     @Test
     void parsesTheFormatsBlock(@TempDir Path dir) throws Exception {
@@ -45,7 +52,7 @@ class TablistContentCodecTest {
                 }
                 """);
 
-        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root);
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
 
         // 40 ticks at 50ms each is two seconds; the global cadence is read from the top-level refresh-ticks.
         assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofSeconds(2L));
@@ -79,7 +86,7 @@ class TablistContentCodecTest {
                 }
                 """);
 
-        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root);
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
 
         assertThat(parsed.formats().formats()).hasSize(1);
         TablistFormat vip = select(parsed, n -> true, "world");
@@ -97,7 +104,7 @@ class TablistContentCodecTest {
                 }
                 """);
 
-        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root);
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
 
         assertThat(select(parsed, n -> true, "world").sortOrder()).isEmpty();
     }
@@ -116,7 +123,7 @@ class TablistContentCodecTest {
                 }
                 """);
 
-        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root);
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
 
         assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofSeconds(2L));
         assertThat(parsed.formats().formats()).hasSize(1);
@@ -134,7 +141,7 @@ class TablistContentCodecTest {
 
     @Test
     void anEmptyRootYieldsInertContent(@TempDir Path dir) throws Exception {
-        TablistContentCodec.Parsed parsed = TablistContentCodec.read(load(dir, "enabled = false\n"));
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(load(dir, "enabled = false\n"), LOG);
 
         assertThat(parsed.formats().formats()).isEmpty();
         assertThat(parsed.formats().select(ctx(n -> true, "world"))).isEmpty();
@@ -154,11 +161,54 @@ class TablistContentCodecTest {
                 }
                 """);
 
-        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root);
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
 
         assertThat(parsed.formats().formats()).isEmpty();
         // A non-positive refresh-ticks still falls back to one second rather than busy-spinning.
         assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofSeconds(1L));
+    }
+
+    @Test
+    void parsesFramesAndScrollAnimationsAndSkipsAnUnknownType(@TempDir Path dir) throws Exception {
+        // The animations block is parsed by the shared AnimationDef.parseAll, the same parse the scoreboard codec uses,
+        // so the grammar (FRAMES + SCROLL + skip-unknown-with-a-log) is identical across both HUD modules.
+        RecordingLogger log = new RecordingLogger();
+        ConfigurationNode root = load(
+                dir,
+                """
+                enabled = true
+                animations {
+                  blink { type = "FRAMES", frames = [ "ON", "OFF" ], interval-ticks = 10 }
+                  marquee { type = "SCROLL", frames = [ "welcome to the server" ], interval-ticks = 2, window = 8, separator = " * " }
+                  bogus { type = "WOBBLE", frames = [ "x" ] }
+                }
+                formats {
+                  default { condition = "", priority = 0, header = [ "<gray>%anim_blink%" ] }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, log);
+
+        // The two valid animations are parsed; the unknown type is skipped and logged.
+        assertThat(parsed.animations()).extracting(d -> d.spec().name()).containsExactlyInAnyOrder("blink", "marquee");
+        AnimationDef blink = byName(parsed.animations(), "blink");
+        assertThat(blink.spec().type()).isEqualTo(AnimationSpec.AnimationType.FRAMES);
+        assertThat(blink.spec().frames()).containsExactly("ON", "OFF");
+        assertThat(blink.spec().intervalTicks()).isEqualTo(10);
+        AnimationDef marquee = byName(parsed.animations(), "marquee");
+        assertThat(marquee.spec().type()).isEqualTo(AnimationSpec.AnimationType.SCROLL);
+        assertThat(marquee.scroll()).hasValueSatisfying(s -> {
+            assertThat(s.window()).isEqualTo(8);
+            assertThat(s.separator()).isEqualTo(" * ");
+        });
+        assertThat(log.warnings).anyMatch(w -> w.contains("animation_skipped") && w.contains("bogus"));
+    }
+
+    private static AnimationDef byName(List<AnimationDef> defs, String name) {
+        return defs.stream()
+                .filter(d -> d.spec().name().equals(name))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static TablistFormat select(
@@ -177,5 +227,41 @@ class TablistContentCodecTest {
         Path file = dir.resolve("config.conf");
         Files.writeString(file, hocon);
         return HoconConfigurationLoader.builder().path(file).build().load();
+    }
+
+    private static class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
+    /** A logger that captures formatted {@code warn} lines so a test can assert a skip was reported. */
+    private static final class RecordingLogger extends NoopLogger {
+        private final List<String> warnings = new ArrayList<>();
+
+        @Override
+        public void warn(String message, Object... args) {
+            warnings.add(format(message, args));
+        }
+
+        private static String format(String message, Object... args) {
+            String out = message;
+            for (Object arg : args) {
+                int at = out.indexOf("{}");
+                if (at < 0) {
+                    break;
+                }
+                out = out.substring(0, at) + arg + out.substring(at + 2);
+            }
+            return out;
+        }
     }
 }

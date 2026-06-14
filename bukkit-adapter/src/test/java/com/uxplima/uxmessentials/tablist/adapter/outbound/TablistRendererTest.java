@@ -13,6 +13,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
@@ -79,7 +82,7 @@ class TablistRendererTest {
         PlayerMock player = server.addPlayer();
         AtomicReference<TablistFormatConfig> ref = new AtomicReference<>(new TablistFormatConfig(
                 List.of(format("default", DisplayCondition.always(), 0, "<gold>{player}", 50))));
-        TablistRenderer renderer = new TablistRenderer(ref::get);
+        TablistRenderer renderer = new TablistRenderer(ref::get, new AnimationRegistry(List.of()));
 
         renderer.renderFor(player);
         assertThat(plain(player.playerListName())).isEqualTo(player.getName());
@@ -143,8 +146,63 @@ class TablistRendererTest {
         assertThat(plain(player.playerListName())).isEqualTo("Welcome " + player.getName() + "!");
     }
 
+    @Test
+    void anAnimationTokenInTheHeaderAndFooterRendersTheCurrentFrame() {
+        // The header/footer are delivered through player.sendPlayerListHeaderAndFooter, which the stock PlayerMock
+        // leaves
+        // a no-op (so playerListHeader()/Footer() never update). A capturing PlayerMock records the components uxmLib's
+        // Tablist hands the player, letting us assert the %anim_<name>% token resolved to the current frame in both.
+        CapturingPlayerMock player = new CapturingPlayerMock(server, "anim");
+        server.addPlayer(player);
+        AnimationRegistry registry = new AnimationRegistry(List.of(AnimationDef.frames(
+                new AnimationSpec("blink", AnimationSpec.AnimationType.FRAMES, List.of("ON", "OFF"), 1))));
+        TablistContent content = new TablistContent(
+                List.of("<gray>State: %anim_blink%"),
+                List.of("<gray>Foot: %anim_blink%"),
+                Duration.ofSeconds(1L),
+                Set.of());
+        TablistFormatConfig config = new TablistFormatConfig(List.of(new TablistFormat(
+                "default", DisplayCondition.always(), 0, content, Optional.empty(), OptionalInt.empty())));
+        TablistRenderer renderer = new TablistRenderer(new AtomicReference<>(config)::get, registry);
+
+        // tick 0 -> frame index 0 ("ON"); the rendered header and footer both carry the current frame.
+        renderer.renderFor(player);
+        assertThat(plain(player.header())).isEqualTo("State: ON");
+        assertThat(plain(player.footer())).isEqualTo("Foot: ON");
+
+        // advance once -> frame index 1 ("OFF"); both follow the shared global clock.
+        registry.advance();
+        renderer.renderFor(player);
+        assertThat(plain(player.header())).isEqualTo("State: OFF");
+        assertThat(plain(player.footer())).isEqualTo("Foot: OFF");
+    }
+
+    /** A PlayerMock that records the header/footer components handed to {@code sendPlayerListHeaderAndFooter}. */
+    private static final class CapturingPlayerMock extends PlayerMock {
+        private @Nullable Component lastHeader;
+        private @Nullable Component lastFooter;
+
+        CapturingPlayerMock(ServerMock server, String name) {
+            super(server, name);
+        }
+
+        @Override
+        public void sendPlayerListHeaderAndFooter(Component header, Component footer) {
+            this.lastHeader = header;
+            this.lastFooter = footer;
+        }
+
+        Component header() {
+            return java.util.Objects.requireNonNull(lastHeader, "header not sent");
+        }
+
+        Component footer() {
+            return java.util.Objects.requireNonNull(lastFooter, "footer not sent");
+        }
+    }
+
     private TablistRenderer renderer(TablistFormatConfig config) {
-        return new TablistRenderer(new AtomicReference<>(config)::get);
+        return new TablistRenderer(new AtomicReference<>(config)::get, new AnimationRegistry(List.of()));
     }
 
     private static TablistFormat format(

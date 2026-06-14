@@ -13,7 +13,6 @@ import org.bukkit.scoreboard.ScoreboardManager;
 
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.command.ScoreboardCommand;
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.listener.ScoreboardConnectionListener;
-import com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationRegistry;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.PdcScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderTask;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
@@ -21,6 +20,7 @@ import com.uxplima.uxmessentials.scoreboard.application.ScoreboardNotifier;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmlib.hud.scoreboard.SidebarManager;

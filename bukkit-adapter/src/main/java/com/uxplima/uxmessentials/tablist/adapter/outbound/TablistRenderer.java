@@ -15,6 +15,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
@@ -36,8 +37,11 @@ import org.jspecify.annotations.NullMarked;
  * <p>A selected format contributes three things, each independent:
  *
  * <ul>
- *   <li>its {@link TablistContent} header/footer line lists, each source run through {@link HudText} (the per-viewer
- *       PlaceholderAPI bridge then MiniMessage parse) and joined with newlines — the existing render path;</li>
+ *   <li>its {@link TablistContent} header/footer line lists, each source first run through the {@link AnimationRegistry}
+ *       (expanding any {@code %anim_<name>%} token to the named animation's current frame at the global render tick) then
+ *       through {@link HudText} (the per-viewer PlaceholderAPI bridge then MiniMessage parse) and joined with newlines.
+ *       The animation token is expanded <em>before</em> PlaceholderAPI and MiniMessage so a frame may itself carry colour
+ *       tags or placeholders, the same two-step transform the scoreboard sidebar uses;</li>
  *   <li>its {@link TablistFormat#nameFormat() name format}, when present, applied as the viewer's tab-list name via
  *       {@link Player#playerListName(Component)} — how the viewer appears to everyone. The {@code {player}} token is
  *       substituted with the viewer's name before the {@link HudText} transform, so {@code "<red>[Staff] {player}"}
@@ -67,6 +71,7 @@ public final class TablistRenderer {
 
     private final Tablist tablist;
     private final Supplier<TablistFormatConfig> formats;
+    private final AnimationRegistry animations;
 
     /**
      * The last name-format source string applied to each player's list name, keyed by player UUID. An absent key means
@@ -79,8 +84,9 @@ public final class TablistRenderer {
     /** The last sort order applied to each player, keyed by player UUID. An absent key means no order is applied. */
     private final Map<UUID, Integer> appliedOrder = new ConcurrentHashMap<>();
 
-    public TablistRenderer(Supplier<TablistFormatConfig> formats) {
+    public TablistRenderer(Supplier<TablistFormatConfig> formats, AnimationRegistry animations) {
         this.formats = Objects.requireNonNull(formats, "formats");
+        this.animations = Objects.requireNonNull(animations, "animations");
         this.tablist = new Tablist();
     }
 
@@ -88,6 +94,9 @@ public final class TablistRenderer {
     public void renderFor(Player player) {
         Objects.requireNonNull(player, "player");
         ConditionContext ctx = conditionContext(player);
+        // Capture the global animation tick once for this paint, so the header, footer, and name format all read the
+        // same frame — the render task steps the clock once per loop tick before this fan-out.
+        long tick = animations.tick();
         Optional<TablistFormat> selected = formats.get().select(ctx);
         if (selected.isEmpty()) {
             clear(player);
@@ -99,8 +108,8 @@ public final class TablistRenderer {
             clear(player);
             return;
         }
-        renderHeaderFooter(player, content);
-        applyNameFormat(player, format.nameFormat());
+        renderHeaderFooter(player, content, tick);
+        applyNameFormat(player, format.nameFormat(), tick);
         applyOrder(player, format.sortOrder());
     }
 
@@ -118,8 +127,8 @@ public final class TablistRenderer {
         resetNameAndOrder(player);
     }
 
-    private void renderHeaderFooter(Player player, TablistContent content) {
-        tablist.set(player, joinLines(player, content.header()), joinLines(player, content.footer()));
+    private void renderHeaderFooter(Player player, TablistContent content, long tick) {
+        tablist.set(player, joinLines(player, content.header(), tick), joinLines(player, content.footer(), tick));
     }
 
     /**
@@ -140,8 +149,12 @@ public final class TablistRenderer {
      * when the source string changed from the last value applied for this player: a steady-state tick re-sends nothing
      * (the setter pushes a client update every call). An absent name format on a player who currently has one resets it
      * to vanilla with {@code playerListName(null)}.
+     *
+     * <p>The tracking keys on the raw source, not the rendered name, so an {@code %anim_<name>%} token in a name format
+     * resolves to the frame current when the operator last changed the format rather than re-sending the player's name
+     * to the client every animation tick (the header/footer carry the animated surface, diffed flicker-free).
      */
-    private void applyNameFormat(Player player, Optional<String> nameFormat) {
+    private void applyNameFormat(Player player, Optional<String> nameFormat, long tick) {
         UUID uuid = player.getUniqueId();
         if (nameFormat.isEmpty()) {
             if (appliedNameFormat.remove(uuid) != null) {
@@ -153,7 +166,7 @@ public final class TablistRenderer {
         if (source.equals(appliedNameFormat.get(uuid))) {
             return;
         }
-        player.playerListName(renderName(player, source));
+        player.playerListName(renderName(player, source, tick));
         appliedNameFormat.put(uuid, source);
     }
 
@@ -189,21 +202,27 @@ public final class TablistRenderer {
         }
     }
 
-    private Component renderName(Player player, String source) {
-        // HudText does PlaceholderAPI + MiniMessage; the {player} convenience token is ours, so substitute it first.
+    private Component renderName(Player player, String source, long tick) {
+        // The {player} convenience token is ours, so substitute it first; then expand any %anim_<name>% token to the
+        // current frame BEFORE HudText runs PlaceholderAPI + MiniMessage, so a frame may itself carry
+        // tags/placeholders.
         String withName = source.replace(PLAYER_TOKEN, player.getName());
-        return HudText.render(player.getUniqueId(), withName);
+        return render(player, withName, tick);
     }
 
-    private Component joinLines(Player player, List<String> sources) {
-        return Component.join(JoinConfiguration.newlines(), renderAll(player, sources));
+    private Component joinLines(Player player, List<String> sources, long tick) {
+        return Component.join(JoinConfiguration.newlines(), renderAll(player, sources, tick));
     }
 
-    private List<Component> renderAll(Player player, List<String> sources) {
+    private List<Component> renderAll(Player player, List<String> sources, long tick) {
         List<Component> rendered = new ArrayList<>(sources.size());
         for (String source : sources) {
-            rendered.add(HudText.render(player.getUniqueId(), source));
+            rendered.add(render(player, source, tick));
         }
         return rendered;
+    }
+
+    private Component render(Player player, String source, long tick) {
+        return HudText.render(player.getUniqueId(), animations.resolve(source, tick));
     }
 }

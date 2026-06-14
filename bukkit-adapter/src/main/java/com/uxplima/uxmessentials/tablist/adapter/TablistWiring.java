@@ -11,6 +11,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.tablist.adapter.inbound.listener.TablistConnectionListener;
@@ -47,9 +48,12 @@ public final class TablistWiring {
         TablistSettings settings = new TablistSettings(dir, kernel.log());
         AtomicBoolean running = new AtomicBoolean(true);
 
-        TablistRenderer renderer = new TablistRenderer(settings::formats);
-        TablistRenderTask renderTask =
-                new TablistRenderTask(kernel.scheduler(), renderer, settings::refreshInterval, running::get);
+        // The animation registry holds the stateful uxmLib animators, so it is built once from the load-time catalog,
+        // shared by the renderer (which reads frames) and the render task (which advances the clock once a tick).
+        AnimationRegistry animations = new AnimationRegistry(settings.animations());
+        TablistRenderer renderer = new TablistRenderer(settings::formats, animations);
+        TablistRenderTask renderTask = new TablistRenderTask(
+                kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
 
         List<CommandRegistration> commands = List.of();
         List<Listener> listeners = List.of(new TablistConnectionListener(renderer));

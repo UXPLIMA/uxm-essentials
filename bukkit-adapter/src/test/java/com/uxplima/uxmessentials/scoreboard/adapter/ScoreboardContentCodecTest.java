@@ -12,10 +12,10 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationDef;
 import com.uxplima.uxmessentials.scoreboard.domain.DisplayContent;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarBoard;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
@@ -177,7 +177,7 @@ class ScoreboardContentCodecTest {
             assertThat(s.separator()).isEqualTo(" * ");
         });
         // The skip is logged once with the bad type and name so an operator can spot the typo.
-        assertThat(log.warnings).anyMatch(w -> w.contains("scoreboard_animation_skipped") && w.contains("bogus"));
+        assertThat(log.warnings).anyMatch(w -> w.contains("animation_skipped") && w.contains("bogus"));
     }
 
     private static AnimationDef byName(List<AnimationDef> defs, String name) {

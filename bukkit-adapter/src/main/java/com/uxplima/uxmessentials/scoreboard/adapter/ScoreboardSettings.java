@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationDef;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.CommentedConfigurationNode;
@@ -52,7 +52,7 @@ public final class ScoreboardSettings {
 
     /**
      * The named animations parsed at load. These are read once at wiring time to build the
-     * {@link com.uxplima.uxmessentials.scoreboard.adapter.outbound.AnimationRegistry} — the registry holds the stateful
+     * {@link com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry} — the registry holds the stateful
      * uxmLib animators, so it is not rebuilt on a content reload (the animation catalog is fixed for a session).
      */
     public List<AnimationDef> animations() {

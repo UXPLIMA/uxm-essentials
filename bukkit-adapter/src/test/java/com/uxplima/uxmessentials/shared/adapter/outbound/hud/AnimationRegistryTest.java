@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.scoreboard.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.hud;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

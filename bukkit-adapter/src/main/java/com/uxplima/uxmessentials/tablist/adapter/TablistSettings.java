@@ -3,9 +3,11 @@ package com.uxplima.uxmessentials.tablist.adapter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormatConfig;
 import org.jspecify.annotations.NullMarked;
@@ -39,12 +41,21 @@ public final class TablistSettings {
     public TablistSettings(Path moduleDir, Logger log) {
         this.moduleDir = Objects.requireNonNull(moduleDir, "moduleDir");
         this.log = Objects.requireNonNull(log, "log");
-        this.parsed = new AtomicReference<>(TablistContentCodec.read(load(moduleDir, log)));
+        this.parsed = new AtomicReference<>(TablistContentCodec.read(load(moduleDir, log), log));
     }
 
     /** The live named-format set; read fresh by the renderer each tick to select a format per viewer. */
     public TablistFormatConfig formats() {
         return Objects.requireNonNull(parsed.get(), "parsed").formats();
+    }
+
+    /**
+     * The named animations parsed at load. These are read once at wiring time to build the
+     * {@link com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry} — the registry holds the stateful
+     * uxmLib animators, so it is not rebuilt on a content reload (the animation catalog is fixed for a session).
+     */
+    public List<AnimationDef> animations() {
+        return Objects.requireNonNull(parsed.get(), "parsed").animations();
     }
 
     /** The live global refresh interval the render timer re-reads each reschedule. */
@@ -54,7 +65,7 @@ public final class TablistSettings {
 
     /** Re-read the config file and swap the parsed content atomically. */
     public void reload() {
-        parsed.set(TablistContentCodec.read(load(moduleDir, log)));
+        parsed.set(TablistContentCodec.read(load(moduleDir, log), log));
     }
 
     private static ConfigurationNode load(Path moduleDir, Logger log) {
