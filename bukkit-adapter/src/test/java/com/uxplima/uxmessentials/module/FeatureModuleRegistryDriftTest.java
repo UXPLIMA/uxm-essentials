@@ -68,6 +68,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
         assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
         assertThat(registry.byId(ModuleId.of("staff"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("npc"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -89,7 +90,8 @@ class FeatureModuleRegistryDriftTest {
                         "vote",
                         "discordlink",
                         "nametags",
-                        "staff");
+                        "staff",
+                        "npc");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -450,14 +452,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void staffIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+    void staffShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule staff =
                 registry.byId(ModuleId.of("staff")).orElseThrow(() -> new AssertionError("staff is not registered"));
 
-        // staff is the 20th context — a STAFF-MODE-ONLY toolkit (the /staffmode toggle + gadget hotbar + staff chat) —
-        // registered last after the nineteen prior modules.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("staff");
+        // staff is the 20th context — a STAFF-MODE-ONLY toolkit (the /staffmode toggle + gadget hotbar + staff chat).
+        // The later npc context now lands last, so staff must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("staff"))).isPresent();
 
         // It ships ENABLED with a default gadget hotbar; every command and gadget is permission-gated, so a regular
         // player sees nothing change. With no modules.conf override it is on, and disabling exactly it removes only it
@@ -480,6 +482,36 @@ class FeatureModuleRegistryDriftTest {
                 staff.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactlyInAnyOrder("staffmode", "staffchat", "stafflist");
         assertThat(staff.migrations()).isEmpty();
+    }
+
+    @Test
+    void npcIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule npc =
+                registry.byId(ModuleId.of("npc")).orElseThrow(() -> new AssertionError("npc is not registered"));
+
+        // npc is the 21st context — server-wide fake-player NPCs behind /npc — registered last after the twenty
+        // prior modules.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("npc");
+
+        // It ships ENABLED but inert (a steady-state feature like holograms — nothing renders until an operator
+        // creates an NPC): with no modules.conf override it is on, and disabling exactly npc removes only it while
+        // every sibling stays on.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("npc", "teleport", "economy", "holograms", "staff");
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.npc.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("npc");
+        assertThat(off).contains("teleport", "holograms", "staff");
+
+        // Enabled, npc contributes its single /npc command and owns no extra Flyway location (its npc table is in
+        // the persistence V38 baseline, always applied), so it declares no MigrationSet of its own.
+        Set<String> literals = npc.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactly("npc");
+        assertThat(npc.migrations()).isEmpty();
     }
 
     @Test

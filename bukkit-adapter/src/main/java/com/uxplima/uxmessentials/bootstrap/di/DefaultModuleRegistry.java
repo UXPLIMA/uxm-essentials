@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.kits.application.KitsModule;
 import com.uxplima.uxmessentials.messaging.application.MessagingModule;
 import com.uxplima.uxmessentials.moderation.application.ModerationModule;
 import com.uxplima.uxmessentials.nametags.application.NametagsModule;
+import com.uxplima.uxmessentials.npc.application.NpcModule;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateModule;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
@@ -130,6 +131,13 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // staff chat fans out through messaging's staff audience, so staff carries no hard dependency edge. It lands
         // last after nametags. Every command and gadget is permission-gated, so a regular player sees nothing change.
         delegate.register(new StaffModule());
+        // npc is the 21st context — server-wide fake-player NPCs (the /npc create/delete/list/move/skin/command
+        // toolkit). Each NPC is rendered to viewers entirely with packets (no real entity) over the uxmLib NPC
+        // packet stack; it is DB-persisted (the npc table is in the persistence V38 baseline) so NPCs come back
+        // after a restart. It carries no hard dependency edge (its only collaborators are the shared persistence
+        // DSL, the Scheduler, messages, and event ports), and like the steady-state features it ships ENABLED but
+        // inert until an operator creates an NPC, so it lands last after staff.
+        delegate.register(new NpcModule());
         // The shared kernel is not a module and never appears here.
     }
 

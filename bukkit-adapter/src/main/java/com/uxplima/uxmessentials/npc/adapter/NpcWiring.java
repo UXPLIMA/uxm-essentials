@@ -1,0 +1,135 @@
+package com.uxplima.uxmessentials.npc.adapter;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.util.List;
+import java.util.Objects;
+
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
+import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
+import com.uxplima.uxmessentials.npc.application.CreateNpc;
+import com.uxplima.uxmessentials.npc.application.DeleteNpc;
+import com.uxplima.uxmessentials.npc.application.ListNpcs;
+import com.uxplima.uxmessentials.npc.application.MoveNpc;
+import com.uxplima.uxmessentials.npc.application.NpcNotifier;
+import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
+import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
+import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
+import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
+import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmlib.npc.ChannelResolver;
+import com.uxplima.uxmlib.npc.PacketSender;
+import com.uxplima.uxmlib.packet.npc.NpcPackets;
+import com.uxplima.uxmlib.packet.npc.internal.NmsNpcPackets;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Constructs the npc context's adapters and use cases over the injected kernel ports, the persistence DSL, and
+ * the uxmLib NPC packet stack, and produces the Brigadier command and lifecycle listener the plugin registers.
+ * This is the one place the npc context is wired — nothing else news up its classes.
+ *
+ * <p>The repository is the jOOQ adapter behind a Caffeine read-cache decorator. The renderer holds the packet
+ * stack — a {@link ChannelResolver} → {@link PacketSender} → {@link NmsNpcPackets} — and sends each viewer a
+ * fake-player spawn (then hides its tab entry) with no real entity. On wire every stored NPC is spawned to the
+ * online viewers in range; a global refresh timer re-evaluates range each second so an NPC appears/disappears as
+ * players move. On stop the {@code Wired} bundle cancels the timer and removes every shown NPC from every viewer
+ * so nothing is orphaned across a reload.
+ */
+@NullMarked
+public final class NpcWiring {
+
+    private static final Duration REFRESH_PERIOD = Duration.ofSeconds(1);
+    /** The radius within which a viewer is shown an NPC — the vanilla player tracking range. */
+    private static final double RENDER_RANGE = 48.0;
+    /** How long after the spawn the tab entry is hidden, so the client links the skin before it goes. */
+    private static final Duration TAB_HIDE_DELAY = Duration.ofSeconds(1);
+
+    private NpcWiring() {}
+
+    /** Build the npc adapters and use cases, and spawn the stored NPCs to the online viewers in range. */
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence) {
+        Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(persistence, "persistence");
+        KernelPorts kernel = ctx.kernel();
+        NpcRepository repository = NpcRepositories.cached(persistence);
+        NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
+        NpcRenderer renderer = new NpcRenderer(packets, kernel.scheduler(), RENDER_RANGE, TAB_HIDE_DELAY);
+        NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
+        NpcServices services = assemble(kernel, repository, renderer, notifier);
+        spawnStored(repository, renderer);
+        List<CommandRegistration> commands = List.of(new NpcCommand(services, kernel.messages()));
+        List<Listener> listeners = List.of(new NpcLifecycleListener(renderer));
+        AutoCloseable refreshTask = kernel.scheduler().repeatGlobal(renderer::refresh, REFRESH_PERIOD, REFRESH_PERIOD);
+        return new Wired(commands, listeners, renderer, refreshTask);
+    }
+
+    private static NpcServices assemble(
+            KernelPorts kernel, NpcRepository repository, NpcRenderer renderer, NpcNotifier notifier) {
+        Clock clock = Clock.systemUTC();
+        return new NpcServices(
+                new CreateNpc(repository, renderer, notifier, kernel.events(), clock),
+                new DeleteNpc(repository, renderer, notifier, kernel.events()),
+                new ListNpcs(repository, notifier),
+                new MoveNpc(repository, renderer, notifier),
+                new SetNpcSkin(repository, renderer, notifier),
+                new SetNpcClickCommand(repository, notifier));
+    }
+
+    private static void spawnStored(NpcRepository repository, NpcRenderer renderer) {
+        // Each render hops onto each viewer's region thread inside the renderer, so this is safe to call straight
+        // from the enable path; a viewer out of range or in another world is simply not shown.
+        for (Npc npc : repository.all()) {
+            renderer.render(npc);
+        }
+    }
+
+    /**
+     * Everything the npc module contributes once wired: the single Brigadier command, the join/quit/world-change
+     * listener, the renderer whose fake players must be removed on stop, and the refresh timer handle.
+     *
+     * @param commands the Brigadier command registrations to publish
+     * @param listeners the lifecycle listener to register
+     * @param renderer the packet renderer, drained on stop
+     * @param refreshTask the global refresh timer handle, cancelled on stop so no task outlives a disable
+     */
+    public record Wired(
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            NpcRenderer renderer,
+            AutoCloseable refreshTask) {
+
+        public Wired {
+            commands = List.copyOf(commands);
+            listeners = List.copyOf(listeners);
+            Objects.requireNonNull(renderer, "renderer");
+            Objects.requireNonNull(refreshTask, "refreshTask");
+        }
+
+        /** Cancel the refresh timer and remove every shown NPC from every viewer so nothing is orphaned. */
+        public void stop() {
+            closeQuietly(refreshTask);
+            renderer.despawnAll();
+        }
+
+        private static void closeQuietly(@Nullable AutoCloseable task) {
+            if (task == null) {
+                return;
+            }
+            try {
+                task.close();
+            } catch (Exception cancellation) {
+                // The repeating-task handle's cancel does not throw; close() only declares the checked type.
+            }
+        }
+    }
+}
