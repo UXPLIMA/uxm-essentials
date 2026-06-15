@@ -120,6 +120,44 @@ class BukkitNpcActionRunnerTest {
     }
 
     @Test
+    void parsesABareSoundKeyWithDefaultVolumeAndPitch() {
+        BukkitNpcActionRunner.SoundSpec spec = BukkitNpcActionRunner.SoundSpec.parse("ENTITY_PLAYER_LEVELUP");
+
+        assertThat(spec.key()).isEqualTo("ENTITY_PLAYER_LEVELUP");
+        assertThat(spec.volume()).isEqualTo(1.0f);
+        assertThat(spec.pitch()).isEqualTo(1.0f);
+    }
+
+    @Test
+    void keepsTheNamespaceOfANamespacedSoundKey() {
+        BukkitNpcActionRunner.SoundSpec spec = BukkitNpcActionRunner.SoundSpec.parse("minecraft:entity.player.levelup");
+
+        // The namespace colon must not be mistaken for a volume separator.
+        assertThat(spec.key()).isEqualTo("minecraft:entity.player.levelup");
+        assertThat(spec.volume()).isEqualTo(1.0f);
+        assertThat(spec.pitch()).isEqualTo(1.0f);
+    }
+
+    @Test
+    void parsesVolumeAndPitchAfterANamespacedKey() {
+        BukkitNpcActionRunner.SoundSpec spec =
+                BukkitNpcActionRunner.SoundSpec.parse("minecraft:block.note_block.pling:0.5:2");
+
+        assertThat(spec.key()).isEqualTo("minecraft:block.note_block.pling");
+        assertThat(spec.volume()).isEqualTo(0.5f);
+        assertThat(spec.pitch()).isEqualTo(2.0f);
+    }
+
+    @Test
+    void readsASingleTrailingNumberAsTheVolume() {
+        BukkitNpcActionRunner.SoundSpec spec = BukkitNpcActionRunner.SoundSpec.parse("ui.button.click:0.5");
+
+        assertThat(spec.key()).isEqualTo("ui.button.click");
+        assertThat(spec.volume()).isEqualTo(0.5f);
+        assertThat(spec.pitch()).isEqualTo(1.0f);
+    }
+
+    @Test
     void oneMalformedActionMidChainIsSkippedAndTheRestStillRun() {
         runner.run(
                 player,
