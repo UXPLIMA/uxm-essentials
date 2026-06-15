@@ -8,6 +8,7 @@ import java.util.Objects;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramCommands;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer;
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
@@ -20,6 +21,7 @@ import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
+import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
@@ -66,11 +68,19 @@ public final class HologramsWiring {
         manager.installLifecycleListener(plugin);
         // Hologram lines are one shared TextDisplay, so placeholders resolve server-globally (online, time, TPS);
         // the identity transform when PlaceholderAPI is absent, so a default server pays nothing.
-        HologramRenderer renderer =
-                new HologramRenderer(manager, kernel.scheduler(), kernel.log(), PlaceholderApiSupport.globalBridge());
+        HologramRenderer renderer = new HologramRenderer(
+                plugin,
+                manager,
+                kernel.scheduler(),
+                kernel.log(),
+                kernel.permissions(),
+                PlaceholderApiSupport.globalBridge());
         HologramNotifier notifier = new HologramNotifier(kernel.messages(), kernel.messageSink());
         HologramServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
+        // A joining player must pick up the permission-gated holograms they qualify for at once, not after a
+        // refresh tick; this listener re-evaluates only the gated holograms for that one player.
+        plugin.getServer().getPluginManager().registerEvents(new HologramVisibilityListener(renderer), plugin);
         AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer);
         return new Wired(HologramCommands.all(services, kernel.messages()), renderer, repository, refreshTask);
     }
@@ -95,7 +105,8 @@ public final class HologramsWiring {
                 new RemoveHologramLine(repository, renderer, notifier),
                 new MoveHologram(repository, renderer, notifier),
                 new SetHologramAppearance(repository, renderer, notifier),
-                new SetHologramRefresh(repository, renderer, notifier));
+                new SetHologramRefresh(repository, renderer, notifier),
+                new SetHologramVisibility(repository, renderer, notifier));
     }
 
     private static void spawnStored(HologramRepository repository, HologramRenderer renderer) {

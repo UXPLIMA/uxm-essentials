@@ -30,6 +30,12 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_BILLBOARD_INVALID("hologram.billboard-invalid"),
     HOLOGRAM_BACKGROUND_INVALID("hologram.background-invalid"),
 
+    // visibility feedback
+    HOLOGRAM_VISIBILITY_SET("hologram.visibility.set"),
+    HOLOGRAM_VISIBILITY_DISTANCE_SET("hologram.visibility.distance-set"),
+    HOLOGRAM_VISIBILITY_MODE_INVALID("hologram.visibility.mode-invalid"),
+    HOLOGRAM_VISIBILITY_NEEDS_NODE("hologram.visibility.needs-node"),
+
     // listing
     HOLOGRAM_LIST_HEADER("hologram.list.header"),
     HOLOGRAM_LIST_ENTRY("hologram.list.entry"),

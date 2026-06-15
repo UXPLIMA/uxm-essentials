@@ -84,8 +84,23 @@ class HologramTest {
         Hologram hologram = twoLine();
 
         assertThat(hologram.appearance()).isEqualTo(Appearance.defaults());
+        assertThat(hologram.visibility()).isEqualTo(Visibility.everyone());
         assertThat(hologram.refreshIntervalTicks()).isZero();
         assertThat(hologram.refreshes()).isFalse();
+    }
+
+    @Test
+    void withVisibilityKeepsEverythingElseButRetargets() {
+        Visibility restricted =
+                Visibility.restrictedTo("uxmessentials.hologram.see.vip").withDistance(48);
+
+        Hologram gated = twoLine().withRefreshIntervalTicks(40).withVisibility(restricted);
+
+        assertThat(gated.visibility()).isEqualTo(restricted);
+        assertThat(gated.refreshIntervalTicks()).isEqualTo(40);
+        assertThat(gated.lines()).hasSize(2);
+        assertThat(gated.appearance()).isEqualTo(Appearance.defaults());
+        assertThat(gated.name().value()).isEqualTo("spawn");
     }
 
     @Test

@@ -125,6 +125,9 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
                 .set(HOLOGRAMS.SCALE, record.getScale())
                 .set(HOLOGRAMS.LINE_WIDTH, record.getLineWidth())
                 .set(HOLOGRAMS.VIEW_RANGE, record.getViewRange())
+                .set(HOLOGRAMS.VISIBILITY_MODE, record.getVisibilityMode())
+                .set(HOLOGRAMS.VISIBILITY_PERMISSION, record.getVisibilityPermission())
+                .set(HOLOGRAMS.VISIBILITY_DISTANCE, record.getVisibilityDistance())
                 .set(HOLOGRAMS.REFRESH_INTERVAL_TICKS, record.getRefreshIntervalTicks())
                 .execute();
     }

@@ -48,6 +48,10 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 new HologramAppearanceCommand(services, messages).nodes()) {
             root.then(styling);
         }
+        for (LiteralArgumentBuilder<CommandSourceStack> visibility :
+                new HologramVisibilityCommand(services, messages).nodes()) {
+            root.then(visibility);
+        }
         return root.build();
     }
 

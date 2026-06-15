@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * @param location where the hologram floats
  * @param lines the ordered text lines (at least one), rendered top-down
  * @param appearance the visual styling (billboard, background, brightness, scale, …)
+ * @param visibility who may see the hologram and how far away it stays visible
  * @param refreshIntervalTicks how often (in ticks) the live entity re-renders, or 0 for a static hologram
  * @param createdAt when the hologram was first created (preserved across a move or edit)
  */
@@ -35,6 +36,7 @@ public record Hologram(
         Position location,
         List<HologramLine> lines,
         Appearance appearance,
+        Visibility visibility,
         int refreshIntervalTicks,
         Instant createdAt) {
 
@@ -46,6 +48,7 @@ public record Hologram(
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(lines, "lines");
         Objects.requireNonNull(appearance, "appearance");
+        Objects.requireNonNull(visibility, "visibility");
         Objects.requireNonNull(createdAt, "createdAt");
         lines = List.copyOf(lines);
         if (lines.isEmpty()) {
@@ -58,10 +61,10 @@ public record Hologram(
 
     /**
      * A new hologram created now at {@code location} with the given ordered lines (at least one), the default
-     * {@link Appearance} and no refresh interval (static).
+     * {@link Appearance}, visible to everyone, and no refresh interval (static).
      */
     public static Hologram create(HologramName name, Position location, List<HologramLine> lines, Instant createdAt) {
-        return new Hologram(name, location, lines, Appearance.defaults(), STATIC, createdAt);
+        return new Hologram(name, location, lines, Appearance.defaults(), Visibility.everyone(), STATIC, createdAt);
     }
 
     /** A copy re-anchored to {@code newLocation}, keeping everything else. */
@@ -71,6 +74,7 @@ public record Hologram(
                 Objects.requireNonNull(newLocation, "newLocation"),
                 lines,
                 appearance,
+                visibility,
                 refreshIntervalTicks,
                 createdAt);
     }
@@ -80,7 +84,7 @@ public record Hologram(
         Objects.requireNonNull(line, "line");
         List<HologramLine> next = new ArrayList<>(lines);
         next.add(line);
-        return new Hologram(name, location, next, appearance, refreshIntervalTicks, createdAt);
+        return new Hologram(name, location, next, appearance, visibility, refreshIntervalTicks, createdAt);
     }
 
     /** A copy with the line at {@code index} replaced by {@code line}; rejects an out-of-range index. */
@@ -89,7 +93,7 @@ public record Hologram(
         requireInRange(index);
         List<HologramLine> next = new ArrayList<>(lines);
         next.set(index, line);
-        return new Hologram(name, location, next, appearance, refreshIntervalTicks, createdAt);
+        return new Hologram(name, location, next, appearance, visibility, refreshIntervalTicks, createdAt);
     }
 
     /**
@@ -103,13 +107,19 @@ public record Hologram(
         }
         List<HologramLine> next = new ArrayList<>(lines);
         next.remove(index);
-        return new Hologram(name, location, next, appearance, refreshIntervalTicks, createdAt);
+        return new Hologram(name, location, next, appearance, visibility, refreshIntervalTicks, createdAt);
     }
 
-    /** A copy restyled with {@code newAppearance}, keeping the name, lines, interval and creation time. */
+    /** A copy restyled with {@code newAppearance}, keeping the name, lines, visibility, interval and creation. */
     public Hologram withAppearance(Appearance newAppearance) {
         Objects.requireNonNull(newAppearance, "newAppearance");
-        return new Hologram(name, location, lines, newAppearance, refreshIntervalTicks, createdAt);
+        return new Hologram(name, location, lines, newAppearance, visibility, refreshIntervalTicks, createdAt);
+    }
+
+    /** A copy with a new {@link Visibility}, keeping the name, lines, appearance, interval and creation time. */
+    public Hologram withVisibility(Visibility newVisibility) {
+        Objects.requireNonNull(newVisibility, "newVisibility");
+        return new Hologram(name, location, lines, appearance, newVisibility, refreshIntervalTicks, createdAt);
     }
 
     /** A copy that re-renders every {@code ticks} ticks (0 = static); rejects a negative interval. */
@@ -117,7 +127,7 @@ public record Hologram(
         if (ticks < 0) {
             throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + ticks);
         }
-        return new Hologram(name, location, lines, appearance, ticks, createdAt);
+        return new Hologram(name, location, lines, appearance, visibility, ticks, createdAt);
     }
 
     /** The number of lines this hologram renders (always at least one). */

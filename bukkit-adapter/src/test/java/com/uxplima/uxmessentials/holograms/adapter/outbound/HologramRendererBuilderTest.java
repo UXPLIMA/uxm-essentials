@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.hologram.HologramSpec;
@@ -76,6 +77,29 @@ class HologramRendererBuilderTest {
         assertThat(applied.viewRange()).isEqualTo(3.0f);
         assertThat(applied.background()).isNotNull();
         assertThat(applied.brightness()).isNotNull();
+    }
+
+    @Test
+    void mapsAFiniteVisibilityDistanceOntoTheLibViewRange() {
+        // 128 blocks over the vanilla 64-block tracking range is a view-range multiplier of 2.0.
+        Hologram hologram = hologram(Appearance.defaults(), "gated")
+                .withVisibility(Visibility.everyone().withDistance(128));
+
+        HologramSpec spec = HologramRenderer.builderFor(hologram, UnaryOperator.identity(), MINI_MESSAGE)
+                .spec();
+
+        assertThat(spec.appearance().viewRange()).isEqualTo(2.0f);
+    }
+
+    @Test
+    void anUnlimitedDistanceLeavesTheAppearanceViewRangeUntouched() {
+        Hologram hologram =
+                hologram(Appearance.defaults().withViewRange(3.0f), "open").withVisibility(Visibility.everyone());
+
+        HologramSpec spec = HologramRenderer.builderFor(hologram, UnaryOperator.identity(), MINI_MESSAGE)
+                .spec();
+
+        assertThat(spec.appearance().viewRange()).isEqualTo(3.0f);
     }
 
     private static Hologram hologram(Appearance appearance, String line) {

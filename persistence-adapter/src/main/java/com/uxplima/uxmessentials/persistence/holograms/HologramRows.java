@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.HologramsRecord;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -21,9 +22,10 @@ import org.jspecify.annotations.Nullable;
  * The anti-corruption mapping between a {@code holograms} row (plus its ordered {@code hologram_lines}
  * child rows) and the domain {@link Hologram}. The world uuid is stored as its canonical 36-character text
  * and the creation time as epoch milliseconds, so the column shape is identical on every backend. The V35
- * appearance columns are nullable: an absent value reads back as the matching {@link Appearance} default (or a
- * static interval), so a pre-V35 row keeps its current look. This class is the single place that translation
- * lives.
+ * appearance columns and V36 visibility columns are nullable: an absent value reads back as the matching
+ * {@link Appearance} default (or a static interval), and as {@link Visibility#everyone()}, so a pre-V35 row
+ * keeps its current look and a pre-V36 row stays visible to everyone. This class is the single place that
+ * translation lives.
  */
 final class HologramRows {
 
@@ -48,6 +50,7 @@ final class HologramRows {
                 position,
                 lines,
                 appearanceOf(row),
+                visibilityOf(row),
                 intOr(row.get(HOLOGRAMS.REFRESH_INTERVAL_TICKS), Hologram.STATIC),
                 Instant.ofEpochMilli(row.get(HOLOGRAMS.CREATED_AT)));
     }
@@ -56,6 +59,7 @@ final class HologramRows {
     static void apply(HologramsRecord record, Hologram hologram) {
         Position location = hologram.location();
         Appearance appearance = hologram.appearance();
+        Visibility visibility = hologram.visibility();
         record.setName(hologram.name().value())
                 .setWorld(location.world().uid().toString())
                 .setWorldName(location.world().name())
@@ -73,6 +77,9 @@ final class HologramRows {
                 .setScale(appearance.scale())
                 .setLineWidth(appearance.lineWidth())
                 .setViewRange(appearance.viewRange())
+                .setVisibilityMode(visibility.mode().name())
+                .setVisibilityPermission(visibility.permission())
+                .setVisibilityDistance(visibility.distance())
                 .setRefreshIntervalTicks(hologram.refreshIntervalTicks());
     }
 
@@ -87,6 +94,19 @@ final class HologramRows {
                 floatOr(row.get(HOLOGRAMS.SCALE), defaults.scale()),
                 intOr(row.get(HOLOGRAMS.LINE_WIDTH), defaults.lineWidth()),
                 floatOr(row.get(HOLOGRAMS.VIEW_RANGE), defaults.viewRange()));
+    }
+
+    private static Visibility visibilityOf(Record row) {
+        String mode = row.get(HOLOGRAMS.VISIBILITY_MODE);
+        String permission = row.get(HOLOGRAMS.VISIBILITY_PERMISSION);
+        int distance = intOr(row.get(HOLOGRAMS.VISIBILITY_DISTANCE), Visibility.UNLIMITED);
+        // A pre-V36 row (NULL mode) — and a PERMISSION mode that somehow lost its node — both read back as
+        // "visible to everyone", so a row never resolves to an invalid Visibility.
+        boolean permissionGated = "PERMISSION".equalsIgnoreCase(mode) && permission != null && !permission.isBlank();
+        if (permissionGated) {
+            return new Visibility(Visibility.Mode.PERMISSION, permission, distance);
+        }
+        return new Visibility(Visibility.Mode.ALL, null, distance);
     }
 
     private static Billboard billboardOf(@Nullable String stored) {

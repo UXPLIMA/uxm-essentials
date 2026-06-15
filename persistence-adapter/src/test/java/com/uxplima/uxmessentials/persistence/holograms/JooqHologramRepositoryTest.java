@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.persistence.jooq.tables.HologramLines;
 import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -126,6 +127,51 @@ class JooqHologramRepositoryTest {
 
         assertThat(loaded.appearance()).isEqualTo(styled);
         assertThat(loaded.refreshIntervalTicks()).isEqualTo(40);
+    }
+
+    @Test
+    void roundTripsPermissionVisibilityAndDistance() {
+        Visibility gated =
+                Visibility.restrictedTo("uxmessentials.hologram.see.vip").withDistance(48);
+        repository.save(hologram("spawn", 1, 64, 1, "line").withVisibility(gated));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.visibility()).isEqualTo(gated);
+        assertThat(loaded.visibility().mode()).isEqualTo(Visibility.Mode.PERMISSION);
+        assertThat(loaded.visibility().permission()).isEqualTo("uxmessentials.hologram.see.vip");
+        assertThat(loaded.visibility().distance()).isEqualTo(48);
+    }
+
+    @Test
+    void aRowWithNoVisibilityColumnsReadsBackAsEveryone() {
+        // A pre-V36 row: insert the name row directly leaving every visibility column NULL, plus one line.
+        Holograms holograms = Holograms.HOLOGRAMS;
+        HologramLines lines = HologramLines.HOLOGRAM_LINES;
+        persistence.dsl().transaction(config -> {
+            config.dsl()
+                    .insertInto(holograms)
+                    .set(holograms.NAME, "legacy")
+                    .set(holograms.WORLD, WORLD.uid().toString())
+                    .set(holograms.WORLD_NAME, "world")
+                    .set(holograms.X, 0.0)
+                    .set(holograms.Y, 64.0)
+                    .set(holograms.Z, 0.0)
+                    .set(holograms.YAW, 0.0f)
+                    .set(holograms.PITCH, 0.0f)
+                    .set(holograms.CREATED_AT, 1_000L)
+                    .execute();
+            config.dsl()
+                    .insertInto(lines)
+                    .set(lines.HOLOGRAM, "legacy")
+                    .set(lines.IDX, 0)
+                    .set(lines.TEXT, "line")
+                    .execute();
+        });
+
+        Hologram loaded = repository.find(HologramName.of("legacy")).orElseThrow();
+
+        assertThat(loaded.visibility()).isEqualTo(Visibility.everyone());
     }
 
     @Test
