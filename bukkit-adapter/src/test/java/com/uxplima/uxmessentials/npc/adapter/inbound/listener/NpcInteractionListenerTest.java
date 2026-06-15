@@ -20,6 +20,7 @@ import org.bukkit.util.Vector;
 import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.Npc;
@@ -63,7 +64,10 @@ class NpcInteractionListenerTest {
         server = MockBukkit.mock();
         MockBukkit.createMockPlugin();
         packets = new FixedIdPackets();
-        renderer = new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
+        InlineScheduler rendererScheduler = new InlineScheduler();
+        NpcViewSpawner spawner =
+                new NpcViewSpawner(packets, rendererScheduler, new NoopLogger(), Duration.ofSeconds(1));
+        renderer = new NpcRenderer(packets, spawner, rendererScheduler, 48.0, 16.0);
         repository = new FakeRepository();
         runner = new RecordingRunner();
         actionRunner = new RecordingActionRunner();

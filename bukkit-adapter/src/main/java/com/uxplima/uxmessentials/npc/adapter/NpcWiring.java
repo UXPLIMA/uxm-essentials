@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.HttpClientFetcher;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
 import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
@@ -84,8 +85,9 @@ public final class NpcWiring {
         NpcSettings settings = new NpcSettings(ctx.config());
         NpcRepository repository = NpcRepositories.cached(persistence);
         NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
-        NpcRenderer renderer = new NpcRenderer(
-                packets, kernel.scheduler(), kernel.log(), RENDER_RANGE, settings.lookRange(), TAB_HIDE_DELAY);
+        NpcViewSpawner spawner = new NpcViewSpawner(packets, kernel.scheduler(), kernel.log(), TAB_HIDE_DELAY);
+        NpcRenderer renderer =
+                new NpcRenderer(packets, spawner, kernel.scheduler(), RENDER_RANGE, settings.lookRange());
         NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
         NpcServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
