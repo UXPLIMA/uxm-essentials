@@ -287,6 +287,11 @@ public final class NpcRenderer implements NpcView {
         }
         packets.send(viewer, packets.remove(rendered.entityId()));
         packets.send(viewer, packets.tabRemove(rendered.profileId()));
+        // The glow-colour team is client-side scoreboard state that outlives the despawned entity, so drop it here
+        // on every despawn path (out of range, delete, world change, and the remove step of a glow re-render).
+        // Removing a team the viewer never had is a harmless no-op, so this is unconditional rather than gated on
+        // whether the NPC was glowing — it also clears a team left by a now-cleared colour.
+        packets.send(viewer, packets.glowColorRemove(glowTeam(rendered.npc())));
     }
 
     private boolean inRange(Player viewer, Position npcAt) {

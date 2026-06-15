@@ -255,6 +255,11 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object glowColorRemove(String teamName) {
+            return new Object();
+        }
+
+        @Override
         public Object bundle(List<Object> built) {
             return new Object();
         }

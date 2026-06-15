@@ -340,6 +340,33 @@ class NpcRendererTest {
         assertThat(packets.glowColors.get(0).color()).isNull();
     }
 
+    @Test
+    void removesTheGlowTeamWhenAGlowingNpcDespawns() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0).withGlowing(true).withGlowColor("RED"));
+
+        renderer.despawn(NpcName.of("guide"));
+
+        // The client-side glow-colour team must be dropped on despawn, or it lingers and can later tint a real
+        // player who shares the seated name.
+        assertThat(packets.glowColorRemovesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(packets.glowColorRemovesSentTo(viewer.getUniqueId()).get(0).teamName())
+                .isEqualTo("guide");
+    }
+
+    @Test
+    void removesTheGlowTeamWhenTheViewerGoesOutOfRange() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0).withGlowing(true).withGlowColor("AQUA")); // in range -> shown
+
+        renderer.render(npcAt(viewer, 100.0).withGlowing(true).withGlowColor("AQUA")); // same name, now far away
+
+        // Moving out of range removes the fake player and must also drop its now-orphaned glow team.
+        assertThat(packets.glowColorRemovesSentTo(viewer.getUniqueId())).hasSize(1);
+    }
+
     private Npc npcAt(Player viewer, double offset) {
         return npc(locationOf(viewer).add(offset, 0, 0), null);
     }
@@ -435,6 +462,11 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object glowColorRemove(String teamName) {
+            return new GlowColorRemove(teamName);
+        }
+
+        @Override
         public Object bundle(List<Object> built) {
             List<Object> copy = List.copyOf(built);
             bundles.add(copy);
@@ -471,6 +503,10 @@ class NpcRendererTest {
             return sentTo(viewer, Remove.class);
         }
 
+        List<GlowColorRemove> glowColorRemovesSentTo(UUID viewer) {
+            return sentTo(viewer, GlowColorRemove.class);
+        }
+
         private <T> List<T> sentTo(UUID viewer, Class<T> type) {
             List<T> matches = new ArrayList<>();
             for (Sent s : sent) {
@@ -498,6 +534,8 @@ class NpcRendererTest {
         private record Glow(int entityId, boolean glowing) {}
 
         private record GlowColor(String teamName, String memberName, @Nullable NamedColor color) {}
+
+        private record GlowColorRemove(String teamName) {}
 
         private record Bundle(List<Object> packets) {}
     }
