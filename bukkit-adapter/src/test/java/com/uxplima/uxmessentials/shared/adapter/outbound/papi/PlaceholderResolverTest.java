@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
@@ -25,9 +26,15 @@ import org.junit.jupiter.api.Test;
 class PlaceholderResolverTest {
 
     private static final PlayerRef ALICE = new PlayerRef(UUID.randomUUID(), "Alice");
+    private static final PlayerRef BOB = new PlayerRef(UUID.randomUUID(), "Bob");
     private static final Currency COINS = Currency.builder(CurrencyId.of("coins"))
             .symbol("$")
             .plural("coins")
+            .format("#,##0.00")
+            .build();
+    private static final Currency GEMS = Currency.builder(CurrencyId.of("gems"))
+            .symbol("g")
+            .plural("gems")
             .format("#,##0.00")
             .build();
 
@@ -60,52 +67,91 @@ class PlaceholderResolverTest {
 
     @Test
     void economyPlaceholdersReadBalanceFormattedAndPosition() {
-        EconomyPlaceholders economy = new EconomyPlaceholders() {
-            @Override
-            public Money balance(PlayerRef who) {
-                return Money.of(COINS, new BigDecimal("1234.5"));
-            }
-
-            @Override
-            public String formatted(PlayerRef who) {
-                return "$1.23K";
-            }
-
-            @Override
-            public OptionalInt baltopPosition(PlayerRef who) {
-                return OptionalInt.of(4);
-            }
-        };
+        FakeEconomy economy =
+                new FakeEconomy().balance(ALICE, "1234.5").formatted("$1.23K").position(4);
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().economy(economy).build());
 
         assertThat(resolver.resolve(ALICE, true, "balance")).contains("1234.50");
         assertThat(resolver.resolve(ALICE, true, "balance_formatted")).contains("$1.23K");
         assertThat(resolver.resolve(ALICE, true, "baltop_position")).contains("4");
+        // The economy_-prefixed aliases resolve the same scalars.
+        assertThat(resolver.resolve(ALICE, true, "economy_balance")).contains("1234.50");
+        assertThat(resolver.resolve(ALICE, true, "economy_balance_formatted")).contains("$1.23K");
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_position")).contains("4");
     }
 
     @Test
     void unrankedBaltopPositionDegradesToDash() {
-        EconomyPlaceholders economy = new EconomyPlaceholders() {
-            @Override
-            public Money balance(PlayerRef who) {
-                return Money.zero(COINS);
-            }
-
-            @Override
-            public String formatted(PlayerRef who) {
-                return "$0.00";
-            }
-
-            @Override
-            public OptionalInt baltopPosition(PlayerRef who) {
-                return OptionalInt.empty();
-            }
-        };
+        FakeEconomy economy = new FakeEconomy().position(-1);
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().economy(economy).build());
 
         assertThat(resolver.resolve(ALICE, true, "baltop_position")).contains("-");
+    }
+
+    @Test
+    void economyCompactAndShortRenderTheAbbreviatedBalance() {
+        FakeEconomy economy = new FakeEconomy().balance(ALICE, "1234500").compactValue("$1.23M");
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().economy(economy).build());
+
+        assertThat(resolver.resolve(ALICE, true, "economy_balance_compact")).contains("$1.23M");
+        assertThat(resolver.resolve(ALICE, true, "economy_balance_short")).contains("$1.23M");
+    }
+
+    @Test
+    void economyCurrencyNameAndSymbolReadTheDefaultCurrency() {
+        FakeEconomy economy = new FakeEconomy().currency(COINS);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().economy(economy).build());
+
+        assertThat(resolver.resolve(ALICE, true, "economy_currency_name")).contains("coins");
+        assertThat(resolver.resolve(ALICE, true, "economy_currency_symbol")).contains("$");
+    }
+
+    @Test
+    void perCurrencyBalanceResolvesTheNamedCurrencyAndDashesTheUnknown() {
+        FakeEconomy economy = new FakeEconomy().currency(GEMS).balance(ALICE, GEMS, "50");
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().economy(economy).build());
+
+        assertThat(resolver.resolve(ALICE, true, "economy_balance_gems")).contains("50.00");
+        assertThat(resolver.resolve(ALICE, true, "economy_balance_formatted_gems"))
+                .contains("g50.00");
+        assertThat(resolver.resolve(ALICE, true, "economy_balance_doubloons")).contains("-");
+    }
+
+    @Test
+    void indexedBaltopReadsRowFieldsAndDashesOutOfRange() {
+        FakeEconomy economy = new FakeEconomy()
+                .currency(COINS)
+                .baltopRow(COINS, 1, new BaltopRow(BOB, Money.of(COINS, new BigDecimal("9000"))));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().economy(economy).build());
+
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_1_name")).contains("Bob");
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_1_amount")).contains("9000.00");
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_1_formatted")).contains("$9,000.00");
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_1_uuid"))
+                .contains(BOB.uuid().toString());
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_2_name")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_x_name")).contains("-");
+    }
+
+    @Test
+    void perCurrencyIndexedBaltopReadsTheNamedCurrencyLeaderboard() {
+        FakeEconomy economy = new FakeEconomy()
+                .currency(GEMS)
+                .baltopRow(GEMS, 1, new BaltopRow(BOB, Money.of(GEMS, new BigDecimal("12"))));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().economy(economy).build());
+
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_gems_1_name")).contains("Bob");
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_gems_1_amount"))
+                .contains("12.00");
+        assertThat(resolver.resolve(ALICE, true, "economy_baltop_doubloons_1_name"))
+                .contains("-");
     }
 
     @Test
@@ -278,6 +324,99 @@ class PlaceholderResolverTest {
 
     private static PlaceholderResolver resolverWith(PlaceholderContexts contexts) {
         return new PlaceholderResolver(contexts);
+    }
+
+    /** A configurable {@link EconomyPlaceholders} fake — every read returns the value the test seeded. */
+    private static final class FakeEconomy implements EconomyPlaceholders {
+
+        private final java.util.Map<PlayerRef, Money> defaultBalances = new java.util.HashMap<>();
+        private final java.util.Map<String, Money> currencyBalances = new java.util.HashMap<>();
+        private final java.util.Map<String, Currency> currencies = new java.util.HashMap<>();
+        private final java.util.Map<String, BaltopRow> rows = new java.util.HashMap<>();
+        private Currency defaultCurrency = COINS;
+        private String formatted = "$0.00";
+        private String compact = "$0.00";
+        private int position = -1;
+
+        FakeEconomy balance(PlayerRef who, String amount) {
+            defaultBalances.put(who, Money.of(COINS, new BigDecimal(amount)));
+            return this;
+        }
+
+        FakeEconomy balance(PlayerRef who, Currency currency, String amount) {
+            currencyBalances.put(key(who, currency), Money.of(currency, new BigDecimal(amount)));
+            return this;
+        }
+
+        FakeEconomy currency(Currency currency) {
+            currencies.put(currency.id().value(), currency);
+            this.defaultCurrency = currency;
+            return this;
+        }
+
+        FakeEconomy formatted(String value) {
+            this.formatted = value;
+            return this;
+        }
+
+        FakeEconomy compactValue(String value) {
+            this.compact = value;
+            return this;
+        }
+
+        FakeEconomy position(int value) {
+            this.position = value;
+            return this;
+        }
+
+        FakeEconomy baltopRow(Currency currency, int rank, BaltopRow row) {
+            rows.put(currency.id().value() + "#" + rank, row);
+            return this;
+        }
+
+        @Override
+        public Money balance(PlayerRef who) {
+            return defaultBalances.getOrDefault(who, Money.zero(COINS));
+        }
+
+        @Override
+        public String formatted(PlayerRef who) {
+            return formatted;
+        }
+
+        @Override
+        public String compact(PlayerRef who) {
+            return compact;
+        }
+
+        @Override
+        public OptionalInt baltopPosition(PlayerRef who) {
+            return position >= 1 ? OptionalInt.of(position) : OptionalInt.empty();
+        }
+
+        @Override
+        public Optional<Currency> currency(String currencyId) {
+            return Optional.ofNullable(currencies.get(currencyId.toLowerCase(java.util.Locale.ROOT)));
+        }
+
+        @Override
+        public Currency defaultCurrency() {
+            return defaultCurrency;
+        }
+
+        @Override
+        public Money balance(PlayerRef who, Currency currency) {
+            return currencyBalances.getOrDefault(key(who, currency), Money.zero(currency));
+        }
+
+        @Override
+        public Optional<BaltopRow> baltopRow(Currency currency, int rank) {
+            return Optional.ofNullable(rows.get(currency.id().value() + "#" + rank));
+        }
+
+        private static String key(PlayerRef who, Currency currency) {
+            return who.uuid() + "#" + currency.id().value();
+        }
     }
 
     private static HomesPlaceholders fakeHomes(int count, int limit) {

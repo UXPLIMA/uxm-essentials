@@ -262,6 +262,12 @@ permissions:
   uxmessentials.economy.admin.bulk:
     description: '/eco giveall, /eco giverandom, /eco resetall server-wide bulk mutations.'
     default: op
+  uxmessentials.economy.bypasscmdcost:
+    description: 'Skip the configured per-command economy charge (command-costs in economy.conf).'
+    default: op
+  # The per-currency gate uxmessentials.economy.currency.<id> is an open value space: a currency
+  # with permission-required=true in economy.conf is usable only by holders of its node. It is not
+  # enumerated here because the id set is operator-defined.
   # kits context (docs/permissions.md "Kits"). The per-kit gate uxmessentials.kit.<id> and the cooldown
   # tier uxmessentials.kit.cooldown.<seconds> are an open value space granted per kit and are intentionally
   # not enumerated here; only the base nodes are declared. Per-kit permission gating is data-driven in each
