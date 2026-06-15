@@ -117,6 +117,15 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
                 .set(HOLOGRAMS.YAW, record.getYaw())
                 .set(HOLOGRAMS.PITCH, record.getPitch())
                 .set(HOLOGRAMS.CREATED_AT, record.getCreatedAt())
+                .set(HOLOGRAMS.BILLBOARD, record.getBillboard())
+                .set(HOLOGRAMS.BACKGROUND_ARGB, record.getBackgroundArgb())
+                .set(HOLOGRAMS.TEXT_SHADOW, record.getTextShadow())
+                .set(HOLOGRAMS.BRIGHTNESS_BLOCK, record.getBrightnessBlock())
+                .set(HOLOGRAMS.BRIGHTNESS_SKY, record.getBrightnessSky())
+                .set(HOLOGRAMS.SCALE, record.getScale())
+                .set(HOLOGRAMS.LINE_WIDTH, record.getLineWidth())
+                .set(HOLOGRAMS.VIEW_RANGE, record.getViewRange())
+                .set(HOLOGRAMS.REFRESH_INTERVAL_TICKS, record.getRefreshIntervalTicks())
                 .execute();
     }
 

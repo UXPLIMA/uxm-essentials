@@ -78,4 +78,38 @@ class HologramTest {
     void hologramLineRejectsBlankText() {
         assertThatThrownBy(() -> new HologramLine("  ")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void createDefaultsToTheDefaultAppearanceAndStaticInterval() {
+        Hologram hologram = twoLine();
+
+        assertThat(hologram.appearance()).isEqualTo(Appearance.defaults());
+        assertThat(hologram.refreshIntervalTicks()).isZero();
+        assertThat(hologram.refreshes()).isFalse();
+    }
+
+    @Test
+    void withAppearanceKeepsNameLinesAndIntervalButRestyles() {
+        Appearance styled = Appearance.defaults().withBillboard(Billboard.FIXED).withScale(2.0f);
+
+        Hologram restyled = twoLine().withRefreshIntervalTicks(40).withAppearance(styled);
+
+        assertThat(restyled.appearance()).isEqualTo(styled);
+        assertThat(restyled.refreshIntervalTicks()).isEqualTo(40);
+        assertThat(restyled.lines()).hasSize(2);
+        assertThat(restyled.name().value()).isEqualTo("spawn");
+    }
+
+    @Test
+    void withRefreshIntervalMarksTheHologramRefreshing() {
+        Hologram refreshing = twoLine().withRefreshIntervalTicks(20);
+
+        assertThat(refreshing.refreshes()).isTrue();
+        assertThat(refreshing.refreshIntervalTicks()).isEqualTo(20);
+    }
+
+    @Test
+    void withRefreshIntervalRejectsANegativeValue() {
+        assertThatThrownBy(() -> twoLine().withRefreshIntervalTicks(-1)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

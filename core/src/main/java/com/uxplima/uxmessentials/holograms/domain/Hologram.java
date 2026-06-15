@@ -9,41 +9,70 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 
 /**
  * One server-wide hologram: a {@link HologramName}, the {@link Position} it floats at, its ordered text
- * {@link HologramLine}s, and the moment it was created. A hologram is a value object — re-anchoring (a move)
- * or editing a line produces a new instance rather than mutating in place, so the aggregate is always in a
- * valid state and a repository save records a fully-formed snapshot.
+ * {@link HologramLine}s, its visual {@link Appearance}, how often it re-renders, and the moment it was created.
+ * A hologram is a value object — re-anchoring (a move), editing a line, or restyling produces a new instance
+ * rather than mutating in place, so the aggregate is always in a valid state and a repository save records a
+ * fully-formed snapshot.
  *
  * <p>The position carries its own {@link com.uxplima.uxmessentials.shared.domain.WorldRef}, so the
  * hologram's world is read from {@code location().world()} rather than held separately. A hologram always
  * carries at least one line — an empty hologram would render nothing and is rejected at construction, so the
  * line-removal op refuses to drop the last line.
  *
+ * <p>{@link #refreshIntervalTicks()} is 0 for a static hologram (rendered once, never re-rendered); a positive
+ * value means the live entity re-renders on that cadence so its lines pick up fresh placeholder values. A line
+ * that embeds no placeholder and a hologram with no interval cost nothing beyond the one initial render.
+ *
  * @param name the hologram's canonical, server-unique name
  * @param location where the hologram floats
  * @param lines the ordered text lines (at least one), rendered top-down
+ * @param appearance the visual styling (billboard, background, brightness, scale, …)
+ * @param refreshIntervalTicks how often (in ticks) the live entity re-renders, or 0 for a static hologram
  * @param createdAt when the hologram was first created (preserved across a move or edit)
  */
-public record Hologram(HologramName name, Position location, List<HologramLine> lines, Instant createdAt) {
+public record Hologram(
+        HologramName name,
+        Position location,
+        List<HologramLine> lines,
+        Appearance appearance,
+        int refreshIntervalTicks,
+        Instant createdAt) {
+
+    /** A refresh interval of 0 means "static": render once on enable, never re-render. */
+    public static final int STATIC = 0;
 
     public Hologram {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(lines, "lines");
+        Objects.requireNonNull(appearance, "appearance");
         Objects.requireNonNull(createdAt, "createdAt");
         lines = List.copyOf(lines);
         if (lines.isEmpty()) {
             throw new IllegalArgumentException("a hologram needs at least one line");
         }
+        if (refreshIntervalTicks < 0) {
+            throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + refreshIntervalTicks);
+        }
     }
 
-    /** A new hologram created now at {@code location} with the given ordered lines (at least one). */
+    /**
+     * A new hologram created now at {@code location} with the given ordered lines (at least one), the default
+     * {@link Appearance} and no refresh interval (static).
+     */
     public static Hologram create(HologramName name, Position location, List<HologramLine> lines, Instant createdAt) {
-        return new Hologram(name, location, lines, createdAt);
+        return new Hologram(name, location, lines, Appearance.defaults(), STATIC, createdAt);
     }
 
-    /** A copy re-anchored to {@code newLocation}, keeping the name, lines, and original creation time. */
+    /** A copy re-anchored to {@code newLocation}, keeping everything else. */
     public Hologram movedTo(Position newLocation) {
-        return new Hologram(name, Objects.requireNonNull(newLocation, "newLocation"), lines, createdAt);
+        return new Hologram(
+                name,
+                Objects.requireNonNull(newLocation, "newLocation"),
+                lines,
+                appearance,
+                refreshIntervalTicks,
+                createdAt);
     }
 
     /** A copy with {@code line} appended after the current last line. */
@@ -51,7 +80,7 @@ public record Hologram(HologramName name, Position location, List<HologramLine> 
         Objects.requireNonNull(line, "line");
         List<HologramLine> next = new ArrayList<>(lines);
         next.add(line);
-        return new Hologram(name, location, next, createdAt);
+        return new Hologram(name, location, next, appearance, refreshIntervalTicks, createdAt);
     }
 
     /** A copy with the line at {@code index} replaced by {@code line}; rejects an out-of-range index. */
@@ -60,7 +89,7 @@ public record Hologram(HologramName name, Position location, List<HologramLine> 
         requireInRange(index);
         List<HologramLine> next = new ArrayList<>(lines);
         next.set(index, line);
-        return new Hologram(name, location, next, createdAt);
+        return new Hologram(name, location, next, appearance, refreshIntervalTicks, createdAt);
     }
 
     /**
@@ -74,12 +103,31 @@ public record Hologram(HologramName name, Position location, List<HologramLine> 
         }
         List<HologramLine> next = new ArrayList<>(lines);
         next.remove(index);
-        return new Hologram(name, location, next, createdAt);
+        return new Hologram(name, location, next, appearance, refreshIntervalTicks, createdAt);
+    }
+
+    /** A copy restyled with {@code newAppearance}, keeping the name, lines, interval and creation time. */
+    public Hologram withAppearance(Appearance newAppearance) {
+        Objects.requireNonNull(newAppearance, "newAppearance");
+        return new Hologram(name, location, lines, newAppearance, refreshIntervalTicks, createdAt);
+    }
+
+    /** A copy that re-renders every {@code ticks} ticks (0 = static); rejects a negative interval. */
+    public Hologram withRefreshIntervalTicks(int ticks) {
+        if (ticks < 0) {
+            throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + ticks);
+        }
+        return new Hologram(name, location, lines, appearance, ticks, createdAt);
     }
 
     /** The number of lines this hologram renders (always at least one). */
     public int lineCount() {
         return lines.size();
+    }
+
+    /** Whether this hologram re-renders on a cadence (a positive interval), rather than rendering once. */
+    public boolean refreshes() {
+        return refreshIntervalTicks > STATIC;
     }
 
     private void requireInRange(int index) {

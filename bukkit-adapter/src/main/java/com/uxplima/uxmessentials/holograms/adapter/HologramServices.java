@@ -8,7 +8,9 @@ import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
+import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
+import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -24,6 +26,8 @@ import org.jspecify.annotations.NullMarked;
  * @param setLine {@code /hologram setline}
  * @param removeLine {@code /hologram removeline}
  * @param move {@code /hologram movehere}
+ * @param appearance {@code /hologram billboard|background|shadow|brightness|scale|linewidth|viewrange}
+ * @param refresh {@code /hologram refreshinterval}
  */
 @NullMarked
 public record HologramServices(
@@ -33,7 +37,9 @@ public record HologramServices(
         AddHologramLine addLine,
         SetHologramLine setLine,
         RemoveHologramLine removeLine,
-        MoveHologram move) {
+        MoveHologram move,
+        SetHologramAppearance appearance,
+        SetHologramRefresh refresh) {
 
     public HologramServices {
         Objects.requireNonNull(create, "create");
@@ -43,5 +49,7 @@ public record HologramServices(
         Objects.requireNonNull(setLine, "setLine");
         Objects.requireNonNull(removeLine, "removeLine");
         Objects.requireNonNull(move, "move");
+        Objects.requireNonNull(appearance, "appearance");
+        Objects.requireNonNull(refresh, "refresh");
     }
 }

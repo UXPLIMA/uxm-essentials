@@ -74,6 +74,27 @@ public final class PlaceholderApiSupport {
         return PlaceholderAPI.setPlaceholders(player, source);
     }
 
+    /**
+     * A viewer-free pre-parse transform for text shown to everyone at once (a shared hologram line is one
+     * entity, not one per player). It resolves server-global placeholders ({@code %server_online%}, time,
+     * TPS, …) against a {@code null} player and leaves player-relative tokens for the operator to avoid;
+     * the identity transform when PlaceholderAPI is absent. Per-player-relative resolution would need a
+     * per-viewer hologram, which the shared-text renderer does not spawn.
+     */
+    public static UnaryOperator<String> globalBridge() {
+        if (!isPresent()) {
+            return UnaryOperator.identity();
+        }
+        return source -> PlaceholderAPI.setPlaceholders((OfflinePlayer) null, source);
+    }
+
+    /** Whether {@code source} embeds a PlaceholderAPI token ({@code %...%}) the bridge would expand. */
+    public static boolean hasPlaceholder(String source) {
+        Objects.requireNonNull(source, "source");
+        int open = source.indexOf('%');
+        return open >= 0 && source.indexOf('%', open + 1) > open;
+    }
+
     /** A registered expansion handle; {@link #close()} unregisters it on plugin disable. */
     public static final class Registration implements AutoCloseable {
 

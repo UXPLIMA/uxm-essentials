@@ -8,9 +8,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.holograms.domain.Appearance;
+import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.persistence.jooq.tables.HologramLines;
+import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -103,6 +107,58 @@ class JooqHologramRepositoryTest {
         repository.save(hologramAt("third", Instant.ofEpochMilli(3_000)));
 
         assertThat(repository.all().stream().map(h -> h.name().value())).containsExactly("first", "second", "third");
+    }
+
+    @Test
+    void roundTripsAppearanceAndRefreshInterval() {
+        Appearance styled = Appearance.defaults()
+                .withBillboard(Billboard.VERTICAL)
+                .withBackgroundArgb(0x80112233)
+                .withTextShadow(true)
+                .withBrightness(15, 7)
+                .withScale(2.5f)
+                .withLineWidth(120)
+                .withViewRange(3.0f);
+        repository.save(
+                hologram("spawn", 1, 64, 1, "line").withAppearance(styled).withRefreshIntervalTicks(40));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.appearance()).isEqualTo(styled);
+        assertThat(loaded.refreshIntervalTicks()).isEqualTo(40);
+    }
+
+    @Test
+    void aRowWithNoAppearanceColumnsReadsBackAsDefaults() {
+        // A pre-V35 row: insert the name row directly leaving every appearance column NULL, plus one line. The
+        // insert runs in a transaction so it commits exactly as the repository's own save path does.
+        Holograms holograms = Holograms.HOLOGRAMS;
+        HologramLines lines = HologramLines.HOLOGRAM_LINES;
+        persistence.dsl().transaction(config -> {
+            config.dsl()
+                    .insertInto(holograms)
+                    .set(holograms.NAME, "legacy")
+                    .set(holograms.WORLD, WORLD.uid().toString())
+                    .set(holograms.WORLD_NAME, "world")
+                    .set(holograms.X, 0.0)
+                    .set(holograms.Y, 64.0)
+                    .set(holograms.Z, 0.0)
+                    .set(holograms.YAW, 0.0f)
+                    .set(holograms.PITCH, 0.0f)
+                    .set(holograms.CREATED_AT, 1_000L)
+                    .execute();
+            config.dsl()
+                    .insertInto(lines)
+                    .set(lines.HOLOGRAM, "legacy")
+                    .set(lines.IDX, 0)
+                    .set(lines.TEXT, "line")
+                    .execute();
+        });
+
+        Hologram loaded = repository.find(HologramName.of("legacy")).orElseThrow();
+
+        assertThat(loaded.appearance()).isEqualTo(Appearance.defaults());
+        assertThat(loaded.refreshIntervalTicks()).isZero();
     }
 
     private Hologram hologram(String name, double x, double y, double z, String... lines) {

@@ -35,7 +35,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        return Commands.literal("hologram")
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("hologram")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(createNode())
                 .then(name("delete", this::delete))
@@ -43,8 +43,12 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 .then(textNode("addline", this::addLine))
                 .then(setLineNode())
                 .then(indexNode("removeline", this::removeLine))
-                .then(name("movehere", this::move))
-                .build();
+                .then(name("movehere", this::move));
+        for (LiteralArgumentBuilder<CommandSourceStack> styling :
+                new HologramAppearanceCommand(services, messages).nodes()) {
+            root.then(styling);
+        }
+        return root.build();
     }
 
     @Override

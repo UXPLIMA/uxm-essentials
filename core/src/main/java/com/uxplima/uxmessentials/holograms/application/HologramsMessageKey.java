@@ -24,6 +24,12 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_LINE_SET("hologram.line.set"),
     HOLOGRAM_LINE_REMOVED("hologram.line.removed"),
 
+    // appearance + refresh feedback
+    HOLOGRAM_APPEARANCE_SET("hologram.appearance.set"),
+    HOLOGRAM_REFRESH_SET("hologram.refresh.set"),
+    HOLOGRAM_BILLBOARD_INVALID("hologram.billboard-invalid"),
+    HOLOGRAM_BACKGROUND_INVALID("hologram.background-invalid"),
+
     // listing
     HOLOGRAM_LIST_HEADER("hologram.list.header"),
     HOLOGRAM_LIST_ENTRY("hologram.list.entry"),

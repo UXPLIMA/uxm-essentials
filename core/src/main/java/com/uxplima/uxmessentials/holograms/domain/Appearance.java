@@ -1,0 +1,152 @@
+package com.uxplima.uxmessentials.holograms.domain;
+
+import java.util.Objects;
+
+/**
+ * The visual styling of a hologram, kept separate from its text so the {@link Hologram} aggregate stays small
+ * and a styling change is one transition rather than a rebuild. Every field is a primitive or a domain enum so
+ * the value object stays pure (no Bukkit); the adapter maps each one onto the native {@code TextDisplay}
+ * setters at the rendering boundary.
+ *
+ * <p>Each numeric field carries a documented sentinel for "leave Paper's default" so a stored row that never
+ * set a property round-trips back to the default rather than a magic literal: {@link #DEFAULT_BACKGROUND} for a
+ * transparent/default panel, {@link #DEFAULT_BRIGHTNESS} (-1) for the block and sky light overrides. Scale,
+ * line width and view range default to the vanilla values (1.0, 200, 1.0). {@link #defaults()} is what a new
+ * hologram and an un-styled stored row both resolve to.
+ *
+ * @param billboard how the display faces the viewer ({@link Billboard#CENTER} by default)
+ * @param backgroundArgb the text-panel background as a packed ARGB int, or {@link #DEFAULT_BACKGROUND}
+ * @param textShadow whether the text casts a drop shadow
+ * @param brightnessBlock the block-light override 0–15, or {@link #DEFAULT_BRIGHTNESS} for the world value
+ * @param brightnessSky the sky-light override 0–15, or {@link #DEFAULT_BRIGHTNESS} for the world value
+ * @param scale the uniform scale factor (1.0 = default size)
+ * @param lineWidth the maximum line width in pixels before wrapping (200 = vanilla)
+ * @param viewRange the view-distance multiplier (1.0 = vanilla)
+ */
+public record Appearance(
+        Billboard billboard,
+        int backgroundArgb,
+        boolean textShadow,
+        int brightnessBlock,
+        int brightnessSky,
+        float scale,
+        int lineWidth,
+        float viewRange) {
+
+    /** The background sentinel meaning "no override" — the vanilla translucent panel. */
+    public static final int DEFAULT_BACKGROUND = Integer.MIN_VALUE;
+
+    /** The brightness sentinel meaning "no override" — the text takes the world light at its position. */
+    public static final int DEFAULT_BRIGHTNESS = -1;
+
+    private static final float DEFAULT_SCALE = 1.0f;
+    private static final int DEFAULT_LINE_WIDTH = 200;
+    private static final float DEFAULT_VIEW_RANGE = 1.0f;
+
+    private static final float MIN_SCALE = 0.05f;
+    private static final float MAX_SCALE = 64.0f;
+    private static final int MIN_LINE_WIDTH = 1;
+    private static final int MAX_LINE_WIDTH = 4000;
+    private static final float MIN_VIEW_RANGE = 0.0f;
+    private static final float MAX_VIEW_RANGE = 256.0f;
+    private static final int MAX_LIGHT = 15;
+
+    public Appearance {
+        Objects.requireNonNull(billboard, "billboard");
+        if (scale < MIN_SCALE || scale > MAX_SCALE) {
+            throw new IllegalArgumentException("scale out of range [" + MIN_SCALE + ", " + MAX_SCALE + "]: " + scale);
+        }
+        if (lineWidth < MIN_LINE_WIDTH || lineWidth > MAX_LINE_WIDTH) {
+            throw new IllegalArgumentException(
+                    "lineWidth out of range [" + MIN_LINE_WIDTH + ", " + MAX_LINE_WIDTH + "]: " + lineWidth);
+        }
+        if (viewRange < MIN_VIEW_RANGE || viewRange > MAX_VIEW_RANGE) {
+            throw new IllegalArgumentException(
+                    "viewRange out of range [" + MIN_VIEW_RANGE + ", " + MAX_VIEW_RANGE + "]: " + viewRange);
+        }
+        if (!isDefaultBrightness(brightnessBlock) && (brightnessBlock < 0 || brightnessBlock > MAX_LIGHT)) {
+            throw new IllegalArgumentException("brightnessBlock out of range [0, 15]: " + brightnessBlock);
+        }
+        if (!isDefaultBrightness(brightnessSky) && (brightnessSky < 0 || brightnessSky > MAX_LIGHT)) {
+            throw new IllegalArgumentException("brightnessSky out of range [0, 15]: " + brightnessSky);
+        }
+    }
+
+    /** The default styling: centred billboard, no overrides, vanilla scale/width/view-range. */
+    public static Appearance defaults() {
+        return new Appearance(
+                Billboard.CENTER,
+                DEFAULT_BACKGROUND,
+                false,
+                DEFAULT_BRIGHTNESS,
+                DEFAULT_BRIGHTNESS,
+                DEFAULT_SCALE,
+                DEFAULT_LINE_WIDTH,
+                DEFAULT_VIEW_RANGE);
+    }
+
+    /** Clamp a raw scale to the accepted range, so operator input never throws at the command boundary. */
+    public static float clampScale(float raw) {
+        return Math.min(MAX_SCALE, Math.max(MIN_SCALE, raw));
+    }
+
+    /** Clamp a raw line width to the accepted range. */
+    public static int clampLineWidth(int raw) {
+        return Math.min(MAX_LINE_WIDTH, Math.max(MIN_LINE_WIDTH, raw));
+    }
+
+    /** Clamp a raw view range to the accepted range. */
+    public static float clampViewRange(float raw) {
+        return Math.min(MAX_VIEW_RANGE, Math.max(MIN_VIEW_RANGE, raw));
+    }
+
+    /** Whether {@code brightness} is the "no override" sentinel. */
+    public static boolean isDefaultBrightness(int brightness) {
+        return brightness == DEFAULT_BRIGHTNESS;
+    }
+
+    /** Whether {@code argb} is the "no background override" sentinel. */
+    public boolean hasBackground() {
+        return backgroundArgb != DEFAULT_BACKGROUND;
+    }
+
+    /** Whether either light channel carries an override. */
+    public boolean hasBrightness() {
+        return !isDefaultBrightness(brightnessBlock) || !isDefaultBrightness(brightnessSky);
+    }
+
+    public Appearance withBillboard(Billboard value) {
+        Objects.requireNonNull(value, "value");
+        return new Appearance(
+                value, backgroundArgb, textShadow, brightnessBlock, brightnessSky, scale, lineWidth, viewRange);
+    }
+
+    public Appearance withBackgroundArgb(int value) {
+        return new Appearance(
+                billboard, value, textShadow, brightnessBlock, brightnessSky, scale, lineWidth, viewRange);
+    }
+
+    public Appearance withTextShadow(boolean value) {
+        return new Appearance(
+                billboard, backgroundArgb, value, brightnessBlock, brightnessSky, scale, lineWidth, viewRange);
+    }
+
+    public Appearance withBrightness(int block, int sky) {
+        return new Appearance(billboard, backgroundArgb, textShadow, block, sky, scale, lineWidth, viewRange);
+    }
+
+    public Appearance withScale(float value) {
+        return new Appearance(
+                billboard, backgroundArgb, textShadow, brightnessBlock, brightnessSky, value, lineWidth, viewRange);
+    }
+
+    public Appearance withLineWidth(int value) {
+        return new Appearance(
+                billboard, backgroundArgb, textShadow, brightnessBlock, brightnessSky, scale, value, viewRange);
+    }
+
+    public Appearance withViewRange(float value) {
+        return new Appearance(
+                billboard, backgroundArgb, textShadow, brightnessBlock, brightnessSky, scale, lineWidth, value);
+    }
+}

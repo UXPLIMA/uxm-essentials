@@ -29,11 +29,13 @@ import org.jspecify.annotations.Nullable;
 abstract class HologramCommandSupport {
 
     final HologramServices services;
+    final Messages messages;
     final CommandFeedback feedback;
 
     HologramCommandSupport(HologramServices services, Messages messages) {
         this.services = Objects.requireNonNull(services, "services");
-        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.messages = Objects.requireNonNull(messages, "messages");
+        this.feedback = new CommandFeedback(messages);
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */

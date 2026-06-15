@@ -2,8 +2,11 @@ package com.uxplima.uxmessentials.persistence.holograms;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.holograms.domain.Appearance;
+import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -12,12 +15,15 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.HologramsRecord
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jooq.Record;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The anti-corruption mapping between a {@code holograms} row (plus its ordered {@code hologram_lines}
  * child rows) and the domain {@link Hologram}. The world uuid is stored as its canonical 36-character text
- * and the creation time as epoch milliseconds, so the column shape is identical on every backend. This class
- * is the single place that translation lives.
+ * and the creation time as epoch milliseconds, so the column shape is identical on every backend. The V35
+ * appearance columns are nullable: an absent value reads back as the matching {@link Appearance} default (or a
+ * static interval), so a pre-V35 row keeps its current look. This class is the single place that translation
+ * lives.
  */
 final class HologramRows {
 
@@ -41,12 +47,15 @@ final class HologramRows {
                 HologramName.of(row.get(HOLOGRAMS.NAME)),
                 position,
                 lines,
+                appearanceOf(row),
+                intOr(row.get(HOLOGRAMS.REFRESH_INTERVAL_TICKS), Hologram.STATIC),
                 Instant.ofEpochMilli(row.get(HOLOGRAMS.CREATED_AT)));
     }
 
     /** Populate a {@link HologramsRecord} from a domain {@link Hologram} for an upsert (the name row only). */
     static void apply(HologramsRecord record, Hologram hologram) {
         Position location = hologram.location();
+        Appearance appearance = hologram.appearance();
         record.setName(hologram.name().value())
                 .setWorld(location.world().uid().toString())
                 .setWorldName(location.world().name())
@@ -55,6 +64,55 @@ final class HologramRows {
                 .setZ(location.z())
                 .setYaw(location.yaw())
                 .setPitch(location.pitch())
-                .setCreatedAt(hologram.createdAt().toEpochMilli());
+                .setCreatedAt(hologram.createdAt().toEpochMilli())
+                .setBillboard(appearance.billboard().name())
+                .setBackgroundArgb(appearance.hasBackground() ? appearance.backgroundArgb() : null)
+                .setTextShadow((short) (appearance.textShadow() ? 1 : 0))
+                .setBrightnessBlock(brightnessColumn(appearance.brightnessBlock()))
+                .setBrightnessSky(brightnessColumn(appearance.brightnessSky()))
+                .setScale(appearance.scale())
+                .setLineWidth(appearance.lineWidth())
+                .setViewRange(appearance.viewRange())
+                .setRefreshIntervalTicks(hologram.refreshIntervalTicks());
+    }
+
+    private static Appearance appearanceOf(Record row) {
+        Appearance defaults = Appearance.defaults();
+        return new Appearance(
+                billboardOf(row.get(HOLOGRAMS.BILLBOARD)),
+                intOr(row.get(HOLOGRAMS.BACKGROUND_ARGB), Appearance.DEFAULT_BACKGROUND),
+                shadowOf(row.get(HOLOGRAMS.TEXT_SHADOW)),
+                brightnessOf(row.get(HOLOGRAMS.BRIGHTNESS_BLOCK)),
+                brightnessOf(row.get(HOLOGRAMS.BRIGHTNESS_SKY)),
+                floatOr(row.get(HOLOGRAMS.SCALE), defaults.scale()),
+                intOr(row.get(HOLOGRAMS.LINE_WIDTH), defaults.lineWidth()),
+                floatOr(row.get(HOLOGRAMS.VIEW_RANGE), defaults.viewRange()));
+    }
+
+    private static Billboard billboardOf(@Nullable String stored) {
+        if (stored == null) {
+            return Billboard.CENTER;
+        }
+        return Billboard.parse(stored.toUpperCase(Locale.ROOT)).orElse(Billboard.CENTER);
+    }
+
+    private static boolean shadowOf(@Nullable Short stored) {
+        return stored != null && stored != 0;
+    }
+
+    private static int brightnessOf(@Nullable Integer stored) {
+        return stored == null ? Appearance.DEFAULT_BRIGHTNESS : stored;
+    }
+
+    private static @Nullable Integer brightnessColumn(int brightness) {
+        return Appearance.isDefaultBrightness(brightness) ? null : brightness;
+    }
+
+    private static int intOr(@Nullable Integer value, int fallback) {
+        return value == null ? fallback : value;
+    }
+
+    private static float floatOr(@Nullable Float value, float fallback) {
+        return value == null ? fallback : value;
     }
 }
