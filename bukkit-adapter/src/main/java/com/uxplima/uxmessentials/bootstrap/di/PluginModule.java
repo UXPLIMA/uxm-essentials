@@ -75,6 +75,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlac
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWarpsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ServicesTeleportPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StaffStaffPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreCommunicationPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreDiscordlinkPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
@@ -336,7 +337,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links);
         } else if (module.id().equals(ModuleId.of("communication"))) {
-            wireCommunication(plugin, ctx, resources);
+            wireCommunication(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
             wireHolograms(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
@@ -613,7 +614,8 @@ public final class PluginModule {
                 wired.services().toggleVanish(), wired.store());
     }
 
-    private static void wireCommunication(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireCommunication(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // communication persists nothing: the per-player broadcast opt-out is PDC-backed (survives relog), the
         // sequence counters are transient, and the connection policies, announcer schedule, and info pages are
         // config-authored content in the modules/communication content files. It carries no cross-context bridge — its
@@ -624,6 +626,9 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
+        // The communication PAPI seam reads the same global chat lock /togglechat flips and the per-player announcer
+        // subscription /broadcasttoggle flips, so a placeholder matches the live chat state and the player's opt-in.
+        links.placeholders.communication(new StoreCommunicationPlaceholders(wired.chatLock(), wired.optOutStore()));
         resources.onClose(wired::stop);
     }
 

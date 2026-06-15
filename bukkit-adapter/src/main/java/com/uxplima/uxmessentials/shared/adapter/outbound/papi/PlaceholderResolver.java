@@ -58,6 +58,7 @@ public final class PlaceholderResolver {
     private static final String STAFF_PREFIX = "staff_";
     private static final String DISCORDLINK_PREFIX = "discordlink_";
     private static final String HOLOGRAMS_PREFIX = "holograms_";
+    private static final String COMMUNICATION_PREFIX = "communication_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -134,6 +135,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(HOLOGRAMS_PREFIX)) {
             return Optional.of(holograms(normalized.substring(HOLOGRAMS_PREFIX.length())));
+        }
+        if (normalized.startsWith(COMMUNICATION_PREFIX)) {
+            return Optional.of(communication(who, online, normalized.substring(COMMUNICATION_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -718,6 +722,26 @@ public final class PlaceholderResolver {
             return EMPTY;
         }
         return key.equals("count") ? Integer.toString(seam.get().count()) : EMPTY;
+    }
+
+    /**
+     * Resolve a {@code communication_}-stripped key against the communication seam. {@code chat_enabled} reads the
+     * server-wide chat lock — open while {@code /togglechat} does not hold it — and answers for any requester.
+     * {@code broadcasts} reads the requester's announcer subscription ({@code /broadcasttoggle}); the store
+     * resolves the connected player, so it holds no value for an offline requester and the offline guard degrades
+     * it to the dash. A disabled module degrades every key to the dash.
+     */
+    private String communication(PlayerRef who, boolean online, String key) {
+        Optional<CommunicationPlaceholders> seam = contexts.communication();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        CommunicationPlaceholders communication = seam.get();
+        return switch (key) {
+            case "chat_enabled" -> bool(communication.chatEnabled());
+            case "broadcasts" -> online ? bool(communication.receivesBroadcasts(who)) : EMPTY;
+            default -> EMPTY;
+        };
     }
 
     /**

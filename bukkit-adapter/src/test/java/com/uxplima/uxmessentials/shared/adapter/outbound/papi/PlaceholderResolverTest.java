@@ -942,6 +942,48 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void communicationPlaceholdersReadChatLockAndBroadcastSubscription() {
+        FakeCommunication open = new FakeCommunication().chatEnabled(true).receivesBroadcasts(ALICE, true);
+        FakeCommunication locked = new FakeCommunication().chatEnabled(false).receivesBroadcasts(ALICE, false);
+        PlaceholderResolver openResolver =
+                resolverWith(PlaceholderContexts.builder().communication(open).build());
+        PlaceholderResolver lockedResolver =
+                resolverWith(PlaceholderContexts.builder().communication(locked).build());
+
+        assertThat(openResolver.resolve(ALICE, true, "communication_chat_enabled"))
+                .contains("yes");
+        assertThat(openResolver.resolve(ALICE, true, "communication_broadcasts"))
+                .contains("yes");
+        assertThat(lockedResolver.resolve(ALICE, true, "communication_chat_enabled"))
+                .contains("no");
+        assertThat(lockedResolver.resolve(ALICE, true, "communication_broadcasts"))
+                .contains("no");
+    }
+
+    @Test
+    void communicationBroadcastsDegradeOfflineButChatEnabledStillReads() {
+        FakeCommunication open = new FakeCommunication().chatEnabled(true).receivesBroadcasts(ALICE, true);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().communication(open).build());
+
+        // The chat lock is server-wide, so it answers for an offline requester too.
+        assertThat(resolver.resolve(ALICE, false, "communication_chat_enabled")).contains("yes");
+        // The per-player subscription is session-meaningful, so it degrades to the dash when offline.
+        assertThat(resolver.resolve(ALICE, false, "communication_broadcasts")).contains("-");
+    }
+
+    @Test
+    void communicationDegradesWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "communication_chat_enabled")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "communication_broadcasts")).contains("-");
+        // An unknown communication_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "communication_unknown")).contains("-");
+    }
+
+    @Test
     void disabledContextsDegradeToTheirEmptyDefault() {
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().build());
@@ -1575,6 +1617,37 @@ class PlaceholderResolverTest {
         @Override
         public Optional<String> discordId(PlayerRef who) {
             return Optional.ofNullable(ids.get(who));
+        }
+    }
+
+    /** A configurable {@link CommunicationPlaceholders} fake — every read returns the value the test seeded. */
+    private static final class FakeCommunication implements CommunicationPlaceholders {
+
+        private final java.util.Set<PlayerRef> receiving = new java.util.HashSet<>();
+        private boolean chatEnabled = true;
+
+        FakeCommunication chatEnabled(boolean value) {
+            this.chatEnabled = value;
+            return this;
+        }
+
+        FakeCommunication receivesBroadcasts(PlayerRef who, boolean value) {
+            if (value) {
+                receiving.add(who);
+            } else {
+                receiving.remove(who);
+            }
+            return this;
+        }
+
+        @Override
+        public boolean chatEnabled() {
+            return chatEnabled;
+        }
+
+        @Override
+        public boolean receivesBroadcasts(PlayerRef who) {
+            return receiving.contains(who);
         }
     }
 

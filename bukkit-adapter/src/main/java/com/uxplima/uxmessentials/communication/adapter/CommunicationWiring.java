@@ -100,7 +100,7 @@ public final class CommunicationWiring {
                 settings);
         List<Listener> listeners = listeners(
                 services, registry, infoSender, settings, chatLock, notifier, channelBroadcaster, optOutStore);
-        return new Wired(commands, listeners, announcer, running);
+        return new Wired(commands, listeners, announcer, running, chatLock, optOutStore);
     }
 
     /**
@@ -183,18 +183,24 @@ public final class CommunicationWiring {
      * @param listeners the join/quit/death listeners to register
      * @param announcer the self-rescheduling announcer timer, armed by the caller
      * @param running the flag flipped false on stop so the announcer exits
+     * @param chatLock the global chat lock the PAPI seam reads the chat-enabled state from
+     * @param optOutStore the per-player announcer subscription the PAPI seam reads the broadcast state from
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             AnnouncerTask announcer,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            ChatLock chatLock,
+            BroadcastOptOutStore optOutStore) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(announcer, "announcer");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(chatLock, "chatLock");
+            Objects.requireNonNull(optOutStore, "optOutStore");
         }
 
         /** Arm the announcer timer. */
