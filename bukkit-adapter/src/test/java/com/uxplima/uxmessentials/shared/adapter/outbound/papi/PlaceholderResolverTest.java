@@ -470,6 +470,92 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void playerwarpsCountLimitLeftAndListReadThroughTheSeam() {
+        FakePlayerwarps warps = new FakePlayerwarps(2, 5)
+                .owned("base", playerWarpView("base", "Alice", "world", 10, 64, -20, 7))
+                .owned("mine", playerWarpView("mine", "Alice", "world_nether", 1, 30, 2, 0));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerwarps(warps).build());
+
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_count")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_limit")).contains("5");
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_left")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_list")).contains("base, mine");
+    }
+
+    @Test
+    void unlimitedPlayerwarpLimitRendersTheInfinityMarker() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .playerwarps(new FakePlayerwarps(7, -1))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_limit")).contains("∞");
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_left")).contains("∞");
+    }
+
+    @Test
+    void playerwarpsListDashesWhenNoneOwned() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .playerwarps(new FakePlayerwarps(0, 5))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_count")).contains("0");
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_list")).contains("-");
+    }
+
+    @Test
+    void perPlayerwarpFieldsReadOwnerWorldCoordinatesAndVisits() {
+        FakePlayerwarps warps = new FakePlayerwarps(1, 5)
+                .owned("shop", playerWarpView("shop", "Alice", "world_nether", 100, 70, -50, 4));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerwarps(warps).build());
+
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_shop_owner")).contains("Alice");
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_shop_world")).contains("world_nether");
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_shop_x")).contains("100");
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_shop_y")).contains("70");
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_shop_z")).contains("-50");
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_shop_visits")).contains("4");
+    }
+
+    @Test
+    void perPlayerwarpFieldHandlesNamesWithUnderscores() {
+        FakePlayerwarps warps =
+                new FakePlayerwarps(1, 5).owned("pvp_arena", playerWarpView("pvp_arena", "Alice", "world", 1, 2, 3, 0));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerwarps(warps).build());
+
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_pvp_arena_world")).contains("world");
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_pvp_arena_x")).contains("1");
+    }
+
+    @Test
+    void perPlayerwarpFieldDashesUnknownAndMalformed() {
+        FakePlayerwarps warps =
+                new FakePlayerwarps(1, 5).owned("base", playerWarpView("base", "Alice", "world", 0, 64, 0, 0));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerwarps(warps).build());
+
+        // A warp the player does not own degrades to the dash, never leaking another owner's data.
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_secret_world")).contains("-");
+        // An unknown field on an owned warp, and a tail with no field segment, both degrade to the dash.
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_base_unknown")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_base")).contains("-");
+    }
+
+    @Test
+    void playerwarpsDegradeWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_count")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_list")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "playerwarp_base_world")).contains("-");
+        // An unknown playerwarps_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "playerwarps_unknown")).contains("-");
+    }
+
+    @Test
     void moderationPlaceholdersReadMutedAndJailed() {
         FakeModeration moderation = new FakeModeration().muted(true).jailed(false);
         PlaceholderResolver resolver = resolverWith(
@@ -1179,6 +1265,49 @@ class PlaceholderResolverTest {
     private static WarpsPlaceholders.WarpView warpView(
             String world, int x, int y, int z, long visits, String owner, String cost) {
         return new WarpsPlaceholders.WarpView(world, x, y, z, visits, owner, new BigDecimal(cost));
+    }
+
+    /** A configurable {@link PlayerwarpsPlaceholders} fake — only the seeded (owned) warps are counted/listed/found. */
+    private static final class FakePlayerwarps implements PlayerwarpsPlaceholders {
+
+        private final java.util.LinkedHashMap<String, PlayerWarpView> owned = new java.util.LinkedHashMap<>();
+        private final int count;
+        private final int limit;
+
+        FakePlayerwarps(int count, int limit) {
+            this.count = count;
+            this.limit = limit;
+        }
+
+        FakePlayerwarps owned(String name, PlayerWarpView view) {
+            owned.put(name, view);
+            return this;
+        }
+
+        @Override
+        public int count(PlayerRef who) {
+            return count;
+        }
+
+        @Override
+        public int limit(PlayerRef who) {
+            return limit;
+        }
+
+        @Override
+        public List<PlayerWarpView> list(PlayerRef who) {
+            return List.copyOf(owned.values());
+        }
+
+        @Override
+        public Optional<PlayerWarpView> find(PlayerRef who, String name) {
+            return Optional.ofNullable(owned.get(name.toLowerCase(java.util.Locale.ROOT)));
+        }
+    }
+
+    private static PlayerwarpsPlaceholders.PlayerWarpView playerWarpView(
+            String name, String owner, String world, int x, int y, int z, long visits) {
+        return new PlayerwarpsPlaceholders.PlayerWarpView(name, owner, world, x, y, z, visits);
     }
 
     private static VaultsPlaceholders fakeVaults(int count, int max, int size) {

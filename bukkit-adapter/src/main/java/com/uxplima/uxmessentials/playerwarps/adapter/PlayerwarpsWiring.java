@@ -76,7 +76,7 @@ public final class PlayerwarpsWiring {
         }
         PlayerWarpServices services = assemble(kernel, repository, notifier, teleporter, quota, editorView, ctx);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
-        return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer));
+        return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
     }
 
     private static PlayerWarpServices assemble(
@@ -116,18 +116,27 @@ public final class PlayerwarpsWiring {
     }
 
     /**
-     * Everything the player-warps module contributes once wired: the Brigadier commands. The context holds no
-     * repeating scheduled work and no in-memory store beyond the repository cache, so there is nothing to
-     * drain on stop — the module's {@code stop()} clears its own bookkeeping and the cache expires.
+     * Everything the player-warps module contributes once wired: the Brigadier commands, the join cache-warmer,
+     * and the read ports the PAPI seam queries. The context holds no repeating scheduled work and no in-memory
+     * store beyond the repository cache, so there is nothing to drain on stop — the module's {@code stop()}
+     * clears its own bookkeeping and the cache expires.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the join cache-warmer the plugin registers
+     * @param repository the cached player-warp repository the PAPI seam reads owned warps from
+     * @param quota the per-owner count-limit reducer the PAPI seam reads the limit through
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners) {
+    public record Wired(
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            PlayerWarpRepository repository,
+            PlayerWarpQuota quota) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(quota, "quota");
         }
     }
 }

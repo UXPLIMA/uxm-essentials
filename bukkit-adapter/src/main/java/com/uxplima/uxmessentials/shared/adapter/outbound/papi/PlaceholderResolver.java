@@ -48,6 +48,8 @@ public final class PlaceholderResolver {
     private static final String VAULTS_PREFIX = "vaults_";
     private static final String WARPS_PREFIX = "warps_";
     private static final String WARP_PREFIX = "warp_";
+    private static final String PLAYERWARPS_PREFIX = "playerwarps_";
+    private static final String PLAYERWARP_PREFIX = "playerwarp_";
     private static final String PRESENCE_PREFIX = "presence_";
     private static final String PLAYERSTATE_PREFIX = "playerstate_";
     private static final String TELEPORT_PREFIX = "teleport_";
@@ -90,6 +92,14 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(WARP_PREFIX)) {
             return Optional.of(warpField(who, normalized.substring(WARP_PREFIX.length())));
+        }
+        // The plural prefix is checked before the singular: "playerwarp_" is itself a prefix of "playerwarps_",
+        // so the more specific list/scalar family must win before the per-warp field branch.
+        if (normalized.startsWith(PLAYERWARPS_PREFIX)) {
+            return Optional.of(playerwarpsFamily(who, normalized.substring(PLAYERWARPS_PREFIX.length())));
+        }
+        if (normalized.startsWith(PLAYERWARP_PREFIX)) {
+            return Optional.of(playerwarpField(who, normalized.substring(PLAYERWARP_PREFIX.length())));
         }
         if (normalized.startsWith(VOTES_PREFIX)) {
             return Optional.of(votes(who, normalized.substring(VOTES_PREFIX.length())));
@@ -539,6 +549,80 @@ public final class PlaceholderResolver {
             case "visits" -> Long.toString(warp.visits());
             case "owner" -> warp.owner();
             case "cost" -> warp.cost().toPlainString();
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code playerwarps_*} tail against the player-warps seam. {@code count} reads how many warps the
+     * player owns; {@code limit} the resolved {@code uxmessentials.pwarp.limit} quota (the infinity marker when
+     * unlimited); {@code left} the remaining headroom (the same marker when unlimited); {@code list} joins the
+     * owned names (the dash when they own none). A disabled module degrades every key to the dash.
+     */
+    private String playerwarpsFamily(PlayerRef who, String tail) {
+        Optional<PlayerwarpsPlaceholders> seam = contexts.playerwarps();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        PlayerwarpsPlaceholders playerwarps = seam.get();
+        return switch (tail) {
+            case "count" -> Integer.toString(playerwarps.count(who));
+            case "limit" -> {
+                int limit = playerwarps.limit(who);
+                yield limit < 0 ? unlimited() : Integer.toString(limit);
+            }
+            case "left" -> {
+                int limit = playerwarps.limit(who);
+                yield limit < 0 ? unlimited() : Integer.toString(Math.max(0, limit - playerwarps.count(who)));
+            }
+            case "list" -> {
+                List<PlayerwarpsPlaceholders.PlayerWarpView> all = playerwarps.list(who);
+                yield all.isEmpty() ? EMPTY : joinPlayerwarpNames(all);
+            }
+            default -> EMPTY;
+        };
+    }
+
+    private static String joinPlayerwarpNames(List<PlayerwarpsPlaceholders.PlayerWarpView> warps) {
+        StringBuilder names = new StringBuilder();
+        for (PlayerwarpsPlaceholders.PlayerWarpView warp : warps) {
+            if (names.length() > 0) {
+                names.append(", ");
+            }
+            names.append(warp.name());
+        }
+        return names.toString();
+    }
+
+    /**
+     * Resolve a {@code playerwarp_<name>_<field>} tail. The field is the segment after the last underscore (so a
+     * warp name may itself contain underscores) and is read off the warp the player owns: {@code owner},
+     * {@code world}, {@code x|y|z}, or {@code visits}. A disabled module, a malformed tail, or a warp the player
+     * does not own all degrade to the dash.
+     */
+    private String playerwarpField(PlayerRef who, String tail) {
+        Optional<PlayerwarpsPlaceholders> seam = contexts.playerwarps();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        int split = tail.lastIndexOf('_');
+        if (split <= 0 || split == tail.length() - 1) {
+            return EMPTY;
+        }
+        String name = tail.substring(0, split);
+        String field = tail.substring(split + 1);
+        Optional<PlayerwarpsPlaceholders.PlayerWarpView> view = seam.get().find(who, name);
+        if (view.isEmpty()) {
+            return EMPTY;
+        }
+        PlayerwarpsPlaceholders.PlayerWarpView warp = view.get();
+        return switch (field) {
+            case "owner" -> warp.owner();
+            case "world" -> warp.world();
+            case "x" -> Integer.toString(warp.blockX());
+            case "y" -> Integer.toString(warp.blockY());
+            case "z" -> Integer.toString(warp.blockZ());
+            case "visits" -> Long.toString(warp.visits());
             default -> EMPTY;
         };
     }

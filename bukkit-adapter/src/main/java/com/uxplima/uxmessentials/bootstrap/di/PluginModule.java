@@ -68,6 +68,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupp
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryPlayerwarpsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWarpsPlaceholders;
@@ -644,6 +645,9 @@ public final class PluginModule {
                 ctx, persistence, engine, links.warpEditorView, links.warpPlayerWarpHandle, links.warpTeleportRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands
+        // hold, so a placeholder matches what /setpwarp enforces and the /pwarps list shows.
+        links.placeholders.playerwarps(new RepositoryPlayerwarpsPlaceholders(wired.repository(), wired.quota()));
     }
 
     private static void wireScoreboard(
