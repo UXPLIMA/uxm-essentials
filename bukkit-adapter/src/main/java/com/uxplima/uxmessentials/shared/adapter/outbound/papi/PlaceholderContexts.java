@@ -32,6 +32,7 @@ public final class PlaceholderContexts {
     private final @Nullable DiscordlinkPlaceholders discordlink;
     private final @Nullable HologramsPlaceholders holograms;
     private final @Nullable CommunicationPlaceholders communication;
+    private final @Nullable ServerMetricsPlaceholders serverMetrics;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -50,6 +51,7 @@ public final class PlaceholderContexts {
         this.discordlink = builder.discordlink;
         this.holograms = builder.holograms;
         this.communication = builder.communication;
+        this.serverMetrics = builder.serverMetrics;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -121,6 +123,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(communication);
     }
 
+    public Optional<ServerMetricsPlaceholders> serverMetrics() {
+        return Optional.ofNullable(serverMetrics);
+    }
+
     /** True when no context registered a seam — registering the expansion would surface nothing. */
     public boolean isEmpty() {
         return homes == null
@@ -138,7 +144,8 @@ public final class PlaceholderContexts {
                 && staff == null
                 && discordlink == null
                 && holograms == null
-                && communication == null;
+                && communication == null
+                && serverMetrics == null;
     }
 
     /** Mutable collector for the seams, filled as each context's adapters are wired in bootstrap. */
@@ -160,6 +167,7 @@ public final class PlaceholderContexts {
         private @Nullable DiscordlinkPlaceholders discordlink;
         private @Nullable HologramsPlaceholders holograms;
         private @Nullable CommunicationPlaceholders communication;
+        private @Nullable ServerMetricsPlaceholders serverMetrics;
 
         private Builder() {}
 
@@ -240,6 +248,11 @@ public final class PlaceholderContexts {
 
         public Builder communication(CommunicationPlaceholders seam) {
             this.communication = seam;
+            return this;
+        }
+
+        public Builder serverMetrics(ServerMetricsPlaceholders seam) {
+            this.serverMetrics = seam;
             return this;
         }
 

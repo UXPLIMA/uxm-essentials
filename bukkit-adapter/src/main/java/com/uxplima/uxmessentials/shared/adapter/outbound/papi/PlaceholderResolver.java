@@ -59,6 +59,8 @@ public final class PlaceholderResolver {
     private static final String DISCORDLINK_PREFIX = "discordlink_";
     private static final String HOLOGRAMS_PREFIX = "holograms_";
     private static final String COMMUNICATION_PREFIX = "communication_";
+    private static final String SERVER_PREFIX = "server_";
+    private static final String SERVER_WORLD_PLAYERS_PREFIX = "world_players_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -138,6 +140,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(COMMUNICATION_PREFIX)) {
             return Optional.of(communication(who, online, normalized.substring(COMMUNICATION_PREFIX.length())));
+        }
+        if (normalized.startsWith(SERVER_PREFIX)) {
+            return Optional.of(serverMetric(normalized.substring(SERVER_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -742,6 +747,69 @@ public final class PlaceholderResolver {
             case "broadcasts" -> online ? bool(communication.receivesBroadcasts(who)) : EMPTY;
             default -> EMPTY;
         };
+    }
+
+    /**
+     * Resolve a {@code server_}-stripped key against the always-present server-metrics seam. Every value is a
+     * server-wide global, so the requesting player is ignored. The TPS keys read the Paper {@code getTPS()}
+     * window — {@code tps} the 1-minute rate, {@code tps_5m}/{@code tps_15m} the longer windows, and
+     * {@code tps_colored} the 1-minute rate wrapped in a MiniMessage colour (green/yellow/red); the heap keys
+     * read whole megabytes; {@code uptime} reads whole minutes and {@code uptime_formatted} the {@code 1h30m}
+     * compact form; {@code world_players_<world>} counts a named world's roster (the dash for an unknown world).
+     * The seam is always wired, so an unknown key still degrades to the dash rather than the raw token.
+     */
+    private String serverMetric(String tail) {
+        Optional<ServerMetricsPlaceholders> seam = contexts.serverMetrics();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        ServerMetricsPlaceholders metrics = seam.get();
+        if (tail.startsWith(SERVER_WORLD_PLAYERS_PREFIX)) {
+            return worldPlayers(metrics, tail.substring(SERVER_WORLD_PLAYERS_PREFIX.length()));
+        }
+        return switch (tail) {
+            case "online" -> Integer.toString(metrics.onlinePlayers());
+            case "max_players" -> Integer.toString(metrics.maxPlayers());
+            case "version" -> metrics.minecraftVersion();
+            case "uptime" -> Long.toString(metrics.uptime().toMinutes());
+            case "uptime_formatted" -> PlaceholderDurations.compact(metrics.uptime());
+            case "tps" -> tps(metrics, 0);
+            case "tps_5m" -> tps(metrics, 1);
+            case "tps_15m" -> tps(metrics, 2);
+            case "tps_colored" -> tpsColored(metrics);
+            case "ram_used" -> Long.toString(metrics.ramUsedMb());
+            case "ram_max" -> Long.toString(metrics.ramMaxMb());
+            case "ram_free" -> Long.toString(metrics.ramFreeMb());
+            default -> EMPTY;
+        };
+    }
+
+    /** Render one TPS window, clamped to the 20.0 ceiling and trimmed to two decimals. */
+    private static String tps(ServerMetricsPlaceholders metrics, int window) {
+        return decimal(clampTps(metrics.tps()[window]));
+    }
+
+    /**
+     * The 1-minute TPS wrapped in a MiniMessage colour: green at or above 18, yellow at or above 15, red below.
+     * The HUD renders the result through MiniMessage; a raw PAPI consumer sees the tag literally, so prefer the
+     * uncoloured {@code server_tps} where MiniMessage is not in play.
+     */
+    private static String tpsColored(ServerMetricsPlaceholders metrics) {
+        double value = clampTps(metrics.tps()[0]);
+        String colour = value >= 18.0 ? "green" : value >= 15.0 ? "yellow" : "red";
+        return "<" + colour + ">" + decimal(value) + "</" + colour + ">";
+    }
+
+    private static double clampTps(double value) {
+        return Math.min(20.0, value);
+    }
+
+    private static String worldPlayers(ServerMetricsPlaceholders metrics, String world) {
+        if (world.isBlank()) {
+            return EMPTY;
+        }
+        OptionalInt count = metrics.worldPlayers(world);
+        return count.isPresent() ? Integer.toString(count.getAsInt()) : EMPTY;
     }
 
     /**

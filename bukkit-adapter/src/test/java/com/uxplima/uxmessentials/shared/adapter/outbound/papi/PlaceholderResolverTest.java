@@ -1108,6 +1108,83 @@ class PlaceholderResolverTest {
         assertThat(noSeam.resolve(ALICE, true, "playerstate_unknown")).contains("-");
     }
 
+    @Test
+    void serverMetricsReadGlobalsIgnoringTheRequester() {
+        FakeServerMetrics metrics = new FakeServerMetrics()
+                .online(12)
+                .maxPlayers(50)
+                .version("1.21.11")
+                .uptime(Duration.ofHours(1).plusMinutes(30))
+                .tps(19.97, 19.5, 18.2)
+                .ram(2048, 4096, 1500)
+                .worldPlayers("world", 8);
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().serverMetrics(metrics).build());
+
+        // The requesting player and online flag are irrelevant — every value is server-wide.
+        assertThat(resolver.resolve(ALICE, false, "server_online")).contains("12");
+        assertThat(resolver.resolve(BOB, true, "server_max_players")).contains("50");
+        assertThat(resolver.resolve(ALICE, true, "server_version")).contains("1.21.11");
+        assertThat(resolver.resolve(ALICE, true, "server_uptime")).contains("90");
+        assertThat(resolver.resolve(ALICE, true, "server_uptime_formatted")).contains("1h30m");
+        assertThat(resolver.resolve(ALICE, true, "server_ram_used")).contains("2048");
+        assertThat(resolver.resolve(ALICE, true, "server_ram_max")).contains("4096");
+        assertThat(resolver.resolve(ALICE, true, "server_ram_free")).contains("1500");
+        assertThat(resolver.resolve(ALICE, true, "server_world_players_world")).contains("8");
+    }
+
+    @Test
+    void serverTpsReadsEachWindowClampedAndTrimmed() {
+        // The 1-minute window over-reports above 20 on a fresh server; it is clamped to the 20.0 ceiling.
+        FakeServerMetrics metrics = new FakeServerMetrics().tps(20.04, 19.5, 15.0);
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().serverMetrics(metrics).build());
+
+        assertThat(resolver.resolve(ALICE, true, "server_tps")).contains("20");
+        assertThat(resolver.resolve(ALICE, true, "server_tps_5m")).contains("19.5");
+        assertThat(resolver.resolve(ALICE, true, "server_tps_15m")).contains("15");
+    }
+
+    @Test
+    void serverTpsColoredWrapsTheRateInGreenYellowOrRed() {
+        PlaceholderResolver healthy = resolverWith(PlaceholderContexts.builder()
+                .serverMetrics(new FakeServerMetrics().tps(19.9, 19.9, 19.9))
+                .build());
+        PlaceholderResolver strained = resolverWith(PlaceholderContexts.builder()
+                .serverMetrics(new FakeServerMetrics().tps(16.0, 16.0, 16.0))
+                .build());
+        PlaceholderResolver lagging = resolverWith(PlaceholderContexts.builder()
+                .serverMetrics(new FakeServerMetrics().tps(9.0, 9.0, 9.0))
+                .build());
+
+        assertThat(healthy.resolve(ALICE, true, "server_tps_colored")).contains("<green>19.9</green>");
+        assertThat(strained.resolve(ALICE, true, "server_tps_colored")).contains("<yellow>16</yellow>");
+        assertThat(lagging.resolve(ALICE, true, "server_tps_colored")).contains("<red>9</red>");
+    }
+
+    @Test
+    void serverWorldPlayersDashesUnknownWorldAndBlankName() {
+        FakeServerMetrics metrics = new FakeServerMetrics().worldPlayers("world", 4);
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().serverMetrics(metrics).build());
+
+        assertThat(resolver.resolve(ALICE, true, "server_world_players_world")).contains("4");
+        assertThat(resolver.resolve(ALICE, true, "server_world_players_void")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "server_world_players_")).contains("-");
+    }
+
+    @Test
+    void serverMetricsDegradeWhenSeamAbsentButUnknownKeyStaysRaw() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        // No seam wired: every server_ key degrades to the dash rather than the raw token.
+        assertThat(resolver.resolve(ALICE, true, "server_online")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "server_tps")).contains("-");
+        // An unknown server_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "server_unknown")).contains("-");
+    }
+
     private static PresencePlaceholders presenceSeam(PresencePlaceholders.Snapshot snapshot) {
         return who -> Optional.of(snapshot);
     }
@@ -1668,6 +1745,103 @@ class PlaceholderResolverTest {
                 return size;
             }
         };
+    }
+
+    /** A configurable {@link ServerMetricsPlaceholders} fake — every read returns the value the test seeded. */
+    private static final class FakeServerMetrics implements ServerMetricsPlaceholders {
+
+        private final java.util.Map<String, Integer> worldPlayers = new java.util.HashMap<>();
+        private int online;
+        private int maxPlayers;
+        private String version = "1.21.11";
+        private Duration uptime = Duration.ZERO;
+        private double[] tps = {20.0, 20.0, 20.0};
+        private long ramUsed;
+        private long ramMax;
+        private long ramFree;
+
+        FakeServerMetrics online(int value) {
+            this.online = value;
+            return this;
+        }
+
+        FakeServerMetrics maxPlayers(int value) {
+            this.maxPlayers = value;
+            return this;
+        }
+
+        FakeServerMetrics version(String value) {
+            this.version = value;
+            return this;
+        }
+
+        FakeServerMetrics uptime(Duration value) {
+            this.uptime = value;
+            return this;
+        }
+
+        FakeServerMetrics tps(double m1, double m5, double m15) {
+            this.tps = new double[] {m1, m5, m15};
+            return this;
+        }
+
+        FakeServerMetrics ram(long used, long max, long free) {
+            this.ramUsed = used;
+            this.ramMax = max;
+            this.ramFree = free;
+            return this;
+        }
+
+        FakeServerMetrics worldPlayers(String world, int count) {
+            this.worldPlayers.put(world, count);
+            return this;
+        }
+
+        @Override
+        public int onlinePlayers() {
+            return online;
+        }
+
+        @Override
+        public int maxPlayers() {
+            return maxPlayers;
+        }
+
+        @Override
+        public String minecraftVersion() {
+            return version;
+        }
+
+        @Override
+        public Duration uptime() {
+            return uptime;
+        }
+
+        @Override
+        public double[] tps() {
+            return tps.clone();
+        }
+
+        @Override
+        public long ramUsedMb() {
+            return ramUsed;
+        }
+
+        @Override
+        public long ramMaxMb() {
+            return ramMax;
+        }
+
+        @Override
+        public long ramFreeMb() {
+            return ramFree;
+        }
+
+        @Override
+        public OptionalInt worldPlayers(String world) {
+            Integer count = worldPlayers.get(world);
+            return count == null ? OptionalInt.empty() : OptionalInt.of(count);
+        }
     }
 
     private static HomesPlaceholders fakeHomes(int count, int limit) {

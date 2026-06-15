@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bootstrap.di;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitAccessPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
@@ -299,6 +301,10 @@ public final class PluginModule {
             startModule(module, ctx, resources, log);
             wireAdapters(plugin, module, ctx, persistence, resources, links, bus, guiLayouts);
         }
+        // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
+        // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
+        // from this enable (a reload restarts it) rather than the whole JVM's age.
+        links.placeholders.serverMetrics(new BukkitServerMetrics(plugin.getServer(), Instant.now()));
         return links.placeholders.build();
     }
 
