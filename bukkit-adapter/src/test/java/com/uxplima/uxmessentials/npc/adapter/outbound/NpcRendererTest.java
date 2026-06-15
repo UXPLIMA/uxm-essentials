@@ -461,6 +461,58 @@ class NpcRendererTest {
     }
 
     @Test
+    void warnsOnceForABadStoredTypeNoMatterHowManyRefreshTicksRetryIt() {
+        PlayerMock viewer = server.addPlayer();
+        CountingLogger logger = new CountingLogger();
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), logger, 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0).withEntityType("NOT_A_REAL_TYPE")); // one warn
+
+        // The reconcile retries the unresolvable NPC every tick (the skip never marks the viewer shown), so without
+        // the warn-once cache this would log a line per refresh per viewer — an unbounded flood for a bad row.
+        renderer.refresh();
+        renderer.refresh();
+        renderer.refresh();
+
+        assertThat(logger.warns).isEqualTo(1);
+        assertThat(packets.spawnEntities).isEmpty();
+    }
+
+    @Test
+    void reArmsTheBadTypeWarningWhenTheTypeIsChangedToAnotherBadValue() {
+        PlayerMock viewer = server.addPlayer();
+        CountingLogger logger = new CountingLogger();
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), logger, 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0).withEntityType("NOT_A_REAL_TYPE")); // warn #1
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("ALSO_NOT_REAL")); // a distinct bad value -> warn #2
+
+        // A change to a different unresolvable value is a new problem the operator should see, so it re-warns —
+        // but only once for the new value, not per tick.
+        renderer.refresh();
+        renderer.refresh();
+        assertThat(logger.warns).isEqualTo(2);
+    }
+
+    @Test
+    void stopsWarningOnceTheBadTypeIsFixedToAValidOne() {
+        PlayerMock viewer = server.addPlayer();
+        CountingLogger logger = new CountingLogger();
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), logger, 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0).withEntityType("NOT_A_REAL_TYPE")); // warn #1
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("VILLAGER")); // fixed -> spawns, clears the warned record
+
+        renderer.refresh();
+        renderer.refresh();
+        // The fix renders the mob and no further warns are logged for the now-valid NPC.
+        assertThat(logger.warns).isEqualTo(1);
+        assertThat(packets.spawnEntities).hasSize(1);
+    }
+
+    @Test
     void aSteadyMobNpcIsNotReSpawnedOnRefresh() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer =
@@ -672,6 +724,25 @@ class NpcRendererTest {
 
         @Override
         public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
+    /** A logger that counts warn lines so a test can assert a bad stored type is logged once, not per refresh tick. */
+    private static final class CountingLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        private int warns;
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {
+            warns++;
+        }
 
         @Override
         public void error(String message, Throwable cause) {}

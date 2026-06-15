@@ -76,6 +76,12 @@ public final class NpcRenderer implements NpcView {
     private final Map<String, RenderedNpc> live = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> shownTo = new ConcurrentHashMap<>();
     private final Map<Integer, String> nameByEntityId = new ConcurrentHashMap<>();
+    // NPC name -> the unresolvable entity-type value we already warned about, so a bad row is logged once rather
+    // than every refresh tick for every viewer. The skip in spawnForViewer never marks the viewer shown, so the
+    // 1s reconcile would otherwise re-warn forever; this caps it at one line per NPC per distinct bad value and
+    // re-arms when the type is changed (to a valid type, which renders, or to a different bad value, which warns
+    // afresh).
+    private final Map<String, String> warnedBadType = new ConcurrentHashMap<>();
 
     public NpcRenderer(
             NpcPackets packets,
@@ -109,6 +115,7 @@ public final class NpcRenderer implements NpcView {
             return;
         }
         nameByEntityId.remove(removed.entityId());
+        warnedBadType.remove(name.value());
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             removeFromViewer(viewer, removed);
         }
@@ -152,6 +159,7 @@ public final class NpcRenderer implements NpcView {
         live.clear();
         shownTo.clear();
         nameByEntityId.clear();
+        warnedBadType.clear();
     }
 
     /**
@@ -267,14 +275,14 @@ public final class NpcRenderer implements NpcView {
         } else {
             String typeKey = bukkitTypeKey(npc.entityType());
             if (typeKey == null) {
-                log.warn(
-                        "NPC {} has an unknown entity type {}, skipping its spawn",
-                        npc.name().value(),
-                        npc.entityType());
+                warnBadTypeOnce(npc);
                 return;
             }
             spawnMobForViewer(viewer, rendered, typeKey);
         }
+        // The type resolved (player or a real mob), so forget any earlier warning for this NPC — a fixed type
+        // re-arms the warn if it ever breaks again.
+        warnedBadType.remove(npc.name().value());
         Position at = npc.location();
         packets.send(viewer, packets.headLook(rendered.entityId(), at.yaw()));
         packets.send(viewer, packets.bodyLook(rendered.entityId(), at.yaw(), at.pitch()));
@@ -398,6 +406,19 @@ public final class NpcRenderer implements NpcView {
     /** The stable per-NPC scoreboard team name that tints its glow (capped well under the 16-char team-name limit). */
     private static String glowTeam(Npc npc) {
         return profileName(npc);
+    }
+
+    /**
+     * Log the unresolvable stored type for {@code npc} once. The 1s reconcile retries a bad NPC for every viewer
+     * every tick (the skip never marks the viewer shown), so warning unconditionally would flood the log; this
+     * warns only the first time a given NPC carries a given bad value, and re-warns if the value later changes.
+     */
+    private void warnBadTypeOnce(Npc npc) {
+        String name = npc.name().value();
+        String badType = npc.entityType();
+        if (!badType.equals(warnedBadType.put(name, badType))) {
+            log.warn("NPC {} has an unknown entity type {}, skipping its spawn", name, badType);
+        }
     }
 
     /**
