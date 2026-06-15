@@ -110,7 +110,7 @@ public final class PlayerstateWiring {
                 new OfflineContainerListener(offlineView),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
                 new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
-        return new Wired(commands, listeners, invseeView, offlineView, services);
+        return new Wired(commands, listeners, invseeView, offlineView, services, store, info);
     }
 
     private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {
@@ -174,13 +174,17 @@ public final class PlayerstateWiring {
      * @param invseeView the online invsee menu, held so {@code stop()} flushes every still-open view
      * @param offlineView the offline invsee/endersee menus, held so {@code stop()} flushes every still-open view
      * @param services the constructed use cases, exposing {@code openContainer} cross-context for the staff EXAMINE gadget
+     * @param store the in-memory snapshot map, read by the placeholder seam for the god flag
+     * @param info the live-player read port, read by the placeholder seam for total play time
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             InvseeView invseeView,
             OfflineContainerView offlineView,
-            PlayerStateServices services) {
+            PlayerStateServices services,
+            PlayerStateStore store,
+            PlayerInfo info) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -188,6 +192,8 @@ public final class PlayerstateWiring {
             Objects.requireNonNull(invseeView, "invseeView");
             Objects.requireNonNull(offlineView, "offlineView");
             Objects.requireNonNull(services, "services");
+            Objects.requireNonNull(store, "store");
+            Objects.requireNonNull(info, "info");
         }
 
         /** Reconcile every still-open invsee/endersee menu back onto its target. Called on module stop. */

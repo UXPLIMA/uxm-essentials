@@ -403,6 +403,116 @@ class PlaceholderResolverTest {
         assertThat(resolver.resolve(ALICE, true, "jailed")).contains("no");
     }
 
+    @Test
+    void playerstatePlaceholdersReadLiveState() {
+        PlayerstatePlaceholders.Snapshot snapshot = new PlayerstatePlaceholders.Snapshot(
+                "creative",
+                true,
+                false,
+                true,
+                0.2f,
+                0.1f,
+                18.0,
+                20.0,
+                17,
+                30,
+                0.25f,
+                "world",
+                100,
+                64,
+                -200,
+                "plains",
+                Duration.ofHours(5).plusMinutes(30));
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .playerstate(who -> Optional.of(snapshot))
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "playerstate_gamemode")).contains("creative");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_fly")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_flying")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_god")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_health")).contains("18");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_max_health")).contains("20");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_food")).contains("17");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_level")).contains("30");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_xp")).contains("0.25");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_world")).contains("world");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_x")).contains("100");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_y")).contains("64");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_z")).contains("-200");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_biome")).contains("plains");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_playtime")).contains("5");
+        assertThat(resolver.resolve(ALICE, true, "playerstate_playtime_formatted"))
+                .contains("5h30m");
+    }
+
+    @Test
+    void playerstateSpeedFollowsWhetherTheyAreFlying() {
+        PlayerstatePlaceholders.Snapshot walking = new PlayerstatePlaceholders.Snapshot(
+                "survival",
+                false,
+                false,
+                false,
+                0.2f,
+                0.1f,
+                20.0,
+                20.0,
+                20,
+                0,
+                0f,
+                "world",
+                0,
+                0,
+                0,
+                "plains",
+                Duration.ZERO);
+        PlayerstatePlaceholders.Snapshot flying = new PlayerstatePlaceholders.Snapshot(
+                "survival",
+                true,
+                true,
+                false,
+                0.2f,
+                0.1f,
+                20.0,
+                20.0,
+                20,
+                0,
+                0f,
+                "world",
+                0,
+                0,
+                0,
+                "plains",
+                Duration.ZERO);
+
+        assertThat(resolverWith(PlaceholderContexts.builder()
+                                .playerstate(who -> Optional.of(walking))
+                                .build())
+                        .resolve(ALICE, true, "playerstate_speed"))
+                .contains("0.2");
+        assertThat(resolverWith(PlaceholderContexts.builder()
+                                .playerstate(who -> Optional.of(flying))
+                                .build())
+                        .resolve(ALICE, true, "playerstate_speed"))
+                .contains("0.1");
+    }
+
+    @Test
+    void playerstatePlaceholdersDegradeOfflineAndWhenDisabled() {
+        PlayerstatePlaceholders empty = who -> Optional.empty();
+        PlaceholderResolver withSeam =
+                resolverWith(PlaceholderContexts.builder().playerstate(empty).build());
+        PlaceholderResolver noSeam = resolverWith(PlaceholderContexts.builder().build());
+
+        // Offline: the seam reports no snapshot, so every key is the dash.
+        assertThat(withSeam.resolve(ALICE, true, "playerstate_gamemode")).contains("-");
+        // The offline guard short-circuits before the seam is even consulted.
+        assertThat(withSeam.resolve(ALICE, false, "playerstate_health")).contains("-");
+        // Disabled module: no seam at all.
+        assertThat(noSeam.resolve(ALICE, true, "playerstate_world")).contains("-");
+        assertThat(noSeam.resolve(ALICE, true, "playerstate_unknown")).contains("-");
+    }
+
     private static PresencePlaceholders presenceSeam(PresencePlaceholders.Snapshot snapshot) {
         return who -> Optional.of(snapshot);
     }

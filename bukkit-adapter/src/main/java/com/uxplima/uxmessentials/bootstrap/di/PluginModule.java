@@ -70,6 +70,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
@@ -463,6 +464,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        links.placeholders.playerstate(new StorePlayerstatePlaceholders(wired.store(), wired.info()));
         // Captured for staff (wired last), which binds its EXAMINE gadget to this /invsee open use case.
         links.staffOpenContainer = wired.services().openContainer();
     }

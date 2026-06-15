@@ -41,6 +41,7 @@ public final class PlaceholderResolver {
     private static final String ECONOMY_PREFIX = "economy_";
     private static final String HOMES_PREFIX = "homes_";
     private static final String PRESENCE_PREFIX = "presence_";
+    private static final String PLAYERSTATE_PREFIX = "playerstate_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -79,6 +80,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(PRESENCE_PREFIX)) {
             return Optional.of(presence(who, online, normalized.substring(PRESENCE_PREFIX.length())));
+        }
+        if (normalized.startsWith(PLAYERSTATE_PREFIX)) {
+            return Optional.of(playerstate(who, online, normalized.substring(PLAYERSTATE_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -315,6 +319,46 @@ public final class PlaceholderResolver {
         };
     }
 
+    /**
+     * Resolve a {@code playerstate_}-stripped key against the playerstate seam. Every key is live session
+     * state, so a disabled module or an offline player degrades each to the dash. Coordinates are block-
+     * truncated, the float scalars (speed, experience) are rendered with up to two decimal places trimmed,
+     * and {@code playtime}/{@code playtime_formatted} read the total time played.
+     */
+    private String playerstate(PlayerRef who, boolean online, String key) {
+        Optional<PlayerstatePlaceholders> seam = contexts.playerstate();
+        if (seam.isEmpty() || !online) {
+            return EMPTY;
+        }
+        Optional<PlayerstatePlaceholders.Snapshot> snapshot = seam.get().snapshot(who);
+        return snapshot.map(state -> playerstateField(state, key)).orElse(EMPTY);
+    }
+
+    private static String playerstateField(PlayerstatePlaceholders.Snapshot state, String key) {
+        return switch (key) {
+            case "gamemode" -> state.gamemode();
+            case "fly" -> bool(state.flightAllowed());
+            case "flying" -> bool(state.flying());
+            case "god" -> bool(state.god());
+            case "speed" -> decimal(state.flying() ? state.flySpeed() : state.walkSpeed());
+            case "walk_speed" -> decimal(state.walkSpeed());
+            case "fly_speed" -> decimal(state.flySpeed());
+            case "health" -> decimal(state.health());
+            case "max_health" -> decimal(state.maxHealth());
+            case "food" -> Integer.toString(state.food());
+            case "level" -> Integer.toString(state.level());
+            case "xp" -> decimal(state.experienceProgress());
+            case "world" -> state.world();
+            case "x" -> Integer.toString(state.blockX());
+            case "y" -> Integer.toString(state.blockY());
+            case "z" -> Integer.toString(state.blockZ());
+            case "biome" -> state.biome();
+            case "playtime" -> Long.toString(state.playtime().toHours());
+            case "playtime_formatted" -> PlaceholderDurations.compact(state.playtime());
+            default -> EMPTY;
+        };
+    }
+
     private String kitCooldown(PlayerRef who, String kitId) {
         Optional<KitsPlaceholders> seam = contexts.kits();
         if (seam.isEmpty() || kitId.isBlank()) {
@@ -452,6 +496,17 @@ public final class PlaceholderResolver {
 
     private static String bool(boolean value) {
         return value ? YES : NO;
+    }
+
+    /**
+     * A live scalar (health, speed, experience progress) rounded to two decimal places with trailing zeros
+     * stripped — so {@code 20.0} reads {@code 20} and {@code 0.25} reads {@code 0.25}.
+     */
+    private static String decimal(double value) {
+        return new java.math.BigDecimal(value)
+                .setScale(2, java.math.RoundingMode.HALF_UP)
+                .stripTrailingZeros()
+                .toPlainString();
     }
 
     private static String unlimited() {

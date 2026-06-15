@@ -19,6 +19,7 @@ public final class PlaceholderContexts {
     private final @Nullable HomesPlaceholders homes;
     private final @Nullable EconomyPlaceholders economy;
     private final @Nullable PresencePlaceholders presence;
+    private final @Nullable PlayerstatePlaceholders playerstate;
     private final @Nullable KitsPlaceholders kits;
     private final @Nullable VaultsPlaceholders vaults;
     private final @Nullable ModerationPlaceholders moderation;
@@ -28,6 +29,7 @@ public final class PlaceholderContexts {
         this.homes = builder.homes;
         this.economy = builder.economy;
         this.presence = builder.presence;
+        this.playerstate = builder.playerstate;
         this.kits = builder.kits;
         this.vaults = builder.vaults;
         this.moderation = builder.moderation;
@@ -51,6 +53,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(presence);
     }
 
+    public Optional<PlayerstatePlaceholders> playerstate() {
+        return Optional.ofNullable(playerstate);
+    }
+
     public Optional<KitsPlaceholders> kits() {
         return Optional.ofNullable(kits);
     }
@@ -72,6 +78,7 @@ public final class PlaceholderContexts {
         return homes == null
                 && economy == null
                 && presence == null
+                && playerstate == null
                 && kits == null
                 && vaults == null
                 && moderation == null
@@ -84,6 +91,7 @@ public final class PlaceholderContexts {
         private @Nullable HomesPlaceholders homes;
         private @Nullable EconomyPlaceholders economy;
         private @Nullable PresencePlaceholders presence;
+        private @Nullable PlayerstatePlaceholders playerstate;
         private @Nullable KitsPlaceholders kits;
         private @Nullable VaultsPlaceholders vaults;
         private @Nullable ModerationPlaceholders moderation;
@@ -103,6 +111,11 @@ public final class PlaceholderContexts {
 
         public Builder presence(PresencePlaceholders seam) {
             this.presence = seam;
+            return this;
+        }
+
+        public Builder playerstate(PlayerstatePlaceholders seam) {
+            this.playerstate = seam;
             return this;
         }
 
