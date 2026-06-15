@@ -40,6 +40,7 @@ public final class PlaceholderResolver {
     private static final String KIT_COOLDOWN_PREFIX = "kit_cooldown_";
     private static final String ECONOMY_PREFIX = "economy_";
     private static final String HOMES_PREFIX = "homes_";
+    private static final String PRESENCE_PREFIX = "presence_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -75,6 +76,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(VOTEPARTY_PREFIX)) {
             return Optional.of(voteparty(normalized.substring(VOTEPARTY_PREFIX.length())));
+        }
+        if (normalized.startsWith(PRESENCE_PREFIX)) {
+            return Optional.of(presence(who, online, normalized.substring(PRESENCE_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -285,6 +289,12 @@ public final class PlaceholderResolver {
         }
     }
 
+    /**
+     * Resolve a presence key against the presence seam. Accepts both the bare keys ({@code afk},
+     * {@code afk_duration}, {@code vanished}) and the {@code presence_}-stripped family ({@code nickname},
+     * {@code realname}, {@code afk_since} as an alias of {@code afk_duration}, {@code afk_reason}). Presence is
+     * session-only state, so an offline player or a disabled module degrades every key to the dash.
+     */
     private String presence(PlayerRef who, boolean online, String key) {
         Optional<PresencePlaceholders> seam = contexts.presence();
         if (seam.isEmpty() || !online) {
@@ -297,7 +307,10 @@ public final class PlaceholderResolver {
         PresencePlaceholders.Snapshot state = snapshot.get();
         return switch (key) {
             case "afk" -> bool(state.afk());
-            case "afk_duration" -> state.afk() ? PlaceholderDurations.compact(state.afkFor()) : EMPTY;
+            case "afk_duration", "afk_since" -> state.afk() ? PlaceholderDurations.compact(state.afkFor()) : EMPTY;
+            case "afk_reason" -> state.afk() ? state.afkReason().orElse(EMPTY) : EMPTY;
+            case "nickname" -> state.nickname();
+            case "realname" -> who.name();
             default -> bool(state.vanished());
         };
     }

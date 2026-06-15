@@ -209,8 +209,8 @@ class PlaceholderResolverTest {
 
     @Test
     void presencePlaceholdersReadAfkDurationAndVanish() {
-        PresencePlaceholders presence =
-                who -> Optional.of(new PresencePlaceholders.Snapshot(true, Duration.ofSeconds(90), true));
+        PresencePlaceholders presence = presenceSeam(
+                new PresencePlaceholders.Snapshot(true, Duration.ofSeconds(90), Optional.of("lunch"), true, "Ace"));
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().presence(presence).build());
 
@@ -220,25 +220,53 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void presencePrefixReadsNicknameRealnameReasonAndStatus() {
+        PresencePlaceholders presence = presenceSeam(
+                new PresencePlaceholders.Snapshot(true, Duration.ofSeconds(90), Optional.of("lunch"), true, "Ace"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().presence(presence).build());
+
+        assertThat(resolver.resolve(ALICE, true, "presence_nickname")).contains("Ace");
+        assertThat(resolver.resolve(ALICE, true, "presence_realname")).contains("Alice");
+        assertThat(resolver.resolve(ALICE, true, "presence_afk")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "presence_afk_since")).contains("1m30s");
+        assertThat(resolver.resolve(ALICE, true, "presence_afk_reason")).contains("lunch");
+        assertThat(resolver.resolve(ALICE, true, "presence_vanished")).contains("yes");
+    }
+
+    @Test
+    void presenceAfkReasonIsDashWithoutAReason() {
+        PresencePlaceholders presence = presenceSeam(
+                new PresencePlaceholders.Snapshot(true, Duration.ofSeconds(5), Optional.empty(), false, "Alice"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().presence(presence).build());
+
+        assertThat(resolver.resolve(ALICE, true, "presence_afk_reason")).contains("-");
+    }
+
+    @Test
     void presencePlaceholdersDegradeWhenOffline() {
-        PresencePlaceholders presence =
-                who -> Optional.of(new PresencePlaceholders.Snapshot(true, Duration.ofSeconds(90), true));
+        PresencePlaceholders presence = presenceSeam(
+                new PresencePlaceholders.Snapshot(true, Duration.ofSeconds(90), Optional.of("afk"), true, "Ace"));
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().presence(presence).build());
 
         assertThat(resolver.resolve(ALICE, false, "afk")).contains("-");
         assertThat(resolver.resolve(ALICE, false, "afk_duration")).contains("-");
+        assertThat(resolver.resolve(ALICE, false, "presence_nickname")).contains("-");
+        assertThat(resolver.resolve(ALICE, false, "presence_realname")).contains("-");
     }
 
     @Test
     void afkDurationIsDashWhenNotAfk() {
         PresencePlaceholders presence =
-                who -> Optional.of(new PresencePlaceholders.Snapshot(false, Duration.ZERO, false));
+                presenceSeam(new PresencePlaceholders.Snapshot(false, Duration.ZERO, Optional.empty(), false, "Alice"));
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().presence(presence).build());
 
         assertThat(resolver.resolve(ALICE, true, "afk")).contains("no");
         assertThat(resolver.resolve(ALICE, true, "afk_duration")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "presence_afk_reason")).contains("-");
     }
 
     @Test
@@ -373,6 +401,10 @@ class PlaceholderResolverTest {
         // A disabled moderation module means "no one is sanctioned", not the dash.
         assertThat(resolver.resolve(ALICE, true, "muted")).contains("no");
         assertThat(resolver.resolve(ALICE, true, "jailed")).contains("no");
+    }
+
+    private static PresencePlaceholders presenceSeam(PresencePlaceholders.Snapshot snapshot) {
+        return who -> Optional.of(snapshot);
     }
 
     private static PlaceholderResolver resolverWith(PlaceholderContexts contexts) {
