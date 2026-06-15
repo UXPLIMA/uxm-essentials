@@ -46,6 +46,8 @@ public final class PlaceholderResolver {
     private static final String ECONOMY_PREFIX = "economy_";
     private static final String HOMES_PREFIX = "homes_";
     private static final String VAULTS_PREFIX = "vaults_";
+    private static final String WARPS_PREFIX = "warps_";
+    private static final String WARP_PREFIX = "warp_";
     private static final String PRESENCE_PREFIX = "presence_";
     private static final String PLAYERSTATE_PREFIX = "playerstate_";
     private static final String TELEPORT_PREFIX = "teleport_";
@@ -82,6 +84,12 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(VAULTS_PREFIX)) {
             return Optional.of(vaultsFamily(who, normalized.substring(VAULTS_PREFIX.length())));
+        }
+        if (normalized.startsWith(WARPS_PREFIX)) {
+            return Optional.of(warpsFamily(who, normalized.substring(WARPS_PREFIX.length())));
+        }
+        if (normalized.startsWith(WARP_PREFIX)) {
+            return Optional.of(warpField(who, normalized.substring(WARP_PREFIX.length())));
         }
         if (normalized.startsWith(VOTES_PREFIX)) {
             return Optional.of(votes(who, normalized.substring(VOTES_PREFIX.length())));
@@ -476,6 +484,61 @@ public final class PlaceholderResolver {
                 yield max < 0 ? unlimited() : Integer.toString(Math.max(0, max - vaults.count(who)));
             }
             case "size" -> Integer.toString(vaults.size(who));
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code warps_*} tail against the warps seam. {@code count} reads how many warps the player may
+     * use; {@code list} joins their names (the dash when they may use none). A disabled module degrades both to
+     * the dash. Only warps the player may teleport to are counted or listed.
+     */
+    private String warpsFamily(PlayerRef who, String tail) {
+        Optional<WarpsPlaceholders> seam = contexts.warps();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        WarpsPlaceholders warps = seam.get();
+        return switch (tail) {
+            case "count" -> Integer.toString(warps.count(who));
+            case "list" -> {
+                List<String> names = warps.accessibleNames(who);
+                yield names.isEmpty() ? EMPTY : String.join(", ", names);
+            }
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code warp_<name>_<field>} tail. The field is the segment after the last underscore (so a warp
+     * name may itself contain underscores) and is read off the warp's view: {@code world}, {@code x|y|z},
+     * {@code visits}, {@code owner}, or {@code cost}. A disabled module, a malformed tail, a warp that does not
+     * exist, or one the player may not use all degrade to the dash.
+     */
+    private String warpField(PlayerRef who, String tail) {
+        Optional<WarpsPlaceholders> seam = contexts.warps();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        int split = tail.lastIndexOf('_');
+        if (split <= 0 || split == tail.length() - 1) {
+            return EMPTY;
+        }
+        String name = tail.substring(0, split);
+        String field = tail.substring(split + 1);
+        Optional<WarpsPlaceholders.WarpView> view = seam.get().find(who, name);
+        if (view.isEmpty()) {
+            return EMPTY;
+        }
+        WarpsPlaceholders.WarpView warp = view.get();
+        return switch (field) {
+            case "world" -> warp.world();
+            case "x" -> Integer.toString(warp.blockX());
+            case "y" -> Integer.toString(warp.blockY());
+            case "z" -> Integer.toString(warp.blockZ());
+            case "visits" -> Long.toString(warp.visits());
+            case "owner" -> warp.owner();
+            case "cost" -> warp.cost().toPlainString();
             default -> EMPTY;
         };
     }

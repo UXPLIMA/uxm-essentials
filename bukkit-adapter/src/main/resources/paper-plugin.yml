@@ -210,6 +210,30 @@ permissions:
   uxmessentials.warp.delete:
     description: '/delwarp <name> to remove a warp.'
     default: op
+  uxmessentials.warp.lock:
+    description: '/warp lock <name> to lock or unlock a warp against use.'
+    default: op
+  uxmessentials.warp.password:
+    description: '/warp password <name> to set or clear a warp''s access password.'
+    default: op
+  uxmessentials.warp.edit:
+    description: '/warp edit <name> to open the warp editor (cost, gates, effects, welcome message, icon).'
+    default: op
+  uxmessentials.warp.sign.create:
+    description: 'Create a [warp] sign that teleports players to a warp on click.'
+    default: op
+  uxmessentials.warp.sign.use:
+    description: 'Use a [warp] sign to teleport to its warp.'
+    default: true
+  uxmessentials.warp.bypass.lock:
+    description: 'Use a locked warp regardless of its lock state.'
+    default: op
+  uxmessentials.warp.bypass.password:
+    description: 'Use a password-protected warp without entering its password.'
+    default: op
+  uxmessentials.warp.bypass.safety:
+    description: 'Use a warp whose destination fails the safety check.'
+    default: op
   # economy context (docs/permissions.md "Economy"). Balances are DB-backed and survive world
   # rollbacks; the native provider registers through the ServicesManager unless a foreign economy
   # (Treasury/Vault) is already present, in which case it defers (ADR 0004). The per-currency value

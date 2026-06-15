@@ -370,6 +370,77 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void warpsCountAndListReadThroughTheSeam() {
+        FakeWarps warps = new FakeWarps()
+                .visible("spawn", warpView("world", 0, 64, 0, 12, "Admin", "0"))
+                .visible("shop", warpView("world", 100, 70, -50, 4, "Admin", "250"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().warps(warps).build());
+
+        assertThat(resolver.resolve(ALICE, true, "warps_count")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "warps_list")).contains("spawn, shop");
+    }
+
+    @Test
+    void warpsListAndCountDashWhenNoneVisible() {
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().warps(new FakeWarps()).build());
+
+        assertThat(resolver.resolve(ALICE, true, "warps_count")).contains("0");
+        assertThat(resolver.resolve(ALICE, true, "warps_list")).contains("-");
+    }
+
+    @Test
+    void perWarpFieldsReadWorldCoordinatesVisitsOwnerAndCost() {
+        FakeWarps warps = new FakeWarps().visible("shop", warpView("world_nether", 100, 70, -50, 4, "Admin", "250"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().warps(warps).build());
+
+        assertThat(resolver.resolve(ALICE, true, "warp_shop_world")).contains("world_nether");
+        assertThat(resolver.resolve(ALICE, true, "warp_shop_x")).contains("100");
+        assertThat(resolver.resolve(ALICE, true, "warp_shop_y")).contains("70");
+        assertThat(resolver.resolve(ALICE, true, "warp_shop_z")).contains("-50");
+        assertThat(resolver.resolve(ALICE, true, "warp_shop_visits")).contains("4");
+        assertThat(resolver.resolve(ALICE, true, "warp_shop_owner")).contains("Admin");
+        assertThat(resolver.resolve(ALICE, true, "warp_shop_cost")).contains("250");
+    }
+
+    @Test
+    void perWarpFieldHandlesNamesWithUnderscores() {
+        FakeWarps warps = new FakeWarps().visible("pvp_arena", warpView("world", 1, 2, 3, 0, "Admin", "0"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().warps(warps).build());
+
+        assertThat(resolver.resolve(ALICE, true, "warp_pvp_arena_world")).contains("world");
+        assertThat(resolver.resolve(ALICE, true, "warp_pvp_arena_x")).contains("1");
+    }
+
+    @Test
+    void perWarpFieldDashesUnknownHiddenAndMalformed() {
+        FakeWarps warps = new FakeWarps().visible("spawn", warpView("world", 0, 64, 0, 0, "Admin", "0"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().warps(warps).build());
+
+        // A warp the player cannot see (not in the visible set) degrades to the dash, never leaking its data.
+        assertThat(resolver.resolve(ALICE, true, "warp_secret_world")).contains("-");
+        // An unknown field on a visible warp, and a tail with no field segment, both degrade to the dash.
+        assertThat(resolver.resolve(ALICE, true, "warp_spawn_unknown")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "warp_spawn")).contains("-");
+    }
+
+    @Test
+    void warpsDegradeWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "warps_count")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "warps_list")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "warp_spawn_world")).contains("-");
+        // An unknown warps_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "warps_unknown")).contains("-");
+    }
+
+    @Test
     void vaultsCountMaxLeftAndSizeReadThroughTheSeam() {
         PlaceholderResolver resolver = resolverWith(
                 PlaceholderContexts.builder().vaults(fakeVaults(2, 5, 6)).build());
@@ -1077,6 +1148,37 @@ class PlaceholderResolverTest {
         public List<String> usableIds(PlayerRef who) {
             return usableIds;
         }
+    }
+
+    /** A configurable {@link WarpsPlaceholders} fake — only the seeded (visible) warps are counted/listed/found. */
+    private static final class FakeWarps implements WarpsPlaceholders {
+
+        private final java.util.LinkedHashMap<String, WarpView> visible = new java.util.LinkedHashMap<>();
+
+        FakeWarps visible(String name, WarpView view) {
+            visible.put(name, view);
+            return this;
+        }
+
+        @Override
+        public int count(PlayerRef who) {
+            return visible.size();
+        }
+
+        @Override
+        public List<String> accessibleNames(PlayerRef who) {
+            return List.copyOf(visible.keySet());
+        }
+
+        @Override
+        public Optional<WarpView> find(PlayerRef who, String name) {
+            return Optional.ofNullable(visible.get(name.toLowerCase(java.util.Locale.ROOT)));
+        }
+    }
+
+    private static WarpsPlaceholders.WarpView warpView(
+            String world, int x, int y, int z, long visits, String owner, String cost) {
+        return new WarpsPlaceholders.WarpView(world, x, y, z, visits, owner, new BigDecimal(cost));
     }
 
     private static VaultsPlaceholders fakeVaults(int count, int max, int size) {

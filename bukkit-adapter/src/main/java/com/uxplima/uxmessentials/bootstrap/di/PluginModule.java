@@ -70,6 +70,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWarpsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ServicesTeleportPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
@@ -448,6 +449,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        links.placeholders.warps(new RepositoryWarpsPlaceholders(wired.listWarps()));
     }
 
     private static void wireKits(

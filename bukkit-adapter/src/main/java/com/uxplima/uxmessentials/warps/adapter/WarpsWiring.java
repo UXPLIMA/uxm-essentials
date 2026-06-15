@@ -158,14 +158,15 @@ public final class WarpsWiring {
                         repository, services.useWarp(), kernel.permissions(), ctx.config(), kernel.messages()),
                 promptListener,
                 editorListener);
-        return new Wired(commands, listeners, editorView, playerWarpHandle, teleportRegistry, () -> {
-            teleportRegistry.clear();
-            // Drop any pending editor chat prompt so a leftover callback cannot fire after teardown.
-            promptListener.clear();
-            if (redisSync != null) {
-                redisSync.stop();
-            }
-        });
+        return new Wired(
+                commands, listeners, services.listWarps(), editorView, playerWarpHandle, teleportRegistry, () -> {
+                    teleportRegistry.clear();
+                    // Drop any pending editor chat prompt so a leftover callback cannot fire after teardown.
+                    promptListener.clear();
+                    if (redisSync != null) {
+                        redisSync.stop();
+                    }
+                });
     }
 
     private static final class RedisBroadcastingRepository implements WarpRepository {
@@ -257,6 +258,7 @@ public final class WarpsWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the listeners to register
+     * @param listWarps the visibility-filtered listing the {@code warps_*}/{@code warp_*} placeholders read
      * @param editorView the warp editor view player-warps re-uses for its own editor entry, or {@code null}
      * @param playerWarpHandle the late-bound handle player-warps binds its repository into for the editor
      * @param teleportRegistry the warp-arrival notification handoff player-warps shares so its hops also notify
@@ -265,6 +267,7 @@ public final class WarpsWiring {
     public record Wired(
             List<CommandRegistration> commands,
             List<org.bukkit.event.Listener> listeners,
+            ListWarps listWarps,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle playerWarpHandle,
@@ -274,6 +277,7 @@ public final class WarpsWiring {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(listWarps, "listWarps");
             Objects.requireNonNull(playerWarpHandle, "playerWarpHandle");
             Objects.requireNonNull(teleportRegistry, "teleportRegistry");
             Objects.requireNonNull(stopAction, "stopAction");

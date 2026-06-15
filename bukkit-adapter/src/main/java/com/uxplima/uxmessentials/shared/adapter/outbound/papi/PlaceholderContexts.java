@@ -22,6 +22,7 @@ public final class PlaceholderContexts {
     private final @Nullable PlayerstatePlaceholders playerstate;
     private final @Nullable KitsPlaceholders kits;
     private final @Nullable VaultsPlaceholders vaults;
+    private final @Nullable WarpsPlaceholders warps;
     private final @Nullable ModerationPlaceholders moderation;
     private final @Nullable TeleportPlaceholders teleport;
     private final @Nullable VotePlaceholders vote;
@@ -33,6 +34,7 @@ public final class PlaceholderContexts {
         this.playerstate = builder.playerstate;
         this.kits = builder.kits;
         this.vaults = builder.vaults;
+        this.warps = builder.warps;
         this.moderation = builder.moderation;
         this.teleport = builder.teleport;
         this.vote = builder.vote;
@@ -67,6 +69,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(vaults);
     }
 
+    public Optional<WarpsPlaceholders> warps() {
+        return Optional.ofNullable(warps);
+    }
+
     public Optional<ModerationPlaceholders> moderation() {
         return Optional.ofNullable(moderation);
     }
@@ -87,6 +93,7 @@ public final class PlaceholderContexts {
                 && playerstate == null
                 && kits == null
                 && vaults == null
+                && warps == null
                 && moderation == null
                 && teleport == null
                 && vote == null;
@@ -101,6 +108,7 @@ public final class PlaceholderContexts {
         private @Nullable PlayerstatePlaceholders playerstate;
         private @Nullable KitsPlaceholders kits;
         private @Nullable VaultsPlaceholders vaults;
+        private @Nullable WarpsPlaceholders warps;
         private @Nullable ModerationPlaceholders moderation;
         private @Nullable TeleportPlaceholders teleport;
         private @Nullable VotePlaceholders vote;
@@ -134,6 +142,11 @@ public final class PlaceholderContexts {
 
         public Builder vaults(VaultsPlaceholders seam) {
             this.vaults = seam;
+            return this;
+        }
+
+        public Builder warps(WarpsPlaceholders seam) {
+            this.warps = seam;
             return this;
         }
 
