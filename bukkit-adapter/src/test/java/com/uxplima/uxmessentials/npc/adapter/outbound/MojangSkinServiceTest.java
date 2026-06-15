@@ -92,6 +92,20 @@ class MojangSkinServiceTest {
     }
 
     @Test
+    void aUsernameWithIllegalUriCharactersCompletesEmptyWithoutHangingOrFetching() {
+        FakeFetcher fetcher = new FakeFetcher();
+        MojangSkinService service = newService(fetcher);
+
+        // A space (or backslash/pipe/stray percent) cannot form a legal URI path segment; URI.create would
+        // throw out of the async stage and leave the future uncompleted, so the service must reject it as a miss.
+        CompletableFuture<Optional<NpcSkin>> future = service.fetchByName("not a name");
+
+        assertThat(future).isCompleted();
+        assertThat(future.join()).isEmpty();
+        assertThat(fetcher.calls).isEmpty();
+    }
+
+    @Test
     void aSecondLookupForTheSameNameIsServedFromCache() {
         FakeFetcher fetcher = new FakeFetcher();
         fetcher.bodies.put(PROFILE_URI, "{\"id\":\"069a79f444e94726a5befca90e38aaf5\",\"name\":\"Notch\"}");

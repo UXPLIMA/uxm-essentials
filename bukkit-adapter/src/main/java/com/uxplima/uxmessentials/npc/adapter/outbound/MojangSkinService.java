@@ -82,7 +82,12 @@ public final class MojangSkinService implements SkinService {
     }
 
     private Optional<NpcSkin> resolve(String username) {
-        Optional<String> profileBody = fetcher.get(URI.create(NAME_TO_UUID + username));
+        Optional<URI> nameUri = uri(NAME_TO_UUID + username);
+        if (nameUri.isEmpty()) {
+            log.debug("NPC skin username {} is not a valid Mojang name lookup target", username);
+            return Optional.empty();
+        }
+        Optional<String> profileBody = fetcher.get(nameUri.get());
         if (profileBody.isEmpty()) {
             log.debug("No Mojang profile resolved for NPC skin username {}", username);
             return Optional.empty();
@@ -92,7 +97,12 @@ public final class MojangSkinService implements SkinService {
             log.warn("Mojang name lookup for NPC skin username {} returned no id", username);
             return Optional.empty();
         }
-        Optional<String> textureBody = fetcher.get(URI.create(PROFILE + id.get() + SIGNED_QUERY));
+        Optional<URI> profileUri = uri(PROFILE + id.get() + SIGNED_QUERY);
+        if (profileUri.isEmpty()) {
+            log.warn("Mojang profile id {} for NPC skin username {} is not a valid session target", id.get(), username);
+            return Optional.empty();
+        }
+        Optional<String> textureBody = fetcher.get(profileUri.get());
         if (textureBody.isEmpty()) {
             log.warn("Mojang session profile for NPC skin username {} ({}) returned no body", username, id.get());
             return Optional.empty();
@@ -102,5 +112,19 @@ public final class MojangSkinService implements SkinService {
             log.warn("Mojang session profile for NPC skin username {} carried no textures property", username);
         }
         return skin;
+    }
+
+    /**
+     * Build a request {@link URI}, or empty when {@code spec} is not a valid URI. A real Mojang username is
+     * {@code [A-Za-z0-9_]{1,16}}, so a name carrying a space, a backslash, or a stray percent escape can never
+     * form a legal path segment and is definitively not an account — treat it as a miss rather than letting
+     * {@link URI#create(String)} throw out of the async stage and leave the command's future hanging.
+     */
+    private static Optional<URI> uri(String spec) {
+        try {
+            return Optional.of(URI.create(spec));
+        } catch (IllegalArgumentException malformed) {
+            return Optional.empty();
+        }
     }
 }
