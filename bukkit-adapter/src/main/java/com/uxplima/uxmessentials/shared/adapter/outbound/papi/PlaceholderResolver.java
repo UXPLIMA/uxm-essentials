@@ -59,6 +59,7 @@ public final class PlaceholderResolver {
     private static final String DISCORDLINK_PREFIX = "discordlink_";
     private static final String HOLOGRAMS_PREFIX = "holograms_";
     private static final String COMMUNICATION_PREFIX = "communication_";
+    private static final String SCOREBOARD_PREFIX = "scoreboard_";
     private static final String SERVER_PREFIX = "server_";
     private static final String SERVER_WORLD_PLAYERS_PREFIX = "world_players_";
     private static final String VOTES_PREFIX = "votes_";
@@ -140,6 +141,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(COMMUNICATION_PREFIX)) {
             return Optional.of(communication(who, online, normalized.substring(COMMUNICATION_PREFIX.length())));
+        }
+        if (normalized.startsWith(SCOREBOARD_PREFIX)) {
+            return Optional.of(scoreboard(who, online, normalized.substring(SCOREBOARD_PREFIX.length())));
         }
         if (normalized.startsWith(SERVER_PREFIX)) {
             return Optional.of(serverMetric(normalized.substring(SERVER_PREFIX.length())));
@@ -747,6 +751,20 @@ public final class PlaceholderResolver {
             case "broadcasts" -> online ? bool(communication.receivesBroadcasts(who)) : EMPTY;
             default -> EMPTY;
         };
+    }
+
+    /**
+     * Resolve a {@code scoreboard_}-stripped key against the scoreboard seam. {@code visible} reports whether the
+     * requester currently sees the sidebar ({@code yes}) or has hidden it with {@code /scoreboard} ({@code no}). The
+     * preference is read off the live player, so it holds no value for an offline requester and the offline guard
+     * degrades it to the dash. A disabled module degrades every key to the dash.
+     */
+    private String scoreboard(PlayerRef who, boolean online, String key) {
+        Optional<ScoreboardPlaceholders> seam = contexts.scoreboard();
+        if (seam.isEmpty() || !online) {
+            return EMPTY;
+        }
+        return key.equals("visible") ? bool(seam.get().visible(who)) : EMPTY;
     }
 
     /**

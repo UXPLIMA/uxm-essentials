@@ -81,6 +81,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreCommunication
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreDiscordlinkPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreScoreboardPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
@@ -685,6 +686,9 @@ public final class PluginModule {
         ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.nameVisibility);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The scoreboard PAPI seam reads the same PDC-backed "hidden" bit the /scoreboard toggle flips, so the
+        // scoreboard_visible placeholder matches whether the player actually sees the sidebar in game.
+        links.placeholders.scoreboard(new StoreScoreboardPlaceholders(wired.visibility()));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
     }

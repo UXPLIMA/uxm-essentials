@@ -942,6 +942,39 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void scoreboardVisiblePlaceholderReadsTheShownState() {
+        FakeScoreboard shown = new FakeScoreboard().visible(ALICE, true);
+        FakeScoreboard hidden = new FakeScoreboard().visible(ALICE, false);
+        PlaceholderResolver shownResolver =
+                resolverWith(PlaceholderContexts.builder().scoreboard(shown).build());
+        PlaceholderResolver hiddenResolver =
+                resolverWith(PlaceholderContexts.builder().scoreboard(hidden).build());
+
+        assertThat(shownResolver.resolve(ALICE, true, "scoreboard_visible")).contains("yes");
+        assertThat(hiddenResolver.resolve(ALICE, true, "scoreboard_visible")).contains("no");
+    }
+
+    @Test
+    void scoreboardVisibleDegradesOfflineSinceTheBoardIsSessionScoped() {
+        FakeScoreboard shown = new FakeScoreboard().visible(ALICE, true);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().scoreboard(shown).build());
+
+        // The board belongs to a live player, so an offline requester has nothing to show.
+        assertThat(resolver.resolve(ALICE, false, "scoreboard_visible")).contains("-");
+    }
+
+    @Test
+    void scoreboardDegradesWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "scoreboard_visible")).contains("-");
+        // An unknown scoreboard_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "scoreboard_unknown")).contains("-");
+    }
+
+    @Test
     void communicationPlaceholdersReadChatLockAndBroadcastSubscription() {
         FakeCommunication open = new FakeCommunication().chatEnabled(true).receivesBroadcasts(ALICE, true);
         FakeCommunication locked = new FakeCommunication().chatEnabled(false).receivesBroadcasts(ALICE, false);
@@ -1673,6 +1706,26 @@ class PlaceholderResolverTest {
         @Override
         public int onlineStaffCount() {
             return onlineCount;
+        }
+    }
+
+    /** A configurable {@link ScoreboardPlaceholders} fake — every read returns the value the test seeded. */
+    private static final class FakeScoreboard implements ScoreboardPlaceholders {
+
+        private final java.util.Set<PlayerRef> shown = new java.util.HashSet<>();
+
+        FakeScoreboard visible(PlayerRef who, boolean value) {
+            if (value) {
+                shown.add(who);
+            } else {
+                shown.remove(who);
+            }
+            return this;
+        }
+
+        @Override
+        public boolean visible(PlayerRef who) {
+            return shown.contains(who);
         }
     }
 

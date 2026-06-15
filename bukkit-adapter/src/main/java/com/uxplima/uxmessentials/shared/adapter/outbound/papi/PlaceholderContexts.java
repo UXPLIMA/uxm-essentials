@@ -32,6 +32,7 @@ public final class PlaceholderContexts {
     private final @Nullable DiscordlinkPlaceholders discordlink;
     private final @Nullable HologramsPlaceholders holograms;
     private final @Nullable CommunicationPlaceholders communication;
+    private final @Nullable ScoreboardPlaceholders scoreboard;
     private final @Nullable ServerMetricsPlaceholders serverMetrics;
 
     private PlaceholderContexts(Builder builder) {
@@ -51,6 +52,7 @@ public final class PlaceholderContexts {
         this.discordlink = builder.discordlink;
         this.holograms = builder.holograms;
         this.communication = builder.communication;
+        this.scoreboard = builder.scoreboard;
         this.serverMetrics = builder.serverMetrics;
     }
 
@@ -123,6 +125,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(communication);
     }
 
+    public Optional<ScoreboardPlaceholders> scoreboard() {
+        return Optional.ofNullable(scoreboard);
+    }
+
     public Optional<ServerMetricsPlaceholders> serverMetrics() {
         return Optional.ofNullable(serverMetrics);
     }
@@ -145,6 +151,7 @@ public final class PlaceholderContexts {
                 && discordlink == null
                 && holograms == null
                 && communication == null
+                && scoreboard == null
                 && serverMetrics == null;
     }
 
@@ -167,6 +174,7 @@ public final class PlaceholderContexts {
         private @Nullable DiscordlinkPlaceholders discordlink;
         private @Nullable HologramsPlaceholders holograms;
         private @Nullable CommunicationPlaceholders communication;
+        private @Nullable ScoreboardPlaceholders scoreboard;
         private @Nullable ServerMetricsPlaceholders serverMetrics;
 
         private Builder() {}
@@ -248,6 +256,11 @@ public final class PlaceholderContexts {
 
         public Builder communication(CommunicationPlaceholders seam) {
             this.communication = seam;
+            return this;
+        }
+
+        public Builder scoreboard(ScoreboardPlaceholders seam) {
+            this.scoreboard = seam;
             return this;
         }
 

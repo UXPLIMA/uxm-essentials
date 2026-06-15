@@ -56,6 +56,7 @@ class PlaceholderInventoryDriftTest {
             "discordlink_",
             "holograms_",
             "communication_",
+            "scoreboard_",
             "server_");
 
     /** The bare (un-prefixed) keys the resolver dispatches in its terminal switch. */
@@ -175,6 +176,7 @@ class PlaceholderInventoryDriftTest {
                 .discordlink(discordlink())
                 .holograms(() -> 0)
                 .communication(communication())
+                .scoreboard(who -> true)
                 .serverMetrics(serverMetrics())
                 .build();
     }

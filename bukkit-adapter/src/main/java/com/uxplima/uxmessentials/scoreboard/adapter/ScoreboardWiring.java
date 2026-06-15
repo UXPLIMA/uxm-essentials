@@ -78,7 +78,7 @@ public final class ScoreboardWiring {
         List<CommandRegistration> commands =
                 List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages()));
         List<Listener> listeners = List.of(new ScoreboardConnectionListener(renderer, kernel.scheduler()));
-        return new Wired(commands, listeners, renderer, renderTask, running);
+        return new Wired(commands, listeners, renderer, renderTask, running, visibility);
     }
 
     private static SidebarManager sidebarManager(NameVisibilityCoordinator nameVisibility) {
@@ -102,13 +102,15 @@ public final class ScoreboardWiring {
      * @param renderer the per-player renderer, used to tear down boards on stop
      * @param renderTask the self-rescheduling render timer, armed by the caller
      * @param running the flag flipped false on stop so the render timer exits
+     * @param visibility the per-player "hidden" preference store, exposed for the {@code scoreboard_*} PAPI seam
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             ScoreboardRenderer renderer,
             ScoreboardRenderTask renderTask,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            ScoreboardVisibilityStore visibility) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -116,6 +118,7 @@ public final class ScoreboardWiring {
             Objects.requireNonNull(renderer, "renderer");
             Objects.requireNonNull(renderTask, "renderTask");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(visibility, "visibility");
         }
 
         /** Arm the render timer. */
