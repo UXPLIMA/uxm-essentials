@@ -43,6 +43,7 @@ public final class PlaceholderResolver {
     private static final String PRESENCE_PREFIX = "presence_";
     private static final String PLAYERSTATE_PREFIX = "playerstate_";
     private static final String TELEPORT_PREFIX = "teleport_";
+    private static final String MODERATION_PREFIX = "moderation_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -87,6 +88,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(TELEPORT_PREFIX)) {
             return Optional.of(teleport(who, online, normalized.substring(TELEPORT_PREFIX.length())));
+        }
+        if (normalized.startsWith(MODERATION_PREFIX)) {
+            return Optional.of(moderationFamily(who, normalized.substring(MODERATION_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -535,6 +539,73 @@ public final class PlaceholderResolver {
         }
         ModerationPlaceholders moderation = seam.get();
         return bool(key.equals("muted") ? moderation.isMuted(who) : moderation.isJailed(who));
+    }
+
+    /**
+     * Resolve a {@code moderation_}-stripped key against the moderation seam. The state-boolean keys
+     * ({@code banned}, {@code muted}, {@code jailed}, {@code frozen}) and {@code warns} read straight through;
+     * the ban/mute detail keys read the active, clock-gated sanction and render its remaining wait (raw whole
+     * seconds and a {@code _formatted} variant; {@code permanent} for a permanent sanction), reason and issuer.
+     * A disabled module degrades the booleans to "no" and the detail/count keys to the dash.
+     */
+    private String moderationFamily(PlayerRef who, String tail) {
+        Optional<ModerationPlaceholders> seam = contexts.moderation();
+        if (seam.isEmpty()) {
+            return isBooleanModerationKey(tail) ? NO : EMPTY;
+        }
+        ModerationPlaceholders moderation = seam.get();
+        return switch (tail) {
+            case "banned" -> bool(moderation.activeBan(who).isPresent());
+            case "muted" -> bool(moderation.isMuted(who));
+            case "jailed" -> bool(moderation.isJailed(who));
+            case "frozen" -> bool(moderation.isFrozen(who));
+            case "warns" -> Integer.toString(moderation.warnCount(who));
+            case "ban_reason" -> sanctionField(moderation.activeBan(who), Sanction.REASON, false);
+            case "ban_issuer" -> sanctionField(moderation.activeBan(who), Sanction.ISSUER, false);
+            case "ban_remaining" -> sanctionField(moderation.activeBan(who), Sanction.REMAINING, false);
+            case "ban_remaining_formatted" -> sanctionField(moderation.activeBan(who), Sanction.REMAINING, true);
+            case "mute_reason" -> sanctionField(moderation.activeMute(who), Sanction.REASON, false);
+            case "mute_issuer" -> sanctionField(moderation.activeMute(who), Sanction.ISSUER, false);
+            case "mute_remaining" -> sanctionField(moderation.activeMute(who), Sanction.REMAINING, false);
+            case "mute_remaining_formatted" -> sanctionField(moderation.activeMute(who), Sanction.REMAINING, true);
+            default -> EMPTY;
+        };
+    }
+
+    private static boolean isBooleanModerationKey(String tail) {
+        return switch (tail) {
+            case "banned", "muted", "jailed", "frozen" -> true;
+            default -> false;
+        };
+    }
+
+    private enum Sanction {
+        REASON,
+        ISSUER,
+        REMAINING
+    }
+
+    /** Render one field of an active ban/mute view, or the dash when no sanction is active. */
+    private static String sanctionField(
+            Optional<ModerationPlaceholders.SanctionView> view, Sanction field, boolean formatted) {
+        if (view.isEmpty()) {
+            return EMPTY;
+        }
+        ModerationPlaceholders.SanctionView active = view.get();
+        return switch (field) {
+            case REASON -> active.reason();
+            case ISSUER -> active.issuer();
+            case REMAINING -> sanctionRemaining(active.remaining(), formatted);
+        };
+    }
+
+    /** A sanction's remaining wait, or {@code permanent} when it never lifts. */
+    private static String sanctionRemaining(Optional<Duration> remaining, boolean formatted) {
+        if (remaining.isEmpty()) {
+            return "permanent";
+        }
+        Duration left = remaining.get();
+        return formatted ? PlaceholderDurations.compact(left) : Long.toString(Math.max(0, left.toSeconds()));
     }
 
     private static String baltopPosition(OptionalInt position) {

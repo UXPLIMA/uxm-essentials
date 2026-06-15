@@ -300,22 +300,91 @@ class PlaceholderResolverTest {
 
     @Test
     void moderationPlaceholdersReadMutedAndJailed() {
-        ModerationPlaceholders moderation = new ModerationPlaceholders() {
-            @Override
-            public boolean isMuted(PlayerRef who) {
-                return true;
-            }
-
-            @Override
-            public boolean isJailed(PlayerRef who) {
-                return false;
-            }
-        };
+        FakeModeration moderation = new FakeModeration().muted(true).jailed(false);
         PlaceholderResolver resolver = resolverWith(
                 PlaceholderContexts.builder().moderation(moderation).build());
 
         assertThat(resolver.resolve(ALICE, true, "muted")).contains("yes");
         assertThat(resolver.resolve(ALICE, true, "jailed")).contains("no");
+    }
+
+    @Test
+    void moderationBanPlaceholdersReadReasonRemainingAndIssuer() {
+        FakeModeration moderation = new FakeModeration()
+                .ban(new ModerationPlaceholders.SanctionView(Optional.of(Duration.ofSeconds(90)), "griefing", "Mod"));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().moderation(moderation).build());
+
+        assertThat(resolver.resolve(ALICE, true, "moderation_banned")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_reason")).contains("griefing");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_issuer")).contains("Mod");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_remaining")).contains("90");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_remaining_formatted"))
+                .contains("1m30s");
+    }
+
+    @Test
+    void moderationPermanentBanRendersPermanentRemaining() {
+        FakeModeration moderation = new FakeModeration()
+                .ban(new ModerationPlaceholders.SanctionView(Optional.empty(), "cheating", "Console"));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().moderation(moderation).build());
+
+        assertThat(resolver.resolve(ALICE, true, "moderation_banned")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_remaining")).contains("permanent");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_remaining_formatted"))
+                .contains("permanent");
+    }
+
+    @Test
+    void moderationMutePlaceholdersReadReasonRemainingAndIssuer() {
+        FakeModeration moderation = new FakeModeration()
+                .mute(new ModerationPlaceholders.SanctionView(Optional.of(Duration.ofMinutes(2)), "spam", "Helper"));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().moderation(moderation).build());
+
+        assertThat(resolver.resolve(ALICE, true, "muted")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "moderation_mute_reason")).contains("spam");
+        assertThat(resolver.resolve(ALICE, true, "moderation_mute_issuer")).contains("Helper");
+        assertThat(resolver.resolve(ALICE, true, "moderation_mute_remaining")).contains("120");
+        assertThat(resolver.resolve(ALICE, true, "moderation_mute_remaining_formatted"))
+                .contains("2m");
+    }
+
+    @Test
+    void moderationFrozenAndWarnsReadThroughTheSeam() {
+        FakeModeration moderation = new FakeModeration().frozen(true).warns(3);
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().moderation(moderation).build());
+
+        assertThat(resolver.resolve(ALICE, true, "moderation_frozen")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "moderation_warns")).contains("3");
+    }
+
+    @Test
+    void moderationDetailKeysDashWhenNotSanctioned() {
+        FakeModeration moderation = new FakeModeration();
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().moderation(moderation).build());
+
+        assertThat(resolver.resolve(ALICE, true, "moderation_banned")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_reason")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_remaining")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "moderation_mute_reason")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "moderation_mute_remaining")).contains("-");
+    }
+
+    @Test
+    void moderationFamilyDegradesWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        // A disabled moderation module means "no one is sanctioned" for the booleans, the dash for details.
+        assertThat(resolver.resolve(ALICE, true, "moderation_banned")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "moderation_frozen")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "moderation_warns")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "moderation_ban_reason")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "moderation_mute_remaining")).contains("-");
     }
 
     @Test
@@ -764,6 +833,78 @@ class PlaceholderResolverTest {
         @Override
         public boolean acceptingRequests(PlayerRef who) {
             return accepting;
+        }
+    }
+
+    /** A configurable {@link ModerationPlaceholders} fake — every read returns the value the test seeded. */
+    private static final class FakeModeration implements ModerationPlaceholders {
+
+        private boolean muted;
+        private boolean jailed;
+        private boolean frozen;
+        private int warns;
+        private Optional<SanctionView> ban = Optional.empty();
+        private Optional<SanctionView> mute = Optional.empty();
+
+        FakeModeration muted(boolean value) {
+            this.muted = value;
+            return this;
+        }
+
+        FakeModeration jailed(boolean value) {
+            this.jailed = value;
+            return this;
+        }
+
+        FakeModeration frozen(boolean value) {
+            this.frozen = value;
+            return this;
+        }
+
+        FakeModeration warns(int count) {
+            this.warns = count;
+            return this;
+        }
+
+        FakeModeration ban(SanctionView view) {
+            this.ban = Optional.of(view);
+            return this;
+        }
+
+        FakeModeration mute(SanctionView view) {
+            this.mute = Optional.of(view);
+            this.muted = true;
+            return this;
+        }
+
+        @Override
+        public boolean isMuted(PlayerRef who) {
+            return muted;
+        }
+
+        @Override
+        public boolean isJailed(PlayerRef who) {
+            return jailed;
+        }
+
+        @Override
+        public boolean isFrozen(PlayerRef who) {
+            return frozen;
+        }
+
+        @Override
+        public int warnCount(PlayerRef who) {
+            return warns;
+        }
+
+        @Override
+        public Optional<SanctionView> activeBan(PlayerRef who) {
+            return ban;
+        }
+
+        @Override
+        public Optional<SanctionView> activeMute(PlayerRef who) {
+            return mute;
         }
     }
 

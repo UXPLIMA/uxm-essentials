@@ -518,7 +518,8 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
-        links.placeholders.moderation(new GateModerationPlaceholders(wired.mutePolicy(), wired.jailGate()));
+        links.placeholders.moderation(new GateModerationPlaceholders(
+                wired.mutePolicy(), wired.jailGate(), wired.repository(), wired.sanctions(), wired.clock()));
         // Captured for staff (wired last), which binds its FREEZE gadget to the audited freeze use case and the
         // live freeze-state read (BukkitSanctions is the Sanctions adapter).
         links.staffModerationFreeze = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.ModerationFreezeSeam(
