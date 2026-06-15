@@ -77,6 +77,9 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
         if (material.isEmpty()) {
             return Command.SINGLE_SUCCESS;
         }
+        if (!allowsItem(ctx, material.get())) {
+            return Command.SINGLE_SUCCESS;
+        }
         Optional<AmountSpec> amount =
                 AmountSpec.of(requestedAmount, services.config().giveCap());
         if (amount.isEmpty()) {
@@ -97,6 +100,16 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
             reply(ctx, ItemworldMessageKey.UNKNOWN_ITEM, Map.of("item", raw));
         }
         return material;
+    }
+
+    /**
+     * Per-type gate on the resolved item. EssentialsX gates {@code /give} by {@code essentials.give.item-<item>};
+     * the parity node here is {@code uxmessentials.itemworld.give.<material>}. The check binds to the sender, so a
+     * console source (which has already passed the base node and carries no per-player nodes) is allowed every type.
+     */
+    private boolean allowsItem(CommandContext<CommandSourceStack> ctx, Material material) {
+        return !(ctx.getSource().getSender() instanceof Player sender)
+                || allowsType(ctx, sender, "give", material.getKey().getKey());
     }
 
     private void deliver(CommandContext<CommandSourceStack> ctx, Material material, AmountSpec amount) {

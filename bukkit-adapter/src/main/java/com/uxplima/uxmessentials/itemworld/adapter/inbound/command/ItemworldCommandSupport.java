@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -110,6 +111,27 @@ abstract class ItemworldCommandSupport {
     /** A {@link PlayerRef} for the live player, for audit attribution and locale resolution. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
+    }
+
+    /**
+     * Whether {@code player} may act on the given {@code type} for this command, mirroring EssentialsX's per-type
+     * gating: after the base {@code uxmessentials.<cmd>.use} node passes, the resolved registry type ({@code zombie},
+     * {@code diamond_sword}, {@code sharpness}) must also be permitted under
+     * {@code uxmessentials.itemworld.<cmd>.<type>}. The wildcard parent ({@code …spawnmob.*} / {@code …give.*} /
+     * {@code …enchant.*}) and every per-type node default {@code true} in {@code paper-plugin.yml}, so a base-perm
+     * holder is unaffected until an operator negates a specific type — non-breaking, opt-out restriction. On a denied
+     * type the sender is told {@link SharedMessageKey#COMMAND_NO_PERMISSION} and the caller must not proceed.
+     *
+     * @param command the command segment of the node ({@code spawnmob}, {@code give}, {@code enchant})
+     * @param type the resolved registry key path, already namespace-stripped and lower-cased by the caller
+     */
+    final boolean allowsType(CommandContext<CommandSourceStack> ctx, Player player, String command, String type) {
+        String node = "uxmessentials.itemworld." + command + "." + type.toLowerCase(Locale.ROOT);
+        if (services.kernel().permissions().has(ref(player), node)) {
+            return true;
+        }
+        reply(ctx, SharedMessageKey.COMMAND_NO_PERMISSION);
+        return false;
     }
 
     /** Send {@code key} to the command sender, rendered in their locale, with no placeholders. */

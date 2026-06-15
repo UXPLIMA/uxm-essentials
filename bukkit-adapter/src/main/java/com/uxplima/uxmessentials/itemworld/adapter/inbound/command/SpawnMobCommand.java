@@ -83,6 +83,9 @@ public final class SpawnMobCommand extends ItemworldCommandSupport implements Co
             reply(ctx, ItemworldMessageKey.SPAWNMOB_UNKNOWN, Map.of("mob", rawType));
             return Command.SINGLE_SUCCESS;
         }
+        if (!allowsType(ctx, player, "spawnmob", type.get().getKey().getKey())) {
+            return Command.SINGLE_SUCCESS;
+        }
         spawn(ctx, player, spec.get(), type.get());
         return Command.SINGLE_SUCCESS;
     }

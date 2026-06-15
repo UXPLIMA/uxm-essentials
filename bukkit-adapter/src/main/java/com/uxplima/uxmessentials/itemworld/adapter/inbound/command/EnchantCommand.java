@@ -82,6 +82,9 @@ public final class EnchantCommand extends ItemworldCommandSupport implements Com
             reply(ctx, ItemworldMessageKey.ENCHANT_UNKNOWN, Map.of("enchant", rawId));
             return;
         }
+        if (!allowsType(ctx, player, "enchant", enchantment.get().getKey().getKey())) {
+            return;
+        }
         EnchantSpec resolved = spec.get();
         services.kernel().scheduler().onEntity(ref(player), () -> {
             ItemStack updated = ItemBuilder.from(hand)
