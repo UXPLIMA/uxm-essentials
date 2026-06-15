@@ -37,7 +37,12 @@ public final class PlaceholderResolver {
 
     private static final String YES = "yes";
     private static final String NO = "no";
-    private static final String KIT_COOLDOWN_PREFIX = "kit_cooldown_";
+    private static final String KIT_PREFIX = "kit_";
+    private static final String KIT_COOLDOWN_PREFIX = "cooldown_";
+    private static final String KIT_AVAILABLE_PREFIX = "available_";
+    private static final String KIT_HAS_PREFIX = "has_";
+    private static final String KIT_COST_PREFIX = "cost_";
+    private static final String KIT_CLAIMS_LEFT_PREFIX = "claims_left_";
     private static final String ECONOMY_PREFIX = "economy_";
     private static final String HOMES_PREFIX = "homes_";
     private static final String VAULTS_PREFIX = "vaults_";
@@ -66,8 +71,8 @@ public final class PlaceholderResolver {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(key, "key");
         String normalized = key.toLowerCase(Locale.ROOT);
-        if (normalized.startsWith(KIT_COOLDOWN_PREFIX)) {
-            return Optional.of(kitCooldown(who, normalized.substring(KIT_COOLDOWN_PREFIX.length())));
+        if (normalized.startsWith(KIT_PREFIX)) {
+            return Optional.of(kitFamily(who, normalized.substring(KIT_PREFIX.length())));
         }
         if (normalized.startsWith(ECONOMY_PREFIX)) {
             return Optional.of(economyFamily(who, normalized.substring(ECONOMY_PREFIX.length())));
@@ -99,6 +104,7 @@ public final class PlaceholderResolver {
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
             case "afk", "afk_duration", "vanished" -> Optional.of(presence(who, online, normalized));
+            case "kits_list" -> Optional.of(kitsList(who));
             case "muted", "jailed" -> Optional.of(moderation(who, normalized));
             default -> Optional.empty();
         };
@@ -370,13 +376,81 @@ public final class PlaceholderResolver {
         };
     }
 
-    private String kitCooldown(PlayerRef who, String kitId) {
+    /**
+     * Resolve a {@code kit_*} tail against the kits seam. The indexed forms carry the kit id in their tail:
+     * {@code cooldown_<id>} (and the {@code cooldown_<id>_formatted} alias) the remaining wait, {@code
+     * available_<id>} whether the kit may be claimed now, {@code has_<id>} whether the player holds the
+     * per-kit permission, {@code cost_<id>} the price ({@code free} when there is no charge), and {@code
+     * claims_left_<id>} the remaining claims ({@code unlimited} for a repeatable kit). A disabled module, a
+     * blank id, or an unknown kit degrades each to the dash.
+     */
+    private String kitFamily(PlayerRef who, String tail) {
         Optional<KitsPlaceholders> seam = contexts.kits();
-        if (seam.isEmpty() || kitId.isBlank()) {
+        if (seam.isEmpty()) {
             return EMPTY;
         }
-        Optional<Duration> remaining = seam.get().cooldownRemaining(who, kitId);
-        return remaining.map(PlaceholderDurations::compact).orElse(EMPTY);
+        KitsPlaceholders kits = seam.get();
+        if (tail.startsWith(KIT_COOLDOWN_PREFIX)) {
+            return kitCooldown(kits, who, tail.substring(KIT_COOLDOWN_PREFIX.length()));
+        }
+        if (tail.startsWith(KIT_AVAILABLE_PREFIX)) {
+            return kitId(tail.substring(KIT_AVAILABLE_PREFIX.length()))
+                    .flatMap(id -> kits.available(who, id))
+                    .map(PlaceholderResolver::bool)
+                    .orElse(EMPTY);
+        }
+        if (tail.startsWith(KIT_HAS_PREFIX)) {
+            return kitId(tail.substring(KIT_HAS_PREFIX.length()))
+                    .flatMap(id -> kits.hasPermission(who, id))
+                    .map(PlaceholderResolver::bool)
+                    .orElse(EMPTY);
+        }
+        if (tail.startsWith(KIT_COST_PREFIX)) {
+            return kitId(tail.substring(KIT_COST_PREFIX.length()))
+                    .flatMap(kits::cost)
+                    .map(PlaceholderResolver::kitCost)
+                    .orElse(EMPTY);
+        }
+        if (tail.startsWith(KIT_CLAIMS_LEFT_PREFIX)) {
+            return kitId(tail.substring(KIT_CLAIMS_LEFT_PREFIX.length()))
+                    .flatMap(id -> kits.claimsLeft(who, id))
+                    .map(left -> left < 0 ? unlimited() : Integer.toString(left))
+                    .orElse(EMPTY);
+        }
+        return EMPTY;
+    }
+
+    /**
+     * Resolve a {@code kit_cooldown_*} tail: {@code <id>} for the raw {@code 1m30s} remaining, or
+     * {@code <id>_formatted} for the same value (kept distinct so a config can pin either spelling). An
+     * unknown kit or a blank id degrades to the dash.
+     */
+    private static String kitCooldown(KitsPlaceholders kits, PlayerRef who, String tail) {
+        String id = tail.endsWith("_formatted") ? tail.substring(0, tail.length() - "_formatted".length()) : tail;
+        return kitId(id)
+                .flatMap(kitId -> kits.cooldownRemaining(who, kitId))
+                .map(PlaceholderDurations::compact)
+                .orElse(EMPTY);
+    }
+
+    /** The comma-separated ids of the kits the player may claim, or the dash when they may claim none. */
+    private String kitsList(PlayerRef who) {
+        Optional<KitsPlaceholders> seam = contexts.kits();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        List<String> ids = seam.get().usableIds(who);
+        return ids.isEmpty() ? EMPTY : String.join(", ", ids);
+    }
+
+    /** A non-blank kit id from a placeholder tail, or empty when the tail carried no id. */
+    private static Optional<String> kitId(String tail) {
+        return tail.isBlank() ? Optional.empty() : Optional.of(tail);
+    }
+
+    /** Render a kit price: {@code free} for a zero cost, else the plain amount. */
+    private static String kitCost(java.math.BigDecimal amount) {
+        return amount.signum() == 0 ? "free" : amount.toPlainString();
     }
 
     /**

@@ -271,22 +271,102 @@ class PlaceholderResolverTest {
 
     @Test
     void kitCooldownReadsRemainingAndIsDashForUnknownKit() {
-        KitsPlaceholders kits =
-                (who, kitId) -> kitId.equals("daily") ? Optional.of(Duration.ofSeconds(3_661)) : Optional.empty();
+        FakeKits kits = new FakeKits().cooldown("daily", Duration.ofSeconds(3_661));
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().kits(kits).build());
 
         assertThat(resolver.resolve(ALICE, true, "kit_cooldown_daily")).contains("1h1m1s");
+        assertThat(resolver.resolve(ALICE, true, "kit_cooldown_daily_formatted"))
+                .contains("1h1m1s");
         assertThat(resolver.resolve(ALICE, true, "kit_cooldown_ghost")).contains("-");
     }
 
     @Test
     void readyKitRendersZeroSeconds() {
-        KitsPlaceholders kits = (who, kitId) -> Optional.of(Duration.ZERO);
+        FakeKits kits = new FakeKits().cooldown("daily", Duration.ZERO);
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().kits(kits).build());
 
         assertThat(resolver.resolve(ALICE, true, "kit_cooldown_daily")).contains("0s");
+    }
+
+    @Test
+    void kitAvailableAndHasReadThroughTheSeam() {
+        FakeKits kits = new FakeKits()
+                .cooldown("daily", Duration.ZERO)
+                .available("daily", true)
+                .hasPermission("daily", true)
+                .available("vip", false)
+                .hasPermission("vip", false);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().kits(kits).build());
+
+        assertThat(resolver.resolve(ALICE, true, "kit_available_daily")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "kit_has_daily")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "kit_available_vip")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "kit_has_vip")).contains("no");
+        // An unknown kit degrades to the dash, never a misleading "no".
+        assertThat(resolver.resolve(ALICE, true, "kit_available_ghost")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "kit_has_ghost")).contains("-");
+    }
+
+    @Test
+    void kitCostRendersFreeOrTheAmountAndDashesUnknown() {
+        FakeKits kits = new FakeKits()
+                .cooldown("daily", Duration.ZERO)
+                .cost("daily", new BigDecimal("0"))
+                .cooldown("crate", Duration.ZERO)
+                .cost("crate", new BigDecimal("250"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().kits(kits).build());
+
+        assertThat(resolver.resolve(ALICE, true, "kit_cost_daily")).contains("free");
+        assertThat(resolver.resolve(ALICE, true, "kit_cost_crate")).contains("250");
+        assertThat(resolver.resolve(ALICE, true, "kit_cost_ghost")).contains("-");
+    }
+
+    @Test
+    void kitClaimsLeftRendersUnlimitedAndTheRemainingCount() {
+        FakeKits kits = new FakeKits()
+                .cooldown("daily", Duration.ZERO)
+                .claimsLeft("daily", -1)
+                .cooldown("starter", Duration.ZERO)
+                .claimsLeft("starter", 1)
+                .cooldown("welcome", Duration.ZERO)
+                .claimsLeft("welcome", 0);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().kits(kits).build());
+
+        assertThat(resolver.resolve(ALICE, true, "kit_claims_left_daily")).contains("∞");
+        assertThat(resolver.resolve(ALICE, true, "kit_claims_left_starter")).contains("1");
+        assertThat(resolver.resolve(ALICE, true, "kit_claims_left_welcome")).contains("0");
+        assertThat(resolver.resolve(ALICE, true, "kit_claims_left_ghost")).contains("-");
+    }
+
+    @Test
+    void kitsListJoinsUsableIdsAndDashesWhenNone() {
+        FakeKits withKits = new FakeKits().usable("daily", "starter");
+        FakeKits noKits = new FakeKits();
+        PlaceholderResolver withResolver =
+                resolverWith(PlaceholderContexts.builder().kits(withKits).build());
+        PlaceholderResolver noResolver =
+                resolverWith(PlaceholderContexts.builder().kits(noKits).build());
+
+        assertThat(withResolver.resolve(ALICE, true, "kits_list")).contains("daily, starter");
+        assertThat(noResolver.resolve(ALICE, true, "kits_list")).contains("-");
+    }
+
+    @Test
+    void kitFamilyDegradesWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "kit_cooldown_daily")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "kit_available_daily")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "kit_cost_daily")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "kits_list")).contains("-");
+        // An unknown kit_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "kit_unknown")).contains("-");
     }
 
     @Test
@@ -925,6 +1005,77 @@ class PlaceholderResolverTest {
         @Override
         public Optional<SanctionView> activeMute(PlayerRef who) {
             return mute;
+        }
+    }
+
+    /** A configurable {@link KitsPlaceholders} fake — every read returns the value the test seeded, else empty. */
+    private static final class FakeKits implements KitsPlaceholders {
+
+        private final java.util.Map<String, Duration> cooldowns = new java.util.HashMap<>();
+        private final java.util.Map<String, Boolean> available = new java.util.HashMap<>();
+        private final java.util.Map<String, Boolean> permission = new java.util.HashMap<>();
+        private final java.util.Map<String, BigDecimal> costs = new java.util.HashMap<>();
+        private final java.util.Map<String, Integer> claimsLeft = new java.util.HashMap<>();
+        private List<String> usableIds = List.of();
+
+        FakeKits cooldown(String kitId, Duration remaining) {
+            cooldowns.put(kitId, remaining);
+            return this;
+        }
+
+        FakeKits available(String kitId, boolean value) {
+            available.put(kitId, value);
+            return this;
+        }
+
+        FakeKits hasPermission(String kitId, boolean value) {
+            permission.put(kitId, value);
+            return this;
+        }
+
+        FakeKits cost(String kitId, BigDecimal amount) {
+            costs.put(kitId, amount);
+            return this;
+        }
+
+        FakeKits claimsLeft(String kitId, int value) {
+            claimsLeft.put(kitId, value);
+            return this;
+        }
+
+        FakeKits usable(String... ids) {
+            this.usableIds = List.of(ids);
+            return this;
+        }
+
+        @Override
+        public Optional<Duration> cooldownRemaining(PlayerRef who, String kitId) {
+            return Optional.ofNullable(cooldowns.get(kitId));
+        }
+
+        @Override
+        public Optional<Boolean> available(PlayerRef who, String kitId) {
+            return Optional.ofNullable(available.get(kitId));
+        }
+
+        @Override
+        public Optional<Boolean> hasPermission(PlayerRef who, String kitId) {
+            return Optional.ofNullable(permission.get(kitId));
+        }
+
+        @Override
+        public Optional<BigDecimal> cost(String kitId) {
+            return Optional.ofNullable(costs.get(kitId));
+        }
+
+        @Override
+        public Optional<Integer> claimsLeft(PlayerRef who, String kitId) {
+            return Optional.ofNullable(claimsLeft.get(kitId));
+        }
+
+        @Override
+        public List<String> usableIds(PlayerRef who) {
+            return usableIds;
         }
     }
 

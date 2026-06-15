@@ -63,7 +63,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogCo
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.GateModerationPlaceholders;
-import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitCooldownPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitAccessPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPlaceholders;
@@ -463,8 +463,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
-        links.placeholders.kits(
-                new KitCooldownPlaceholders(wired.repository(), ctx.kernel().cooldowns()));
+        links.placeholders.kits(new KitAccessPlaceholders(wired.repository(), wired.access(), wired.listKits()));
     }
 
     private static void wirePlayerstate(ModuleContext ctx, CloseableResources resources, ContextLinks links) {

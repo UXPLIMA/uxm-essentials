@@ -204,7 +204,8 @@ public final class KitsWiring {
         // economy PromptRegistry teardown).
         Runnable stopAction = promptListener::clear;
 
-        return new Wired(commands, listeners, services.kitEditorView(), repository, stopAction);
+        return new Wired(
+                commands, listeners, services.kitEditorView(), repository, access, services.listKits(), stopAction);
     }
 
     private static KitServices assemble(
@@ -267,13 +268,17 @@ public final class KitsWiring {
      * Everything the kits module contributes once wired: the Brigadier commands, the Bukkit listeners (the
      * read-only {@code /kit show} preview guard and the {@code /kit editor} window's save-on-close handler), the
      * {@link KitEditorView} held so {@link #stop()} can flush every still-open editor on disable, plus the
-     * {@link KitRepository} the {@code kit_cooldown_<id>} placeholder resolves a kit's cooldown tier against.
-     * The kit catalog is config-backed, so the only durable-while-open state is the set of open editor windows.
+     * {@link KitRepository} the {@code kit_*} placeholders resolve a kit's catalog facts against, plus the
+     * {@link KitAccess} gate and the {@link ListKits} filter those placeholders read availability and the
+     * usable-kit list through. The kit catalog is config-backed, so the only durable-while-open state is the
+     * set of open editor windows.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
      * @param kitEditorView the editor window, held so {@code stop()} flushes every still-open edit
-     * @param repository the kit catalog the cooldown placeholder reads
+     * @param repository the kit catalog the cost/cooldown placeholders read
+     * @param access the claim gate the availability/permission/claims-left placeholders read
+     * @param listKits the {@code /kit list} filter the usable-kit-list placeholder reads
      * @param stopAction clears any pending chat prompt on stop
      */
     public record Wired(
@@ -281,6 +286,8 @@ public final class KitsWiring {
             List<Listener> listeners,
             KitEditorView kitEditorView,
             KitRepository repository,
+            KitAccess access,
+            ListKits listKits,
             Runnable stopAction) {
 
         public Wired {
@@ -288,6 +295,8 @@ public final class KitsWiring {
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(kitEditorView, "kitEditorView");
             Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(access, "access");
+            Objects.requireNonNull(listKits, "listKits");
             Objects.requireNonNull(stopAction, "stopAction");
         }
 
