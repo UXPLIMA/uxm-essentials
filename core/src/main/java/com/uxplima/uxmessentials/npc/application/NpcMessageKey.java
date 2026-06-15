@@ -21,6 +21,9 @@ public enum NpcMessageKey implements MessageKey {
 
     // skin / command feedback
     NPC_SKIN_SET("npc.skin.set"),
+    NPC_SKIN_FETCHING("npc.skin.fetching"),
+    NPC_SKIN_FETCH_FAILED("npc.skin.fetch-failed"),
+    NPC_SKIN_PLAYER_NOT_FOUND("npc.skin.player-not-found"),
     NPC_SKIN_PLAYER_OFFLINE("npc.skin.player-offline"),
     NPC_SKIN_UNAVAILABLE("npc.skin.unavailable"),
     NPC_COMMAND_SET("npc.command.set"),

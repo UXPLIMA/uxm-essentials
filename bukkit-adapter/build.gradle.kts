@@ -49,6 +49,9 @@ dependencies {
     // Caffeine is supplied at runtime by the plugin loader (see UxmEssentialsLoader); compileOnly here so the tablist
     // skin-fetch cache can bind to it without re-shading a library the loader already provides.
     compileOnly(libs.caffeine)
+    // gson is likewise provisioned at runtime by the plugin loader; compileOnly so the npc Mojang skin fetch can parse
+    // the two profile responses without re-shading a library already on the server classpath.
+    compileOnly(libs.gson)
     implementation(libs.bstats.bukkit)
 
     // uxmLib GUI toolkit (dogfood) — consumed from mavenLocal; pulls uxmlib-item + uxmlib-common

@@ -9,11 +9,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
+import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcSkinByName;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionListener;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitServerConnector;
+import com.uxplima.uxmessentials.npc.adapter.outbound.HttpClientFetcher;
+import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
@@ -32,6 +35,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
+import com.uxplima.uxmessentials.npc.application.port.SkinService;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -84,7 +88,11 @@ public final class NpcWiring {
         NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
         NpcServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
-        List<CommandRegistration> commands = List.of(new NpcCommand(services, kernel.messages()));
+        SkinService skinService =
+                new MojangSkinService(kernel.scheduler(), kernel.log(), new HttpClientFetcher(kernel.log()));
+        NpcSkinByName skinByName =
+                new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
+        List<CommandRegistration> commands = List.of(new NpcCommand(services, skinByName, kernel.messages()));
         BukkitNpcCommandRunner commandRunner = new BukkitNpcCommandRunner();
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
         NpcActionRunner actionRunner = new BukkitNpcActionRunner(commandRunner, connector, kernel.log());
