@@ -54,7 +54,7 @@ class NpcRendererTest {
     void rendersOneSpawnBundleAndSchedulesTheTabHideForAnInRangeViewer() {
         PlayerMock viewer = server.addPlayer();
         InlineScheduler scheduler = new InlineScheduler();
-        NpcRenderer renderer = new NpcRenderer(packets, scheduler, 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, scheduler, 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 1.0)); // one block away — in range
 
@@ -72,7 +72,7 @@ class NpcRendererTest {
     @Test
     void linksTheSpawnUuidToTheTabAddUuidSoTheSkinResolves() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 1.0));
 
@@ -87,7 +87,7 @@ class NpcRendererTest {
     @Test
     void carriesTheStoredSkinOnTheTabAdd() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npc(locationOf(viewer), new NpcSkin("tex", "sig")));
 
@@ -99,7 +99,7 @@ class NpcRendererTest {
     @Test
     void doesNotSpawnAnOutOfRangeViewer() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 100.0)); // far away — out of range
 
@@ -110,7 +110,7 @@ class NpcRendererTest {
     @Test
     void despawnRemovesTheNpcFromEveryViewerThatHadIt() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0));
 
         renderer.despawn(NpcName.of("guide"));
@@ -123,7 +123,7 @@ class NpcRendererTest {
     @Test
     void forgetDropsTheViewerWithoutAnyRemovePacket() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0));
         int sendsBefore = packets.removes.size();
 
@@ -140,7 +140,7 @@ class NpcRendererTest {
     @Test
     void removesAnNpcThatMovedOutOfRangeOfAViewer() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0)); // in range -> shown
 
         Npc moved = npcAt(viewer, 100.0); // same name, now far away
@@ -153,7 +153,7 @@ class NpcRendererTest {
     @Test
     void despawnAllRemovesEveryNpcFromEveryViewerAndClearsTracking() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0));
 
         renderer.despawnAll();
@@ -168,7 +168,7 @@ class NpcRendererTest {
     void schedulesButDoesNotImmediatelySendTheTabRemoveWhenTheHopIsDeferred() {
         PlayerMock viewer = server.addPlayer();
         DeferredScheduler scheduler = new DeferredScheduler();
-        NpcRenderer renderer = new NpcRenderer(packets, scheduler, 48.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, scheduler, 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 1.0));
 
@@ -179,6 +179,43 @@ class NpcRendererTest {
 
         scheduler.runAllAsyncAfter();
         assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).hasSize(1);
+    }
+
+    @Test
+    void lookTickAimsAnInRangeViewerOfALookingNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 2.0)); // shown, and within the 16-block look range
+        int looksBefore = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        renderer.lookTick();
+
+        // The look tick re-aims the NPC at this viewer: a head-look and a body-look on top of the spawn pair.
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksBefore + 2);
+    }
+
+    @Test
+    void lookTickIgnoresAnNpcWithLookAtPlayerOff() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 2.0).withLookAtPlayer(false));
+        int looksBefore = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        renderer.lookTick();
+
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksBefore);
+    }
+
+    @Test
+    void lookTickIgnoresAViewerBeyondTheLookRange() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 30.0)); // shown (render range 48) but past the 16-block look range
+        int looksBefore = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        renderer.lookTick();
+
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksBefore);
     }
 
     private Npc npcAt(Player viewer, double offset) {
@@ -233,17 +270,17 @@ class NpcRendererTest {
 
         @Override
         public Object headLook(int entityId, float yaw) {
-            return new Look(entityId);
+            return new Look(entityId, yaw, 0f);
         }
 
         @Override
         public Object bodyLook(int entityId, float yaw, float pitch) {
-            return new Look(entityId);
+            return new Look(entityId, yaw, pitch);
         }
 
         @Override
         public Object teleport(int entityId, double x, double y, double z, float yaw, float pitch) {
-            return new Look(entityId);
+            return new Look(entityId, yaw, pitch);
         }
 
         @Override
@@ -276,6 +313,10 @@ class NpcRendererTest {
             return sentTo(viewer, Bundle.class);
         }
 
+        List<Look> looksSentTo(UUID viewer) {
+            return sentTo(viewer, Look.class);
+        }
+
         List<TabRemove> tabRemovesSentTo(UUID viewer) {
             return sentTo(viewer, TabRemove.class);
         }
@@ -302,7 +343,7 @@ class NpcRendererTest {
 
         private record Spawn(int entityId, UUID profileId) {}
 
-        private record Look(int entityId) {}
+        private record Look(int entityId, float yaw, float pitch) {}
 
         private record Remove(int entityId) {}
 

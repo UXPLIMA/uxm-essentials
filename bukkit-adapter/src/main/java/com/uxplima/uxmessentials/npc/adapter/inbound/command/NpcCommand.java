@@ -12,6 +12,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -31,11 +32,12 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@code /npc <create|delete|list|movehere|skin|command>}: the single operator command for fake-player NPCs.
- * Each subcommand maps its arguments to one use-case call; {@code create} and {@code movehere} read the
- * operator's current position, {@code create} defaults the skin to the operator's own skin (lifted from their
- * Bukkit profile, or skinless when unavailable), and {@code skin} accepts {@code texture:<value>[:<sig>]} or
- * {@code player:<online-name>}. The base {@code uxmessentials.npc.admin} node guards the whole command.
+ * {@code /npc <create|delete|list|movehere|skin|command|lookatplayer>}: the single operator command for
+ * fake-player NPCs. Each subcommand maps its arguments to one use-case call; {@code create} and {@code movehere}
+ * read the operator's current position, {@code create} defaults the skin to the operator's own skin (lifted from
+ * their Bukkit profile, or skinless when unavailable), {@code skin} accepts {@code texture:<value>[:<sig>]} or
+ * {@code player:<online-name>}, and {@code lookatplayer} toggles whether the NPC turns to face nearby players.
+ * The base {@code uxmessentials.npc.admin} node guards the whole command.
  */
 @NullMarked
 public final class NpcCommand implements CommandRegistration {
@@ -62,6 +64,7 @@ public final class NpcCommand implements CommandRegistration {
                 .then(name("movehere", this::move))
                 .then(greedy("skin", this::skin))
                 .then(greedy("command", this::command))
+                .then(lookAtPlayerNode())
                 .build();
     }
 
@@ -138,6 +141,22 @@ public final class NpcCommand implements CommandRegistration {
             return 0;
         }
         services.command().setCommand(ref(sender), nameArg(ctx), value(ctx));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> lookAtPlayerNode() {
+        return Commands.literal("lookatplayer")
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("value", BoolArgumentType.bool())
+                                .executes(this::lookAtPlayer)));
+    }
+
+    private int lookAtPlayer(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.look().setLookAtPlayer(ref(sender), nameArg(ctx), ctx.getArgument("value", Boolean.class));
         return Command.SINGLE_SUCCESS;
     }
 

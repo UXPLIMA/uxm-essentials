@@ -18,7 +18,8 @@ import org.jspecify.annotations.Nullable;
  * on every backend. The skin columns are nullable: a NULL {@code skin_texture} reads back as no skin (the
  * default Steve fake player), and a present texture rebuilds an {@link NpcSkin} carrying its (possibly NULL)
  * signature. The {@code click_command} column is likewise nullable — a NULL means clicking the NPC does
- * nothing. This class is the single place that translation lives.
+ * nothing. The {@code look_at_player} column is a SMALLINT 0/1 read back as a boolean (whether the NPC rotates
+ * to face nearby viewers). This class is the single place that translation lives.
  */
 final class NpcRows {
 
@@ -37,6 +38,7 @@ final class NpcRows {
                 position,
                 skinOf(row.get(NPC.SKIN_TEXTURE), row.get(NPC.SKIN_SIGNATURE)),
                 row.get(NPC.CLICK_COMMAND),
+                row.get(NPC.LOOK_AT_PLAYER) != 0,
                 Instant.ofEpochMilli(row.get(NPC.CREATED_AT)));
     }
 
@@ -55,6 +57,7 @@ final class NpcRows {
                 .setSkinTexture(skin == null ? null : skin.texture())
                 .setSkinSignature(skin == null ? null : skin.signature())
                 .setClickCommand(npc.clickCommand())
+                .setLookAtPlayer((short) (npc.lookAtPlayer() ? 1 : 0))
                 .setCreatedAt(npc.createdAt().toEpochMilli());
     }
 

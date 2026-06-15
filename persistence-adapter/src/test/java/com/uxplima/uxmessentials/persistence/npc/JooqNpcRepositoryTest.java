@@ -23,9 +23,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * End-to-end coverage of {@link JooqNpcRepository} against the default embedded SQLite backend with the Flyway
- * V38 baseline applied. It proves the round-trip (save → find) of the row including a skin and a click command,
- * the null skin / null command path, the name-key upsert (a move/re-skin overwrites in place), the delete, the
- * {@code exists} check, and the creation-order list.
+ * baseline applied. It proves the round-trip (save → find) of the row including a skin, a click command and the
+ * look-at-player flag, the null skin / null command path, the name-key upsert (a move/re-skin overwrites in
+ * place), the delete, the {@code exists} check, and the creation-order list.
  */
 class JooqNpcRepositoryTest {
 
@@ -52,6 +52,7 @@ class JooqNpcRepositoryTest {
                 Position.of(WORLD, 10, 64, 20),
                 new NpcSkin("tex", "sig"),
                 "warp spawn",
+                false,
                 Instant.ofEpochMilli(1_000)));
 
         Optional<Npc> loaded = repository.find(NpcName.of("guide"));
@@ -63,6 +64,16 @@ class JooqNpcRepositoryTest {
         assertThat(reloaded.location().world().name()).isEqualTo("world");
         assertThat(reloaded.skin()).isEqualTo(new NpcSkin("tex", "sig"));
         assertThat(reloaded.clickCommand()).isEqualTo("warp spawn");
+        assertThat(reloaded.lookAtPlayer()).isFalse();
+    }
+
+    @Test
+    void defaultsLookAtPlayerToTrueForACreatedNpc() {
+        repository.save(
+                Npc.create(NpcName.of("plain"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
+
+        assertThat(repository.find(NpcName.of("plain")).orElseThrow().lookAtPlayer())
+                .isTrue();
     }
 
     @Test
@@ -98,6 +109,7 @@ class JooqNpcRepositoryTest {
                 Position.of(WORLD, 100, 70, 100),
                 new NpcSkin("tex2", null),
                 "spawn",
+                true,
                 Instant.ofEpochMilli(1_000)));
 
         assertThat(repository.all()).hasSize(1);

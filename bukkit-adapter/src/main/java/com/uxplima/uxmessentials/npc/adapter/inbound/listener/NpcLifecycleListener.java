@@ -19,8 +19,8 @@ import org.jspecify.annotations.NullMarked;
  * mover so the ones in the new world appear and the ones left behind are removed. The renderer routes each
  * send onto the viewer's region thread, so this listener only needs to fan the events through.
  *
- * <p>Click interaction (and look-at-player) is wired in a later sub-phase; this listener owns only the
- * spawn/forget lifecycle of the renderer's per-viewer tracking.
+ * <p>Look-at-player runs on the renderer's own look loop and click interaction has its own listener; this one
+ * owns only the spawn/forget lifecycle of the renderer's per-viewer tracking.
  */
 @NullMarked
 public final class NpcLifecycleListener implements Listener {

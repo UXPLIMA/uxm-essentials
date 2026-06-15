@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
+import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import org.jspecify.annotations.NullMarked;
 
@@ -22,10 +23,17 @@ import org.jspecify.annotations.NullMarked;
  * @param move {@code /npc movehere}
  * @param skin {@code /npc skin}
  * @param command {@code /npc command}
+ * @param look {@code /npc lookatplayer}
  */
 @NullMarked
 public record NpcServices(
-        CreateNpc create, DeleteNpc delete, ListNpcs list, MoveNpc move, SetNpcSkin skin, SetNpcClickCommand command) {
+        CreateNpc create,
+        DeleteNpc delete,
+        ListNpcs list,
+        MoveNpc move,
+        SetNpcSkin skin,
+        SetNpcClickCommand command,
+        SetNpcLookAtPlayer look) {
 
     public NpcServices {
         Objects.requireNonNull(create, "create");
@@ -34,5 +42,6 @@ public record NpcServices(
         Objects.requireNonNull(move, "move");
         Objects.requireNonNull(skin, "skin");
         Objects.requireNonNull(command, "command");
+        Objects.requireNonNull(look, "look");
     }
 }

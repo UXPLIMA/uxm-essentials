@@ -81,6 +81,7 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
                 .set(NPC.SKIN_TEXTURE, record.getSkinTexture())
                 .set(NPC.SKIN_SIGNATURE, record.getSkinSignature())
                 .set(NPC.CLICK_COMMAND, record.getClickCommand())
+                .set(NPC.LOOK_AT_PLAYER, record.getLookAtPlayer())
                 .set(NPC.CREATED_AT, record.getCreatedAt())
                 .execute();
     }

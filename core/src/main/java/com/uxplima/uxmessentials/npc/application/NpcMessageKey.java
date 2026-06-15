@@ -25,6 +25,8 @@ public enum NpcMessageKey implements MessageKey {
     NPC_SKIN_UNAVAILABLE("npc.skin.unavailable"),
     NPC_COMMAND_SET("npc.command.set"),
     NPC_COMMAND_CLEARED("npc.command.cleared"),
+    NPC_LOOK_ENABLED("npc.look.enabled"),
+    NPC_LOOK_DISABLED("npc.look.disabled"),
 
     // listing
     NPC_LIST_HEADER("npc.list.header"),

@@ -16,7 +16,9 @@ import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
+import com.uxplima.uxmessentials.npc.application.NpcSettings;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
+import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
@@ -61,16 +63,20 @@ public final class NpcWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         KernelPorts kernel = ctx.kernel();
+        NpcSettings settings = new NpcSettings(ctx.config());
         NpcRepository repository = NpcRepositories.cached(persistence);
         NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
-        NpcRenderer renderer = new NpcRenderer(packets, kernel.scheduler(), RENDER_RANGE, TAB_HIDE_DELAY);
+        NpcRenderer renderer =
+                new NpcRenderer(packets, kernel.scheduler(), RENDER_RANGE, settings.lookRange(), TAB_HIDE_DELAY);
         NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
         NpcServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
         List<CommandRegistration> commands = List.of(new NpcCommand(services, kernel.messages()));
         List<Listener> listeners = List.of(new NpcLifecycleListener(renderer));
         AutoCloseable refreshTask = kernel.scheduler().repeatGlobal(renderer::refresh, REFRESH_PERIOD, REFRESH_PERIOD);
-        return new Wired(commands, listeners, renderer, refreshTask);
+        Duration lookPeriod = settings.lookPeriod();
+        AutoCloseable lookTask = kernel.scheduler().repeatGlobal(renderer::lookTick, lookPeriod, lookPeriod);
+        return new Wired(commands, listeners, renderer, refreshTask, lookTask);
     }
 
     private static NpcServices assemble(
@@ -82,7 +88,8 @@ public final class NpcWiring {
                 new ListNpcs(repository, notifier),
                 new MoveNpc(repository, renderer, notifier),
                 new SetNpcSkin(repository, renderer, notifier),
-                new SetNpcClickCommand(repository, notifier));
+                new SetNpcClickCommand(repository, notifier),
+                new SetNpcLookAtPlayer(repository, renderer, notifier));
     }
 
     private static void spawnStored(NpcRepository repository, NpcRenderer renderer) {
@@ -101,23 +108,27 @@ public final class NpcWiring {
      * @param listeners the lifecycle listener to register
      * @param renderer the packet renderer, drained on stop
      * @param refreshTask the global refresh timer handle, cancelled on stop so no task outlives a disable
+     * @param lookTask the look-at-player timer handle, cancelled on stop alongside the refresh timer
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             NpcRenderer renderer,
-            AutoCloseable refreshTask) {
+            AutoCloseable refreshTask,
+            AutoCloseable lookTask) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(renderer, "renderer");
             Objects.requireNonNull(refreshTask, "refreshTask");
+            Objects.requireNonNull(lookTask, "lookTask");
         }
 
-        /** Cancel the refresh timer and remove every shown NPC from every viewer so nothing is orphaned. */
+        /** Cancel the timers and remove every shown NPC from every viewer so nothing is orphaned. */
         public void stop() {
             closeQuietly(refreshTask);
+            closeQuietly(lookTask);
             renderer.despawnAll();
         }
 

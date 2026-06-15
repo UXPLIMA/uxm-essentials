@@ -24,19 +24,36 @@ class NpcTest {
         assertThat(npc.location()).isEqualTo(AT);
         assertThat(npc.hasSkin()).isFalse();
         assertThat(npc.hasClickCommand()).isFalse();
+        assertThat(npc.lookAtPlayer()).isTrue();
         assertThat(npc.createdAt()).isEqualTo(CREATED);
+    }
+
+    @Test
+    void withLookAtPlayerTogglesAndKeepsEverythingElse() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
+                .withClickCommand("spawn");
+
+        Npc unlooking = npc.withLookAtPlayer(false);
+        assertThat(unlooking.lookAtPlayer()).isFalse();
+        assertThat(unlooking.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+        assertThat(unlooking.clickCommand()).isEqualTo("spawn");
+        assertThat(unlooking.createdAt()).isEqualTo(CREATED);
+
+        assertThat(unlooking.withLookAtPlayer(true).lookAtPlayer()).isTrue();
     }
 
     @Test
     void movedToReanchorsAndKeepsEverythingElse() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
-                .withClickCommand("spawn");
+                .withClickCommand("spawn")
+                .withLookAtPlayer(false);
 
         Npc moved = npc.movedTo(ELSEWHERE);
 
         assertThat(moved.location()).isEqualTo(ELSEWHERE);
         assertThat(moved.skin()).isEqualTo(NpcSkin.unsigned("tex"));
         assertThat(moved.clickCommand()).isEqualTo("spawn");
+        assertThat(moved.lookAtPlayer()).isFalse();
         assertThat(moved.createdAt()).isEqualTo(CREATED);
     }
 

@@ -60,6 +60,7 @@ final class DefaultResources {
             "modules/tablist/config.conf",
             "modules/nametags/config.conf",
             "modules/staff/config.conf",
+            "modules/npc/config.conf",
             "modules/migration/config.conf",
             "modules/kits/gui/kits-menu.conf",
             "modules/kits/gui/kits-manager.conf",
