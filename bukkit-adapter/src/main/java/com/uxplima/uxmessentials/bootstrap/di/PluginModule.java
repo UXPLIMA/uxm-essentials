@@ -74,6 +74,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlac
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWarpsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ServicesTeleportPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StaffStaffPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreDiscordlinkPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
@@ -346,7 +347,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
-            wireDiscordlink(plugin, ctx, persistence, resources);
+            wireDiscordlink(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
             wireNametags(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("staff"))) {
@@ -768,7 +769,11 @@ public final class PluginModule {
     }
 
     private static void wireDiscordlink(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
         // discordlink builds its un-cached jOOQ store over persistence.dsl() (the discord_link_pending and
         // discord_links tables ship in the persistence V16 baseline, always applied) and the /discordlink and
         // /discordunlink commands. It registers its ConfirmLink seam into the ServicesManager so the optional
@@ -777,6 +782,9 @@ public final class PluginModule {
         // looks the service up once its gateway is ready and forwards nothing while it is absent.
         DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence);
         wired.commands().forEach(resources::addCommand);
+        // The discordlink PAPI seam reads the same DB-backed link store the /discordlink commands hold, so a
+        // placeholder matches the binding the player redeemed (and answers for an offline player too).
+        links.placeholders.discordlink(new StoreDiscordlinkPlaceholders(wired.store()));
         plugin.getServer()
                 .getServicesManager()
                 .register(

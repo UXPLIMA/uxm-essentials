@@ -929,6 +929,12 @@ permissions:
   uxmessentials.voteparty.admin:
     description: '/voteparty force|set|add — force the party or adjust the party counter.'
     default: op
+  # discordlink context (docs/permissions.md "Discord linking"). One self-service node gates every in-game
+  # command — linking is opt-in and only ever acts on the caller's own account; the /link redemption itself runs
+  # inside the optional Discord bridge jar. uxmessentials.module.discordlink is the reload/inspect tier.
+  uxmessentials.discord.link:
+    description: '/discordlink (issue a code), /discordlink status (show your binding), and /discordunlink (remove it) — all act only on your own account.'
+    default: true
   # staff context (docs/permissions.md "Staff"). STAFF-MODE ONLY: the /staffmode toggle (item-loss-safe DB-backed
   # loadout swap + the VANISH/EXAMINE gadget hotbar) and staff chat. No sanctions here. The .chat node both gates
   # sending and identifies the staff-chat receive audience (configurable via modules/staff/config.conf).

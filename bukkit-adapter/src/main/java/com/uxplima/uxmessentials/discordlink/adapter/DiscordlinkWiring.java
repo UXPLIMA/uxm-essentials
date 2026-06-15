@@ -54,7 +54,7 @@ public final class DiscordlinkWiring {
         DiscordLinkServices services =
                 new DiscordLinkServices(beginLink, confirmLink, new Unlink(store), new LinkStatus(store), notifier);
         DiscordLinkConfirmation confirmation = new ConfirmLinkService(confirmLink, kernel.playerLookup());
-        return new Wired(DiscordLinkCommands.all(services), confirmation);
+        return new Wired(DiscordLinkCommands.all(services), confirmation, store);
     }
 
     private static Duration ttl(ModuleContext ctx) {
@@ -73,12 +73,15 @@ public final class DiscordlinkWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param confirmation the {@code /link} confirmation seam the Discord bridge consumes
+     * @param store the DB-backed link store the PAPI seam reads the player's binding from
      */
-    public record Wired(List<CommandRegistration> commands, DiscordLinkConfirmation confirmation) {
+    public record Wired(
+            List<CommandRegistration> commands, DiscordLinkConfirmation confirmation, DiscordLinkStore store) {
 
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(confirmation, "confirmation");
+            Objects.requireNonNull(store, "store");
         }
     }
 }

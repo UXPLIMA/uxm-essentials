@@ -56,6 +56,7 @@ public final class PlaceholderResolver {
     private static final String MODERATION_PREFIX = "moderation_";
     private static final String MESSAGING_PREFIX = "messaging_";
     private static final String STAFF_PREFIX = "staff_";
+    private static final String DISCORDLINK_PREFIX = "discordlink_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -126,6 +127,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(STAFF_PREFIX)) {
             return Optional.of(staff(who, online, normalized.substring(STAFF_PREFIX.length())));
+        }
+        if (normalized.startsWith(DISCORDLINK_PREFIX)) {
+            return Optional.of(discordlink(who, normalized.substring(DISCORDLINK_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -676,6 +680,25 @@ public final class PlaceholderResolver {
         return switch (key) {
             case "mode" -> online ? bool(staff.inStaffMode(who)) : NO;
             case "online", "count" -> Integer.toString(staff.onlineStaffCount());
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code discordlink_}-stripped key against the discord-link seam. {@code linked} reports whether
+     * the account is bound to a Discord user; {@code id} reads the bound Discord snowflake (the dash when not
+     * linked). Both reads are DB-backed and answer for an offline player. The binding stores only the snowflake
+     * id, not a Discord username, so there is no username key. A disabled module degrades every key to the dash.
+     */
+    private String discordlink(PlayerRef who, String key) {
+        Optional<DiscordlinkPlaceholders> seam = contexts.discordlink();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        DiscordlinkPlaceholders discordlink = seam.get();
+        return switch (key) {
+            case "linked" -> bool(discordlink.linked(who));
+            case "id" -> discordlink.discordId(who).orElse(EMPTY);
             default -> EMPTY;
         };
     }
