@@ -14,8 +14,10 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
  * <p>The profile uuid is derived deterministically from the NPC name ({@code nameUUIDFromBytes("uxmnpc:" +
  * name)}), so it is stable across a restart, identical on every viewer, and links the {@code textures} property
  * carried on the tab-add to the spawned entity. The entity id is allocated from the shared server counter when
- * the NPC is first tracked; a move or a re-skin keeps the same id (the renderer despawns and re-spawns under it),
- * and only a delete-then-recreate allocates a fresh one.
+ * the NPC is first tracked and kept for the NPC's whole life: a move or a re-skin reuses it (the explicit-render
+ * path removes then re-spawns the fake player under the same id), and only a delete frees it — a later recreate
+ * allocates a fresh one. The idempotent refresh tick never reallocates either; it only spawns/removes on a
+ * range transition.
  *
  * @param npc the current stored snapshot this fake player renders
  * @param entityId the protocol entity id the spawn/remove packets carry

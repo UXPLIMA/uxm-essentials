@@ -138,6 +138,64 @@ class NpcRendererTest {
     }
 
     @Test
+    void refreshDoesNotReSpawnAStationaryInRangeViewer() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0)); // shown once
+
+        renderer.refresh();
+        renderer.refresh();
+
+        // The refresh tick is idempotent: a stationary, already-shown viewer gets no second spawn bundle and no
+        // second tab-add — this is the fix for the once-a-second re-spawn flood and tab flicker (B1).
+        assertThat(packets.bundlesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(packets.spawns).hasSize(1);
+        assertThat(packets.tabAdds).hasSize(1);
+        // No churn: a stationary refresh sends neither a remove nor an extra tab-remove.
+        assertThat(packets.removesSentTo(viewer.getUniqueId())).isEmpty();
+        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).hasSize(1); // only the initial deferred hide
+    }
+
+    @Test
+    void reSkinReRendersAnAlreadyShownViewerWithTheNewSkin() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npc(locationOf(viewer), new NpcSkin("oldtex", "oldsig"))); // shown with the old skin
+
+        renderer.render(npc(locationOf(viewer), new NpcSkin("newtex", "newsig"))); // re-skin edit
+
+        // The explicit render forces a fresh re-render for the already-shown viewer: a remove, then a second spawn
+        // bundle carrying the NEW skin (S1) — not the skipped no-op the idempotent refresh would do.
+        assertThat(packets.removesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(packets.bundlesSentTo(viewer.getUniqueId())).hasSize(2);
+        assertThat(packets.spawns).hasSize(2);
+        assertThat(packets.tabAdds).hasSize(2);
+        TabSkin reskinned =
+                java.util.Objects.requireNonNull(packets.tabAdds.get(1).skin(), "re-skin");
+        assertThat(reskinned.textureValue()).isEqualTo("newtex");
+        assertThat(reskinned.signature()).isEqualTo("newsig");
+        // The entity id is reused across the re-render (no reallocation on an edit), so the spawn pair share one id.
+        assertThat(packets.spawns.get(1).entityId())
+                .isEqualTo(packets.spawns.get(0).entityId());
+    }
+
+    @Test
+    void moveReRendersAnAlreadyShownViewerAtTheNewLocation() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0)); // shown near the viewer
+
+        renderer.render(npcAt(viewer, 5.0)); // moved, still in range
+
+        // A move of an in-range, already-shown NPC forces a remove-then-spawn under the same id at the new position.
+        assertThat(packets.removesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(packets.spawns).hasSize(2);
+        assertThat(packets.spawns.get(1).x()).isEqualTo(locationOf(viewer).getX() + 5.0);
+        assertThat(packets.spawns.get(1).entityId())
+                .isEqualTo(packets.spawns.get(0).entityId());
+    }
+
+    @Test
     void removesAnNpcThatMovedOutOfRangeOfAViewer() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
@@ -263,7 +321,7 @@ class NpcRendererTest {
 
         @Override
         public Object spawnPlayer(int entityId, UUID profileId, double x, double y, double z, float yaw, float pitch) {
-            Spawn packet = new Spawn(entityId, profileId);
+            Spawn packet = new Spawn(entityId, profileId, x, y, z);
             spawns.add(packet);
             return packet;
         }
@@ -341,7 +399,7 @@ class NpcRendererTest {
 
         private record TabRemove(UUID profileId) {}
 
-        private record Spawn(int entityId, UUID profileId) {}
+        private record Spawn(int entityId, UUID profileId, double x, double y, double z) {}
 
         private record Look(int entityId, float yaw, float pitch) {}
 

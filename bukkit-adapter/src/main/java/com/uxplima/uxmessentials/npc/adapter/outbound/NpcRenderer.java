@@ -37,6 +37,19 @@ import org.jspecify.annotations.Nullable;
  * client never accumulates duplicates. Sends hop onto the viewer's entity region thread through the injected
  * {@link Scheduler} (Folia-correct); resolving the viewer's distance reads the live player there. A viewer
  * within {@link #renderRange} blocks of an NPC in the same world is eligible.
+ *
+ * <p>Two distinct paths keep the world in step with the model:
+ *
+ * <ul>
+ *   <li><b>{@link #render(Npc) explicit render}</b> — driven by the create/move/re-skin/look-toggle use cases. For an
+ *       in-range viewer it <em>forces</em> a fresh re-render (remove-then-spawn under the same entity id) so a new skin
+ *       or position is reflected immediately even for a viewer that already had the old one; an in-range viewer that
+ *       was not shown is spawned; an out-of-range viewer that was shown is removed.</li>
+ *   <li><b>{@link #refresh() refresh tick} / join / world-change</b> — an <em>idempotent</em> reconcile that acts only
+ *       on transitions: a not-shown in-range viewer is spawned, an already-shown in-range viewer is left untouched (the
+ *       look loop owns ongoing rotation), an out-of-range shown viewer is removed. This is what stops the once-a-second
+ *       re-spawn flood and tab flicker for a stationary player.</li>
+ * </ul>
  */
 @NullMarked
 public final class NpcRenderer implements NpcView {
@@ -69,7 +82,7 @@ public final class NpcRenderer implements NpcView {
         Objects.requireNonNull(npc, "npc");
         RenderedNpc rendered = track(npc);
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            reconcileViewer(viewer, rendered);
+            forceRenderForViewer(viewer, rendered);
         }
     }
 
@@ -101,7 +114,11 @@ public final class NpcRenderer implements NpcView {
         shownTo.remove(viewer.getUniqueId());
     }
 
-    /** Re-evaluate every NPC for every online viewer (the refresh tick): show in-range, remove out-of-range. */
+    /**
+     * The 1s refresh tick: reconcile every NPC for every online viewer on transitions only. A newly in-range viewer is
+     * spawned, a newly out-of-range viewer is removed, and an already-shown stationary viewer is left untouched — so a
+     * standing player never gets a redundant once-a-second re-spawn or tab flicker.
+     */
     public void refresh() {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             for (RenderedNpc rendered : live.values()) {
@@ -183,12 +200,37 @@ public final class NpcRenderer implements NpcView {
         return rendered;
     }
 
-    /** Show the NPC to the viewer if in range and not yet shown (or refresh it), else remove it if out of range. */
+    /**
+     * The idempotent reconcile used by the refresh tick, join, and world-change: act only on transitions. A not-shown
+     * in-range viewer is spawned; an already-shown in-range viewer is left untouched (no re-spawn, no re-tabAdd — the
+     * look loop owns ongoing rotation); an out-of-range shown viewer is removed.
+     */
     private void reconcileViewer(Player viewer, RenderedNpc rendered) {
         // The range check reads the live player location, so it must run on the viewer's own region thread along
         // with the send; doing it inline here would touch a Player off its region thread (unsafe on Folia).
         scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
             if (inRange(viewer, rendered.npc().location())) {
+                if (!isShown(viewer, rendered)) {
+                    spawnForViewer(viewer, rendered);
+                }
+            } else {
+                removeFromViewer(viewer, rendered);
+            }
+        });
+    }
+
+    /**
+     * The explicit-edit reconcile used by {@link #render(Npc)} (create + every edit use case): force the viewer to the
+     * current snapshot. An in-range viewer is re-rendered fresh — remove-then-spawn under the same entity id when it was
+     * already shown so a new skin or position lands immediately, or a plain spawn when it was not shown; an out-of-range
+     * shown viewer is removed.
+     */
+    private void forceRenderForViewer(Player viewer, RenderedNpc rendered) {
+        scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
+            if (inRange(viewer, rendered.npc().location())) {
+                if (isShown(viewer, rendered)) {
+                    removeFromViewer(viewer, rendered);
+                }
                 spawnForViewer(viewer, rendered);
             } else {
                 removeFromViewer(viewer, rendered);

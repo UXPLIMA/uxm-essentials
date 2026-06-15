@@ -12,7 +12,11 @@ import com.uxplima.uxmessentials.npc.domain.NpcName;
  */
 public interface NpcView {
 
-    /** Spawn or re-spawn {@code npc} for every eligible viewer (a create, a move, or a re-skin). */
+    /**
+     * Reflect the current {@code npc} snapshot for every eligible viewer (a create, a move, or a re-skin): an in-range
+     * viewer is (re-)rendered with the new state, an out-of-range viewer that had it is removed. Already-shown viewers
+     * are re-rendered too, so an edit lands immediately rather than waiting for them to leave and re-enter range.
+     */
     void render(Npc npc);
 
     /** Remove the NPC under {@code name} from every viewer (a delete). */
