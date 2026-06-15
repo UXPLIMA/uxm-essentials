@@ -54,6 +54,7 @@ public final class PlaceholderResolver {
     private static final String PLAYERSTATE_PREFIX = "playerstate_";
     private static final String TELEPORT_PREFIX = "teleport_";
     private static final String MODERATION_PREFIX = "moderation_";
+    private static final String MESSAGING_PREFIX = "messaging_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -118,6 +119,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(MODERATION_PREFIX)) {
             return Optional.of(moderationFamily(who, normalized.substring(MODERATION_PREFIX.length())));
+        }
+        if (normalized.startsWith(MESSAGING_PREFIX)) {
+            return Optional.of(messaging(who, online, normalized.substring(MESSAGING_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -623,6 +627,31 @@ public final class PlaceholderResolver {
             case "y" -> Integer.toString(warp.blockY());
             case "z" -> Integer.toString(warp.blockZ());
             case "visits" -> Long.toString(warp.visits());
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code messaging_}-stripped key against the messaging seam. The two durable mail keys
+     * ({@code mail_unread}, {@code mail_total}) and the ignore count ({@code ignoring_count}) read straight
+     * through and answer for an offline player as well, since mail and the ignore list are DB-backed. The
+     * session-scoped keys — {@code reply_target} (the last-conversation partner), {@code msgtoggle} (whether
+     * the player accepts DMs) and {@code socialspy} (the spy flag) — hold no value for an offline player, so
+     * the offline guard degrades them to the dash. A disabled module degrades every key to the dash.
+     */
+    private String messaging(PlayerRef who, boolean online, String key) {
+        Optional<MessagingPlaceholders> seam = contexts.messaging();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        MessagingPlaceholders messaging = seam.get();
+        return switch (key) {
+            case "mail_unread" -> Long.toString(messaging.unreadMail(who));
+            case "mail_total" -> Long.toString(messaging.totalMail(who));
+            case "ignoring_count" -> Integer.toString(messaging.ignoringCount(who));
+            case "reply_target" -> online ? messaging.replyTarget(who).orElse(EMPTY) : EMPTY;
+            case "msgtoggle" -> online ? bool(messaging.acceptingMessages(who)) : EMPTY;
+            case "socialspy" -> online ? bool(messaging.socialSpy(who)) : EMPTY;
             default -> EMPTY;
         };
     }

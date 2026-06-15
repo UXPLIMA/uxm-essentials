@@ -497,6 +497,9 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.mutePolicy = wired.mutePolicy();
         links.afkStatus = wired.afkStatus();
+        // The messaging PAPI seam reads the same mail/conversation/toggle/socialspy/ignore stores the messaging
+        // commands hold, so a placeholder matches the player's in-game mail count and toggle state.
+        links.placeholders.messaging(wired.placeholders());
         // Captured for staff (wired last), which binds its staff chat to the messaging staff-audience resolver.
         links.staffAudience = new com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience();
     }

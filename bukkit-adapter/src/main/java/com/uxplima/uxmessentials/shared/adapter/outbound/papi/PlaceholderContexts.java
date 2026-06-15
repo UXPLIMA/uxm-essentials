@@ -27,6 +27,7 @@ public final class PlaceholderContexts {
     private final @Nullable ModerationPlaceholders moderation;
     private final @Nullable TeleportPlaceholders teleport;
     private final @Nullable VotePlaceholders vote;
+    private final @Nullable MessagingPlaceholders messaging;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -40,6 +41,7 @@ public final class PlaceholderContexts {
         this.moderation = builder.moderation;
         this.teleport = builder.teleport;
         this.vote = builder.vote;
+        this.messaging = builder.messaging;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -91,6 +93,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(vote);
     }
 
+    public Optional<MessagingPlaceholders> messaging() {
+        return Optional.ofNullable(messaging);
+    }
+
     /** True when no context registered a seam — registering the expansion would surface nothing. */
     public boolean isEmpty() {
         return homes == null
@@ -103,7 +109,8 @@ public final class PlaceholderContexts {
                 && playerwarps == null
                 && moderation == null
                 && teleport == null
-                && vote == null;
+                && vote == null
+                && messaging == null;
     }
 
     /** Mutable collector for the seams, filled as each context's adapters are wired in bootstrap. */
@@ -120,6 +127,7 @@ public final class PlaceholderContexts {
         private @Nullable ModerationPlaceholders moderation;
         private @Nullable TeleportPlaceholders teleport;
         private @Nullable VotePlaceholders vote;
+        private @Nullable MessagingPlaceholders messaging;
 
         private Builder() {}
 
@@ -175,6 +183,11 @@ public final class PlaceholderContexts {
 
         public Builder vote(VotePlaceholders seam) {
             this.vote = seam;
+            return this;
+        }
+
+        public Builder messaging(MessagingPlaceholders seam) {
+            this.messaging = seam;
             return this;
         }
 

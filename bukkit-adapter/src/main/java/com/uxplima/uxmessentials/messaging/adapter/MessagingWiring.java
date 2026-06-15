@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -194,6 +195,16 @@ public final class MessagingWiring {
         /** Arm the mail-expiry sweep. */
         public void startBackgroundWork() {
             expirySweep.start();
+        }
+
+        /**
+         * The PAPI read seam over this module's mail, conversation, message-toggle, social-spy, and ignore
+         * stores — the same stores the {@code /mail}, {@code /reply}, {@code /msgtoggle}, {@code /socialspy},
+         * and {@code /ignore} use cases hold, so a placeholder matches the player's in-game state.
+         */
+        public StoresMessagingPlaceholders placeholders() {
+            return new StoresMessagingPlaceholders(
+                    stores.mail(), stores.conversations(), stores.toggles(), stores.socialSpy(), stores.ignores());
         }
 
         /** Stop the sweep and drop the transient session stores. */

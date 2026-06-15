@@ -797,6 +797,69 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void messagingPlaceholdersReadMailReplyToggleSpyAndIgnore() {
+        FakeMessaging messaging = new FakeMessaging()
+                .unread(3)
+                .total(8)
+                .replyTarget("Bob")
+                .accepting(false)
+                .spying(true)
+                .ignoring(2);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().messaging(messaging).build());
+
+        assertThat(resolver.resolve(ALICE, true, "messaging_mail_unread")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "messaging_mail_total")).contains("8");
+        assertThat(resolver.resolve(ALICE, true, "messaging_reply_target")).contains("Bob");
+        assertThat(resolver.resolve(ALICE, true, "messaging_msgtoggle")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "messaging_socialspy")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "messaging_ignoring_count")).contains("2");
+    }
+
+    @Test
+    void messagingReplyTargetDashesWhenNoConversation() {
+        FakeMessaging messaging = new FakeMessaging().accepting(true);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().messaging(messaging).build());
+
+        assertThat(resolver.resolve(ALICE, true, "messaging_reply_target")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "messaging_msgtoggle")).contains("yes");
+    }
+
+    @Test
+    void messagingSessionKeysDashOfflineButDurableKeysStillRead() {
+        FakeMessaging messaging = new FakeMessaging()
+                .unread(4)
+                .total(4)
+                .ignoring(1)
+                .replyTarget("Bob")
+                .accepting(true)
+                .spying(true);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().messaging(messaging).build());
+
+        // The DB-backed mail and ignore reads answer for an offline player.
+        assertThat(resolver.resolve(ALICE, false, "messaging_mail_unread")).contains("4");
+        assertThat(resolver.resolve(ALICE, false, "messaging_mail_total")).contains("4");
+        assertThat(resolver.resolve(ALICE, false, "messaging_ignoring_count")).contains("1");
+        // The session-only reads degrade to the dash for an offline player.
+        assertThat(resolver.resolve(ALICE, false, "messaging_reply_target")).contains("-");
+        assertThat(resolver.resolve(ALICE, false, "messaging_msgtoggle")).contains("-");
+        assertThat(resolver.resolve(ALICE, false, "messaging_socialspy")).contains("-");
+    }
+
+    @Test
+    void messagingDegradesWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "messaging_mail_unread")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "messaging_msgtoggle")).contains("-");
+        // An unknown messaging_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "messaging_unknown")).contains("-");
+    }
+
+    @Test
     void disabledContextsDegradeToTheirEmptyDefault() {
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().build());
@@ -1308,6 +1371,77 @@ class PlaceholderResolverTest {
     private static PlayerwarpsPlaceholders.PlayerWarpView playerWarpView(
             String name, String owner, String world, int x, int y, int z, long visits) {
         return new PlayerwarpsPlaceholders.PlayerWarpView(name, owner, world, x, y, z, visits);
+    }
+
+    /** A configurable {@link MessagingPlaceholders} fake — every read returns the value the test seeded. */
+    private static final class FakeMessaging implements MessagingPlaceholders {
+
+        private long unread;
+        private long total;
+        private Optional<String> replyTarget = Optional.empty();
+        private boolean accepting = true;
+        private boolean spying;
+        private int ignoring;
+
+        FakeMessaging unread(long value) {
+            this.unread = value;
+            return this;
+        }
+
+        FakeMessaging total(long value) {
+            this.total = value;
+            return this;
+        }
+
+        FakeMessaging replyTarget(String name) {
+            this.replyTarget = Optional.of(name);
+            return this;
+        }
+
+        FakeMessaging accepting(boolean value) {
+            this.accepting = value;
+            return this;
+        }
+
+        FakeMessaging spying(boolean value) {
+            this.spying = value;
+            return this;
+        }
+
+        FakeMessaging ignoring(int value) {
+            this.ignoring = value;
+            return this;
+        }
+
+        @Override
+        public long unreadMail(PlayerRef who) {
+            return unread;
+        }
+
+        @Override
+        public long totalMail(PlayerRef who) {
+            return total;
+        }
+
+        @Override
+        public Optional<String> replyTarget(PlayerRef who) {
+            return replyTarget;
+        }
+
+        @Override
+        public boolean acceptingMessages(PlayerRef who) {
+            return accepting;
+        }
+
+        @Override
+        public boolean socialSpy(PlayerRef who) {
+            return spying;
+        }
+
+        @Override
+        public int ignoringCount(PlayerRef who) {
+            return ignoring;
+        }
     }
 
     private static VaultsPlaceholders fakeVaults(int count, int max, int size) {
