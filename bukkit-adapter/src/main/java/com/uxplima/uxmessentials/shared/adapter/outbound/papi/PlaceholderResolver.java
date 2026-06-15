@@ -39,6 +39,7 @@ public final class PlaceholderResolver {
     private static final String NO = "no";
     private static final String KIT_COOLDOWN_PREFIX = "kit_cooldown_";
     private static final String ECONOMY_PREFIX = "economy_";
+    private static final String HOMES_PREFIX = "homes_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -66,6 +67,9 @@ public final class PlaceholderResolver {
         if (normalized.startsWith(ECONOMY_PREFIX)) {
             return Optional.of(economyFamily(who, normalized.substring(ECONOMY_PREFIX.length())));
         }
+        if (normalized.startsWith(HOMES_PREFIX)) {
+            return Optional.of(homesFamily(who, normalized.substring(HOMES_PREFIX.length())));
+        }
         if (normalized.startsWith(VOTES_PREFIX)) {
             return Optional.of(votes(who, normalized.substring(VOTES_PREFIX.length())));
         }
@@ -73,7 +77,6 @@ public final class PlaceholderResolver {
             return Optional.of(voteparty(normalized.substring(VOTEPARTY_PREFIX.length())));
         }
         return switch (normalized) {
-            case "homes_count", "homes_limit", "homes_left" -> Optional.of(homes(who, normalized));
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
             case "afk", "afk_duration", "vanished" -> Optional.of(presence(who, online, normalized));
             case "vaults_count" -> Optional.of(vaults(who));
@@ -82,18 +85,87 @@ public final class PlaceholderResolver {
         };
     }
 
-    private String homes(PlayerRef who, String key) {
+    /**
+     * Resolve a {@code homes_*} tail against the homes seam. The count/limit/left scalars and the home-list
+     * placeholders read from the seam; the indexed forms ({@code <index>}, {@code <index>_world},
+     * {@code <index>_x|y|z}) parse the 1-based index from the tail and degrade to the dash when it is out of
+     * range or unparseable, and {@code exists_<label>} reports whether a home carries that label.
+     */
+    private String homesFamily(PlayerRef who, String tail) {
         Optional<HomesPlaceholders> seam = contexts.homes();
         if (seam.isEmpty()) {
             return EMPTY;
         }
         HomesPlaceholders homes = seam.get();
-        int count = homes.count(who);
-        int limit = homes.limit(who);
-        return switch (key) {
-            case "homes_count" -> Integer.toString(count);
-            case "homes_limit" -> limit < 0 ? unlimited() : Integer.toString(limit);
-            default -> limit < 0 ? unlimited() : Integer.toString(Math.max(0, limit - count));
+        switch (tail) {
+            case "count" -> {
+                return Integer.toString(homes.count(who));
+            }
+            case "limit" -> {
+                int limit = homes.limit(who);
+                return limit < 0 ? unlimited() : Integer.toString(limit);
+            }
+            case "left" -> {
+                int limit = homes.limit(who);
+                return limit < 0 ? unlimited() : Integer.toString(Math.max(0, limit - homes.count(who)));
+            }
+            case "list" -> {
+                List<HomesPlaceholders.HomeView> all = homes.list(who);
+                return all.isEmpty() ? EMPTY : joinNames(all);
+            }
+            default -> {
+                if (tail.startsWith("exists_")) {
+                    return homeExists(homes.list(who), tail.substring("exists_".length()));
+                }
+                return indexedHome(homes.list(who), tail);
+            }
+        }
+    }
+
+    private static String joinNames(List<HomesPlaceholders.HomeView> homes) {
+        StringBuilder names = new StringBuilder();
+        for (HomesPlaceholders.HomeView home : homes) {
+            if (names.length() > 0) {
+                names.append(", ");
+            }
+            names.append(home.name());
+        }
+        return names.toString();
+    }
+
+    private static String homeExists(List<HomesPlaceholders.HomeView> homes, String label) {
+        if (label.isBlank()) {
+            return NO;
+        }
+        boolean present = homes.stream().anyMatch(home -> home.name().equalsIgnoreCase(label));
+        return bool(present);
+    }
+
+    /**
+     * Resolve an indexed-home tail: {@code <index>}, {@code <index>_world}, or {@code <index>_x|y|z}. The
+     * leading token is the 1-based home index; an unparseable or out-of-range index degrades to the dash.
+     */
+    private static String indexedHome(List<HomesPlaceholders.HomeView> homes, String tail) {
+        List<String> parts = List.of(tail.split("_", 2));
+        int index;
+        try {
+            index = Integer.parseInt(parts.get(0));
+        } catch (NumberFormatException ignored) {
+            return EMPTY;
+        }
+        if (index < 1 || index > homes.size()) {
+            return EMPTY;
+        }
+        HomesPlaceholders.HomeView home = homes.get(index - 1);
+        if (parts.size() == 1) {
+            return home.name();
+        }
+        return switch (parts.get(1)) {
+            case "world" -> home.world();
+            case "x" -> Integer.toString(home.blockX());
+            case "y" -> Integer.toString(home.blockY());
+            case "z" -> Integer.toString(home.blockZ());
+            default -> EMPTY;
         };
     }
 

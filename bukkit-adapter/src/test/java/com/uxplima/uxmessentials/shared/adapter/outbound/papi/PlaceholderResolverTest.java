@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
@@ -63,6 +64,58 @@ class PlaceholderResolverTest {
 
         assertThat(resolver.resolve(ALICE, true, "homes_limit")).contains("∞");
         assertThat(resolver.resolve(ALICE, true, "homes_left")).contains("∞");
+    }
+
+    @Test
+    void homesListJoinsNamesAndDashesWhenEmpty() {
+        List<HomesPlaceholders.HomeView> homes = List.of(
+                new HomesPlaceholders.HomeView("base", "world", 10, 64, -20),
+                new HomesPlaceholders.HomeView("mine", "world_nether", 1, 30, 2));
+        PlaceholderResolver withHomes = resolverWith(
+                PlaceholderContexts.builder().homes(fakeHomes(2, 5, homes)).build());
+        PlaceholderResolver noHomes = resolverWith(
+                PlaceholderContexts.builder().homes(fakeHomes(0, 5, List.of())).build());
+
+        assertThat(withHomes.resolve(ALICE, true, "homes_list")).contains("base, mine");
+        assertThat(noHomes.resolve(ALICE, true, "homes_list")).contains("-");
+    }
+
+    @Test
+    void indexedHomeReadsNameWorldAndCoordinates() {
+        List<HomesPlaceholders.HomeView> homes = List.of(
+                new HomesPlaceholders.HomeView("base", "world", 10, 64, -20),
+                new HomesPlaceholders.HomeView("mine", "world_nether", 1, 30, 2));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().homes(fakeHomes(2, 5, homes)).build());
+
+        assertThat(resolver.resolve(ALICE, true, "homes_1")).contains("base");
+        assertThat(resolver.resolve(ALICE, true, "homes_1_world")).contains("world");
+        assertThat(resolver.resolve(ALICE, true, "homes_1_x")).contains("10");
+        assertThat(resolver.resolve(ALICE, true, "homes_1_y")).contains("64");
+        assertThat(resolver.resolve(ALICE, true, "homes_1_z")).contains("-20");
+        assertThat(resolver.resolve(ALICE, true, "homes_2_world")).contains("world_nether");
+    }
+
+    @Test
+    void indexedHomeDashesOutOfRangeAndUnparseable() {
+        List<HomesPlaceholders.HomeView> homes = List.of(new HomesPlaceholders.HomeView("base", "world", 0, 0, 0));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().homes(fakeHomes(1, 5, homes)).build());
+
+        assertThat(resolver.resolve(ALICE, true, "homes_3")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "homes_0")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "homes_abc")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "homes_1_unknown")).contains("-");
+    }
+
+    @Test
+    void homeExistsReportsYesOrNoByLabel() {
+        List<HomesPlaceholders.HomeView> homes = List.of(new HomesPlaceholders.HomeView("Base", "world", 0, 0, 0));
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().homes(fakeHomes(1, 5, homes)).build());
+
+        assertThat(resolver.resolve(ALICE, true, "homes_exists_base")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "homes_exists_mine")).contains("no");
     }
 
     @Test
@@ -420,6 +473,10 @@ class PlaceholderResolverTest {
     }
 
     private static HomesPlaceholders fakeHomes(int count, int limit) {
+        return fakeHomes(count, limit, List.of());
+    }
+
+    private static HomesPlaceholders fakeHomes(int count, int limit, List<HomesPlaceholders.HomeView> homes) {
         return new HomesPlaceholders() {
             @Override
             public int count(PlayerRef who) {
@@ -429,6 +486,11 @@ class PlaceholderResolverTest {
             @Override
             public int limit(PlayerRef who) {
                 return limit;
+            }
+
+            @Override
+            public List<HomesPlaceholders.HomeView> list(PlayerRef who) {
+                return homes;
             }
         };
     }
