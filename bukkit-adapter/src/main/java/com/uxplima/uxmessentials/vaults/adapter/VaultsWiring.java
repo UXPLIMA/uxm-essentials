@@ -103,12 +103,25 @@ public final class VaultsWiring {
         bus.registry().register(VaultSync.listener(cached));
         VaultRepository repository = VaultSync.repository(cached, bus.publisher());
         VaultAudit audit = new LoggingVaultAudit(auditLogger());
-        VaultServices services = assemble(kernel, settings, repository, clock, vaultEconomy, audit);
+        // The two quota reducers are built once here so the placeholder seam reads the same resolved
+        // vault.amount / vault.size the use cases enforce, rather than constructing a second pair.
+        VaultAmountQuota amountQuota = new VaultAmountQuota(kernel.permissions(), settings.defaultAmount());
+        VaultSizeQuota sizeQuota = new VaultSizeQuota(kernel.permissions(), settings.defaultSize());
+        VaultServices services =
+                assemble(kernel, settings, repository, clock, vaultEconomy, audit, amountQuota, sizeQuota);
         // The cleanup sweep is opt-in: when cleanup.enabled is false it is never built, so a disabled module
         // arms zero background work. The running flag is flipped on stop so the self-rescheduling loop exits.
         AtomicBoolean running = new AtomicBoolean(true);
         Optional<VaultCleanupSweep> sweep = cleanupSweep(kernel, settings, repository, audit, running, clock);
-        return new Wired(VaultCommands.all(services), List.of(), services.view(), repository, sweep, running);
+        return new Wired(
+                VaultCommands.all(services),
+                List.of(),
+                services.view(),
+                repository,
+                amountQuota,
+                sizeQuota,
+                sweep,
+                running);
     }
 
     private static Optional<VaultCleanupSweep> cleanupSweep(
@@ -138,9 +151,9 @@ public final class VaultsWiring {
             VaultRepository repository,
             Clock clock,
             Optional<VaultEconomy> vaultEconomy,
-            VaultAudit audit) {
-        VaultAmountQuota amountQuota = new VaultAmountQuota(kernel.permissions(), settings.defaultAmount());
-        VaultSizeQuota sizeQuota = new VaultSizeQuota(kernel.permissions(), settings.defaultSize());
+            VaultAudit audit,
+            VaultAmountQuota amountQuota,
+            VaultSizeQuota sizeQuota) {
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
         VaultCharge charge = buildCharge(kernel, settings, vaultEconomy);
         SaveVault saveVault = new SaveVault(repository, kernel.events(), clock);
@@ -211,6 +224,8 @@ public final class VaultsWiring {
      * @param listeners the Bukkit listeners to register (none here; the menu listener is uxmLib's)
      * @param view the GUI, held for the stop-time flush
      * @param repository the vault store the {@code vaults_count} placeholder reads
+     * @param amountQuota the vault-count reducer the {@code vaults_max}/{@code vaults_left} placeholders read
+     * @param sizeQuota the per-vault size reducer the {@code vaults_size} placeholder reads
      * @param cleanupSweep the inactive-vault cleanup sweep, armed by {@link #startBackgroundWork} (empty when off)
      * @param running the flag flipped false on stop so the sweep's self-rescheduling loop exits
      */
@@ -219,6 +234,8 @@ public final class VaultsWiring {
             List<Listener> listeners,
             VaultView view,
             VaultRepository repository,
+            VaultAmountQuota amountQuota,
+            VaultSizeQuota sizeQuota,
             Optional<VaultCleanupSweep> cleanupSweep,
             AtomicBoolean running) {
 
@@ -227,6 +244,8 @@ public final class VaultsWiring {
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(view, "view");
             Objects.requireNonNull(repository, "repository");
+            Objects.requireNonNull(amountQuota, "amountQuota");
+            Objects.requireNonNull(sizeQuota, "sizeQuota");
             Objects.requireNonNull(cleanupSweep, "cleanupSweep");
             Objects.requireNonNull(running, "running");
         }

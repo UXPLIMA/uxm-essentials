@@ -557,7 +557,8 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
-        links.placeholders.vaults(new RepositoryVaultsPlaceholders(wired.repository()));
+        links.placeholders.vaults(
+                new RepositoryVaultsPlaceholders(wired.repository(), wired.amountQuota(), wired.sizeQuota()));
     }
 
     private static void bindMute(

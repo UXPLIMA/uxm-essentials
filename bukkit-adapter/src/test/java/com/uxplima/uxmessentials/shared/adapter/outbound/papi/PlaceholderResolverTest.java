@@ -290,12 +290,32 @@ class PlaceholderResolverTest {
     }
 
     @Test
-    void vaultsCountReadsThroughTheSeam() {
-        VaultsPlaceholders vaults = who -> 6;
-        PlaceholderResolver resolver =
-                resolverWith(PlaceholderContexts.builder().vaults(vaults).build());
+    void vaultsCountMaxLeftAndSizeReadThroughTheSeam() {
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().vaults(fakeVaults(2, 5, 6)).build());
 
-        assertThat(resolver.resolve(ALICE, true, "vaults_count")).contains("6");
+        assertThat(resolver.resolve(ALICE, true, "vaults_count")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "vaults_max")).contains("5");
+        assertThat(resolver.resolve(ALICE, true, "vaults_left")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "vaults_size")).contains("6");
+    }
+
+    @Test
+    void unlimitedVaultMaxRendersTheInfinityMarker() {
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().vaults(fakeVaults(7, -1, 3)).build());
+
+        assertThat(resolver.resolve(ALICE, true, "vaults_max")).contains("∞");
+        assertThat(resolver.resolve(ALICE, true, "vaults_left")).contains("∞");
+        assertThat(resolver.resolve(ALICE, true, "vaults_size")).contains("3");
+    }
+
+    @Test
+    void unknownVaultsTailDegradesToDash() {
+        PlaceholderResolver resolver = resolverWith(
+                PlaceholderContexts.builder().vaults(fakeVaults(1, 5, 6)).build());
+
+        assertThat(resolver.resolve(ALICE, true, "vaults_unknown")).contains("-");
     }
 
     @Test
@@ -906,6 +926,25 @@ class PlaceholderResolverTest {
         public Optional<SanctionView> activeMute(PlayerRef who) {
             return mute;
         }
+    }
+
+    private static VaultsPlaceholders fakeVaults(int count, int max, int size) {
+        return new VaultsPlaceholders() {
+            @Override
+            public int count(PlayerRef who) {
+                return count;
+            }
+
+            @Override
+            public int max(PlayerRef who) {
+                return max;
+            }
+
+            @Override
+            public int size(PlayerRef who) {
+                return size;
+            }
+        };
     }
 
     private static HomesPlaceholders fakeHomes(int count, int limit) {

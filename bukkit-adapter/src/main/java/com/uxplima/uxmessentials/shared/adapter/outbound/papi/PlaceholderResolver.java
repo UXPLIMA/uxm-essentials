@@ -40,6 +40,7 @@ public final class PlaceholderResolver {
     private static final String KIT_COOLDOWN_PREFIX = "kit_cooldown_";
     private static final String ECONOMY_PREFIX = "economy_";
     private static final String HOMES_PREFIX = "homes_";
+    private static final String VAULTS_PREFIX = "vaults_";
     private static final String PRESENCE_PREFIX = "presence_";
     private static final String PLAYERSTATE_PREFIX = "playerstate_";
     private static final String TELEPORT_PREFIX = "teleport_";
@@ -74,6 +75,9 @@ public final class PlaceholderResolver {
         if (normalized.startsWith(HOMES_PREFIX)) {
             return Optional.of(homesFamily(who, normalized.substring(HOMES_PREFIX.length())));
         }
+        if (normalized.startsWith(VAULTS_PREFIX)) {
+            return Optional.of(vaultsFamily(who, normalized.substring(VAULTS_PREFIX.length())));
+        }
         if (normalized.startsWith(VOTES_PREFIX)) {
             return Optional.of(votes(who, normalized.substring(VOTES_PREFIX.length())));
         }
@@ -95,7 +99,6 @@ public final class PlaceholderResolver {
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
             case "afk", "afk_duration", "vanished" -> Optional.of(presence(who, online, normalized));
-            case "vaults_count" -> Optional.of(vaults(who));
             case "muted", "jailed" -> Optional.of(moderation(who, normalized));
             default -> Optional.empty();
         };
@@ -376,8 +379,31 @@ public final class PlaceholderResolver {
         return remaining.map(PlaceholderDurations::compact).orElse(EMPTY);
     }
 
-    private String vaults(PlayerRef who) {
-        return contexts.vaults().map(seam -> Integer.toString(seam.count(who))).orElse(EMPTY);
+    /**
+     * Resolve a {@code vaults_*} tail against the vaults seam. {@code count} reads how many vaults the player
+     * holds; {@code max} and {@code left} read the resolved {@code vault.amount} quota (an unlimited quota
+     * renders as the infinity marker, and {@code left} as the same marker); {@code size} reads the resolved
+     * {@code vault.size} rows. A disabled module degrades every key to the dash.
+     */
+    private String vaultsFamily(PlayerRef who, String tail) {
+        Optional<VaultsPlaceholders> seam = contexts.vaults();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        VaultsPlaceholders vaults = seam.get();
+        return switch (tail) {
+            case "count" -> Integer.toString(vaults.count(who));
+            case "max" -> {
+                int max = vaults.max(who);
+                yield max < 0 ? unlimited() : Integer.toString(max);
+            }
+            case "left" -> {
+                int max = vaults.max(who);
+                yield max < 0 ? unlimited() : Integer.toString(Math.max(0, max - vaults.count(who)));
+            }
+            case "size" -> Integer.toString(vaults.size(who));
+            default -> EMPTY;
+        };
     }
 
     /**
