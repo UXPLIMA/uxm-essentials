@@ -1,0 +1,304 @@
+package com.uxplima.uxmessentials.npc.adapter.inbound.listener;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.util.Vector;
+
+import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
+import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
+import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.packet.tablist.TabSkin;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.entity.PlayerMock;
+
+/**
+ * Covers {@link NpcInteractionListener}: a right-click on an NPC's (server-unknown) fake entity runs its bound
+ * command via the runner; the {@code [console]}/{@code [player]} prefixes route to the right dispatcher; a
+ * {@code {player}} token is filled with the clicker's name; the per-player-per-NPC cooldown swallows a rapid
+ * second click; an NPC with no command and an unknown entity id do nothing; a left-click (attack) and the off
+ * hand are ignored.
+ */
+class NpcInteractionListenerTest {
+
+    private static final int ENTITY_ID = 1;
+
+    private ServerMock server;
+    private FixedIdPackets packets;
+    private NpcRenderer renderer;
+    private FakeRepository repository;
+    private RecordingRunner runner;
+    private final AtomicLong now = new AtomicLong(0);
+
+    @BeforeEach
+    void setUp() {
+        server = MockBukkit.mock();
+        MockBukkit.createMockPlugin();
+        packets = new FixedIdPackets();
+        renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        repository = new FakeRepository();
+        runner = new RecordingRunner();
+    }
+
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
+    }
+
+    private NpcInteractionListener listener(Duration cooldown) {
+        return new NpcInteractionListener(renderer, repository, runner, new InlineScheduler(), cooldown, now::get);
+    }
+
+    @Test
+    void runsTheBoundCommandAsThePlayerByDefault() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "warp spawn");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(runner.playerCommands).containsExactly("warp spawn");
+        assertThat(runner.consoleCommands).isEmpty();
+    }
+
+    @Test
+    void runsAConsolePrefixedCommandAsConsole() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "[console] give {player} diamond 1");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(runner.consoleCommands).containsExactly("give " + player.getName() + " diamond 1");
+        assertThat(runner.playerCommands).isEmpty();
+    }
+
+    @Test
+    void substitutesThePlayerTokenForAPlayerCommand() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "[player] msg {player} hi");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(runner.playerCommands).containsExactly("msg " + player.getName() + " hi");
+    }
+
+    @Test
+    void cooldownBlocksARapidSecondClick() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "warp spawn");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+        now.set(200); // still within the 500 ms window
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(runner.playerCommands).containsExactly("warp spawn");
+    }
+
+    @Test
+    void aClickAfterTheCooldownRunsAgain() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "warp spawn");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+        now.set(600); // past the 500 ms window
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(runner.playerCommands).containsExactly("warp spawn", "warp spawn");
+    }
+
+    @Test
+    void doesNothingForAnNpcWithNoCommand() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", null);
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(runner.playerCommands).isEmpty();
+        assertThat(runner.consoleCommands).isEmpty();
+    }
+
+    @Test
+    void ignoresAnUnknownEntityId() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "warp spawn");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(
+                new PlayerUseUnknownEntityEvent(player, 999, false, EquipmentSlot.HAND, new Vector()));
+
+        assertThat(runner.playerCommands).isEmpty();
+    }
+
+    @Test
+    void ignoresAttackAndTheOffHand() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "warp spawn");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(
+                new PlayerUseUnknownEntityEvent(player, ENTITY_ID, true, EquipmentSlot.HAND, new Vector()));
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.OFF_HAND));
+
+        assertThat(runner.playerCommands).isEmpty();
+        assertThat(runner.consoleCommands).isEmpty();
+    }
+
+    private PlayerMock renderNpcAndAddPlayer(String name, @Nullable String command) {
+        PlayerMock player = server.addPlayer();
+        Position at = com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toPosition(
+                java.util.Objects.requireNonNull(player.getLocation(), "loc"));
+        Npc npc = new Npc(NpcName.of(name), at, null, command, true, Instant.ofEpochMilli(1_000));
+        repository.save(npc);
+        renderer.render(npc); // populates the entityId -> name map under ENTITY_ID
+        return player;
+    }
+
+    private PlayerUseUnknownEntityEvent interact(Player player, EquipmentSlot hand) {
+        return new PlayerUseUnknownEntityEvent(player, ENTITY_ID, false, hand, new Vector());
+    }
+
+    /** Fake packets handing out a single fixed entity id so the test knows which id the click carries. */
+    private static final class FixedIdPackets implements com.uxplima.uxmlib.packet.npc.NpcPackets {
+        @Override
+        public int allocateEntityId() {
+            return ENTITY_ID;
+        }
+
+        @Override
+        public Object tabAdd(UUID profileId, String name, @Nullable TabSkin skin) {
+            return new Object();
+        }
+
+        @Override
+        public Object tabRemove(UUID profileId) {
+            return new Object();
+        }
+
+        @Override
+        public Object spawnPlayer(int entityId, UUID profileId, double x, double y, double z, float yaw, float pitch) {
+            return new Object();
+        }
+
+        @Override
+        public Object headLook(int entityId, float yaw) {
+            return new Object();
+        }
+
+        @Override
+        public Object bodyLook(int entityId, float yaw, float pitch) {
+            return new Object();
+        }
+
+        @Override
+        public Object teleport(int entityId, double x, double y, double z, float yaw, float pitch) {
+            return new Object();
+        }
+
+        @Override
+        public Object remove(int entityId) {
+            return new Object();
+        }
+
+        @Override
+        public Object bundle(List<Object> built) {
+            return new Object();
+        }
+
+        @Override
+        public void send(Player viewer, Object packet) {
+            // no-op: the interaction test does not assert on packets
+        }
+    }
+
+    /** An in-memory repository keyed by NPC name. */
+    private static final class FakeRepository implements NpcRepository {
+        private final Map<String, Npc> byName = new LinkedHashMap<>();
+
+        @Override
+        public Optional<Npc> find(NpcName name) {
+            return Optional.ofNullable(byName.get(name.value()));
+        }
+
+        @Override
+        public List<Npc> all() {
+            return List.copyOf(byName.values());
+        }
+
+        @Override
+        public boolean exists(NpcName name) {
+            return byName.containsKey(name.value());
+        }
+
+        @Override
+        public void save(Npc npc) {
+            byName.put(npc.name().value(), npc);
+        }
+
+        @Override
+        public void delete(NpcName name) {
+            byName.remove(name.value());
+        }
+    }
+
+    /** Records which command went to console vs the player. */
+    private static final class RecordingRunner implements NpcCommandRunner {
+        private final List<String> consoleCommands = new ArrayList<>();
+        private final List<String> playerCommands = new ArrayList<>();
+
+        @Override
+        public void runAsConsole(String command) {
+            consoleCommands.add(command);
+        }
+
+        @Override
+        public void runAsPlayer(Player player, String command) {
+            playerCommands.add(command);
+        }
+    }
+
+    /** Runs every scheduled hop inline so the dispatch completes within the test. */
+    private static final class InlineScheduler implements Scheduler {
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+}

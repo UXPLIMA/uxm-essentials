@@ -17,8 +17,8 @@ import org.jspecify.annotations.Nullable;
  * {@code /npc command <name> <command…>}: bind (or, with a blank command, clear) the command an NPC runs when a
  * player clicks it, and save the new snapshot. A name no NPC exists at is rejected with
  * {@link NpcError#NOT_FOUND}. Binding does not touch the rendering — the fake player looks the same — so no
- * re-render is needed; the interaction that actually runs the command is wired in a later sub-phase. The
- * operator-only permission is enforced at the adapter gate.
+ * re-render is needed; the interaction listener reads the bound command from the repository when the NPC is
+ * clicked. The operator-only permission is enforced at the adapter gate.
  */
 public final class SetNpcClickCommand {
 

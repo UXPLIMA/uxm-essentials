@@ -9,7 +9,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
+import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionListener;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
+import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
@@ -43,8 +45,10 @@ import org.jspecify.annotations.Nullable;
  * stack — a {@link ChannelResolver} → {@link PacketSender} → {@link NmsNpcPackets} — and sends each viewer a
  * fake-player spawn (then hides its tab entry) with no real entity. On wire every stored NPC is spawned to the
  * online viewers in range; a global refresh timer re-evaluates range each second so an NPC appears/disappears as
- * players move. On stop the {@code Wired} bundle cancels the timer and removes every shown NPC from every viewer
- * so nothing is orphaned across a reload.
+ * players move, and a faster look timer turns each looking NPC toward its nearby viewers. The interaction
+ * listener runs an NPC's bound click command when a player clicks its fake entity. On stop the {@code Wired}
+ * bundle cancels both timers and removes every shown NPC from every viewer so nothing is orphaned across a
+ * reload.
  */
 @NullMarked
 public final class NpcWiring {
@@ -72,7 +76,9 @@ public final class NpcWiring {
         NpcServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
         List<CommandRegistration> commands = List.of(new NpcCommand(services, kernel.messages()));
-        List<Listener> listeners = List.of(new NpcLifecycleListener(renderer));
+        NpcInteractionListener interaction = new NpcInteractionListener(
+                renderer, repository, new BukkitNpcCommandRunner(), kernel.scheduler(), settings.clickCooldown());
+        List<Listener> listeners = List.of(new NpcLifecycleListener(renderer), interaction);
         AutoCloseable refreshTask = kernel.scheduler().repeatGlobal(renderer::refresh, REFRESH_PERIOD, REFRESH_PERIOD);
         Duration lookPeriod = settings.lookPeriod();
         AutoCloseable lookTask = kernel.scheduler().repeatGlobal(renderer::lookTick, lookPeriod, lookPeriod);

@@ -969,10 +969,10 @@ permissions:
     description: '/stafflist to open the online-staff GUI (vanish-aware) and click a head to teleport to that staff member.'
     default: op
   # npc context (docs/permissions.md "NPC"). Server-wide fake-player NPCs (no real entity; rendered to each
-  # viewer with packets) behind the single /npc command (create / delete / list / movehere / skin / command),
-  # an operator surface gated as a whole by uxmessentials.npc.admin. uxmessentials.npc.use is reserved for the
-  # player-facing interaction (clicking an NPC), wired in a later sub-phase. uxmessentials.module.npc is the
-  # reload/inspect tier.
+  # viewer with packets) behind the single /npc command (create / delete / list / movehere / skin / command /
+  # lookatplayer), an operator surface gated as a whole by uxmessentials.npc.admin. Clicking an NPC runs its
+  # bound command for everyone; uxmessentials.npc.use is reserved for a future per-NPC permission gate.
+  # uxmessentials.module.npc is the reload/inspect tier.
   uxmessentials.module.npc:
     description: 'Hot-reload / inspect the npc module (server-wide fake-player NPCs behind /npc).'
     default: op
