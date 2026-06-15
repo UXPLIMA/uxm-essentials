@@ -18,9 +18,13 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
 import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
+import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.npc.domain.NpcAction;
+import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -51,6 +55,7 @@ class NpcInteractionListenerTest {
     private NpcRenderer renderer;
     private FakeRepository repository;
     private RecordingRunner runner;
+    private RecordingActionRunner actionRunner;
     private final AtomicLong now = new AtomicLong(0);
 
     @BeforeEach
@@ -61,6 +66,7 @@ class NpcInteractionListenerTest {
         renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
         repository = new FakeRepository();
         runner = new RecordingRunner();
+        actionRunner = new RecordingActionRunner();
     }
 
     @AfterEach
@@ -69,7 +75,8 @@ class NpcInteractionListenerTest {
     }
 
     private NpcInteractionListener listener(Duration cooldown) {
-        return new NpcInteractionListener(renderer, repository, runner, new InlineScheduler(), cooldown, now::get);
+        return new NpcInteractionListener(
+                renderer, repository, runner, actionRunner, new InlineScheduler(), cooldown, now::get);
     }
 
     @Test
@@ -170,24 +177,69 @@ class NpcInteractionListenerTest {
     }
 
     @Test
-    void ignoresAttackAndTheOffHand() {
+    void doesNotRunTheClickCommandOnAttackAndIgnoresTheOffHand() {
         PlayerMock player = renderNpcAndAddPlayer("guide", "warp spawn");
         NpcInteractionListener listener = listener(Duration.ofMillis(500));
 
+        // The single click command is right-click only, so an attack runs no command.
         listener.onUseUnknownEntity(
                 new PlayerUseUnknownEntityEvent(player, ENTITY_ID, true, EquipmentSlot.HAND, new Vector()));
+        // The off-hand fires its own duplicate event, which is ignored regardless of attack/interact.
+        now.set(600);
         listener.onUseUnknownEntity(interact(player, EquipmentSlot.OFF_HAND));
 
         assertThat(runner.playerCommands).isEmpty();
         assertThat(runner.consoleCommands).isEmpty();
     }
 
+    @Test
+    void runsTheClickCommandThenTheMatchingActionChainOnRightClick() {
+        NpcAction action = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "hi");
+        PlayerMock player = renderNpcWithActions("guide", "warp spawn", action);
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(runner.playerCommands).containsExactly("warp spawn");
+        assertThat(actionRunner.calls).containsExactly(new RunCall(List.of(action), false));
+    }
+
+    @Test
+    void runsTheActionChainOnAttackWithTheAttackFlag() {
+        NpcAction action = new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.MESSAGE, "ouch");
+        PlayerMock player = renderNpcWithActions("guide", null, action);
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(
+                new PlayerUseUnknownEntityEvent(player, ENTITY_ID, true, EquipmentSlot.HAND, new Vector()));
+
+        assertThat(runner.playerCommands).isEmpty();
+        assertThat(actionRunner.calls).containsExactly(new RunCall(List.of(action), true));
+    }
+
+    @Test
+    void doesNotInvokeTheActionRunnerWhenTheNpcHasNoActions() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "warp spawn");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(actionRunner.calls).isEmpty();
+    }
+
     private PlayerMock renderNpcAndAddPlayer(String name, @Nullable String command) {
+        return renderNpcWithActions(name, command);
+    }
+
+    private PlayerMock renderNpcWithActions(String name, @Nullable String command, NpcAction... actions) {
         PlayerMock player = server.addPlayer();
         Position at = com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toPosition(
                 java.util.Objects.requireNonNull(player.getLocation(), "loc"));
         Npc npc = Npc.create(NpcName.of(name), at, null, Instant.ofEpochMilli(1_000))
                 .withClickCommand(command);
+        for (NpcAction action : actions) {
+            npc = npc.withActionAdded(action);
+        }
         repository.save(npc);
         renderer.render(npc); // populates the entityId -> name map under ENTITY_ID
         return player;
@@ -313,6 +365,19 @@ class NpcInteractionListenerTest {
         @Override
         public void runAsPlayer(Player player, String command) {
             playerCommands.add(command);
+        }
+    }
+
+    /** One captured action-chain invocation: the actions passed and the attack flag they were run with. */
+    private record RunCall(List<NpcAction> actions, boolean attack) {}
+
+    /** Records each action-chain invocation so the listener's pass-through can be asserted. */
+    private static final class RecordingActionRunner implements NpcActionRunner {
+        private final List<RunCall> calls = new ArrayList<>();
+
+        @Override
+        public void run(Player viewer, List<NpcAction> actions, boolean attack) {
+            calls.add(new RunCall(List.copyOf(actions), attack));
         }
     }
 

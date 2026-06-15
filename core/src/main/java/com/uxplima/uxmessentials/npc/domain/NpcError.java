@@ -13,7 +13,10 @@ public enum NpcError {
     NOT_FOUND(NpcMessageKey.NPC_NOT_FOUND),
 
     /** {@code /npc create} for a name an NPC already exists under. */
-    NAME_TAKEN(NpcMessageKey.NPC_NAME_TAKEN);
+    NAME_TAKEN(NpcMessageKey.NPC_NAME_TAKEN),
+
+    /** {@code /npc action remove} with a 1-based index outside the NPC's action list. */
+    ACTION_INDEX_INVALID(NpcMessageKey.NPC_ACTION_INDEX_INVALID);
 
     private final NpcMessageKey messageKey;
 

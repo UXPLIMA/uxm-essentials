@@ -145,4 +145,85 @@ class NpcTest {
         assertThat(moved.glowing()).isTrue();
         assertThat(moved.glowColor()).isEqualTo("AQUA");
     }
+
+    @Test
+    void createsWithNoActions() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        assertThat(npc.actions()).isEmpty();
+        assertThat(npc.hasActions()).isFalse();
+    }
+
+    @Test
+    void withActionAddedAppendsInOrderKeepingTheRest() {
+        NpcAction first = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "hi");
+        NpcAction second = new NpcAction(ClickTrigger.ANY, NpcActionType.SOUND, "minecraft:ui.button.click");
+        Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
+                .withClickCommand("spawn")
+                .withActionAdded(first)
+                .withActionAdded(second);
+
+        assertThat(npc.actions()).containsExactly(first, second);
+        assertThat(npc.hasActions()).isTrue();
+        assertThat(npc.clickCommand()).isEqualTo("spawn");
+        assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+    }
+
+    @Test
+    void withActionRemovedAtDropsTheChosenOne() {
+        NpcAction first = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "hi");
+        NpcAction second = new NpcAction(ClickTrigger.ANY, NpcActionType.ACTIONBAR, "bye");
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withActionAdded(first)
+                .withActionAdded(second);
+
+        assertThat(npc.withActionRemovedAt(0).actions()).containsExactly(second);
+        assertThat(npc.withActionRemovedAt(1).actions()).containsExactly(first);
+    }
+
+    @Test
+    void withActionRemovedAtRejectsAnOutOfRangeIndex() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withActionRemovedAt(1))
+                .isInstanceOf(IndexOutOfBoundsException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withActionRemovedAt(-1))
+                .isInstanceOf(IndexOutOfBoundsException.class);
+    }
+
+    @Test
+    void withActionsClearedEmptiesTheList() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi"))
+                .withActionsCleared();
+
+        assertThat(npc.actions()).isEmpty();
+        assertThat(npc.hasActions()).isFalse();
+    }
+
+    @Test
+    void actionsListIsImmutable() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> npc.actions().add(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "x")))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void everyTransitionPreservesActions() {
+        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withActionAdded(action);
+
+        assertThat(npc.movedTo(ELSEWHERE).actions()).containsExactly(action);
+        assertThat(npc.withSkin(NpcSkin.unsigned("tex")).actions()).containsExactly(action);
+        assertThat(npc.withClickCommand("spawn").actions()).containsExactly(action);
+        assertThat(npc.withLookAtPlayer(false).actions()).containsExactly(action);
+        assertThat(npc.withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET").actions())
+                .containsExactly(action);
+        assertThat(npc.withGlowing(true).actions()).containsExactly(action);
+        assertThat(npc.withGlowColor("RED").actions()).containsExactly(action);
+    }
 }

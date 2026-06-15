@@ -11,14 +11,21 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionListener;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
+import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcCommandRunner;
+import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitServerConnector;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
+import com.uxplima.uxmessentials.npc.application.AddNpcAction;
+import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
+import com.uxplima.uxmessentials.npc.application.ListNpcActions;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
+import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
 import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
@@ -78,13 +85,16 @@ public final class NpcWiring {
         NpcServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
         List<CommandRegistration> commands = List.of(new NpcCommand(services, kernel.messages()));
+        BukkitNpcCommandRunner commandRunner = new BukkitNpcCommandRunner();
+        BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
+        NpcActionRunner actionRunner = new BukkitNpcActionRunner(commandRunner, connector, kernel.log());
         NpcInteractionListener interaction = new NpcInteractionListener(
-                renderer, repository, new BukkitNpcCommandRunner(), kernel.scheduler(), settings.clickCooldown());
+                renderer, repository, commandRunner, actionRunner, kernel.scheduler(), settings.clickCooldown());
         List<Listener> listeners = List.of(new NpcLifecycleListener(renderer), interaction);
         AutoCloseable refreshTask = kernel.scheduler().repeatGlobal(renderer::refresh, REFRESH_PERIOD, REFRESH_PERIOD);
         Duration lookPeriod = settings.lookPeriod();
         AutoCloseable lookTask = kernel.scheduler().repeatGlobal(renderer::lookTick, lookPeriod, lookPeriod);
-        return new Wired(commands, listeners, renderer, refreshTask, lookTask);
+        return new Wired(commands, listeners, renderer, connector, refreshTask, lookTask);
     }
 
     private static NpcServices assemble(
@@ -99,7 +109,11 @@ public final class NpcWiring {
                 new SetNpcClickCommand(repository, notifier),
                 new SetNpcLookAtPlayer(repository, renderer, notifier),
                 new SetNpcEquipment(repository, renderer, notifier),
-                new SetNpcGlowing(repository, renderer, notifier));
+                new SetNpcGlowing(repository, renderer, notifier),
+                new AddNpcAction(repository, notifier),
+                new ListNpcActions(repository, notifier),
+                new RemoveNpcAction(repository, notifier),
+                new ClearNpcActions(repository, notifier));
     }
 
     private static void spawnStored(NpcRepository repository, NpcRenderer renderer) {
@@ -117,6 +131,7 @@ public final class NpcWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the lifecycle listener to register
      * @param renderer the packet renderer, drained on stop
+     * @param connector the proxy connect channel, unregistered on stop so nothing outlives a disable
      * @param refreshTask the global refresh timer handle, cancelled on stop so no task outlives a disable
      * @param lookTask the look-at-player timer handle, cancelled on stop alongside the refresh timer
      */
@@ -124,6 +139,7 @@ public final class NpcWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             NpcRenderer renderer,
+            BukkitServerConnector connector,
             AutoCloseable refreshTask,
             AutoCloseable lookTask) {
 
@@ -131,14 +147,16 @@ public final class NpcWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(renderer, "renderer");
+            Objects.requireNonNull(connector, "connector");
             Objects.requireNonNull(refreshTask, "refreshTask");
             Objects.requireNonNull(lookTask, "lookTask");
         }
 
-        /** Cancel the timers and remove every shown NPC from every viewer so nothing is orphaned. */
+        /** Cancel the timers, unregister the proxy channel, and remove every shown NPC so nothing is orphaned. */
         public void stop() {
             closeQuietly(refreshTask);
             closeQuietly(lookTask);
+            connector.close();
             renderer.despawnAll();
         }
 

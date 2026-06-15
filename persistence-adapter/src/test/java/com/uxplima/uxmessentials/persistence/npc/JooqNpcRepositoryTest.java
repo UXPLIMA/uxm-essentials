@@ -8,8 +8,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.npc.domain.NpcAction;
+import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -96,6 +99,58 @@ class JooqNpcRepositoryTest {
         assertThat(loaded.equipment()).isEmpty();
         assertThat(loaded.glowing()).isFalse();
         assertThat(loaded.glowColor()).isNull();
+    }
+
+    @Test
+    void roundTripsActionsInOrder() {
+        NpcAction first = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "<green>welcome");
+        NpcAction second = new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.RUN_CONSOLE, "say hi {player}");
+        NpcAction third = new NpcAction(ClickTrigger.ANY, NpcActionType.SOUND, "ui.button.click:1:2");
+        repository.save(Npc.create(NpcName.of("guide"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                .withActionAdded(first)
+                .withActionAdded(second)
+                .withActionAdded(third));
+
+        Npc loaded = repository.find(NpcName.of("guide")).orElseThrow();
+
+        assertThat(loaded.actions()).containsExactly(first, second, third);
+    }
+
+    @Test
+    void replacesActionsOnSaveLeavingNoStaleRows() {
+        repository.save(Npc.create(NpcName.of("guide"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "one"))
+                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "two")));
+
+        NpcAction kept = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.ACTIONBAR, "only");
+        repository.save(repository
+                .find(NpcName.of("guide"))
+                .orElseThrow()
+                .withActionsCleared()
+                .withActionAdded(kept));
+
+        assertThat(repository.find(NpcName.of("guide")).orElseThrow().actions()).containsExactly(kept);
+    }
+
+    @Test
+    void defaultsActionsEmptyForACreatedNpc() {
+        repository.save(
+                Npc.create(NpcName.of("bare"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
+
+        assertThat(repository.find(NpcName.of("bare")).orElseThrow().actions()).isEmpty();
+    }
+
+    @Test
+    void deleteRemovesTheActionRowsToo() {
+        repository.save(Npc.create(NpcName.of("guide"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi")));
+
+        repository.delete(NpcName.of("guide"));
+        // Re-create under the same name; the actions must not resurface from a stale child row.
+        repository.save(
+                Npc.create(NpcName.of("guide"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(2_000)));
+
+        assertThat(repository.find(NpcName.of("guide")).orElseThrow().actions()).isEmpty();
     }
 
     @Test

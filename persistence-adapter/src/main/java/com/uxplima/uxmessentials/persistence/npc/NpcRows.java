@@ -2,11 +2,15 @@ package com.uxplima.uxmessentials.persistence.npc;
 
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.npc.domain.NpcAction;
+import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.NpcRecord;
@@ -24,7 +28,9 @@ import org.jspecify.annotations.Nullable;
  * nothing. The {@code look_at_player} column is a SMALLINT 0/1 read back as a boolean (whether the NPC rotates
  * to face nearby viewers). Equipment is six nullable material-name columns ({@code equip_<slot>}), one per
  * wearable slot, NULL for an empty slot; {@code glowing} is a SMALLINT 0/1 and {@code glow_color} the optional
- * outline colour name. This class is the single place that translation lives.
+ * outline colour name. The click-action chain lives in the child {@code npc_action} table and is passed in
+ * already ordered — each row's {@code click_trigger}/{@code type} are the enum names and {@code value} the raw
+ * operator payload. This class is the single place that translation lives.
  */
 final class NpcRows {
 
@@ -33,8 +39,8 @@ final class NpcRows {
 
     private NpcRows() {}
 
-    /** Rebuild a domain {@link Npc} from an {@code npc} row. */
-    static Npc toNpc(Record row) {
+    /** Rebuild a domain {@link Npc} from an {@code npc} row and its already-ordered action list. */
+    static Npc toNpc(Record row, List<NpcAction> orderedActions) {
         WorldRef world = new WorldRef(UUID.fromString(row.get(NPC.WORLD)), row.get(NPC.WORLD_NAME));
         Position position = new Position(
                 world, row.get(NPC.X), row.get(NPC.Y), row.get(NPC.Z), row.get(NPC.YAW), row.get(NPC.PITCH));
@@ -47,6 +53,7 @@ final class NpcRows {
                 equipmentOf(row),
                 row.get(NPC.GLOWING) != 0,
                 row.get(NPC.GLOW_COLOR),
+                orderedActions,
                 Instant.ofEpochMilli(row.get(NPC.CREATED_AT)));
     }
 
@@ -100,6 +107,28 @@ final class NpcRows {
     private static void put(Map<EquipmentSlot, String> equipment, EquipmentSlot slot, @Nullable String material) {
         if (material != null && !material.isBlank()) {
             equipment.put(slot, material);
+        }
+    }
+
+    /**
+     * Build a domain {@link NpcAction} from a stored row's trigger/type/value, or {@code null} when the trigger
+     * or type enum name no longer parses (a forward-incompatible row is skipped on load rather than crashing the
+     * whole NPC set). The caller filters the nulls out.
+     */
+    static @Nullable NpcAction toAction(String trigger, String type, String value) {
+        ClickTrigger clickTrigger = enumOrNull(ClickTrigger.class, trigger);
+        NpcActionType actionType = enumOrNull(NpcActionType.class, type);
+        if (clickTrigger == null || actionType == null) {
+            return null;
+        }
+        return new NpcAction(clickTrigger, actionType, value);
+    }
+
+    private static <E extends Enum<E>> @Nullable E enumOrNull(Class<E> type, String name) {
+        try {
+            return Enum.valueOf(type, name);
+        } catch (IllegalArgumentException unknown) {
+            return null;
         }
     }
 }

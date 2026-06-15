@@ -17,6 +17,7 @@ import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Ticker;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
@@ -33,11 +34,14 @@ import org.jspecify.annotations.NullMarked;
  * and it runs on the clicking player's region thread (where {@code performCommand} / {@code dispatchCommand} are
  * safe).
  *
- * <p>The command may carry a routing prefix: {@code [console]} runs it as the server console, {@code [player]}
- * (or no prefix) as the clicking player; a {@code {player}} token is replaced with the clicker's name. Only a
- * right-click/interact with the main hand is acted on — the event fires once per hand and a held button repeats,
- * so a left-click (attack) and the off-hand are ignored and a short per-player-per-NPC cooldown swallows the
- * duplicate the client still sends. The cooldown is a self-evicting Caffeine cache keyed {@code uuid:npcName} with
+ * <p>On a click the single bound click command runs first (kept for backward-compat), then the ordered action
+ * chain — every {@link com.uxplima.uxmessentials.npc.domain.NpcAction} whose trigger matches the click — runs
+ * through the {@link NpcActionRunner}. The command may carry a routing prefix: {@code [console]} runs it as the
+ * server console, {@code [player]} (or no prefix) as the clicking player; a {@code {player}} token is replaced
+ * with the clicker's name. The click command alone is right-click-only; the action chain carries its own
+ * per-action trigger (left/right/any), so both an attack and an interact are now acted on — only the off-hand
+ * duplicate is ignored. A held button repeats and the client double-fires, so a short per-player-per-NPC cooldown
+ * gates the whole interaction. The cooldown is a self-evicting Caffeine cache keyed {@code uuid:npcName} with
  * {@code expireAfterWrite(cooldown)}: a present (un-expired) stamp means the cooldown is still running, and an
  * expired entry — which means the cooldown has elapsed — drops out on its own, so the map cannot grow for offline
  * players or deleted NPCs over the JVM lifetime. The interaction runs for everyone (an NPC is a server fixture);
@@ -57,6 +61,7 @@ public final class NpcInteractionListener implements Listener {
     private final NpcRenderer renderer;
     private final NpcRepository repository;
     private final NpcCommandRunner runner;
+    private final NpcActionRunner actionRunner;
     private final Scheduler scheduler;
     private final long cooldownMillis;
     private final Cache<String, Boolean> lastClick;
@@ -65,21 +70,24 @@ public final class NpcInteractionListener implements Listener {
             NpcRenderer renderer,
             NpcRepository repository,
             NpcCommandRunner runner,
+            NpcActionRunner actionRunner,
             Scheduler scheduler,
             Duration clickCooldown) {
-        this(renderer, repository, runner, scheduler, clickCooldown, System::currentTimeMillis);
+        this(renderer, repository, runner, actionRunner, scheduler, clickCooldown, System::currentTimeMillis);
     }
 
     NpcInteractionListener(
             NpcRenderer renderer,
             NpcRepository repository,
             NpcCommandRunner runner,
+            NpcActionRunner actionRunner,
             Scheduler scheduler,
             Duration clickCooldown,
             LongSupplier clock) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.runner = Objects.requireNonNull(runner, "runner");
+        this.actionRunner = Objects.requireNonNull(actionRunner, "actionRunner");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.cooldownMillis =
                 Objects.requireNonNull(clickCooldown, "clickCooldown").toMillis();
@@ -99,8 +107,8 @@ public final class NpcInteractionListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onUseUnknownEntity(PlayerUseUnknownEntityEvent event) {
-        if (event.isAttack() || event.getHand() != EquipmentSlot.HAND) {
-            return; // interact (right-click) with the main hand only; left-click and the off-hand duplicate are ignored
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return; // main hand only; the off-hand fires its own duplicate event we ignore
         }
         String npcName = renderer.npcNameAt(event.getEntityId());
         if (npcName == null) {
@@ -110,11 +118,24 @@ public final class NpcInteractionListener implements Listener {
         if (onCooldown(player, npcName)) {
             return;
         }
-        Optional<Npc> npc = repository.find(NpcName.of(npcName));
-        if (npc.isEmpty() || !npc.get().hasClickCommand()) {
+        Optional<Npc> found = repository.find(NpcName.of(npcName));
+        if (found.isEmpty()) {
             return;
         }
-        run(player, Objects.requireNonNull(npc.get().clickCommand(), "clickCommand"));
+        Npc npc = found.get();
+        boolean attack = event.isAttack();
+        // The single click command is the legacy right-click-only binding; the richer action chain carries its
+        // own per-action trigger and runs after it, both on the clicking player's region thread.
+        scheduler.onEntity(BukkitRefs.toRef(player), () -> interact(player, npc, attack));
+    }
+
+    private void interact(Player player, Npc npc, boolean attack) {
+        if (!attack && npc.hasClickCommand()) {
+            run(player, Objects.requireNonNull(npc.clickCommand(), "clickCommand"));
+        }
+        if (npc.hasActions()) {
+            actionRunner.run(player, npc.actions(), attack);
+        }
     }
 
     private boolean onCooldown(Player player, String npcName) {
@@ -140,15 +161,14 @@ public final class NpcInteractionListener implements Listener {
     private void run(Player player, String rawCommand) {
         String substituted = rawCommand.replace(PLAYER_TOKEN, player.getName());
         String lower = substituted.toLowerCase(Locale.ROOT);
-        // The command runs on the clicking player's region thread, where performCommand/dispatchCommand are safe.
+        // Already on the clicking player's region thread, where performCommand/dispatchCommand are safe.
         if (lower.startsWith(CONSOLE_PREFIX)) {
-            String command = substituted.substring(CONSOLE_PREFIX.length()).strip();
-            scheduler.onEntity(BukkitRefs.toRef(player), () -> runner.runAsConsole(command));
+            runner.runAsConsole(substituted.substring(CONSOLE_PREFIX.length()).strip());
             return;
         }
         String command = lower.startsWith(PLAYER_PREFIX)
                 ? substituted.substring(PLAYER_PREFIX.length()).strip()
                 : substituted.strip();
-        scheduler.onEntity(BukkitRefs.toRef(player), () -> runner.runAsPlayer(player, command));
+        runner.runAsPlayer(player, command);
     }
 }

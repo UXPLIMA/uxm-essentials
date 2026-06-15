@@ -2,10 +2,14 @@ package com.uxplima.uxmessentials.npc.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.npc.application.AddNpcAction;
+import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
+import com.uxplima.uxmessentials.npc.application.ListNpcActions;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
+import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
 import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
@@ -28,6 +32,10 @@ import org.jspecify.annotations.NullMarked;
  * @param look {@code /npc lookatplayer}
  * @param equip {@code /npc equip}
  * @param glow {@code /npc glow}
+ * @param addAction {@code /npc action add}
+ * @param listActions {@code /npc action list}
+ * @param removeAction {@code /npc action remove}
+ * @param clearActions {@code /npc action clear}
  */
 @NullMarked
 public record NpcServices(
@@ -39,7 +47,11 @@ public record NpcServices(
         SetNpcClickCommand command,
         SetNpcLookAtPlayer look,
         SetNpcEquipment equip,
-        SetNpcGlowing glow) {
+        SetNpcGlowing glow,
+        AddNpcAction addAction,
+        ListNpcActions listActions,
+        RemoveNpcAction removeAction,
+        ClearNpcActions clearActions) {
 
     public NpcServices {
         Objects.requireNonNull(create, "create");
@@ -51,5 +63,9 @@ public record NpcServices(
         Objects.requireNonNull(look, "look");
         Objects.requireNonNull(equip, "equip");
         Objects.requireNonNull(glow, "glow");
+        Objects.requireNonNull(addAction, "addAction");
+        Objects.requireNonNull(listActions, "listActions");
+        Objects.requireNonNull(removeAction, "removeAction");
+        Objects.requireNonNull(clearActions, "clearActions");
     }
 }

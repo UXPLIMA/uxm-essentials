@@ -40,13 +40,24 @@ public enum NpcMessageKey implements MessageKey {
     NPC_LIST_ENTRY("npc.list.entry"),
     NPC_LIST_EMPTY("npc.list.empty"),
 
+    // action-chain feedback
+    NPC_ACTION_ADDED("npc.action.added"),
+    NPC_ACTION_REMOVED("npc.action.removed"),
+    NPC_ACTION_CLEARED("npc.action.cleared"),
+    NPC_ACTION_LIST_HEADER("npc.action.list-header"),
+    NPC_ACTION_LIST_ENTRY("npc.action.list-entry"),
+    NPC_ACTION_NONE("npc.action.none"),
+
     // failures
     NPC_NOT_FOUND("npc.not-found"),
     NPC_NAME_TAKEN("npc.name-taken"),
     NPC_PLAYERS_ONLY("npc.players-only"),
     NPC_INVALID_SLOT("npc.invalid-slot"),
     NPC_INVALID_MATERIAL("npc.invalid-material"),
-    NPC_INVALID_COLOR("npc.invalid-color");
+    NPC_INVALID_COLOR("npc.invalid-color"),
+    NPC_INVALID_TRIGGER("npc.invalid-trigger"),
+    NPC_INVALID_ACTION_TYPE("npc.invalid-action-type"),
+    NPC_ACTION_INDEX_INVALID("npc.action.index-invalid");
 
     private final String key;
 

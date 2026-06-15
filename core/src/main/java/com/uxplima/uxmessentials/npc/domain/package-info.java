@@ -1,6 +1,7 @@
 /**
  * Pure domain of the npc bounded context: the {@code Npc} value object (server-wide name, position, optional
- * skin, optional click command, and creation time), the {@code NpcName} and {@code NpcSkin} value objects, the
+ * skin, optional click command, an ordered {@code NpcAction} list, and creation time), the {@code NpcName} and
+ * {@code NpcSkin} value objects, the {@code ClickTrigger} / {@code NpcActionType} action vocabulary, the
  * modelled {@code NpcError} failures, and the sealed {@code NpcEvent} family. NPCs are server-wide, so an
  * {@code NpcName} is unique across the whole table; moving, re-skinning, or rebinding a click command produces
  * new validated instances rather than mutating in place. How an NPC renders (a fake-player spawn packet to each
