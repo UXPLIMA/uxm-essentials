@@ -127,6 +127,25 @@ class NpcInteractionListenerTest {
     }
 
     @Test
+    void theCooldownStampEvictsItselfOnceTheCooldownElapses() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "warp spawn");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+        // A fresh click leaves exactly one tracked stamp.
+        assertThat(listener.trackedClicks()).isEqualTo(1);
+
+        now.set(600); // past the 500 ms window
+        // The expired stamp drops out on its own — the map does not retain the (now idle) player/NPC pair.
+        assertThat(listener.trackedClicks()).isZero();
+
+        // And a click after expiry runs again (cooldown elapsed == evicted entry, same semantics as before).
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+        assertThat(runner.playerCommands).containsExactly("warp spawn", "warp spawn");
+        assertThat(listener.trackedClicks()).isEqualTo(1);
+    }
+
+    @Test
     void doesNothingForAnNpcWithNoCommand() {
         PlayerMock player = renderNpcAndAddPlayer("guide", null);
         NpcInteractionListener listener = listener(Duration.ofMillis(500));
