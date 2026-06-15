@@ -55,6 +55,7 @@ public final class PlaceholderResolver {
     private static final String TELEPORT_PREFIX = "teleport_";
     private static final String MODERATION_PREFIX = "moderation_";
     private static final String MESSAGING_PREFIX = "messaging_";
+    private static final String STAFF_PREFIX = "staff_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -122,6 +123,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(MESSAGING_PREFIX)) {
             return Optional.of(messaging(who, online, normalized.substring(MESSAGING_PREFIX.length())));
+        }
+        if (normalized.startsWith(STAFF_PREFIX)) {
+            return Optional.of(staff(who, online, normalized.substring(STAFF_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -652,6 +656,26 @@ public final class PlaceholderResolver {
             case "reply_target" -> online ? messaging.replyTarget(who).orElse(EMPTY) : EMPTY;
             case "msgtoggle" -> online ? bool(messaging.acceptingMessages(who)) : EMPTY;
             case "socialspy" -> online ? bool(messaging.socialSpy(who)) : EMPTY;
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code staff_}-stripped key against the staff seam. {@code mode} reads the live session-scoped
+     * {@code /staffmode} marker, so an offline requester (who holds no marker) reads {@code no}; {@code online}
+     * and its {@code count} alias read the server-wide online-staff roster size — the holders of the
+     * {@code uxmessentials.staff.member} marker — which answer for an offline requester too since the count does
+     * not depend on who asks. A disabled module degrades every key to the dash.
+     */
+    private String staff(PlayerRef who, boolean online, String key) {
+        Optional<StaffPlaceholders> seam = contexts.staff();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        StaffPlaceholders staff = seam.get();
+        return switch (key) {
+            case "mode" -> online ? bool(staff.inStaffMode(who)) : NO;
+            case "online", "count" -> Integer.toString(staff.onlineStaffCount());
             default -> EMPTY;
         };
     }

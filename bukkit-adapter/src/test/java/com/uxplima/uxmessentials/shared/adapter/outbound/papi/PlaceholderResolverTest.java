@@ -860,6 +860,41 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void staffPlaceholdersReadModeAndOnlineCount() {
+        FakeStaff staff = new FakeStaff().mode(ALICE, true).onlineCount(3);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().staff(staff).build());
+
+        assertThat(resolver.resolve(ALICE, true, "staff_mode")).contains("yes");
+        assertThat(resolver.resolve(BOB, true, "staff_mode")).contains("no");
+        assertThat(resolver.resolve(ALICE, true, "staff_online")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "staff_count")).contains("3");
+    }
+
+    @Test
+    void staffModeDegradesOfflineButOnlineCountStillReads() {
+        FakeStaff staff = new FakeStaff().mode(ALICE, true).onlineCount(2);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().staff(staff).build());
+
+        // staff_mode is session-only: an offline requester holds no marker, so it reads "no".
+        assertThat(resolver.resolve(ALICE, false, "staff_mode")).contains("no");
+        // The server-wide roster count does not depend on the requester's session, so it still answers.
+        assertThat(resolver.resolve(ALICE, false, "staff_online")).contains("2");
+    }
+
+    @Test
+    void staffDegradesWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "staff_mode")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "staff_online")).contains("-");
+        // An unknown staff_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "staff_unknown")).contains("-");
+    }
+
+    @Test
     void disabledContextsDegradeToTheirEmptyDefault() {
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().build());
@@ -1441,6 +1476,37 @@ class PlaceholderResolverTest {
         @Override
         public int ignoringCount(PlayerRef who) {
             return ignoring;
+        }
+    }
+
+    /** A configurable {@link StaffPlaceholders} fake — every read returns the value the test seeded. */
+    private static final class FakeStaff implements StaffPlaceholders {
+
+        private final java.util.Set<PlayerRef> inMode = new java.util.HashSet<>();
+        private int onlineCount;
+
+        FakeStaff mode(PlayerRef who, boolean value) {
+            if (value) {
+                inMode.add(who);
+            } else {
+                inMode.remove(who);
+            }
+            return this;
+        }
+
+        FakeStaff onlineCount(int value) {
+            this.onlineCount = value;
+            return this;
+        }
+
+        @Override
+        public boolean inStaffMode(PlayerRef who) {
+            return inMode.contains(who);
+        }
+
+        @Override
+        public int onlineStaffCount() {
+            return onlineCount;
         }
     }
 

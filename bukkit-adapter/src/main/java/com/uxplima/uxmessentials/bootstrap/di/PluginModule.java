@@ -73,6 +73,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPl
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWarpsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ServicesTeleportPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StaffStaffPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
@@ -726,6 +727,9 @@ public final class PluginModule {
         StaffWiring.Wired wired = StaffWiring.wire(plugin, ctx, persistence, seams, events);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The staff PAPI seam reads the same staff-mode marker the /staffmode use cases hold and counts the online
+        // staff-member holders the /stafflist roster shows, so a placeholder matches what the player sees in game.
+        links.placeholders.staff(new StaffStaffPlaceholders(wired.services().store(), plugin.getServer()));
         resources.onClose(wired::stop);
     }
 
