@@ -8,7 +8,9 @@ import java.util.function.UnaryOperator;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -30,9 +32,12 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The outbound seam that keeps the in-world rendering in step with the stored model, realised over the uxmLib
- * native-Display hologram API. Each domain {@link Hologram} maps to one live uxmLib {@code Hologram} (a single
- * multi-line {@code TextDisplay}); the renderer tracks them by name so a re-render, a refresh, or a despawn
- * finds the live entity.
+ * native-Display hologram API. Each domain {@link Hologram} maps to one live uxmLib hologram by its type: a
+ * {@code TEXT} hologram to a single multi-line {@code TextDisplay}, an {@code ITEM} hologram to an
+ * {@code ItemDisplay} (its {@code Material} name resolved here), a {@code BLOCK} hologram to a
+ * {@code BlockDisplay} (its BlockData string parsed here). The renderer tracks them by name so a re-render, a
+ * refresh, or a despawn finds the live entity; an unknown material or unparseable BlockData is failed soft
+ * (logged and skipped) so it never crashes the render.
  *
  * <p>Spawning and despawning a display entity must run on the owning region thread (Folia), so every mutation
  * hops through the injected {@link Scheduler} port: {@code render} schedules onto the hologram's location, and
@@ -107,7 +112,7 @@ public final class HologramRenderer implements HologramView {
     public void despawnAll() {
         for (Tracked tracked : live.values()) {
             // Each entity is removed on its own region thread, derived from the position it was spawned at.
-            scheduler.onRegion(tracked.position(), () -> manager.remove(tracked.live()));
+            scheduler.onRegion(tracked.position(), () -> tracked.live().removeFrom(manager));
         }
         live.clear();
     }
@@ -120,7 +125,7 @@ public final class HologramRenderer implements HologramView {
             return;
         }
         // The display entity must be removed on its own region thread; route through its spawn position.
-        scheduler.onRegion(existing.position(), () -> manager.remove(existing.live()));
+        scheduler.onRegion(existing.position(), () -> existing.live().removeFrom(manager));
     }
 
     /**
@@ -157,12 +162,57 @@ public final class HologramRenderer implements HologramView {
         if (previous != null) {
             // Despawn the old entity on its own region thread; on a cross-world move it lives in a
             // different world from the new one, so it must not be removed inline on this region thread.
-            scheduler.onRegion(previous.position(), () -> manager.remove(previous.live()));
+            scheduler.onRegion(previous.position(), () -> previous.live().removeFrom(manager));
         }
-        Holograms.Builder builder = builderFor(hologram, placeholders, miniMessage);
-        com.uxplima.uxmlib.hologram.Hologram spawned = manager.spawn(builder, at);
+        RenderedHologram spawned = spawnFor(hologram, at);
+        if (spawned == null) {
+            // Invalid item material or block data — already logged; leave nothing tracked rather than crash.
+            return;
+        }
         applyVisibility(spawned, hologram.visibility());
         live.put(hologram.name().value(), new Tracked(spawned, hologram, hologram.location()));
+    }
+
+    /**
+     * Spawn the live entity for {@code hologram} by its type: a text hologram from the configured builder, an
+     * item hologram from the resolved {@code Material}, a block hologram from the parsed BlockData. An ITEM with
+     * an unknown material or a BLOCK with an unparseable BlockData string is failed soft — logged and skipped
+     * (returns {@code null}) rather than throwing, so one bad value never breaks the render of the others.
+     */
+    private @org.jspecify.annotations.Nullable RenderedHologram spawnFor(Hologram hologram, Location at) {
+        return switch (hologram.type()) {
+            case TEXT -> RenderedHologram.ofText(manager.spawn(builderFor(hologram, placeholders, miniMessage), at));
+            case ITEM -> spawnItem(hologram, at);
+            case BLOCK -> spawnBlock(hologram, at);
+        };
+    }
+
+    private @org.jspecify.annotations.Nullable RenderedHologram spawnItem(Hologram hologram, Location at) {
+        ItemStack item = HologramModels.itemOf(hologram.itemMaterial());
+        if (item == null) {
+            log.warn(
+                    "skipping item hologram {} — unknown material {}",
+                    hologram.name().value(),
+                    String.valueOf(hologram.itemMaterial()));
+            return null;
+        }
+        Holograms.ItemBuilder builder = Holograms.item(item);
+        HologramAppearances.applyDisplay(builder, hologram.appearance());
+        return RenderedHologram.ofModel(manager.spawn(builder, at));
+    }
+
+    private @org.jspecify.annotations.Nullable RenderedHologram spawnBlock(Hologram hologram, Location at) {
+        BlockData block = HologramModels.blockOf(hologram.blockData());
+        if (block == null) {
+            log.warn(
+                    "skipping block hologram {} — invalid block data {}",
+                    hologram.name().value(),
+                    String.valueOf(hologram.blockData()));
+            return null;
+        }
+        Holograms.BlockBuilder builder = Holograms.block(block);
+        HologramAppearances.applyDisplay(builder, hologram.appearance());
+        return RenderedHologram.ofModel(manager.spawn(builder, at));
     }
 
     /**
@@ -170,7 +220,7 @@ public final class HologramRenderer implements HologramView {
      * entity visible by default (no work). {@code PERMISSION} restricts it to an explicit viewer set, then shows
      * it to each online player who holds the node — so a non-holder never sees it and a holder sees it at once.
      */
-    private void applyVisibility(com.uxplima.uxmlib.hologram.Hologram spawned, Visibility visibility) {
+    private void applyVisibility(RenderedHologram spawned, Visibility visibility) {
         if (!visibility.isPermissionGated()) {
             return;
         }
@@ -180,7 +230,7 @@ public final class HologramRenderer implements HologramView {
         }
     }
 
-    private void applyViewer(com.uxplima.uxmlib.hologram.Hologram spawned, Visibility visibility, Player viewer) {
+    private void applyViewer(RenderedHologram spawned, Visibility visibility, Player viewer) {
         if (maySee(permissions, visibility, BukkitRefs.toRef(viewer))) {
             spawned.show(plugin, viewer);
         } else {
@@ -226,6 +276,8 @@ public final class HologramRenderer implements HologramView {
     /**
      * A live uxmLib hologram paired with the domain {@link Hologram} it renders (so its {@link Visibility} is
      * known for a viewer recompute) and the {@link Position} it was spawned at (so its owning region is known).
+     * The live entity is held as a type-agnostic {@link RenderedHologram} so a text, item or block hologram is
+     * tracked, despawned and re-shown the same way.
      */
-    private record Tracked(com.uxplima.uxmlib.hologram.Hologram live, Hologram hologram, Position position) {}
+    private record Tracked(RenderedHologram live, Hologram hologram, Position position) {}
 }

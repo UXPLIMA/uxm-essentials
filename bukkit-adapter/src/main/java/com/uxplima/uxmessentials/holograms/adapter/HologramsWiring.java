@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.holograms.application.MoveHologram;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
+import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
 import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
@@ -106,7 +107,8 @@ public final class HologramsWiring {
                 new MoveHologram(repository, renderer, notifier),
                 new SetHologramAppearance(repository, renderer, notifier),
                 new SetHologramRefresh(repository, renderer, notifier),
-                new SetHologramVisibility(repository, renderer, notifier));
+                new SetHologramVisibility(repository, renderer, notifier),
+                new SetHologramModel(repository, renderer, notifier));
     }
 
     private static void spawnStored(HologramRepository repository, HologramRenderer renderer) {

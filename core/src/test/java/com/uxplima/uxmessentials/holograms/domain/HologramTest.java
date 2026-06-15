@@ -127,4 +127,83 @@ class HologramTest {
     void withRefreshIntervalRejectsANegativeValue() {
         assertThatThrownBy(() -> twoLine().withRefreshIntervalTicks(-1)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void createDefaultsToTheTextType() {
+        assertThat(twoLine().type()).isEqualTo(HologramType.TEXT);
+        assertThat(twoLine().itemMaterial()).isNull();
+        assertThat(twoLine().blockData()).isNull();
+    }
+
+    @Test
+    void createItemHoldsTheMaterialAndNeedsNoLines() {
+        Hologram item = Hologram.createItem(HologramName.of("loot"), AT, "DIAMOND", Instant.ofEpochMilli(1_000));
+
+        assertThat(item.type()).isEqualTo(HologramType.ITEM);
+        assertThat(item.itemMaterial()).isEqualTo("DIAMOND");
+        assertThat(item.lineCount()).isZero();
+        assertThat(item.blockData()).isNull();
+    }
+
+    @Test
+    void createBlockHoldsTheBlockDataAndNeedsNoLines() {
+        Hologram block = Hologram.createBlock(
+                HologramName.of("statue"), AT, "minecraft:oak_log[axis=y]", Instant.ofEpochMilli(1_000));
+
+        assertThat(block.type()).isEqualTo(HologramType.BLOCK);
+        assertThat(block.blockData()).isEqualTo("minecraft:oak_log[axis=y]");
+        assertThat(block.lineCount()).isZero();
+        assertThat(block.itemMaterial()).isNull();
+    }
+
+    @Test
+    void asItemSwitchesTypeAndContentKeepingNameAndStyling() {
+        Hologram item = twoLine().withRefreshIntervalTicks(40).asItem("EMERALD");
+
+        assertThat(item.type()).isEqualTo(HologramType.ITEM);
+        assertThat(item.itemMaterial()).isEqualTo("EMERALD");
+        assertThat(item.name().value()).isEqualTo("spawn");
+        assertThat(item.refreshIntervalTicks()).isEqualTo(40);
+    }
+
+    @Test
+    void asBlockSwitchesTypeAndContent() {
+        Hologram block = twoLine().asBlock("minecraft:stone");
+
+        assertThat(block.type()).isEqualTo(HologramType.BLOCK);
+        assertThat(block.blockData()).isEqualTo("minecraft:stone");
+        assertThat(block.itemMaterial()).isNull();
+    }
+
+    @Test
+    void anItemHologramRejectsAMissingMaterial() {
+        assertThatThrownBy(() -> Hologram.createItem(HologramName.of("x"), AT, "  ", Instant.ofEpochMilli(1_000)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aBlockHologramRejectsMissingBlockData() {
+        assertThatThrownBy(() -> Hologram.createBlock(HologramName.of("x"), AT, " ", Instant.ofEpochMilli(1_000)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void anItemHologramMayHaveItsOnlyLineRemoved() {
+        // A relaxed invariant for the non-text types: an item hologram with a label line can drop it to zero.
+        Hologram item = Hologram.createItem(HologramName.of("loot"), AT, "DIAMOND", Instant.ofEpochMilli(1_000))
+                .withLineAppended(new HologramLine("label"));
+
+        Hologram bare = item.withLineRemoved(0);
+
+        assertThat(bare.lineCount()).isZero();
+        assertThat(bare.type()).isEqualTo(HologramType.ITEM);
+    }
+
+    @Test
+    void aTextHologramStillRefusesToDropItsLastLine() {
+        // The TEXT invariant is unchanged — only the non-text types relax it.
+        Hologram one = twoLine().withLineRemoved(0);
+
+        assertThatThrownBy(() -> one.withLineRemoved(0)).isInstanceOf(IllegalStateException.class);
+    }
 }

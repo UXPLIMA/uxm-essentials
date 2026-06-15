@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.HologramType;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.HologramsRecord;
@@ -24,8 +25,9 @@ import org.jspecify.annotations.Nullable;
  * and the creation time as epoch milliseconds, so the column shape is identical on every backend. The V35
  * appearance columns and V36 visibility columns are nullable: an absent value reads back as the matching
  * {@link Appearance} default (or a static interval), and as {@link Visibility#everyone()}, so a pre-V35 row
- * keeps its current look and a pre-V36 row stays visible to everyone. This class is the single place that
- * translation lives.
+ * keeps its current look and a pre-V36 row stays visible to everyone. The V37 type columns are likewise
+ * nullable: a NULL type reads back as {@link HologramType#TEXT}, so a pre-V37 row keeps rendering its lines.
+ * This class is the single place that translation lives.
  */
 final class HologramRows {
 
@@ -48,7 +50,10 @@ final class HologramRows {
         return new Hologram(
                 HologramName.of(row.get(HOLOGRAMS.NAME)),
                 position,
+                typeOf(row.get(HOLOGRAMS.TYPE)),
                 lines,
+                row.get(HOLOGRAMS.ITEM_MATERIAL),
+                row.get(HOLOGRAMS.BLOCK_DATA),
                 appearanceOf(row),
                 visibilityOf(row),
                 intOr(row.get(HOLOGRAMS.REFRESH_INTERVAL_TICKS), Hologram.STATIC),
@@ -61,6 +66,9 @@ final class HologramRows {
         Appearance appearance = hologram.appearance();
         Visibility visibility = hologram.visibility();
         record.setName(hologram.name().value())
+                .setType(hologram.type().name())
+                .setItemMaterial(hologram.itemMaterial())
+                .setBlockData(hologram.blockData())
                 .setWorld(location.world().uid().toString())
                 .setWorldName(location.world().name())
                 .setX(location.x())
@@ -107,6 +115,12 @@ final class HologramRows {
             return new Visibility(Visibility.Mode.PERMISSION, permission, distance);
         }
         return new Visibility(Visibility.Mode.ALL, null, distance);
+    }
+
+    private static HologramType typeOf(@Nullable String stored) {
+        // A pre-V37 row (NULL type) — and any unknown token — reads back as TEXT, so a row never resolves to
+        // an invalid type and an existing hologram keeps rendering its lines.
+        return HologramType.parse(stored).orElse(HologramType.TEXT);
     }
 
     private static Billboard billboardOf(@Nullable String stored) {

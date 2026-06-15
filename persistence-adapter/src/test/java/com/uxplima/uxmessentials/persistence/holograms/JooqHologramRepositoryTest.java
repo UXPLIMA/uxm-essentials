@@ -130,6 +130,66 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsAnItemHologramType() {
+        repository.save(Hologram.createItem(
+                HologramName.of("loot"), Position.of(WORLD, 1, 64, 1), "DIAMOND", Instant.ofEpochMilli(1_000)));
+
+        Hologram loaded = repository.find(HologramName.of("loot")).orElseThrow();
+
+        assertThat(loaded.type()).isEqualTo(com.uxplima.uxmessentials.holograms.domain.HologramType.ITEM);
+        assertThat(loaded.itemMaterial()).isEqualTo("DIAMOND");
+        assertThat(loaded.blockData()).isNull();
+        assertThat(loaded.lineCount()).isZero();
+    }
+
+    @Test
+    void roundTripsABlockHologramType() {
+        repository.save(Hologram.createBlock(
+                HologramName.of("statue"),
+                Position.of(WORLD, 1, 64, 1),
+                "minecraft:oak_log[axis=y]",
+                Instant.ofEpochMilli(1_000)));
+
+        Hologram loaded = repository.find(HologramName.of("statue")).orElseThrow();
+
+        assertThat(loaded.type()).isEqualTo(com.uxplima.uxmessentials.holograms.domain.HologramType.BLOCK);
+        assertThat(loaded.blockData()).isEqualTo("minecraft:oak_log[axis=y]");
+        assertThat(loaded.itemMaterial()).isNull();
+    }
+
+    @Test
+    void aRowWithNoTypeColumnReadsBackAsText() {
+        // A pre-V37 row: insert the name row directly leaving the type/item/block columns NULL, plus one line.
+        Holograms holograms = Holograms.HOLOGRAMS;
+        HologramLines lines = HologramLines.HOLOGRAM_LINES;
+        persistence.dsl().transaction(config -> {
+            config.dsl()
+                    .insertInto(holograms)
+                    .set(holograms.NAME, "legacy")
+                    .set(holograms.WORLD, WORLD.uid().toString())
+                    .set(holograms.WORLD_NAME, "world")
+                    .set(holograms.X, 0.0)
+                    .set(holograms.Y, 64.0)
+                    .set(holograms.Z, 0.0)
+                    .set(holograms.YAW, 0.0f)
+                    .set(holograms.PITCH, 0.0f)
+                    .set(holograms.CREATED_AT, 1_000L)
+                    .execute();
+            config.dsl()
+                    .insertInto(lines)
+                    .set(lines.HOLOGRAM, "legacy")
+                    .set(lines.IDX, 0)
+                    .set(lines.TEXT, "line")
+                    .execute();
+        });
+
+        Hologram loaded = repository.find(HologramName.of("legacy")).orElseThrow();
+
+        assertThat(loaded.type()).isEqualTo(com.uxplima.uxmessentials.holograms.domain.HologramType.TEXT);
+        assertThat(loaded.itemMaterial()).isNull();
+    }
+
+    @Test
     void roundTripsPermissionVisibilityAndDistance() {
         Visibility gated =
                 Visibility.restrictedTo("uxmessentials.hologram.see.vip").withDistance(48);

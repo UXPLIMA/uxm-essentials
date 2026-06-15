@@ -6,18 +6,23 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
+import org.jspecify.annotations.Nullable;
 
 /**
- * One server-wide hologram: a {@link HologramName}, the {@link Position} it floats at, its ordered text
- * {@link HologramLine}s, its visual {@link Appearance}, how often it re-renders, and the moment it was created.
- * A hologram is a value object — re-anchoring (a move), editing a line, or restyling produces a new instance
- * rather than mutating in place, so the aggregate is always in a valid state and a repository save records a
- * fully-formed snapshot.
+ * One server-wide hologram: a {@link HologramName}, the {@link Position} it floats at, its {@link HologramType},
+ * its content (text {@link HologramLine}s for {@link HologramType#TEXT}, an item-material name for
+ * {@link HologramType#ITEM}, a BlockData string for {@link HologramType#BLOCK}), its visual {@link Appearance},
+ * how often it re-renders, and the moment it was created. A hologram is a value object — re-anchoring (a move),
+ * editing a line, restyling, or switching to an item/block produces a new instance rather than mutating in
+ * place, so the aggregate is always in a valid state and a repository save records a fully-formed snapshot.
  *
  * <p>The position carries its own {@link com.uxplima.uxmessentials.shared.domain.WorldRef}, so the
- * hologram's world is read from {@code location().world()} rather than held separately. A hologram always
- * carries at least one line — an empty hologram would render nothing and is rejected at construction, so the
- * line-removal op refuses to drop the last line.
+ * hologram's world is read from {@code location().world()} rather than held separately. A {@code TEXT} hologram
+ * always carries at least one line — an empty text hologram would render nothing and is rejected at
+ * construction, so the line-removal op refuses to drop the last line. An {@code ITEM} or {@code BLOCK}
+ * hologram's content is its model (the {@link #itemMaterial()} or {@link #blockData()} string), so it needs no
+ * line; the line invariant is therefore relaxed for the non-text types (lines, if present, are reserved for a
+ * future text-label-above-the-model rendering — v1 renders the model only).
  *
  * <p>{@link #refreshIntervalTicks()} is 0 for a static hologram (rendered once, never re-rendered); a positive
  * value means the live entity re-renders on that cadence so its lines pick up fresh placeholder values. A line
@@ -25,7 +30,10 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  *
  * @param name the hologram's canonical, server-unique name
  * @param location where the hologram floats
- * @param lines the ordered text lines (at least one), rendered top-down
+ * @param type whether the hologram renders text lines, a floating item, or a floating block
+ * @param lines the ordered text lines (at least one for TEXT; may be empty for ITEM/BLOCK)
+ * @param itemMaterial the {@code Material} name shown by an ITEM hologram, or {@code null} for other types
+ * @param blockData the BlockData string shown by a BLOCK hologram, or {@code null} for other types
  * @param appearance the visual styling (billboard, background, brightness, scale, …)
  * @param visibility who may see the hologram and how far away it stays visible
  * @param refreshIntervalTicks how often (in ticks) the live entity re-renders, or 0 for a static hologram
@@ -34,7 +42,10 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 public record Hologram(
         HologramName name,
         Position location,
+        HologramType type,
         List<HologramLine> lines,
+        @Nullable String itemMaterial,
+        @Nullable String blockData,
         Appearance appearance,
         Visibility visibility,
         int refreshIntervalTicks,
@@ -46,13 +57,20 @@ public record Hologram(
     public Hologram {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(type, "type");
         Objects.requireNonNull(lines, "lines");
         Objects.requireNonNull(appearance, "appearance");
         Objects.requireNonNull(visibility, "visibility");
         Objects.requireNonNull(createdAt, "createdAt");
         lines = List.copyOf(lines);
-        if (lines.isEmpty()) {
-            throw new IllegalArgumentException("a hologram needs at least one line");
+        if (type.requiresLines() && lines.isEmpty()) {
+            throw new IllegalArgumentException("a text hologram needs at least one line");
+        }
+        if (type == HologramType.ITEM && (itemMaterial == null || itemMaterial.isBlank())) {
+            throw new IllegalArgumentException("an item hologram needs an item material");
+        }
+        if (type == HologramType.BLOCK && (blockData == null || blockData.isBlank())) {
+            throw new IllegalArgumentException("a block hologram needs block data");
         }
         if (refreshIntervalTicks < 0) {
             throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + refreshIntervalTicks);
@@ -60,23 +78,56 @@ public record Hologram(
     }
 
     /**
-     * A new hologram created now at {@code location} with the given ordered lines (at least one), the default
-     * {@link Appearance}, visible to everyone, and no refresh interval (static).
+     * A new TEXT hologram created now at {@code location} with the given ordered lines (at least one), the
+     * default {@link Appearance}, visible to everyone, and no refresh interval (static).
      */
     public static Hologram create(HologramName name, Position location, List<HologramLine> lines, Instant createdAt) {
-        return new Hologram(name, location, lines, Appearance.defaults(), Visibility.everyone(), STATIC, createdAt);
+        return new Hologram(
+                name,
+                location,
+                HologramType.TEXT,
+                lines,
+                null,
+                null,
+                Appearance.defaults(),
+                Visibility.everyone(),
+                STATIC,
+                createdAt);
+    }
+
+    /** A new ITEM hologram created now at {@code location} showing {@code itemMaterial}, with no lines. */
+    public static Hologram createItem(HologramName name, Position location, String itemMaterial, Instant createdAt) {
+        return new Hologram(
+                name,
+                location,
+                HologramType.ITEM,
+                List.of(),
+                Objects.requireNonNull(itemMaterial, "itemMaterial"),
+                null,
+                Appearance.defaults(),
+                Visibility.everyone(),
+                STATIC,
+                createdAt);
+    }
+
+    /** A new BLOCK hologram created now at {@code location} showing {@code blockData}, with no lines. */
+    public static Hologram createBlock(HologramName name, Position location, String blockData, Instant createdAt) {
+        return new Hologram(
+                name,
+                location,
+                HologramType.BLOCK,
+                List.of(),
+                null,
+                Objects.requireNonNull(blockData, "blockData"),
+                Appearance.defaults(),
+                Visibility.everyone(),
+                STATIC,
+                createdAt);
     }
 
     /** A copy re-anchored to {@code newLocation}, keeping everything else. */
     public Hologram movedTo(Position newLocation) {
-        return new Hologram(
-                name,
-                Objects.requireNonNull(newLocation, "newLocation"),
-                lines,
-                appearance,
-                visibility,
-                refreshIntervalTicks,
-                createdAt);
+        return copy(Objects.requireNonNull(newLocation, "newLocation"), type, lines, itemMaterial, blockData);
     }
 
     /** A copy with {@code line} appended after the current last line. */
@@ -84,7 +135,7 @@ public record Hologram(
         Objects.requireNonNull(line, "line");
         List<HologramLine> next = new ArrayList<>(lines);
         next.add(line);
-        return new Hologram(name, location, next, appearance, visibility, refreshIntervalTicks, createdAt);
+        return copy(location, type, next, itemMaterial, blockData);
     }
 
     /** A copy with the line at {@code index} replaced by {@code line}; rejects an out-of-range index. */
@@ -93,33 +144,66 @@ public record Hologram(
         requireInRange(index);
         List<HologramLine> next = new ArrayList<>(lines);
         next.set(index, line);
-        return new Hologram(name, location, next, appearance, visibility, refreshIntervalTicks, createdAt);
+        return copy(location, type, next, itemMaterial, blockData);
     }
 
     /**
-     * A copy with the line at {@code index} removed; rejects an out-of-range index, and rejects removing the
-     * last remaining line (a hologram must keep at least one line, so the caller deletes the hologram instead).
+     * A copy with the line at {@code index} removed; rejects an out-of-range index, and (for a TEXT hologram)
+     * rejects removing the last remaining line — a text hologram must keep at least one line, so the caller
+     * deletes the hologram instead.
      */
     public Hologram withLineRemoved(int index) {
         requireInRange(index);
-        if (lines.size() == 1) {
-            throw new IllegalStateException("a hologram must keep at least one line");
+        if (type.requiresLines() && lines.size() == 1) {
+            throw new IllegalStateException("a text hologram must keep at least one line");
         }
         List<HologramLine> next = new ArrayList<>(lines);
         next.remove(index);
-        return new Hologram(name, location, next, appearance, visibility, refreshIntervalTicks, createdAt);
+        return copy(location, type, next, itemMaterial, blockData);
     }
 
-    /** A copy restyled with {@code newAppearance}, keeping the name, lines, visibility, interval and creation. */
+    /** A copy switched to an ITEM hologram showing {@code newItemMaterial} (lines and styling kept). */
+    public Hologram asItem(String newItemMaterial) {
+        Objects.requireNonNull(newItemMaterial, "newItemMaterial");
+        return copy(location, HologramType.ITEM, lines, newItemMaterial, null);
+    }
+
+    /** A copy switched to a BLOCK hologram showing {@code newBlockData} (lines and styling kept). */
+    public Hologram asBlock(String newBlockData) {
+        Objects.requireNonNull(newBlockData, "newBlockData");
+        return copy(location, HologramType.BLOCK, lines, null, newBlockData);
+    }
+
+    /** A copy restyled with {@code newAppearance}, keeping everything else. */
     public Hologram withAppearance(Appearance newAppearance) {
         Objects.requireNonNull(newAppearance, "newAppearance");
-        return new Hologram(name, location, lines, newAppearance, visibility, refreshIntervalTicks, createdAt);
+        return new Hologram(
+                name,
+                location,
+                type,
+                lines,
+                itemMaterial,
+                blockData,
+                newAppearance,
+                visibility,
+                refreshIntervalTicks,
+                createdAt);
     }
 
-    /** A copy with a new {@link Visibility}, keeping the name, lines, appearance, interval and creation time. */
+    /** A copy with a new {@link Visibility}, keeping everything else. */
     public Hologram withVisibility(Visibility newVisibility) {
         Objects.requireNonNull(newVisibility, "newVisibility");
-        return new Hologram(name, location, lines, appearance, newVisibility, refreshIntervalTicks, createdAt);
+        return new Hologram(
+                name,
+                location,
+                type,
+                lines,
+                itemMaterial,
+                blockData,
+                appearance,
+                newVisibility,
+                refreshIntervalTicks,
+                createdAt);
     }
 
     /** A copy that re-renders every {@code ticks} ticks (0 = static); rejects a negative interval. */
@@ -127,10 +211,11 @@ public record Hologram(
         if (ticks < 0) {
             throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + ticks);
         }
-        return new Hologram(name, location, lines, appearance, visibility, ticks, createdAt);
+        return new Hologram(
+                name, location, type, lines, itemMaterial, blockData, appearance, visibility, ticks, createdAt);
     }
 
-    /** The number of lines this hologram renders (always at least one). */
+    /** The number of lines this hologram renders (0 for an item/block hologram with no label lines). */
     public int lineCount() {
         return lines.size();
     }
@@ -138,6 +223,25 @@ public record Hologram(
     /** Whether this hologram re-renders on a cadence (a positive interval), rather than rendering once. */
     public boolean refreshes() {
         return refreshIntervalTicks > STATIC;
+    }
+
+    private Hologram copy(
+            Position at,
+            HologramType newType,
+            List<HologramLine> newLines,
+            @Nullable String newItem,
+            @Nullable String newBlock) {
+        return new Hologram(
+                name,
+                at,
+                newType,
+                newLines,
+                newItem,
+                newBlock,
+                appearance,
+                visibility,
+                refreshIntervalTicks,
+                createdAt);
     }
 
     private void requireInRange(int index) {

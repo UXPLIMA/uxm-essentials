@@ -11,7 +11,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * The holograms context's command surface as a platform-neutral {@link CommandSpec}: the single
  * {@code /hologram} literal, gated by {@code uxmessentials.hologram.use}, that serves every form through its
  * subcommands — {@code create}, {@code delete}, {@code list}, {@code addline}, {@code setline},
- * {@code removeline}, and {@code movehere}. The holograms inbound adapter realises the Brigadier node from
+ * {@code removeline}, {@code movehere}, and the {@code item} / {@code block} type setters (plus the appearance
+ * and visibility styling subcommands). The holograms inbound adapter realises the Brigadier node from
  * the started module's context on the next {@code COMMANDS} fire. Collected here so {@code HologramsModule}
  * stays small and the command/permission pairing is one greppable row the permissions guard checks against
  * {@code paper-plugin.yml}.

@@ -41,6 +41,22 @@ final class HologramAppearances {
         }
     }
 
+    /**
+     * Apply the {@link Display}-shared fields of {@code appearance} — billboard, scale, view range and
+     * brightness — onto an item or block {@code builder}. The text-only fields (background, line width, shadow)
+     * have no meaning for an item or block display, so they are deliberately left off this path.
+     */
+    static void applyDisplay(Holograms.ModelBuilder<?> builder, Appearance appearance) {
+        Objects.requireNonNull(builder, "builder");
+        Objects.requireNonNull(appearance, "appearance");
+        builder.billboard(toBukkit(appearance.billboard()));
+        builder.scale(appearance.scale());
+        builder.viewRange(appearance.viewRange());
+        if (appearance.hasBrightness()) {
+            builder.brightness(brightness(appearance));
+        }
+    }
+
     private static Display.Brightness brightness(Appearance appearance) {
         int block = Appearance.isDefaultBrightness(appearance.brightnessBlock()) ? 0 : appearance.brightnessBlock();
         int sky = Appearance.isDefaultBrightness(appearance.brightnessSky()) ? 0 : appearance.brightnessSky();

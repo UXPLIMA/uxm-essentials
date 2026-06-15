@@ -19,10 +19,11 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /hologram <create|delete|list|addline|setline|removeline|movehere>}: the single operator command for
- * native-Display holograms. Each subcommand maps its arguments to one use-case call; the create/move forms
- * read the operator's current position, and the line indices are 1-based at the command boundary (converted
- * to 0-based for the use cases). The base {@code uxmessentials.hologram.use} node guards the whole command.
+ * {@code /hologram <create|delete|list|addline|setline|removeline|movehere|item|block|…>}: the single operator
+ * command for native-Display holograms. Each subcommand maps its arguments to one use-case call; the
+ * create/move forms read the operator's current position, the line indices are 1-based at the command boundary
+ * (converted to 0-based for the use cases), and {@code item}/{@code block} switch an existing hologram to a
+ * floating item or block. The base {@code uxmessentials.hologram.use} node guards the whole command.
  */
 @NullMarked
 public final class HologramCommand extends HologramCommandSupport implements CommandRegistration {
@@ -51,6 +52,9 @@ public final class HologramCommand extends HologramCommandSupport implements Com
         for (LiteralArgumentBuilder<CommandSourceStack> visibility :
                 new HologramVisibilityCommand(services, messages).nodes()) {
             root.then(visibility);
+        }
+        for (LiteralArgumentBuilder<CommandSourceStack> model : new HologramModelCommand(services, messages).nodes()) {
+            root.then(model);
         }
         return root.build();
     }
