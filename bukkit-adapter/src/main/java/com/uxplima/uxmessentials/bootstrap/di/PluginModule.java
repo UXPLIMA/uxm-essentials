@@ -67,6 +67,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.KitAccessPlacehold
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHologramsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryPlayerwarpsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
@@ -337,7 +338,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("communication"))) {
             wireCommunication(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
-            wireHolograms(plugin, ctx, persistence, resources);
+            wireHolograms(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
             wirePlayerwarps(ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
@@ -627,7 +628,11 @@ public final class PluginModule {
     }
 
     private static void wireHolograms(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
         // holograms builds its cached jOOQ HologramRepository over persistence.dsl() and its renderer over the
         // uxmLib native-Display API; the holograms / hologram_lines tables ship in the persistence V13 baseline,
         // always applied. It carries no cross-context bridge — its only collaborators are the shared Scheduler,
@@ -635,6 +640,9 @@ public final class PluginModule {
         // thread); on disable the spawned display entities are despawned so a reload re-spawns cleanly.
         HologramsWiring.Wired wired = HologramsWiring.wire(plugin, ctx, persistence);
         wired.commands().forEach(resources::addCommand);
+        // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
+        // matches the registered hologram total (a server-wide value resolved per request).
+        links.placeholders.holograms(new RepositoryHologramsPlaceholders(wired.repository()));
         resources.onClose(wired::stop);
     }
 

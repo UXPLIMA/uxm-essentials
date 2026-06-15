@@ -56,7 +56,7 @@ public final class HologramsWiring {
         HologramNotifier notifier = new HologramNotifier(kernel.messages(), kernel.messageSink());
         HologramServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
-        return new Wired(HologramCommands.all(services, kernel.messages()), renderer);
+        return new Wired(HologramCommands.all(services, kernel.messages()), renderer, repository);
     }
 
     private static HologramServices assemble(
@@ -86,12 +86,14 @@ public final class HologramsWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param renderer the live-entity renderer, despawned on stop
+     * @param repository the cached hologram repository the PAPI seam reads the server-wide count from
      */
-    public record Wired(List<CommandRegistration> commands, HologramRenderer renderer) {
+    public record Wired(List<CommandRegistration> commands, HologramRenderer renderer, HologramRepository repository) {
 
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(renderer, "renderer");
+            Objects.requireNonNull(repository, "repository");
         }
 
         /** Despawn every spawned hologram so no display entity is orphaned across a reload. */

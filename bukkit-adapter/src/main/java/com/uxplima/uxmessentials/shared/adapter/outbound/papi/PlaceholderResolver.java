@@ -57,6 +57,7 @@ public final class PlaceholderResolver {
     private static final String MESSAGING_PREFIX = "messaging_";
     private static final String STAFF_PREFIX = "staff_";
     private static final String DISCORDLINK_PREFIX = "discordlink_";
+    private static final String HOLOGRAMS_PREFIX = "holograms_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -130,6 +131,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(DISCORDLINK_PREFIX)) {
             return Optional.of(discordlink(who, normalized.substring(DISCORDLINK_PREFIX.length())));
+        }
+        if (normalized.startsWith(HOLOGRAMS_PREFIX)) {
+            return Optional.of(holograms(normalized.substring(HOLOGRAMS_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -701,6 +705,19 @@ public final class PlaceholderResolver {
             case "id" -> discordlink.discordId(who).orElse(EMPTY);
             default -> EMPTY;
         };
+    }
+
+    /**
+     * Resolve a {@code holograms_}-stripped key against the holograms seam. The only key is {@code count} — the
+     * server-wide number of registered holograms, the same for every requester. A disabled module degrades it to
+     * the dash.
+     */
+    private String holograms(String key) {
+        Optional<HologramsPlaceholders> seam = contexts.holograms();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        return key.equals("count") ? Integer.toString(seam.get().count()) : EMPTY;
     }
 
     /**

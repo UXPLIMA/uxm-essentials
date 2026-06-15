@@ -922,6 +922,26 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void hologramsCountReadsTheServerWideTotal() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().holograms(() -> 4).build());
+
+        // The count is server-wide, so it reads identically for any requester, online or offline.
+        assertThat(resolver.resolve(ALICE, true, "holograms_count")).contains("4");
+        assertThat(resolver.resolve(BOB, false, "holograms_count")).contains("4");
+    }
+
+    @Test
+    void hologramsDegradesWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "holograms_count")).contains("-");
+        // An unknown holograms_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "holograms_unknown")).contains("-");
+    }
+
+    @Test
     void disabledContextsDegradeToTheirEmptyDefault() {
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().build());
