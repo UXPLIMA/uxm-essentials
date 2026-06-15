@@ -42,6 +42,7 @@ public final class PlaceholderResolver {
     private static final String HOMES_PREFIX = "homes_";
     private static final String PRESENCE_PREFIX = "presence_";
     private static final String PLAYERSTATE_PREFIX = "playerstate_";
+    private static final String TELEPORT_PREFIX = "teleport_";
     private static final String VOTES_PREFIX = "votes_";
     private static final String VOTES_TOP_PREFIX = "top_";
     private static final String VOTES_POSITION_PREFIX = "position_";
@@ -83,6 +84,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(PLAYERSTATE_PREFIX)) {
             return Optional.of(playerstate(who, online, normalized.substring(PLAYERSTATE_PREFIX.length())));
+        }
+        if (normalized.startsWith(TELEPORT_PREFIX)) {
+            return Optional.of(teleport(who, online, normalized.substring(TELEPORT_PREFIX.length())));
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));
@@ -475,6 +479,53 @@ public final class PlaceholderResolver {
             case "remaining" -> Integer.toString(Math.max(0, threshold - count));
             default -> EMPTY;
         };
+    }
+
+    /**
+     * Resolve a {@code teleport_}-stripped key against the teleport seam. The cooldown/warmup remaining keys
+     * carry a raw whole-second scalar and a {@code _formatted} {@code 1m30s} variant, reading {@code 0} (or
+     * {@code 0s}) when nothing is in flight; the back-location keys read the captured {@code /back} point
+     * (dash when none); the request scalars and the accept flag read the {@code tpa} registry and the
+     * {@code /tptoggle} state. A disabled module degrades every key to the dash; offline reads degrade the
+     * session-only request/accept and warmup keys to the dash since they cannot be queried.
+     */
+    private String teleport(PlayerRef who, boolean online, String key) {
+        Optional<TeleportPlaceholders> seam = contexts.teleport();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        TeleportPlaceholders teleport = seam.get();
+        return switch (key) {
+            case "cooldown_remaining" -> remainingSeconds(teleport.cooldownRemaining(who));
+            case "cooldown_remaining_formatted" -> remainingFormatted(teleport.cooldownRemaining(who));
+            case "warmup_remaining" -> online ? remainingSeconds(teleport.warmupRemaining(who)) : EMPTY;
+            case "warmup_remaining_formatted" -> online ? remainingFormatted(teleport.warmupRemaining(who)) : EMPTY;
+            case "back_available" -> bool(teleport.backLocation(who).isPresent());
+            case "back_world" -> teleport.backLocation(who)
+                    .map(TeleportPlaceholders.BackView::world)
+                    .orElse(EMPTY);
+            case "back_x" -> backCoordinate(teleport.backLocation(who), TeleportPlaceholders.BackView::blockX);
+            case "back_y" -> backCoordinate(teleport.backLocation(who), TeleportPlaceholders.BackView::blockY);
+            case "back_z" -> backCoordinate(teleport.backLocation(who), TeleportPlaceholders.BackView::blockZ);
+            case "tpa_incoming" -> online ? Integer.toString(teleport.incomingRequests(who)) : EMPTY;
+            case "tpa_pending" -> online ? bool(teleport.hasOutgoingRequest(who)) : EMPTY;
+            case "accepting" -> online ? bool(teleport.acceptingRequests(who)) : EMPTY;
+            default -> EMPTY;
+        };
+    }
+
+    private static String backCoordinate(
+            Optional<TeleportPlaceholders.BackView> back,
+            java.util.function.ToIntFunction<TeleportPlaceholders.BackView> field) {
+        return back.map(view -> Integer.toString(field.applyAsInt(view))).orElse(EMPTY);
+    }
+
+    private static String remainingSeconds(Optional<Duration> remaining) {
+        return Long.toString(remaining.map(d -> Math.max(0, d.toSeconds())).orElse(0L));
+    }
+
+    private static String remainingFormatted(Optional<Duration> remaining) {
+        return remaining.map(PlaceholderDurations::compact).orElse(PlaceholderDurations.compact(Duration.ZERO));
     }
 
     private String moderation(PlayerRef who, String key) {

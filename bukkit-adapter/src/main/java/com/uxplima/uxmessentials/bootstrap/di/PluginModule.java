@@ -70,6 +70,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ProviderEconomyPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryHomesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVaultsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryVotePlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ServicesTeleportPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
@@ -362,6 +363,15 @@ public final class PluginModule {
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.teleportEngine = wired.services().engine();
+        // The teleport PAPI seam reads the same cooldown gate, warmup tracker, /back store, tpa registry and
+        // /tptoggle flags the teleport commands do, so a placeholder matches what the player experiences.
+        links.placeholders.teleport(new ServicesTeleportPlaceholders(
+                ctx.kernel().cooldowns(),
+                wired.services().warmupTracker(),
+                wired.services().backStore(),
+                wired.services().requests(),
+                wired.services().flags(),
+                java.time.Clock.systemUTC()));
         // Captured for staff (wired last), which binds its COMPASS gadget and /stafflist to this admin engine.
         links.staffTeleport = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.TeleportSeam(
                 wired.services().engine());

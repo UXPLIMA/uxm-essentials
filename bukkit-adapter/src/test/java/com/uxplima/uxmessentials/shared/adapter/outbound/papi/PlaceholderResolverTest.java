@@ -319,6 +319,88 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void teleportCooldownAndWarmupRenderRawAndFormattedRemaining() {
+        FakeTeleport teleport =
+                new FakeTeleport().cooldown(Duration.ofSeconds(90)).warmup(Duration.ofSeconds(3));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().teleport(teleport).build());
+
+        assertThat(resolver.resolve(ALICE, true, "teleport_cooldown_remaining")).contains("90");
+        assertThat(resolver.resolve(ALICE, true, "teleport_cooldown_remaining_formatted"))
+                .contains("1m30s");
+        assertThat(resolver.resolve(ALICE, true, "teleport_warmup_remaining")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "teleport_warmup_remaining_formatted"))
+                .contains("3s");
+    }
+
+    @Test
+    void teleportCooldownAndWarmupRenderZeroWhenNothingInFlight() {
+        FakeTeleport teleport = new FakeTeleport();
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().teleport(teleport).build());
+
+        assertThat(resolver.resolve(ALICE, true, "teleport_cooldown_remaining")).contains("0");
+        assertThat(resolver.resolve(ALICE, true, "teleport_cooldown_remaining_formatted"))
+                .contains("0s");
+        assertThat(resolver.resolve(ALICE, true, "teleport_warmup_remaining")).contains("0");
+        assertThat(resolver.resolve(ALICE, true, "teleport_warmup_remaining_formatted"))
+                .contains("0s");
+    }
+
+    @Test
+    void teleportBackPlaceholdersReadCaptureAndDashWhenNone() {
+        FakeTeleport withBack = new FakeTeleport().back(new TeleportPlaceholders.BackView("world_nether", 10, 64, -20));
+        FakeTeleport noBack = new FakeTeleport();
+        PlaceholderResolver withResolver =
+                resolverWith(PlaceholderContexts.builder().teleport(withBack).build());
+        PlaceholderResolver noResolver =
+                resolverWith(PlaceholderContexts.builder().teleport(noBack).build());
+
+        assertThat(withResolver.resolve(ALICE, true, "teleport_back_available")).contains("yes");
+        assertThat(withResolver.resolve(ALICE, true, "teleport_back_world")).contains("world_nether");
+        assertThat(withResolver.resolve(ALICE, true, "teleport_back_x")).contains("10");
+        assertThat(withResolver.resolve(ALICE, true, "teleport_back_y")).contains("64");
+        assertThat(withResolver.resolve(ALICE, true, "teleport_back_z")).contains("-20");
+        assertThat(noResolver.resolve(ALICE, true, "teleport_back_available")).contains("no");
+        assertThat(noResolver.resolve(ALICE, true, "teleport_back_world")).contains("-");
+        assertThat(noResolver.resolve(ALICE, true, "teleport_back_x")).contains("-");
+    }
+
+    @Test
+    void teleportRequestPlaceholdersReadIncomingOutgoingAndAccepting() {
+        FakeTeleport teleport = new FakeTeleport().incoming(2).outgoing(true).accepting(false);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().teleport(teleport).build());
+
+        assertThat(resolver.resolve(ALICE, true, "teleport_tpa_incoming")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "teleport_tpa_pending")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "teleport_accepting")).contains("no");
+    }
+
+    @Test
+    void teleportSessionPlaceholdersDegradeOfflineAndWhenDisabled() {
+        FakeTeleport teleport = new FakeTeleport()
+                .warmup(Duration.ofSeconds(3))
+                .incoming(1)
+                .outgoing(true)
+                .accepting(true);
+        PlaceholderResolver withSeam =
+                resolverWith(PlaceholderContexts.builder().teleport(teleport).build());
+        PlaceholderResolver noSeam = resolverWith(PlaceholderContexts.builder().build());
+
+        // Offline: the session-only warmup/request/accept keys cannot be queried, so they degrade to the dash.
+        assertThat(withSeam.resolve(ALICE, false, "teleport_warmup_remaining")).contains("-");
+        assertThat(withSeam.resolve(ALICE, false, "teleport_tpa_incoming")).contains("-");
+        assertThat(withSeam.resolve(ALICE, false, "teleport_tpa_pending")).contains("-");
+        assertThat(withSeam.resolve(ALICE, false, "teleport_accepting")).contains("-");
+        // Disabled module: every teleport key degrades to the dash.
+        assertThat(noSeam.resolve(ALICE, true, "teleport_cooldown_remaining")).contains("-");
+        assertThat(noSeam.resolve(ALICE, true, "teleport_back_available")).contains("-");
+        // An unknown teleport_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(withSeam.resolve(ALICE, true, "teleport_unknown")).contains("-");
+    }
+
+    @Test
     void votePlaceholdersReadPeriodicTotals() {
         VotePlaceholders vote = new VotePlaceholders() {
             @Override
@@ -611,6 +693,77 @@ class PlaceholderResolverTest {
 
         private static String key(PlayerRef who, Currency currency) {
             return who.uuid() + "#" + currency.id().value();
+        }
+    }
+
+    /** A configurable {@link TeleportPlaceholders} fake — every read returns the value the test seeded. */
+    private static final class FakeTeleport implements TeleportPlaceholders {
+
+        private Optional<Duration> cooldown = Optional.empty();
+        private Optional<Duration> warmup = Optional.empty();
+        private Optional<BackView> back = Optional.empty();
+        private int incoming;
+        private boolean outgoing;
+        private boolean accepting;
+
+        FakeTeleport cooldown(Duration remaining) {
+            this.cooldown = Optional.of(remaining);
+            return this;
+        }
+
+        FakeTeleport warmup(Duration remaining) {
+            this.warmup = Optional.of(remaining);
+            return this;
+        }
+
+        FakeTeleport back(BackView view) {
+            this.back = Optional.of(view);
+            return this;
+        }
+
+        FakeTeleport incoming(int count) {
+            this.incoming = count;
+            return this;
+        }
+
+        FakeTeleport outgoing(boolean pending) {
+            this.outgoing = pending;
+            return this;
+        }
+
+        FakeTeleport accepting(boolean value) {
+            this.accepting = value;
+            return this;
+        }
+
+        @Override
+        public Optional<Duration> cooldownRemaining(PlayerRef who) {
+            return cooldown;
+        }
+
+        @Override
+        public Optional<Duration> warmupRemaining(PlayerRef who) {
+            return warmup;
+        }
+
+        @Override
+        public Optional<BackView> backLocation(PlayerRef who) {
+            return back;
+        }
+
+        @Override
+        public int incomingRequests(PlayerRef who) {
+            return incoming;
+        }
+
+        @Override
+        public boolean hasOutgoingRequest(PlayerRef who) {
+            return outgoing;
+        }
+
+        @Override
+        public boolean acceptingRequests(PlayerRef who) {
+            return accepting;
         }
     }
 

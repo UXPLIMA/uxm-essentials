@@ -23,6 +23,7 @@ public final class PlaceholderContexts {
     private final @Nullable KitsPlaceholders kits;
     private final @Nullable VaultsPlaceholders vaults;
     private final @Nullable ModerationPlaceholders moderation;
+    private final @Nullable TeleportPlaceholders teleport;
     private final @Nullable VotePlaceholders vote;
 
     private PlaceholderContexts(Builder builder) {
@@ -33,6 +34,7 @@ public final class PlaceholderContexts {
         this.kits = builder.kits;
         this.vaults = builder.vaults;
         this.moderation = builder.moderation;
+        this.teleport = builder.teleport;
         this.vote = builder.vote;
     }
 
@@ -69,6 +71,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(moderation);
     }
 
+    public Optional<TeleportPlaceholders> teleport() {
+        return Optional.ofNullable(teleport);
+    }
+
     public Optional<VotePlaceholders> vote() {
         return Optional.ofNullable(vote);
     }
@@ -82,6 +88,7 @@ public final class PlaceholderContexts {
                 && kits == null
                 && vaults == null
                 && moderation == null
+                && teleport == null
                 && vote == null;
     }
 
@@ -95,6 +102,7 @@ public final class PlaceholderContexts {
         private @Nullable KitsPlaceholders kits;
         private @Nullable VaultsPlaceholders vaults;
         private @Nullable ModerationPlaceholders moderation;
+        private @Nullable TeleportPlaceholders teleport;
         private @Nullable VotePlaceholders vote;
 
         private Builder() {}
@@ -131,6 +139,11 @@ public final class PlaceholderContexts {
 
         public Builder moderation(ModerationPlaceholders seam) {
             this.moderation = seam;
+            return this;
+        }
+
+        public Builder teleport(TeleportPlaceholders seam) {
+            this.teleport = seam;
             return this;
         }
 

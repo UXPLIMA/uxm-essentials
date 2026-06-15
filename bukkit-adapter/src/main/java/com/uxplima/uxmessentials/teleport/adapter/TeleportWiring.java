@@ -123,7 +123,8 @@ public final class TeleportWiring {
                 arrivalHud,
                 arrivalEffects);
         PrewarmedSafeLocationQueue rtpQueue = rtpQueue(kernel, config, settings, running);
-        Warmups warmups = new TrackingWarmups(kernel.warmups(), warmupTracker, settings::cancelToggles);
+        Warmups warmups = new TrackingWarmups(
+                kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock);
         TeleportEngine engine = new TeleportEngine(
                 kernel.cooldowns(), warmups, executor, notifier, kernel.events(), settings, jailGate);
         return new TeleportServices.Builder()

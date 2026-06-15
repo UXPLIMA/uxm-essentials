@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.teleport.adapter.inbound.listener;
 
+import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,15 +31,29 @@ public final class WarmupTracker {
 
     private final ConcurrentHashMap<UUID, Entry> pending = new ConcurrentHashMap<>();
 
-    /** Arm a warmup for {@code who} anchored at {@code origin}, holding {@code handle} for cancellation. */
-    public void arm(PlayerRef who, PendingTeleport warmup, WarmupHandle handle) {
+    /**
+     * Arm a warmup for {@code who} anchored at {@code origin}, holding {@code handle} for cancellation and
+     * {@code completesAt} for the {@code teleport_warmup_remaining} placeholder read.
+     */
+    public void arm(PlayerRef who, PendingTeleport warmup, WarmupHandle handle, Instant completesAt) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warmup, "warmup");
         Objects.requireNonNull(handle, "handle");
+        Objects.requireNonNull(completesAt, "completesAt");
         if (handle.isComplete()) {
             return; // a zero-duration warmup already fired; nothing to track or cancel
         }
-        pending.put(who.uuid(), new Entry(warmup, handle));
+        pending.put(who.uuid(), new Entry(warmup, handle, completesAt));
+    }
+
+    /**
+     * When {@code who}'s in-flight warmup completes, or empty when no warmup is armed. The placeholder seam
+     * subtracts the clock to render the remaining wait; a completed or cancelled warmup is already forgotten.
+     */
+    public Optional<Instant> completesAt(UUID who) {
+        Objects.requireNonNull(who, "who");
+        Entry entry = pending.get(who);
+        return entry == null ? Optional.empty() : Optional.of(entry.completesAt());
     }
 
     /** Reconcile a movement; cancels and clears the warmup when the player left the origin block. */
@@ -73,9 +89,9 @@ public final class WarmupTracker {
                 entry.handle().cancel();
                 return null;
             }
-            return new Entry(outcome.state(), entry.handle());
+            return new Entry(outcome.state(), entry.handle(), entry.completesAt());
         });
     }
 
-    private record Entry(PendingTeleport warmup, WarmupHandle handle) {}
+    private record Entry(PendingTeleport warmup, WarmupHandle handle, Instant completesAt) {}
 }

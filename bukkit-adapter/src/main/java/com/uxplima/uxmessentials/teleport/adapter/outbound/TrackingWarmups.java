@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -7,6 +9,8 @@ import java.util.function.Supplier;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -28,6 +32,11 @@ import org.jspecify.annotations.NullMarked;
  * warmup orchestration in {@code :core} untouched while still giving the adapter the live handle the
  * move-cancels-warmup invariant needs. A zero-duration (bypass) warmup returns an already-complete handle
  * the tracker drops, so a bypassed teleport is correctly immune to move-cancel.
+ *
+ * <p>The wrapper also resolves the warmup's duration here — the same min-reducer the kernel
+ * {@code SchedulerWarmups} applies — and records the resulting completion instant with the tracker, so the
+ * {@code teleport_warmup_remaining} placeholder can read the remaining wait the kernel port does not surface
+ * back through its handle.
  */
 @NullMarked
 public final class TrackingWarmups implements Warmups {
@@ -35,19 +44,29 @@ public final class TrackingWarmups implements Warmups {
     private final Warmups delegate;
     private final WarmupTracker tracker;
     private final Supplier<WarmupCancelToggles> toggles;
+    private final Permissions permissions;
+    private final Clock clock;
 
-    public TrackingWarmups(Warmups delegate, WarmupTracker tracker, Supplier<WarmupCancelToggles> toggles) {
+    public TrackingWarmups(
+            Warmups delegate,
+            WarmupTracker tracker,
+            Supplier<WarmupCancelToggles> toggles,
+            Permissions permissions,
+            Clock clock) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.tracker = Objects.requireNonNull(tracker, "tracker");
         this.toggles = Objects.requireNonNull(toggles, "toggles");
+        this.permissions = Objects.requireNonNull(permissions, "permissions");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
     public WarmupHandle begin(PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel) {
         Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kind, "kind");
         Optional<Position> origin = currentPosition(who);
         WarmupHandle handle = delegate.begin(who, kind, wrapComplete(who, onComplete), onCancel);
-        origin.ifPresent(at -> arm(who, at, handle));
+        origin.ifPresent(at -> arm(who, kind, at, handle));
         return handle;
     }
 
@@ -58,7 +77,7 @@ public final class TrackingWarmups implements Warmups {
         };
     }
 
-    private void arm(PlayerRef who, Position origin, WarmupHandle handle) {
+    private void arm(PlayerRef who, WarmupKind kind, Position origin, WarmupHandle handle) {
         if (handle.isComplete()) {
             return;
         }
@@ -67,7 +86,18 @@ public final class TrackingWarmups implements Warmups {
         // marker keeps the tracker honest without re-plumbing the engine's destination through the port.
         PendingTeleport warmup =
                 PendingTeleport.arm(who, TeleportKind.ADMIN, origin, Destination.at(origin), toggles.get());
-        tracker.arm(who, warmup, handle);
+        tracker.arm(who, warmup, handle, clock.instant().plus(resolveDuration(who, kind)));
+    }
+
+    private Duration resolveDuration(PlayerRef who, WarmupKind kind) {
+        if (permissions.has(who, kind.bypassNode())) {
+            return Duration.ZERO;
+        }
+        QuotaFamily family = QuotaFamily.threshold(kind.warmupNode());
+        long seconds = permissions
+                .resolveQuota(who, family, null, kind.defaultSeconds())
+                .orElse(kind.defaultSeconds());
+        return Duration.ofSeconds(Math.max(0L, seconds));
     }
 
     private static Optional<Position> currentPosition(PlayerRef who) {
