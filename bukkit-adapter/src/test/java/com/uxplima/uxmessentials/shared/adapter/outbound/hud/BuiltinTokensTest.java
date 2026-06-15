@@ -68,6 +68,17 @@ class BuiltinTokensTest {
     }
 
     @Test
+    void substitutesTheJvmMetricTokens() {
+        PlayerMock player = server.addPlayer();
+
+        // ram_used/ram_max read whole megabytes off the JVM, so they resolve to a non-negative integer string;
+        // uptime reads the process runtime bean and renders the compact form (always non-empty).
+        assertThat(BuiltinTokens.apply(player, "{ram_used}")).matches("\\d+");
+        assertThat(BuiltinTokens.apply(player, "{ram_max}")).matches("\\d+");
+        assertThat(BuiltinTokens.apply(player, "{uptime}")).isNotBlank();
+    }
+
+    @Test
     void resolvesEveryTokenInOnePass() {
         PlayerMock player = server.addPlayer();
 
