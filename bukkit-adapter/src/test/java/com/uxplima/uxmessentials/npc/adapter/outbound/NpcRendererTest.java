@@ -35,7 +35,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * Covers the {@link NpcRenderer} dispatch under MockBukkit with a fake {@link com.uxplima.uxmlib.packet.npc.NpcPackets}:
  * a render to an in-range viewer sends one spawn bundle (tab-add + spawn) and schedules the tab-remove that hides the
  * entry; the renderer tracks which NPCs each viewer has been shown; a delete and a forget-then-quit both leave no ghost;
- * and an out-of-range viewer is never spawned (and is removed when it falls out of range).
+ * and an out-of-range viewer is never spawned (and is removed when it falls out of range). A non-player NPC instead
+ * spawns through {@code spawnEntity} with no tab entry, still wears its equipment/glow, fails soft on an unknown stored
+ * type, and re-renders cleanly (remove + re-add) when its type changes.
  */
 class NpcRendererTest {
 
@@ -58,7 +60,7 @@ class NpcRendererTest {
     void rendersOneSpawnBundleAndSchedulesTheTabHideForAnInRangeViewer() {
         PlayerMock viewer = server.addPlayer();
         InlineScheduler scheduler = new InlineScheduler();
-        NpcRenderer renderer = new NpcRenderer(packets, scheduler, 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, scheduler, new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 1.0)); // one block away — in range
 
@@ -76,7 +78,8 @@ class NpcRendererTest {
     @Test
     void linksTheSpawnUuidToTheTabAddUuidSoTheSkinResolves() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 1.0));
 
@@ -91,7 +94,8 @@ class NpcRendererTest {
     @Test
     void carriesTheStoredSkinOnTheTabAdd() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npc(locationOf(viewer), new NpcSkin("tex", "sig")));
 
@@ -103,7 +107,8 @@ class NpcRendererTest {
     @Test
     void doesNotSpawnAnOutOfRangeViewer() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 100.0)); // far away — out of range
 
@@ -114,7 +119,8 @@ class NpcRendererTest {
     @Test
     void despawnRemovesTheNpcFromEveryViewerThatHadIt() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0));
 
         renderer.despawn(NpcName.of("guide"));
@@ -127,7 +133,8 @@ class NpcRendererTest {
     @Test
     void forgetDropsTheViewerWithoutAnyRemovePacket() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0));
         int sendsBefore = packets.removes.size();
 
@@ -144,7 +151,8 @@ class NpcRendererTest {
     @Test
     void refreshDoesNotReSpawnAStationaryInRangeViewer() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0)); // shown once
 
         renderer.refresh();
@@ -163,7 +171,8 @@ class NpcRendererTest {
     @Test
     void reSkinReRendersAnAlreadyShownViewerWithTheNewSkin() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npc(locationOf(viewer), new NpcSkin("oldtex", "oldsig"))); // shown with the old skin
 
         renderer.render(npc(locationOf(viewer), new NpcSkin("newtex", "newsig"))); // re-skin edit
@@ -186,7 +195,8 @@ class NpcRendererTest {
     @Test
     void moveReRendersAnAlreadyShownViewerAtTheNewLocation() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0)); // shown near the viewer
 
         renderer.render(npcAt(viewer, 5.0)); // moved, still in range
@@ -202,7 +212,8 @@ class NpcRendererTest {
     @Test
     void removesAnNpcThatMovedOutOfRangeOfAViewer() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0)); // in range -> shown
 
         Npc moved = npcAt(viewer, 100.0); // same name, now far away
@@ -215,7 +226,8 @@ class NpcRendererTest {
     @Test
     void despawnAllRemovesEveryNpcFromEveryViewerAndClearsTracking() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0));
 
         renderer.despawnAll();
@@ -230,7 +242,7 @@ class NpcRendererTest {
     void schedulesButDoesNotImmediatelySendTheTabRemoveWhenTheHopIsDeferred() {
         PlayerMock viewer = server.addPlayer();
         DeferredScheduler scheduler = new DeferredScheduler();
-        NpcRenderer renderer = new NpcRenderer(packets, scheduler, 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer = new NpcRenderer(packets, scheduler, new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 1.0));
 
@@ -246,7 +258,8 @@ class NpcRendererTest {
     @Test
     void lookTickAimsAnInRangeViewerOfALookingNpc() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 2.0)); // shown, and within the 16-block look range
         int looksBefore = packets.looksSentTo(viewer.getUniqueId()).size();
 
@@ -259,7 +272,8 @@ class NpcRendererTest {
     @Test
     void lookTickIgnoresAnNpcWithLookAtPlayerOff() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 2.0).withLookAtPlayer(false));
         int looksBefore = packets.looksSentTo(viewer.getUniqueId()).size();
 
@@ -271,7 +285,8 @@ class NpcRendererTest {
     @Test
     void lookTickIgnoresAViewerBeyondTheLookRange() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 30.0)); // shown (render range 48) but past the 16-block look range
         int looksBefore = packets.looksSentTo(viewer.getUniqueId()).size();
 
@@ -283,7 +298,8 @@ class NpcRendererTest {
     @Test
     void appliesEquipmentAndGlowOnSpawnForAnInRangeViewer() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         Npc npc = npcAt(viewer, 1.0)
                 .withEquipment(com.uxplima.uxmessentials.npc.domain.EquipmentSlot.HEAD, "DIAMOND_HELMET")
@@ -303,7 +319,8 @@ class NpcRendererTest {
     @Test
     void sendsNoEquipmentOrGlowForAPlainNpc() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         renderer.render(npcAt(viewer, 1.0));
 
@@ -315,7 +332,8 @@ class NpcRendererTest {
     @Test
     void dropsAnUnknownMaterialSoTheSpawnStillSucceeds() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         Npc npc = npcAt(viewer, 1.0)
                 .withEquipment(com.uxplima.uxmessentials.npc.domain.EquipmentSlot.HEAD, "NOT_A_REAL_MATERIAL");
@@ -330,7 +348,8 @@ class NpcRendererTest {
     @Test
     void glowsWhiteWhenTheColorNameIsUnknown() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
 
         Npc npc = npcAt(viewer, 1.0).withGlowing(true).withGlowColor("octarine");
         renderer.render(npc);
@@ -343,7 +362,8 @@ class NpcRendererTest {
     @Test
     void removesTheGlowTeamWhenAGlowingNpcDespawns() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0).withGlowing(true).withGlowColor("RED"));
 
         renderer.despawn(NpcName.of("guide"));
@@ -358,13 +378,100 @@ class NpcRendererTest {
     @Test
     void removesTheGlowTeamWhenTheViewerGoesOutOfRange() {
         PlayerMock viewer = server.addPlayer();
-        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         renderer.render(npcAt(viewer, 1.0).withGlowing(true).withGlowColor("AQUA")); // in range -> shown
 
         renderer.render(npcAt(viewer, 100.0).withGlowing(true).withGlowColor("AQUA")); // same name, now far away
 
         // Moving out of range removes the fake player and must also drop its now-orphaned glow team.
         assertThat(packets.glowColorRemovesSentTo(viewer.getUniqueId())).hasSize(1);
+    }
+
+    @Test
+    void spawnsAMobNpcThroughSpawnEntityWithNoTabEntry() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("VILLAGER"));
+
+        // A mob spawns via spawnEntity with the canonical key and NO tab entry / no fake-player spawn at all.
+        assertThat(packets.spawnEntities).hasSize(1);
+        assertThat(packets.spawnEntities.get(0).entityTypeKey()).isEqualTo("minecraft:villager");
+        assertThat(packets.spawns).isEmpty();
+        assertThat(packets.tabAdds).isEmpty();
+        // The mob carries the stable per-NPC entity UUID (no profile behind it).
+        assertThat(packets.spawnEntities.get(0).entityUuid()).isEqualTo(RenderedNpc.profileIdFor("guide"));
+    }
+
+    @Test
+    void appliesEquipmentAndGlowToAMobNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
+
+        Npc npc = npcAt(viewer, 1.0)
+                .withEntityType("ZOMBIE")
+                .withEquipment(com.uxplima.uxmessentials.npc.domain.EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .withGlowing(true)
+                .withGlowColor("RED");
+        renderer.render(npc);
+
+        assertThat(packets.spawnEntities).hasSize(1);
+        assertThat(packets.equipments).hasSize(1);
+        assertThat(packets.equipments.get(0).items()).containsKey(com.uxplima.uxmlib.packet.npc.EquipmentSlot.HEAD);
+        assertThat(packets.glows.get(0).glowing()).isTrue();
+        assertThat(packets.glowColors.get(0).color()).isEqualTo(com.uxplima.uxmlib.packet.npc.NamedColor.RED);
+    }
+
+    @Test
+    void failsSoftAndSkipsSpawningAnUnknownStoredEntityType() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
+
+        // An entity type that does not resolve to a Bukkit type must not throw on the render thread.
+        assertThatCode(() -> renderer.render(npcAt(viewer, 1.0).withEntityType("NOT_A_REAL_TYPE")))
+                .doesNotThrowAnyException();
+
+        // Nothing is spawned for the bad type, by either path.
+        assertThat(packets.spawnEntities).isEmpty();
+        assertThat(packets.spawns).isEmpty();
+        assertThat(packets.tabAdds).isEmpty();
+    }
+
+    @Test
+    void aTypeChangeForcesACleanRemoveAndReAdd() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0)); // shown as a fake player
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("VILLAGER")); // type change → force re-render
+
+        // The force path removes the old (player) entity and re-adds it as the mob — no ghost of the old type.
+        assertThat(packets.removesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(packets.spawns).hasSize(1); // the original player spawn only
+        assertThat(packets.spawnEntities).hasSize(1); // the new villager spawn
+        assertThat(packets.spawnEntities.get(0).entityTypeKey()).isEqualTo("minecraft:villager");
+        // The entity id is reused across the type change (the renderer keeps one id per NPC).
+        assertThat(packets.spawnEntities.get(0).entityId())
+                .isEqualTo(packets.spawns.get(0).entityId());
+    }
+
+    @Test
+    void aSteadyMobNpcIsNotReSpawnedOnRefresh() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer =
+                new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer.render(npcAt(viewer, 1.0).withEntityType("VILLAGER")); // shown once as a mob
+
+        renderer.refresh();
+        renderer.refresh();
+
+        // The reconcile idempotency holds for a mob too: a stationary, already-shown mob is not re-spawned.
+        assertThat(packets.spawnEntities).hasSize(1);
     }
 
     private Npc npcAt(Player viewer, double offset) {
@@ -388,6 +495,7 @@ class NpcRendererTest {
         private final AtomicInteger nextId = new AtomicInteger(1);
         private final List<TabAdd> tabAdds = new ArrayList<>();
         private final List<Spawn> spawns = new ArrayList<>();
+        private final List<SpawnEntity> spawnEntities = new ArrayList<>();
         private final List<UUID> tabRemoves = new ArrayList<>();
         private final List<Integer> removes = new ArrayList<>();
         private final List<List<Object>> bundles = new ArrayList<>();
@@ -417,6 +525,21 @@ class NpcRendererTest {
         public Object spawnPlayer(int entityId, UUID profileId, double x, double y, double z, float yaw, float pitch) {
             Spawn packet = new Spawn(entityId, profileId, x, y, z);
             spawns.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object spawnEntity(
+                int entityId,
+                UUID entityUuid,
+                String entityTypeKey,
+                double x,
+                double y,
+                double z,
+                float yaw,
+                float pitch) {
+            SpawnEntity packet = new SpawnEntity(entityId, entityUuid, entityTypeKey, x, y, z);
+            spawnEntities.add(packet);
             return packet;
         }
 
@@ -525,6 +648,8 @@ class NpcRendererTest {
 
         private record Spawn(int entityId, UUID profileId, double x, double y, double z) {}
 
+        private record SpawnEntity(int entityId, UUID entityUuid, String entityTypeKey, double x, double y, double z) {}
+
         private record Look(int entityId, float yaw, float pitch) {}
 
         private record Remove(int entityId) {}
@@ -538,6 +663,21 @@ class NpcRendererTest {
         private record GlowColorRemove(String teamName) {}
 
         private record Bundle(List<Object> packets) {}
+    }
+
+    /** A logger that swallows every line — the renderer's fail-soft warn has nothing to assert beyond not throwing. */
+    private static final class NoopLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     /** A scheduler that runs every hop inline so the spawn and the deferred tab-hide both complete immediately. */

@@ -225,5 +225,58 @@ class NpcTest {
                 .containsExactly(action);
         assertThat(npc.withGlowing(true).actions()).containsExactly(action);
         assertThat(npc.withGlowColor("RED").actions()).containsExactly(action);
+        assertThat(npc.withEntityType("VILLAGER").actions()).containsExactly(action);
+    }
+
+    @Test
+    void createsAsAPlayerTypeByDefault() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        assertThat(npc.entityType()).isEqualTo("PLAYER");
+        assertThat(npc.isPlayerType()).isTrue();
+    }
+
+    @Test
+    void withEntityTypeUpperCasesAndSetsPlayerTypeFalseForAMob() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
+                .withEntityType("villager");
+
+        assertThat(npc.entityType()).isEqualTo("VILLAGER");
+        assertThat(npc.isPlayerType()).isFalse();
+        // The skin is preserved across a type flip so switching back to PLAYER restores it.
+        assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+
+        Npc backToPlayer = npc.withEntityType("PLAYER");
+        assertThat(backToPlayer.isPlayerType()).isTrue();
+        assertThat(backToPlayer.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+    }
+
+    @Test
+    void rejectsABlankEntityTypeAtConstruction() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> Npc.create(NpcName.of("guide"), AT, null, CREATED).withEntityType(" "))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> Npc.create(NpcName.of("guide"), AT, null, CREATED).withEntityType(""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void everyTransitionPreservesEntityType() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withEntityType("ZOMBIE");
+        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+
+        assertThat(npc.movedTo(ELSEWHERE).entityType()).isEqualTo("ZOMBIE");
+        assertThat(npc.withSkin(NpcSkin.unsigned("tex")).entityType()).isEqualTo("ZOMBIE");
+        assertThat(npc.withClickCommand("spawn").entityType()).isEqualTo("ZOMBIE");
+        assertThat(npc.withLookAtPlayer(false).entityType()).isEqualTo("ZOMBIE");
+        assertThat(npc.withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET").entityType())
+                .isEqualTo("ZOMBIE");
+        assertThat(npc.withGlowing(true).entityType()).isEqualTo("ZOMBIE");
+        assertThat(npc.withGlowColor("RED").entityType()).isEqualTo("ZOMBIE");
+        assertThat(npc.withActionAdded(action).entityType()).isEqualTo("ZOMBIE");
+        Npc withTwo = npc.withActionAdded(action).withActionAdded(action);
+        assertThat(withTwo.withActionRemovedAt(0).entityType()).isEqualTo("ZOMBIE");
+        assertThat(withTwo.withActionsCleared().entityType()).isEqualTo("ZOMBIE");
     }
 }

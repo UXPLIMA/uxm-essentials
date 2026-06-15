@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -21,6 +22,7 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.packet.npc.EquipmentSlot;
@@ -67,6 +69,7 @@ public final class NpcRenderer implements NpcView {
 
     private final NpcPackets packets;
     private final Scheduler scheduler;
+    private final Logger log;
     private final double renderRange;
     private final double lookRange;
     private final Duration tabHideDelay;
@@ -75,9 +78,15 @@ public final class NpcRenderer implements NpcView {
     private final Map<Integer, String> nameByEntityId = new ConcurrentHashMap<>();
 
     public NpcRenderer(
-            NpcPackets packets, Scheduler scheduler, double renderRange, double lookRange, Duration tabHideDelay) {
+            NpcPackets packets,
+            Scheduler scheduler,
+            Logger log,
+            double renderRange,
+            double lookRange,
+            Duration tabHideDelay) {
         this.packets = Objects.requireNonNull(packets, "packets");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
         this.renderRange = renderRange;
         this.lookRange = lookRange;
         this.tabHideDelay = Objects.requireNonNull(tabHideDelay, "tabHideDelay");
@@ -244,7 +253,37 @@ public final class NpcRenderer implements NpcView {
         });
     }
 
+    /**
+     * Spawn the NPC for this viewer, branching on type. A fake player takes the player path (tab-add + spawn,
+     * deferred tab-hide, skin); any other type spawns the mob through {@code spawnEntity} with no tab entry and no
+     * skin. An unknown stored type resolves to nothing and is skipped (logged, never thrown on the render thread),
+     * so a bad row never spawns and never marks the viewer as shown. Both paths then dress the entity (equipment +
+     * glow) and aim it, and mark the viewer as shown.
+     */
     private void spawnForViewer(Player viewer, RenderedNpc rendered) {
+        Npc npc = rendered.npc();
+        if (npc.isPlayerType()) {
+            spawnPlayerForViewer(viewer, rendered);
+        } else {
+            String typeKey = bukkitTypeKey(npc.entityType());
+            if (typeKey == null) {
+                log.warn(
+                        "NPC {} has an unknown entity type {}, skipping its spawn",
+                        npc.name().value(),
+                        npc.entityType());
+                return;
+            }
+            spawnMobForViewer(viewer, rendered, typeKey);
+        }
+        Position at = npc.location();
+        packets.send(viewer, packets.headLook(rendered.entityId(), at.yaw()));
+        packets.send(viewer, packets.bodyLook(rendered.entityId(), at.yaw(), at.pitch()));
+        applyAppearance(viewer, rendered);
+        shownTo.computeIfAbsent(viewer.getUniqueId(), id -> ConcurrentHashMap.newKeySet())
+                .add(npc.name().value());
+    }
+
+    private void spawnPlayerForViewer(Player viewer, RenderedNpc rendered) {
         UUID profileId = rendered.profileId();
         Position at = rendered.npc().location();
         Object tabAdd = packets.tabAdd(
@@ -252,14 +291,25 @@ public final class NpcRenderer implements NpcView {
         Object spawn =
                 packets.spawnPlayer(rendered.entityId(), profileId, at.x(), at.y(), at.z(), at.yaw(), at.pitch());
         packets.send(viewer, packets.bundle(List.of(tabAdd, spawn)));
-        packets.send(viewer, packets.headLook(rendered.entityId(), at.yaw()));
-        packets.send(viewer, packets.bodyLook(rendered.entityId(), at.yaw(), at.pitch()));
-        applyAppearance(viewer, rendered);
         // Hide the entry from the tab list a moment later, once the client has parsed it — the spawned fake
         // player keeps its skin even after the entry is gone.
         scheduler.asyncAfter(tabHideDelay, () -> packets.send(viewer, packets.tabRemove(profileId)));
-        shownTo.computeIfAbsent(viewer.getUniqueId(), id -> ConcurrentHashMap.newKeySet())
-                .add(rendered.npc().name().value());
+    }
+
+    private void spawnMobForViewer(Player viewer, RenderedNpc rendered, String typeKey) {
+        // A mob has no tab entry and no skin: the spawn UUID is the stable per-NPC entity uuid, not a profile.
+        Position at = rendered.npc().location();
+        packets.send(
+                viewer,
+                packets.spawnEntity(
+                        rendered.entityId(),
+                        rendered.profileId(),
+                        typeKey,
+                        at.x(),
+                        at.y(),
+                        at.z(),
+                        at.yaw(),
+                        at.pitch()));
     }
 
     /**
@@ -348,5 +398,20 @@ public final class NpcRenderer implements NpcView {
     /** The stable per-NPC scoreboard team name that tints its glow (capped well under the 16-char team-name limit). */
     private static String glowTeam(Npc npc) {
         return profileName(npc);
+    }
+
+    /**
+     * Resolve a stored uppercase entity-type name to its canonical {@code minecraft:…} key, or {@code null} when
+     * the name no longer names a real Bukkit type. A type that vanished between saves (a removed type, a typo in a
+     * hand-edited row) returns {@code null} so the caller skips the spawn rather than throwing on the render thread.
+     */
+    private static @Nullable String bukkitTypeKey(String entityTypeName) {
+        try {
+            return EntityType.valueOf(entityTypeName.toUpperCase(Locale.ROOT))
+                    .getKey()
+                    .asString();
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
     }
 }

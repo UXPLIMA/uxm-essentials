@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
+import com.uxplima.uxmessentials.npc.application.SetNpcEntityType;
 import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
@@ -83,8 +84,8 @@ public final class NpcWiring {
         NpcSettings settings = new NpcSettings(ctx.config());
         NpcRepository repository = NpcRepositories.cached(persistence);
         NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
-        NpcRenderer renderer =
-                new NpcRenderer(packets, kernel.scheduler(), RENDER_RANGE, settings.lookRange(), TAB_HIDE_DELAY);
+        NpcRenderer renderer = new NpcRenderer(
+                packets, kernel.scheduler(), kernel.log(), RENDER_RANGE, settings.lookRange(), TAB_HIDE_DELAY);
         NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
         NpcServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
@@ -114,6 +115,7 @@ public final class NpcWiring {
                 new ListNpcs(repository, notifier),
                 new MoveNpc(repository, renderer, notifier),
                 new SetNpcSkin(repository, renderer, notifier),
+                new SetNpcEntityType(repository, renderer, notifier),
                 new SetNpcClickCommand(repository, notifier),
                 new SetNpcLookAtPlayer(repository, renderer, notifier),
                 new SetNpcEquipment(repository, renderer, notifier),

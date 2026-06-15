@@ -20,7 +20,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-class SetNpcSkinTest {
+class SetNpcEntityTypeTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
     private static final Position AT = Position.of(WORLD, 1, 64, 1);
@@ -28,7 +28,7 @@ class SetNpcSkinTest {
     private FakeNpcRepository repository;
     private RecordingView view;
     private CapturingSink sink;
-    private SetNpcSkin setSkin;
+    private SetNpcEntityType setType;
     private PlayerRef actor;
 
     @BeforeEach
@@ -36,42 +36,31 @@ class SetNpcSkinTest {
         repository = new FakeNpcRepository();
         view = new RecordingView();
         sink = new CapturingSink();
-        setSkin = new SetNpcSkin(repository, view, new NpcNotifier(new NpcTestSupport.KeyMessages(), sink));
+        setType = new SetNpcEntityType(repository, view, new NpcNotifier(new NpcTestSupport.KeyMessages(), sink));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 
     @Test
-    void reskinsSavesRendersAndNotifies() {
-        repository.save(Npc.create(NpcName.of("guide"), AT, null, Instant.ofEpochMilli(1_000)));
+    void setsTheTypeSavesRendersAndNotifies() {
+        repository.save(Npc.create(NpcName.of("guide"), AT, new NpcSkin("tex", "sig"), Instant.ofEpochMilli(1_000)));
 
-        Result<Unit, NpcError> result = setSkin.setSkin(actor, NpcName.of("guide"), new NpcSkin("tex", "sig"));
+        Result<Unit, NpcError> result = setType.setEntityType(actor, NpcName.of("guide"), "villager");
 
         assertThat(result.isOk()).isTrue();
-        assertThat(repository.find(NpcName.of("guide")).orElseThrow().skin()).isEqualTo(new NpcSkin("tex", "sig"));
+        Npc saved = repository.find(NpcName.of("guide")).orElseThrow();
+        assertThat(saved.entityType()).isEqualTo("VILLAGER");
+        // The skin is preserved across the type change so flipping back to PLAYER restores it.
+        assertThat(saved.skin()).isEqualTo(new NpcSkin("tex", "sig"));
         assertThat(view.rendered).hasSize(1);
-        assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_SKIN_SET.key());
+        assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_TYPE_SET.key());
     }
 
     @Test
     void rejectsAnUnknownName() {
-        Result<Unit, NpcError> result = setSkin.setSkin(actor, NpcName.of("ghost"), NpcSkin.unsigned("tex"));
+        Result<Unit, NpcError> result = setType.setEntityType(actor, NpcName.of("ghost"), "ZOMBIE");
 
         assertThat(result.errorOrThrow()).isEqualTo(NpcError.NOT_FOUND);
         assertThat(view.rendered).isEmpty();
         assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_NOT_FOUND.key());
-    }
-
-    @Test
-    void rejectsReskinningAMobNpcLeavingItUntouched() {
-        repository.save(Npc.create(NpcName.of("mob"), AT, null, Instant.ofEpochMilli(1_000))
-                .withEntityType("VILLAGER"));
-
-        Result<Unit, NpcError> result = setSkin.setSkin(actor, NpcName.of("mob"), new NpcSkin("tex", "sig"));
-
-        assertThat(result.errorOrThrow()).isEqualTo(NpcError.SKIN_ONLY_PLAYER);
-        // The stored NPC is untouched (no skin applied, no render) — it stays a skinless villager.
-        assertThat(repository.find(NpcName.of("mob")).orElseThrow().skin()).isNull();
-        assertThat(view.rendered).isEmpty();
-        assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_SKIN_ONLY_PLAYER.key());
     }
 }

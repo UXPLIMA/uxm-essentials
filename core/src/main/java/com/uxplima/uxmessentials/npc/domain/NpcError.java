@@ -16,7 +16,10 @@ public enum NpcError {
     NAME_TAKEN(NpcMessageKey.NPC_NAME_TAKEN),
 
     /** {@code /npc action remove} with a 1-based index outside the NPC's action list. */
-    ACTION_INDEX_INVALID(NpcMessageKey.NPC_ACTION_INDEX_INVALID);
+    ACTION_INDEX_INVALID(NpcMessageKey.NPC_ACTION_INDEX_INVALID),
+
+    /** {@code /npc skin} against a non-player NPC: only a fake player carries a skin. */
+    SKIN_ONLY_PLAYER(NpcMessageKey.NPC_SKIN_ONLY_PLAYER);
 
     private final NpcMessageKey messageKey;
 

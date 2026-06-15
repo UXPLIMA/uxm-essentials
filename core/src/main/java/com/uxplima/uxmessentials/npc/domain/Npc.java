@@ -35,6 +35,12 @@ import org.jspecify.annotations.Nullable;
  * snapshot is immutable; {@code withActionAdded} / {@code withActionRemovedAt} / {@code withActionsCleared}
  * produce new instances, and every other transition preserves the actions unchanged.
  *
+ * <p>{@code entityType} is the Bukkit {@code EntityType} <em>name</em> (uppercase, e.g. {@code "PLAYER"} or
+ * {@code "VILLAGER"}) the NPC renders as — the default {@code "PLAYER"} keeps the fake-player path (tab entry +
+ * skin), any other living type spawns that mob instead. It is a plain string so the domain stays Bukkit-free; the
+ * adapter is the only place that resolves it to a real {@code EntityType} and decides whether the type is a valid
+ * living one. The skin is kept across a type change, so flipping a mob back to {@code PLAYER} restores its skin.
+ *
  * @param name the NPC's canonical, server-unique name
  * @param location where the NPC stands and which way it faces
  * @param skin the fake player's skin, or {@code null} for the default skin
@@ -44,6 +50,7 @@ import org.jspecify.annotations.Nullable;
  * @param glowing whether the fake player's outline glows
  * @param glowColor the glow outline colour name, or {@code null} for the default white outline
  * @param actions the ordered list of typed actions a click runs, after the single click command
+ * @param entityType the uppercase Bukkit {@code EntityType} name the NPC renders as ({@code "PLAYER"} by default)
  * @param createdAt when the NPC was first created (preserved across a move, re-skin, or rebind)
  */
 public record Npc(
@@ -56,7 +63,11 @@ public record Npc(
         boolean glowing,
         @Nullable String glowColor,
         List<NpcAction> actions,
+        String entityType,
         Instant createdAt) {
+
+    /** The default entity type: a fake player, the one type with the tab-entry + skin path. */
+    public static final String DEFAULT_ENTITY_TYPE = "PLAYER";
 
     public Npc {
         Objects.requireNonNull(name, "name");
@@ -64,36 +75,98 @@ public record Npc(
         Objects.requireNonNull(createdAt, "createdAt");
         equipment = copyEquipment(equipment);
         actions = List.copyOf(Objects.requireNonNull(actions, "actions"));
+        entityType = normalizeType(entityType);
     }
 
     /** A new NPC created now at {@code location} with the given (possibly {@code null}) skin, no command, looking. */
     public static Npc create(NpcName name, Position location, @Nullable NpcSkin skin, Instant createdAt) {
-        return new Npc(name, location, skin, null, true, Map.of(), false, null, List.of(), createdAt);
+        return new Npc(
+                name, location, skin, null, true, Map.of(), false, null, List.of(), DEFAULT_ENTITY_TYPE, createdAt);
     }
 
     /** A copy re-anchored to {@code newLocation}, keeping everything else. */
     public Npc movedTo(Position newLocation) {
         Objects.requireNonNull(newLocation, "newLocation");
         return new Npc(
-                name, newLocation, skin, clickCommand, lookAtPlayer, equipment, glowing, glowColor, actions, createdAt);
+                name,
+                newLocation,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                actions,
+                entityType,
+                createdAt);
     }
 
     /** A copy wearing {@code newSkin} (or {@code null} to reset to the default skin), keeping everything else. */
     public Npc withSkin(@Nullable NpcSkin newSkin) {
         return new Npc(
-                name, location, newSkin, clickCommand, lookAtPlayer, equipment, glowing, glowColor, actions, createdAt);
+                name,
+                location,
+                newSkin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                actions,
+                entityType,
+                createdAt);
     }
 
     /** A copy whose click runs {@code newCommand} (or {@code null} to clear it), keeping everything else. */
     public Npc withClickCommand(@Nullable String newCommand) {
         return new Npc(
-                name, location, skin, newCommand, lookAtPlayer, equipment, glowing, glowColor, actions, createdAt);
+                name,
+                location,
+                skin,
+                newCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                actions,
+                entityType,
+                createdAt);
     }
 
     /** A copy that does or does not rotate to face nearby viewers, keeping everything else. */
     public Npc withLookAtPlayer(boolean newLookAtPlayer) {
         return new Npc(
-                name, location, skin, clickCommand, newLookAtPlayer, equipment, glowing, glowColor, actions, createdAt);
+                name,
+                location,
+                skin,
+                clickCommand,
+                newLookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                actions,
+                entityType,
+                createdAt);
+    }
+
+    /**
+     * A copy rendered as {@code newEntityType} (the uppercase Bukkit {@code EntityType} name), keeping everything
+     * else including the skin. The name is upper-cased and must be non-blank; whether it is a real, living type is
+     * the adapter's concern, validated at the command boundary before this is called.
+     */
+    public Npc withEntityType(String newEntityType) {
+        return new Npc(
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                actions,
+                newEntityType,
+                createdAt);
     }
 
     /**
@@ -112,19 +185,50 @@ public record Npc(
             updated.put(slot, materialName);
         }
         return new Npc(
-                name, location, skin, clickCommand, lookAtPlayer, updated, glowing, glowColor, actions, createdAt);
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                updated,
+                glowing,
+                glowColor,
+                actions,
+                entityType,
+                createdAt);
     }
 
     /** A copy whose outline does or does not glow, keeping everything else (and its colour). */
     public Npc withGlowing(boolean newGlowing) {
         return new Npc(
-                name, location, skin, clickCommand, lookAtPlayer, equipment, newGlowing, glowColor, actions, createdAt);
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                newGlowing,
+                glowColor,
+                actions,
+                entityType,
+                createdAt);
     }
 
     /** A copy whose glow outline is tinted {@code newColor} (or {@code null} for the default white), keeping the rest. */
     public Npc withGlowColor(@Nullable String newColor) {
         String color = newColor == null || newColor.isBlank() ? null : newColor;
-        return new Npc(name, location, skin, clickCommand, lookAtPlayer, equipment, glowing, color, actions, createdAt);
+        return new Npc(
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                color,
+                actions,
+                entityType,
+                createdAt);
     }
 
     /** A copy with {@code action} appended to the end of the action list, keeping everything else. */
@@ -133,7 +237,17 @@ public record Npc(
         List<NpcAction> updated = new ArrayList<>(actions);
         updated.add(action);
         return new Npc(
-                name, location, skin, clickCommand, lookAtPlayer, equipment, glowing, glowColor, updated, createdAt);
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                updated,
+                entityType,
+                createdAt);
     }
 
     /**
@@ -147,13 +261,38 @@ public record Npc(
         List<NpcAction> updated = new ArrayList<>(actions);
         updated.remove(index);
         return new Npc(
-                name, location, skin, clickCommand, lookAtPlayer, equipment, glowing, glowColor, updated, createdAt);
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                updated,
+                entityType,
+                createdAt);
     }
 
     /** A copy with no actions, keeping everything else. */
     public Npc withActionsCleared() {
         return new Npc(
-                name, location, skin, clickCommand, lookAtPlayer, equipment, glowing, glowColor, List.of(), createdAt);
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                List.of(),
+                entityType,
+                createdAt);
+    }
+
+    /** Whether this NPC renders as a fake player (the default type with the tab-entry + skin path). */
+    public boolean isPlayerType() {
+        return DEFAULT_ENTITY_TYPE.equals(entityType);
     }
 
     /** Whether this NPC carries a skin (a fake player with no skin renders the default Steve). */
@@ -179,6 +318,16 @@ public record Npc(
     /** Whether clicking this NPC runs at least one action. */
     public boolean hasActions() {
         return !actions.isEmpty();
+    }
+
+    /** Upper-case the entity-type name and reject a blank one — the type is always a non-blank uppercase name. */
+    private static String normalizeType(String entityType) {
+        Objects.requireNonNull(entityType, "entityType");
+        String trimmed = entityType.strip();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("entityType must not be blank");
+        }
+        return trimmed.toUpperCase(java.util.Locale.ROOT);
     }
 
     /** An immutable, empty-tolerant copy of the equipment map keyed in slot order. */

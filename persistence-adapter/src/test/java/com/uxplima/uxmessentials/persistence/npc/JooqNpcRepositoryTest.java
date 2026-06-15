@@ -28,8 +28,9 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * End-to-end coverage of {@link JooqNpcRepository} against the default embedded SQLite backend with the Flyway
  * baseline applied. It proves the round-trip (save → find) of the row including a skin, a click command and the
- * look-at-player flag, the null skin / null command path, the name-key upsert (a move/re-skin overwrites in
- * place), the delete, the {@code exists} check, and the creation-order list.
+ * look-at-player flag, the entity type (the V42 PLAYER default and a non-player value), the null skin / null
+ * command path, the name-key upsert (a move/re-skin overwrites in place), the delete, the {@code exists} check,
+ * and the creation-order list.
  */
 class JooqNpcRepositoryTest {
 
@@ -151,6 +152,31 @@ class JooqNpcRepositoryTest {
                 Npc.create(NpcName.of("guide"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(2_000)));
 
         assertThat(repository.find(NpcName.of("guide")).orElseThrow().actions()).isEmpty();
+    }
+
+    @Test
+    void defaultsEntityTypeToPlayerForACreatedNpc() {
+        repository.save(
+                Npc.create(NpcName.of("plain"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
+
+        Npc loaded = repository.find(NpcName.of("plain")).orElseThrow();
+        assertThat(loaded.entityType()).isEqualTo("PLAYER");
+        assertThat(loaded.isPlayerType()).isTrue();
+    }
+
+    @Test
+    void roundTripsANonPlayerEntityType() {
+        repository.save(Npc.create(NpcName.of("mob"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                .withEntityType("VILLAGER"));
+
+        Npc loaded = repository.find(NpcName.of("mob")).orElseThrow();
+
+        assertThat(loaded.entityType()).isEqualTo("VILLAGER");
+        assertThat(loaded.isPlayerType()).isFalse();
+        // An upsert to a different type overwrites the stored value in place (the name-key upsert path).
+        repository.save(loaded.withEntityType("ZOMBIE"));
+        assertThat(repository.find(NpcName.of("mob")).orElseThrow().entityType())
+                .isEqualTo("ZOMBIE");
     }
 
     @Test

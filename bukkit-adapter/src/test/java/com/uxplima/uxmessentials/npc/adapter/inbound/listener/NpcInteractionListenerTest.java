@@ -63,7 +63,7 @@ class NpcInteractionListenerTest {
         server = MockBukkit.mock();
         MockBukkit.createMockPlugin();
         packets = new FixedIdPackets();
-        renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+        renderer = new NpcRenderer(packets, new InlineScheduler(), new NoopLogger(), 48.0, 16.0, Duration.ofSeconds(1));
         repository = new FakeRepository();
         runner = new RecordingRunner();
         actionRunner = new RecordingActionRunner();
@@ -272,6 +272,19 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object spawnEntity(
+                int entityId,
+                UUID entityUuid,
+                String entityTypeKey,
+                double x,
+                double y,
+                double z,
+                float yaw,
+                float pitch) {
+            return new Object();
+        }
+
+        @Override
         public Object headLook(int entityId, float yaw) {
             return new Object();
         }
@@ -382,6 +395,20 @@ class NpcInteractionListenerTest {
     }
 
     /** Runs every scheduled hop inline so the dispatch completes within the test. */
+    private static final class NoopLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
     private static final class InlineScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {

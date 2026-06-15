@@ -17,9 +17,11 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 /**
  * {@code /npc skin <name> <texture:… | player:…>}: re-skin an existing NPC, save the new snapshot, and
  * re-render the fake player so every viewer sees the new skin. A name no NPC exists at is rejected with
- * {@link NpcError#NOT_FOUND}. The skin is resolved at the adapter boundary (a raw texture/signature pair, or an
- * online player's textures) and handed here as a domain {@link NpcSkin}; this use case owns only the not-found
- * decision and the persistence. The operator-only permission is enforced at the adapter gate.
+ * {@link NpcError#NOT_FOUND}. A skin only renders on a fake player, so re-skinning a mob NPC is rejected with
+ * {@link NpcError#SKIN_ONLY_PLAYER} (the stored skin is left untouched, ready to show again if the NPC is flipped
+ * back to {@code PLAYER}). The skin is resolved at the adapter boundary (a raw texture/signature pair, or an
+ * online player's textures) and handed here as a domain {@link NpcSkin}; this use case owns the not-found and
+ * player-type decisions and the persistence. The operator-only permission is enforced at the adapter gate.
  */
 public final class SetNpcSkin {
 
@@ -42,6 +44,10 @@ public final class SetNpcSkin {
         if (existing.isEmpty()) {
             notifier.send(actor, NpcError.NOT_FOUND.messageKey(), Map.of("name", name.value()));
             return Result.err(NpcError.NOT_FOUND);
+        }
+        if (!existing.get().isPlayerType()) {
+            notifier.send(actor, NpcError.SKIN_ONLY_PLAYER.messageKey(), Map.of("name", name.value()));
+            return Result.err(NpcError.SKIN_ONLY_PLAYER);
         }
         Npc reskinned = existing.get().withSkin(skin);
         repository.save(reskinned);
