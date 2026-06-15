@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.npc.domain;
 
 import java.time.Instant;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -20,11 +22,20 @@ import org.jspecify.annotations.Nullable;
  * binding. {@code lookAtPlayer} controls whether the fake player rotates to face each nearby viewer; it defaults
  * to {@code true} so a freshly created NPC tracks players out of the box.
  *
+ * <p>{@code equipment} maps each worn {@link EquipmentSlot} to a material <em>name</em> ({@code DIAMOND_HELMET}),
+ * not a Bukkit item, so the aggregate stays Bukkit-free — the adapter resolves the name to a real item at render.
+ * A slot absent from the map is empty. {@code glowing} toggles the fake player's outline, and {@code glowColor}
+ * is the colour name ({@code RED}) the outline is tinted, or {@code null} for the default white outline. The map
+ * is copied defensively on construction so a stored snapshot is immutable.
+ *
  * @param name the NPC's canonical, server-unique name
  * @param location where the NPC stands and which way it faces
  * @param skin the fake player's skin, or {@code null} for the default skin
  * @param clickCommand the command run when a player clicks the NPC, or {@code null} for no action
  * @param lookAtPlayer whether the NPC rotates to face each nearby viewer
+ * @param equipment the worn items by slot as material names; an absent slot is empty
+ * @param glowing whether the fake player's outline glows
+ * @param glowColor the glow outline colour name, or {@code null} for the default white outline
  * @param createdAt when the NPC was first created (preserved across a move, re-skin, or rebind)
  */
 public record Npc(
@@ -33,38 +44,71 @@ public record Npc(
         @Nullable NpcSkin skin,
         @Nullable String clickCommand,
         boolean lookAtPlayer,
+        Map<EquipmentSlot, String> equipment,
+        boolean glowing,
+        @Nullable String glowColor,
         Instant createdAt) {
 
     public Npc {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(createdAt, "createdAt");
+        equipment = copyEquipment(equipment);
     }
 
     /** A new NPC created now at {@code location} with the given (possibly {@code null}) skin, no command, looking. */
     public static Npc create(NpcName name, Position location, @Nullable NpcSkin skin, Instant createdAt) {
-        return new Npc(name, location, skin, null, true, createdAt);
+        return new Npc(name, location, skin, null, true, Map.of(), false, null, createdAt);
     }
 
     /** A copy re-anchored to {@code newLocation}, keeping everything else. */
     public Npc movedTo(Position newLocation) {
         Objects.requireNonNull(newLocation, "newLocation");
-        return new Npc(name, newLocation, skin, clickCommand, lookAtPlayer, createdAt);
+        return new Npc(name, newLocation, skin, clickCommand, lookAtPlayer, equipment, glowing, glowColor, createdAt);
     }
 
     /** A copy wearing {@code newSkin} (or {@code null} to reset to the default skin), keeping everything else. */
     public Npc withSkin(@Nullable NpcSkin newSkin) {
-        return new Npc(name, location, newSkin, clickCommand, lookAtPlayer, createdAt);
+        return new Npc(name, location, newSkin, clickCommand, lookAtPlayer, equipment, glowing, glowColor, createdAt);
     }
 
     /** A copy whose click runs {@code newCommand} (or {@code null} to clear it), keeping everything else. */
     public Npc withClickCommand(@Nullable String newCommand) {
-        return new Npc(name, location, skin, newCommand, lookAtPlayer, createdAt);
+        return new Npc(name, location, skin, newCommand, lookAtPlayer, equipment, glowing, glowColor, createdAt);
     }
 
     /** A copy that does or does not rotate to face nearby viewers, keeping everything else. */
     public Npc withLookAtPlayer(boolean newLookAtPlayer) {
-        return new Npc(name, location, skin, clickCommand, newLookAtPlayer, createdAt);
+        return new Npc(name, location, skin, clickCommand, newLookAtPlayer, equipment, glowing, glowColor, createdAt);
+    }
+
+    /**
+     * A copy with {@code slot} set to {@code materialName} (or cleared when {@code materialName} is {@code null}),
+     * keeping everything else. The material name is stored as given — the adapter validates it against the live
+     * registry at render time, so an unknown name simply renders no item in that slot rather than failing here.
+     */
+    public Npc withEquipment(EquipmentSlot slot, @Nullable String materialName) {
+        Objects.requireNonNull(slot, "slot");
+        // An EnumMap copy-constructor rejects an empty source map, so build it by class and fill it.
+        Map<EquipmentSlot, String> updated = new EnumMap<>(EquipmentSlot.class);
+        updated.putAll(equipment);
+        if (materialName == null || materialName.isBlank()) {
+            updated.remove(slot);
+        } else {
+            updated.put(slot, materialName);
+        }
+        return new Npc(name, location, skin, clickCommand, lookAtPlayer, updated, glowing, glowColor, createdAt);
+    }
+
+    /** A copy whose outline does or does not glow, keeping everything else (and its colour). */
+    public Npc withGlowing(boolean newGlowing) {
+        return new Npc(name, location, skin, clickCommand, lookAtPlayer, equipment, newGlowing, glowColor, createdAt);
+    }
+
+    /** A copy whose glow outline is tinted {@code newColor} (or {@code null} for the default white), keeping the rest. */
+    public Npc withGlowColor(@Nullable String newColor) {
+        String color = newColor == null || newColor.isBlank() ? null : newColor;
+        return new Npc(name, location, skin, clickCommand, lookAtPlayer, equipment, glowing, color, createdAt);
     }
 
     /** Whether this NPC carries a skin (a fake player with no skin renders the default Steve). */
@@ -75,5 +119,23 @@ public record Npc(
     /** Whether clicking this NPC runs a command. */
     public boolean hasClickCommand() {
         return clickCommand != null && !clickCommand.isBlank();
+    }
+
+    /** Whether this NPC wears anything in any slot. */
+    public boolean hasEquipment() {
+        return !equipment.isEmpty();
+    }
+
+    /** Whether a glow colour is set (a glowing NPC with no colour renders the default white outline). */
+    public boolean hasGlowColor() {
+        return glowColor != null && !glowColor.isBlank();
+    }
+
+    /** An immutable, empty-tolerant copy of the equipment map keyed in slot order. */
+    private static Map<EquipmentSlot, String> copyEquipment(@Nullable Map<EquipmentSlot, String> source) {
+        if (source == null || source.isEmpty()) {
+            return Map.of();
+        }
+        return Map.copyOf(new EnumMap<>(source));
     }
 }

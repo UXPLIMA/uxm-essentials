@@ -1,8 +1,11 @@
 package com.uxplima.uxmessentials.persistence.npc;
 
 import java.time.Instant;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
@@ -19,7 +22,9 @@ import org.jspecify.annotations.Nullable;
  * default Steve fake player), and a present texture rebuilds an {@link NpcSkin} carrying its (possibly NULL)
  * signature. The {@code click_command} column is likewise nullable — a NULL means clicking the NPC does
  * nothing. The {@code look_at_player} column is a SMALLINT 0/1 read back as a boolean (whether the NPC rotates
- * to face nearby viewers). This class is the single place that translation lives.
+ * to face nearby viewers). Equipment is six nullable material-name columns ({@code equip_<slot>}), one per
+ * wearable slot, NULL for an empty slot; {@code glowing} is a SMALLINT 0/1 and {@code glow_color} the optional
+ * outline colour name. This class is the single place that translation lives.
  */
 final class NpcRows {
 
@@ -39,6 +44,9 @@ final class NpcRows {
                 skinOf(row.get(NPC.SKIN_TEXTURE), row.get(NPC.SKIN_SIGNATURE)),
                 row.get(NPC.CLICK_COMMAND),
                 row.get(NPC.LOOK_AT_PLAYER) != 0,
+                equipmentOf(row),
+                row.get(NPC.GLOWING) != 0,
+                row.get(NPC.GLOW_COLOR),
                 Instant.ofEpochMilli(row.get(NPC.CREATED_AT)));
     }
 
@@ -46,6 +54,7 @@ final class NpcRows {
     static void apply(NpcRecord record, Npc npc) {
         Position location = npc.location();
         NpcSkin skin = npc.skin();
+        Map<EquipmentSlot, String> equipment = npc.equipment();
         record.setName(npc.name().value())
                 .setWorld(location.world().uid().toString())
                 .setWorldName(location.world().name())
@@ -58,6 +67,14 @@ final class NpcRows {
                 .setSkinSignature(skin == null ? null : skin.signature())
                 .setClickCommand(npc.clickCommand())
                 .setLookAtPlayer((short) (npc.lookAtPlayer() ? 1 : 0))
+                .setEquipMainhand(equipment.get(EquipmentSlot.MAINHAND))
+                .setEquipOffhand(equipment.get(EquipmentSlot.OFFHAND))
+                .setEquipHead(equipment.get(EquipmentSlot.HEAD))
+                .setEquipChest(equipment.get(EquipmentSlot.CHEST))
+                .setEquipLegs(equipment.get(EquipmentSlot.LEGS))
+                .setEquipFeet(equipment.get(EquipmentSlot.FEET))
+                .setGlowing((short) (npc.glowing() ? 1 : 0))
+                .setGlowColor(npc.glowColor())
                 .setCreatedAt(npc.createdAt().toEpochMilli());
     }
 
@@ -66,5 +83,23 @@ final class NpcRows {
             return null;
         }
         return new NpcSkin(texture, signature);
+    }
+
+    /** Read the six equipment columns into a slot-keyed map, skipping the NULL (empty) slots. */
+    private static Map<EquipmentSlot, String> equipmentOf(Record row) {
+        Map<EquipmentSlot, String> equipment = new EnumMap<>(EquipmentSlot.class);
+        put(equipment, EquipmentSlot.MAINHAND, row.get(NPC.EQUIP_MAINHAND));
+        put(equipment, EquipmentSlot.OFFHAND, row.get(NPC.EQUIP_OFFHAND));
+        put(equipment, EquipmentSlot.HEAD, row.get(NPC.EQUIP_HEAD));
+        put(equipment, EquipmentSlot.CHEST, row.get(NPC.EQUIP_CHEST));
+        put(equipment, EquipmentSlot.LEGS, row.get(NPC.EQUIP_LEGS));
+        put(equipment, EquipmentSlot.FEET, row.get(NPC.EQUIP_FEET));
+        return equipment;
+    }
+
+    private static void put(Map<EquipmentSlot, String> equipment, EquipmentSlot slot, @Nullable String material) {
+        if (material != null && !material.isBlank()) {
+            equipment.put(slot, material);
+        }
     }
 }

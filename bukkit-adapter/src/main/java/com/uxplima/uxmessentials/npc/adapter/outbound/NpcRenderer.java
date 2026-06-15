@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.npc.adapter.outbound;
 
 import java.time.Duration;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -10,7 +12,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
@@ -19,6 +23,8 @@ import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.packet.npc.EquipmentSlot;
+import com.uxplima.uxmlib.packet.npc.NamedColor;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.NullMarked;
@@ -248,11 +254,30 @@ public final class NpcRenderer implements NpcView {
         packets.send(viewer, packets.bundle(List.of(tabAdd, spawn)));
         packets.send(viewer, packets.headLook(rendered.entityId(), at.yaw()));
         packets.send(viewer, packets.bodyLook(rendered.entityId(), at.yaw(), at.pitch()));
+        applyAppearance(viewer, rendered);
         // Hide the entry from the tab list a moment later, once the client has parsed it — the spawned fake
         // player keeps its skin even after the entry is gone.
         scheduler.asyncAfter(tabHideDelay, () -> packets.send(viewer, packets.tabRemove(profileId)));
         shownTo.computeIfAbsent(viewer.getUniqueId(), id -> ConcurrentHashMap.newKeySet())
                 .add(rendered.npc().name().value());
+    }
+
+    /**
+     * Dress the just-spawned fake player for this viewer: send its equipment, then its glow toggle and (when the
+     * NPC carries a colour) the team that tints the outline. Equipment that names a material this server does not
+     * know is dropped from the map — an unknown name renders an empty slot rather than failing the whole spawn —
+     * and an unparseable colour falls back to the default white outline, so the appearance is always fail-soft.
+     */
+    private void applyAppearance(Player viewer, RenderedNpc rendered) {
+        Npc npc = rendered.npc();
+        if (npc.hasEquipment()) {
+            packets.send(viewer, packets.equipment(rendered.entityId(), resolveEquipment(npc)));
+        }
+        if (npc.glowing()) {
+            packets.send(viewer, packets.glow(rendered.entityId(), true));
+            NamedColor color = npc.hasGlowColor() ? parseColor(npc.glowColor()) : null;
+            packets.send(viewer, packets.glowColor(glowTeam(npc), profileName(npc), color));
+        }
     }
 
     private void removeFromViewer(Player viewer, RenderedNpc rendered) {
@@ -276,5 +301,47 @@ public final class NpcRenderer implements NpcView {
 
     private static @Nullable TabSkin tabSkin(@Nullable NpcSkin skin) {
         return skin == null ? null : new TabSkin(skin.texture(), skin.signature());
+    }
+
+    /** Resolve each stored material name to a real item, dropping a slot whose name this server does not know. */
+    private static Map<EquipmentSlot, ItemStack> resolveEquipment(Npc npc) {
+        Map<EquipmentSlot, ItemStack> resolved = new EnumMap<>(EquipmentSlot.class);
+        for (Map.Entry<com.uxplima.uxmessentials.npc.domain.EquipmentSlot, String> entry :
+                npc.equipment().entrySet()) {
+            Material material = Material.matchMaterial(entry.getValue());
+            if (material != null && material.isItem()) {
+                resolved.put(toPacketSlot(entry.getKey()), new ItemStack(material));
+            }
+        }
+        return resolved;
+    }
+
+    /** Map a domain equipment slot onto the uxmLib packet slot — the single place those two enums meet. */
+    private static EquipmentSlot toPacketSlot(com.uxplima.uxmessentials.npc.domain.EquipmentSlot slot) {
+        return switch (slot) {
+            case MAINHAND -> EquipmentSlot.MAINHAND;
+            case OFFHAND -> EquipmentSlot.OFFHAND;
+            case HEAD -> EquipmentSlot.HEAD;
+            case CHEST -> EquipmentSlot.CHEST;
+            case LEGS -> EquipmentSlot.LEGS;
+            case FEET -> EquipmentSlot.FEET;
+        };
+    }
+
+    /** Parse a stored colour name to a {@link NamedColor}, falling back to the default white outline when unknown. */
+    private static @Nullable NamedColor parseColor(@Nullable String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        try {
+            return NamedColor.valueOf(name.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
+    }
+
+    /** The stable per-NPC scoreboard team name that tints its glow (capped well under the 16-char team-name limit). */
+    private static String glowTeam(Npc npc) {
+        return profileName(npc);
     }
 }

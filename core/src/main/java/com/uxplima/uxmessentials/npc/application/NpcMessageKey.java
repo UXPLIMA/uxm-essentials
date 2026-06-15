@@ -28,6 +28,13 @@ public enum NpcMessageKey implements MessageKey {
     NPC_LOOK_ENABLED("npc.look.enabled"),
     NPC_LOOK_DISABLED("npc.look.disabled"),
 
+    // equipment / glow feedback
+    NPC_EQUIP_SET("npc.equip.set"),
+    NPC_EQUIP_CLEARED("npc.equip.cleared"),
+    NPC_GLOW_ENABLED("npc.glow.enabled"),
+    NPC_GLOW_DISABLED("npc.glow.disabled"),
+    NPC_GLOW_SET("npc.glow.set"),
+
     // listing
     NPC_LIST_HEADER("npc.list.header"),
     NPC_LIST_ENTRY("npc.list.entry"),
@@ -36,7 +43,10 @@ public enum NpcMessageKey implements MessageKey {
     // failures
     NPC_NOT_FOUND("npc.not-found"),
     NPC_NAME_TAKEN("npc.name-taken"),
-    NPC_PLAYERS_ONLY("npc.players-only");
+    NPC_PLAYERS_ONLY("npc.players-only"),
+    NPC_INVALID_SLOT("npc.invalid-slot"),
+    NPC_INVALID_MATERIAL("npc.invalid-material"),
+    NPC_INVALID_COLOR("npc.invalid-color");
 
     private final String key;
 

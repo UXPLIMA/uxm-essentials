@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
@@ -47,13 +48,13 @@ class JooqNpcRepositoryTest {
 
     @Test
     void savesAndFindsAnNpcWithSkinAndCommand() {
-        repository.save(new Npc(
-                NpcName.of("guide"),
-                Position.of(WORLD, 10, 64, 20),
-                new NpcSkin("tex", "sig"),
-                "warp spawn",
-                false,
-                Instant.ofEpochMilli(1_000)));
+        repository.save(Npc.create(
+                        NpcName.of("guide"),
+                        Position.of(WORLD, 10, 64, 20),
+                        new NpcSkin("tex", "sig"),
+                        Instant.ofEpochMilli(1_000))
+                .withClickCommand("warp spawn")
+                .withLookAtPlayer(false));
 
         Optional<Npc> loaded = repository.find(NpcName.of("guide"));
 
@@ -65,6 +66,36 @@ class JooqNpcRepositoryTest {
         assertThat(reloaded.skin()).isEqualTo(new NpcSkin("tex", "sig"));
         assertThat(reloaded.clickCommand()).isEqualTo("warp spawn");
         assertThat(reloaded.lookAtPlayer()).isFalse();
+    }
+
+    @Test
+    void roundTripsEquipmentAndGlow() {
+        repository.save(
+                Npc.create(NpcName.of("knight"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                        .withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                        .withEquipment(EquipmentSlot.MAINHAND, "NETHERITE_SWORD")
+                        .withGlowing(true)
+                        .withGlowColor("RED"));
+
+        Npc loaded = repository.find(NpcName.of("knight")).orElseThrow();
+
+        assertThat(loaded.equipment())
+                .containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .containsEntry(EquipmentSlot.MAINHAND, "NETHERITE_SWORD")
+                .hasSize(2);
+        assertThat(loaded.glowing()).isTrue();
+        assertThat(loaded.glowColor()).isEqualTo("RED");
+    }
+
+    @Test
+    void defaultsEquipmentEmptyAndGlowOffForACreatedNpc() {
+        repository.save(
+                Npc.create(NpcName.of("bare"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
+
+        Npc loaded = repository.find(NpcName.of("bare")).orElseThrow();
+        assertThat(loaded.equipment()).isEmpty();
+        assertThat(loaded.glowing()).isFalse();
+        assertThat(loaded.glowColor()).isNull();
     }
 
     @Test
@@ -104,13 +135,12 @@ class JooqNpcRepositoryTest {
     @Test
     void saveUpsertsOnTheNameKey() {
         repository.save(npc("guide", 0, 0, 0));
-        repository.save(new Npc(
-                NpcName.of("guide"),
-                Position.of(WORLD, 100, 70, 100),
-                new NpcSkin("tex2", null),
-                "spawn",
-                true,
-                Instant.ofEpochMilli(1_000)));
+        repository.save(Npc.create(
+                        NpcName.of("guide"),
+                        Position.of(WORLD, 100, 70, 100),
+                        new NpcSkin("tex2", null),
+                        Instant.ofEpochMilli(1_000))
+                .withClickCommand("spawn"));
 
         assertThat(repository.all()).hasSize(1);
         Npc updated = repository.find(NpcName.of("guide")).orElseThrow();

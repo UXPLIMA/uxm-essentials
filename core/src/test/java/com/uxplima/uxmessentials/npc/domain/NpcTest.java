@@ -78,4 +78,71 @@ class NpcTest {
 
         assertThat(bound.withClickCommand(null).hasClickCommand()).isFalse();
     }
+
+    @Test
+    void createsWithNoEquipmentAndNoGlow() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        assertThat(npc.equipment()).isEmpty();
+        assertThat(npc.hasEquipment()).isFalse();
+        assertThat(npc.glowing()).isFalse();
+        assertThat(npc.glowColor()).isNull();
+        assertThat(npc.hasGlowColor()).isFalse();
+    }
+
+    @Test
+    void withEquipmentSetsAndClearsASlotKeepingTheRest() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .withEquipment(EquipmentSlot.MAINHAND, "STICK");
+
+        assertThat(npc.equipment())
+                .containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .containsEntry(EquipmentSlot.MAINHAND, "STICK")
+                .hasSize(2);
+        assertThat(npc.hasEquipment()).isTrue();
+
+        Npc cleared = npc.withEquipment(EquipmentSlot.HEAD, null);
+        assertThat(cleared.equipment()).doesNotContainKey(EquipmentSlot.HEAD).hasSize(1);
+    }
+
+    @Test
+    void equipmentMapIsImmutable() {
+        Npc npc =
+                Npc.create(NpcName.of("guide"), AT, null, CREATED).withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.equipment().put(EquipmentSlot.FEET, "BOOTS"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void withGlowingAndColorToggleAndTintKeepingTheRest() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
+                .withGlowing(true)
+                .withGlowColor("RED");
+
+        assertThat(npc.glowing()).isTrue();
+        assertThat(npc.glowColor()).isEqualTo("RED");
+        assertThat(npc.hasGlowColor()).isTrue();
+        assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+
+        Npc cleared = npc.withGlowColor(null);
+        assertThat(cleared.hasGlowColor()).isFalse();
+        assertThat(cleared.glowing()).isTrue();
+        assertThat(npc.withGlowing(false).glowing()).isFalse();
+    }
+
+    @Test
+    void movedToAndWithSkinPreserveEquipmentAndGlow() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .withGlowing(true)
+                .withGlowColor("AQUA");
+
+        Npc moved = npc.movedTo(ELSEWHERE).withSkin(NpcSkin.unsigned("tex"));
+
+        assertThat(moved.equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+        assertThat(moved.glowing()).isTrue();
+        assertThat(moved.glowColor()).isEqualTo("AQUA");
+    }
 }

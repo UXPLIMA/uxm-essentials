@@ -7,6 +7,8 @@ import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
+import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
+import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import org.jspecify.annotations.NullMarked;
@@ -24,6 +26,8 @@ import org.jspecify.annotations.NullMarked;
  * @param skin {@code /npc skin}
  * @param command {@code /npc command}
  * @param look {@code /npc lookatplayer}
+ * @param equip {@code /npc equip}
+ * @param glow {@code /npc glow}
  */
 @NullMarked
 public record NpcServices(
@@ -33,7 +37,9 @@ public record NpcServices(
         MoveNpc move,
         SetNpcSkin skin,
         SetNpcClickCommand command,
-        SetNpcLookAtPlayer look) {
+        SetNpcLookAtPlayer look,
+        SetNpcEquipment equip,
+        SetNpcGlowing glow) {
 
     public NpcServices {
         Objects.requireNonNull(create, "create");
@@ -43,5 +49,7 @@ public record NpcServices(
         Objects.requireNonNull(skin, "skin");
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(look, "look");
+        Objects.requireNonNull(equip, "equip");
+        Objects.requireNonNull(glow, "glow");
     }
 }

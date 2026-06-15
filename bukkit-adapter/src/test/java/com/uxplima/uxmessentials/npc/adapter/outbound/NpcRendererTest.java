@@ -6,11 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
@@ -18,6 +21,7 @@ import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.packet.npc.NamedColor;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -276,6 +280,66 @@ class NpcRendererTest {
         assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksBefore);
     }
 
+    @Test
+    void appliesEquipmentAndGlowOnSpawnForAnInRangeViewer() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+
+        Npc npc = npcAt(viewer, 1.0)
+                .withEquipment(com.uxplima.uxmessentials.npc.domain.EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .withGlowing(true)
+                .withGlowColor("RED");
+        renderer.render(npc);
+
+        // The spawn carries the equipment packet (one resolved slot) and the glow toggle + the team that tints it.
+        assertThat(packets.equipments).hasSize(1);
+        assertThat(packets.equipments.get(0).items()).containsKey(com.uxplima.uxmlib.packet.npc.EquipmentSlot.HEAD);
+        assertThat(packets.glows).hasSize(1);
+        assertThat(packets.glows.get(0).glowing()).isTrue();
+        assertThat(packets.glowColors).hasSize(1);
+        assertThat(packets.glowColors.get(0).color()).isEqualTo(com.uxplima.uxmlib.packet.npc.NamedColor.RED);
+    }
+
+    @Test
+    void sendsNoEquipmentOrGlowForAPlainNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+
+        renderer.render(npcAt(viewer, 1.0));
+
+        assertThat(packets.equipments).isEmpty();
+        assertThat(packets.glows).isEmpty();
+        assertThat(packets.glowColors).isEmpty();
+    }
+
+    @Test
+    void dropsAnUnknownMaterialSoTheSpawnStillSucceeds() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+
+        Npc npc = npcAt(viewer, 1.0)
+                .withEquipment(com.uxplima.uxmessentials.npc.domain.EquipmentSlot.HEAD, "NOT_A_REAL_MATERIAL");
+        renderer.render(npc);
+
+        // The unknown name is dropped, so the equipment packet carries no slots — the spawn itself still went out.
+        assertThat(packets.equipments).hasSize(1);
+        assertThat(packets.equipments.get(0).items()).isEmpty();
+        assertThat(packets.spawns).hasSize(1);
+    }
+
+    @Test
+    void glowsWhiteWhenTheColorNameIsUnknown() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = new NpcRenderer(packets, new InlineScheduler(), 48.0, 16.0, Duration.ofSeconds(1));
+
+        Npc npc = npcAt(viewer, 1.0).withGlowing(true).withGlowColor("octarine");
+        renderer.render(npc);
+
+        // An unparseable colour falls back to a null (default white) team colour rather than failing the spawn.
+        assertThat(packets.glows.get(0).glowing()).isTrue();
+        assertThat(packets.glowColors.get(0).color()).isNull();
+    }
+
     private Npc npcAt(Player viewer, double offset) {
         return npc(locationOf(viewer).add(offset, 0, 0), null);
     }
@@ -300,6 +364,9 @@ class NpcRendererTest {
         private final List<UUID> tabRemoves = new ArrayList<>();
         private final List<Integer> removes = new ArrayList<>();
         private final List<List<Object>> bundles = new ArrayList<>();
+        private final List<Equipment> equipments = new ArrayList<>();
+        private final List<Glow> glows = new ArrayList<>();
+        private final List<GlowColor> glowColors = new ArrayList<>();
         private final List<Sent> sent = new ArrayList<>();
 
         @Override
@@ -344,6 +411,27 @@ class NpcRendererTest {
         @Override
         public Object remove(int entityId) {
             return new Remove(entityId);
+        }
+
+        @Override
+        public Object equipment(int entityId, Map<com.uxplima.uxmlib.packet.npc.EquipmentSlot, ItemStack> items) {
+            Equipment packet = new Equipment(entityId, new EnumMap<>(items));
+            equipments.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object glow(int entityId, boolean glowing) {
+            Glow packet = new Glow(entityId, glowing);
+            glows.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object glowColor(String teamName, String memberName, @Nullable NamedColor color) {
+            GlowColor packet = new GlowColor(teamName, memberName, color);
+            glowColors.add(packet);
+            return packet;
         }
 
         @Override
@@ -404,6 +492,12 @@ class NpcRendererTest {
         private record Look(int entityId, float yaw, float pitch) {}
 
         private record Remove(int entityId) {}
+
+        private record Equipment(int entityId, Map<com.uxplima.uxmlib.packet.npc.EquipmentSlot, ItemStack> items) {}
+
+        private record Glow(int entityId, boolean glowing) {}
+
+        private record GlowColor(String teamName, String memberName, @Nullable NamedColor color) {}
 
         private record Bundle(List<Object> packets) {}
     }

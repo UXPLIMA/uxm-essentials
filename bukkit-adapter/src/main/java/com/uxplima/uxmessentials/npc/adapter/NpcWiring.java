@@ -20,6 +20,8 @@ import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
+import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
+import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
@@ -95,7 +97,9 @@ public final class NpcWiring {
                 new MoveNpc(repository, renderer, notifier),
                 new SetNpcSkin(repository, renderer, notifier),
                 new SetNpcClickCommand(repository, notifier),
-                new SetNpcLookAtPlayer(repository, renderer, notifier));
+                new SetNpcLookAtPlayer(repository, renderer, notifier),
+                new SetNpcEquipment(repository, renderer, notifier),
+                new SetNpcGlowing(repository, renderer, notifier));
     }
 
     private static void spawnStored(NpcRepository repository, NpcRenderer renderer) {

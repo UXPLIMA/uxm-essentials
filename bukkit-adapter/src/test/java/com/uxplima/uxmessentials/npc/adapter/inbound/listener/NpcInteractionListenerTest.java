@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
 import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.packet.npc.NamedColor;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -184,7 +186,8 @@ class NpcInteractionListenerTest {
         PlayerMock player = server.addPlayer();
         Position at = com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toPosition(
                 java.util.Objects.requireNonNull(player.getLocation(), "loc"));
-        Npc npc = new Npc(NpcName.of(name), at, null, command, true, Instant.ofEpochMilli(1_000));
+        Npc npc = Npc.create(NpcName.of(name), at, null, Instant.ofEpochMilli(1_000))
+                .withClickCommand(command);
         repository.save(npc);
         renderer.render(npc); // populates the entityId -> name map under ENTITY_ID
         return player;
@@ -233,6 +236,21 @@ class NpcInteractionListenerTest {
 
         @Override
         public Object remove(int entityId) {
+            return new Object();
+        }
+
+        @Override
+        public Object equipment(int entityId, Map<com.uxplima.uxmlib.packet.npc.EquipmentSlot, ItemStack> items) {
+            return new Object();
+        }
+
+        @Override
+        public Object glow(int entityId, boolean glowing) {
+            return new Object();
+        }
+
+        @Override
+        public Object glowColor(String teamName, String memberName, @Nullable NamedColor color) {
             return new Object();
         }
 
