@@ -1,14 +1,18 @@
 package com.uxplima.uxmessentials.persistence.holograms;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramLines.HOLOGRAM_LINES;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramManualViewer.HOLOGRAM_MANUAL_VIEWER;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Holograms.HOLOGRAMS;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
@@ -76,10 +80,50 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
             dsl.deleteFrom(HOLOGRAM_LINES)
                     .where(HOLOGRAM_LINES.HOLOGRAM.eq(name.value()))
                     .execute();
+            dsl.deleteFrom(HOLOGRAM_MANUAL_VIEWER)
+                    .where(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME.eq(name.value()))
+                    .execute();
             return dsl.deleteFrom(HOLOGRAMS)
                     .where(HOLOGRAMS.NAME.eq(name.value()))
                     .execute();
         });
+    }
+
+    @Override
+    public Set<UUID> manualViewers(HologramName name) {
+        Objects.requireNonNull(name, "name");
+        return read(dsl -> {
+            Set<UUID> viewers = new LinkedHashSet<>();
+            for (String stored : dsl.select(HOLOGRAM_MANUAL_VIEWER.PLAYER_UUID)
+                    .from(HOLOGRAM_MANUAL_VIEWER)
+                    .where(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME.eq(name.value()))
+                    .fetch(HOLOGRAM_MANUAL_VIEWER.PLAYER_UUID)) {
+                viewers.add(UUID.fromString(stored));
+            }
+            return viewers;
+        });
+    }
+
+    @Override
+    public void showTo(HologramName name, UUID viewer) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
+        write(dsl -> dsl.insertInto(HOLOGRAM_MANUAL_VIEWER)
+                .set(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME, name.value())
+                .set(HOLOGRAM_MANUAL_VIEWER.PLAYER_UUID, viewer.toString())
+                .onConflict(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME, HOLOGRAM_MANUAL_VIEWER.PLAYER_UUID)
+                .doNothing()
+                .execute());
+    }
+
+    @Override
+    public void hideFrom(HologramName name, UUID viewer) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
+        write(dsl -> dsl.deleteFrom(HOLOGRAM_MANUAL_VIEWER)
+                .where(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME.eq(name.value()))
+                .and(HOLOGRAM_MANUAL_VIEWER.PLAYER_UUID.eq(viewer.toString()))
+                .execute());
     }
 
     private static List<String> lines(DSLContext dsl, String name) {

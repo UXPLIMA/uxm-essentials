@@ -2,9 +2,11 @@ package com.uxplima.uxmessentials.holograms.application;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
@@ -26,6 +28,7 @@ final class HologramTestSupport {
     /** An in-memory {@link HologramRepository} keyed by name in insertion order. */
     static final class FakeHologramRepository implements HologramRepository {
         private final Map<String, Hologram> byName = new LinkedHashMap<>();
+        private final Map<String, Set<UUID>> manualViewers = new LinkedHashMap<>();
 
         @Override
         public Optional<Hologram> find(HologramName name) {
@@ -50,6 +53,27 @@ final class HologramTestSupport {
         @Override
         public void delete(HologramName name) {
             byName.remove(name.value());
+            manualViewers.remove(name.value());
+        }
+
+        @Override
+        public Set<UUID> manualViewers(HologramName name) {
+            return new LinkedHashSet<>(manualViewers.getOrDefault(name.value(), Set.of()));
+        }
+
+        @Override
+        public void showTo(HologramName name, UUID viewer) {
+            manualViewers
+                    .computeIfAbsent(name.value(), key -> new LinkedHashSet<>())
+                    .add(viewer);
+        }
+
+        @Override
+        public void hideFrom(HologramName name, UUID viewer) {
+            Set<UUID> viewers = manualViewers.get(name.value());
+            if (viewers != null) {
+                viewers.remove(viewer);
+            }
         }
     }
 
@@ -57,6 +81,7 @@ final class HologramTestSupport {
     static final class RecordingView implements HologramView {
         final List<Hologram> rendered = new ArrayList<>();
         final List<HologramName> despawned = new ArrayList<>();
+        final List<ViewerChange> viewerChanges = new ArrayList<>();
 
         @Override
         public void render(Hologram hologram) {
@@ -67,7 +92,15 @@ final class HologramTestSupport {
         public void despawn(HologramName name) {
             despawned.add(name);
         }
+
+        @Override
+        public void applyManualViewer(HologramName name, UUID viewer, boolean visible) {
+            viewerChanges.add(new ViewerChange(name, viewer, visible));
+        }
     }
+
+    /** One captured per-player MANUAL viewer change, for asserting the immediate show/hide side effect. */
+    record ViewerChange(HologramName name, UUID viewer, boolean visible) {}
 
     /** Captures every published domain event. */
     static final class RecordingEvents implements DomainEventPublisher {

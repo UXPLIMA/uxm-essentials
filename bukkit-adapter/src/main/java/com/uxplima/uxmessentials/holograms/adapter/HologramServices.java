@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
+import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
 import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
@@ -45,6 +46,7 @@ import org.jspecify.annotations.NullMarked;
  * @param appearance {@code /hologram billboard|background|shadow|brightness|scale|linewidth|viewrange}
  * @param refresh {@code /hologram refreshinterval}
  * @param visibility {@code /hologram visibility|visibilitydistance}
+ * @param viewers {@code /hologram show|hide}
  * @param model {@code /hologram item|block}
  */
 @NullMarked
@@ -66,6 +68,7 @@ public record HologramServices(
         SetHologramAppearance appearance,
         SetHologramRefresh refresh,
         SetHologramVisibility visibility,
+        ManageHologramViewer viewers,
         SetHologramModel model) {
 
     public HologramServices {
@@ -86,6 +89,7 @@ public record HologramServices(
         Objects.requireNonNull(appearance, "appearance");
         Objects.requireNonNull(refresh, "refresh");
         Objects.requireNonNull(visibility, "visibility");
+        Objects.requireNonNull(viewers, "viewers");
         Objects.requireNonNull(model, "model");
     }
 }

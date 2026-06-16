@@ -2,7 +2,10 @@ package com.uxplima.uxmessentials.holograms.adapter.outbound;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
@@ -58,11 +61,15 @@ import org.jspecify.annotations.NullMarked;
  * <p>A hologram's {@link Visibility} is applied at the spawn boundary. {@link Visibility.Mode#ALL} is the cheap
  * default — the shared entity is visible by default to everyone. {@link Visibility.Mode#PERMISSION} restricts
  * the entity to an allowed-viewer set (Paper's native {@code show/hideEntity}) recomputed from the online
- * permission-holders on every render and refresh; {@link #recomputeVisibilityFor(Player)} re-evaluates a single
- * joiner so they pick up the permission-gated holograms they qualify for without waiting for a refresh tick. A
- * finite {@link Visibility#distance()} maps onto the native display view range — blocks divided by the vanilla
- * {@value #VANILLA_VIEW_BLOCKS}-block tracking range, since the lib view range is a multiplier — so the hologram
- * culls beyond that radius; distance 0 leaves the appearance's own view-range multiplier untouched.
+ * permission-holders on every render and refresh. {@link Visibility.Mode#MANUAL} hides the entity from everyone
+ * and restricts it to its persisted shown-viewer set, queried per hologram through the injected
+ * {@code manualViewers} lookup; {@link #applyManualViewer(HologramName, java.util.UUID, boolean)} shows or hides
+ * one online viewer the instant {@code /hologram show|hide} runs. {@link #recomputeVisibilityFor(Player)}
+ * re-evaluates a single joiner so they pick up the permission-gated and manual holograms they qualify for
+ * without waiting for a refresh tick. A finite {@link Visibility#distance()} maps onto the native display view
+ * range — blocks divided by the vanilla {@value #VANILLA_VIEW_BLOCKS}-block tracking range, since the lib view
+ * range is a multiplier — so the hologram culls beyond that radius; distance 0 leaves the appearance's own
+ * view-range multiplier untouched.
  */
 @NullMarked
 public final class HologramRenderer implements HologramView {
@@ -76,6 +83,7 @@ public final class HologramRenderer implements HologramView {
     private final Logger log;
     private final Permissions permissions;
     private final UnaryOperator<String> placeholders;
+    private final Function<HologramName, Set<UUID>> manualViewers;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final Map<String, Tracked> live = new ConcurrentHashMap<>();
 
@@ -85,13 +93,15 @@ public final class HologramRenderer implements HologramView {
             Scheduler scheduler,
             Logger log,
             Permissions permissions,
-            UnaryOperator<String> placeholders) {
+            UnaryOperator<String> placeholders,
+            Function<HologramName, Set<UUID>> manualViewers) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.manager = Objects.requireNonNull(manager, "manager");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.placeholders = Objects.requireNonNull(placeholders, "placeholders");
+        this.manualViewers = Objects.requireNonNull(manualViewers, "manualViewers");
     }
 
     @Override
@@ -143,19 +153,45 @@ public final class HologramRenderer implements HologramView {
     }
 
     /**
-     * Re-evaluate every permission-gated hologram for a single {@code joiner} on their region thread, showing it
-     * to them when they hold its node and hiding it otherwise. Called from the join listener so a player who logs
-     * in sees the holograms they qualify for at once rather than after the next refresh tick. {@code ALL}
-     * holograms are visible by default and need no per-viewer call, so the loop touches only the gated ones.
+     * Re-evaluate every per-viewer hologram for a single {@code joiner} on their region thread, showing it to
+     * them when they qualify (they hold a {@code PERMISSION} node, or are in a {@code MANUAL} hologram's shown
+     * set) and hiding it otherwise. Called from the join listener so a player who logs in sees the holograms
+     * they qualify for at once rather than after the next refresh tick. {@code ALL} holograms are visible by
+     * default and need no per-viewer call, so the loop touches only the gated and manual ones.
      */
     public void recomputeVisibilityFor(Player joiner) {
         Objects.requireNonNull(joiner, "joiner");
         for (Tracked tracked : live.values()) {
             Visibility visibility = tracked.hologram().visibility();
-            if (visibility.isPermissionGated()) {
-                scheduler.onRegion(tracked.position(), () -> applyViewer(tracked.live(), visibility, joiner));
+            if (visibility.isPermissionGated() || visibility.isManual()) {
+                Set<UUID> shown = shownViewersFor(tracked.hologram());
+                scheduler.onRegion(tracked.position(), () -> applyViewer(tracked.live(), visibility, joiner, shown));
             }
         }
+    }
+
+    /**
+     * Apply a single MANUAL viewer change to the live entity at once: show the hologram under {@code name} to
+     * the online {@code viewer} when {@code visible}, hide it otherwise — so {@code /hologram show|hide} takes
+     * effect without a refresh tick. A no-op when the hologram is not tracked or the viewer is offline; the
+     * change is routed onto the entity's region thread.
+     */
+    @Override
+    public void applyManualViewer(HologramName name, UUID viewer, boolean visible) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
+        Tracked tracked = live.get(name.value());
+        Player online = Bukkit.getPlayer(viewer);
+        if (tracked == null || online == null) {
+            return;
+        }
+        scheduler.onRegion(tracked.position(), () -> {
+            if (visible) {
+                tracked.live().show(plugin, online);
+            } else {
+                tracked.live().hide(plugin, online);
+            }
+        });
     }
 
     private void spawnReplacing(Hologram hologram, Location at) {
@@ -170,7 +206,7 @@ public final class HologramRenderer implements HologramView {
             // Invalid item material or block data — already logged; leave nothing tracked rather than crash.
             return;
         }
-        applyVisibility(spawned, hologram.visibility());
+        applyVisibility(spawned, hologram);
         live.put(hologram.name().value(), new Tracked(spawned, hologram, hologram.location()));
     }
 
@@ -231,21 +267,32 @@ public final class HologramRenderer implements HologramView {
 
     /**
      * Apply {@code visibility} to a freshly spawned entity on its own region thread. {@code ALL} keeps the
-     * entity visible by default (no work). {@code PERMISSION} restricts it to an explicit viewer set, then shows
-     * it to each online player who holds the node — so a non-holder never sees it and a holder sees it at once.
+     * entity visible by default (no work). {@code PERMISSION} and {@code MANUAL} restrict it to an explicit
+     * viewer set, then show it to each online player who qualifies (a node-holder, or a member of the manual
+     * shown set) — so a non-qualifier never sees it and a qualifier sees it at once.
      */
-    private void applyVisibility(RenderedHologram spawned, Visibility visibility) {
-        if (!visibility.isPermissionGated()) {
+    private void applyVisibility(RenderedHologram spawned, Hologram hologram) {
+        Visibility visibility = hologram.visibility();
+        if (!visibility.isPermissionGated() && !visibility.isManual()) {
             return;
         }
+        Set<UUID> shown = shownViewersFor(hologram);
         spawned.restrictToViewers();
         for (Player online : Bukkit.getOnlinePlayers()) {
-            applyViewer(spawned, visibility, online);
+            applyViewer(spawned, visibility, online, shown);
         }
     }
 
-    private void applyViewer(RenderedHologram spawned, Visibility visibility, Player viewer) {
-        if (maySee(permissions, visibility, BukkitRefs.toRef(viewer))) {
+    /** The manual shown-viewer set for a MANUAL hologram, queried lazily; empty for any other mode. */
+    private Set<UUID> shownViewersFor(Hologram hologram) {
+        if (!hologram.visibility().isManual()) {
+            return Set.of();
+        }
+        return manualViewers.apply(hologram.name());
+    }
+
+    private void applyViewer(RenderedHologram spawned, Visibility visibility, Player viewer, Set<UUID> shown) {
+        if (maySee(permissions, visibility, BukkitRefs.toRef(viewer), shown)) {
             spawned.show(plugin, viewer);
         } else {
             spawned.hide(plugin, viewer);
@@ -253,11 +300,15 @@ public final class HologramRenderer implements HologramView {
     }
 
     /**
-     * Whether {@code who} may see a hologram with this {@code visibility}: everyone for {@code ALL}, and only a
-     * holder of the gating node for {@code PERMISSION}. Pure (the {@code Permissions} call aside), so the
-     * permission-gated viewer set is unit-testable with a fake {@code Permissions}.
+     * Whether {@code who} may see a hologram with this {@code visibility}: everyone for {@code ALL}, only a
+     * holder of the gating node for {@code PERMISSION}, and only a member of {@code shownViewers} for
+     * {@code MANUAL}. Pure (the {@code Permissions} call aside), so the gated and manual viewer sets are
+     * unit-testable with a fake {@code Permissions} and an explicit shown set.
      */
-    static boolean maySee(Permissions permissions, Visibility visibility, PlayerRef who) {
+    static boolean maySee(Permissions permissions, Visibility visibility, PlayerRef who, Set<UUID> shownViewers) {
+        if (visibility.isManual()) {
+            return shownViewers.contains(who.uuid());
+        }
         if (!visibility.isPermissionGated()) {
             return true;
         }

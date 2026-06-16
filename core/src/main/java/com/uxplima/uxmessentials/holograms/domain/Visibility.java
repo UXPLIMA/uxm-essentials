@@ -13,9 +13,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@link Mode#ALL} (the default) shows the hologram to everyone — the cheap, static-hologram path with no
  * per-viewer bookkeeping. {@link Mode#PERMISSION} shows it only to players who hold {@link #permission()}; the
- * node is operator-chosen and so dynamic (it is not a fixed plugin-declared node). A {@code MANUAL} mode
- * (hidden until an operator explicitly shows it to a named player) is intentionally not modelled yet: it needs
- * per-player persisted show/hide state, which is disproportionate to its value here and is deferred.
+ * node is operator-chosen and so dynamic (it is not a fixed plugin-declared node). {@link Mode#MANUAL} hides the
+ * hologram from everyone until an operator explicitly shows it to a named player; the set of shown players is a
+ * per-hologram, persisted association the operator grows with {@code /hologram show} and shrinks with {@code
+ * /hologram hide}, so it survives a restart. Like {@code ALL}, {@code MANUAL} carries no permission node — its
+ * gate is the explicit viewer set, not a node.
  *
  * <p>{@link #distance()} is the visibility radius in blocks: {@link #UNLIMITED} (0, the default) leaves the
  * vanilla display tracking range untouched, and a positive value culls the hologram beyond that many blocks.
@@ -38,7 +40,9 @@ public record Visibility(Mode mode, @Nullable String permission, int distance) {
         /** Everyone sees the hologram — the default, no per-viewer bookkeeping. */
         ALL,
         /** Only players who hold the hologram's {@link Visibility#permission()} node see it. */
-        PERMISSION
+        PERMISSION,
+        /** Hidden from everyone until an operator explicitly shows it to a named player. */
+        MANUAL
     }
 
     public Visibility {
@@ -46,8 +50,8 @@ public record Visibility(Mode mode, @Nullable String permission, int distance) {
         if (mode == Mode.PERMISSION && (permission == null || permission.isBlank())) {
             throw new IllegalArgumentException("PERMISSION visibility needs a non-blank permission node");
         }
-        if (mode == Mode.ALL && permission != null) {
-            throw new IllegalArgumentException("ALL visibility carries no permission node");
+        if (mode != Mode.PERMISSION && permission != null) {
+            throw new IllegalArgumentException(mode + " visibility carries no permission node");
         }
         if (distance < 0) {
             throw new IllegalArgumentException("distance must not be negative: " + distance);
@@ -64,6 +68,11 @@ public record Visibility(Mode mode, @Nullable String permission, int distance) {
         return new Visibility(Mode.PERMISSION, requireNode(node), UNLIMITED);
     }
 
+    /** Hidden from everyone until shown to a named player, no permission node, vanilla view range. */
+    public static Visibility manual() {
+        return new Visibility(Mode.MANUAL, null, UNLIMITED);
+    }
+
     /** A copy whose mode becomes {@link Mode#ALL} (dropping any permission node), keeping the distance. */
     public Visibility toEveryone() {
         return new Visibility(Mode.ALL, null, distance);
@@ -72,6 +81,11 @@ public record Visibility(Mode mode, @Nullable String permission, int distance) {
     /** A copy whose mode becomes {@link Mode#PERMISSION} guarded by {@code node}, keeping the distance. */
     public Visibility toPermission(String node) {
         return new Visibility(Mode.PERMISSION, requireNode(node), distance);
+    }
+
+    /** A copy whose mode becomes {@link Mode#MANUAL} (dropping any permission node), keeping the distance. */
+    public Visibility toManual() {
+        return new Visibility(Mode.MANUAL, null, distance);
     }
 
     /** A copy with the visibility radius set to {@code blocks} (0 = unlimited), keeping the mode and node. */
@@ -87,6 +101,11 @@ public record Visibility(Mode mode, @Nullable String permission, int distance) {
     /** Whether this hologram is restricted to permission-holders rather than visible to everyone. */
     public boolean isPermissionGated() {
         return mode == Mode.PERMISSION;
+    }
+
+    /** Whether this hologram is hidden by default and shown only to its explicit per-player viewer set. */
+    public boolean isManual() {
+        return mode == Mode.MANUAL;
     }
 
     /** Whether a finite visibility radius is set (a positive distance), rather than the vanilla range. */

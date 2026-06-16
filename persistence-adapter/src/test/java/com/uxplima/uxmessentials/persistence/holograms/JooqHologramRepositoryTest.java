@@ -223,6 +223,56 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsManualVisibilityMode() {
+        repository.save(hologram("spawn", 1, 64, 1, "line").withVisibility(Visibility.manual()));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.visibility().mode()).isEqualTo(Visibility.Mode.MANUAL);
+        assertThat(loaded.visibility().isManual()).isTrue();
+        assertThat(loaded.visibility().permission()).isNull();
+    }
+
+    @Test
+    void manualViewersStartEmptyAndRoundTripAddAndRemove() {
+        repository.save(hologram("spawn", 1, 64, 1, "line").withVisibility(Visibility.manual()));
+        UUID alice = UUID.randomUUID();
+        UUID bob = UUID.randomUUID();
+        HologramName spawn = HologramName.of("spawn");
+
+        assertThat(repository.manualViewers(spawn)).isEmpty();
+
+        repository.showTo(spawn, alice);
+        repository.showTo(spawn, bob);
+        assertThat(repository.manualViewers(spawn)).containsExactlyInAnyOrder(alice, bob);
+
+        // Idempotent: showing again does not duplicate.
+        repository.showTo(spawn, alice);
+        assertThat(repository.manualViewers(spawn)).containsExactlyInAnyOrder(alice, bob);
+
+        repository.hideFrom(spawn, alice);
+        assertThat(repository.manualViewers(spawn)).containsExactly(bob);
+
+        // Hiding an absent viewer is a no-op.
+        repository.hideFrom(spawn, alice);
+        assertThat(repository.manualViewers(spawn)).containsExactly(bob);
+    }
+
+    @Test
+    void deleteRemovesTheManualViewers() {
+        repository.save(hologram("spawn", 1, 64, 1, "line").withVisibility(Visibility.manual()));
+        HologramName spawn = HologramName.of("spawn");
+        repository.showTo(spawn, UUID.randomUUID());
+
+        repository.delete(spawn);
+
+        assertThat(repository.manualViewers(spawn)).isEmpty();
+        // A hologram re-created under the freed name starts with no viewers, proving no orphans.
+        repository.save(hologram("spawn", 1, 64, 1, "line").withVisibility(Visibility.manual()));
+        assertThat(repository.manualViewers(spawn)).isEmpty();
+    }
+
+    @Test
     void aRowWithNoVisibilityColumnsReadsBackAsEveryone() {
         // A pre-V36 row: insert the name row directly leaving every visibility column NULL, plus one line.
         Holograms holograms = Holograms.HOLOGRAMS;

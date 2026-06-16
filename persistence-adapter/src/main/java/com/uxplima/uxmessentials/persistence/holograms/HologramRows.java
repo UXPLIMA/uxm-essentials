@@ -115,9 +115,11 @@ final class HologramRows {
         int distance = intOr(row.get(HOLOGRAMS.VISIBILITY_DISTANCE), Visibility.UNLIMITED);
         // A pre-V36 row (NULL mode) — and a PERMISSION mode that somehow lost its node — both read back as
         // "visible to everyone", so a row never resolves to an invalid Visibility.
-        boolean permissionGated = "PERMISSION".equalsIgnoreCase(mode) && permission != null && !permission.isBlank();
-        if (permissionGated) {
+        if ("PERMISSION".equalsIgnoreCase(mode) && permission != null && !permission.isBlank()) {
             return new Visibility(Visibility.Mode.PERMISSION, permission, distance);
+        }
+        if ("MANUAL".equalsIgnoreCase(mode)) {
+            return new Visibility(Visibility.Mode.MANUAL, null, distance);
         }
         return new Visibility(Visibility.Mode.ALL, null, distance);
     }

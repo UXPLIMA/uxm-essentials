@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
@@ -68,6 +70,24 @@ public final class CachedHologramRepository implements HologramRepository {
         Objects.requireNonNull(name, "name");
         delegate.delete(name);
         cache.invalidate(ALL_KEY);
+    }
+
+    @Override
+    public Set<UUID> manualViewers(HologramName name) {
+        // The manual viewer set is a small side-table read only on render/join and mutated on show/hide; it is
+        // not part of the cached Hologram snapshot, so it passes straight through to keep the immediate
+        // show/hide path from ever serving a stale set.
+        return delegate.manualViewers(name);
+    }
+
+    @Override
+    public void showTo(HologramName name, UUID viewer) {
+        delegate.showTo(name, viewer);
+    }
+
+    @Override
+    public void hideFrom(HologramName name, UUID viewer) {
+        delegate.hideFrom(name, viewer);
     }
 
     /** Drop the cached set; call on a module reload. */

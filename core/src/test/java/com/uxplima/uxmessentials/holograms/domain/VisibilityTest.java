@@ -70,4 +70,37 @@ class VisibilityTest {
         assertThat(Visibility.clampDistance(10_000)).isEqualTo(Visibility.MAX_DISTANCE);
         assertThat(Visibility.clampDistance(64)).isEqualTo(64);
     }
+
+    @Test
+    void manualIsHiddenByDefaultWithNoNode() {
+        Visibility manual = Visibility.manual();
+
+        assertThat(manual.mode()).isEqualTo(Mode.MANUAL);
+        assertThat(manual.permission()).isNull();
+        assertThat(manual.distance()).isEqualTo(Visibility.UNLIMITED);
+        assertThat(manual.isManual()).isTrue();
+        assertThat(manual.isPermissionGated()).isFalse();
+    }
+
+    @Test
+    void manualModeRejectsANode() {
+        assertThatThrownBy(() -> new Visibility(Mode.MANUAL, "some.node", 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void toManualKeepsTheDistanceAndDropsAnyNode() {
+        Visibility manual = Visibility.restrictedTo("node.x").withDistance(48).toManual();
+
+        assertThat(manual.mode()).isEqualTo(Mode.MANUAL);
+        assertThat(manual.permission()).isNull();
+        assertThat(manual.distance()).isEqualTo(48);
+        assertThat(manual.isManual()).isTrue();
+    }
+
+    @Test
+    void allAndPermissionAreNotManual() {
+        assertThat(Visibility.everyone().isManual()).isFalse();
+        assertThat(Visibility.restrictedTo("node.x").isManual()).isFalse();
+    }
 }

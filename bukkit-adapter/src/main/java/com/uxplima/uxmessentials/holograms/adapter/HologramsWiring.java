@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
+import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
 import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
@@ -84,7 +85,8 @@ public final class HologramsWiring {
                 kernel.scheduler(),
                 kernel.log(),
                 kernel.permissions(),
-                PlaceholderApiSupport.globalBridge());
+                PlaceholderApiSupport.globalBridge(),
+                repository::manualViewers);
         HologramNotifier notifier = new HologramNotifier(kernel.messages(), kernel.messageSink());
         HologramServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
@@ -125,6 +127,7 @@ public final class HologramsWiring {
                 new SetHologramAppearance(repository, renderer, notifier),
                 new SetHologramRefresh(repository, renderer, notifier),
                 new SetHologramVisibility(repository, renderer, notifier),
+                new ManageHologramViewer(repository, renderer, notifier),
                 new SetHologramModel(repository, renderer, notifier));
     }
 

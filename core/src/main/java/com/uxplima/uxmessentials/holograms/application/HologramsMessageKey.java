@@ -64,6 +64,13 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_VISIBILITY_MODE_INVALID("hologram.visibility.mode-invalid"),
     HOLOGRAM_VISIBILITY_NEEDS_NODE("hologram.visibility.needs-node"),
 
+    // manual per-player visibility feedback
+    HOLOGRAM_SHOWN_TO("hologram.shown-to"),
+    HOLOGRAM_HIDDEN_FROM("hologram.hidden-from"),
+    HOLOGRAM_ALREADY_SHOWN("hologram.already-shown"),
+    HOLOGRAM_NOT_SHOWN("hologram.not-shown"),
+    HOLOGRAM_PLAYER_NOT_FOUND("hologram.player-not-found"),
+
     // listing
     HOLOGRAM_LIST_HEADER("hologram.list.header"),
     HOLOGRAM_LIST_ENTRY("hologram.list.entry"),

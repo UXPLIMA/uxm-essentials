@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.holograms.adapter.outbound;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
@@ -16,7 +17,8 @@ import org.junit.jupiter.api.Test;
  * Pins {@link HologramRenderer#maySee} — the per-player decision the renderer's allowed-viewer set is built
  * from. An {@code ALL} hologram is visible to everyone; a {@code PERMISSION} hologram is visible only to the
  * players the {@link Permissions} port says hold its node, so the restricted viewer set is exactly the
- * node-holders among the candidates.
+ * node-holders among the candidates; a {@code MANUAL} hologram is visible only to the players in its explicit
+ * shown-viewer set, hidden from everyone else.
  */
 class HologramVisibilityViewerTest {
 
@@ -28,8 +30,10 @@ class HologramVisibilityViewerTest {
     void everyoneSeesAnAllHologram() {
         Permissions noOne = grantingTo(null);
 
-        assertThat(HologramRenderer.maySee(noOne, Visibility.everyone(), VIP)).isTrue();
-        assertThat(HologramRenderer.maySee(noOne, Visibility.everyone(), PLAIN)).isTrue();
+        assertThat(HologramRenderer.maySee(noOne, Visibility.everyone(), VIP, Set.of()))
+                .isTrue();
+        assertThat(HologramRenderer.maySee(noOne, Visibility.everyone(), PLAIN, Set.of()))
+                .isTrue();
     }
 
     @Test
@@ -37,8 +41,8 @@ class HologramVisibilityViewerTest {
         Permissions onlyVip = grantingTo(VIP);
         Visibility gated = Visibility.restrictedTo(NODE);
 
-        assertThat(HologramRenderer.maySee(onlyVip, gated, VIP)).isTrue();
-        assertThat(HologramRenderer.maySee(onlyVip, gated, PLAIN)).isFalse();
+        assertThat(HologramRenderer.maySee(onlyVip, gated, VIP, Set.of())).isTrue();
+        assertThat(HologramRenderer.maySee(onlyVip, gated, PLAIN, Set.of())).isFalse();
     }
 
     @Test
@@ -47,10 +51,42 @@ class HologramVisibilityViewerTest {
         Visibility gated = Visibility.restrictedTo(NODE);
 
         List<PlayerRef> visible = List.of(VIP, PLAIN).stream()
-                .filter(who -> HologramRenderer.maySee(onlyVip, gated, who))
+                .filter(who -> HologramRenderer.maySee(onlyVip, gated, who, Set.of()))
                 .toList();
 
         assertThat(visible).containsExactly(VIP);
+    }
+
+    @Test
+    void onlyTheManualViewerSetSeesAManualHologram() {
+        Permissions noOne = grantingTo(null);
+        Visibility manual = Visibility.manual();
+        Set<UUID> shown = Set.of(VIP.uuid());
+
+        assertThat(HologramRenderer.maySee(noOne, manual, VIP, shown)).isTrue();
+        assertThat(HologramRenderer.maySee(noOne, manual, PLAIN, shown)).isFalse();
+    }
+
+    @Test
+    void aManualHologramWithNoShownViewersIsHiddenFromEveryone() {
+        Permissions noOne = grantingTo(null);
+        Visibility manual = Visibility.manual();
+
+        assertThat(HologramRenderer.maySee(noOne, manual, VIP, Set.of())).isFalse();
+        assertThat(HologramRenderer.maySee(noOne, manual, PLAIN, Set.of())).isFalse();
+    }
+
+    @Test
+    void theManualViewerSetIsIgnoredForAllAndPermissionModes() {
+        Permissions onlyVip = grantingTo(VIP);
+        Set<UUID> shownPlain = Set.of(PLAIN.uuid());
+
+        // ALL: everyone sees it regardless of the manual set.
+        assertThat(HologramRenderer.maySee(onlyVip, Visibility.everyone(), PLAIN, shownPlain))
+                .isTrue();
+        // PERMISSION: the node decides, not the manual set — Plain is in the set but lacks the node.
+        assertThat(HologramRenderer.maySee(onlyVip, Visibility.restrictedTo(NODE), PLAIN, shownPlain))
+                .isFalse();
     }
 
     /** A {@link Permissions} fake that grants exactly the matching node to {@code holder} (everyone else: false). */

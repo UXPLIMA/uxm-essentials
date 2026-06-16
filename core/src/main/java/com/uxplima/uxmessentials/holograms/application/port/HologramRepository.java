@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.holograms.application.port;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -33,4 +35,17 @@ public interface HologramRepository {
 
     /** Remove the hologram under {@code name} and its lines; a no-op when no such row exists. */
     void delete(HologramName name);
+
+    /**
+     * The set of player uuids explicitly shown the {@link com.uxplima.uxmessentials.holograms.domain.Visibility.Mode#MANUAL}
+     * hologram under {@code name}, in stored order; empty when none is shown or no such hologram exists. Backs the
+     * renderer's MANUAL allowed-viewer set, queried per hologram on render and on join.
+     */
+    Set<UUID> manualViewers(HologramName name);
+
+    /** Add {@code viewer} to the manual viewer set of the hologram under {@code name}; idempotent. */
+    void showTo(HologramName name, UUID viewer);
+
+    /** Remove {@code viewer} from the manual viewer set of the hologram under {@code name}; a no-op when absent. */
+    void hideFrom(HologramName name, UUID viewer);
 }
