@@ -6,24 +6,19 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
-import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
-import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -79,23 +74,19 @@ import org.jspecify.annotations.NullMarked;
  * one online viewer the instant {@code /hologram show|hide} runs. {@link #recomputeVisibilityFor(Player)}
  * re-evaluates a single joiner so they pick up the permission-gated and manual holograms they qualify for
  * without waiting for a refresh tick. A finite {@link Visibility#distance()} maps onto the native display view
- * range — blocks divided by the vanilla {@value #VANILLA_VIEW_BLOCKS}-block tracking range, since the lib view
+ * range — blocks divided by the vanilla {@value HologramSpawns#VANILLA_VIEW_BLOCKS}-block tracking range, since the lib view
  * range is a multiplier — so the hologram culls beyond that radius; distance 0 leaves the appearance's own
  * view-range multiplier untouched.
  */
 @NullMarked
 public final class HologramRenderer implements HologramView {
 
-    /** The vanilla display entity tracking range in blocks at view-range multiplier 1.0. */
-    static final float VANILLA_VIEW_BLOCKS = 64.0f;
-
     private final Plugin plugin;
     private final HologramManager manager;
     private final Scheduler scheduler;
     private final Logger log;
-    private final Permissions permissions;
     private final UnaryOperator<String> placeholders;
-    private final Function<HologramName, Set<UUID>> manualViewers;
+    private final HologramViewers viewers;
     private final HologramTextOverrides textOverrides;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final Map<String, Tracked> live = new ConcurrentHashMap<>();
@@ -105,17 +96,15 @@ public final class HologramRenderer implements HologramView {
             HologramManager manager,
             Scheduler scheduler,
             Logger log,
-            Permissions permissions,
             UnaryOperator<String> placeholders,
-            Function<HologramName, Set<UUID>> manualViewers,
+            HologramViewers viewers,
             HologramTextOverrides textOverrides) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.manager = Objects.requireNonNull(manager, "manager");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
-        this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.placeholders = Objects.requireNonNull(placeholders, "placeholders");
-        this.manualViewers = Objects.requireNonNull(manualViewers, "manualViewers");
+        this.viewers = Objects.requireNonNull(viewers, "viewers");
         this.textOverrides = Objects.requireNonNull(textOverrides, "textOverrides");
     }
 
@@ -179,7 +168,7 @@ public final class HologramRenderer implements HologramView {
         for (Tracked tracked : live.values()) {
             Hologram hologram = tracked.hologram();
             Visibility visibility = hologram.visibility();
-            Set<UUID> shown = shownViewersFor(hologram);
+            Set<UUID> shown = viewers.shownViewersFor(hologram);
             boolean gated = visibility.isPermissionGated() || visibility.isManual();
             boolean perViewerText = textOverrides.hasPerViewerText(hologram)
                     && tracked.live().textEntityId() != RenderedHologram.NO_ENTITY;
@@ -192,13 +181,12 @@ public final class HologramRenderer implements HologramView {
 
     /** Apply a joiner's visibility (when gated) and their per-viewer text override (when they may see it). */
     private void applyJoiner(RenderedHologram live, Hologram hologram, Player joiner, Set<UUID> shown, boolean gated) {
-        Visibility visibility = hologram.visibility();
         if (gated) {
             // Showing/hiding the shared entity touches the hologram's own viewer set, so it stays on this
             // (the hologram's) region thread.
-            applyViewer(live, visibility, joiner, shown);
+            viewers.applyViewer(live, hologram.visibility(), joiner, shown);
         }
-        if (maySee(permissions, visibility, BukkitRefs.toRef(joiner), shown)
+        if (viewers.maySee(hologram, joiner, shown)
                 && textOverrides.hasPerViewerText(hologram)
                 && live.textEntityId() != RenderedHologram.NO_ENTITY) {
             dispatchPerViewerText(scheduler, textOverrides, List.of(joiner), live.textEntityId(), hologram);
@@ -236,12 +224,12 @@ public final class HologramRenderer implements HologramView {
             // different world from the new one, so it must not be removed inline on this region thread.
             scheduler.onRegion(previous.position(), () -> previous.live().removeFrom(manager));
         }
-        RenderedHologram spawned = spawnFor(hologram, at);
+        RenderedHologram spawned = HologramSpawns.spawnFor(manager, log, hologram, at, placeholders, miniMessage);
         if (spawned == null) {
             // Invalid item material or block data — already logged; leave nothing tracked rather than crash.
             return;
         }
-        applyVisibility(spawned, hologram);
+        viewers.applyOnSpawn(spawned, hologram);
         live.put(hologram.name().value(), new Tracked(spawned, hologram, hologram.location()));
         sendPerViewerText(spawned, hologram);
     }
@@ -256,17 +244,16 @@ public final class HologramRenderer implements HologramView {
         if (!textOverrides.hasPerViewerText(hologram) || spawned.textEntityId() == RenderedHologram.NO_ENTITY) {
             return;
         }
-        dispatchPerViewerText(scheduler, textOverrides, eligibleViewers(hologram), spawned.textEntityId(), hologram);
+        dispatchPerViewerText(scheduler, textOverrides, viewers.eligible(hologram), spawned.textEntityId(), hologram);
     }
 
     /**
      * Hop each viewer's per-viewer text resolve onto <em>that viewer's</em> entity thread before resolving and
      * sending the override. Resolving a player-relative {@code %papi%} token reads the viewer's live entity
      * state, which under Folia is only safe to touch from the entity's owning thread — never the hologram's
-     * region thread the spawn/refresh runs on, where a viewer may sit in a different region or world. This
-     * mirrors the scoreboard and tablist render loops, which {@code onEntity}-hop per viewer for the same
-     * reason. Pure of any spawn or live-entity read, so the dispatch is unit-testable with a recording
-     * scheduler and fake viewers.
+     * region thread the spawn/refresh runs on, where a viewer may sit in a different region or world (the same
+     * rule the scoreboard and tablist render loops follow). Pure of any spawn or live-entity read, so it is
+     * unit-testable with a recording scheduler and fake viewers.
      */
     static void dispatchPerViewerText(
             Scheduler scheduler,
@@ -279,113 +266,12 @@ public final class HologramRenderer implements HologramView {
         }
     }
 
-    /** The online players who may currently see {@code hologram} under its visibility — the override audience. */
-    private List<Player> eligibleViewers(Hologram hologram) {
-        Visibility visibility = hologram.visibility();
-        Set<UUID> shown = shownViewersFor(hologram);
-        List<Player> eligible = new java.util.ArrayList<>();
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            if (maySee(permissions, visibility, BukkitRefs.toRef(online), shown)) {
-                eligible.add(online);
-            }
-        }
-        return eligible;
-    }
-
-    /**
-     * Spawn the live entity for {@code hologram} by its type: a text hologram from the configured builder, an
-     * item hologram from the resolved {@code Material}, a block hologram from the parsed BlockData. An ITEM with
-     * an unknown material or a BLOCK with an unparseable BlockData string is failed soft — logged and skipped
-     * (returns {@code null}) rather than throwing, so one bad value never breaks the render of the others.
-     */
-    private @org.jspecify.annotations.Nullable RenderedHologram spawnFor(Hologram hologram, Location at) {
-        return switch (hologram.type()) {
-            case TEXT -> RenderedHologram.ofText(manager.spawn(builderFor(hologram, placeholders, miniMessage), at));
-            case ITEM -> spawnItem(hologram, at);
-            case BLOCK -> spawnBlock(hologram, at);
-        };
-    }
-
-    private @org.jspecify.annotations.Nullable RenderedHologram spawnItem(Hologram hologram, Location at) {
-        ItemStack item = HologramModels.itemOf(hologram.itemMaterial());
-        if (item == null) {
-            log.warn(
-                    "skipping item hologram {} — unknown material {}",
-                    hologram.name().value(),
-                    String.valueOf(hologram.itemMaterial()));
-            return null;
-        }
-        Holograms.ItemBuilder builder = Holograms.item(item);
-        HologramAppearances.applyDisplay(builder, hologram.appearance());
-        applyRotation(builder, hologram);
-        return RenderedHologram.ofModel(manager.spawn(builder, at));
-    }
-
-    private @org.jspecify.annotations.Nullable RenderedHologram spawnBlock(Hologram hologram, Location at) {
-        BlockData block = HologramModels.blockOf(hologram.blockData());
-        if (block == null) {
-            log.warn(
-                    "skipping block hologram {} — invalid block data {}",
-                    hologram.name().value(),
-                    String.valueOf(hologram.blockData()));
-            return null;
-        }
-        Holograms.BlockBuilder builder = Holograms.block(block);
-        HologramAppearances.applyDisplay(builder, hologram.appearance());
-        applyRotation(builder, hologram);
-        return RenderedHologram.ofModel(manager.spawn(builder, at));
-    }
-
-    /**
-     * Apply a stored {@link Rotation} to a model (item/block) builder when it is non-zero. Only visible with a
-     * FIXED billboard — applied regardless, so the operator sets the billboard separately as on the text path.
-     */
-    private static void applyRotation(Holograms.ModelBuilder<?> builder, Hologram hologram) {
-        Rotation rotation = hologram.rotation();
-        if (rotation.isRotated()) {
-            builder.rotation(rotation.yaw(), rotation.pitch());
-        }
-    }
-
-    /**
-     * Apply {@code visibility} to a freshly spawned entity on its own region thread. {@code ALL} keeps the
-     * entity visible by default (no work). {@code PERMISSION} and {@code MANUAL} restrict it to an explicit
-     * viewer set, then show it to each online player who qualifies (a node-holder, or a member of the manual
-     * shown set) — so a non-qualifier never sees it and a qualifier sees it at once.
-     */
-    private void applyVisibility(RenderedHologram spawned, Hologram hologram) {
-        Visibility visibility = hologram.visibility();
-        if (!visibility.isPermissionGated() && !visibility.isManual()) {
-            return;
-        }
-        Set<UUID> shown = shownViewersFor(hologram);
-        spawned.restrictToViewers();
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            applyViewer(spawned, visibility, online, shown);
-        }
-    }
-
-    /** The manual shown-viewer set for a MANUAL hologram, queried lazily; empty for any other mode. */
-    private Set<UUID> shownViewersFor(Hologram hologram) {
-        if (!hologram.visibility().isManual()) {
-            return Set.of();
-        }
-        return manualViewers.apply(hologram.name());
-    }
-
-    private void applyViewer(RenderedHologram spawned, Visibility visibility, Player viewer, Set<UUID> shown) {
-        if (maySee(permissions, visibility, BukkitRefs.toRef(viewer), shown)) {
-            spawned.show(plugin, viewer);
-        } else {
-            spawned.hide(plugin, viewer);
-        }
-    }
-
     /**
      * Whether {@code who} may see a hologram with this {@code visibility}: everyone for {@code ALL}, only a
      * holder of the gating node for {@code PERMISSION}, and only a member of {@code shownViewers} for
      * {@code MANUAL}. Pure (the {@code Permissions} call aside), so the gated and manual viewer sets are
-     * unit-testable with a fake {@code Permissions} and an explicit shown set.
+     * unit-testable with a fake {@code Permissions} and an explicit shown set; the visibility collaborator and
+     * tests reach it here.
      */
     static boolean maySee(Permissions permissions, Visibility visibility, PlayerRef who, Set<UUID> shownViewers) {
         if (visibility.isManual()) {
@@ -398,31 +284,10 @@ public final class HologramRenderer implements HologramView {
         return node != null && permissions.has(who, node);
     }
 
-    /**
-     * Build the configured uxmLib builder for {@code hologram}: each line's MiniMessage source run through
-     * {@code placeholders} before it is deserialised, the appearance applied, and a finite visibility distance
-     * mapped onto the native view range. Pure (no world, no entity), so the placeholder resolution, appearance
-     * mapping and distance-to-view-range mapping are unit-testable through {@code builder.spec()}.
-     */
+    /** The pure model-to-builder mapping, kept reachable here so the builder mapping stays unit-testable. */
     static Holograms.Builder builderFor(
             Hologram hologram, UnaryOperator<String> placeholders, MiniMessage miniMessage) {
-        Holograms.Builder builder = Holograms.builder();
-        for (HologramLine line : hologram.lines()) {
-            builder.line(miniMessage.deserialize(placeholders.apply(line.value())));
-        }
-        HologramAppearances.apply(builder, hologram.appearance());
-        Rotation rotation = hologram.rotation();
-        if (rotation.isRotated()) {
-            // Only visible with a FIXED billboard; applied regardless so the operator sets the billboard separately.
-            builder.rotation(rotation.yaw(), rotation.pitch());
-        }
-        Visibility visibility = hologram.visibility();
-        if (visibility.hasDistanceLimit()) {
-            // The lib view range is a multiplier on the vanilla tracking range, so a block radius maps to
-            // blocks / 64; this overrides the appearance's own view-range multiplier when a distance is set.
-            builder.viewRange(visibility.distance() / VANILLA_VIEW_BLOCKS);
-        }
-        return builder;
+        return HologramSpawns.builderFor(hologram, placeholders, miniMessage);
     }
 
     /**

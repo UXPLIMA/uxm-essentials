@@ -1,174 +1,73 @@
 package com.uxplima.uxmessentials.npc.adapter.inbound.command;
 
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-
-import org.bukkit.Bukkit;
-import org.bukkit.Material;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.BoolArgumentType;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.suggestion.Suggestions;
-import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
-import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
-import com.uxplima.uxmessentials.npc.adapter.outbound.NpcTypeData;
-import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
-import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
-import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.packet.npc.NpcPose;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
- * {@code /npc <create|delete|list|movehere|skin|type|command|lookatplayer|equip|glow|pose|scale|action|data>}:
- * the single operator command for NPCs. Each subcommand maps its arguments to one use-case call; {@code create} and
- * {@code movehere} read the operator's current position, {@code create} defaults the skin to the operator's own
- * skin (lifted from their Bukkit profile, or skinless when unavailable), {@code skin} accepts {@code
- * texture:<value>[:<sig>]} (raw, no fetch), {@code player:<online-name>}, {@code name:<username>} (any account,
- * online or offline, fetched from Mojang off-thread), or {@code url:<image-url>} (a signed skin generated from a
- * custom image through MineSkin off-thread) and applies only to a fake player, {@code type <ENTITY_TYPE>} changes
- * which living entity the NPC renders as ({@code PLAYER} or any living mob), {@code lookatplayer} toggles whether
- * the NPC turns to face nearby players, {@code equip <slot> <material|hand|air>} dresses one slot (a Material
- * name, the held item, or {@code air}/{@code none} to clear it), {@code glow <true|false> [color]} toggles the
- * glowing outline and its colour, {@code pose <pose>} freezes the NPC in a body pose ({@code standing},
- * {@code sitting}, {@code sleeping}, …), {@code scale <n>} resizes it ({@code 1.0} is the natural size, clamped to
- * the protocol's usable range), and {@code action <add|list|remove|clear>} edits the ordered click-action chain
- * (a trigger word left/right/any, a type word, and the rest of the line as the value). The type word is one of
- * the effects ({@code console}, {@code player}, {@code message}, {@code actionbar}, {@code title}, {@code sound},
- * {@code connect}, {@code give}), the sequencer's {@code delay}, or a gate ({@code chance}, {@code permission},
- * {@code condition}, {@code cost}); the cheap value shapes (a numeric delay/chance/cost, a known give material)
- * are validated at add time, while the gates and text effects accept any value. The base {@code
- * uxmessentials.npc.admin} node guards the whole command.
+ * {@code /npc <create|delete|list|movehere|command|lookatplayer|skin|type|equip|glow|pose|scale|action|data>}:
+ * the single operator command for NPCs. The root keeps the lifecycle subcommands — {@code create} (reads the
+ * operator's position and defaults the skin to their own Bukkit profile, or skinless when unavailable),
+ * {@code delete}, {@code list}, {@code movehere} (reads the operator's position), {@code command} (the bound
+ * click command), and {@code lookatplayer} (whether the NPC turns to face nearby players) — and attaches the skin
+ * (name/player/url/texture), appearance (type/equip/glow/pose/scale), data (set/clear/list) and action
+ * (add/list/remove/clear) sub-handlers under the one {@code /npc} literal, each contributing argument nodes
+ * rather than a new literal. The base {@code uxmessentials.npc.admin} node guards the whole command.
  */
 @NullMarked
-public final class NpcCommand implements CommandRegistration {
+public final class NpcCommand extends NpcCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.npc.admin";
-    private static final String PLAYER_PREFIX = "player:";
-    private static final String NAME_PREFIX = "name:";
-    private static final String URL_PREFIX = "url:";
-    private static final String TEXTURE_PREFIX = "texture:";
-    private static final String HAND_KEYWORD = "hand";
-    /**
-     * The skin-spec prefixes suggested for {@code /npc skin}: {@code name:} fetches any account by username,
-     * {@code url:} generates a signed skin from a custom image URL, {@code player:} copies an online player, and
-     * {@code texture:} sets a raw base64 value (with an optional {@code :signature}).
-     */
-    private static final List<String> SKIN_PREFIXES = List.of(NAME_PREFIX, URL_PREFIX, PLAYER_PREFIX, TEXTURE_PREFIX);
-    /** The accepted {@code action add} trigger words, also the tab suggestions. */
-    private static final List<String> TRIGGER_WORDS = List.of("left", "right", "any");
-    /** The accepted {@code action add} type words, also the tab suggestions. */
-    private static final List<String> TYPE_WORDS = List.of(
-            "console",
-            "player",
-            "message",
-            "actionbar",
-            "title",
-            "sound",
-            "connect",
-            "delay",
-            "chance",
-            "permission",
-            "condition",
-            "cost",
-            "give");
-    /** The accepted {@code data set}/{@code data clear} keys, also the tab suggestions. */
-    private static final List<String> DATA_KEYS =
-            List.of("baby", "size", "charged", "villager_type", "villager_profession", "villager_level");
-    /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
-    private static final List<String> BOOLEAN_VALUES = List.of("true", "false");
-    /** The smallest accepted scale — the lower bound of the protocol's usable {@code generic.scale} range. */
-    private static final double MIN_SCALE = 0.0625;
-    /** The largest accepted scale — the upper bound of the protocol's usable {@code generic.scale} range. */
-    private static final double MAX_SCALE = 16.0;
-    /** A sentinel the equip handler returns instead of a material when the word named no known item material. */
-    private static final String INVALID_MATERIAL = "invalid-material";
 
-    private final NpcServices services;
-    private final NpcSkinByName skinByName;
-    private final CommandFeedback feedback;
+    private final NpcSkinCommands skinCommands;
+    private final NpcAppearanceCommands appearanceCommands;
+    private final NpcDataCommands dataCommands;
+    private final NpcActionCommands actionCommands;
 
     public NpcCommand(NpcServices services, NpcSkinByName skinByName, Messages messages) {
-        this.services = Objects.requireNonNull(services, "services");
-        this.skinByName = Objects.requireNonNull(skinByName, "skinByName");
-        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        super(services, messages);
+        this.skinCommands = new NpcSkinCommands(services, skinByName, messages);
+        this.appearanceCommands = new NpcAppearanceCommands(services, messages);
+        this.dataCommands = new NpcDataCommands(services, messages);
+        this.actionCommands = new NpcActionCommands(services, messages);
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        return Commands.literal("npc")
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("npc")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(name("create", this::create))
                 .then(name("delete", this::delete))
                 .then(Commands.literal("list").executes(this::list))
                 .then(name("movehere", this::move))
-                .then(skinNode())
-                .then(typeNode())
                 .then(greedy("command", this::command))
                 .then(lookAtPlayerNode())
-                .then(equipNode())
-                .then(glowNode())
-                .then(poseNode())
-                .then(scaleNode())
-                .then(actionNode())
-                .then(dataNode())
-                .build();
+                .then(skinCommands.node())
+                .then(dataCommands.node())
+                .then(actionCommands.node());
+        for (LiteralArgumentBuilder<CommandSourceStack> appearance : appearanceCommands.nodes()) {
+            root.then(appearance);
+        }
+        return root.build();
     }
 
     @Override
     public String description() {
         return "Create and manage fake-player NPCs.";
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
-        return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word()).executes(action));
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> greedy(String literal, Command<CommandSourceStack> action) {
-        return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("value", StringArgumentType.greedyString())
-                                .executes(action)));
-    }
-
-    /** Like {@link #greedy} for {@code skin}, but suggesting the {@code name:}/{@code url:}/{@code player:}/{@code texture:} prefixes. */
-    private LiteralArgumentBuilder<CommandSourceStack> skinNode() {
-        return Commands.literal("skin")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("value", StringArgumentType.greedyString())
-                                .suggests(this::suggestSkinPrefixes)
-                                .executes(this::skin)));
     }
 
     private int create(CommandContext<CommandSourceStack> ctx) {
@@ -208,37 +107,6 @@ public final class NpcCommand implements CommandRegistration {
         return Command.SINGLE_SUCCESS;
     }
 
-    private int skin(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        String spec = value(ctx);
-        if (spec.regionMatches(true, 0, NAME_PREFIX, 0, NAME_PREFIX.length())) {
-            // The username path resolves off-thread (a Mojang round-trip), so it dispatches its own async flow
-            // and reports success straight away rather than blocking the command thread on the lookup.
-            skinByName.apply(
-                    ref(sender),
-                    nameArg(ctx),
-                    spec.substring(NAME_PREFIX.length()).strip());
-            return Command.SINGLE_SUCCESS;
-        }
-        if (spec.regionMatches(true, 0, URL_PREFIX, 0, URL_PREFIX.length())) {
-            // The image-URL path generates off-thread through MineSkin, the same fire-and-forget async shape.
-            skinByName.applyFromUrl(
-                    ref(sender),
-                    nameArg(ctx),
-                    spec.substring(URL_PREFIX.length()).strip());
-            return Command.SINGLE_SUCCESS;
-        }
-        NpcSkin skin = resolveSkin(sender, spec);
-        if (skin == null) {
-            return 0; // the unresolvable-skin feedback was already sent
-        }
-        services.skin().setSkin(ref(sender), nameArg(ctx), skin);
-        return Command.SINGLE_SUCCESS;
-    }
-
     private int command(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
@@ -246,64 +114,6 @@ public final class NpcCommand implements CommandRegistration {
         }
         services.command().setCommand(ref(sender), nameArg(ctx), value(ctx));
         return Command.SINGLE_SUCCESS;
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> typeNode() {
-        return Commands.literal("type")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("type", StringArgumentType.word())
-                                .suggests(this::suggestEntityTypes)
-                                .executes(this::type)));
-    }
-
-    private int type(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        String word = ctx.getArgument("type", String.class);
-        EntityType entityType = parseLivingType(word);
-        if (entityType == null) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, Map.of("type", word));
-            return 0;
-        }
-        services.type().setEntityType(ref(sender), nameArg(ctx), entityType.name());
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private CompletableFuture<Suggestions> suggestEntityTypes(
-            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
-        String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
-        for (EntityType type : EntityType.values()) {
-            if (isLiving(type) && type.name().toLowerCase(Locale.ROOT).startsWith(prefix)) {
-                builder.suggest(type.name());
-            }
-        }
-        return builder.buildFuture();
-    }
-
-    /**
-     * Parse the type word case-insensitively to a Bukkit {@link EntityType}, accepting it only when it is a living
-     * type an NPC can render as ({@code PLAYER} or a living-entity class). Returns {@code null} for an unknown or
-     * non-living type so the caller reports {@link NpcMessageKey#NPC_INVALID_ENTITY_TYPE}.
-     */
-    private static @Nullable EntityType parseLivingType(String word) {
-        EntityType type;
-        try {
-            type = EntityType.valueOf(word.strip().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException unknown) {
-            return null;
-        }
-        return isLiving(type) ? type : null;
-    }
-
-    /** Whether an NPC may render as {@code type}: a fake player, or any entity whose class is a living entity. */
-    private static boolean isLiving(EntityType type) {
-        if (type == EntityType.PLAYER) {
-            return true;
-        }
-        Class<?> entityClass = type.getEntityClass();
-        return entityClass != null && LivingEntity.class.isAssignableFrom(entityClass);
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> lookAtPlayerNode() {
@@ -320,439 +130,5 @@ public final class NpcCommand implements CommandRegistration {
         }
         services.look().setLookAtPlayer(ref(sender), nameArg(ctx), ctx.getArgument("value", Boolean.class));
         return Command.SINGLE_SUCCESS;
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> equipNode() {
-        return Commands.literal("equip")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("slot", StringArgumentType.word())
-                                .then(Commands.argument("material", StringArgumentType.word())
-                                        .executes(this::equip))));
-    }
-
-    private int equip(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        Optional<EquipmentSlot> slot = EquipmentSlot.parse(ctx.getArgument("slot", String.class));
-        if (slot.isEmpty()) {
-            feedback.send(
-                    sender, NpcMessageKey.NPC_INVALID_SLOT, Map.of("slot", ctx.getArgument("slot", String.class)));
-            return 0;
-        }
-        String material = resolveMaterial(sender, ctx.getArgument("material", String.class));
-        if (INVALID_MATERIAL.equals(material)) {
-            return 0; // the invalid-material feedback was already sent
-        }
-        services.equip().setEquipment(ref(sender), nameArg(ctx), slot.get(), material);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> glowNode() {
-        return Commands.literal("glow")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(this::glow)
-                                .then(Commands.argument("color", StringArgumentType.word())
-                                        .executes(this::glow))));
-    }
-
-    private int glow(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        boolean glowing = ctx.getArgument("value", Boolean.class);
-        String color = colorArg(ctx);
-        if (glowing && color != null && !isKnownColor(color)) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_COLOR, Map.of("color", color));
-            return 0;
-        }
-        services.glow().setGlowing(ref(sender), nameArg(ctx), glowing, color == null ? "" : color);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> poseNode() {
-        return Commands.literal("pose")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("pose", StringArgumentType.word())
-                                .suggests(this::suggestPoses)
-                                .executes(this::pose)));
-    }
-
-    private int pose(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        String word = ctx.getArgument("pose", String.class);
-        NpcPose pose = parsePose(word);
-        if (pose == null) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_POSE, Map.of("pose", word));
-            return 0;
-        }
-        services.pose().setPose(ref(sender), nameArg(ctx), pose.name());
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> scaleNode() {
-        return Commands.literal("scale")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("value", DoubleArgumentType.doubleArg())
-                                .executes(this::scale)));
-    }
-
-    private int scale(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        double value = ctx.getArgument("value", Double.class);
-        if (!Double.isFinite(value) || value < MIN_SCALE || value > MAX_SCALE) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_SCALE, Map.of("scale", Double.toString(value)));
-            return 0;
-        }
-        services.scale().setScale(ref(sender), nameArg(ctx), value);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    /** Parse the pose word case-insensitively to an {@link NpcPose}, or {@code null} when it names no known pose. */
-    private static @Nullable NpcPose parsePose(String word) {
-        try {
-            return NpcPose.valueOf(word.strip().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException unknown) {
-            return null;
-        }
-    }
-
-    private CompletableFuture<Suggestions> suggestPoses(
-            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
-        String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
-        for (NpcPose pose : NpcPose.values()) {
-            if (pose.name().toLowerCase(Locale.ROOT).startsWith(prefix)) {
-                builder.suggest(pose.name());
-            }
-        }
-        return builder.buildFuture();
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> actionNode() {
-        return Commands.literal("action")
-                .then(actionAddNode())
-                .then(Commands.literal("list")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::actionList)))
-                .then(Commands.literal("remove")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .then(Commands.argument("index", IntegerArgumentType.integer(1))
-                                        .executes(this::actionRemove))))
-                .then(Commands.literal("clear")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::actionClear)));
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> actionAddNode() {
-        return Commands.literal("add")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("trigger", StringArgumentType.word())
-                                .suggests(this::suggestTriggers)
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .suggests(this::suggestTypes)
-                                        .then(Commands.argument("value", StringArgumentType.greedyString())
-                                                .executes(this::actionAdd)))));
-    }
-
-    private int actionAdd(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        ClickTrigger trigger = parseTrigger(ctx.getArgument("trigger", String.class));
-        if (trigger == null) {
-            feedback.send(
-                    sender,
-                    NpcMessageKey.NPC_INVALID_TRIGGER,
-                    Map.of("trigger", ctx.getArgument("trigger", String.class)));
-            return 0;
-        }
-        String typeWord = ctx.getArgument("type", String.class);
-        NpcActionType type = NpcActionValueCheck.parseType(typeWord).orElse(null);
-        if (type == null) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_ACTION_TYPE, Map.of("type", typeWord));
-            return 0;
-        }
-        String value = value(ctx);
-        NpcActionValueCheck.Result check = NpcActionValueCheck.check(type, value);
-        if (check instanceof NpcActionValueCheck.Result.Invalid invalid) {
-            feedback.send(
-                    sender,
-                    NpcMessageKey.NPC_INVALID_ACTION_VALUE,
-                    Map.of("value", value, "type", typeWord.toLowerCase(Locale.ROOT), "hint", invalid.hint()));
-            return 0;
-        }
-        services.addAction().add(ref(sender), nameArg(ctx), new NpcAction(trigger, type, value));
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int actionList(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.listActions().list(ref(sender), nameArg(ctx));
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int actionRemove(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.removeAction().remove(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class));
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int actionClear(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.clearActions().clear(ref(sender), nameArg(ctx));
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> dataNode() {
-        return Commands.literal("data")
-                .then(Commands.literal("set")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .then(Commands.argument("key", StringArgumentType.word())
-                                        .suggests(this::suggestDataKeys)
-                                        .then(Commands.argument("value", StringArgumentType.greedyString())
-                                                .suggests(this::suggestDataValues)
-                                                .executes(this::dataSet)))))
-                .then(Commands.literal("clear")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .then(Commands.argument("key", StringArgumentType.word())
-                                        .suggests(this::suggestDataKeys)
-                                        .executes(this::dataClear))))
-                .then(Commands.literal("list")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::dataList)));
-    }
-
-    private int dataSet(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
-        String value = value(ctx);
-        if (!NpcTypeData.isKnownKey(key) || !NpcTypeData.isValidValue(key, value)) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_DATA, Map.of("key", key, "value", value));
-            return 0;
-        }
-        services.setData().set(ref(sender), nameArg(ctx), key, value);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int dataClear(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
-        if (!NpcTypeData.isKnownKey(key)) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_DATA, Map.of("key", key, "value", ""));
-            return 0;
-        }
-        services.setData().set(ref(sender), nameArg(ctx), key, null);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private int dataList(CommandContext<CommandSourceStack> ctx) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
-        services.listData().list(ref(sender), nameArg(ctx));
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private CompletableFuture<Suggestions> suggestDataKeys(
-            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
-        return suggest(builder, DATA_KEYS);
-    }
-
-    /** Suggest the boolean values for a {@code baby}/{@code charged} key; other keys take a free value. */
-    private CompletableFuture<Suggestions> suggestDataValues(
-            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
-        String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
-        if (key.equals("baby") || key.equals("charged")) {
-            return suggest(builder, BOOLEAN_VALUES);
-        }
-        return builder.buildFuture();
-    }
-
-    private CompletableFuture<Suggestions> suggestTriggers(
-            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
-        return suggest(builder, TRIGGER_WORDS);
-    }
-
-    private CompletableFuture<Suggestions> suggestTypes(
-            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
-        return suggest(builder, TYPE_WORDS);
-    }
-
-    private CompletableFuture<Suggestions> suggestSkinPrefixes(
-            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
-        return suggest(builder, SKIN_PREFIXES);
-    }
-
-    private static CompletableFuture<Suggestions> suggest(SuggestionsBuilder builder, List<String> words) {
-        String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
-        for (String word : words) {
-            if (word.startsWith(prefix)) {
-                builder.suggest(word);
-            }
-        }
-        return builder.buildFuture();
-    }
-
-    /** Map the operator's trigger word (left/right/any) to a {@link ClickTrigger}, or {@code null} when unknown. */
-    private static @Nullable ClickTrigger parseTrigger(String word) {
-        return switch (word.strip().toLowerCase(Locale.ROOT)) {
-            case "left" -> ClickTrigger.LEFT_CLICK;
-            case "right" -> ClickTrigger.RIGHT_CLICK;
-            case "any" -> ClickTrigger.ANY;
-            default -> null;
-        };
-    }
-
-    /**
-     * Resolve the equip word into the token to store: {@code air}/{@code none} clears the slot (empty string),
-     * {@code hand} captures the FULL item the sender holds — a single-quantity clone serialized with all its NBT
-     * (enchantments, name, lore, custom model data), or empty when their hand is empty — and any other word is a
-     * bare Material name (human-readable, resolved to a plain item at render). Returns the {@link #INVALID_MATERIAL}
-     * sentinel after sending feedback when the word names no known item material.
-     */
-    private String resolveMaterial(Player sender, String word) {
-        String normalized = word.strip().toLowerCase(Locale.ROOT);
-        if (normalized.equals("air") || normalized.equals("none")) {
-            return "";
-        }
-        if (normalized.equals(HAND_KEYWORD)) {
-            return handToken(sender);
-        }
-        Material material = Material.matchMaterial(word.strip());
-        if (material == null || !material.isItem()) {
-            feedback.send(sender, NpcMessageKey.NPC_INVALID_MATERIAL, Map.of("material", word));
-            return INVALID_MATERIAL;
-        }
-        return material.name();
-    }
-
-    /** Serialize the sender's full held item (one copy) into a stored token, or empty when the hand is empty. */
-    private static String handToken(Player sender) {
-        ItemStack hand = sender.getInventory().getItemInMainHand();
-        if (hand.getType().isAir()) {
-            return "";
-        }
-        ItemStack one = hand.clone();
-        one.setAmount(1); // an equipment slot shows a single item, never a stack count
-        return EquipmentPayloads.serialize(one);
-    }
-
-    private static boolean isKnownColor(String word) {
-        try {
-            com.uxplima.uxmlib.packet.npc.NamedColor.valueOf(word.strip().toUpperCase(Locale.ROOT));
-            return true;
-        } catch (IllegalArgumentException unknown) {
-            return false;
-        }
-    }
-
-    /**
-     * Parse the synchronous skin spec: {@code player:<online-name>} copies that online player's skin (feedback
-     * when they are offline or carry no skin), {@code texture:<value>[:<signature>]} (or a bare value) uses the
-     * raw strings directly with no fetch. Returns {@code null} after sending feedback when the spec cannot be
-     * resolved. The {@code name:}/{@code url:} async forms are dispatched by the caller before reaching here.
-     */
-    private @Nullable NpcSkin resolveSkin(Player sender, String spec) {
-        if (spec.regionMatches(true, 0, PLAYER_PREFIX, 0, PLAYER_PREFIX.length())) {
-            return skinFromPlayer(sender, spec.substring(PLAYER_PREFIX.length()).strip());
-        }
-        String raw = spec.regionMatches(true, 0, TEXTURE_PREFIX, 0, TEXTURE_PREFIX.length())
-                ? spec.substring(TEXTURE_PREFIX.length())
-                : spec;
-        return skinFromTexture(sender, raw.strip());
-    }
-
-    private @Nullable NpcSkin skinFromPlayer(Player sender, String targetName) {
-        Player target = Bukkit.getPlayerExact(targetName);
-        if (target == null) {
-            feedback.send(sender, NpcMessageKey.NPC_SKIN_PLAYER_OFFLINE, Map.of("player", targetName));
-            return null;
-        }
-        Optional<NpcSkin> skin = BukkitNpcSkins.of(target);
-        if (skin.isEmpty()) {
-            feedback.send(sender, NpcMessageKey.NPC_SKIN_UNAVAILABLE, Map.of("player", targetName));
-        }
-        return skin.orElse(null);
-    }
-
-    /**
-     * Set the skin from a raw {@code texture:<value>[:<signature>]} spec directly, no fetch. A blank value is
-     * rejected with {@link NpcMessageKey#NPC_SKIN_INVALID_TEXTURE}. A value with no signature is allowed — it
-     * renders on our packet NPC — but a one-line note recommends a signature, since a strict client may show an
-     * unsigned skin from another account as the default Steve/Alex.
-     */
-    private @Nullable NpcSkin skinFromTexture(Player sender, String raw) {
-        int separator = raw.indexOf(':');
-        String texture = separator < 0 ? raw : raw.substring(0, separator);
-        String signature = separator < 0 ? null : raw.substring(separator + 1);
-        if (texture.isBlank()) {
-            feedback.send(sender, NpcMessageKey.NPC_SKIN_INVALID_TEXTURE, Map.of("player", raw));
-            return null;
-        }
-        String resolvedSignature = (signature == null || signature.isBlank()) ? null : signature;
-        if (resolvedSignature == null) {
-            feedback.send(sender, NpcMessageKey.NPC_SKIN_UNSIGNED, Map.of());
-        }
-        return new NpcSkin(texture, resolvedSignature);
-    }
-
-    private @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
-        if (sender instanceof Player player) {
-            return player;
-        }
-        feedback.send(sender, NpcMessageKey.NPC_PLAYERS_ONLY, Map.of());
-        return null;
-    }
-
-    private static NpcName nameArg(CommandContext<CommandSourceStack> ctx) {
-        return NpcName.of(ctx.getArgument("name", String.class));
-    }
-
-    private static String value(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getArgument("value", String.class);
-    }
-
-    /** The optional {@code color} word for {@code /npc glow}, or {@code null} when the form omits it. */
-    private static @Nullable String colorArg(CommandContext<CommandSourceStack> ctx) {
-        try {
-            return ctx.getArgument("color", String.class);
-        } catch (IllegalArgumentException absent) {
-            return null;
-        }
-    }
-
-    private static PlayerRef ref(Player player) {
-        return BukkitRefs.toRef(player);
-    }
-
-    private static Position position(Player player) {
-        return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
     }
 }

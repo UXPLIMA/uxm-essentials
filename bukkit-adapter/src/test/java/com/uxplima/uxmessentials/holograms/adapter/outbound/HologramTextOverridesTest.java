@@ -27,10 +27,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins {@link HologramTextOverrides} — the collaborator that resolves a hologram's lines per viewer and sends a
- * text-override packet to each. A line with a {@code %...%} token marks the hologram as per-viewer; a static
- * hologram gets no override at all. Each eligible viewer's packet carries <em>their</em> resolved text (the
+ * text-override packet for one viewer. A line with a {@code %...%} token marks the hologram as per-viewer; a
+ * static hologram gets no override at all. Each viewer's packet carries <em>their</em> resolved text (the
  * injected bridge factory returns a viewer-specific transform), and one viewer's resolve throwing must not stop
- * the others. The packet sink and bridge factory are fakes, so no NMS and no PlaceholderAPI is needed.
+ * the renderer's loop over the others — exercised here by sending each viewer in turn through the per-viewer
+ * {@code sendOverride}, exactly as the renderer's per-viewer entity hop does. The packet sink and bridge factory
+ * are fakes, so no NMS and no PlaceholderAPI is needed.
  */
 class HologramTextOverridesTest {
 
@@ -65,7 +67,8 @@ class HologramTextOverridesTest {
                         BOB, source -> source.replace("%name%", "Bob"))));
         Hologram hologram = text("welcome", "hello %name%");
 
-        overrides.sendOverrides(List.of(player(ALICE), player(BOB)), ENTITY_ID, hologram);
+        overrides.sendOverride(player(ALICE), ENTITY_ID, hologram);
+        overrides.sendOverride(player(BOB), ENTITY_ID, hologram);
 
         assertThat(packets.sends).hasSize(2);
         assertThat(plain(packets.textFor(ALICE))).isEqualTo("hello Alice");
@@ -91,13 +94,13 @@ class HologramTextOverridesTest {
                 Hologram.STATIC,
                 Instant.EPOCH);
 
-        overrides.sendOverrides(List.of(player(ALICE)), ENTITY_ID, hologram);
+        overrides.sendOverride(player(ALICE), ENTITY_ID, hologram);
 
         assertThat(plain(packets.textFor(ALICE))).isEqualTo("top Alice\nbottom");
     }
 
     @Test
-    void oneViewersResolveThrowingDoesNotStopTheOthers() {
+    void oneViewersResolveThrowingIsSwallowedSoTheRendererLoopContinues() {
         FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
         UnaryOperator<String> blowsUp = source -> {
             throw new IllegalStateException("boom");
@@ -106,20 +109,21 @@ class HologramTextOverridesTest {
                 overrides(packets, perViewer(Map.of(ALICE, blowsUp, BOB, source -> source.replace("%name%", "Bob"))));
         Hologram hologram = text("welcome", "hello %name%");
 
-        overrides.sendOverrides(List.of(player(ALICE), player(BOB)), ENTITY_ID, hologram);
+        // The renderer hops each viewer onto their own thread and calls sendOverride per viewer; Alice's resolve
+        // throws and is swallowed (no send), so the next viewer's call still goes through.
+        overrides.sendOverride(player(ALICE), ENTITY_ID, hologram);
+        overrides.sendOverride(player(BOB), ENTITY_ID, hologram);
 
-        // Alice's resolve threw and was swallowed; Bob still got his override.
         assertThat(packets.sends).hasSize(1);
         assertThat(plain(packets.textFor(BOB))).isEqualTo("hello Bob");
     }
 
     @Test
-    void sendsNothingForAnEmptyViewerSet() {
+    void sendsNothingWhenNoViewerIsResolved() {
         FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
-        HologramTextOverrides overrides = overrides(packets, perViewer(Map.of()));
+        overrides(packets, perViewer(Map.of()));
 
-        overrides.sendOverrides(List.of(), ENTITY_ID, text("welcome", "hello %name%"));
-
+        // With no eligible viewer the renderer never calls sendOverride, so nothing leaves the sink.
         assertThat(packets.sends).isEmpty();
     }
 

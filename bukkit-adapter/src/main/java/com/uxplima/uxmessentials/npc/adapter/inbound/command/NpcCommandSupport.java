@@ -1,0 +1,101 @@
+package com.uxplima.uxmessentials.npc.adapter.inbound.command;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.uxplima.uxmessentials.npc.adapter.NpcServices;
+import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
+import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Shared collaborators and argument helpers the {@code /npc} command and its sub-handlers hold: the constructed
+ * {@link NpcServices} and a {@link CommandFeedback} over the {@link Messages} catalog (the latter for the
+ * players-only rejection a console may see, and the per-subcommand validation replies — all other player-facing
+ * feedback flows through the use cases' {@code MessageSink}). The root command and each sub-handler extend this
+ * so each stays focused on building its node and mapping arguments to use-case calls, while the single
+ * {@code /npc} literal stays intact (the sub-handlers contribute argument nodes under it, never a new literal).
+ */
+@NullMarked
+abstract class NpcCommandSupport {
+
+    final NpcServices services;
+    final CommandFeedback feedback;
+
+    NpcCommandSupport(NpcServices services, Messages messages) {
+        this.services = Objects.requireNonNull(services, "services");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+    }
+
+    /** A {@code <literal> <name>} subcommand mapping the name word to {@code action}. */
+    final LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
+        return Commands.literal(literal)
+                .then(Commands.argument("name", StringArgumentType.word()).executes(action));
+    }
+
+    /** A {@code <literal> <name> <value…>} subcommand whose value is the greedy rest of the line. */
+    final LiteralArgumentBuilder<CommandSourceStack> greedy(String literal, Command<CommandSourceStack> action) {
+        return Commands.literal(literal)
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                .executes(action)));
+    }
+
+    /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
+    final @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (sender instanceof Player player) {
+            return player;
+        }
+        feedback.send(sender, NpcMessageKey.NPC_PLAYERS_ONLY, Map.of());
+        return null;
+    }
+
+    static NpcName nameArg(CommandContext<CommandSourceStack> ctx) {
+        return NpcName.of(ctx.getArgument("name", String.class));
+    }
+
+    static String value(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getArgument("value", String.class);
+    }
+
+    static PlayerRef ref(Player player) {
+        return BukkitRefs.toRef(player);
+    }
+
+    static Position position(Player player) {
+        return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
+    }
+
+    /** Suggest the {@code words} that start with what the operator has typed, case-insensitively. */
+    static CompletableFuture<Suggestions> suggest(SuggestionsBuilder builder, List<String> words) {
+        String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
+        for (String word : words) {
+            if (word.startsWith(prefix)) {
+                builder.suggest(word);
+            }
+        }
+        return builder.buildFuture();
+    }
+}

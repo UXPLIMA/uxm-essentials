@@ -75,22 +75,11 @@ public final class HologramTextOverrides {
     }
 
     /**
-     * Send each viewer in {@code eligible} a text-override packet for the shared {@code entityId}, carrying that
-     * viewer's own resolved text. Each viewer is resolved and sent independently, so one viewer's resolve
-     * throwing is logged and skipped without stopping the rest. Caller-guaranteed to be invoked only for a
-     * hologram {@link #hasPerViewerText(Hologram) needs} per-viewer text.
-     */
-    void sendOverrides(Iterable<? extends Player> eligible, int entityId, Hologram hologram) {
-        Objects.requireNonNull(eligible, "eligible");
-        Objects.requireNonNull(hologram, "hologram");
-        for (Player viewer : eligible) {
-            sendOverride(viewer, entityId, hologram);
-        }
-    }
-
-    /**
-     * Send one viewer their text-override packet for the shared {@code entityId}. Fail-soft: a bridge or parse
-     * error for this viewer is logged and swallowed so a sibling-viewer loop continues.
+     * Send one viewer their text-override packet for the shared {@code entityId}, carrying that viewer's own
+     * resolved text. The renderer hops each eligible viewer onto their own entity thread and calls this once per
+     * viewer, so resolution stays per viewer. Fail-soft: a bridge or parse error for this viewer is logged and
+     * swallowed so the renderer's sibling-viewer loop continues. Caller-guaranteed to be invoked only for a
+     * hologram that {@link #hasPerViewerText(Hologram) needs} per-viewer text.
      */
     void sendOverride(Player viewer, int entityId, Hologram hologram) {
         Objects.requireNonNull(viewer, "viewer");

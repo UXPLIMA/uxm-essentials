@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTeleportAdapter;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTextOverrides;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramViewers;
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
 import com.uxplima.uxmessentials.holograms.application.CenterHologram;
 import com.uxplima.uxmessentials.holograms.application.CopyHologram;
@@ -90,14 +91,14 @@ public final class HologramsWiring {
         // collaborator below — each viewer sees their own resolved values over the one shared entity.
         HologramTextOverrides textOverrides = new HologramTextOverrides(
                 perViewerTextPackets(), PlaceholderApiSupport::messageBridge, MiniMessage.miniMessage(), kernel.log());
+        HologramViewers viewers = new HologramViewers(plugin, kernel.permissions(), repository::manualViewers);
         HologramRenderer renderer = new HologramRenderer(
                 plugin,
                 manager,
                 kernel.scheduler(),
                 kernel.log(),
-                kernel.permissions(),
                 PlaceholderApiSupport.globalBridge(),
-                repository::manualViewers,
+                viewers,
                 textOverrides);
         HologramNotifier notifier = new HologramNotifier(kernel.messages(), kernel.messageSink());
         HologramServices services = assemble(kernel, repository, renderer, notifier);
