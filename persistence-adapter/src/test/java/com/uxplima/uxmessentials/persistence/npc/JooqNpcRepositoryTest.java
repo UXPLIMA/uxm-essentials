@@ -139,6 +139,79 @@ class JooqNpcRepositoryTest {
     }
 
     @Test
+    void editingOneSlotPreservesAnotherSlotsLegacyGearAcrossTheV45Migration() {
+        // The risky lifecycle: a pre-V45 NPC has its mainhand in the legacy VARCHAR column only. Editing a
+        // DIFFERENT slot rewrites the whole row through the upsert, which moves mainhand's value into the new
+        // equip_mainhand_b64 column (a bare material name, no b64: prefix) and clears the legacy one. The mapper
+        // must still surface mainhand on the next load, so the unedited slot's gear is never lost on first save.
+        com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
+                com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
+        persistence.dsl().transaction(cfg -> org.jooq
+                .impl
+                .DSL
+                .using(cfg)
+                .insertInto(npc)
+                .set(npc.NAME, "veteran")
+                .set(npc.WORLD, WORLD.uid().toString())
+                .set(npc.WORLD_NAME, WORLD.name())
+                .set(npc.X, 0.0)
+                .set(npc.Y, 64.0)
+                .set(npc.Z, 0.0)
+                .set(npc.YAW, 0.0f)
+                .set(npc.PITCH, 0.0f)
+                .set(npc.LOOK_AT_PLAYER, (short) 1)
+                .set(npc.EQUIP_MAINHAND, "DIAMOND_SWORD")
+                .set(npc.GLOWING, (short) 0)
+                .set(npc.ENTITY_TYPE, "PLAYER")
+                .set(npc.CREATED_AT, 1_000L)
+                .execute());
+
+        Npc legacy = repository.find(NpcName.of("veteran")).orElseThrow();
+        repository.save(legacy.withEquipment(EquipmentSlot.OFFHAND, "SHIELD"));
+        Npc reloaded = repository.find(NpcName.of("veteran")).orElseThrow();
+
+        assertThat(reloaded.equipment())
+                .containsEntry(EquipmentSlot.MAINHAND, "DIAMOND_SWORD")
+                .containsEntry(EquipmentSlot.OFFHAND, "SHIELD")
+                .hasSize(2);
+    }
+
+    @Test
+    void clearingASlotWipesBothColumnsSoNoStaleGearResurfaces() {
+        // Clearing a slot must null both the legacy VARCHAR and the new TEXT column. Seed a row carrying a legacy
+        // head value, clear that slot, and confirm it stays empty on reload — a stale value in either column would
+        // resurface through the new-then-legacy read.
+        com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
+                com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
+        persistence.dsl().transaction(cfg -> org.jooq
+                .impl
+                .DSL
+                .using(cfg)
+                .insertInto(npc)
+                .set(npc.NAME, "molting")
+                .set(npc.WORLD, WORLD.uid().toString())
+                .set(npc.WORLD_NAME, WORLD.name())
+                .set(npc.X, 0.0)
+                .set(npc.Y, 64.0)
+                .set(npc.Z, 0.0)
+                .set(npc.YAW, 0.0f)
+                .set(npc.PITCH, 0.0f)
+                .set(npc.LOOK_AT_PLAYER, (short) 1)
+                .set(npc.EQUIP_HEAD, "DIAMOND_HELMET")
+                .set(npc.GLOWING, (short) 0)
+                .set(npc.ENTITY_TYPE, "PLAYER")
+                .set(npc.CREATED_AT, 1_000L)
+                .execute());
+
+        Npc seeded = repository.find(NpcName.of("molting")).orElseThrow();
+        repository.save(seeded.withEquipment(EquipmentSlot.HEAD, null));
+        Npc reloaded = repository.find(NpcName.of("molting")).orElseThrow();
+
+        assertThat(reloaded.equipment()).doesNotContainKey(EquipmentSlot.HEAD);
+        assertThat(reloaded.equipment()).isEmpty();
+    }
+
+    @Test
     void defaultsEquipmentEmptyAndGlowOffForACreatedNpc() {
         repository.save(
                 Npc.create(NpcName.of("bare"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
