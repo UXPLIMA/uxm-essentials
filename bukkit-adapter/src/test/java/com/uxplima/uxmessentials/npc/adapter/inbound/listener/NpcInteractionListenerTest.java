@@ -339,6 +339,21 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object zombieBaby(int entityId, boolean baby) {
+            return new Object();
+        }
+
+        @Override
+        public Object piglinBaby(int entityId, boolean baby) {
+            return new Object();
+        }
+
+        @Override
+        public Object zoglinBaby(int entityId, boolean baby) {
+            return new Object();
+        }
+
+        @Override
         public Object villagerData(int entityId, String type, String profession, int level) {
             return new Object();
         }

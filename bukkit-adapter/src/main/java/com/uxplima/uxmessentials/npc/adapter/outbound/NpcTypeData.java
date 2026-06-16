@@ -2,8 +2,9 @@ package com.uxplima.uxmessentials.npc.adapter.outbound;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
-import org.bukkit.entity.Ageable;
+import org.bukkit.entity.Breedable;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Slime;
@@ -20,9 +21,14 @@ import org.jspecify.annotations.Nullable;
  * field. This is the per-type support map kept out of {@link NpcViewSpawner}: the spawner sends pose/scale/glow,
  * this sends the type-specific data ({@code baby}, {@code size}, {@code charged}, {@code villager_*}).
  *
- * <p>The correctness invariant is that a metadata value is never sent for an entity type that has no such field —
- * a baby flag goes only to an ageable mob, a size only to a slime/magma cube, charged only to a creeper, the
- * villager data only to a villager — so a wrong index never lands on an unrelated field. Each property is
+ * <p>The correctness invariant is that a metadata value is never sent for an entity type that has no such field,
+ * and never through an accessor whose data index differs for that type — a size only to a slime/magma cube,
+ * charged only to a creeper, the villager data only to a villager. The baby flag is the subtle one: the breeding
+ * animals, the villager line, and the hoglin are real {@code AgeableMob} subclasses and take the {@code baby}
+ * packet, but the zombie line, piglins, and zoglins extend {@code Monster} and carry their baby flag at a
+ * different data index, so each routes to its own packet ({@code zombieBaby}/{@code piglinBaby}/{@code
+ * zoglinBaby}); a piglin brute and every non-ageable type get no baby packet at all. This keeps a wrong index
+ * from ever landing on an unrelated field. Each property is
  * fail-soft: an unsupported key for the type is skipped, an unparseable value is skipped, and nothing throws on
  * the render thread (the same discipline as the pose/equipment fail-soft path). A skipped property logs at debug
  * with context so a misconfiguration is diagnosable without flooding the per-tick reconcile.
@@ -41,12 +47,25 @@ public final class NpcTypeData {
     private static final String DEFAULT_VILLAGER_TYPE = "plains";
     /** The default villager profession when a villager NPC sets a type/level but no explicit profession. */
     private static final String DEFAULT_VILLAGER_PROFESSION = "none";
-    /** The default villager badge level (the lowest tier) when none is set. */
+    /** The default villager badge level (the lowest tier) when none is set; also the lowest the client renders. */
     private static final int DEFAULT_VILLAGER_LEVEL = 1;
+    /** The highest villager badge tier the client renders; a higher value would not map to a real badge. */
+    private static final int MAX_VILLAGER_LEVEL = 5;
     /** The lower bound of a usable slime size. */
     private static final int MIN_SIZE = 1;
     /** The upper bound a slime size is clamped to, so a hostile value cannot spawn an absurd render box. */
     private static final int MAX_SIZE = 16;
+
+    /**
+     * The zombie-line types: {@code Ageable} on the Bukkit side but {@code Monster} (not {@code AgeableMob}) on the
+     * server side, so their baby flag lives at {@code Zombie.DATA_BABY_ID}, a different index than the ageable one.
+     */
+    private static final Set<EntityType> ZOMBIE_FAMILY = Set.of(
+            EntityType.ZOMBIE,
+            EntityType.HUSK,
+            EntityType.DROWNED,
+            EntityType.ZOMBIE_VILLAGER,
+            EntityType.ZOMBIFIED_PIGLIN);
 
     private NpcTypeData() {}
 
@@ -77,11 +96,22 @@ public final class NpcTypeData {
         if (value == null) {
             return;
         }
-        if (!isAgeable(type)) {
-            skip(log, npc, KEY_BABY, type, "type is not ageable");
-            return;
+        boolean baby = Boolean.parseBoolean(value.strip());
+        // Route to the builder whose accessor index matches the type. The breeding-animal/villager/hoglin line are
+        // real AgeableMob subclasses (Bukkit Breedable); the zombie line, the piglin, and the zoglin extend Monster
+        // and carry their baby flag at their own index, so each takes its own packet. A piglin brute (Ageable but no
+        // baby form) and every non-ageable type get nothing — a baby value never reaches a wrong field.
+        if (isBreedable(type)) {
+            packets.send(viewer, packets.baby(id, baby));
+        } else if (ZOMBIE_FAMILY.contains(type)) {
+            packets.send(viewer, packets.zombieBaby(id, baby));
+        } else if (type == EntityType.PIGLIN) {
+            packets.send(viewer, packets.piglinBaby(id, baby));
+        } else if (type == EntityType.ZOGLIN) {
+            packets.send(viewer, packets.zoglinBaby(id, baby));
+        } else {
+            skip(log, npc, KEY_BABY, type, "type has no baby form at a known data index");
         }
-        packets.send(viewer, packets.baby(id, Boolean.parseBoolean(value.strip())));
     }
 
     private static void applySize(
@@ -126,9 +156,9 @@ public final class NpcTypeData {
         String villagerType = data.getOrDefault(KEY_VILLAGER_TYPE, DEFAULT_VILLAGER_TYPE);
         String profession = data.getOrDefault(KEY_VILLAGER_PROFESSION, DEFAULT_VILLAGER_PROFESSION);
         Integer level = parseInt(data.get(KEY_VILLAGER_LEVEL));
-        packets.send(
-                viewer,
-                packets.villagerData(id, villagerType, profession, level == null ? DEFAULT_VILLAGER_LEVEL : level));
+        int badge =
+                level == null ? DEFAULT_VILLAGER_LEVEL : Math.clamp(level, DEFAULT_VILLAGER_LEVEL, MAX_VILLAGER_LEVEL);
+        packets.send(viewer, packets.villagerData(id, villagerType, profession, badge));
     }
 
     /** Whether {@code key} is one this adapter knows how to apply — the set the command validates against. */
@@ -169,9 +199,16 @@ public final class NpcTypeData {
         return parsed != null && parsed > 0;
     }
 
-    private static boolean isAgeable(EntityType type) {
+    /**
+     * Whether {@code type} is a breeding mob — the Bukkit {@code Breedable} marker, which is exactly the set of
+     * server-side {@code AgeableMob} subclasses (the breeding animals, the villager line, the hoglin). Bukkit's
+     * wider {@code Ageable} also covers the zombie line, piglins, and zoglins, but those extend {@code Monster} and
+     * keep their baby flag at a different index, so {@code Breedable} is the precise gate for the {@code baby}
+     * packet.
+     */
+    private static boolean isBreedable(EntityType type) {
         Class<?> entityClass = type.getEntityClass();
-        return entityClass != null && Ageable.class.isAssignableFrom(entityClass);
+        return entityClass != null && Breedable.class.isAssignableFrom(entityClass);
     }
 
     private static boolean isSlime(EntityType type) {

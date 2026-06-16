@@ -428,6 +428,89 @@ class NpcRendererTest {
     }
 
     @Test
+    void sendsTheAgeableBabyToABreedingAnimal() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // A cow is a real AgeableMob, so it takes the shared AgeableMob baby packet and none of the monster-family
+        // variants.
+        renderer.render(npcAt(viewer, 1.0).withEntityType("COW").withTypeData("baby", "true"));
+
+        assertThat(packets.babies).hasSize(1);
+        assertThat(packets.babies.get(0).baby()).isTrue();
+        assertThat(packets.zombieBabies).isEmpty();
+        assertThat(packets.piglinBabies).isEmpty();
+        assertThat(packets.zoglinBabies).isEmpty();
+    }
+
+    @Test
+    void routesTheZombieLineBabyThroughTheZombieAccessorNotTheAgeableOne() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // Zombies extend Monster, not AgeableMob: their baby flag lives at a different data index, so it must go
+        // through zombieBaby. Sending the AgeableMob baby packet here would desync the client. Husk/drowned/zombie
+        // villager/zombified piglin share the zombie accessor.
+        for (String zombieType : new String[] {"ZOMBIE", "HUSK", "DROWNED", "ZOMBIE_VILLAGER", "ZOMBIFIED_PIGLIN"}) {
+            packets.babies.clear();
+            packets.zombieBabies.clear();
+
+            renderer.render(npcAt(viewer, 1.0).withEntityType(zombieType).withTypeData("baby", "true"));
+
+            assertThat(packets.babies)
+                    .as("no AgeableMob baby for %s", zombieType)
+                    .isEmpty();
+            assertThat(packets.zombieBabies)
+                    .as("zombie baby for %s", zombieType)
+                    .hasSize(1);
+            assertThat(packets.zombieBabies.get(0).baby()).isTrue();
+        }
+    }
+
+    @Test
+    void routesPiglinAndZoglinBabyThroughTheirOwnAccessors() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("PIGLIN").withTypeData("baby", "true"));
+        assertThat(packets.babies).isEmpty();
+        assertThat(packets.piglinBabies).hasSize(1);
+        assertThat(packets.piglinBabies.get(0).baby()).isTrue();
+
+        packets.babies.clear();
+        renderer.render(npcAt(viewer, 1.0).withEntityType("ZOGLIN").withTypeData("baby", "false"));
+        assertThat(packets.babies).isEmpty();
+        assertThat(packets.zoglinBabies).hasSize(1);
+        assertThat(packets.zoglinBabies.get(0).baby()).isFalse();
+    }
+
+    @Test
+    void doesNotSendBabyToAPiglinBruteWhichHasNoBabyForm() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // A piglin brute is Bukkit-Ageable but has no baby field on the server side at all, so it gets nothing.
+        renderer.render(npcAt(viewer, 1.0).withEntityType("PIGLIN_BRUTE").withTypeData("baby", "true"));
+
+        assertThat(packets.babies).isEmpty();
+        assertThat(packets.zombieBabies).isEmpty();
+        assertThat(packets.piglinBabies).isEmpty();
+        assertThat(packets.zoglinBabies).isEmpty();
+        assertThat(packets.spawnEntities).hasSize(1);
+    }
+
+    @Test
+    void clampsAnOversizedVillagerLevelToTheTopBadge() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("VILLAGER").withTypeData("villager_level", "99"));
+
+        assertThat(packets.villagerDatas).hasSize(1);
+        assertThat(packets.villagerDatas.get(0).level()).isEqualTo(5);
+    }
+
+    @Test
     void clampsAnOversizedSlimeSize() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -717,6 +800,9 @@ class NpcRendererTest {
         private final List<PoseSet> poses = new ArrayList<>();
         private final List<Scale> scales = new ArrayList<>();
         private final List<Baby> babies = new ArrayList<>();
+        private final List<ZombieBaby> zombieBabies = new ArrayList<>();
+        private final List<PiglinBaby> piglinBabies = new ArrayList<>();
+        private final List<ZoglinBaby> zoglinBabies = new ArrayList<>();
         private final List<SlimeSize> slimeSizes = new ArrayList<>();
         private final List<Charged> chargeds = new ArrayList<>();
         private final List<VillagerData> villagerDatas = new ArrayList<>();
@@ -824,6 +910,27 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object zombieBaby(int entityId, boolean baby) {
+            ZombieBaby packet = new ZombieBaby(entityId, baby);
+            zombieBabies.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object piglinBaby(int entityId, boolean baby) {
+            PiglinBaby packet = new PiglinBaby(entityId, baby);
+            piglinBabies.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object zoglinBaby(int entityId, boolean baby) {
+            ZoglinBaby packet = new ZoglinBaby(entityId, baby);
+            zoglinBabies.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object villagerData(int entityId, String type, String profession, int level) {
             VillagerData packet = new VillagerData(entityId, type, profession, level);
             villagerDatas.add(packet);
@@ -923,6 +1030,12 @@ class NpcRendererTest {
         private record Scale(int entityId, double scale) {}
 
         private record Baby(int entityId, boolean baby) {}
+
+        private record ZombieBaby(int entityId, boolean baby) {}
+
+        private record PiglinBaby(int entityId, boolean baby) {}
+
+        private record ZoglinBaby(int entityId, boolean baby) {}
 
         private record SlimeSize(int entityId, int size) {}
 
