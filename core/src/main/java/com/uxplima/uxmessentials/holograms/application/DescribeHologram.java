@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
+import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -82,12 +83,41 @@ public final class DescribeHologram {
                 viewer,
                 HologramsMessageKey.HOLOGRAM_INFO_BACKGROUND,
                 Map.of("background", appearance.hasBackground() ? argbHex(appearance.backgroundArgb()) : NO_OVERRIDE));
-        notifier.send(
-                viewer, HologramsMessageKey.HOLOGRAM_INFO_SCALE, Map.of("scale", Float.toString(appearance.scale())));
+        notifier.send(viewer, HologramsMessageKey.HOLOGRAM_INFO_SCALE, scale(appearance.transform()));
         notifier.send(
                 viewer,
                 HologramsMessageKey.HOLOGRAM_INFO_VIEW_RANGE,
                 Map.of("range", Float.toString(appearance.viewRange())));
+        notifier.send(
+                viewer,
+                HologramsMessageKey.HOLOGRAM_INFO_ALIGNMENT,
+                Map.of("alignment", appearance.alignment().name()));
+        notifier.send(
+                viewer,
+                HologramsMessageKey.HOLOGRAM_INFO_SEE_THROUGH,
+                Map.of("seethrough", Boolean.toString(appearance.seeThrough())));
+        notifier.send(viewer, HologramsMessageKey.HOLOGRAM_INFO_TRANSLATION, translation(appearance.transform()));
+        notifier.send(viewer, HologramsMessageKey.HOLOGRAM_INFO_SHADOW, shadow(appearance));
+    }
+
+    private static Map<String, String> scale(Transform transform) {
+        return Map.of(
+                "x", Float.toString(transform.scaleX()),
+                "y", Float.toString(transform.scaleY()),
+                "z", Float.toString(transform.scaleZ()));
+    }
+
+    private static Map<String, String> translation(Transform transform) {
+        return Map.of(
+                "x", Float.toString(transform.translationX()),
+                "y", Float.toString(transform.translationY()),
+                "z", Float.toString(transform.translationZ()));
+    }
+
+    private static Map<String, String> shadow(Appearance appearance) {
+        return Map.of(
+                "radius", appearance.hasShadowRadius() ? Float.toString(appearance.shadowRadius()) : NO_OVERRIDE,
+                "strength", appearance.hasShadowStrength() ? Float.toString(appearance.shadowStrength()) : NO_OVERRIDE);
     }
 
     private static Map<String, String> location(Position at) {

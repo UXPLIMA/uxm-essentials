@@ -1,17 +1,25 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -32,10 +40,35 @@ abstract class HologramCommandSupport {
     final Messages messages;
     final CommandFeedback feedback;
 
-    HologramCommandSupport(HologramServices services, Messages messages) {
+    /** A side-effect-free, non-blocking source of the current hologram names for tab-completion. */
+    private final Supplier<? extends Collection<String>> hologramNames;
+
+    HologramCommandSupport(
+            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
         this.services = Objects.requireNonNull(services, "services");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.hologramNames = Objects.requireNonNull(hologramNames, "hologramNames");
         this.feedback = new CommandFeedback(messages);
+    }
+
+    /**
+     * A single-word {@code name} argument pre-wired to complete against the current hologram names. The names
+     * are read from the in-memory hologram set on each keystroke, so the completion is allocation-light and
+     * never touches the database (the set is warm after the one load on enable).
+     */
+    final RequiredArgumentBuilder<CommandSourceStack, String> nameArgument(String literal) {
+        return Commands.argument(literal, StringArgumentType.word()).suggests(nameSuggestions());
+    }
+
+    /** The suggestion provider over the current hologram names, reusable for any {@code name} argument. */
+    final SuggestionProvider<CommandSourceStack> nameSuggestions() {
+        return CommandSuggestions.fromStrings(hologramNames);
+    }
+
+    /** A literal argument that completes against a fixed set of choices (enum values, booleans). */
+    static RequiredArgumentBuilder<CommandSourceStack, String> choiceArgument(String literal, List<String> choices) {
+        return Commands.argument(literal, StringArgumentType.word())
+                .suggests(CommandSuggestions.fromStrings(() -> choices));
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */

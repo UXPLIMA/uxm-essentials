@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -32,8 +34,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 final class HologramModelCommand extends HologramCommandSupport {
 
-    HologramModelCommand(HologramServices services, Messages messages) {
-        super(services, messages);
+    HologramModelCommand(
+            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
+        super(services, messages, hologramNames);
     }
 
     /** The {@code item} and {@code block} subcommand nodes the {@code /hologram} literal attaches. */
@@ -43,7 +46,7 @@ final class HologramModelCommand extends HologramCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> contentNode(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(Commands.argument("content", StringArgumentType.greedyString())
                                 .executes(action)));
     }

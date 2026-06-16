@@ -40,6 +40,10 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_INFO_VISIBILITY("hologram.info.visibility"),
     HOLOGRAM_INFO_REFRESH("hologram.info.refresh"),
     HOLOGRAM_INFO_ROTATION("hologram.info.rotation"),
+    HOLOGRAM_INFO_ALIGNMENT("hologram.info.alignment"),
+    HOLOGRAM_INFO_SEE_THROUGH("hologram.info.see-through"),
+    HOLOGRAM_INFO_TRANSLATION("hologram.info.translation"),
+    HOLOGRAM_INFO_SHADOW("hologram.info.shadow"),
 
     // nearby listing
     HOLOGRAM_NEARBY_HEADER("hologram.nearby.header"),
@@ -51,6 +55,7 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_REFRESH_SET("hologram.refresh.set"),
     HOLOGRAM_BILLBOARD_INVALID("hologram.billboard-invalid"),
     HOLOGRAM_BACKGROUND_INVALID("hologram.background-invalid"),
+    HOLOGRAM_ALIGNMENT_INVALID("hologram.alignment-invalid"),
 
     // item / block type feedback
     HOLOGRAM_ITEM_SET("hologram.item.set"),

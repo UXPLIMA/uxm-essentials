@@ -81,6 +81,34 @@ class HologramRendererBuilderTest {
     }
 
     @Test
+    void mapsTheNewDisplayPropertiesOntoTheBuilder() {
+        Appearance styled = Appearance.defaults()
+                .withSeeThrough(true)
+                .withAlignment(com.uxplima.uxmessentials.holograms.domain.TextAlignment.LEFT)
+                .withShadowRadius(1.5f)
+                .withShadowStrength(0.8f)
+                .withScale(2f, 3f, 4f)
+                .withTranslation(0.5f, 1.0f, -0.5f);
+        Hologram hologram = hologram(styled, "props");
+
+        HologramSpec spec = HologramRenderer.builderFor(hologram, UnaryOperator.identity(), MINI_MESSAGE)
+                .spec();
+
+        com.uxplima.uxmlib.hologram.Appearance applied = spec.appearance();
+        assertThat(applied.seeThrough()).isTrue();
+        assertThat(applied.alignment()).isEqualTo(org.bukkit.entity.TextDisplay.TextAlignment.LEFT);
+        assertThat(applied.shadowRadius()).isEqualTo(1.5f);
+        assertThat(applied.shadowStrength()).isEqualTo(0.8f);
+        com.uxplima.uxmlib.hologram.Transform transform = java.util.Objects.requireNonNull(applied.transform());
+        assertThat(transform.scaleX()).isEqualTo(2f);
+        assertThat(transform.scaleY()).isEqualTo(3f);
+        assertThat(transform.scaleZ()).isEqualTo(4f);
+        assertThat(transform.transX()).isEqualTo(0.5f);
+        assertThat(transform.transY()).isEqualTo(1.0f);
+        assertThat(transform.transZ()).isEqualTo(-0.5f);
+    }
+
+    @Test
     void mapsAFiniteVisibilityDistanceOntoTheLibViewRange() {
         // 128 blocks over the vanilla 64-block tracking range is a view-range multiplier of 2.0.
         Hologram hologram = hologram(Appearance.defaults(), "gated")

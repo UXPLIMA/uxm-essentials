@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -43,8 +45,11 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 final class HologramVisibilityCommand extends HologramCommandSupport {
 
-    HologramVisibilityCommand(HologramServices services, Messages messages) {
-        super(services, messages);
+    private static final List<String> MODES = List.of("ALL", "PERMISSION", "MANUAL");
+
+    HologramVisibilityCommand(
+            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
+        super(services, messages, hologramNames);
     }
 
     /** The visibility subcommand nodes the {@code /hologram} literal attaches. */
@@ -54,20 +59,20 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> showNode() {
         return Commands.literal("show")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(CommandSuggestions.playerArgument("player").executes(this::show)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> hideNode() {
         return Commands.literal("hide")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(CommandSuggestions.playerArgument("player").executes(this::hide)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> visibilityNode() {
         return Commands.literal("visibility")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("mode", StringArgumentType.word())
+                .then(nameArgument("name")
+                        .then(choiceArgument("mode", MODES)
                                 .executes(this::visibility)
                                 .then(Commands.argument("permission", StringArgumentType.word())
                                         .executes(this::visibility))));
@@ -75,7 +80,7 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> visibilityDistanceNode() {
         return Commands.literal("visibilitydistance")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(Commands.argument("blocks", IntegerArgumentType.integer(0))
                                 .executes(this::visibilityDistance)));
     }

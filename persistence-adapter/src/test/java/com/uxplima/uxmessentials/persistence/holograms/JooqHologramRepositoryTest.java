@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
+import com.uxplima.uxmessentials.holograms.domain.TextAlignment;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.persistence.jooq.tables.HologramLines;
 import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
@@ -128,6 +129,67 @@ class JooqHologramRepositoryTest {
 
         assertThat(loaded.appearance()).isEqualTo(styled);
         assertThat(loaded.refreshIntervalTicks()).isEqualTo(40);
+    }
+
+    @Test
+    void roundTripsTheNewDisplayProperties() {
+        Appearance styled = Appearance.defaults()
+                .withSeeThrough(true)
+                .withAlignment(TextAlignment.LEFT)
+                .withShadowRadius(1.5f)
+                .withShadowStrength(0.8f)
+                .withScale(2f, 3f, 4f)
+                .withTranslation(0.5f, 1.0f, -0.5f);
+        repository.save(hologram("spawn", 1, 64, 1, "line").withAppearance(styled));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.appearance()).isEqualTo(styled);
+        assertThat(loaded.appearance().alignment()).isEqualTo(TextAlignment.LEFT);
+        assertThat(loaded.appearance().seeThrough()).isTrue();
+        assertThat(loaded.appearance().transform().scaleY()).isEqualTo(3f);
+        assertThat(loaded.appearance().transform().translationX()).isEqualTo(0.5f);
+        assertThat(loaded.appearance().shadowRadius()).isEqualTo(1.5f);
+        assertThat(loaded.appearance().shadowStrength()).isEqualTo(0.8f);
+    }
+
+    @Test
+    void aPreV48UniformScaleRowReadsBackUniformOnEveryAxis() {
+        // A pre-V48 row carries the V35 uniform `scale` only (scale_y/z, translation, alignment, see-through,
+        // shadow columns NULL): insert it directly and prove the per-axis scale reads back uniform.
+        Holograms holograms = Holograms.HOLOGRAMS;
+        HologramLines lines = HologramLines.HOLOGRAM_LINES;
+        persistence.dsl().transaction(config -> {
+            config.dsl()
+                    .insertInto(holograms)
+                    .set(holograms.NAME, "legacy")
+                    .set(holograms.WORLD, WORLD.uid().toString())
+                    .set(holograms.WORLD_NAME, "world")
+                    .set(holograms.X, 0.0)
+                    .set(holograms.Y, 64.0)
+                    .set(holograms.Z, 0.0)
+                    .set(holograms.YAW, 0.0f)
+                    .set(holograms.PITCH, 0.0f)
+                    .set(holograms.CREATED_AT, 1_000L)
+                    .set(holograms.SCALE, 2.5f)
+                    .execute();
+            config.dsl()
+                    .insertInto(lines)
+                    .set(lines.HOLOGRAM, "legacy")
+                    .set(lines.IDX, 0)
+                    .set(lines.TEXT, "line")
+                    .execute();
+        });
+
+        Hologram loaded = repository.find(HologramName.of("legacy")).orElseThrow();
+
+        assertThat(loaded.appearance().transform().scaleX()).isEqualTo(2.5f);
+        assertThat(loaded.appearance().transform().scaleY()).isEqualTo(2.5f);
+        assertThat(loaded.appearance().transform().scaleZ()).isEqualTo(2.5f);
+        assertThat(loaded.appearance().transform().isUniformScale()).isTrue();
+        assertThat(loaded.appearance().alignment()).isEqualTo(TextAlignment.CENTER);
+        assertThat(loaded.appearance().seeThrough()).isFalse();
+        assertThat(loaded.appearance().hasShadowRadius()).isFalse();
     }
 
     @Test

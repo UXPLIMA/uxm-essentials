@@ -107,7 +107,13 @@ public final class HologramsWiring {
         // refresh tick; this listener re-evaluates only the gated holograms for that one player.
         plugin.getServer().getPluginManager().registerEvents(new HologramVisibilityListener(renderer), plugin);
         AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer);
-        return new Wired(HologramCommands.all(services, kernel.messages()), renderer, repository, refreshTask);
+        // The cached repository's all() is the authoritative in-memory set after the one warm load, so reading
+        // names off it per keystroke is allocation-light and never touches the database — safe on the tick thread.
+        java.util.function.Supplier<java.util.List<String>> hologramNames = () -> repository.all().stream()
+                .map(hologram -> hologram.name().value())
+                .toList();
+        return new Wired(
+                HologramCommands.all(services, kernel.messages(), hologramNames), renderer, repository, refreshTask);
     }
 
     /**

@@ -12,6 +12,8 @@ import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramType;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
+import com.uxplima.uxmessentials.holograms.domain.TextAlignment;
+import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.HologramsRecord;
@@ -86,6 +88,15 @@ final class HologramRows {
                 .setBrightnessBlock(brightnessColumn(appearance.brightnessBlock()))
                 .setBrightnessSky(brightnessColumn(appearance.brightnessSky()))
                 .setScale(appearance.scale())
+                .setScaleY(appearance.transform().scaleY())
+                .setScaleZ(appearance.transform().scaleZ())
+                .setTranslationX(appearance.transform().translationX())
+                .setTranslationY(appearance.transform().translationY())
+                .setTranslationZ(appearance.transform().translationZ())
+                .setSeeThrough((short) (appearance.seeThrough() ? 1 : 0))
+                .setTextAlignment(appearance.alignment().name())
+                .setShadowRadius(shadowColumn(appearance.shadowRadius()))
+                .setShadowStrength(shadowColumn(appearance.shadowStrength()))
                 .setLineWidth(appearance.lineWidth())
                 .setViewRange(appearance.viewRange())
                 .setVisibilityMode(visibility.mode().name())
@@ -98,15 +109,46 @@ final class HologramRows {
 
     private static Appearance appearanceOf(Record row) {
         Appearance defaults = Appearance.defaults();
+        // The V35 uniform scale is the X axis and the per-axis fallback: a pre-V48 row (NULL scale_y/z) reads
+        // back as a uniform scale, so an existing scaled hologram keeps its size on every axis.
+        float scaleX = floatOr(row.get(HOLOGRAMS.SCALE), defaults.scale());
+        Transform transform = new Transform(
+                floatOr(row.get(HOLOGRAMS.TRANSLATION_X), 0f),
+                floatOr(row.get(HOLOGRAMS.TRANSLATION_Y), 0f),
+                floatOr(row.get(HOLOGRAMS.TRANSLATION_Z), 0f),
+                scaleX,
+                floatOr(row.get(HOLOGRAMS.SCALE_Y), scaleX),
+                floatOr(row.get(HOLOGRAMS.SCALE_Z), scaleX));
         return new Appearance(
                 billboardOf(row.get(HOLOGRAMS.BILLBOARD)),
                 intOr(row.get(HOLOGRAMS.BACKGROUND_ARGB), Appearance.DEFAULT_BACKGROUND),
                 shadowOf(row.get(HOLOGRAMS.TEXT_SHADOW)),
                 brightnessOf(row.get(HOLOGRAMS.BRIGHTNESS_BLOCK)),
                 brightnessOf(row.get(HOLOGRAMS.BRIGHTNESS_SKY)),
-                floatOr(row.get(HOLOGRAMS.SCALE), defaults.scale()),
+                transform,
                 intOr(row.get(HOLOGRAMS.LINE_WIDTH), defaults.lineWidth()),
-                floatOr(row.get(HOLOGRAMS.VIEW_RANGE), defaults.viewRange()));
+                floatOr(row.get(HOLOGRAMS.VIEW_RANGE), defaults.viewRange()),
+                shadowOf(row.get(HOLOGRAMS.SEE_THROUGH)),
+                alignmentOf(row.get(HOLOGRAMS.TEXT_ALIGNMENT)),
+                shadowValueOf(row.get(HOLOGRAMS.SHADOW_RADIUS)),
+                shadowValueOf(row.get(HOLOGRAMS.SHADOW_STRENGTH)));
+    }
+
+    private static TextAlignment alignmentOf(@Nullable String stored) {
+        // A pre-V48 row (NULL alignment) — and any unknown token — reads back as CENTER, so a row never resolves
+        // to an invalid alignment and an existing hologram keeps its centred lines.
+        if (stored == null) {
+            return TextAlignment.CENTER;
+        }
+        return TextAlignment.parse(stored).orElse(TextAlignment.CENTER);
+    }
+
+    private static float shadowValueOf(@Nullable Float stored) {
+        return stored == null ? Appearance.DEFAULT_SHADOW : stored;
+    }
+
+    private static @Nullable Float shadowColumn(float shadow) {
+        return Appearance.isDefaultShadow(shadow) ? null : shadow;
     }
 
     private static Visibility visibilityOf(Record row) {

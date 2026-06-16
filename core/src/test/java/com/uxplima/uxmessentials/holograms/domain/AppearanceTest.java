@@ -20,6 +20,12 @@ class AppearanceTest {
         assertThat(defaults.hasBrightness()).isFalse();
         assertThat(defaults.backgroundArgb()).isEqualTo(Appearance.DEFAULT_BACKGROUND);
         assertThat(defaults.brightnessBlock()).isEqualTo(Appearance.DEFAULT_BRIGHTNESS);
+        assertThat(defaults.seeThrough()).isFalse();
+        assertThat(defaults.alignment()).isEqualTo(TextAlignment.CENTER);
+        assertThat(defaults.hasShadowRadius()).isFalse();
+        assertThat(defaults.hasShadowStrength()).isFalse();
+        assertThat(defaults.transform()).isEqualTo(Transform.DEFAULT);
+        assertThat(defaults.transform().isUniformScale()).isTrue();
     }
 
     @Test
@@ -46,8 +52,65 @@ class AppearanceTest {
     }
 
     @Test
+    void newDisplayPropertiesRoundTripAndKeepOtherFields() {
+        Appearance styled = Appearance.defaults()
+                .withSeeThrough(true)
+                .withAlignment(TextAlignment.LEFT)
+                .withShadowRadius(1.5f)
+                .withShadowStrength(0.8f)
+                .withScale(2f, 3f, 4f)
+                .withTranslation(0.5f, 1f, -0.5f);
+
+        assertThat(styled.seeThrough()).isTrue();
+        assertThat(styled.alignment()).isEqualTo(TextAlignment.LEFT);
+        assertThat(styled.shadowRadius()).isEqualTo(1.5f);
+        assertThat(styled.shadowStrength()).isEqualTo(0.8f);
+        assertThat(styled.hasShadowRadius()).isTrue();
+        assertThat(styled.hasShadowStrength()).isTrue();
+        assertThat(styled.transform().scaleX()).isEqualTo(2f);
+        assertThat(styled.transform().scaleY()).isEqualTo(3f);
+        assertThat(styled.transform().scaleZ()).isEqualTo(4f);
+        assertThat(styled.transform().isUniformScale()).isFalse();
+        assertThat(styled.transform().translationX()).isEqualTo(0.5f);
+        assertThat(styled.transform().translationY()).isEqualTo(1f);
+        assertThat(styled.transform().translationZ()).isEqualTo(-0.5f);
+        // The legacy uniform scale() accessor reports the X axis, preserving the SCALE column semantics.
+        assertThat(styled.scale()).isEqualTo(2f);
+    }
+
+    @Test
+    void uniformScaleKeepsEveryAxisEqualAndTranslation() {
+        Appearance styled = Appearance.defaults().withTranslation(0f, 2f, 0f).withScale(1.5f);
+
+        assertThat(styled.transform().scaleX()).isEqualTo(1.5f);
+        assertThat(styled.transform().scaleY()).isEqualTo(1.5f);
+        assertThat(styled.transform().scaleZ()).isEqualTo(1.5f);
+        // A uniform scale change keeps an earlier translation.
+        assertThat(styled.transform().translationY()).isEqualTo(2f);
+    }
+
+    @Test
     void rejectsAnOutOfRangeScale() {
         assertThatThrownBy(() -> Appearance.defaults().withScale(0.0f)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsAnOutOfRangePerAxisScale() {
+        assertThatThrownBy(() -> Appearance.defaults().withScale(2f, 1000f, 1f))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsAnOutOfRangeShadow() {
+        assertThatThrownBy(() -> Appearance.defaults().withShadowRadius(1000f))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void alignmentParsesCaseInsensitivelyAndRejectsUnknown() {
+        assertThat(TextAlignment.parse("left")).contains(TextAlignment.LEFT);
+        assertThat(TextAlignment.parse("CENTER")).contains(TextAlignment.CENTER);
+        assertThat(TextAlignment.parse("justified")).isEmpty();
     }
 
     @Test
@@ -62,6 +125,10 @@ class AppearanceTest {
         assertThat(Appearance.clampScale(0.0f)).isGreaterThan(0.0f);
         assertThat(Appearance.clampLineWidth(0)).isGreaterThanOrEqualTo(1);
         assertThat(Appearance.clampViewRange(-5.0f)).isGreaterThanOrEqualTo(0.0f);
+        assertThat(Appearance.clampShadow(1000.0f)).isLessThanOrEqualTo(100.0f);
+        assertThat(Appearance.clampShadow(-5.0f)).isGreaterThanOrEqualTo(0.0f);
+        assertThat(Appearance.clampTranslation(10_000.0f)).isLessThanOrEqualTo(256.0f);
+        assertThat(Appearance.clampTranslation(-10_000.0f)).isGreaterThanOrEqualTo(-256.0f);
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -18,8 +20,12 @@ public final class HologramCommands {
 
     private HologramCommands() {}
 
-    /** Every holograms command (one: {@code /hologram}). */
-    public static List<CommandRegistration> all(HologramServices services, Messages messages) {
-        return List.of(new HologramCommand(services, messages));
+    /**
+     * Every holograms command (one: {@code /hologram}). {@code hologramNames} is a side-effect-free, non-blocking
+     * source of the current hologram names used to tab-complete every {@code name} argument across the surface.
+     */
+    public static List<CommandRegistration> all(
+            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
+        return List.of(new HologramCommand(services, messages, hologramNames));
     }
 }

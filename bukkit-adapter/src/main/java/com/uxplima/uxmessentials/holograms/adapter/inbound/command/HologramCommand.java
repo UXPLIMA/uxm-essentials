@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
+import java.util.Collection;
+import java.util.function.Supplier;
+
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -30,8 +33,12 @@ public final class HologramCommand extends HologramCommandSupport implements Com
 
     private static final String PERMISSION = "uxmessentials.hologram.use";
 
-    public HologramCommand(HologramServices services, Messages messages) {
-        super(services, messages);
+    private final Supplier<? extends Collection<String>> hologramNames;
+
+    public HologramCommand(
+            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
+        super(services, messages, hologramNames);
+        this.hologramNames = hologramNames;
     }
 
     @Override
@@ -46,18 +53,19 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 .then(indexNode("removeline", this::removeLine))
                 .then(name("movehere", this::move));
         for (LiteralArgumentBuilder<CommandSourceStack> styling :
-                new HologramAppearanceCommand(services, messages).nodes()) {
+                new HologramAppearanceCommand(services, messages, hologramNames).nodes()) {
             root.then(styling);
         }
         for (LiteralArgumentBuilder<CommandSourceStack> visibility :
-                new HologramVisibilityCommand(services, messages).nodes()) {
+                new HologramVisibilityCommand(services, messages, hologramNames).nodes()) {
             root.then(visibility);
         }
-        for (LiteralArgumentBuilder<CommandSourceStack> model : new HologramModelCommand(services, messages).nodes()) {
+        for (LiteralArgumentBuilder<CommandSourceStack> model :
+                new HologramModelCommand(services, messages, hologramNames).nodes()) {
             root.then(model);
         }
         for (LiteralArgumentBuilder<CommandSourceStack> convenience :
-                new HologramConvenienceCommand(services, messages).nodes()) {
+                new HologramConvenienceCommand(services, messages, hologramNames).nodes()) {
             root.then(convenience);
         }
         return root.build();
@@ -69,6 +77,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> createNode() {
+        // The create name is a brand-new name, so it deliberately does not complete against the existing set.
         return Commands.literal("create")
                 .then(Commands.argument("name", StringArgumentType.word())
                         .then(Commands.argument("text", StringArgumentType.greedyString())
@@ -77,14 +86,14 @@ public final class HologramCommand extends HologramCommandSupport implements Com
 
     private LiteralArgumentBuilder<CommandSourceStack> textNode(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(Commands.argument("text", StringArgumentType.greedyString())
                                 .executes(action)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> setLineNode() {
         return Commands.literal("setline")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(Commands.argument("index", IntegerArgumentType.integer(1))
                                 .then(Commands.argument("text", StringArgumentType.greedyString())
                                         .executes(this::setLine))));
@@ -92,14 +101,13 @@ public final class HologramCommand extends HologramCommandSupport implements Com
 
     private LiteralArgumentBuilder<CommandSourceStack> indexNode(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(Commands.argument("index", IntegerArgumentType.integer(1))
                                 .executes(action)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
-        return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word()).executes(action));
+        return Commands.literal(literal).then(nameArgument("name").executes(action));
     }
 
     private int create(CommandContext<CommandSourceStack> ctx) {

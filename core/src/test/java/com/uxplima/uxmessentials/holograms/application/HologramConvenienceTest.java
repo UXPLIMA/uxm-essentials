@@ -135,7 +135,11 @@ class HologramConvenienceTest {
                         "hologram.info.view-range",
                         "hologram.info.visibility",
                         "hologram.info.refresh",
-                        "hologram.info.rotation");
+                        "hologram.info.rotation",
+                        "hologram.info.alignment",
+                        "hologram.info.see-through",
+                        "hologram.info.translation",
+                        "hologram.info.shadow");
     }
 
     @Test

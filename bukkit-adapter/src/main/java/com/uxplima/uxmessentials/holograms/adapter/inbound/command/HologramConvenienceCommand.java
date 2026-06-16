@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
 
@@ -32,8 +34,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 final class HologramConvenienceCommand extends HologramCommandSupport {
 
-    HologramConvenienceCommand(HologramServices services, Messages messages) {
-        super(services, messages);
+    HologramConvenienceCommand(
+            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
+        super(services, messages, hologramNames);
     }
 
     /** The convenience subcommand nodes the {@code /hologram} literal attaches. */
@@ -49,8 +52,9 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> copyNode() {
+        // The source completes against the existing names; the destination is a brand-new name, so it does not.
         return Commands.literal("copy")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(Commands.argument("dest", StringArgumentType.word())
                                 .executes(this::copy)));
     }
@@ -64,7 +68,7 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> rotateNode() {
         return Commands.literal("rotate")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(Commands.argument("yaw", FloatArgumentType.floatArg())
                                 .executes(this::rotate)
                                 .then(Commands.argument("pitch", FloatArgumentType.floatArg())
@@ -73,15 +77,14 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> insertLineNode() {
         return Commands.literal("insertline")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument("name")
                         .then(Commands.argument("index", IntegerArgumentType.integer(1))
                                 .then(Commands.argument("text", StringArgumentType.greedyString())
                                         .executes(this::insertLine))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
-        return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word()).executes(action));
+        return Commands.literal(literal).then(nameArgument("name").executes(action));
     }
 
     private int copy(CommandContext<CommandSourceStack> ctx) {
