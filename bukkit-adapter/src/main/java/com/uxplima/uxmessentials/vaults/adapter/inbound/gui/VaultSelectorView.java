@@ -47,7 +47,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The owned-index load reads the database, so {@link #open} schedules it through {@link Scheduler#async} and
  * builds and opens the menu back on the viewer's entity thread (the Folia-safe async-load→entity-build idiom the
- * baltop and warp menus use). A click opens a live window, so it too runs on the viewer's entity thread.
+ * baltop and warp menus use). Clicking an owned icon reads that vault's contents, so the read runs off the click
+ * thread the same way and the window open bridges back to the viewer's entity thread.
  */
 @NullMarked
 public final class VaultSelectorView {
@@ -208,20 +209,25 @@ public final class VaultSelectorView {
     }
 
     /**
-     * Open the vault at {@code index} through the same use case the command drives, on the viewer's entity
-     * thread. The vault identity is the bound index, never re-read from the clicked icon. The selector stays
+     * Open the vault at {@code index} through the same use case the command drives. The vault identity is the
+     * bound index, never re-read from the clicked icon. The open reads the vault's contents from the database,
+     * so the read runs off the click (region) thread through {@link Scheduler#async}; the window open (and any
+     * rejection) bridges back to the viewer's entity thread, mirroring {@code /vault <n>}. The selector stays
      * open behind the vault window; closing the vault returns the player to wherever they were.
      */
     private void openVaultAt(Player player, PlayerRef viewer, PaginatedGui gui, int index) {
-        scheduler.onEntity(viewer, () -> {
+        scheduler.async(() -> {
             Result<Vault, VaultError> resolved = openVault.open(viewer, index);
             if (resolved.isErr()) {
-                reject(viewer, index, resolved.errorOrThrow());
+                scheduler.onEntity(viewer, () -> reject(viewer, index, resolved.errorOrThrow()));
                 return;
             }
-            gui.close(player);
-            view.open(player, viewer, viewer, resolved.orElseThrow());
-            notifier.opened(viewer, index);
+            Vault vault = resolved.orElseThrow();
+            scheduler.onEntity(viewer, () -> {
+                gui.close(player);
+                view.open(player, viewer, viewer, vault);
+                notifier.opened(viewer, index);
+            });
         });
     }
 
