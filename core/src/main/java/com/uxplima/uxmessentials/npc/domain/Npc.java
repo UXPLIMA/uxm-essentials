@@ -1,9 +1,6 @@
 package com.uxplima.uxmessentials.npc.domain;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -12,199 +9,150 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One server-wide fake-player NPC: a {@link NpcName}, the {@link Position} it stands at, an optional
- * {@link NpcSkin}, the optional command run when a player clicks it, and the moment it was created. An NPC is a
- * value object — moving it, re-skinning it, or rebinding its click command produces a new instance rather than
- * mutating in place, so the aggregate is always in a valid state and a repository save records a fully-formed
- * snapshot.
+ * One server-wide fake-player NPC: a {@link NpcName}, the {@link Position} it stands at, its visual
+ * {@link NpcAppearance} (skin, entity type, equipment, glow, pose, scale, type-data) and its interactive
+ * {@link NpcBehavior} (click command, look-at-player, action list), and the moment it was created. An NPC is a
+ * value object — moving it, re-skinning it, or rebinding its click produces a new instance rather than mutating in
+ * place, so the aggregate is always in a valid state and a repository save records a fully-formed snapshot.
  *
- * <p>The position carries its own {@link com.uxplima.uxmessentials.shared.domain.WorldRef}, so the NPC's world
- * is read from {@code location().world()} rather than held separately. A {@code null} skin renders the default
- * (Steve) fake player; a {@code null} click command means clicking the NPC does nothing. The click command is
- * stored as raw text here — running it on interaction is an adapter concern, so the domain only carries the
- * binding. {@code lookAtPlayer} controls whether the fake player rotates to face each nearby viewer; it defaults
- * to {@code true} so a freshly created NPC tracks players out of the box.
+ * <p>The visual and behavioural fields are grouped into the {@link NpcAppearance} and {@link NpcBehavior} value
+ * objects to keep this aggregate small; {@code Npc} exposes the same per-field transitions and accessors it always
+ * did ({@code withSkin}, {@code withEquipment}, {@code skin()}, {@code equipment()}, …) and simply delegates each to
+ * the owning value object. The legacy fourteen-argument constructor is retained so the persistence mapper and any
+ * caller that builds an NPC field-by-field are unaffected by the grouping.
  *
- * <p>{@code equipment} maps each worn {@link EquipmentSlot} to an opaque item <em>token</em> the domain stores
- * verbatim and never interprets — it is either a legacy Bukkit material name ({@code DIAMOND_HELMET}) or a
- * serialized full-item payload (a named/enchanted/custom item), and the adapter is the only place that resolves
- * a token to a real Bukkit item at render. Keeping the value a plain {@code String} is what keeps the aggregate
- * Bukkit-free even though the token may now carry a whole item's NBT. A slot absent from the map is empty.
- * {@code glowing} toggles the fake player's outline, and {@code glowColor} is the colour name ({@code RED}) the
- * outline is tinted, or {@code null} for the default white outline. The map is copied defensively on construction
- * so a stored snapshot is immutable.
- *
- * <p>{@code actions} is the ordered list of {@link NpcAction}s a click runs (the richer mechanism alongside the
- * single {@code clickCommand}, which still runs first). The list is copied defensively on construction so the
- * snapshot is immutable; {@code withActionAdded} / {@code withActionRemovedAt} / {@code withActionsCleared}
- * produce new instances, and every other transition preserves the actions unchanged.
- *
- * <p>{@code entityType} is the Bukkit {@code EntityType} <em>name</em> (uppercase, e.g. {@code "PLAYER"} or
- * {@code "VILLAGER"}) the NPC renders as — the default {@code "PLAYER"} keeps the fake-player path (tab entry +
- * skin), any other living type spawns that mob instead. It is a plain string so the domain stays Bukkit-free; the
- * adapter is the only place that resolves it to a real {@code EntityType} and decides whether the type is a valid
- * living one. The skin is kept across a type change, so flipping a mob back to {@code PLAYER} restores its skin.
- *
- * <p>{@code pose} is the body pose the NPC is frozen in — the uppercase pose name ({@code "STANDING"} by default,
- * or {@code "SITTING"}, {@code "SLEEPING"}, …). It is a plain string so the domain stays Bukkit-free: which pose
- * names are valid is resolved against the packet layer at render time, so an unknown name simply renders standing
- * rather than failing here. {@code scale} resizes the NPC ({@code 1.0} is the natural size; {@code 2.0} twice as
- * tall, {@code 0.5} half) and must be finite and positive; the command clamps it to the protocol's usable range.
- *
- * <p>{@code typeData} is the per-entity-type appearance metadata — a small map of plain-string key/value pairs
- * the domain stores verbatim and never interprets ({@code "baby" → "true"}, {@code "size" → "4"}, {@code
- * "villager_profession" → "librarian"}, …). Whether a given key applies to the NPC's {@code entityType}, and how
- * each value parses, is wholly the render adapter's concern; keeping both sides plain {@code String}s is what
- * keeps the aggregate Bukkit-free. A key whose value is {@code null} or blank is absent. The map is copied
- * defensively on construction so a stored snapshot is immutable; {@code withTypeData} produces a new instance,
- * and every other transition preserves the type data unchanged.
+ * <p>The position carries its own {@link com.uxplima.uxmessentials.shared.domain.WorldRef}, so the NPC's world is
+ * read from {@code location().world()} rather than held separately. {@code createdAt} is preserved across every
+ * transition (a move, re-skin, rebind, or appearance change).
  *
  * @param name the NPC's canonical, server-unique name
  * @param location where the NPC stands and which way it faces
- * @param skin the fake player's skin, or {@code null} for the default skin
- * @param clickCommand the command run when a player clicks the NPC, or {@code null} for no action
- * @param lookAtPlayer whether the NPC rotates to face each nearby viewer
- * @param equipment the worn items by slot as opaque tokens (a material name or a serialized item); absent = empty
- * @param glowing whether the fake player's outline glows
- * @param glowColor the glow outline colour name, or {@code null} for the default white outline
- * @param actions the ordered list of typed actions a click runs, after the single click command
- * @param entityType the uppercase Bukkit {@code EntityType} name the NPC renders as ({@code "PLAYER"} by default)
- * @param pose the uppercase pose name the NPC is frozen in ({@code "STANDING"} by default)
- * @param scale the NPC's size multiplier ({@code 1.0} is the natural size); finite and positive
- * @param typeData the per-entity-type appearance metadata as opaque key/value strings; absent key = unset
- * @param createdAt when the NPC was first created (preserved across a move, re-skin, or rebind)
+ * @param appearance the visual half: skin, entity type, equipment, glow, pose, scale, type-data
+ * @param behavior the interactive half: click command, look-at-player, action list
+ * @param createdAt when the NPC was first created (preserved across every transition)
  */
-public record Npc(
-        NpcName name,
-        Position location,
-        @Nullable NpcSkin skin,
-        @Nullable String clickCommand,
-        boolean lookAtPlayer,
-        Map<EquipmentSlot, String> equipment,
-        boolean glowing,
-        @Nullable String glowColor,
-        List<NpcAction> actions,
-        String entityType,
-        String pose,
-        double scale,
-        Map<String, String> typeData,
-        Instant createdAt) {
+public record Npc(NpcName name, Position location, NpcAppearance appearance, NpcBehavior behavior, Instant createdAt) {
 
     /** The default entity type: a fake player, the one type with the tab-entry + skin path. */
-    public static final String DEFAULT_ENTITY_TYPE = "PLAYER";
+    public static final String DEFAULT_ENTITY_TYPE = NpcAppearance.DEFAULT_ENTITY_TYPE;
 
     /** The default body pose: the natural upright stance. */
-    public static final String DEFAULT_POSE = "STANDING";
+    public static final String DEFAULT_POSE = NpcAppearance.DEFAULT_POSE;
 
     /** The default size multiplier: the NPC's natural size. */
-    public static final double DEFAULT_SCALE = 1.0;
+    public static final double DEFAULT_SCALE = NpcAppearance.DEFAULT_SCALE;
 
     public Npc {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(appearance, "appearance");
+        Objects.requireNonNull(behavior, "behavior");
         Objects.requireNonNull(createdAt, "createdAt");
-        equipment = copyEquipment(equipment);
-        actions = List.copyOf(Objects.requireNonNull(actions, "actions"));
-        entityType = normalizeType(entityType);
-        pose = normalizePose(pose);
-        scale = validateScale(scale);
-        typeData = copyTypeData(typeData);
+    }
+
+    /**
+     * The legacy field-by-field constructor, retained so the persistence mapper and field-level callers are
+     * unaffected by the appearance/behavior grouping. The visual fields are folded into an {@link NpcAppearance}
+     * and the interactive fields into an {@link NpcBehavior}, each of which applies the same validation and
+     * defensive copying it always did.
+     */
+    public Npc(
+            NpcName name,
+            Position location,
+            @Nullable NpcSkin skin,
+            @Nullable String clickCommand,
+            boolean lookAtPlayer,
+            Map<EquipmentSlot, String> equipment,
+            boolean glowing,
+            @Nullable String glowColor,
+            List<NpcAction> actions,
+            String entityType,
+            String pose,
+            double scale,
+            Map<String, String> typeData,
+            Instant createdAt) {
+        this(
+                name,
+                location,
+                new NpcAppearance(skin, entityType, equipment, glowing, glowColor, pose, scale, typeData),
+                new NpcBehavior(clickCommand, lookAtPlayer, actions),
+                createdAt);
     }
 
     /** A new NPC created now at {@code location} with the given (possibly {@code null}) skin, no command, looking. */
     public static Npc create(NpcName name, Position location, @Nullable NpcSkin skin, Instant createdAt) {
-        return new Npc(
-                name,
-                location,
-                skin,
-                null,
-                true,
-                Map.of(),
-                false,
-                null,
-                List.of(),
-                DEFAULT_ENTITY_TYPE,
-                DEFAULT_POSE,
-                DEFAULT_SCALE,
-                Map.of(),
-                createdAt);
+        return new Npc(name, location, NpcAppearance.defaults(skin), NpcBehavior.defaults(), createdAt);
     }
+
+    // --- Appearance accessors (delegated, so existing call sites are unchanged) ---
+
+    public @Nullable NpcSkin skin() {
+        return appearance.skin();
+    }
+
+    public Map<EquipmentSlot, String> equipment() {
+        return appearance.equipment();
+    }
+
+    public boolean glowing() {
+        return appearance.glowing();
+    }
+
+    public @Nullable String glowColor() {
+        return appearance.glowColor();
+    }
+
+    public String entityType() {
+        return appearance.entityType();
+    }
+
+    public String pose() {
+        return appearance.pose();
+    }
+
+    public double scale() {
+        return appearance.scale();
+    }
+
+    public Map<String, String> typeData() {
+        return appearance.typeData();
+    }
+
+    // --- Behavior accessors (delegated) ---
+
+    public @Nullable String clickCommand() {
+        return behavior.clickCommand();
+    }
+
+    public boolean lookAtPlayer() {
+        return behavior.lookAtPlayer();
+    }
+
+    public List<NpcAction> actions() {
+        return behavior.actions();
+    }
+
+    // --- Transitions (delegated; createdAt and the untouched half are always preserved) ---
 
     /** A copy re-anchored to {@code newLocation}, keeping everything else. */
     public Npc movedTo(Position newLocation) {
         Objects.requireNonNull(newLocation, "newLocation");
-        return new Npc(
-                name,
-                newLocation,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                actions,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, newLocation, appearance, behavior, createdAt);
     }
 
     /** A copy wearing {@code newSkin} (or {@code null} to reset to the default skin), keeping everything else. */
     public Npc withSkin(@Nullable NpcSkin newSkin) {
-        return new Npc(
-                name,
-                location,
-                newSkin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                actions,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance.withSkin(newSkin), behavior, createdAt);
     }
 
     /** A copy whose click runs {@code newCommand} (or {@code null} to clear it), keeping everything else. */
     public Npc withClickCommand(@Nullable String newCommand) {
-        return new Npc(
-                name,
-                location,
-                skin,
-                newCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                actions,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance, behavior.withClickCommand(newCommand), createdAt);
     }
 
     /** A copy that does or does not rotate to face nearby viewers, keeping everything else. */
     public Npc withLookAtPlayer(boolean newLookAtPlayer) {
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                newLookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                actions,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance, behavior.withLookAtPlayer(newLookAtPlayer), createdAt);
     }
 
     /**
@@ -213,21 +161,7 @@ public record Npc(
      * the adapter's concern, validated at the command boundary before this is called.
      */
     public Npc withEntityType(String newEntityType) {
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                actions,
-                newEntityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance.withEntityType(newEntityType), behavior, createdAt);
     }
 
     /**
@@ -237,69 +171,17 @@ public record Npc(
      * so an unresolvable token simply renders no item in that slot rather than failing here.
      */
     public Npc withEquipment(EquipmentSlot slot, @Nullable String itemToken) {
-        Objects.requireNonNull(slot, "slot");
-        // An EnumMap copy-constructor rejects an empty source map, so build it by class and fill it.
-        Map<EquipmentSlot, String> updated = new EnumMap<>(EquipmentSlot.class);
-        updated.putAll(equipment);
-        if (itemToken == null || itemToken.isBlank()) {
-            updated.remove(slot);
-        } else {
-            updated.put(slot, itemToken);
-        }
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                updated,
-                glowing,
-                glowColor,
-                actions,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance.withEquipment(slot, itemToken), behavior, createdAt);
     }
 
     /** A copy whose outline does or does not glow, keeping everything else (and its colour). */
     public Npc withGlowing(boolean newGlowing) {
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                newGlowing,
-                glowColor,
-                actions,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance.withGlowing(newGlowing), behavior, createdAt);
     }
 
     /** A copy whose glow outline is tinted {@code newColor} (or {@code null} for the default white), keeping the rest. */
     public Npc withGlowColor(@Nullable String newColor) {
-        String color = newColor == null || newColor.isBlank() ? null : newColor;
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                color,
-                actions,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance.withGlowColor(newColor), behavior, createdAt);
     }
 
     /**
@@ -308,40 +190,12 @@ public record Npc(
      * an unknown name renders standing rather than failing here.
      */
     public Npc withPose(String newPose) {
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                actions,
-                entityType,
-                newPose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance.withPose(newPose), behavior, createdAt);
     }
 
     /** A copy resized to {@code newScale} ({@code 1.0} is the natural size), keeping everything else. */
     public Npc withScale(double newScale) {
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                actions,
-                entityType,
-                pose,
-                newScale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance.withScale(newScale), behavior, createdAt);
     }
 
     /**
@@ -351,53 +205,12 @@ public record Npc(
      * adapter's concern, so an unsupported or unparseable pair simply renders nothing rather than failing here.
      */
     public Npc withTypeData(String key, @Nullable String value) {
-        String trimmedKey = Objects.requireNonNull(key, "key").strip();
-        if (trimmedKey.isEmpty()) {
-            throw new IllegalArgumentException("type-data key must not be blank");
-        }
-        Map<String, String> updated = new LinkedHashMap<>(typeData);
-        if (value == null || value.isBlank()) {
-            updated.remove(trimmedKey);
-        } else {
-            updated.put(trimmedKey, value);
-        }
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                actions,
-                entityType,
-                pose,
-                scale,
-                updated,
-                createdAt);
+        return new Npc(name, location, appearance.withTypeData(key, value), behavior, createdAt);
     }
 
     /** A copy with {@code action} appended to the end of the action list, keeping everything else. */
     public Npc withActionAdded(NpcAction action) {
-        Objects.requireNonNull(action, "action");
-        List<NpcAction> updated = new ArrayList<>(actions);
-        updated.add(action);
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                updated,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance, behavior.withActionAdded(action), createdAt);
     }
 
     /**
@@ -405,133 +218,58 @@ public record Npc(
      * {@link IndexOutOfBoundsException} when {@code index} is outside the current action list.
      */
     public Npc withActionRemovedAt(int index) {
-        if (index < 0 || index >= actions.size()) {
-            throw new IndexOutOfBoundsException("action index out of range: " + index);
-        }
-        List<NpcAction> updated = new ArrayList<>(actions);
-        updated.remove(index);
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                updated,
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance, behavior.withActionRemovedAt(index), createdAt);
     }
 
     /** A copy with no actions, keeping everything else. */
     public Npc withActionsCleared() {
-        return new Npc(
-                name,
-                location,
-                skin,
-                clickCommand,
-                lookAtPlayer,
-                equipment,
-                glowing,
-                glowColor,
-                List.of(),
-                entityType,
-                pose,
-                scale,
-                typeData,
-                createdAt);
+        return new Npc(name, location, appearance, behavior.withActionsCleared(), createdAt);
     }
+
+    // --- Predicates (delegated) ---
 
     /** Whether this NPC renders as a fake player (the default type with the tab-entry + skin path). */
     public boolean isPlayerType() {
-        return DEFAULT_ENTITY_TYPE.equals(entityType);
+        return appearance.isPlayerType();
     }
 
     /** Whether this NPC carries a skin (a fake player with no skin renders the default Steve). */
     public boolean hasSkin() {
-        return skin != null;
+        return appearance.hasSkin();
     }
 
     /** Whether clicking this NPC runs a command. */
     public boolean hasClickCommand() {
-        return clickCommand != null && !clickCommand.isBlank();
+        return behavior.hasClickCommand();
     }
 
     /** Whether this NPC wears anything in any slot. */
     public boolean hasEquipment() {
-        return !equipment.isEmpty();
+        return appearance.hasEquipment();
     }
 
     /** Whether a glow colour is set (a glowing NPC with no colour renders the default white outline). */
     public boolean hasGlowColor() {
-        return glowColor != null && !glowColor.isBlank();
+        return appearance.hasGlowColor();
     }
 
     /** Whether clicking this NPC runs at least one action. */
     public boolean hasActions() {
-        return !actions.isEmpty();
+        return behavior.hasActions();
     }
 
     /** Whether this NPC is frozen in a non-default pose (a default-posed NPC needs no pose packet). */
     public boolean hasPose() {
-        return !DEFAULT_POSE.equals(pose);
+        return appearance.hasPose();
     }
 
     /** Whether this NPC is resized (a natural-size NPC needs no scale packet). */
     public boolean hasScale() {
-        return Double.compare(scale, DEFAULT_SCALE) != 0;
+        return appearance.hasScale();
     }
 
     /** Whether this NPC carries any per-entity-type appearance metadata (an empty map needs no metadata packet). */
     public boolean hasTypeData() {
-        return !typeData.isEmpty();
-    }
-
-    /** Upper-case the entity-type name and reject a blank one — the type is always a non-blank uppercase name. */
-    private static String normalizeType(String entityType) {
-        Objects.requireNonNull(entityType, "entityType");
-        String trimmed = entityType.strip();
-        if (trimmed.isEmpty()) {
-            throw new IllegalArgumentException("entityType must not be blank");
-        }
-        return trimmed.toUpperCase(java.util.Locale.ROOT);
-    }
-
-    /** Upper-case the pose name and reject a blank one — the pose is always a non-blank uppercase name. */
-    private static String normalizePose(String pose) {
-        Objects.requireNonNull(pose, "pose");
-        String trimmed = pose.strip();
-        if (trimmed.isEmpty()) {
-            throw new IllegalArgumentException("pose must not be blank");
-        }
-        return trimmed.toUpperCase(java.util.Locale.ROOT);
-    }
-
-    /** Reject a non-finite or non-positive scale — the size multiplier is always a finite, positive number. */
-    private static double validateScale(double scale) {
-        if (!Double.isFinite(scale) || scale <= 0.0) {
-            throw new IllegalArgumentException("scale must be finite and positive, was " + scale);
-        }
-        return scale;
-    }
-
-    /** An immutable, empty-tolerant copy of the equipment map keyed in slot order. */
-    private static Map<EquipmentSlot, String> copyEquipment(@Nullable Map<EquipmentSlot, String> source) {
-        if (source == null || source.isEmpty()) {
-            return Map.of();
-        }
-        return Map.copyOf(new EnumMap<>(source));
-    }
-
-    /** An immutable, empty-tolerant copy of the type-data map. */
-    private static Map<String, String> copyTypeData(@Nullable Map<String, String> source) {
-        if (source == null || source.isEmpty()) {
-            return Map.of();
-        }
-        return Map.copyOf(source);
+        return appearance.hasTypeData();
     }
 }
