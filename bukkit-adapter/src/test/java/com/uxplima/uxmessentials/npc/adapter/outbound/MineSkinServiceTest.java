@@ -220,6 +220,25 @@ class MineSkinServiceTest {
     }
 
     @Test
+    void aSeamThatThrowsMidPollCompletesTheFutureEmptyRatherThanOrphaningIt() {
+        FakeSeam seam = new FakeSeam();
+        // The POST succeeds and hands back a queued job, so the throw only fires once the queue-poll GET runs —
+        // proving a throw deeper in the poll loop (not just on the first POST) still completes the future empty
+        // rather than escaping the async stage and hanging the operator on the "generating" line.
+        seam.script(new HttpResponseView(202, Optional.of(V2_QUEUED), OptionalLong.empty()));
+        seam.getThrower = new IllegalStateException("poll exploded");
+        MineSkinService service = newService(seam, null);
+
+        CompletableFuture<Optional<NpcSkin>> future = service.fetchFromUrl(IMAGE_URL);
+
+        assertThat(future).isCompleted();
+        assertThat(future).isNotCompletedExceptionally();
+        assertThat(future.join()).isEmpty();
+        assertThat(seam.posts).isEqualTo(1);
+        assertThat(seam.gets).isEqualTo(1);
+    }
+
+    @Test
     void anIllegalUrlCompletesEmptyWithoutEverCalling() {
         FakeSeam seam = new FakeSeam();
         seam.thrower = new IllegalStateException("must never be reached");
@@ -273,6 +292,7 @@ class MineSkinServiceTest {
         private HttpResponseView postDefault = HttpResponseView.transportError();
         private HttpResponseView getDefault = HttpResponseView.transportError();
         private @Nullable RuntimeException thrower;
+        private @Nullable RuntimeException getThrower;
         private int posts;
         private int gets;
         private String lastBody = "";
@@ -309,6 +329,9 @@ class MineSkinServiceTest {
         public HttpResponseView exchangeGet(URI uri, @Nullable String authToken) {
             gets++;
             lastGetUri = uri.toString();
+            if (getThrower != null) {
+                throw getThrower;
+            }
             if (thrower != null) {
                 throw thrower;
             }
