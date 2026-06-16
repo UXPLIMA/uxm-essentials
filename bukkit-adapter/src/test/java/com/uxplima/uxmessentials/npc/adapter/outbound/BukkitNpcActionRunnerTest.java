@@ -549,6 +549,33 @@ class BukkitNpcActionRunnerTest {
     }
 
     @Test
+    void aGateChosenInsideARandomGroupThatDeniesStopsTheRestOfTheChain() {
+        // The group's chosen member is a CHANCE 0 gate (offset 0): a denied gate must stop the whole chain, exactly
+        // as it would inline — the action after the group must not run.
+        BukkitNpcActionRunner deterministic = new BukkitNpcActionRunner(
+                commandRunner,
+                connector,
+                scheduler,
+                permissions,
+                Optional.of(economy),
+                messages,
+                new NoopLogger(),
+                bound -> 0);
+        deterministic.run(
+                player,
+                List.of(
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "before"),
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "2"),
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.CHANCE, "0"),
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "in-group"),
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                false);
+
+        // The chosen gate denied: "before" ran, the gate stopped the chain, and "after" (past the group) did not run.
+        assertThat(commandRunner.playerCommands).containsExactly("before");
+    }
+
+    @Test
     void randomTriggerFiltersTheMarkerItself() {
         // The RANDOM marker carries a trigger; on a non-matching click it is filtered out before the group runs,
         // so the would-be group members run as ordinary actions (no random pick happens).

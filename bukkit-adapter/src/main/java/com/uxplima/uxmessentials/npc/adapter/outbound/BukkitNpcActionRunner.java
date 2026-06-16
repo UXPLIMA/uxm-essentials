@@ -150,8 +150,8 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
                 int afterGroup = (at + 1) + present; // resume past the present members (a count past the end clamps)
                 if (present > 0) {
                     int chosen = (at + 1) + boundedPick(present);
-                    if (step(viewer, actions, chosen, afterGroup) == Step.PARKED) {
-                        return; // a chosen DELAY parked the tail to resume after the group; this invocation is done
+                    if (step(viewer, actions, chosen, afterGroup) != Step.CONTINUE) {
+                        return; // chosen STOP (a denied gate) or PARKED (a DELAY) ends this invocation, like inline
                     }
                 }
                 at = afterGroup - 1; // -1 so the loop's increment lands the next iteration after the group
