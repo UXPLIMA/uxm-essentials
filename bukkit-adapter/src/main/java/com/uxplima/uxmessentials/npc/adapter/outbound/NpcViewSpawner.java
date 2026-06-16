@@ -9,7 +9,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -136,9 +135,10 @@ public final class NpcViewSpawner {
 
     /**
      * Dress the just-spawned fake player for this viewer: send its equipment, then its glow toggle and (when the
-     * NPC carries a colour) the team that tints the outline. Equipment that names a material this server does not
-     * know is dropped from the map — an unknown name renders an empty slot rather than failing the whole spawn —
-     * and an unparseable colour falls back to the default white outline, so the appearance is always fail-soft.
+     * NPC carries a colour) the team that tints the outline. An equipment slot whose stored token does not resolve
+     * to a real item — an unknown material name, or a corrupt serialized payload — is dropped from the map, so the
+     * slot shows empty rather than failing the whole spawn, and an unparseable colour falls back to the default
+     * white outline; the appearance is always fail-soft.
      */
     private void applyAppearance(Player viewer, RenderedNpc rendered) {
         Npc npc = rendered.npc();
@@ -174,15 +174,14 @@ public final class NpcViewSpawner {
         return skin == null ? null : new TabSkin(skin.texture(), skin.signature());
     }
 
-    /** Resolve each stored material name to a real item, dropping a slot whose name this server does not know. */
+    /** Resolve each stored token (a serialized item or a legacy material name) to a real item, dropping a slot
+     * whose token this server cannot resolve. */
     private static Map<EquipmentSlot, ItemStack> resolveEquipment(Npc npc) {
         Map<EquipmentSlot, ItemStack> resolved = new EnumMap<>(EquipmentSlot.class);
         for (Map.Entry<com.uxplima.uxmessentials.npc.domain.EquipmentSlot, String> entry :
                 npc.equipment().entrySet()) {
-            Material material = Material.matchMaterial(entry.getValue());
-            if (material != null && material.isItem()) {
-                resolved.put(toPacketSlot(entry.getKey()), new ItemStack(material));
-            }
+            EquipmentSlot slot = toPacketSlot(entry.getKey());
+            EquipmentPayloads.resolve(entry.getValue()).ifPresent(item -> resolved.put(slot, item));
         }
         return resolved;
     }

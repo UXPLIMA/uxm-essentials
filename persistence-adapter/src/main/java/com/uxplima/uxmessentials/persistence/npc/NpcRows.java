@@ -26,8 +26,11 @@ import org.jspecify.annotations.Nullable;
  * default Steve fake player), and a present texture rebuilds an {@link NpcSkin} carrying its (possibly NULL)
  * signature. The {@code click_command} column is likewise nullable — a NULL means clicking the NPC does
  * nothing. The {@code look_at_player} column is a SMALLINT 0/1 read back as a boolean (whether the NPC rotates
- * to face nearby viewers). Equipment is six nullable material-name columns ({@code equip_<slot>}), one per
- * wearable slot, NULL for an empty slot; {@code glowing} is a SMALLINT 0/1 and {@code glow_color} the optional
+ * to face nearby viewers). Equipment is now stored as an opaque per-slot token (either a legacy material name or
+ * a serialized full-item payload) in the V45 TEXT columns ({@code equip_<slot>_b64}); the V40 VARCHAR columns
+ * ({@code equip_<slot>}) are kept for backward compatibility, so a save writes the new column and a read takes
+ * the new column first and falls back to the old one when it is NULL — an NPC stored before V45 keeps its gear.
+ * A slot with both columns NULL is empty. {@code glowing} is a SMALLINT 0/1 and {@code glow_color} the optional
  * outline colour name. The {@code entity_type} column is the uppercase Bukkit {@code EntityType} name the NPC
  * renders as ({@code PLAYER} by default, the fake-player path), NOT NULL so an older row reads back as a player.
  * The click-action chain lives in the child {@code npc_action} table and is passed in already ordered — each
@@ -77,12 +80,14 @@ final class NpcRows {
                 .setSkinSignature(skin == null ? null : skin.signature())
                 .setClickCommand(npc.clickCommand())
                 .setLookAtPlayer((short) (npc.lookAtPlayer() ? 1 : 0))
-                .setEquipMainhand(equipment.get(EquipmentSlot.MAINHAND))
-                .setEquipOffhand(equipment.get(EquipmentSlot.OFFHAND))
-                .setEquipHead(equipment.get(EquipmentSlot.HEAD))
-                .setEquipChest(equipment.get(EquipmentSlot.CHEST))
-                .setEquipLegs(equipment.get(EquipmentSlot.LEGS))
-                .setEquipFeet(equipment.get(EquipmentSlot.FEET))
+                // The token (material name or serialized item) is written to the V45 TEXT columns; the V40
+                // VARCHAR columns are left NULL on a save and only ever read for a pre-V45 row's gear.
+                .setEquipMainhandB64(equipment.get(EquipmentSlot.MAINHAND))
+                .setEquipOffhandB64(equipment.get(EquipmentSlot.OFFHAND))
+                .setEquipHeadB64(equipment.get(EquipmentSlot.HEAD))
+                .setEquipChestB64(equipment.get(EquipmentSlot.CHEST))
+                .setEquipLegsB64(equipment.get(EquipmentSlot.LEGS))
+                .setEquipFeetB64(equipment.get(EquipmentSlot.FEET))
                 .setGlowing((short) (npc.glowing() ? 1 : 0))
                 .setGlowColor(npc.glowColor())
                 .setEntityType(npc.entityType())
@@ -96,21 +101,28 @@ final class NpcRows {
         return new NpcSkin(texture, signature);
     }
 
-    /** Read the six equipment columns into a slot-keyed map, skipping the NULL (empty) slots. */
+    /**
+     * Read the six equipment slots into a slot-keyed map, skipping the empty slots. Each slot prefers its V45
+     * {@code equip_<slot>_b64} token and falls back to the V40 {@code equip_<slot>} material name when the new
+     * column is NULL, so an NPC stored before V45 keeps its gear.
+     */
     private static Map<EquipmentSlot, String> equipmentOf(Record row) {
         Map<EquipmentSlot, String> equipment = new EnumMap<>(EquipmentSlot.class);
-        put(equipment, EquipmentSlot.MAINHAND, row.get(NPC.EQUIP_MAINHAND));
-        put(equipment, EquipmentSlot.OFFHAND, row.get(NPC.EQUIP_OFFHAND));
-        put(equipment, EquipmentSlot.HEAD, row.get(NPC.EQUIP_HEAD));
-        put(equipment, EquipmentSlot.CHEST, row.get(NPC.EQUIP_CHEST));
-        put(equipment, EquipmentSlot.LEGS, row.get(NPC.EQUIP_LEGS));
-        put(equipment, EquipmentSlot.FEET, row.get(NPC.EQUIP_FEET));
+        put(equipment, EquipmentSlot.MAINHAND, row.get(NPC.EQUIP_MAINHAND_B64), row.get(NPC.EQUIP_MAINHAND));
+        put(equipment, EquipmentSlot.OFFHAND, row.get(NPC.EQUIP_OFFHAND_B64), row.get(NPC.EQUIP_OFFHAND));
+        put(equipment, EquipmentSlot.HEAD, row.get(NPC.EQUIP_HEAD_B64), row.get(NPC.EQUIP_HEAD));
+        put(equipment, EquipmentSlot.CHEST, row.get(NPC.EQUIP_CHEST_B64), row.get(NPC.EQUIP_CHEST));
+        put(equipment, EquipmentSlot.LEGS, row.get(NPC.EQUIP_LEGS_B64), row.get(NPC.EQUIP_LEGS));
+        put(equipment, EquipmentSlot.FEET, row.get(NPC.EQUIP_FEET_B64), row.get(NPC.EQUIP_FEET));
         return equipment;
     }
 
-    private static void put(Map<EquipmentSlot, String> equipment, EquipmentSlot slot, @Nullable String material) {
-        if (material != null && !material.isBlank()) {
-            equipment.put(slot, material);
+    /** Store {@code token} for {@code slot}, preferring the V45 value and falling back to the legacy one. */
+    private static void put(
+            Map<EquipmentSlot, String> equipment, EquipmentSlot slot, @Nullable String token, @Nullable String legacy) {
+        String value = token != null && !token.isBlank() ? token : legacy;
+        if (value != null && !value.isBlank()) {
+            equipment.put(slot, value);
         }
     }
 

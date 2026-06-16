@@ -24,11 +24,14 @@ import org.jspecify.annotations.Nullable;
  * binding. {@code lookAtPlayer} controls whether the fake player rotates to face each nearby viewer; it defaults
  * to {@code true} so a freshly created NPC tracks players out of the box.
  *
- * <p>{@code equipment} maps each worn {@link EquipmentSlot} to a material <em>name</em> ({@code DIAMOND_HELMET}),
- * not a Bukkit item, so the aggregate stays Bukkit-free — the adapter resolves the name to a real item at render.
- * A slot absent from the map is empty. {@code glowing} toggles the fake player's outline, and {@code glowColor}
- * is the colour name ({@code RED}) the outline is tinted, or {@code null} for the default white outline. The map
- * is copied defensively on construction so a stored snapshot is immutable.
+ * <p>{@code equipment} maps each worn {@link EquipmentSlot} to an opaque item <em>token</em> the domain stores
+ * verbatim and never interprets — it is either a legacy Bukkit material name ({@code DIAMOND_HELMET}) or a
+ * serialized full-item payload (a named/enchanted/custom item), and the adapter is the only place that resolves
+ * a token to a real Bukkit item at render. Keeping the value a plain {@code String} is what keeps the aggregate
+ * Bukkit-free even though the token may now carry a whole item's NBT. A slot absent from the map is empty.
+ * {@code glowing} toggles the fake player's outline, and {@code glowColor} is the colour name ({@code RED}) the
+ * outline is tinted, or {@code null} for the default white outline. The map is copied defensively on construction
+ * so a stored snapshot is immutable.
  *
  * <p>{@code actions} is the ordered list of {@link NpcAction}s a click runs (the richer mechanism alongside the
  * single {@code clickCommand}, which still runs first). The list is copied defensively on construction so the
@@ -46,7 +49,7 @@ import org.jspecify.annotations.Nullable;
  * @param skin the fake player's skin, or {@code null} for the default skin
  * @param clickCommand the command run when a player clicks the NPC, or {@code null} for no action
  * @param lookAtPlayer whether the NPC rotates to face each nearby viewer
- * @param equipment the worn items by slot as material names; an absent slot is empty
+ * @param equipment the worn items by slot as opaque tokens (a material name or a serialized item); absent = empty
  * @param glowing whether the fake player's outline glows
  * @param glowColor the glow outline colour name, or {@code null} for the default white outline
  * @param actions the ordered list of typed actions a click runs, after the single click command
@@ -170,19 +173,20 @@ public record Npc(
     }
 
     /**
-     * A copy with {@code slot} set to {@code materialName} (or cleared when {@code materialName} is {@code null}),
-     * keeping everything else. The material name is stored as given — the adapter validates it against the live
-     * registry at render time, so an unknown name simply renders no item in that slot rather than failing here.
+     * A copy with {@code slot} set to {@code itemToken} (or cleared when {@code itemToken} is {@code null} or
+     * blank), keeping everything else. The token is stored verbatim and uninterpreted — it is either a legacy
+     * material name or a serialized full-item payload, and the adapter resolves it to a real item at render time,
+     * so an unresolvable token simply renders no item in that slot rather than failing here.
      */
-    public Npc withEquipment(EquipmentSlot slot, @Nullable String materialName) {
+    public Npc withEquipment(EquipmentSlot slot, @Nullable String itemToken) {
         Objects.requireNonNull(slot, "slot");
         // An EnumMap copy-constructor rejects an empty source map, so build it by class and fill it.
         Map<EquipmentSlot, String> updated = new EnumMap<>(EquipmentSlot.class);
         updated.putAll(equipment);
-        if (materialName == null || materialName.isBlank()) {
+        if (itemToken == null || itemToken.isBlank()) {
             updated.remove(slot);
         } else {
-            updated.put(slot, materialName);
+            updated.put(slot, itemToken);
         }
         return new Npc(
                 name,

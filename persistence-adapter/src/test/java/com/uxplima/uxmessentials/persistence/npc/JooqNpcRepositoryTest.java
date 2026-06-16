@@ -92,6 +92,53 @@ class JooqNpcRepositoryTest {
     }
 
     @Test
+    void roundTripsALongSerializedEquipmentTokenWithoutTruncation() {
+        // A serialized + base64 ItemStack token is far longer than the legacy VARCHAR(64) cap. The V45 TEXT
+        // column must store it whole — this asserts the full token comes back byte-for-byte, not truncated.
+        String longToken = "b64:" + "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5".repeat(40);
+        assertThat(longToken.length()).isGreaterThan(1_000);
+        repository.save(
+                Npc.create(NpcName.of("knight"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                        .withEquipment(EquipmentSlot.MAINHAND, longToken));
+
+        Npc loaded = repository.find(NpcName.of("knight")).orElseThrow();
+
+        assertThat(loaded.equipment()).containsEntry(EquipmentSlot.MAINHAND, longToken);
+    }
+
+    @Test
+    void readsALegacyMaterialNameFromTheV40Column() {
+        // Simulate an NPC stored before V45: only the legacy equip_head VARCHAR column is set, the V45
+        // equip_head_b64 column is NULL. The mapper's fallback must still surface the gear. The data source runs
+        // with auto-commit off, so the seed insert is wrapped in a transaction to commit before the read.
+        com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
+                com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
+        persistence.dsl().transaction(cfg -> org.jooq
+                .impl
+                .DSL
+                .using(cfg)
+                .insertInto(npc)
+                .set(npc.NAME, "legacy")
+                .set(npc.WORLD, WORLD.uid().toString())
+                .set(npc.WORLD_NAME, WORLD.name())
+                .set(npc.X, 0.0)
+                .set(npc.Y, 64.0)
+                .set(npc.Z, 0.0)
+                .set(npc.YAW, 0.0f)
+                .set(npc.PITCH, 0.0f)
+                .set(npc.LOOK_AT_PLAYER, (short) 1)
+                .set(npc.EQUIP_HEAD, "DIAMOND_HELMET")
+                .set(npc.GLOWING, (short) 0)
+                .set(npc.ENTITY_TYPE, "PLAYER")
+                .set(npc.CREATED_AT, 1_000L)
+                .execute());
+
+        Npc loaded = repository.find(NpcName.of("legacy")).orElseThrow();
+
+        assertThat(loaded.equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+    }
+
+    @Test
     void defaultsEquipmentEmptyAndGlowOffForACreatedNpc() {
         repository.save(
                 Npc.create(NpcName.of("bare"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));

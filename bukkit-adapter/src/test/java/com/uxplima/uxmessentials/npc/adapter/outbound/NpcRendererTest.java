@@ -315,6 +315,49 @@ class NpcRendererTest {
     }
 
     @Test
+    void equipsAStoredSerializedItemWithItsMetaIntact() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        ItemStack sword = new ItemStack(org.bukkit.Material.DIAMOND_SWORD);
+        org.bukkit.inventory.meta.ItemMeta meta = sword.getItemMeta();
+        meta.displayName(net.kyori.adventure.text.Component.text("Excalibur"));
+        meta.addEnchant(org.bukkit.enchantments.Enchantment.SHARPNESS, 5, true);
+        sword.setItemMeta(meta);
+        Npc npc = npcAt(viewer, 1.0)
+                .withEquipment(
+                        com.uxplima.uxmessentials.npc.domain.EquipmentSlot.MAINHAND,
+                        EquipmentPayloads.serialize(sword));
+        renderer.render(npc);
+
+        // The serialized payload deserializes back to the full item — enchantments and custom name survive the
+        // round-trip through the stored token.
+        assertThat(packets.equipments).hasSize(1);
+        ItemStack sent = java.util.Objects.requireNonNull(
+                packets.equipments.get(0).items().get(com.uxplima.uxmlib.packet.npc.EquipmentSlot.MAINHAND),
+                "mainhand item");
+        assertThat(sent.getType()).isEqualTo(org.bukkit.Material.DIAMOND_SWORD);
+        assertThat(sent.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.SHARPNESS))
+                .isEqualTo(5);
+        assertThat(sent.getItemMeta().displayName()).isEqualTo(net.kyori.adventure.text.Component.text("Excalibur"));
+    }
+
+    @Test
+    void dropsACorruptSerializedPayloadSoTheSpawnStillSucceeds() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        Npc npc = npcAt(viewer, 1.0)
+                .withEquipment(com.uxplima.uxmessentials.npc.domain.EquipmentSlot.HEAD, "b64:not-valid-@@@");
+        renderer.render(npc);
+
+        // A corrupt serialized token is dropped fail-soft: the equipment packet carries no slots, the spawn went out.
+        assertThat(packets.equipments).hasSize(1);
+        assertThat(packets.equipments.get(0).items()).isEmpty();
+        assertThat(packets.spawns).hasSize(1);
+    }
+
+    @Test
     void dropsAnUnknownMaterialSoTheSpawnStillSucceeds() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());

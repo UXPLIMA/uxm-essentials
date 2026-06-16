@@ -107,6 +107,16 @@ class NpcTest {
     }
 
     @Test
+    void withEquipmentStoresAnOpaqueTokenVerbatim() {
+        // The domain never interprets the equipment value — a serialized-item token is stored and returned
+        // byte-for-byte, exactly as a material name would be.
+        String token = "b64:rO0ABXNyAB...some-opaque-serialized-payload==";
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withEquipment(EquipmentSlot.MAINHAND, token);
+
+        assertThat(npc.equipment()).containsEntry(EquipmentSlot.MAINHAND, token);
+    }
+
+    @Test
     void equipmentMapIsImmutable() {
         Npc npc =
                 Npc.create(NpcName.of("guide"), AT, null, CREATED).withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET");
