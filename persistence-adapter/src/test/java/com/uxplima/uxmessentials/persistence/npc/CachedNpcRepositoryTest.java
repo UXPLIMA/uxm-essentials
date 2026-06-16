@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
@@ -94,6 +96,90 @@ class CachedNpcRepositoryTest {
     }
 
     @Test
+    void concurrentSavesFromManyThreadsAllRemainInTheAuthoritativeIndex() throws InterruptedException {
+        CountingRepository delegate = new CountingRepository();
+        CachedNpcRepository cached = new CachedNpcRepository(delegate);
+        cached.all(); // warm load over an empty set
+
+        int threads = 16;
+        List<NpcName> names = new ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            names.add(NpcName.of("npc" + i));
+        }
+
+        // Each thread saves a distinct NPC at the same moment. A racy read-modify-set would lose all but the
+        // last writer's entry from the in-memory index (the index is authoritative, so a lost entry reads as
+        // absent); the CAS retry loop must compose every save so all of them survive.
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threads);
+        for (NpcName name : names) {
+            Thread t = new Thread(() -> {
+                awaitQuietly(start);
+                cached.save(npc(name));
+                done.countDown();
+            });
+            t.start();
+        }
+        start.countDown();
+        assertThat(done.await(10, TimeUnit.SECONDS)).isTrue();
+
+        for (NpcName name : names) {
+            assertThat(cached.exists(name)).as("npc %s present in index", name).isTrue();
+        }
+        assertThat(cached.all()).hasSize(threads);
+    }
+
+    @Test
+    void concurrentSavesAndDeletesComposeWithoutLosingUntouchedEntries() throws InterruptedException {
+        CountingRepository delegate = new CountingRepository();
+        CachedNpcRepository cached = new CachedNpcRepository(delegate);
+
+        int count = 32;
+        List<NpcName> survivors = new ArrayList<>();
+        List<NpcName> doomed = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            NpcName survivor = NpcName.of("keep" + i);
+            NpcName victim = NpcName.of("drop" + i);
+            survivors.add(survivor);
+            doomed.add(victim);
+            cached.save(npc(survivor));
+            cached.save(npc(victim));
+        }
+
+        // Delete every "drop" NPC concurrently. A racy publish would let one delete clobber another's removal or
+        // resurrect an unrelated "keep" entry; the CAS loop must leave exactly the survivors behind.
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(doomed.size());
+        for (NpcName victim : doomed) {
+            Thread t = new Thread(() -> {
+                awaitQuietly(start);
+                cached.delete(victim);
+                done.countDown();
+            });
+            t.start();
+        }
+        start.countDown();
+        assertThat(done.await(10, TimeUnit.SECONDS)).isTrue();
+
+        for (NpcName survivor : survivors) {
+            assertThat(cached.exists(survivor)).as("survivor %s kept", survivor).isTrue();
+        }
+        for (NpcName victim : doomed) {
+            assertThat(cached.exists(victim)).as("victim %s gone", victim).isFalse();
+        }
+        assertThat(cached.all()).hasSize(survivors.size());
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted while waiting to start", e);
+        }
+    }
+
+    @Test
     void firstReadBeforeAnyWarmLoadLoadsOnceThenServesFromMemory() {
         CountingRepository delegate = new CountingRepository();
         delegate.store(npc(GUIDE));
@@ -113,7 +199,7 @@ class CachedNpcRepositoryTest {
     /** A fake delegate that counts {@code all}/{@code save}/{@code delete} calls and holds the NPCs in memory. */
     private static final class CountingRepository implements NpcRepository {
 
-        private final Map<String, Npc> stored = new LinkedHashMap<>();
+        private final Map<String, Npc> stored = new ConcurrentHashMap<>();
         private final AtomicInteger allReads = new AtomicInteger();
         private final AtomicInteger findReads = new AtomicInteger();
         private final AtomicInteger existsReads = new AtomicInteger();
