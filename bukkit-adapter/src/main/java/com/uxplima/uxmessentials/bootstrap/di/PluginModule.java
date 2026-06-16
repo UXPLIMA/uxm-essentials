@@ -50,6 +50,7 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
+import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
@@ -363,7 +364,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("staff"))) {
             wireStaff(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("npc"))) {
-            wireNpc(plugin, ctx, persistence, resources);
+            wireNpc(plugin, ctx, persistence, resources, links);
         }
     }
 
@@ -443,6 +444,7 @@ public final class PluginModule {
         links.kitEconomy = wired.kitEconomy();
         links.homeEconomy = wired.homeEconomy();
         links.vaultEconomy = wired.vaultEconomy();
+        links.npcEconomy = wired.npcEconomy();
         links.placeholders.economy(new ProviderEconomyPlaceholders(
                 wired.provider(), wired.defaultCurrency(), wired.amountFormat(), BalTop.MAX_PAGE_SIZE));
     }
@@ -729,15 +731,20 @@ public final class PluginModule {
     }
 
     private static void wireNpc(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
         // npc builds its cached jOOQ NpcRepository over persistence.dsl() and its renderer over the uxmLib NPC
-        // packet stack; the npc table ships in the persistence V38 baseline, always applied. It carries no
-        // cross-context bridge — its only collaborators are the shared Scheduler, messages/messageSink, and event
-        // ports. A fake-player NPC has no real entity: each viewer is sent a spawn (then its tab entry is hidden),
-        // range-culled and re-evaluated on a per-second global refresh and on join/quit/world-change. On wire every
-        // stored NPC is shown to the online viewers in range; on disable the refresh timer is cancelled and every
-        // shown fake player is removed from every viewer so a reload re-spawns cleanly with no ghost.
-        NpcWiring.Wired wired = NpcWiring.wire(plugin, ctx, persistence);
+        // packet stack; the npc table ships in the persistence V38 baseline, always applied. Its one cross-context
+        // edge is soft: a COST click action charges through the economy bridge captured during economy wiring (npc
+        // lands after economy), absent on a server without economy so the gate is simply skipped. A fake-player NPC
+        // has no real entity: each viewer is sent a spawn (then its tab entry is hidden), range-culled and
+        // re-evaluated on a per-second global refresh and on join/quit/world-change. On wire every stored NPC is
+        // shown to the online viewers in range; on disable the refresh timer is cancelled and every shown fake
+        // player is removed from every viewer so a reload re-spawns cleanly with no ghost.
+        NpcWiring.Wired wired = NpcWiring.wire(plugin, ctx, persistence, Optional.ofNullable(links.npcEconomy));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -844,6 +851,7 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;
+        private @org.jspecify.annotations.Nullable NpcEconomy npcEconomy;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
         private @org.jspecify.annotations.Nullable MutableAfkStatus afkStatus;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;

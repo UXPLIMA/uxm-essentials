@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.npc.adapter.outbound;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -13,24 +15,40 @@ import net.kyori.adventure.title.Title;
 
 import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionGates.Verdict;
+import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.npc.domain.NpcAction;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
  * The Bukkit/Adventure {@link NpcActionRunner}: it filters an NPC's action chain by click trigger and runs the
- * matching actions in order, each fail-soft. Command dispatch (console/player) reuses the same {@link
- * NpcCommandRunner} and {@code [console]}/{@code [player]}/{@code {player}} convention the single click command
- * uses; message/action-bar/title text is resolved through the shared built-in tokens then the PlaceholderAPI +
- * MiniMessage transform, so an action value may embed {@code {player}}, built-in {@code {token}}s, and {@code
- * %papi%} placeholders; a sound value is {@code KEY[:vol[:pitch]]}; a connect value is a target server name.
+ * matching actions as an ordered <em>sequence</em>. An effect action (console/player command, message/action-bar/
+ * title, sound, connect, give) performs its effect and the sequence moves on, fail-soft — one bad effect logs a
+ * one-line warning and is skipped, the chain continues. A gate action (chance, permission, condition, cost)
+ * decides whether the rest of the chain runs at all through {@link NpcActionGates}: a denied gate stops the
+ * remaining actions, a malformed gate spec is skipped (never aborting). A {@code DELAY} parks the rest of the
+ * chain: the tail is re-scheduled after the stated tick count through the {@link Scheduler} port (ticks converted
+ * at the fixed 50&nbsp;ms cadence) and then hops back onto the viewer's entity region to resume — a tiny
+ * in-adapter sequencer rather than a single straight loop. A viewer who logs off during the wait aborts the rest
+ * silently (the entity hop no-ops on a despawned entity).
  *
- * <p>Every action is wrapped so one bad value (an unknown sound, a malformed title, a connect with no proxy)
- * logs a one-line warning and is skipped — the chain never aborts and the listener never sees a throwable.
+ * <p>Command dispatch (console/player) reuses the same {@link NpcCommandRunner} and {@code [console]}/{@code
+ * [player]}/{@code {player}} convention the single click command uses; message/action-bar/title text is resolved
+ * through the shared built-in tokens then the PlaceholderAPI + MiniMessage transform, so an action value may
+ * embed {@code {player}}, built-in {@code {token}}s, and {@code %papi%} placeholders; a sound value is {@code
+ * KEY[:vol[:pitch]]}; a connect value is a target server name. The whole interaction is cooldown-gated at the
+ * listener, so a delayed continuation never re-arms the cooldown.
  */
 @NullMarked
 public final class BukkitNpcActionRunner implements NpcActionRunner {
@@ -38,33 +56,105 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
     private static final String CONSOLE_PREFIX = "[console]";
     private static final String PLAYER_PREFIX = "[player]";
     private static final String PLAYER_TOKEN = "{player}";
+    private static final long MILLIS_PER_TICK = 50L;
 
     private final NpcCommandRunner commandRunner;
     private final NpcServerConnector connector;
+    private final Scheduler scheduler;
+    private final NpcActionGates gates;
+    private final NpcGifts gifts;
     private final Logger log;
 
-    public BukkitNpcActionRunner(NpcCommandRunner commandRunner, NpcServerConnector connector, Logger log) {
+    public BukkitNpcActionRunner(
+            NpcCommandRunner commandRunner,
+            NpcServerConnector connector,
+            Scheduler scheduler,
+            Permissions permissions,
+            Optional<NpcEconomy> economy,
+            Messages messages,
+            Logger log) {
         this.commandRunner = Objects.requireNonNull(commandRunner, "commandRunner");
         this.connector = Objects.requireNonNull(connector, "connector");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
+        this.gates = new NpcActionGates(
+                Objects.requireNonNull(permissions, "permissions"),
+                Objects.requireNonNull(economy, "economy"),
+                new CommandFeedback(Objects.requireNonNull(messages, "messages")),
+                log);
+        this.gifts = new NpcGifts(log);
     }
 
     @Override
     public void run(Player viewer, List<NpcAction> actions, boolean attack) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(actions, "actions");
+        List<NpcAction> matching = new ArrayList<>();
         for (NpcAction action : actions) {
             if (action.trigger().matches(attack)) {
-                runOne(viewer, action);
+                matching.add(action);
+            }
+        }
+        runFrom(viewer, List.copyOf(matching), 0);
+    }
+
+    /** Run the already-trigger-filtered {@code actions} from {@code index} onward, honouring gates and delays. */
+    private void runFrom(Player viewer, List<NpcAction> actions, int index) {
+        for (int at = index; at < actions.size(); at++) {
+            NpcAction action = actions.get(at);
+            switch (action.type()) {
+                case DELAY -> {
+                    delayThenContinue(viewer, actions, at, action.value());
+                    return; // the tail resumes from the scheduler; this invocation is done
+                }
+                case CHANCE, PERMISSION, CONDITION, COST -> {
+                    if (gate(viewer, action) == Verdict.DENY) {
+                        return; // a denied gate stops the rest of the chain
+                    }
+                }
+                default -> effect(viewer, action);
             }
         }
     }
 
-    private void runOne(Player viewer, NpcAction action) {
+    private Verdict gate(Player viewer, NpcAction action) {
+        return switch (action.type()) {
+            case CHANCE -> gates.chance(action.value());
+            case PERMISSION -> gates.permission(viewer, action.value());
+            case CONDITION -> gates.condition(viewer, action.value());
+            case COST -> gates.cost(viewer, action.value());
+            default -> Verdict.PASS;
+        };
+    }
+
+    /** Park the remaining actions for {@code ticks}, then resume on the viewer's entity region thread. */
+    private void delayThenContinue(Player viewer, List<NpcAction> actions, int index, String raw) {
+        long ticks = parseTicks(raw);
+        if (ticks <= 0L) {
+            runFrom(viewer, actions, index + 1);
+            return;
+        }
+        var ref = BukkitRefs.toRef(viewer);
+        scheduler.asyncAfter(
+                Duration.ofMillis(ticks * MILLIS_PER_TICK),
+                () -> scheduler.onEntity(ref, () -> resume(ref, actions, index + 1)));
+    }
+
+    /** Resume the parked chain for the still-online viewer, or abort silently when they have logged off. */
+    private void resume(PlayerRef ref, List<NpcAction> actions, int index) {
+        Player viewer = org.bukkit.Bukkit.getPlayer(ref.uuid());
+        if (viewer == null || !viewer.isOnline()) {
+            return; // logged off during the wait — abort the rest of the chain
+        }
+        runFrom(viewer, actions, index);
+    }
+
+    /** Perform one effect action; never throws, so a single bad effect skips rather than aborting the chain. */
+    private void effect(Player viewer, NpcAction action) {
         try {
             dispatch(viewer, action);
         } catch (RuntimeException failure) {
-            // Fail-soft: a single malformed action must not abort the rest of the chain.
+            // Fail-soft: a single malformed effect must not abort the rest of the chain.
             log.warn("event=npc_action_failed type={} value={}", action.type().name(), action.value());
         }
     }
@@ -79,6 +169,19 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
             case TITLE -> showTitle(viewer, value);
             case SOUND -> playSound(viewer, value);
             case CONNECT -> connector.connect(viewer, value.strip());
+            case GIVE -> gifts.give(viewer, value);
+            default -> {
+                // Gate and delay types are handled by the sequencer before dispatch; nothing to do here.
+            }
+        }
+    }
+
+    private long parseTicks(String raw) {
+        try {
+            return Long.parseLong(raw.strip());
+        } catch (NumberFormatException notANumber) {
+            log.warn("event=npc_action_bad_delay value={}", raw);
+            return 0L; // a bad delay is treated as no delay — the chain continues immediately
         }
     }
 

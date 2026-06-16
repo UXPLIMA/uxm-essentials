@@ -65,7 +65,11 @@ public enum NpcMessageKey implements MessageKey {
     NPC_SKIN_ONLY_PLAYER("npc.skin-only-player"),
     NPC_INVALID_TRIGGER("npc.invalid-trigger"),
     NPC_INVALID_ACTION_TYPE("npc.invalid-action-type"),
-    NPC_ACTION_INDEX_INVALID("npc.action.index-invalid");
+    NPC_INVALID_ACTION_VALUE("npc.invalid-action-value"),
+    NPC_ACTION_INDEX_INVALID("npc.action.index-invalid"),
+
+    // runtime action feedback
+    NPC_ACTION_COST_DENIED("npc.action.cost-denied");
 
     private final String key;
 

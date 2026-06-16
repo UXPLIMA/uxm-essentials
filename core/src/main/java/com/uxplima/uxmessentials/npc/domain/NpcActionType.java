@@ -5,6 +5,15 @@ package com.uxplima.uxmessentials.npc.domain;
  * interprets the action's raw string {@code value} its own way — a command line, a MiniMessage source, a sound
  * key, or a target server name — and the adapter's runner dispatches accordingly. The domain only names the
  * types and carries the value; how each one runs against Bukkit is an adapter concern.
+ *
+ * <p>The types split into two roles the adapter's sequencer treats differently. <em>Effect</em> types
+ * ({@link #RUN_CONSOLE}, {@link #RUN_PLAYER}, {@link #MESSAGE}, {@link #ACTIONBAR}, {@link #TITLE},
+ * {@link #SOUND}, {@link #CONNECT}, {@link #GIVE}) do something visible and are fail-soft — one bad effect is
+ * logged and skipped, the chain continues. <em>Gate</em> types ({@link #CHANCE}, {@link #PERMISSION},
+ * {@link #CONDITION}, {@link #COST}) decide whether the rest of the chain runs at all: a failed gate stops the
+ * remaining actions (a malformed gate spec is the exception — it is logged and skipped, never aborting).
+ * {@link #DELAY} is neither: it pauses the chain and resumes the tail later. Whether a type gates or merely
+ * effects is the runner's concern; the domain only names it.
  */
 public enum NpcActionType {
 
@@ -27,5 +36,36 @@ public enum NpcActionType {
     SOUND,
 
     /** Send the player to the value-named server through the proxy's BungeeCord connect channel. */
-    CONNECT
+    CONNECT,
+
+    /**
+     * Pause the chain, then resume the remaining actions after the value's whole-tick count. The pause goes
+     * through the scheduler; a viewer who disconnects during the wait aborts the rest silently.
+     */
+    DELAY,
+
+    /**
+     * Roll a random gate. The value is a percent (0–100); on a failed roll the rest of the chain is aborted, so
+     * the actions after it are the "win" branch of a random reward.
+     */
+    CHANCE,
+
+    /** Gate the rest of the chain on a permission node: when the viewer lacks the value-named node, abort. */
+    PERMISSION,
+
+    /**
+     * Gate the rest of the chain on a comparison. The value is {@code <left> <op> <right>} with {@code op} one of
+     * {@code == != > < >= <=}; both sides may embed placeholders resolved per-viewer. A false comparison aborts;
+     * a malformed spec is skipped (the gate is ignored, the chain continues).
+     */
+    CONDITION,
+
+    /**
+     * Charge the viewer the value's amount through the economy seam. Insufficient funds abort the rest of the
+     * chain (and tell the viewer); a successful debit continues. With no economy provider the gate is skipped.
+     */
+    COST,
+
+    /** Give the viewer an item; the value is {@code <material>[:amount]} (default amount 1). Overflow drops. */
+    GIVE
 }

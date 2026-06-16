@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -36,6 +37,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
+import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
 import com.uxplima.uxmessentials.npc.domain.Npc;
@@ -61,9 +63,10 @@ import org.jspecify.annotations.Nullable;
  * fake-player spawn (then hides its tab entry) with no real entity. On wire every stored NPC is spawned to the
  * online viewers in range; a global refresh timer re-evaluates range each second so an NPC appears/disappears as
  * players move, and a faster look timer turns each looking NPC toward its nearby viewers. The interaction
- * listener runs an NPC's bound click command when a player clicks its fake entity. On stop the {@code Wired}
- * bundle cancels both timers and removes every shown NPC from every viewer so nothing is orphaned across a
- * reload.
+ * listener runs an NPC's bound click command when a player clicks its fake entity. A {@code COST} click action
+ * charges through the optional {@link NpcEconomy} bridge captured during economy wiring — empty on a server
+ * without economy, in which case the cost gate is simply skipped. On stop the {@code Wired} bundle cancels both
+ * timers and removes every shown NPC from every viewer so nothing is orphaned across a reload.
  */
 @NullMarked
 public final class NpcWiring {
@@ -77,10 +80,11 @@ public final class NpcWiring {
     private NpcWiring() {}
 
     /** Build the npc adapters and use cases, and spawn the stored NPCs to the online viewers in range. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence) {
+    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Optional<NpcEconomy> economy) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(economy, "economy");
         KernelPorts kernel = ctx.kernel();
         NpcSettings settings = new NpcSettings(ctx.config());
         NpcRepository repository = NpcRepositories.cached(persistence);
@@ -98,7 +102,14 @@ public final class NpcWiring {
         List<CommandRegistration> commands = List.of(new NpcCommand(services, skinByName, kernel.messages()));
         BukkitNpcCommandRunner commandRunner = new BukkitNpcCommandRunner();
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
-        NpcActionRunner actionRunner = new BukkitNpcActionRunner(commandRunner, connector, kernel.log());
+        NpcActionRunner actionRunner = new BukkitNpcActionRunner(
+                commandRunner,
+                connector,
+                kernel.scheduler(),
+                kernel.permissions(),
+                economy,
+                kernel.messages(),
+                kernel.log());
         NpcInteractionListener interaction = new NpcInteractionListener(
                 renderer, repository, commandRunner, actionRunner, kernel.scheduler(), settings.clickCooldown());
         List<Listener> listeners = List.of(new NpcLifecycleListener(renderer), interaction);

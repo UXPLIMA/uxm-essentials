@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.PermissionBaltopExempt
 import com.uxplima.uxmessentials.economy.adapter.outbound.PermissionTaxExemption;
 import com.uxplima.uxmessentials.economy.adapter.outbound.PhysicalWalletRepositoryDecorator;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderKitEconomy;
+import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderNpcEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderTaxSink;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderWarpEconomy;
 import com.uxplima.uxmessentials.economy.adapter.outbound.SalaryTask;
@@ -66,6 +67,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.homes.adapter.outbound.ProviderHomeEconomy;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
+import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
 import com.uxplima.uxmessentials.persistence.economy.LockingWalletRepository;
 import com.uxplima.uxmessentials.persistence.economy.RedisWalletSync;
@@ -251,6 +253,7 @@ public final class EconomyWiring {
         KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency());
         HomeEconomy homeEconomy = new ProviderHomeEconomy(resolved, currencies.defaultCurrency());
         VaultEconomy vaultEconomy = new ProviderVaultEconomy(resolved, currencies.defaultCurrency());
+        NpcEconomy npcEconomy = new ProviderNpcEconomy(resolved, currencies.defaultCurrency());
 
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
@@ -340,6 +343,7 @@ public final class EconomyWiring {
                 kitEconomy,
                 homeEconomy,
                 vaultEconomy,
+                npcEconomy,
                 ledger,
                 snapshots,
                 resolved,
@@ -568,6 +572,7 @@ public final class EconomyWiring {
      * @param kitEconomy the bridge kits charges a per-kit cost through
      * @param homeEconomy the bridge homes charges a per-action cost through
      * @param vaultEconomy the bridge vaults charges a per-action cost (and pays the delete refund) through
+     * @param npcEconomy the bridge an NPC {@code COST} click action charges the clicking viewer through
      * @param ledger the native-ledger persistence handle whose loops are armed/drained
      * @param snapshots the per-currency baltop snapshots whose refresh loop is armed/stopped
      * @param provider the resolved provider this plugin uses (registered or deferred)
@@ -583,6 +588,7 @@ public final class EconomyWiring {
             KitEconomy kitEconomy,
             HomeEconomy homeEconomy,
             VaultEconomy vaultEconomy,
+            NpcEconomy npcEconomy,
             WalletLedger ledger,
             BaltopSnapshots snapshots,
             EconomyProvider provider,
@@ -604,6 +610,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(kitEconomy, "kitEconomy");
             Objects.requireNonNull(homeEconomy, "homeEconomy");
             Objects.requireNonNull(vaultEconomy, "vaultEconomy");
+            Objects.requireNonNull(npcEconomy, "npcEconomy");
             Objects.requireNonNull(ledger, "ledger");
             Objects.requireNonNull(snapshots, "snapshots");
             Objects.requireNonNull(provider, "provider");
