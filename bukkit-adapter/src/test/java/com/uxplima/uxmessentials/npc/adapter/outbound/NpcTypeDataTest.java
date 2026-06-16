@@ -46,4 +46,54 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("villager_profession", "librarian")).isTrue();
         assertThat(NpcTypeData.isValidValue("villager_type", " ")).isFalse();
     }
+
+    @Test
+    void recognisesTheNewVariantKeys() {
+        assertThat(NpcTypeData.isKnownKey("horse_color")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("HORSE_MARKINGS")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("llama_variant")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("sheep_color")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("rabbit_type")).isTrue();
+    }
+
+    @Test
+    void validatesBoundedIntegerVariantKeys() {
+        // Each variant key accepts a non-negative int within its own range; zero is valid (the first variant).
+        assertThat(NpcTypeData.isValidValue("horse_color", "6")).isTrue();
+        assertThat(NpcTypeData.isValidValue("horse_color", "0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("horse_color", "7")).isFalse();
+        assertThat(NpcTypeData.isValidValue("horse_markings", "4")).isTrue();
+        assertThat(NpcTypeData.isValidValue("horse_markings", "5")).isFalse();
+        assertThat(NpcTypeData.isValidValue("llama_variant", "3")).isTrue();
+        assertThat(NpcTypeData.isValidValue("llama_variant", "4")).isFalse();
+        assertThat(NpcTypeData.isValidValue("parrot_variant", "4")).isTrue();
+        assertThat(NpcTypeData.isValidValue("axolotl_variant", "4")).isTrue();
+        assertThat(NpcTypeData.isValidValue("fox_type", "1")).isTrue();
+        assertThat(NpcTypeData.isValidValue("fox_type", "2")).isFalse();
+        assertThat(NpcTypeData.isValidValue("fox_type", "-1")).isFalse();
+    }
+
+    @Test
+    void validatesRabbitTypeIncludingTheKillerVariant() {
+        // The six coats are 0-5; 99 is the killer (toast) rabbit, a valid wire value even though it is out of the
+        // 0-5 run.
+        assertThat(NpcTypeData.isValidValue("rabbit_type", "0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("rabbit_type", "5")).isTrue();
+        assertThat(NpcTypeData.isValidValue("rabbit_type", "99")).isTrue();
+        assertThat(NpcTypeData.isValidValue("rabbit_type", "6")).isFalse();
+        assertThat(NpcTypeData.isValidValue("rabbit_type", "98")).isFalse();
+    }
+
+    @Test
+    void sheepColorAcceptsADyeColorNameOrARawId() {
+        assertThat(NpcTypeData.isValidValue("sheep_color", "red")).isTrue();
+        assertThat(NpcTypeData.isValidValue("sheep_color", "LIGHT_BLUE")).isTrue();
+        assertThat(NpcTypeData.isValidValue("sheep_color", "0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("sheep_color", "15")).isTrue();
+        assertThat(NpcTypeData.isValidValue("sheep_color", "16")).isFalse();
+        assertThat(NpcTypeData.isValidValue("sheep_color", "not_a_color")).isFalse();
+    }
 }

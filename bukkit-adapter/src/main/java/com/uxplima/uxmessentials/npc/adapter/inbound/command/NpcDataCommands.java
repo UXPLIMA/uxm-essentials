@@ -32,8 +32,21 @@ import org.jspecify.annotations.NullMarked;
 final class NpcDataCommands extends NpcCommandSupport {
 
     /** The accepted {@code data set}/{@code data clear} keys, also the tab suggestions. */
-    private static final List<String> DATA_KEYS =
-            List.of("baby", "size", "charged", "villager_type", "villager_profession", "villager_level");
+    private static final List<String> DATA_KEYS = List.of(
+            "baby",
+            "size",
+            "charged",
+            "villager_type",
+            "villager_profession",
+            "villager_level",
+            "horse_color",
+            "horse_markings",
+            "llama_variant",
+            "sheep_color",
+            "parrot_variant",
+            "axolotl_variant",
+            "fox_type",
+            "rabbit_type");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
     private static final List<String> BOOLEAN_VALUES = List.of("true", "false");
 

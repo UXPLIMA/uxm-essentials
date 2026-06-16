@@ -369,6 +369,41 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object horseVariant(int entityId, int color, int markings) {
+            return new Object();
+        }
+
+        @Override
+        public Object llamaVariant(int entityId, int variant) {
+            return new Object();
+        }
+
+        @Override
+        public Object sheepColor(int entityId, int color) {
+            return new Object();
+        }
+
+        @Override
+        public Object parrotVariant(int entityId, int variant) {
+            return new Object();
+        }
+
+        @Override
+        public Object axolotlVariant(int entityId, int variant) {
+            return new Object();
+        }
+
+        @Override
+        public Object foxType(int entityId, int type) {
+            return new Object();
+        }
+
+        @Override
+        public Object rabbitType(int entityId, int type) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }

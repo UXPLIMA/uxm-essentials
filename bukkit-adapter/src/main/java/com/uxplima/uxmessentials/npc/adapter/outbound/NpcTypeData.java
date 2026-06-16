@@ -88,6 +88,7 @@ public final class NpcTypeData {
         applySize(packets, viewer, entityId, type, data, npc, log);
         applyCharged(packets, viewer, entityId, type, data, npc, log);
         applyVillager(packets, viewer, entityId, type, data);
+        NpcVariantData.apply(packets, viewer, entityId, type, data, npc, log);
     }
 
     private static void applyBaby(
@@ -170,7 +171,7 @@ public final class NpcTypeData {
                     KEY_VILLAGER_TYPE,
                     KEY_VILLAGER_PROFESSION,
                     KEY_VILLAGER_LEVEL -> true;
-            default -> false;
+            default -> NpcVariantData.isKnownKey(key);
         };
     }
 
@@ -185,7 +186,7 @@ public final class NpcTypeData {
             case KEY_BABY, KEY_CHARGED -> isBoolean(value);
             case KEY_SIZE, KEY_VILLAGER_LEVEL -> isPositiveInt(value);
             case KEY_VILLAGER_TYPE, KEY_VILLAGER_PROFESSION -> !value.isBlank();
-            default -> false;
+            default -> NpcVariantData.isKnownKey(key) && NpcVariantData.isValidValue(key, value);
         };
     }
 

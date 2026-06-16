@@ -400,6 +400,133 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesHorseColourAndMarkingsToAHorseNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("HORSE")
+                .withTypeData("horse_color", "3")
+                .withTypeData("horse_markings", "2"));
+
+        // The colour and markings collapse into a single horseVariant packet carrying both components.
+        assertThat(packets.horseVariants).hasSize(1);
+        assertThat(packets.horseVariants.get(0).color()).isEqualTo(3);
+        assertThat(packets.horseVariants.get(0).markings()).isEqualTo(2);
+    }
+
+    @Test
+    void appliesHorseColourAloneWithDefaultMarkings() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("HORSE").withTypeData("horse_color", "5"));
+
+        // A colour without markings still ships, with markings defaulted to none (0).
+        assertThat(packets.horseVariants).hasSize(1);
+        assertThat(packets.horseVariants.get(0).color()).isEqualTo(5);
+        assertThat(packets.horseVariants.get(0).markings()).isEqualTo(0);
+    }
+
+    @Test
+    void appliesLlamaVariantToALlamaNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("LLAMA").withTypeData("llama_variant", "2"));
+
+        assertThat(packets.llamaVariants).hasSize(1);
+        assertThat(packets.llamaVariants.get(0).variant()).isEqualTo(2);
+    }
+
+    @Test
+    void appliesSheepColourFromARawIdToASheepNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("SHEEP").withTypeData("sheep_color", "14"));
+
+        assertThat(packets.sheepColors).hasSize(1);
+        assertThat(packets.sheepColors.get(0).color()).isEqualTo(14);
+    }
+
+    @Test
+    void appliesSheepColourFromADyeColorNameToASheepNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // A human-friendly DyeColor name resolves to its wool id (RED == 14) at apply time.
+        renderer.render(npcAt(viewer, 1.0).withEntityType("SHEEP").withTypeData("sheep_color", "red"));
+
+        assertThat(packets.sheepColors).hasSize(1);
+        assertThat(packets.sheepColors.get(0).color()).isEqualTo(org.bukkit.DyeColor.RED.getWoolData());
+    }
+
+    @Test
+    void appliesParrotVariantToAParrotNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("PARROT").withTypeData("parrot_variant", "4"));
+
+        assertThat(packets.parrotVariants).hasSize(1);
+        assertThat(packets.parrotVariants.get(0).variant()).isEqualTo(4);
+    }
+
+    @Test
+    void appliesAxolotlVariantToAnAxolotlNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("AXOLOTL").withTypeData("axolotl_variant", "3"));
+
+        assertThat(packets.axolotlVariants).hasSize(1);
+        assertThat(packets.axolotlVariants.get(0).variant()).isEqualTo(3);
+    }
+
+    @Test
+    void appliesFoxTypeToAFoxNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("FOX").withTypeData("fox_type", "1"));
+
+        assertThat(packets.foxTypes).hasSize(1);
+        assertThat(packets.foxTypes.get(0).type()).isEqualTo(1);
+    }
+
+    @Test
+    void appliesRabbitTypeIncludingTheKillerVariantToARabbitNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("RABBIT").withTypeData("rabbit_type", "99"));
+
+        assertThat(packets.rabbitTypes).hasSize(1);
+        assertThat(packets.rabbitTypes.get(0).type()).isEqualTo(99);
+    }
+
+    @Test
+    void doesNotSendAVariantToTheWrongTypeFailSoft() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // A horse colour on a cow, a sheep colour on a pig: each unsupported key is skipped, not sent, and the
+        // spawn still goes out — a variant value never reaches a type that has no such field.
+        assertThatCode(() -> renderer.render(npcAt(viewer, 1.0)
+                        .withEntityType("COW")
+                        .withTypeData("horse_color", "3")
+                        .withTypeData("sheep_color", "red")
+                        .withTypeData("fox_type", "1")))
+                .doesNotThrowAnyException();
+
+        assertThat(packets.horseVariants).isEmpty();
+        assertThat(packets.sheepColors).isEmpty();
+        assertThat(packets.foxTypes).isEmpty();
+        assertThat(packets.spawnEntities).hasSize(1);
+    }
+
+    @Test
     void skipsUnsupportedTypeDataFailSoftWithoutAPacketOrThrow() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -806,6 +933,13 @@ class NpcRendererTest {
         private final List<SlimeSize> slimeSizes = new ArrayList<>();
         private final List<Charged> chargeds = new ArrayList<>();
         private final List<VillagerData> villagerDatas = new ArrayList<>();
+        private final List<HorseVariant> horseVariants = new ArrayList<>();
+        private final List<LlamaVariant> llamaVariants = new ArrayList<>();
+        private final List<SheepColor> sheepColors = new ArrayList<>();
+        private final List<ParrotVariant> parrotVariants = new ArrayList<>();
+        private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
+        private final List<FoxType> foxTypes = new ArrayList<>();
+        private final List<RabbitType> rabbitTypes = new ArrayList<>();
         private final List<Sent> sent = new ArrayList<>();
 
         @Override
@@ -952,6 +1086,55 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object horseVariant(int entityId, int color, int markings) {
+            HorseVariant packet = new HorseVariant(entityId, color, markings);
+            horseVariants.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object llamaVariant(int entityId, int variant) {
+            LlamaVariant packet = new LlamaVariant(entityId, variant);
+            llamaVariants.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object sheepColor(int entityId, int color) {
+            SheepColor packet = new SheepColor(entityId, color);
+            sheepColors.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object parrotVariant(int entityId, int variant) {
+            ParrotVariant packet = new ParrotVariant(entityId, variant);
+            parrotVariants.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object axolotlVariant(int entityId, int variant) {
+            AxolotlVariant packet = new AxolotlVariant(entityId, variant);
+            axolotlVariants.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object foxType(int entityId, int type) {
+            FoxType packet = new FoxType(entityId, type);
+            foxTypes.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object rabbitType(int entityId, int type) {
+            RabbitType packet = new RabbitType(entityId, type);
+            rabbitTypes.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -1040,6 +1223,20 @@ class NpcRendererTest {
         private record SlimeSize(int entityId, int size) {}
 
         private record Charged(int entityId, boolean charged) {}
+
+        private record HorseVariant(int entityId, int color, int markings) {}
+
+        private record LlamaVariant(int entityId, int variant) {}
+
+        private record SheepColor(int entityId, int color) {}
+
+        private record ParrotVariant(int entityId, int variant) {}
+
+        private record AxolotlVariant(int entityId, int variant) {}
+
+        private record FoxType(int entityId, int type) {}
+
+        private record RabbitType(int entityId, int type) {}
 
         private record VillagerData(int entityId, String type, String profession, int level) {}
 
