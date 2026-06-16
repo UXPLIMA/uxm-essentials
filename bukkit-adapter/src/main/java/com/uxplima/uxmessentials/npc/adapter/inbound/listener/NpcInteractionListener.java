@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 
 import org.bukkit.entity.Player;
@@ -16,7 +15,6 @@ import org.bukkit.inventory.EquipmentSlot;
 import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Ticker;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
@@ -41,12 +39,13 @@ import org.jspecify.annotations.NullMarked;
  * with the clicker's name. The click command alone is right-click-only; the action chain carries its own
  * per-action trigger (left/right/any), so both an attack and an interact are now acted on — only the off-hand
  * duplicate is ignored. A held button repeats and the client double-fires, so a short per-player-per-NPC cooldown
- * gates the whole interaction. The cooldown is a self-evicting Caffeine cache keyed {@code uuid:npcName} with
- * {@code expireAfterWrite(cooldown)}: a present (un-expired) stamp means the cooldown is still running, and an
- * expired entry — which means the cooldown has elapsed — drops out on its own, so the map cannot grow for offline
- * players or deleted NPCs over the JVM lifetime. The interaction runs for everyone (an NPC is a server fixture);
- * the reserved {@code uxmessentials.npc.use} node is left for a future per-NPC permission gate rather than
- * blanket-gating the click here.
+ * gates the whole interaction. The cooldown is a self-evicting Caffeine cache keyed {@code uuid:npcName} with a
+ * per-entry variable {@code expireAfter}: each stamp expires after that click's effective cooldown — the NPC's own
+ * {@code interactionCooldownMillis} override when set, else the module-wide default — so a present (un-expired)
+ * stamp means the cooldown is still running, and an expired entry (the cooldown has elapsed) drops out on its own,
+ * so the map cannot grow for offline players or deleted NPCs over the JVM lifetime. The interaction runs for
+ * everyone (an NPC is a server fixture); the reserved {@code uxmessentials.npc.use} node is left for a future
+ * per-NPC permission gate rather than blanket-gating the click here.
  */
 @NullMarked
 public final class NpcInteractionListener implements Listener {
@@ -64,7 +63,8 @@ public final class NpcInteractionListener implements Listener {
     private final NpcActionRunner actionRunner;
     private final Scheduler scheduler;
     private final long cooldownMillis;
-    private final Cache<String, Boolean> lastClick;
+    private final LongSupplier clock;
+    private final Cache<String, Long> lastClick;
 
     public NpcInteractionListener(
             NpcRenderer renderer,
@@ -91,18 +91,14 @@ public final class NpcInteractionListener implements Listener {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.cooldownMillis =
                 Objects.requireNonNull(clickCooldown, "clickCooldown").toMillis();
-        Objects.requireNonNull(clock, "clock");
-        // The cache expires each stamp once the cooldown has elapsed, so an expired entry is exactly an elapsed
-        // cooldown and the map self-bounds. The ticker reads the injected clock (millis -> nanos) so tests can drive
-        // expiry by advancing it. A non-positive cooldown means "no cooldown"; we still build a (never-read) cache so
-        // the field stays final.
-        long expiryNanos = Math.max(cooldownMillis, 1L) * 1_000_000L;
-        Ticker ticker = () -> clock.getAsLong() * 1_000_000L;
-        this.lastClick = Caffeine.newBuilder()
-                .maximumSize(MAX_TRACKED_CLICKS)
-                .expireAfterWrite(expiryNanos, TimeUnit.NANOSECONDS)
-                .ticker(ticker)
-                .build();
+        this.clock = Objects.requireNonNull(clock, "clock");
+        // Each entry stores the millisecond deadline at which that click's cooldown elapses (now + the effective
+        // cooldown), so the per-NPC override and the global default each block for their own window with no loss of
+        // precision. The cache is bounded by size alone (LRU): a passed deadline is swept on access and in
+        // trackedClicks(), so an idle player/NPC pair drops out and the map cannot grow over the JVM lifetime, while
+        // maximumSize caps it even under churn between sweeps. The injected clock drives the deadline so tests can
+        // advance it.
+        this.lastClick = Caffeine.newBuilder().maximumSize(MAX_TRACKED_CLICKS).build();
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -114,15 +110,15 @@ public final class NpcInteractionListener implements Listener {
         if (npcName == null) {
             return; // a genuinely unknown entity (not one of ours)
         }
-        Player player = event.getPlayer();
-        if (onCooldown(player, npcName)) {
-            return;
-        }
         Optional<Npc> found = repository.find(NpcName.of(npcName));
         if (found.isEmpty()) {
             return;
         }
         Npc npc = found.get();
+        Player player = event.getPlayer();
+        if (onCooldown(player, npcName, effectiveCooldownMillis(npc))) {
+            return;
+        }
         boolean attack = event.isAttack();
         // The single click command is the legacy right-click-only binding; the richer action chain carries its
         // own per-action trigger and runs after it, both on the clicking player's region thread.
@@ -138,22 +134,34 @@ public final class NpcInteractionListener implements Listener {
         }
     }
 
-    private boolean onCooldown(Player player, String npcName) {
-        if (cooldownMillis <= 0) {
+    /** The NPC's per-NPC cooldown override when set (positive), otherwise the module-wide default. */
+    private long effectiveCooldownMillis(Npc npc) {
+        long perNpc = npc.interactionCooldownMillis();
+        return perNpc > 0 ? perNpc : cooldownMillis;
+    }
+
+    private boolean onCooldown(Player player, String npcName, long effectiveMillis) {
+        if (effectiveMillis <= 0) {
             return false;
         }
         String key = player.getUniqueId() + ":" + npcName;
-        // A present (un-expired) stamp means the cooldown is still running; an expired one has already dropped out, so
-        // getIfPresent returns null and we re-stamp to start a fresh window.
-        if (lastClick.getIfPresent(key) != null) {
-            return true;
+        long now = clock.getAsLong();
+        Long deadline = lastClick.getIfPresent(key);
+        if (deadline != null && now < deadline) {
+            return true; // the previous click's cooldown is still running
         }
-        lastClick.put(key, Boolean.TRUE);
+        // No live cooldown (none, or the prior one has elapsed): start a fresh window sized to this click's
+        // effective cooldown. An elapsed entry is overwritten rather than left dangling.
+        lastClick.put(key, now + effectiveMillis);
         return false;
     }
 
-    /** The count of un-expired cooldown stamps after a maintenance pass — exposed so a test can assert eviction. */
+    /** The count of still-running cooldown stamps after sweeping elapsed ones — exposed so a test can assert eviction. */
     long trackedClicks() {
+        long now = clock.getAsLong();
+        // Drop every entry whose deadline has passed, so an elapsed cooldown leaves no residue — the same self-bound
+        // the old time-expiry gave, made precise (Caffeine's variable timer wheel is too coarse for sub-second tests).
+        lastClick.asMap().values().removeIf(deadline -> deadline <= now);
         lastClick.cleanUp();
         return lastClick.estimatedSize();
     }

@@ -293,13 +293,119 @@ class NpcRendererTest {
                 .withGlowColor("RED");
         renderer.render(npc);
 
-        // The spawn carries the equipment packet (one resolved slot) and the glow toggle + the team that tints it.
+        // The spawn carries the equipment packet (one resolved slot) and the shared-flags byte (glow bit) + the
+        // team that tints the outline (and carries the collision rule, both on one team).
         assertThat(packets.equipments).hasSize(1);
         assertThat(packets.equipments.get(0).items()).containsKey(com.uxplima.uxmlib.packet.npc.EquipmentSlot.HEAD);
-        assertThat(packets.glows).hasSize(1);
-        assertThat(packets.glows.get(0).glowing()).isTrue();
-        assertThat(packets.glowColors).hasSize(1);
-        assertThat(packets.glowColors.get(0).color()).isEqualTo(com.uxplima.uxmlib.packet.npc.NamedColor.RED);
+        assertThat(packets.sharedFlags).hasSize(1);
+        assertThat(packets.sharedFlags.get(0).glowing()).isTrue();
+        assertThat(packets.collidables).hasSize(1);
+        assertThat(packets.collidables.get(0).color()).isEqualTo(com.uxplima.uxmlib.packet.npc.NamedColor.RED);
+    }
+
+    @Test
+    void composesOnFireGlowAndInvisibleIntoOneSharedFlagsPacket() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        Npc npc = npcAt(viewer, 1.0).withOnFire(true).withGlowing(true).withInvisible(true);
+        renderer.render(npc);
+
+        // All three flags ride a single shared-flags packet so none overwrites the others' bits.
+        assertThat(packets.sharedFlags).hasSize(1);
+        assertThat(packets.sharedFlags.get(0).onFire()).isTrue();
+        assertThat(packets.sharedFlags.get(0).glowing()).isTrue();
+        assertThat(packets.sharedFlags.get(0).invisible()).isTrue();
+    }
+
+    @Test
+    void sendsTheSilentPacketOnlyForASilentNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withSilent(true));
+        assertThat(packets.silents).hasSize(1);
+        assertThat(packets.silents.get(0).silent()).isTrue();
+    }
+
+    @Test
+    void sendsACollisionTeamReflectingTheCollidableFlag() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // A non-collidable NPC (the default) sends a team with the collision rule off and no colour.
+        renderer.render(npcAt(viewer, 1.0));
+        assertThat(packets.collidables).hasSize(1);
+        assertThat(packets.collidables.get(0).collidable()).isFalse();
+        assertThat(packets.collidables.get(0).color()).isNull();
+
+        // A collidable, non-glowing NPC needs no team at all — the no-team default already collides with no colour.
+        packets.collidables.clear();
+        renderer.render(npcAt(viewer, 1.0).withCollidable(true));
+        assertThat(packets.collidables).isEmpty();
+    }
+
+    @Test
+    void rendersTheDisplayNameAsTheProfileNameKeepingTheId() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withDisplayName("Greeter"));
+
+        // The shown name above the head (the player-info profile name) is the display name, not the id.
+        assertThat(packets.tabAdds.get(0).name()).isEqualTo("Greeter");
+    }
+
+    @Test
+    void keepsTheTabEntryWhenShowInTabIsOn() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withShowInTab(true));
+
+        // The spawn bundle still goes out, but the deferred tab-remove is skipped so the entry stays listed.
+        assertThat(packets.bundlesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).isEmpty();
+    }
+
+    @Test
+    void mirrorSkinSpawnsEachViewerWithTheirOwnProfileSkin() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // A mirror-skin NPC carries no stored skin; the tab-add uses the viewer's own profile skin (or none under
+        // MockBukkit, which is the fail-soft path) — the point is it does not throw and the spawn still goes out.
+        assertThatCode(() -> renderer.render(npcAt(viewer, 1.0).withMirrorSkin(true)))
+                .doesNotThrowAnyException();
+        assertThat(packets.tabAdds).hasSize(1);
+        assertThat(packets.spawns).hasSize(1);
+    }
+
+    @Test
+    void honoursThePerNpcViewDistanceOverride() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // 40 blocks away is inside the global 48 range but outside a per-NPC 10-block override, so it is not shown.
+        renderer.render(npcAt(viewer, 40.0).withViewDistance(10.0));
+        assertThat(packets.spawns).isEmpty();
+
+        // The same distance is inside a per-NPC 60-block override, so the NPC is shown.
+        renderer.render(npcAt(viewer, 40.0).withViewDistance(60.0));
+        assertThat(packets.spawns).hasSize(1);
+    }
+
+    @Test
+    void honoursThePerNpcTurnDistanceOverride() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+        renderer.render(npcAt(viewer, 20.0).withTurnDistance(4.0)); // shown (render 48) but past a 4-block turn range
+        int looksBefore = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        renderer.lookTick();
+
+        // The viewer is past the per-NPC turn distance, so no look packets are sent despite being within look range.
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksBefore);
     }
 
     @Test
@@ -310,8 +416,9 @@ class NpcRendererTest {
         renderer.render(npcAt(viewer, 1.0));
 
         assertThat(packets.equipments).isEmpty();
-        assertThat(packets.glows).isEmpty();
+        assertThat(packets.sharedFlags).isEmpty(); // not glowing, not on fire, not invisible
         assertThat(packets.glowColors).isEmpty();
+        assertThat(packets.silents).isEmpty();
     }
 
     @Test
@@ -785,9 +892,10 @@ class NpcRendererTest {
         Npc npc = npcAt(viewer, 1.0).withGlowing(true).withGlowColor("octarine");
         renderer.render(npc);
 
-        // An unparseable colour falls back to a null (default white) team colour rather than failing the spawn.
-        assertThat(packets.glows.get(0).glowing()).isTrue();
-        assertThat(packets.glowColors.get(0).color()).isNull();
+        // An unparseable colour falls back to a null (default white) team colour rather than failing the spawn; the
+        // glow bit still rides the shared-flags packet and the team carries the (null) colour.
+        assertThat(packets.sharedFlags.get(0).glowing()).isTrue();
+        assertThat(packets.collidables.get(0).color()).isNull();
     }
 
     @Test
@@ -848,8 +956,8 @@ class NpcRendererTest {
         assertThat(packets.spawnEntities).hasSize(1);
         assertThat(packets.equipments).hasSize(1);
         assertThat(packets.equipments.get(0).items()).containsKey(com.uxplima.uxmlib.packet.npc.EquipmentSlot.HEAD);
-        assertThat(packets.glows.get(0).glowing()).isTrue();
-        assertThat(packets.glowColors.get(0).color()).isEqualTo(com.uxplima.uxmlib.packet.npc.NamedColor.RED);
+        assertThat(packets.sharedFlags.get(0).glowing()).isTrue();
+        assertThat(packets.collidables.get(0).color()).isEqualTo(com.uxplima.uxmlib.packet.npc.NamedColor.RED);
     }
 
     @Test
@@ -981,6 +1089,9 @@ class NpcRendererTest {
         private final List<List<Object>> bundles = new ArrayList<>();
         private final List<Equipment> equipments = new ArrayList<>();
         private final List<Glow> glows = new ArrayList<>();
+        private final List<SharedFlags> sharedFlags = new ArrayList<>();
+        private final List<Silent> silents = new ArrayList<>();
+        private final List<Collidable> collidables = new ArrayList<>();
         private final List<GlowColor> glowColors = new ArrayList<>();
         private final List<PoseSet> poses = new ArrayList<>();
         private final List<Scale> scales = new ArrayList<>();
@@ -1074,6 +1185,27 @@ class NpcRendererTest {
         public Object glow(int entityId, boolean glowing) {
             Glow packet = new Glow(entityId, glowing);
             glows.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object sharedFlags(int entityId, boolean onFire, boolean glowing, boolean invisible) {
+            SharedFlags packet = new SharedFlags(entityId, onFire, glowing, invisible);
+            sharedFlags.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object silent(int entityId, boolean silent) {
+            Silent packet = new Silent(entityId, silent);
+            silents.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object collidable(String teamName, String memberName, @Nullable NamedColor color, boolean collidable) {
+            Collidable packet = new Collidable(teamName, memberName, color, collidable);
+            collidables.add(packet);
             return packet;
         }
 
@@ -1285,6 +1417,12 @@ class NpcRendererTest {
         private record Equipment(int entityId, Map<com.uxplima.uxmlib.packet.npc.EquipmentSlot, ItemStack> items) {}
 
         private record Glow(int entityId, boolean glowing) {}
+
+        private record SharedFlags(int entityId, boolean onFire, boolean glowing, boolean invisible) {}
+
+        private record Silent(int entityId, boolean silent) {}
+
+        private record Collidable(String teamName, String memberName, @Nullable NamedColor color, boolean collidable) {}
 
         private record PoseSet(int entityId, com.uxplima.uxmlib.packet.npc.NpcPose pose) {}
 

@@ -63,29 +63,28 @@ final class NpcActionCommands extends NpcCommandSupport {
     /** The {@code give} value word that captures the sender's currently-held item instead of naming a material. */
     private static final String HAND_KEYWORD = "hand";
 
-    NpcActionCommands(NpcServices services, Messages messages) {
-        super(services, messages);
+    NpcActionCommands(
+            NpcServices services,
+            java.util.function.Supplier<? extends java.util.Collection<String>> npcNames,
+            Messages messages) {
+        super(services, npcNames, messages);
     }
 
     /** The {@code action} subcommand node the {@code /npc} literal attaches. */
     LiteralArgumentBuilder<CommandSourceStack> node() {
         return Commands.literal("action")
                 .then(actionAddNode())
-                .then(Commands.literal("list")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::actionList)))
+                .then(Commands.literal("list").then(nameArgument().executes(this::actionList)))
                 .then(Commands.literal("remove")
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(nameArgument()
                                 .then(Commands.argument("index", IntegerArgumentType.integer(1))
                                         .executes(this::actionRemove))))
-                .then(Commands.literal("clear")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::actionClear)));
+                .then(Commands.literal("clear").then(nameArgument().executes(this::actionClear)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> actionAddNode() {
         return Commands.literal("add")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument()
                         .then(Commands.argument("trigger", StringArgumentType.word())
                                 .suggests(this::suggestTriggers)
                                 .then(Commands.argument("type", StringArgumentType.word())

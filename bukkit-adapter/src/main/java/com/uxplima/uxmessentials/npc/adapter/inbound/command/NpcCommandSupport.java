@@ -1,10 +1,12 @@
 package com.uxplima.uxmessentials.npc.adapter.inbound.command;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -15,13 +17,16 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -40,25 +45,52 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 abstract class NpcCommandSupport {
 
+    /** The boolean words suggested for every {@code <true|false>} argument across the {@code /npc} surface. */
+    static final List<String> BOOLEAN_WORDS = List.of("true", "false");
+
     final NpcServices services;
     final CommandFeedback feedback;
+    private final Supplier<? extends Collection<String>> npcNames;
 
-    NpcCommandSupport(NpcServices services, Messages messages) {
+    NpcCommandSupport(NpcServices services, Supplier<? extends Collection<String>> npcNames, Messages messages) {
         this.services = Objects.requireNonNull(services, "services");
+        this.npcNames = Objects.requireNonNull(npcNames, "npcNames");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
-    /** A {@code <literal> <name>} subcommand mapping the name word to {@code action}. */
+    /**
+     * A {@code name} word argument that completes against the current NPC names — the single place every {@code
+     * /npc} subcommand sources its name suggestions, so the operator never has to remember a name. The supplier
+     * reads the renderer's warm in-memory name set on the tick thread, never the DB.
+     */
+    final RequiredArgumentBuilder<CommandSourceStack, String> nameArgument() {
+        return Commands.argument("name", StringArgumentType.word()).suggests(nameSuggestions());
+    }
+
+    /** The shared NPC-name suggestion provider, for a {@code name} argument that is not the first under a literal. */
+    final SuggestionProvider<CommandSourceStack> nameSuggestions() {
+        return CommandSuggestions.fromStrings(npcNames);
+    }
+
+    /** A {@code <literal> <name>} subcommand whose name word completes against the current NPC names. */
     final LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
-        return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word()).executes(action));
+        return Commands.literal(literal).then(nameArgument().executes(action));
     }
 
     /** A {@code <literal> <name> <value…>} subcommand whose value is the greedy rest of the line. */
     final LiteralArgumentBuilder<CommandSourceStack> greedy(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument()
                         .then(Commands.argument("value", StringArgumentType.greedyString())
+                                .executes(action)));
+    }
+
+    /** A {@code <literal> <name> <true|false>} subcommand whose value word completes against the boolean choices. */
+    final LiteralArgumentBuilder<CommandSourceStack> bool(String literal, Command<CommandSourceStack> action) {
+        return Commands.literal(literal)
+                .then(nameArgument()
+                        .then(Commands.argument("value", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .suggests((ctx, builder) -> suggest(builder, BOOLEAN_WORDS))
                                 .executes(action)));
     }
 

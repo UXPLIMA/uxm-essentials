@@ -19,31 +19,50 @@ import org.jspecify.annotations.Nullable;
  * players out of the box. {@code actions} is the ordered list of {@link NpcAction}s a click runs, the richer
  * mechanism alongside the single {@code clickCommand} (which still runs first). The list is copied defensively on
  * construction so the snapshot is immutable.
+ *
+ * <p>{@code interactionCooldownMillis} is the per-NPC override of the global click cooldown that swallows a
+ * duplicate click: {@code 0} (the default) means "use the module-wide default", any positive value overrides it
+ * for this NPC alone. It is carried here rather than as a global so a busy command NPC and a chatty greeter can
+ * each tune their own debounce; the listener resolves the effective value. Negative values are rejected.
  */
-public record NpcBehavior(@Nullable String clickCommand, boolean lookAtPlayer, List<NpcAction> actions) {
+public record NpcBehavior(
+        @Nullable String clickCommand, boolean lookAtPlayer, List<NpcAction> actions, long interactionCooldownMillis) {
 
     public NpcBehavior {
         actions = List.copyOf(Objects.requireNonNull(actions, "actions"));
+        if (interactionCooldownMillis < 0) {
+            throw new IllegalArgumentException(
+                    "interactionCooldownMillis must not be negative, was " + interactionCooldownMillis);
+        }
     }
 
-    /** The default behavior for a freshly created NPC: no command, looking at players, no actions. */
+    /** The legacy three-field constructor, retained so existing callers default the per-NPC cooldown to global. */
+    public NpcBehavior(@Nullable String clickCommand, boolean lookAtPlayer, List<NpcAction> actions) {
+        this(clickCommand, lookAtPlayer, actions, 0L);
+    }
+
+    /** The default behavior for a freshly created NPC: no command, looking at players, no actions, global cooldown. */
     static NpcBehavior defaults() {
-        return new NpcBehavior(null, true, List.of());
+        return new NpcBehavior(null, true, List.of(), 0L);
     }
 
     NpcBehavior withClickCommand(@Nullable String newCommand) {
-        return new NpcBehavior(newCommand, lookAtPlayer, actions);
+        return new NpcBehavior(newCommand, lookAtPlayer, actions, interactionCooldownMillis);
     }
 
     NpcBehavior withLookAtPlayer(boolean newLookAtPlayer) {
-        return new NpcBehavior(clickCommand, newLookAtPlayer, actions);
+        return new NpcBehavior(clickCommand, newLookAtPlayer, actions, interactionCooldownMillis);
+    }
+
+    NpcBehavior withInteractionCooldownMillis(long newCooldownMillis) {
+        return new NpcBehavior(clickCommand, lookAtPlayer, actions, newCooldownMillis);
     }
 
     NpcBehavior withActionAdded(NpcAction action) {
         Objects.requireNonNull(action, "action");
         List<NpcAction> updated = new ArrayList<>(actions);
         updated.add(action);
-        return new NpcBehavior(clickCommand, lookAtPlayer, updated);
+        return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
     }
 
     NpcBehavior withActionRemovedAt(int index) {
@@ -52,11 +71,11 @@ public record NpcBehavior(@Nullable String clickCommand, boolean lookAtPlayer, L
         }
         List<NpcAction> updated = new ArrayList<>(actions);
         updated.remove(index);
-        return new NpcBehavior(clickCommand, lookAtPlayer, updated);
+        return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
     }
 
     NpcBehavior withActionsCleared() {
-        return new NpcBehavior(clickCommand, lookAtPlayer, List.of());
+        return new NpcBehavior(clickCommand, lookAtPlayer, List.of(), interactionCooldownMillis);
     }
 
     boolean hasClickCommand() {
@@ -65,5 +84,10 @@ public record NpcBehavior(@Nullable String clickCommand, boolean lookAtPlayer, L
 
     boolean hasActions() {
         return !actions.isEmpty();
+    }
+
+    /** Whether this NPC overrides the module-wide click cooldown (a positive value), rather than using the default. */
+    boolean hasInteractionCooldown() {
+        return interactionCooldownMillis > 0;
     }
 }

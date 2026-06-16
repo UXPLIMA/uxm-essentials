@@ -67,28 +67,29 @@ final class NpcDataCommands extends NpcCommandSupport {
     /** The frog-variant names, offered as tab completions for {@code frog_variant}. */
     private static final List<String> FROG_VARIANT_VALUES = List.of("temperate", "warm", "cold");
 
-    NpcDataCommands(NpcServices services, Messages messages) {
-        super(services, messages);
+    NpcDataCommands(
+            NpcServices services,
+            java.util.function.Supplier<? extends java.util.Collection<String>> npcNames,
+            Messages messages) {
+        super(services, npcNames, messages);
     }
 
     /** The {@code data} subcommand node the {@code /npc} literal attaches. */
     LiteralArgumentBuilder<CommandSourceStack> node() {
         return Commands.literal("data")
                 .then(Commands.literal("set")
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(nameArgument()
                                 .then(Commands.argument("key", StringArgumentType.word())
                                         .suggests(this::suggestDataKeys)
                                         .then(Commands.argument("value", StringArgumentType.greedyString())
                                                 .suggests(this::suggestDataValues)
                                                 .executes(this::dataSet)))))
                 .then(Commands.literal("clear")
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(nameArgument()
                                 .then(Commands.argument("key", StringArgumentType.word())
                                         .suggests(this::suggestDataKeys)
                                         .executes(this::dataClear))))
-                .then(Commands.literal("list")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::dataList)));
+                .then(Commands.literal("list").then(nameArgument().executes(this::dataList)));
     }
 
     private int dataSet(CommandContext<CommandSourceStack> ctx) {

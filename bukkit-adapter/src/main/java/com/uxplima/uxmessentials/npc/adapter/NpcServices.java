@@ -10,15 +10,24 @@ import com.uxplima.uxmessentials.npc.application.ListNpcActions;
 import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
+import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
+import com.uxplima.uxmessentials.npc.application.SetNpcCollidable;
+import com.uxplima.uxmessentials.npc.application.SetNpcDisplayName;
 import com.uxplima.uxmessentials.npc.application.SetNpcEntityType;
 import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
+import com.uxplima.uxmessentials.npc.application.SetNpcInteractionCooldown;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
+import com.uxplima.uxmessentials.npc.application.SetNpcMirrorSkin;
 import com.uxplima.uxmessentials.npc.application.SetNpcPose;
+import com.uxplima.uxmessentials.npc.application.SetNpcRange;
 import com.uxplima.uxmessentials.npc.application.SetNpcScale;
+import com.uxplima.uxmessentials.npc.application.SetNpcShowInTab;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
+import com.uxplima.uxmessentials.npc.application.SetNpcSkinSlim;
+import com.uxplima.uxmessentials.npc.application.SetNpcState;
 import com.uxplima.uxmessentials.npc.application.SetNpcTypeData;
 import org.jspecify.annotations.NullMarked;
 
@@ -46,6 +55,15 @@ import org.jspecify.annotations.NullMarked;
  * @param clearActions {@code /npc action clear}
  * @param setData {@code /npc data set} / {@code /npc data clear}
  * @param listData {@code /npc data list}
+ * @param moveTo {@code /npc moveto}
+ * @param displayName {@code /npc displayname}
+ * @param cooldown {@code /npc cooldown}
+ * @param mirror {@code /npc mirror}
+ * @param collidable {@code /npc collidable}
+ * @param showInTab {@code /npc showintab}
+ * @param range {@code /npc viewdistance} / {@code /npc turndistance}
+ * @param state {@code /npc state}
+ * @param skinSlim {@code /npc skinslim}
  */
 @NullMarked
 public record NpcServices(
@@ -66,7 +84,16 @@ public record NpcServices(
         RemoveNpcAction removeAction,
         ClearNpcActions clearActions,
         SetNpcTypeData setData,
-        ListNpcTypeData listData) {
+        ListNpcTypeData listData,
+        MoveNpcTo moveTo,
+        SetNpcDisplayName displayName,
+        SetNpcInteractionCooldown cooldown,
+        SetNpcMirrorSkin mirror,
+        SetNpcCollidable collidable,
+        SetNpcShowInTab showInTab,
+        SetNpcRange range,
+        SetNpcState state,
+        SetNpcSkinSlim skinSlim) {
 
     public NpcServices {
         Objects.requireNonNull(create, "create");
@@ -87,5 +114,14 @@ public record NpcServices(
         Objects.requireNonNull(clearActions, "clearActions");
         Objects.requireNonNull(setData, "setData");
         Objects.requireNonNull(listData, "listData");
+        Objects.requireNonNull(moveTo, "moveTo");
+        Objects.requireNonNull(displayName, "displayName");
+        Objects.requireNonNull(cooldown, "cooldown");
+        Objects.requireNonNull(mirror, "mirror");
+        Objects.requireNonNull(collidable, "collidable");
+        Objects.requireNonNull(showInTab, "showInTab");
+        Objects.requireNonNull(range, "range");
+        Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(skinSlim, "skinSlim");
     }
 }

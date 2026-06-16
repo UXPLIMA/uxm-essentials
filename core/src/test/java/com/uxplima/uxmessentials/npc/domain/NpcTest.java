@@ -479,4 +479,142 @@ class NpcTest {
         assertThat(withTwo.withActionRemovedAt(0).entityType()).isEqualTo("ZOMBIE");
         assertThat(withTwo.withActionsCleared().entityType()).isEqualTo("ZOMBIE");
     }
+
+    @Test
+    void createsWithTheFancyNpcsParityDefaults() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        assertThat(npc.displayName()).isNull();
+        assertThat(npc.hasDisplayName()).isFalse();
+        assertThat(npc.mirrorSkin()).isFalse();
+        assertThat(npc.collidable()).isFalse();
+        assertThat(npc.showInTab()).isFalse();
+        assertThat(npc.viewDistance()).isNull();
+        assertThat(npc.turnDistance()).isNull();
+        assertThat(npc.onFire()).isFalse();
+        assertThat(npc.invisible()).isFalse();
+        assertThat(npc.silent()).isFalse();
+        assertThat(npc.interactionCooldownMillis()).isZero();
+    }
+
+    @Test
+    void withDisplayNameSetsAndHidesTheLabelKeepingTheRest() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
+                .withClickCommand("spawn")
+                .withDisplayName("<gold>Town Guide");
+
+        assertThat(npc.displayName()).isEqualTo("<gold>Town Guide");
+        assertThat(npc.hasDisplayName()).isTrue();
+        assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+        assertThat(npc.clickCommand()).isEqualTo("spawn");
+
+        // A blank display name hides the label (stored as null).
+        assertThat(npc.withDisplayName(" ").displayName()).isNull();
+        assertThat(npc.withDisplayName(null).hasDisplayName()).isFalse();
+    }
+
+    @Test
+    void togglesTheStateFlagsIndependently() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withOnFire(true)
+                .withInvisible(true)
+                .withSilent(true);
+
+        assertThat(npc.onFire()).isTrue();
+        assertThat(npc.invisible()).isTrue();
+        assertThat(npc.silent()).isTrue();
+
+        // Clearing one flag leaves the others set — they do not share state.
+        Npc notOnFire = npc.withOnFire(false);
+        assertThat(notOnFire.onFire()).isFalse();
+        assertThat(notOnFire.invisible()).isTrue();
+        assertThat(notOnFire.silent()).isTrue();
+    }
+
+    @Test
+    void togglesMirrorCollidableAndShowInTab() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withMirrorSkin(true)
+                .withCollidable(true)
+                .withShowInTab(true);
+
+        assertThat(npc.mirrorSkin()).isTrue();
+        assertThat(npc.collidable()).isTrue();
+        assertThat(npc.showInTab()).isTrue();
+
+        assertThat(npc.withMirrorSkin(false).mirrorSkin()).isFalse();
+        assertThat(npc.withCollidable(false).collidable()).isFalse();
+        assertThat(npc.withShowInTab(false).showInTab()).isFalse();
+    }
+
+    @Test
+    void setsAndClearsThePerNpcDistanceOverrides() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withViewDistance(80.0)
+                .withTurnDistance(20.0);
+
+        assertThat(npc.viewDistance()).isEqualTo(80.0);
+        assertThat(npc.turnDistance()).isEqualTo(20.0);
+
+        // A null override falls back to the module default.
+        assertThat(npc.withViewDistance(null).viewDistance()).isNull();
+        assertThat(npc.withTurnDistance(null).turnDistance()).isNull();
+    }
+
+    @Test
+    void rejectsANegativeOrNonFiniteDistanceOverride() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withViewDistance(-1.0))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withTurnDistance(Double.NaN))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void setsAndResetsThePerNpcInteractionCooldown() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withInteractionCooldownMillis(2_000);
+
+        assertThat(npc.interactionCooldownMillis()).isEqualTo(2_000);
+
+        // Zero resets to the module-wide default.
+        assertThat(npc.withInteractionCooldownMillis(0).interactionCooldownMillis())
+                .isZero();
+    }
+
+    @Test
+    void rejectsANegativeInteractionCooldown() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withInteractionCooldownMillis(-5))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void everyTransitionPreservesTheNewFields() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withDisplayName("Guide")
+                .withMirrorSkin(true)
+                .withCollidable(true)
+                .withShowInTab(true)
+                .withViewDistance(80.0)
+                .withTurnDistance(20.0)
+                .withOnFire(true)
+                .withInvisible(true)
+                .withSilent(true)
+                .withInteractionCooldownMillis(2_000);
+
+        // A move, a re-skin, and a click rebind each carry the full set of FancyNpcs-parity fields forward.
+        assertThat(npc.movedTo(ELSEWHERE).displayName()).isEqualTo("Guide");
+        assertThat(npc.movedTo(ELSEWHERE).interactionCooldownMillis()).isEqualTo(2_000);
+        assertThat(npc.withSkin(NpcSkin.unsigned("tex")).mirrorSkin()).isTrue();
+        assertThat(npc.withClickCommand("spawn").collidable()).isTrue();
+        assertThat(npc.withScale(2.0).showInTab()).isTrue();
+        assertThat(npc.withEntityType("VILLAGER").viewDistance()).isEqualTo(80.0);
+        assertThat(npc.withGlowing(true).turnDistance()).isEqualTo(20.0);
+        assertThat(npc.withPose("SITTING").onFire()).isTrue();
+        assertThat(npc.withLookAtPlayer(false).invisible()).isTrue();
+        assertThat(npc.withTypeData("baby", "true").silent()).isTrue();
+        assertThat(npc.withDisplayName("Other").interactionCooldownMillis()).isEqualTo(2_000);
+    }
 }

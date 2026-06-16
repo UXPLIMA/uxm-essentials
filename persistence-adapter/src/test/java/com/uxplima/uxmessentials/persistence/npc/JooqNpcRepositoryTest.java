@@ -410,7 +410,17 @@ class JooqNpcRepositoryTest {
                 .withPose("SITTING")
                 .withScale(2.5)
                 .withTypeData("baby", "true")
-                .withTypeData("villager_profession", "librarian"));
+                .withTypeData("villager_profession", "librarian")
+                .withDisplayName("<gold>Town Guide")
+                .withMirrorSkin(true)
+                .withCollidable(true)
+                .withShowInTab(true)
+                .withOnFire(true)
+                .withInvisible(true)
+                .withSilent(true)
+                .withViewDistance(80.0)
+                .withTurnDistance(20.0)
+                .withInteractionCooldownMillis(2_000));
 
         // Re-save touching only the location; every other column goes through doUpdate() unchanged.
         repository.save(repository.find(NpcName.of("decked")).orElseThrow().movedTo(Position.of(WORLD, 100, 70, 100)));
@@ -430,7 +440,125 @@ class JooqNpcRepositoryTest {
         assertThat(reloaded.pose()).isEqualTo("SITTING");
         assertThat(reloaded.scale()).isEqualTo(2.5f);
         assertThat(reloaded.typeData()).containsEntry("baby", "true").containsEntry("villager_profession", "librarian");
+        assertThat(reloaded.displayName()).isEqualTo("<gold>Town Guide");
+        assertThat(reloaded.mirrorSkin()).isTrue();
+        assertThat(reloaded.collidable()).isTrue();
+        assertThat(reloaded.showInTab()).isTrue();
+        assertThat(reloaded.onFire()).isTrue();
+        assertThat(reloaded.invisible()).isTrue();
+        assertThat(reloaded.silent()).isTrue();
+        assertThat(reloaded.viewDistance()).isEqualTo(80.0);
+        assertThat(reloaded.turnDistance()).isEqualTo(20.0);
+        assertThat(reloaded.interactionCooldownMillis()).isEqualTo(2_000);
         assertThat(reloaded.createdAt()).isEqualTo(Instant.ofEpochMilli(1_000));
+    }
+
+    @Test
+    void defaultsTheFancyNpcsParityFieldsForACreatedNpc() {
+        repository.save(
+                Npc.create(NpcName.of("plain"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
+
+        Npc loaded = repository.find(NpcName.of("plain")).orElseThrow();
+        assertThat(loaded.displayName()).isNull();
+        assertThat(loaded.mirrorSkin()).isFalse();
+        assertThat(loaded.collidable()).isFalse();
+        assertThat(loaded.showInTab()).isFalse();
+        assertThat(loaded.onFire()).isFalse();
+        assertThat(loaded.invisible()).isFalse();
+        assertThat(loaded.silent()).isFalse();
+        assertThat(loaded.viewDistance()).isNull();
+        assertThat(loaded.turnDistance()).isNull();
+        assertThat(loaded.interactionCooldownMillis()).isZero();
+    }
+
+    @Test
+    void roundTripsASlimSkinVariant() {
+        repository.save(Npc.create(
+                NpcName.of("alex"),
+                Position.of(WORLD, 1, 64, 1),
+                new NpcSkin("tex", "sig", true),
+                Instant.ofEpochMilli(1_000)));
+
+        Npc loaded = repository.find(NpcName.of("alex")).orElseThrow();
+
+        NpcSkin skin = java.util.Objects.requireNonNull(loaded.skin(), "skin");
+        assertThat(skin).isEqualTo(new NpcSkin("tex", "sig", true));
+        assertThat(skin.slim()).isTrue();
+    }
+
+    @Test
+    void roundTripsTheFancyNpcsParityFields() {
+        repository.save(Npc.create(NpcName.of("rich"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                .withDisplayName("<aqua>Greeter")
+                .withMirrorSkin(true)
+                .withCollidable(true)
+                .withShowInTab(true)
+                .withOnFire(true)
+                .withInvisible(true)
+                .withSilent(true)
+                .withViewDistance(64.0)
+                .withTurnDistance(10.0)
+                .withInteractionCooldownMillis(1_500));
+
+        Npc loaded = repository.find(NpcName.of("rich")).orElseThrow();
+
+        assertThat(loaded.displayName()).isEqualTo("<aqua>Greeter");
+        assertThat(loaded.mirrorSkin()).isTrue();
+        assertThat(loaded.collidable()).isTrue();
+        assertThat(loaded.showInTab()).isTrue();
+        assertThat(loaded.onFire()).isTrue();
+        assertThat(loaded.invisible()).isTrue();
+        assertThat(loaded.silent()).isTrue();
+        assertThat(loaded.viewDistance()).isEqualTo(64.0);
+        assertThat(loaded.turnDistance()).isEqualTo(10.0);
+        assertThat(loaded.interactionCooldownMillis()).isEqualTo(1_500);
+
+        // An upsert clearing the overrides nulls the distance columns and resets the flags in place.
+        repository.save(loaded.withViewDistance(null).withTurnDistance(null).withDisplayName(null));
+        Npc cleared = repository.find(NpcName.of("rich")).orElseThrow();
+        assertThat(cleared.viewDistance()).isNull();
+        assertThat(cleared.turnDistance()).isNull();
+        assertThat(cleared.displayName()).isNull();
+    }
+
+    @Test
+    void readsTheV48DefaultsForALegacyRowWithoutTheNewColumnsSet() {
+        // Simulate an NPC stored before V48: the row is inserted without the new columns, so the V48 NOT NULL
+        // DEFAULTs (0 flags, 0 cooldown) must apply and the nullable display/distance columns read back NULL.
+        com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
+                com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
+        persistence.dsl().transaction(cfg -> org.jooq
+                .impl
+                .DSL
+                .using(cfg)
+                .insertInto(npc)
+                .set(npc.NAME, "ancient")
+                .set(npc.WORLD, WORLD.uid().toString())
+                .set(npc.WORLD_NAME, WORLD.name())
+                .set(npc.X, 0.0)
+                .set(npc.Y, 64.0)
+                .set(npc.Z, 0.0)
+                .set(npc.YAW, 0.0f)
+                .set(npc.PITCH, 0.0f)
+                .set(npc.LOOK_AT_PLAYER, (short) 1)
+                .set(npc.GLOWING, (short) 0)
+                .set(npc.ENTITY_TYPE, "PLAYER")
+                .set(npc.CREATED_AT, 1_000L)
+                .execute());
+
+        Npc loaded = repository.find(NpcName.of("ancient")).orElseThrow();
+
+        assertThat(loaded.displayName()).isNull();
+        assertThat(loaded.mirrorSkin()).isFalse();
+        assertThat(loaded.collidable()).isFalse();
+        assertThat(loaded.showInTab()).isFalse();
+        assertThat(loaded.onFire()).isFalse();
+        assertThat(loaded.invisible()).isFalse();
+        assertThat(loaded.silent()).isFalse();
+        assertThat(loaded.viewDistance()).isNull();
+        assertThat(loaded.turnDistance()).isNull();
+        assertThat(loaded.interactionCooldownMillis()).isZero();
+        assertThat(loaded.skin()).isNull();
     }
 
     @Test

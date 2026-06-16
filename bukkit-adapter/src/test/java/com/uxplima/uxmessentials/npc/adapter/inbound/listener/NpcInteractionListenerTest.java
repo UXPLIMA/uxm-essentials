@@ -159,6 +159,31 @@ class NpcInteractionListenerTest {
     }
 
     @Test
+    void aPerNpcCooldownOverridesTheGlobalDefault() {
+        // The NPC carries a 1000 ms per-NPC override; the global default is 200 ms. A click at 300 ms (past the
+        // global, inside the override) must still be blocked, proving the per-NPC value wins.
+        PlayerMock player = server.addPlayer();
+        Position at = com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toPosition(
+                java.util.Objects.requireNonNull(player.getLocation(), "loc"));
+        Npc npc = Npc.create(NpcName.of("guide"), at, null, Instant.ofEpochMilli(1_000))
+                .withClickCommand("warp spawn")
+                .withInteractionCooldownMillis(1_000);
+        repository.save(npc);
+        renderer.render(npc);
+        NpcInteractionListener listener = listener(Duration.ofMillis(200));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+        now.set(300); // past the 200 ms global, but inside the 1000 ms per-NPC override
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+        assertThat(runner.playerCommands).containsExactly("warp spawn");
+
+        // Past the per-NPC window it runs again.
+        now.set(1_100);
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+        assertThat(runner.playerCommands).containsExactly("warp spawn", "warp spawn");
+    }
+
+    @Test
     void doesNothingForAnNpcWithNoCommand() {
         PlayerMock player = renderNpcAndAddPlayer("guide", null);
         NpcInteractionListener listener = listener(Duration.ofMillis(500));
@@ -315,6 +340,21 @@ class NpcInteractionListenerTest {
 
         @Override
         public Object glow(int entityId, boolean glowing) {
+            return new Object();
+        }
+
+        @Override
+        public Object sharedFlags(int entityId, boolean onFire, boolean glowing, boolean invisible) {
+            return new Object();
+        }
+
+        @Override
+        public Object silent(int entityId, boolean silent) {
+            return new Object();
+        }
+
+        @Override
+        public Object collidable(String teamName, String memberName, @Nullable NamedColor color, boolean collidable) {
             return new Object();
         }
 

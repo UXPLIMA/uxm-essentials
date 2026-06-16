@@ -118,6 +118,42 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
         return appearance.typeData();
     }
 
+    public @Nullable String displayName() {
+        return appearance.displayName();
+    }
+
+    public boolean mirrorSkin() {
+        return appearance.mirrorSkin();
+    }
+
+    public boolean collidable() {
+        return appearance.collidable();
+    }
+
+    public boolean showInTab() {
+        return appearance.showInTab();
+    }
+
+    public @Nullable Double viewDistance() {
+        return appearance.viewDistance();
+    }
+
+    public @Nullable Double turnDistance() {
+        return appearance.turnDistance();
+    }
+
+    public boolean onFire() {
+        return appearance.onFire();
+    }
+
+    public boolean invisible() {
+        return appearance.invisible();
+    }
+
+    public boolean silent() {
+        return appearance.silent();
+    }
+
     // --- Behavior accessors (delegated) ---
 
     public @Nullable String clickCommand() {
@@ -130,6 +166,10 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
 
     public List<NpcAction> actions() {
         return behavior.actions();
+    }
+
+    public long interactionCooldownMillis() {
+        return behavior.interactionCooldownMillis();
     }
 
     // --- Transitions (delegated; createdAt and the untouched half are always preserved) ---
@@ -208,6 +248,60 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
         return new Npc(name, location, appearance.withTypeData(key, value), behavior, createdAt);
     }
 
+    /** A copy whose shown name is {@code newDisplayName} (or {@code null}/blank to hide it), keeping everything else. */
+    public Npc withDisplayName(@Nullable String newDisplayName) {
+        return new Npc(name, location, appearance.withDisplayName(newDisplayName), behavior, createdAt);
+    }
+
+    /** A copy that does or does not mirror each viewer's own skin, keeping everything else. */
+    public Npc withMirrorSkin(boolean newMirrorSkin) {
+        return new Npc(name, location, appearance.withMirrorSkin(newMirrorSkin), behavior, createdAt);
+    }
+
+    /** A copy that does or does not collide with players, keeping everything else. */
+    public Npc withCollidable(boolean newCollidable) {
+        return new Npc(name, location, appearance.withCollidable(newCollidable), behavior, createdAt);
+    }
+
+    /** A copy that does or does not stay a tab-list entry, keeping everything else. */
+    public Npc withShowInTab(boolean newShowInTab) {
+        return new Npc(name, location, appearance.withShowInTab(newShowInTab), behavior, createdAt);
+    }
+
+    /** A copy with a per-NPC render distance ({@code null} to use the global default), keeping everything else. */
+    public Npc withViewDistance(@Nullable Double newViewDistance) {
+        return new Npc(name, location, appearance.withViewDistance(newViewDistance), behavior, createdAt);
+    }
+
+    /** A copy with a per-NPC look-at distance ({@code null} to use the global default), keeping everything else. */
+    public Npc withTurnDistance(@Nullable Double newTurnDistance) {
+        return new Npc(name, location, appearance.withTurnDistance(newTurnDistance), behavior, createdAt);
+    }
+
+    /** A copy that does or does not render on fire, keeping everything else. */
+    public Npc withOnFire(boolean newOnFire) {
+        return new Npc(name, location, appearance.withOnFire(newOnFire), behavior, createdAt);
+    }
+
+    /** A copy that is or is not invisible, keeping everything else. */
+    public Npc withInvisible(boolean newInvisible) {
+        return new Npc(name, location, appearance.withInvisible(newInvisible), behavior, createdAt);
+    }
+
+    /** A copy that is or is not silent, keeping everything else. */
+    public Npc withSilent(boolean newSilent) {
+        return new Npc(name, location, appearance.withSilent(newSilent), behavior, createdAt);
+    }
+
+    /**
+     * A copy with a per-NPC interaction cooldown in milliseconds ({@code 0} to use the module-wide default),
+     * keeping everything else. Negative values are rejected by the behavior value object.
+     */
+    public Npc withInteractionCooldownMillis(long newCooldownMillis) {
+        return new Npc(
+                name, location, appearance, behavior.withInteractionCooldownMillis(newCooldownMillis), createdAt);
+    }
+
     /** A copy with {@code action} appended to the end of the action list, keeping everything else. */
     public Npc withActionAdded(NpcAction action) {
         return new Npc(name, location, appearance, behavior.withActionAdded(action), createdAt);
@@ -271,5 +365,10 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
     /** Whether this NPC carries any per-entity-type appearance metadata (an empty map needs no metadata packet). */
     public boolean hasTypeData() {
         return appearance.hasTypeData();
+    }
+
+    /** Whether this NPC shows a display name distinct from its id (a blank one hides the label). */
+    public boolean hasDisplayName() {
+        return appearance.hasDisplayName();
     }
 }

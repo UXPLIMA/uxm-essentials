@@ -11,6 +11,8 @@ import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcAction;
 import com.uxplima.uxmessentials.npc.domain.NpcActionType;
+import com.uxplima.uxmessentials.npc.domain.NpcAppearance;
+import com.uxplima.uxmessentials.npc.domain.NpcBehavior;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.NpcRecord;
@@ -54,20 +56,34 @@ final class NpcRows {
         WorldRef world = new WorldRef(UUID.fromString(row.get(NPC.WORLD)), row.get(NPC.WORLD_NAME));
         Position position = new Position(
                 world, row.get(NPC.X), row.get(NPC.Y), row.get(NPC.Z), row.get(NPC.YAW), row.get(NPC.PITCH));
-        return new Npc(
-                NpcName.of(row.get(NPC.NAME)),
-                position,
-                skinOf(row.get(NPC.SKIN_TEXTURE), row.get(NPC.SKIN_SIGNATURE)),
-                row.get(NPC.CLICK_COMMAND),
-                row.get(NPC.LOOK_AT_PLAYER) != 0,
+        NpcAppearance appearance = new NpcAppearance(
+                skinOf(row.get(NPC.SKIN_TEXTURE), row.get(NPC.SKIN_SIGNATURE), row.get(NPC.SKIN_SLIM)),
+                row.get(NPC.ENTITY_TYPE),
                 equipmentOf(row),
                 row.get(NPC.GLOWING) != 0,
                 row.get(NPC.GLOW_COLOR),
-                orderedActions,
-                row.get(NPC.ENTITY_TYPE),
                 row.get(NPC.POSE),
                 row.get(NPC.SCALE),
                 typeData,
+                row.get(NPC.DISPLAY_NAME),
+                row.get(NPC.MIRROR_SKIN) != 0,
+                row.get(NPC.COLLIDABLE) != 0,
+                row.get(NPC.SHOW_IN_TAB) != 0,
+                widen(row.get(NPC.VIEW_DISTANCE)),
+                widen(row.get(NPC.TURN_DISTANCE)),
+                row.get(NPC.ON_FIRE) != 0,
+                row.get(NPC.INVISIBLE) != 0,
+                row.get(NPC.SILENT) != 0);
+        NpcBehavior behavior = new NpcBehavior(
+                row.get(NPC.CLICK_COMMAND),
+                row.get(NPC.LOOK_AT_PLAYER) != 0,
+                orderedActions,
+                row.get(NPC.INTERACTION_COOLDOWN_MILLIS));
+        return new Npc(
+                NpcName.of(row.get(NPC.NAME)),
+                position,
+                appearance,
+                behavior,
                 Instant.ofEpochMilli(row.get(NPC.CREATED_AT)));
     }
 
@@ -86,8 +102,10 @@ final class NpcRows {
                 .setPitch(location.pitch())
                 .setSkinTexture(skin == null ? null : skin.texture())
                 .setSkinSignature(skin == null ? null : skin.signature())
+                .setSkinSlim((short) (skin != null && skin.slim() ? 1 : 0))
                 .setClickCommand(npc.clickCommand())
                 .setLookAtPlayer((short) (npc.lookAtPlayer() ? 1 : 0))
+                .setInteractionCooldownMillis(npc.interactionCooldownMillis())
                 // The token (material name or serialized item) is written to the V45 TEXT columns; the V40
                 // VARCHAR columns are left NULL on a save and only ever read for a pre-V45 row's gear.
                 .setEquipMainhandB64(equipment.get(EquipmentSlot.MAINHAND))
@@ -103,14 +121,35 @@ final class NpcRows {
                 // scale is a REAL column (jOOQ maps it to Float); the domain carries the wider double, narrowed
                 // here for storage and widened back on read — the protocol's scale range fits a float exactly.
                 .setScale((float) npc.scale())
+                .setDisplayName(npc.displayName())
+                .setMirrorSkin((short) (npc.mirrorSkin() ? 1 : 0))
+                .setCollidable((short) (npc.collidable() ? 1 : 0))
+                .setShowInTab((short) (npc.showInTab() ? 1 : 0))
+                .setOnFire((short) (npc.onFire() ? 1 : 0))
+                .setInvisible((short) (npc.invisible() ? 1 : 0))
+                .setSilent((short) (npc.silent() ? 1 : 0))
+                // The per-NPC distance overrides are nullable REAL columns (a NULL means "use the module default"),
+                // narrowed from the domain's double exactly like scale; a distance fits a float without loss.
+                .setViewDistance(narrow(npc.viewDistance()))
+                .setTurnDistance(narrow(npc.turnDistance()))
                 .setCreatedAt(npc.createdAt().toEpochMilli());
     }
 
-    private static @Nullable NpcSkin skinOf(@Nullable String texture, @Nullable String signature) {
+    private static @Nullable NpcSkin skinOf(@Nullable String texture, @Nullable String signature, short slim) {
         if (texture == null || texture.isBlank()) {
             return null;
         }
-        return new NpcSkin(texture, signature);
+        return new NpcSkin(texture, signature, slim != 0);
+    }
+
+    /** Widen a nullable REAL distance back to the domain's {@code Double}, preserving a NULL "use default". */
+    private static @Nullable Double widen(@Nullable Float value) {
+        return value == null ? null : value.doubleValue();
+    }
+
+    /** Narrow a nullable domain distance to the REAL column's {@code Float}, preserving a NULL "use default". */
+    private static @Nullable Float narrow(@Nullable Double value) {
+        return value == null ? null : value.floatValue();
     }
 
     /**

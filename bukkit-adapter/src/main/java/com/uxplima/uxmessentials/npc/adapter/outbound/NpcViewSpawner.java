@@ -107,13 +107,20 @@ public final class NpcViewSpawner {
     }
 
     private void spawnPlayerForViewer(Player viewer, RenderedNpc rendered) {
+        Npc npc = rendered.npc();
         UUID profileId = rendered.profileId();
         Position at = rendered.npc().location();
-        Object tabAdd = packets.tabAdd(
-                profileId, profileName(rendered.npc()), tabSkin(rendered.npc().skin()));
+        // A mirror-skin NPC wears the viewer's own skin (resolved per viewer); otherwise its stored skin. The
+        // rendered name above the head is the display name when set, else the NPC id.
+        TabSkin skin = npc.mirrorSkin() ? viewerSkin(viewer) : tabSkin(npc.skin());
+        Object tabAdd = packets.tabAdd(profileId, renderedName(npc), skin);
         Object spawn =
                 packets.spawnPlayer(rendered.entityId(), profileId, at.x(), at.y(), at.z(), at.yaw(), at.pitch());
         packets.send(viewer, packets.bundle(List.of(tabAdd, spawn)));
+        if (npc.showInTab()) {
+            // The operator wants this NPC to stay a tab-list entry, so do not hide it; the entry persists.
+            return;
+        }
         // Hide the entry from the tab list a moment later, once the client has parsed it — the spawned fake
         // player keeps its skin even after the entry is gone.
         scheduler.asyncAfter(tabHideDelay, () -> packets.send(viewer, packets.tabRemove(profileId)));
@@ -144,18 +151,39 @@ public final class NpcViewSpawner {
      */
     private void applyAppearance(Player viewer, RenderedNpc rendered) {
         Npc npc = rendered.npc();
+        int id = rendered.entityId();
         if (npc.hasEquipment()) {
-            packets.send(viewer, packets.equipment(rendered.entityId(), resolveEquipment(npc)));
+            packets.send(viewer, packets.equipment(id, resolveEquipment(npc)));
         }
-        if (npc.glowing()) {
-            packets.send(viewer, packets.glow(rendered.entityId(), true));
-            NamedColor color = npc.hasGlowColor() ? parseColor(npc.glowColor()) : null;
-            packets.send(viewer, packets.glowColor(glowTeam(npc), profileName(npc), color));
+        // The on-fire, glow, and invisible bits share one shared-flags byte, so they compose into a single packet
+        // rather than overwriting each other; sent only when at least one is set (the entity defaults to all-clear).
+        if (npc.onFire() || npc.glowing() || npc.invisible()) {
+            packets.send(viewer, packets.sharedFlags(id, npc.onFire(), npc.glowing(), npc.invisible()));
+        }
+        applyTeam(viewer, npc);
+        if (npc.silent()) {
+            packets.send(viewer, packets.silent(id, true));
         }
         applyShape(viewer, rendered, npc);
         // The per-entity-type metadata (baby/size/charged/villager) is sent only for the type that carries each
         // field, fail-soft per property — the support map lives in NpcTypeData to keep this class under its limit.
-        NpcTypeData.apply(packets, viewer, rendered.entityId(), npc, log);
+        NpcTypeData.apply(packets, viewer, id, npc, log);
+    }
+
+    /**
+     * Send the per-NPC scoreboard team that tints a glowing outline and sets the collision rule — both ride one
+     * team because an entity is on only one. A glow colour and a non-default (non-colliding) state each need the
+     * team; an NPC that glows white and collides needs nothing (the no-team default is exactly that). The colour
+     * falls back to the default white outline when the name is unknown, never failing the spawn.
+     */
+    private void applyTeam(Player viewer, Npc npc) {
+        NamedColor color = npc.glowing() && npc.hasGlowColor() ? parseColor(npc.glowColor()) : null;
+        if (color == null && npc.collidable()) {
+            return; // the no-team default already collides with no colour, so no team packet is needed
+        }
+        // Seat the rendered name (display name or id) on the team — the fake player's nametag is its profile name,
+        // so the colour/collision must bind to the same name the tab-add carried.
+        packets.send(viewer, packets.collidable(glowTeam(npc), renderedName(npc), color, npc.collidable()));
     }
 
     /**
@@ -193,8 +221,29 @@ public final class NpcViewSpawner {
         return name.length() <= MAX_PROFILE_NAME ? name : name.substring(0, MAX_PROFILE_NAME);
     }
 
+    /**
+     * The name rendered above the fake player and seated on its team: the display name when one is set, otherwise
+     * the NPC id. A fake player's nametag is its player-info profile name, so the display name lands here (capped
+     * to the protocol's 16-char profile-name limit); a blank display name falls back to the id, which is the
+     * default. The team member name must equal this so a glow colour / collision rule binds to the same name.
+     */
+    private static String renderedName(Npc npc) {
+        if (!npc.hasDisplayName()) {
+            return profileName(npc);
+        }
+        String shown = Objects.requireNonNull(npc.displayName(), "displayName").strip();
+        return shown.length() <= MAX_PROFILE_NAME ? shown : shown.substring(0, MAX_PROFILE_NAME);
+    }
+
     private static @Nullable TabSkin tabSkin(@Nullable NpcSkin skin) {
         return skin == null ? null : new TabSkin(skin.texture(), skin.signature());
+    }
+
+    /** The viewer's own skin for a mirror-skin NPC, or {@code null} when the viewer carries none (default Steve). */
+    private static @Nullable TabSkin viewerSkin(Player viewer) {
+        return BukkitNpcSkins.of(viewer)
+                .map(skin -> new TabSkin(skin.texture(), skin.signature()))
+                .orElse(null);
     }
 
     /** Resolve each stored token (a serialized item or a legacy material name) to a real item, dropping a slot

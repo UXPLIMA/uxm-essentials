@@ -18,6 +18,7 @@ public enum NpcMessageKey implements MessageKey {
     NPC_CREATED_NO_SKIN("npc.created-no-skin"),
     NPC_DELETED("npc.deleted"),
     NPC_MOVED("npc.moved"),
+    NPC_MOVED_TO("npc.moved-to"),
 
     // skin / command feedback
     NPC_SKIN_SET("npc.skin.set"),
@@ -30,6 +31,9 @@ public enum NpcMessageKey implements MessageKey {
     NPC_SKIN_UNAVAILABLE("npc.skin.unavailable"),
     NPC_SKIN_UNSIGNED("npc.skin.unsigned"),
     NPC_SKIN_INVALID_TEXTURE("npc.skin.invalid-texture"),
+    NPC_SKIN_SLIM_SET("npc.skin.slim-set"),
+    NPC_SKIN_SLIM_CLASSIC("npc.skin.slim-classic"),
+    NPC_SKIN_SLIM_NO_SKIN("npc.skin.slim-no-skin"),
     NPC_COMMAND_SET("npc.command.set"),
     NPC_COMMAND_CLEARED("npc.command.cleared"),
     NPC_LOOK_ENABLED("npc.look.enabled"),
@@ -46,6 +50,24 @@ public enum NpcMessageKey implements MessageKey {
     NPC_TYPE_SET("npc.type.set"),
     NPC_POSE_SET("npc.pose.set"),
     NPC_SCALE_SET("npc.scale.set"),
+
+    // display name / mirror / collidable / show-in-tab / distance / state / cooldown feedback
+    NPC_DISPLAY_NAME_SET("npc.display-name.set"),
+    NPC_DISPLAY_NAME_CLEARED("npc.display-name.cleared"),
+    NPC_MIRROR_ENABLED("npc.mirror.enabled"),
+    NPC_MIRROR_DISABLED("npc.mirror.disabled"),
+    NPC_COLLIDABLE_ENABLED("npc.collidable.enabled"),
+    NPC_COLLIDABLE_DISABLED("npc.collidable.disabled"),
+    NPC_SHOW_IN_TAB_ENABLED("npc.show-in-tab.enabled"),
+    NPC_SHOW_IN_TAB_DISABLED("npc.show-in-tab.disabled"),
+    NPC_VIEW_DISTANCE_SET("npc.view-distance.set"),
+    NPC_VIEW_DISTANCE_DEFAULT("npc.view-distance.default"),
+    NPC_TURN_DISTANCE_SET("npc.turn-distance.set"),
+    NPC_TURN_DISTANCE_DEFAULT("npc.turn-distance.default"),
+    NPC_STATE_ENABLED("npc.state.enabled"),
+    NPC_STATE_DISABLED("npc.state.disabled"),
+    NPC_COOLDOWN_SET("npc.cooldown.set"),
+    NPC_COOLDOWN_DEFAULT("npc.cooldown.default"),
 
     // per-entity-type metadata feedback
     NPC_DATA_SET("npc.data.set"),
@@ -78,6 +100,10 @@ public enum NpcMessageKey implements MessageKey {
     NPC_INVALID_POSE("npc.invalid-pose"),
     NPC_INVALID_SCALE("npc.invalid-scale"),
     NPC_INVALID_DATA("npc.invalid-data"),
+    NPC_INVALID_STATE("npc.invalid-state"),
+    NPC_INVALID_DISTANCE("npc.invalid-distance"),
+    NPC_INVALID_COOLDOWN("npc.invalid-cooldown"),
+    NPC_INVALID_COORDS("npc.invalid-coords"),
     NPC_SKIN_ONLY_PLAYER("npc.skin-only-player"),
     NPC_INVALID_TRIGGER("npc.invalid-trigger"),
     NPC_INVALID_ACTION_TYPE("npc.invalid-action-type"),

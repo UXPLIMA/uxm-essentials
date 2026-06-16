@@ -23,4 +23,26 @@ class NpcSkinTest {
     void rejectsBlankTexture() {
         assertThatThrownBy(() -> new NpcSkin("  ", null)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void defaultsToTheClassicModel() {
+        assertThat(new NpcSkin("tex", "sig").slim()).isFalse();
+        assertThat(NpcSkin.unsigned("tex").slim()).isFalse();
+    }
+
+    @Test
+    void withSlimTogglesTheModelKeepingTexture() {
+        NpcSkin slim = new NpcSkin("tex", "sig").withSlim(true);
+        assertThat(slim.slim()).isTrue();
+        assertThat(slim.texture()).isEqualTo("tex");
+        assertThat(slim.signature()).isEqualTo("sig");
+
+        assertThat(slim.withSlim(false).slim()).isFalse();
+    }
+
+    @Test
+    void carriesAnExplicitVariant() {
+        assertThat(new NpcSkin("tex", "sig", true).slim()).isTrue();
+        assertThat(new NpcSkin("tex", "sig", false).slim()).isFalse();
+    }
 }

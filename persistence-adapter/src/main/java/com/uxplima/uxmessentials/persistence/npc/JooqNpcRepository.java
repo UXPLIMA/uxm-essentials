@@ -190,8 +190,10 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
                 .set(NPC.PITCH, record.getPitch())
                 .set(NPC.SKIN_TEXTURE, record.getSkinTexture())
                 .set(NPC.SKIN_SIGNATURE, record.getSkinSignature())
+                .set(NPC.SKIN_SLIM, record.getSkinSlim())
                 .set(NPC.CLICK_COMMAND, record.getClickCommand())
                 .set(NPC.LOOK_AT_PLAYER, record.getLookAtPlayer())
+                .set(NPC.INTERACTION_COOLDOWN_MILLIS, record.getInteractionCooldownMillis())
                 // Equipment is written to the V45 token columns; the legacy V40 columns are cleared on update so
                 // a migrated row reads its gear from the new column rather than a now-stale material name.
                 .set(NPC.EQUIP_MAINHAND, record.getEquipMainhand())
@@ -211,6 +213,15 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
                 .set(NPC.ENTITY_TYPE, record.getEntityType())
                 .set(NPC.POSE, record.getPose())
                 .set(NPC.SCALE, record.getScale())
+                .set(NPC.DISPLAY_NAME, record.getDisplayName())
+                .set(NPC.MIRROR_SKIN, record.getMirrorSkin())
+                .set(NPC.COLLIDABLE, record.getCollidable())
+                .set(NPC.SHOW_IN_TAB, record.getShowInTab())
+                .set(NPC.ON_FIRE, record.getOnFire())
+                .set(NPC.INVISIBLE, record.getInvisible())
+                .set(NPC.SILENT, record.getSilent())
+                .set(NPC.VIEW_DISTANCE, record.getViewDistance())
+                .set(NPC.TURN_DISTANCE, record.getTurnDistance())
                 .set(NPC.CREATED_AT, record.getCreatedAt())
                 .execute();
     }

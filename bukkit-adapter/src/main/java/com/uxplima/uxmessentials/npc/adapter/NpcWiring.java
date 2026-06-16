@@ -31,17 +31,26 @@ import com.uxplima.uxmessentials.npc.application.ListNpcActions;
 import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
+import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
+import com.uxplima.uxmessentials.npc.application.SetNpcCollidable;
+import com.uxplima.uxmessentials.npc.application.SetNpcDisplayName;
 import com.uxplima.uxmessentials.npc.application.SetNpcEntityType;
 import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
+import com.uxplima.uxmessentials.npc.application.SetNpcInteractionCooldown;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
+import com.uxplima.uxmessentials.npc.application.SetNpcMirrorSkin;
 import com.uxplima.uxmessentials.npc.application.SetNpcPose;
+import com.uxplima.uxmessentials.npc.application.SetNpcRange;
 import com.uxplima.uxmessentials.npc.application.SetNpcScale;
+import com.uxplima.uxmessentials.npc.application.SetNpcShowInTab;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
+import com.uxplima.uxmessentials.npc.application.SetNpcSkinSlim;
+import com.uxplima.uxmessentials.npc.application.SetNpcState;
 import com.uxplima.uxmessentials.npc.application.SetNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
@@ -111,7 +120,8 @@ public final class NpcWiring {
         SkinService skinService = new CompositeSkinService(mojangSkins, mineSkins);
         NpcSkinByName skinByName =
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
-        List<CommandRegistration> commands = List.of(new NpcCommand(services, skinByName, kernel.messages()));
+        List<CommandRegistration> commands =
+                List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages()));
         BukkitNpcCommandRunner commandRunner = new BukkitNpcCommandRunner();
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
         NpcActionRunner actionRunner = new BukkitNpcActionRunner(
@@ -152,7 +162,16 @@ public final class NpcWiring {
                 new RemoveNpcAction(repository, notifier),
                 new ClearNpcActions(repository, notifier),
                 new SetNpcTypeData(repository, renderer, notifier),
-                new ListNpcTypeData(repository, notifier));
+                new ListNpcTypeData(repository, notifier),
+                new MoveNpcTo(repository, renderer, notifier),
+                new SetNpcDisplayName(repository, renderer, notifier),
+                new SetNpcInteractionCooldown(repository, notifier),
+                new SetNpcMirrorSkin(repository, renderer, notifier),
+                new SetNpcCollidable(repository, renderer, notifier),
+                new SetNpcShowInTab(repository, renderer, notifier),
+                new SetNpcRange(repository, renderer, notifier),
+                new SetNpcState(repository, renderer, notifier),
+                new SetNpcSkinSlim(repository, renderer, notifier));
     }
 
     private static void spawnStored(NpcRepository repository, NpcRenderer renderer) {

@@ -50,15 +50,19 @@ final class NpcSkinCommands extends NpcCommandSupport {
 
     private final NpcSkinByName skinByName;
 
-    NpcSkinCommands(NpcServices services, NpcSkinByName skinByName, Messages messages) {
-        super(services, messages);
+    NpcSkinCommands(
+            NpcServices services,
+            java.util.function.Supplier<? extends java.util.Collection<String>> npcNames,
+            NpcSkinByName skinByName,
+            Messages messages) {
+        super(services, npcNames, messages);
         this.skinByName = Objects.requireNonNull(skinByName, "skinByName");
     }
 
     /** The skin subcommand node the {@code /npc} literal attaches. */
     LiteralArgumentBuilder<CommandSourceStack> node() {
         return Commands.literal("skin")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument()
                         .then(Commands.argument("value", StringArgumentType.greedyString())
                                 .suggests(this::suggestSkinPrefixes)
                                 .executes(this::skin)));

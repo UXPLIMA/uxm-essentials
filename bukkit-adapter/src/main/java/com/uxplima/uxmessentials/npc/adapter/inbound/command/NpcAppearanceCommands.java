@@ -50,8 +50,34 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     /** A sentinel the equip handler returns instead of a material when the word named no known item material. */
     private static final String INVALID_MATERIAL = "invalid-material";
 
-    NpcAppearanceCommands(NpcServices services, Messages messages) {
-        super(services, messages);
+    /** The equipment slot words suggested for {@code /npc equip <name> <slot>}. */
+    private static final List<String> SLOT_WORDS = List.of("mainhand", "offhand", "head", "chest", "legs", "feet");
+    /** The material keywords suggested for {@code /npc equip <name> <slot> <material>} alongside item names. */
+    private static final List<String> MATERIAL_KEYWORDS = List.of("hand", "air", "none");
+    /** The glow colour words suggested for {@code /npc glow <name> <bool> [color]}. */
+    private static final List<String> COLOR_WORDS = List.of(
+            "black",
+            "dark_blue",
+            "dark_green",
+            "dark_aqua",
+            "dark_red",
+            "dark_purple",
+            "gold",
+            "gray",
+            "dark_gray",
+            "blue",
+            "green",
+            "aqua",
+            "red",
+            "light_purple",
+            "yellow",
+            "white");
+
+    NpcAppearanceCommands(
+            NpcServices services,
+            java.util.function.Supplier<? extends java.util.Collection<String>> npcNames,
+            Messages messages) {
+        super(services, npcNames, messages);
     }
 
     /** The appearance subcommand nodes the {@code /npc} literal attaches. */
@@ -61,7 +87,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> typeNode() {
         return Commands.literal("type")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument()
                         .then(Commands.argument("type", StringArgumentType.word())
                                 .suggests(this::suggestEntityTypes)
                                 .executes(this::type)));
@@ -93,6 +119,23 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
         return builder.buildFuture();
     }
 
+    /** Suggest the {@code hand}/{@code air}/{@code none} keywords plus every item material name, prefix-filtered. */
+    private CompletableFuture<Suggestions> suggestMaterials(
+            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
+        String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
+        for (String keyword : MATERIAL_KEYWORDS) {
+            if (keyword.startsWith(prefix)) {
+                builder.suggest(keyword);
+            }
+        }
+        for (Material material : Material.values()) {
+            if (material.isItem() && material.name().toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                builder.suggest(material.name().toLowerCase(Locale.ROOT));
+            }
+        }
+        return builder.buildFuture();
+    }
+
     /**
      * Parse the type word case-insensitively to a Bukkit {@link EntityType}, accepting it only when it is a living
      * type an NPC can render as ({@code PLAYER} or a living-entity class). Returns {@code null} for an unknown or
@@ -119,9 +162,11 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> equipNode() {
         return Commands.literal("equip")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument()
                         .then(Commands.argument("slot", StringArgumentType.word())
+                                .suggests((ctx, builder) -> suggest(builder, SLOT_WORDS))
                                 .then(Commands.argument("material", StringArgumentType.word())
+                                        .suggests(this::suggestMaterials)
                                         .executes(this::equip))));
     }
 
@@ -146,10 +191,12 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> glowNode() {
         return Commands.literal("glow")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument()
                         .then(Commands.argument("value", BoolArgumentType.bool())
+                                .suggests((ctx, builder) -> suggest(builder, BOOLEAN_WORDS))
                                 .executes(this::glow)
                                 .then(Commands.argument("color", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> suggest(builder, COLOR_WORDS))
                                         .executes(this::glow))));
     }
 
@@ -170,7 +217,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> poseNode() {
         return Commands.literal("pose")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument()
                         .then(Commands.argument("pose", StringArgumentType.word())
                                 .suggests(this::suggestPoses)
                                 .executes(this::pose)));
@@ -193,7 +240,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
 
     private LiteralArgumentBuilder<CommandSourceStack> scaleNode() {
         return Commands.literal("scale")
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(nameArgument()
                         .then(Commands.argument("value", DoubleArgumentType.doubleArg())
                                 .executes(this::scale)));
     }

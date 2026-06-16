@@ -1,13 +1,14 @@
 package com.uxplima.uxmessentials.npc.adapter.inbound.command;
 
+import java.util.Collection;
+import java.util.function.Supplier;
+
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.BoolArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -37,13 +38,19 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     private final NpcAppearanceCommands appearanceCommands;
     private final NpcDataCommands dataCommands;
     private final NpcActionCommands actionCommands;
+    private final NpcStateCommands stateCommands;
 
-    public NpcCommand(NpcServices services, NpcSkinByName skinByName, Messages messages) {
-        super(services, messages);
-        this.skinCommands = new NpcSkinCommands(services, skinByName, messages);
-        this.appearanceCommands = new NpcAppearanceCommands(services, messages);
-        this.dataCommands = new NpcDataCommands(services, messages);
-        this.actionCommands = new NpcActionCommands(services, messages);
+    public NpcCommand(
+            NpcServices services,
+            Supplier<? extends Collection<String>> npcNames,
+            NpcSkinByName skinByName,
+            Messages messages) {
+        super(services, npcNames, messages);
+        this.skinCommands = new NpcSkinCommands(services, npcNames, skinByName, messages);
+        this.appearanceCommands = new NpcAppearanceCommands(services, npcNames, messages);
+        this.dataCommands = new NpcDataCommands(services, npcNames, messages);
+        this.actionCommands = new NpcActionCommands(services, npcNames, messages);
+        this.stateCommands = new NpcStateCommands(services, npcNames, messages);
     }
 
     @Override
@@ -55,12 +62,15 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                 .then(Commands.literal("list").executes(this::list))
                 .then(name("movehere", this::move))
                 .then(greedy("command", this::command))
-                .then(lookAtPlayerNode())
+                .then(bool("lookatplayer", this::lookAtPlayer))
                 .then(skinCommands.node())
                 .then(dataCommands.node())
                 .then(actionCommands.node());
         for (LiteralArgumentBuilder<CommandSourceStack> appearance : appearanceCommands.nodes()) {
             root.then(appearance);
+        }
+        for (LiteralArgumentBuilder<CommandSourceStack> stateNode : stateCommands.nodes()) {
+            root.then(stateNode);
         }
         return root.build();
     }
@@ -114,13 +124,6 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
         }
         services.command().setCommand(ref(sender), nameArg(ctx), value(ctx));
         return Command.SINGLE_SUCCESS;
-    }
-
-    private LiteralArgumentBuilder<CommandSourceStack> lookAtPlayerNode() {
-        return Commands.literal("lookatplayer")
-                .then(Commands.argument("name", StringArgumentType.word())
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(this::lookAtPlayer)));
     }
 
     private int lookAtPlayer(CommandContext<CommandSourceStack> ctx) {

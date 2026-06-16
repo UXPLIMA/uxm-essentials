@@ -151,6 +151,16 @@ public final class NpcRenderer implements NpcView {
     }
 
     /**
+     * Every tracked NPC's name, for command tab-completion. The renderer tracks every stored NPC (each is rendered
+     * on enable and on create, and stays tracked until deleted), so its live keyset is the warm, in-memory name set
+     * a suggestion provider reads on the tick thread without touching the DB. The returned set is a copy, so a
+     * concurrent edit never leaks the backing map.
+     */
+    public java.util.Set<String> npcNames() {
+        return java.util.Set.copyOf(live.keySet());
+    }
+
+    /**
      * Re-aim every looking NPC at its nearby viewers (the look tick). For each online viewer and each NPC the
      * viewer is currently shown, if the NPC has look-at-player on and the viewer is within the look range, send
      * that viewer head- and body-look packets turning the fake player toward the viewer's eyes — a per-viewer
@@ -170,8 +180,7 @@ public final class NpcRenderer implements NpcView {
     private void aimAtViewer(Player viewer, RenderedNpc rendered) {
         // Reads the live viewer location, so it must run on the viewer's region thread alongside the send.
         scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
-            if (!isShown(viewer, rendered)
-                    || !inLookRange(viewer, rendered.npc().location())) {
+            if (!isShown(viewer, rendered) || !inLookRange(viewer, rendered.npc())) {
                 return;
             }
             Location eye = viewer.getEyeLocation();
@@ -188,9 +197,11 @@ public final class NpcRenderer implements NpcView {
         return shown != null && shown.contains(rendered.npc().name().value());
     }
 
-    private boolean inLookRange(Player viewer, Position npcAt) {
+    private boolean inLookRange(Player viewer, Npc npc) {
         Position viewerAt = BukkitRefs.toPosition(Objects.requireNonNull(viewer.getLocation(), "viewer location"));
-        return viewerAt.distanceTo(npcAt) <= lookRange;
+        Double override = npc.turnDistance();
+        double range = override != null ? override : lookRange;
+        return viewerAt.distanceTo(npc.location()) <= range;
     }
 
     private RenderedNpc track(Npc npc) {
@@ -211,7 +222,7 @@ public final class NpcRenderer implements NpcView {
         // The range check reads the live player location, so it must run on the viewer's own region thread along
         // with the send; doing it inline here would touch a Player off its region thread (unsafe on Folia).
         scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
-            if (inRange(viewer, rendered.npc().location())) {
+            if (inRange(viewer, rendered.npc())) {
                 if (!isShown(viewer, rendered)) {
                     spawnForViewer(viewer, rendered);
                 }
@@ -229,7 +240,7 @@ public final class NpcRenderer implements NpcView {
      */
     private void forceRenderForViewer(Player viewer, RenderedNpc rendered) {
         scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
-            if (inRange(viewer, rendered.npc().location())) {
+            if (inRange(viewer, rendered.npc())) {
                 if (isShown(viewer, rendered)) {
                     removeFromViewer(viewer, rendered);
                 }
@@ -266,9 +277,11 @@ public final class NpcRenderer implements NpcView {
         packets.send(viewer, packets.glowColorRemove(glowTeam(rendered.npc())));
     }
 
-    private boolean inRange(Player viewer, Position npcAt) {
+    private boolean inRange(Player viewer, Npc npc) {
         Position viewerAt = BukkitRefs.toPosition(Objects.requireNonNull(viewer.getLocation(), "viewer location"));
-        return viewerAt.distanceTo(npcAt) <= renderRange;
+        Double override = npc.viewDistance();
+        double range = override != null ? override : renderRange;
+        return viewerAt.distanceTo(npc.location()) <= range;
     }
 
     /**
