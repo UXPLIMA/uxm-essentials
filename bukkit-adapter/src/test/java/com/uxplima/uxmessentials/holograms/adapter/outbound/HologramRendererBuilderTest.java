@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -100,6 +101,33 @@ class HologramRendererBuilderTest {
                 .spec();
 
         assertThat(spec.appearance().viewRange()).isEqualTo(3.0f);
+    }
+
+    @Test
+    void mapsAStoredRotationOntoTheLibTransform() {
+        Hologram hologram = hologram(Appearance.defaults(), "spun").withRotation(Rotation.of(90f, 30f));
+
+        HologramSpec spec = HologramRenderer.builderFor(hologram, UnaryOperator.identity(), MINI_MESSAGE)
+                .spec();
+
+        com.uxplima.uxmlib.hologram.Transform transform =
+                java.util.Objects.requireNonNull(spec.appearance().transform());
+        assertThat(transform.yawDegrees()).isEqualTo(90f);
+        assertThat(transform.pitchDegrees()).isEqualTo(30f);
+    }
+
+    @Test
+    void leavesTheRotationAnglesAtZeroWhenThereIsNoRotation() {
+        // The scale path always seeds a Transform, so the angles (not the transform's presence) prove no spin.
+        Hologram hologram = hologram(Appearance.defaults(), "still");
+
+        HologramSpec spec = HologramRenderer.builderFor(hologram, UnaryOperator.identity(), MINI_MESSAGE)
+                .spec();
+
+        com.uxplima.uxmlib.hologram.Transform transform =
+                java.util.Objects.requireNonNull(spec.appearance().transform());
+        assertThat(transform.yawDegrees()).isZero();
+        assertThat(transform.pitchDegrees()).isZero();
     }
 
     private static Hologram hologram(Appearance appearance, String line) {

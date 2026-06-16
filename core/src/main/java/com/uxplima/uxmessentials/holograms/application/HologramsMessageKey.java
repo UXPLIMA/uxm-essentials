@@ -17,12 +17,34 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_CREATED("hologram.created"),
     HOLOGRAM_DELETED("hologram.deleted"),
     HOLOGRAM_MOVED("hologram.moved"),
+    HOLOGRAM_CENTERED("hologram.centered"),
     HOLOGRAM_TELEPORTED("hologram.teleported"),
+    HOLOGRAM_COPIED("hologram.copied"),
+    HOLOGRAM_ROTATED("hologram.rotated"),
 
     // line editing feedback
     HOLOGRAM_LINE_ADDED("hologram.line.added"),
     HOLOGRAM_LINE_SET("hologram.line.set"),
+    HOLOGRAM_LINE_INSERTED("hologram.line.inserted"),
     HOLOGRAM_LINE_REMOVED("hologram.line.removed"),
+
+    // info (one header + structured entries)
+    HOLOGRAM_INFO_HEADER("hologram.info.header"),
+    HOLOGRAM_INFO_LOCATION("hologram.info.location"),
+    HOLOGRAM_INFO_LINES("hologram.info.lines"),
+    HOLOGRAM_INFO_TYPE("hologram.info.type"),
+    HOLOGRAM_INFO_BILLBOARD("hologram.info.billboard"),
+    HOLOGRAM_INFO_BACKGROUND("hologram.info.background"),
+    HOLOGRAM_INFO_SCALE("hologram.info.scale"),
+    HOLOGRAM_INFO_VIEW_RANGE("hologram.info.view-range"),
+    HOLOGRAM_INFO_VISIBILITY("hologram.info.visibility"),
+    HOLOGRAM_INFO_REFRESH("hologram.info.refresh"),
+    HOLOGRAM_INFO_ROTATION("hologram.info.rotation"),
+
+    // nearby listing
+    HOLOGRAM_NEARBY_HEADER("hologram.nearby.header"),
+    HOLOGRAM_NEARBY_ENTRY("hologram.nearby.entry"),
+    HOLOGRAM_NEARBY_EMPTY("hologram.nearby.empty"),
 
     // appearance + refresh feedback
     HOLOGRAM_APPEARANCE_SET("hologram.appearance.set"),

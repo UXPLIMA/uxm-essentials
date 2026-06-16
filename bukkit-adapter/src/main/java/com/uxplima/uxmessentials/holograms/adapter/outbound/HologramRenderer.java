@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -198,6 +199,7 @@ public final class HologramRenderer implements HologramView {
         }
         Holograms.ItemBuilder builder = Holograms.item(item);
         HologramAppearances.applyDisplay(builder, hologram.appearance());
+        applyRotation(builder, hologram);
         return RenderedHologram.ofModel(manager.spawn(builder, at));
     }
 
@@ -212,7 +214,19 @@ public final class HologramRenderer implements HologramView {
         }
         Holograms.BlockBuilder builder = Holograms.block(block);
         HologramAppearances.applyDisplay(builder, hologram.appearance());
+        applyRotation(builder, hologram);
         return RenderedHologram.ofModel(manager.spawn(builder, at));
+    }
+
+    /**
+     * Apply a stored {@link Rotation} to a model (item/block) builder when it is non-zero. Only visible with a
+     * FIXED billboard — applied regardless, so the operator sets the billboard separately as on the text path.
+     */
+    private static void applyRotation(Holograms.ModelBuilder<?> builder, Hologram hologram) {
+        Rotation rotation = hologram.rotation();
+        if (rotation.isRotated()) {
+            builder.rotation(rotation.yaw(), rotation.pitch());
+        }
     }
 
     /**
@@ -264,6 +278,11 @@ public final class HologramRenderer implements HologramView {
             builder.line(miniMessage.deserialize(placeholders.apply(line.value())));
         }
         HologramAppearances.apply(builder, hologram.appearance());
+        Rotation rotation = hologram.rotation();
+        if (rotation.isRotated()) {
+            // Only visible with a FIXED billboard; applied regardless so the operator sets the billboard separately.
+            builder.rotation(rotation.yaw(), rotation.pitch());
+        }
         Visibility visibility = hologram.visibility();
         if (visibility.hasDistanceLimit()) {
             // The lib view range is a multiplier on the vanilla tracking range, so a block radius maps to

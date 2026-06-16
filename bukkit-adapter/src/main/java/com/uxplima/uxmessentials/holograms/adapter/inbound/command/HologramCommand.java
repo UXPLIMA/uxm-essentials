@@ -56,6 +56,10 @@ public final class HologramCommand extends HologramCommandSupport implements Com
         for (LiteralArgumentBuilder<CommandSourceStack> model : new HologramModelCommand(services, messages).nodes()) {
             root.then(model);
         }
+        for (LiteralArgumentBuilder<CommandSourceStack> convenience :
+                new HologramConvenienceCommand(services, messages).nodes()) {
+            root.then(convenience);
+        }
         return root.build();
     }
 

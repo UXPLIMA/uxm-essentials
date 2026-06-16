@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.persistence.jooq.tables.HologramLines;
 import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
@@ -187,6 +188,24 @@ class JooqHologramRepositoryTest {
 
         assertThat(loaded.type()).isEqualTo(com.uxplima.uxmessentials.holograms.domain.HologramType.TEXT);
         assertThat(loaded.itemMaterial()).isNull();
+    }
+
+    @Test
+    void roundTripsAStoredRotation() {
+        repository.save(hologram("spawn", 1, 64, 1, "line").withRotation(Rotation.of(90f, 30f)));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.rotation()).isEqualTo(Rotation.of(90f, 30f));
+    }
+
+    @Test
+    void aFreshHologramDefaultsToNoRotation() {
+        repository.save(hologram("spawn", 1, 64, 1, "line"));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.rotation()).isEqualTo(Rotation.NONE);
     }
 
     @Test

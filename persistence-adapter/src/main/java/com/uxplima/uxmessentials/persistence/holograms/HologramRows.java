@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramType;
+import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.HologramsRecord;
@@ -56,6 +57,7 @@ final class HologramRows {
                 row.get(HOLOGRAMS.BLOCK_DATA),
                 appearanceOf(row),
                 visibilityOf(row),
+                rotationOf(row),
                 intOr(row.get(HOLOGRAMS.REFRESH_INTERVAL_TICKS), Hologram.STATIC),
                 Instant.ofEpochMilli(row.get(HOLOGRAMS.CREATED_AT)));
     }
@@ -65,6 +67,7 @@ final class HologramRows {
         Position location = hologram.location();
         Appearance appearance = hologram.appearance();
         Visibility visibility = hologram.visibility();
+        Rotation rotation = hologram.rotation();
         record.setName(hologram.name().value())
                 .setType(hologram.type().name())
                 .setItemMaterial(hologram.itemMaterial())
@@ -88,6 +91,8 @@ final class HologramRows {
                 .setVisibilityMode(visibility.mode().name())
                 .setVisibilityPermission(visibility.permission())
                 .setVisibilityDistance(visibility.distance())
+                .setRotationYaw(rotation.yaw())
+                .setRotationPitch(rotation.pitch())
                 .setRefreshIntervalTicks(hologram.refreshIntervalTicks());
     }
 
@@ -115,6 +120,12 @@ final class HologramRows {
             return new Visibility(Visibility.Mode.PERMISSION, permission, distance);
         }
         return new Visibility(Visibility.Mode.ALL, null, distance);
+    }
+
+    private static Rotation rotationOf(Record row) {
+        // The V43 columns are NOT NULL DEFAULT 0, so an existing pre-V43 row reads back as 0/0 = Rotation.NONE.
+        return Rotation.of(
+                floatOr(row.get(HOLOGRAMS.ROTATION_YAW), 0f), floatOr(row.get(HOLOGRAMS.ROTATION_PITCH), 0f));
     }
 
     private static HologramType typeOf(@Nullable String stored) {

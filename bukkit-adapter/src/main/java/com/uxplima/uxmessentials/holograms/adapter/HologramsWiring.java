@@ -11,19 +11,28 @@ import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramComma
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTeleportAdapter;
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
+import com.uxplima.uxmessentials.holograms.application.CenterHologram;
+import com.uxplima.uxmessentials.holograms.application.CopyHologram;
 import com.uxplima.uxmessentials.holograms.application.CreateHologram;
 import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
+import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
+import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
+import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
+import com.uxplima.uxmessentials.holograms.application.RotateHologram;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
 import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
+import com.uxplima.uxmessentials.holograms.application.TeleportToHologram;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
+import com.uxplima.uxmessentials.holograms.application.port.HologramTeleporter;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -97,14 +106,22 @@ public final class HologramsWiring {
     private static HologramServices assemble(
             KernelPorts kernel, HologramRepository repository, HologramRenderer renderer, HologramNotifier notifier) {
         Clock clock = Clock.systemUTC();
+        HologramTeleporter teleporter = new HologramTeleportAdapter(kernel.scheduler(), kernel.log());
         return new HologramServices(
                 new CreateHologram(repository, renderer, notifier, kernel.events(), clock),
                 new DeleteHologram(repository, renderer, notifier, kernel.events()),
                 new ListHolograms(repository, notifier),
                 new AddHologramLine(repository, renderer, notifier),
                 new SetHologramLine(repository, renderer, notifier),
+                new InsertHologramLine(repository, renderer, notifier),
                 new RemoveHologramLine(repository, renderer, notifier),
                 new MoveHologram(repository, renderer, notifier),
+                new CenterHologram(repository, renderer, notifier),
+                new TeleportToHologram(repository, teleporter, notifier),
+                new CopyHologram(repository, renderer, notifier),
+                new RotateHologram(repository, renderer, notifier),
+                new DescribeHologram(repository, notifier),
+                new NearbyHolograms(repository, notifier),
                 new SetHologramAppearance(repository, renderer, notifier),
                 new SetHologramRefresh(repository, renderer, notifier),
                 new SetHologramVisibility(repository, renderer, notifier),

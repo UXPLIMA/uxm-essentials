@@ -206,4 +206,94 @@ class HologramTest {
 
         assertThatThrownBy(() -> one.withLineRemoved(0)).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void createDefaultsToNoRotation() {
+        assertThat(twoLine().rotation()).isEqualTo(Rotation.NONE);
+    }
+
+    @Test
+    void withRotationKeepsEverythingElseButReorients() {
+        Hologram spun = twoLine().withRefreshIntervalTicks(40).withRotation(Rotation.of(90f, 30f));
+
+        assertThat(spun.rotation()).isEqualTo(Rotation.of(90f, 30f));
+        assertThat(spun.refreshIntervalTicks()).isEqualTo(40);
+        assertThat(spun.lines()).hasSize(2);
+        assertThat(spun.name().value()).isEqualTo("spawn");
+        assertThat(spun.appearance()).isEqualTo(Appearance.defaults());
+    }
+
+    @Test
+    void withRotationSurvivesAMoveAndAnEdit() {
+        Hologram spun = twoLine().withRotation(Rotation.of(45f, 15f)).movedTo(Position.of(WORLD, 5, 5, 5));
+
+        assertThat(spun.rotation()).isEqualTo(Rotation.of(45f, 15f));
+        assertThat(spun.withLineAppended(new HologramLine("three")).rotation()).isEqualTo(Rotation.of(45f, 15f));
+    }
+
+    @Test
+    void withLineInsertedPlacesTheLineBeforeTheIndex() {
+        Hologram three = twoLine().withLineInserted(0, new HologramLine("zero"));
+
+        assertThat(three.lines()).map(HologramLine::value).containsExactly("zero", "one", "two");
+    }
+
+    @Test
+    void withLineInsertedBeforeTheSecondLineSplitsTheList() {
+        Hologram three = twoLine().withLineInserted(1, new HologramLine("between"));
+
+        assertThat(three.lines()).map(HologramLine::value).containsExactly("one", "between", "two");
+    }
+
+    @Test
+    void withLineInsertedAtTheSizeAppends() {
+        Hologram three = twoLine().withLineInserted(2, new HologramLine("three"));
+
+        assertThat(three.lines()).map(HologramLine::value).containsExactly("one", "two", "three");
+    }
+
+    @Test
+    void withLineInsertedBeyondTheSizeAlsoAppends() {
+        Hologram three = twoLine().withLineInserted(99, new HologramLine("end"));
+
+        assertThat(three.lines()).map(HologramLine::value).containsExactly("one", "two", "end");
+    }
+
+    @Test
+    void withLineInsertedRejectsANegativeIndex() {
+        assertThatThrownBy(() -> twoLine().withLineInserted(-1, new HologramLine("x")))
+                .isInstanceOf(IndexOutOfBoundsException.class);
+    }
+
+    @Test
+    void renamedToCopiesEveryPropertyUnderTheNewName() {
+        Hologram source = twoLine()
+                .withRefreshIntervalTicks(40)
+                .withAppearance(Appearance.defaults().withBillboard(Billboard.FIXED))
+                .withVisibility(Visibility.restrictedTo("uxmessentials.hologram.see.vip"))
+                .withRotation(Rotation.of(90f, 30f));
+
+        Hologram clone = source.renamedTo(HologramName.of("copy"));
+
+        assertThat(clone.name().value()).isEqualTo("copy");
+        assertThat(clone.location()).isEqualTo(source.location());
+        assertThat(clone.lines()).isEqualTo(source.lines());
+        assertThat(clone.appearance()).isEqualTo(source.appearance());
+        assertThat(clone.visibility()).isEqualTo(source.visibility());
+        assertThat(clone.rotation()).isEqualTo(source.rotation());
+        assertThat(clone.refreshIntervalTicks()).isEqualTo(source.refreshIntervalTicks());
+        assertThat(clone.type()).isEqualTo(source.type());
+        assertThat(clone.createdAt()).isEqualTo(source.createdAt());
+    }
+
+    @Test
+    void renamedToPreservesAnItemModel() {
+        Hologram source = Hologram.createItem(HologramName.of("loot"), AT, "DIAMOND", Instant.ofEpochMilli(1_000));
+
+        Hologram clone = source.renamedTo(HologramName.of("loot-copy"));
+
+        assertThat(clone.type()).isEqualTo(HologramType.ITEM);
+        assertThat(clone.itemMaterial()).isEqualTo("DIAMOND");
+        assertThat(clone.name().value()).isEqualTo("loot-copy");
+    }
 }

@@ -36,6 +36,7 @@ import org.jspecify.annotations.Nullable;
  * @param blockData the BlockData string shown by a BLOCK hologram, or {@code null} for other types
  * @param appearance the visual styling (billboard, background, brightness, scale, …)
  * @param visibility who may see the hologram and how far away it stays visible
+ * @param rotation the display's stored spin (yaw + pitch), only visible with a FIXED billboard
  * @param refreshIntervalTicks how often (in ticks) the live entity re-renders, or 0 for a static hologram
  * @param createdAt when the hologram was first created (preserved across a move or edit)
  */
@@ -48,6 +49,7 @@ public record Hologram(
         @Nullable String blockData,
         Appearance appearance,
         Visibility visibility,
+        Rotation rotation,
         int refreshIntervalTicks,
         Instant createdAt) {
 
@@ -61,6 +63,7 @@ public record Hologram(
         Objects.requireNonNull(lines, "lines");
         Objects.requireNonNull(appearance, "appearance");
         Objects.requireNonNull(visibility, "visibility");
+        Objects.requireNonNull(rotation, "rotation");
         Objects.requireNonNull(createdAt, "createdAt");
         lines = List.copyOf(lines);
         if (type.requiresLines() && lines.isEmpty()) {
@@ -91,6 +94,7 @@ public record Hologram(
                 null,
                 Appearance.defaults(),
                 Visibility.everyone(),
+                Rotation.NONE,
                 STATIC,
                 createdAt);
     }
@@ -106,6 +110,7 @@ public record Hologram(
                 null,
                 Appearance.defaults(),
                 Visibility.everyone(),
+                Rotation.NONE,
                 STATIC,
                 createdAt);
     }
@@ -121,6 +126,7 @@ public record Hologram(
                 Objects.requireNonNull(blockData, "blockData"),
                 Appearance.defaults(),
                 Visibility.everyone(),
+                Rotation.NONE,
                 STATIC,
                 createdAt);
     }
@@ -128,6 +134,27 @@ public record Hologram(
     /** A copy re-anchored to {@code newLocation}, keeping everything else. */
     public Hologram movedTo(Position newLocation) {
         return copy(Objects.requireNonNull(newLocation, "newLocation"), type, lines, itemMaterial, blockData);
+    }
+
+    /**
+     * A full clone under {@code newName}, keeping every other property — location, type, lines, model,
+     * appearance, visibility, rotation, refresh interval and creation time. Backs {@code /hologram copy}:
+     * the duplicate is the same hologram in every way but its name.
+     */
+    public Hologram renamedTo(HologramName newName) {
+        Objects.requireNonNull(newName, "newName");
+        return new Hologram(
+                newName,
+                location,
+                type,
+                lines,
+                itemMaterial,
+                blockData,
+                appearance,
+                visibility,
+                rotation,
+                refreshIntervalTicks,
+                createdAt);
     }
 
     /** A copy with {@code line} appended after the current last line. */
@@ -144,6 +171,21 @@ public record Hologram(
         requireInRange(index);
         List<HologramLine> next = new ArrayList<>(lines);
         next.set(index, line);
+        return copy(location, type, next, itemMaterial, blockData);
+    }
+
+    /**
+     * A copy with {@code line} inserted <em>before</em> the line at {@code index} (so the inserted line takes
+     * that position and the rest shift down by one); an {@code index} at or past the current size appends, like
+     * adding a line at the end. A negative index is rejected.
+     */
+    public Hologram withLineInserted(int index, HologramLine line) {
+        Objects.requireNonNull(line, "line");
+        if (index < 0) {
+            throw new IndexOutOfBoundsException("line index must not be negative: " + index);
+        }
+        List<HologramLine> next = new ArrayList<>(lines);
+        next.add(Math.min(index, next.size()), line);
         return copy(location, type, next, itemMaterial, blockData);
     }
 
@@ -186,6 +228,7 @@ public record Hologram(
                 blockData,
                 newAppearance,
                 visibility,
+                rotation,
                 refreshIntervalTicks,
                 createdAt);
     }
@@ -202,6 +245,24 @@ public record Hologram(
                 blockData,
                 appearance,
                 newVisibility,
+                rotation,
+                refreshIntervalTicks,
+                createdAt);
+    }
+
+    /** A copy with a new {@link Rotation}, keeping everything else. */
+    public Hologram withRotation(Rotation newRotation) {
+        Objects.requireNonNull(newRotation, "newRotation");
+        return new Hologram(
+                name,
+                location,
+                type,
+                lines,
+                itemMaterial,
+                blockData,
+                appearance,
+                visibility,
+                newRotation,
                 refreshIntervalTicks,
                 createdAt);
     }
@@ -212,7 +273,17 @@ public record Hologram(
             throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + ticks);
         }
         return new Hologram(
-                name, location, type, lines, itemMaterial, blockData, appearance, visibility, ticks, createdAt);
+                name,
+                location,
+                type,
+                lines,
+                itemMaterial,
+                blockData,
+                appearance,
+                visibility,
+                rotation,
+                ticks,
+                createdAt);
     }
 
     /** The number of lines this hologram renders (0 for an item/block hologram with no label lines). */
@@ -240,6 +311,7 @@ public record Hologram(
                 newBlock,
                 appearance,
                 visibility,
+                rotation,
                 refreshIntervalTicks,
                 createdAt);
     }
