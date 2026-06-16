@@ -69,6 +69,15 @@ abstract class WarpCommandSupport {
     }
 
     /**
+     * Run {@code feedback} on {@code viewer}'s region thread. Inline command feedback calls
+     * {@code sender.sendMessage(...)}, a Bukkit interaction, so a continuation reached from an async read must
+     * bridge back to the player's entity thread before sending — the same bridge {@code /pwarp} uses.
+     */
+    final void onPlayer(PlayerRef viewer, Runnable feedback) {
+        services.scheduler().onEntity(viewer, feedback);
+    }
+
+    /**
      * A {@code name} string argument that completes against the warps the invoking player may use. The warp
      * repository is held in memory, so the per-keystroke lookup is non-blocking; the suggestion is the same
      * permission-filtered set {@code /warps} renders, so a player never sees a warp they cannot teleport to.

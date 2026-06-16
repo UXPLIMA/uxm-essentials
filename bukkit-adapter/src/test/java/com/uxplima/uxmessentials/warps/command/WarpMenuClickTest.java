@@ -173,7 +173,8 @@ class WarpMenuClickTest {
                 warpMenu,
                 new NoPlayerLookup(),
                 repository,
-                null);
+                null,
+                new SyncScheduler());
     }
 
     /** Three free, ungated, owner-attributed warps. */

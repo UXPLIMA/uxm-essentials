@@ -255,7 +255,8 @@ public final class WarpsWiring {
                 warpMenu,
                 kernel.playerLookup(),
                 repository,
-                editorView);
+                editorView,
+                kernel.scheduler());
     }
 
     /**

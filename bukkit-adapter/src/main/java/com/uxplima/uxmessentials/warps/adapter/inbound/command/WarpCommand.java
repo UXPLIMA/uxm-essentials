@@ -318,13 +318,22 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         String warpName = ctx.getArgument("name", String.class);
         double rating = ctx.getArgument("rating", Double.class);
 
+        // The existence check is served from the in-memory set, but the rating write is not cached — it touches
+        // the database — so run it off the tick thread and bridge the confirmation back to the player's region.
         if (!services.repository().exists(WarpName.of(warpName))) {
             feedback.send(sender, WarpsMessageKey.WARP_NOT_FOUND, Map.of("warp", warpName));
             return 0;
         }
-
-        services.repository().rate(WarpName.of(warpName), sender.getUniqueId(), rating);
-        feedback.send(sender, WarpsMessageKey.WARP_RATED, Map.of("warp", warpName, "rating", Double.toString(rating)));
+        PlayerRef who = ref(sender);
+        services.scheduler().async(() -> {
+            services.repository().rate(WarpName.of(warpName), who.uuid(), rating);
+            onPlayer(
+                    who,
+                    () -> feedback.send(
+                            sender,
+                            WarpsMessageKey.WARP_RATED,
+                            Map.of("warp", warpName, "rating", Double.toString(rating))));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -335,13 +344,20 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         }
         String warpName = ctx.getArgument("name", String.class);
 
+        // The existence check is in-memory; the average rating is an aggregate query against the database, so
+        // run it off the tick thread and bridge the result back to the player's region thread.
         if (!services.repository().exists(WarpName.of(warpName))) {
             feedback.send(sender, WarpsMessageKey.WARP_NOT_FOUND, Map.of("warp", warpName));
             return 0;
         }
-
-        double avg = services.repository().averageRating(WarpName.of(warpName));
-        feedback.send(sender, WarpsMessageKey.WARP_RATING, Map.of("warp", warpName, "rating", oneDecimal(avg)));
+        PlayerRef who = ref(sender);
+        services.scheduler().async(() -> {
+            double avg = services.repository().averageRating(WarpName.of(warpName));
+            onPlayer(
+                    who,
+                    () -> feedback.send(
+                            sender, WarpsMessageKey.WARP_RATING, Map.of("warp", warpName, "rating", oneDecimal(avg))));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
