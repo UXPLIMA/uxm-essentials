@@ -7,11 +7,14 @@ import java.util.Objects;
 
 import org.bukkit.plugin.Plugin;
 
+import net.kyori.adventure.text.minimessage.MiniMessage;
+
 import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramCommands;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTeleportAdapter;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTextOverrides;
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
 import com.uxplima.uxmessentials.holograms.application.CenterHologram;
 import com.uxplima.uxmessentials.holograms.application.CopyHologram;
@@ -43,6 +46,10 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.hologram.HologramManager;
+import com.uxplima.uxmlib.npc.ChannelResolver;
+import com.uxplima.uxmlib.npc.PacketSender;
+import com.uxplima.uxmlib.packet.display.DisplayTextPackets;
+import com.uxplima.uxmlib.packet.display.internal.NmsDisplayTextPackets;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -77,8 +84,12 @@ public final class HologramsWiring {
         HologramRepository repository = HologramRepositories.cached(persistence);
         HologramManager manager = new HologramManager();
         manager.installLifecycleListener(plugin);
-        // Hologram lines are one shared TextDisplay, so placeholders resolve server-globally (online, time, TPS);
-        // the identity transform when PlaceholderAPI is absent, so a default server pays nothing.
+        // A hologram is one shared TextDisplay. Its broadcast text resolves placeholders server-globally (online,
+        // time, TPS); the identity transform when PlaceholderAPI is absent, so a default server pays nothing. On
+        // top of that base, a line embedding a placeholder additionally renders per viewer through the text-override
+        // collaborator below — each viewer sees their own resolved values over the one shared entity.
+        HologramTextOverrides textOverrides = new HologramTextOverrides(
+                perViewerTextPackets(), PlaceholderApiSupport::messageBridge, MiniMessage.miniMessage(), kernel.log());
         HologramRenderer renderer = new HologramRenderer(
                 plugin,
                 manager,
@@ -86,7 +97,8 @@ public final class HologramsWiring {
                 kernel.log(),
                 kernel.permissions(),
                 PlaceholderApiSupport.globalBridge(),
-                repository::manualViewers);
+                repository::manualViewers,
+                textOverrides);
         HologramNotifier notifier = new HologramNotifier(kernel.messages(), kernel.messageSink());
         HologramServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
@@ -95,6 +107,16 @@ public final class HologramsWiring {
         plugin.getServer().getPluginManager().registerEvents(new HologramVisibilityListener(renderer), plugin);
         AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer);
         return new Wired(HologramCommands.all(services, kernel.messages()), renderer, repository, refreshTask);
+    }
+
+    /**
+     * Build the lib per-viewer text-override packet port: the channel resolver finds each viewer's Netty channel,
+     * the sender writes to it, and the NMS port builds the {@code ClientboundSetEntityDataPacket} that overrides
+     * one viewer's copy of a shared display's text. The same stack the nametags and tablist contexts use; it is a
+     * no-op send for a viewer whose channel cannot be resolved.
+     */
+    private static DisplayTextPackets perViewerTextPackets() {
+        return new NmsDisplayTextPackets(new PacketSender(new ChannelResolver()));
     }
 
     private static AutoCloseable scheduleRefresh(

@@ -17,6 +17,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 interface RenderedHologram {
 
+    /** The {@link #textEntityId()} of a hologram that carries no overridable text component (item/block). */
+    int NO_ENTITY = -1;
+
     /** Despawn the backing entity through {@code manager} so it is also untracked. */
     void removeFrom(HologramManager manager);
 
@@ -28,6 +31,13 @@ interface RenderedHologram {
 
     /** Hide the entity from {@code viewer}. */
     void hide(Plugin plugin, Player viewer);
+
+    /**
+     * The backing {@code TextDisplay}'s entity id for a text hologram (so the renderer can target a per-viewer
+     * text-override metadata packet at it), or {@link #NO_ENTITY} for an item or block hologram, which carries
+     * no overridable text component.
+     */
+    int textEntityId();
 
     /** A {@link RenderedHologram} over a text {@code Hologram}. */
     static RenderedHologram ofText(com.uxplima.uxmlib.hologram.Hologram text) {
@@ -50,6 +60,11 @@ interface RenderedHologram {
             @Override
             public void hide(Plugin plugin, Player viewer) {
                 text.hide(plugin, viewer);
+            }
+
+            @Override
+            public int textEntityId() {
+                return text.entity().getEntityId();
             }
         };
     }
@@ -75,6 +90,12 @@ interface RenderedHologram {
             @Override
             public void hide(Plugin plugin, Player viewer) {
                 model.hide(plugin, viewer);
+            }
+
+            @Override
+            public int textEntityId() {
+                // An item/block display has no text component to override per viewer.
+                return NO_ENTITY;
             }
         };
     }

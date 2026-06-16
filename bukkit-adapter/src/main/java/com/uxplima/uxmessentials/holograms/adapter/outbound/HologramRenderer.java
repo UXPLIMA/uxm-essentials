@@ -54,9 +54,20 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Each line's MiniMessage source is run through the injected {@code placeholders} transform before it is
  * deserialised, so an operator may embed server-global {@code %papi%} tokens (online count, time, TPS). The
- * hologram is a single shared entity (not one per viewer), so the transform resolves server-relative
- * placeholders; a hologram with a positive refresh interval is re-rendered by the refresh task on its cadence,
- * picking up fresh values. A static hologram with no placeholder renders once and never again.
+ * hologram is a single shared entity, so that transform resolves server-relative placeholders for the broadcast
+ * base text every viewer sees by default; a hologram with a positive refresh interval is re-rendered by the
+ * refresh task on its cadence, picking up fresh values. A static hologram with no placeholder renders once and
+ * never again.
+ *
+ * <p>On top of that shared base, a text hologram whose lines embed a {@code %...%} token additionally renders
+ * <em>per viewer</em>: after the native spawn, each eligible viewer is sent a text-override metadata packet (via
+ * the {@link HologramTextOverrides} collaborator over the lib {@code DisplayTextPackets} port) carrying their own
+ * resolved placeholder values, so each viewer sees their own text over the one shared {@code TextDisplay} — no
+ * per-viewer entity. Overrides are sent on spawn, on join (so a joiner sees their values at once), and on each
+ * refresh re-render (a remove-then-spawn re-sends them, keeping a refreshing hologram's per-viewer values
+ * fresh). When PlaceholderAPI is absent the per-viewer bridge is the identity, so per-viewer text equals the
+ * global text — the path is harmless. A static, no-placeholder, or item/block hologram is never per-viewer and
+ * pays nothing.
  *
  * <p>A hologram's {@link Visibility} is applied at the spawn boundary. {@link Visibility.Mode#ALL} is the cheap
  * default — the shared entity is visible by default to everyone. {@link Visibility.Mode#PERMISSION} restricts
@@ -84,6 +95,7 @@ public final class HologramRenderer implements HologramView {
     private final Permissions permissions;
     private final UnaryOperator<String> placeholders;
     private final Function<HologramName, Set<UUID>> manualViewers;
+    private final HologramTextOverrides textOverrides;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final Map<String, Tracked> live = new ConcurrentHashMap<>();
 
@@ -94,7 +106,8 @@ public final class HologramRenderer implements HologramView {
             Logger log,
             Permissions permissions,
             UnaryOperator<String> placeholders,
-            Function<HologramName, Set<UUID>> manualViewers) {
+            Function<HologramName, Set<UUID>> manualViewers,
+            HologramTextOverrides textOverrides) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.manager = Objects.requireNonNull(manager, "manager");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -102,6 +115,7 @@ public final class HologramRenderer implements HologramView {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.placeholders = Objects.requireNonNull(placeholders, "placeholders");
         this.manualViewers = Objects.requireNonNull(manualViewers, "manualViewers");
+        this.textOverrides = Objects.requireNonNull(textOverrides, "textOverrides");
     }
 
     @Override
@@ -153,20 +167,38 @@ public final class HologramRenderer implements HologramView {
     }
 
     /**
-     * Re-evaluate every per-viewer hologram for a single {@code joiner} on their region thread, showing it to
-     * them when they qualify (they hold a {@code PERMISSION} node, or are in a {@code MANUAL} hologram's shown
-     * set) and hiding it otherwise. Called from the join listener so a player who logs in sees the holograms
-     * they qualify for at once rather than after the next refresh tick. {@code ALL} holograms are visible by
-     * default and need no per-viewer call, so the loop touches only the gated and manual ones.
+     * Re-evaluate every per-viewer hologram for a single {@code joiner} on their region thread. A permission-gated
+     * or manual hologram is shown to the joiner when they qualify and hidden otherwise ({@code ALL} holograms are
+     * visible by default and need no visibility call); a hologram whose lines embed a placeholder also sends the
+     * joiner their own text override (for an {@code ALL} hologram too) when they may see it. Called from the join
+     * listener so a joiner sees the holograms — and their own placeholder values — at once, not after a refresh.
      */
     public void recomputeVisibilityFor(Player joiner) {
         Objects.requireNonNull(joiner, "joiner");
         for (Tracked tracked : live.values()) {
-            Visibility visibility = tracked.hologram().visibility();
-            if (visibility.isPermissionGated() || visibility.isManual()) {
-                Set<UUID> shown = shownViewersFor(tracked.hologram());
-                scheduler.onRegion(tracked.position(), () -> applyViewer(tracked.live(), visibility, joiner, shown));
+            Hologram hologram = tracked.hologram();
+            Visibility visibility = hologram.visibility();
+            Set<UUID> shown = shownViewersFor(hologram);
+            boolean gated = visibility.isPermissionGated() || visibility.isManual();
+            boolean perViewerText = textOverrides.hasPerViewerText(hologram)
+                    && tracked.live().textEntityId() != RenderedHologram.NO_ENTITY;
+            if (gated || perViewerText) {
+                scheduler.onRegion(
+                        tracked.position(), () -> applyJoiner(tracked.live(), hologram, joiner, shown, gated));
             }
+        }
+    }
+
+    /** Apply a joiner's visibility (when gated) and their per-viewer text override (when they may see it). */
+    private void applyJoiner(RenderedHologram live, Hologram hologram, Player joiner, Set<UUID> shown, boolean gated) {
+        Visibility visibility = hologram.visibility();
+        if (gated) {
+            applyViewer(live, visibility, joiner, shown);
+        }
+        if (maySee(permissions, visibility, BukkitRefs.toRef(joiner), shown)
+                && textOverrides.hasPerViewerText(hologram)
+                && live.textEntityId() != RenderedHologram.NO_ENTITY) {
+            textOverrides.sendOverride(joiner, live.textEntityId(), hologram);
         }
     }
 
@@ -208,6 +240,28 @@ public final class HologramRenderer implements HologramView {
         }
         applyVisibility(spawned, hologram);
         live.put(hologram.name().value(), new Tracked(spawned, hologram, hologram.location()));
+        sendPerViewerText(spawned, hologram);
+    }
+
+    /** Send each eligible viewer their per-viewer text override over the just-spawned entity (no-op if not PAPI). */
+    private void sendPerViewerText(RenderedHologram spawned, Hologram hologram) {
+        if (!textOverrides.hasPerViewerText(hologram) || spawned.textEntityId() == RenderedHologram.NO_ENTITY) {
+            return;
+        }
+        textOverrides.sendOverrides(eligibleViewers(hologram), spawned.textEntityId(), hologram);
+    }
+
+    /** The online players who may currently see {@code hologram} under its visibility — the override audience. */
+    private java.util.List<Player> eligibleViewers(Hologram hologram) {
+        Visibility visibility = hologram.visibility();
+        Set<UUID> shown = shownViewersFor(hologram);
+        java.util.List<Player> eligible = new java.util.ArrayList<>();
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (maySee(permissions, visibility, BukkitRefs.toRef(online), shown)) {
+                eligible.add(online);
+            }
+        }
+        return eligible;
     }
 
     /**
