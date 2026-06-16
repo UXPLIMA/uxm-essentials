@@ -109,7 +109,7 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
                 }
                 case CHANCE, PERMISSION, CONDITION, COST -> {
                     if (gate(viewer, action) == Verdict.DENY) {
-                        return; // a denied gate stops the rest of the chain
+                        return; // a denied (or failed-to-evaluate) gate stops the rest of the chain
                     }
                 }
                 default -> effect(viewer, action);
@@ -118,13 +118,25 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
     }
 
     private Verdict gate(Player viewer, NpcAction action) {
-        return switch (action.type()) {
-            case CHANCE -> gates.chance(action.value());
-            case PERMISSION -> gates.permission(viewer, action.value());
-            case CONDITION -> gates.condition(viewer, action.value());
-            case COST -> gates.cost(viewer, action.value());
-            default -> Verdict.PASS;
-        };
+        try {
+            return switch (action.type()) {
+                case CHANCE -> gates.chance(action.value());
+                case PERMISSION -> gates.permission(viewer, action.value());
+                case CONDITION -> gates.condition(viewer, action.value());
+                case COST -> gates.cost(viewer, action.value());
+                default -> Verdict.PASS;
+            };
+        } catch (RuntimeException failure) {
+            // A gate that throws (a PAPI placeholder, the economy debit, a permission lookup) must not escape to
+            // the interaction listener or the delayed resume's scheduler task. Fail closed: stop the chain rather
+            // than run the actions a passed gate would have unlocked — for COST especially, a thrown withdraw
+            // leaves the charge outcome unknown, so handing out the reward could give it away for free.
+            log.warn(
+                    "event=npc_action_gate_failed type={} value={}",
+                    action.type().name(),
+                    action.value());
+            return Verdict.DENY;
+        }
     }
 
     /** Park the remaining actions for {@code ticks}, then resume on the viewer's entity region thread. */

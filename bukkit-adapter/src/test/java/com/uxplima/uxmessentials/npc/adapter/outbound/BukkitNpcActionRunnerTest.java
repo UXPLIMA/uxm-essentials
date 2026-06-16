@@ -164,6 +164,33 @@ class BukkitNpcActionRunnerTest {
     }
 
     @Test
+    void multipleDelaysEachResumeTheChainAtTheRightIndex() {
+        runner().run(
+                        player,
+                        List.of(
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "one"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.DELAY, "20"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "two"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.DELAY, "20"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "three")),
+                        false);
+
+        // First leg runs up to the first delay, then parks.
+        assertThat(commandRunner.playerCommands).containsExactly("one");
+        assertThat(scheduler.pendingDelays()).isEqualTo(1);
+
+        // Resuming the first delay runs "two" and parks again at the second delay — no skipped or repeated action.
+        scheduler.runDelayedOnce();
+        assertThat(commandRunner.playerCommands).containsExactly("one", "two");
+        assertThat(scheduler.pendingDelays()).isEqualTo(1);
+
+        // Resuming the second delay runs the tail exactly once.
+        scheduler.runDelayedOnce();
+        assertThat(commandRunner.playerCommands).containsExactly("one", "two", "three");
+        assertThat(scheduler.pendingDelays()).isEqualTo(0);
+    }
+
+    @Test
     void delayAbortsWhenTheViewerLoggedOffDuringTheWait() {
         runner().run(
                         player,
@@ -274,6 +301,22 @@ class BukkitNpcActionRunnerTest {
     }
 
     @Test
+    void greaterOrEqualIsNotMisparsedAsAStrayGreaterThan() {
+        // "5 >= 5" must read the whole ">=" operator (5 >= 5 is true); a ">"-then-"=" misparse would compare
+        // "5" against "= 5" and read false, aborting the chain.
+        runner().run(
+                        player,
+                        List.of(
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "5 >= 5"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "boundary-ok"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "5 <= 4"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "unreached")),
+                        false);
+
+        assertThat(commandRunner.playerCommands).containsExactly("boundary-ok");
+    }
+
+    @Test
     void malformedConditionSkipsTheGateAndContinues() {
         runner().run(
                         player,
@@ -314,6 +357,21 @@ class BukkitNpcActionRunnerTest {
         assertThat(economy.withdrawals).containsExactly(new BigDecimal("50")); // charged exactly once (the failed try)
         assertThat(commandRunner.playerCommands).isEmpty();
         assertThat(messages.sentKeys).contains("npc.action.cost-denied");
+    }
+
+    @Test
+    void aGateThatThrowsStopsTheChainWithoutEscapingToTheCaller() {
+        economy.explode = true;
+        runner().run(
+                        player,
+                        List.of(
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "before"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.COST, "50"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                        false);
+
+        // The throwing gate fails closed: actions before it ran, the rest are stopped, and no throwable reached us.
+        assertThat(commandRunner.playerCommands).containsExactly("before");
     }
 
     @Test
@@ -448,6 +506,14 @@ class BukkitNpcActionRunnerTest {
             }
         }
 
+        /** Run exactly the delays parked so far, leaving any new ones a resumed leg parks for the next pass. */
+        void runDelayedOnce() {
+            for (Runnable task : new ArrayList<>(delayed)) {
+                delayed.remove(task);
+                task.run();
+            }
+        }
+
         @Override
         public void onGlobal(Runnable task) {
             task.run();
@@ -501,9 +567,13 @@ class BukkitNpcActionRunnerTest {
     private static final class RecordingEconomy implements NpcEconomy {
         private final List<BigDecimal> withdrawals = new ArrayList<>();
         private boolean affordable = true;
+        private boolean explode = false;
 
         @Override
         public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+            if (explode) {
+                throw new IllegalStateException("economy backend is down");
+            }
             withdrawals.add(amount);
             return affordable;
         }
