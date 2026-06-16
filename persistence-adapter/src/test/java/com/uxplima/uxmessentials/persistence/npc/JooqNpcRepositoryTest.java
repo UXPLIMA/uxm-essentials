@@ -328,6 +328,48 @@ class JooqNpcRepositoryTest {
     }
 
     @Test
+    void reSavingAfterEditingOneFieldKeepsEveryOtherUpsertColumn() {
+        // The upsert's doUpdate() set list must overwrite every column the insert writes; a column present on
+        // insert but missing from doUpdate would be dropped on the second save (the pose/scale bug caught during
+        // implementation). This seeds an NPC carrying a value in every optional column, re-saves it editing only a
+        // single unrelated field (the position), and asserts every other field still round-trips — so any column
+        // omitted from the update set surfaces here as a lost value rather than in production.
+        repository.save(Npc.create(
+                        NpcName.of("decked"),
+                        Position.of(WORLD, 1, 64, 1),
+                        new NpcSkin("tex", "sig"),
+                        Instant.ofEpochMilli(1_000))
+                .withClickCommand("warp spawn")
+                .withLookAtPlayer(false)
+                .withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .withEquipment(EquipmentSlot.MAINHAND, "NETHERITE_SWORD")
+                .withGlowing(true)
+                .withGlowColor("RED")
+                .withEntityType("VILLAGER")
+                .withPose("SITTING")
+                .withScale(2.5));
+
+        // Re-save touching only the location; every other column goes through doUpdate() unchanged.
+        repository.save(repository.find(NpcName.of("decked")).orElseThrow().movedTo(Position.of(WORLD, 100, 70, 100)));
+        Npc reloaded = repository.find(NpcName.of("decked")).orElseThrow();
+
+        assertThat(reloaded.location().blockX()).isEqualTo(100);
+        assertThat(reloaded.skin()).isEqualTo(new NpcSkin("tex", "sig"));
+        assertThat(reloaded.clickCommand()).isEqualTo("warp spawn");
+        assertThat(reloaded.lookAtPlayer()).isFalse();
+        assertThat(reloaded.equipment())
+                .containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .containsEntry(EquipmentSlot.MAINHAND, "NETHERITE_SWORD")
+                .hasSize(2);
+        assertThat(reloaded.glowing()).isTrue();
+        assertThat(reloaded.glowColor()).isEqualTo("RED");
+        assertThat(reloaded.entityType()).isEqualTo("VILLAGER");
+        assertThat(reloaded.pose()).isEqualTo("SITTING");
+        assertThat(reloaded.scale()).isEqualTo(2.5f);
+        assertThat(reloaded.createdAt()).isEqualTo(Instant.ofEpochMilli(1_000));
+    }
+
+    @Test
     void readsTheV46DefaultsForALegacyRowWithoutPoseOrScaleSet() {
         // Simulate an NPC stored before V46: the row is inserted without the pose/scale columns, so the V46
         // NOT NULL DEFAULTs (STANDING / 1.0) must apply and the mapper must read them back correctly. The data
