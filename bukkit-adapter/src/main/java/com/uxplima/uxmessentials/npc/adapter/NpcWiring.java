@@ -16,7 +16,9 @@ import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListen
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitServerConnector;
+import com.uxplima.uxmessentials.npc.adapter.outbound.CompositeSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.HttpClientFetcher;
+import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
@@ -95,8 +97,13 @@ public final class NpcWiring {
         NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
         NpcServices services = assemble(kernel, repository, renderer, notifier);
         spawnStored(repository, renderer);
-        SkinService skinService =
+        MojangSkinService mojangSkins =
                 new MojangSkinService(kernel.scheduler(), kernel.log(), new HttpClientFetcher(kernel.log()));
+        MineSkinService mineSkins = new MineSkinService(
+                kernel.scheduler(),
+                kernel.log(),
+                new HttpClientFetcher(kernel.log(), MineSkinService.GENERATE_TIMEOUT));
+        SkinService skinService = new CompositeSkinService(mojangSkins, mineSkins);
         NpcSkinByName skinByName =
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
         List<CommandRegistration> commands = List.of(new NpcCommand(services, skinByName, kernel.messages()));

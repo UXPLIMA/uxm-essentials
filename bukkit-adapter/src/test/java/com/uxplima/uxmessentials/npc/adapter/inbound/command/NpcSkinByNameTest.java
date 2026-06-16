@@ -102,13 +102,58 @@ class NpcSkinByNameTest {
         assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_SKIN_FETCH_FAILED.key());
     }
 
+    @Test
+    void urlFlowRejectsAMissingNpcBeforeAnyGenerate() {
+        boolean accepted = flow.applyFromUrl(actor, GUIDE, "https://example.com/skin.png");
+
+        assertThat(accepted).isFalse();
+        assertThat(skins.urlRequested).isEmpty();
+        assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_NOT_FOUND.key());
+    }
+
+    @Test
+    void urlFlowSendsFetchingThenAppliesAGeneratedSkin() {
+        repository.save(Npc.create(GUIDE, AT, null, Instant.ofEpochMilli(1_000)));
+
+        boolean accepted = flow.applyFromUrl(actor, GUIDE, "https://example.com/skin.png");
+        assertThat(accepted).isTrue();
+        assertThat(skins.urlRequested).containsExactly("https://example.com/skin.png");
+        assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_SKIN_FETCHING_URL.key());
+
+        skins.complete(Optional.of(new NpcSkin("gentex", "gensig")));
+
+        assertThat(scheduler.bridged).isTrue();
+        assertThat(repository.find(GUIDE).orElseThrow().skin()).isEqualTo(new NpcSkin("gentex", "gensig"));
+        assertThat(view.rendered).hasSize(1);
+        assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_SKIN_SET.key());
+    }
+
+    @Test
+    void urlFlowReportsAGenerateFailureWhenNoSkinResolves() {
+        repository.save(Npc.create(GUIDE, AT, null, Instant.ofEpochMilli(1_000)));
+
+        flow.applyFromUrl(actor, GUIDE, "https://example.com/missing.png");
+        skins.complete(Optional.empty());
+
+        assertThat(scheduler.bridged).isTrue();
+        assertThat(view.rendered).isEmpty();
+        assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_SKIN_GENERATE_FAILED.key());
+    }
+
     private static final class FakeSkinService implements SkinService {
         private final List<String> requested = new ArrayList<>();
+        private final List<String> urlRequested = new ArrayList<>();
         private CompletableFuture<Optional<NpcSkin>> pending = new CompletableFuture<>();
 
         @Override
         public CompletableFuture<Optional<NpcSkin>> fetchByName(String username) {
             requested.add(username);
+            return pending;
+        }
+
+        @Override
+        public CompletableFuture<Optional<NpcSkin>> fetchFromUrl(String imageUrl) {
+            urlRequested.add(imageUrl);
             return pending;
         }
 

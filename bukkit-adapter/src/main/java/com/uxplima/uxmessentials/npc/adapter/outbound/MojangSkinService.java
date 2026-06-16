@@ -9,7 +9,6 @@ import java.util.concurrent.CompletableFuture;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.uxplima.uxmessentials.npc.application.port.SkinService;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -17,7 +16,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Resolves any Minecraft account's signed skin from its username through Mojang's public API, the source for
- * {@code /npc skin <name> name:<username>}. The lookup is the well-known two-step dance:
+ * {@code /npc skin <name> name:<username>}. It is the {@code fetchByName} leg of the {@link CompositeSkinService}
+ * that fronts the {@code SkinService} port. The lookup is the well-known two-step dance:
  *
  * <ol>
  *   <li>{@code GET https://api.mojang.com/users/profiles/minecraft/<username>} → the canonical name and the
@@ -34,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
  * do not hammer the rate-limited name→uuid endpoint.
  */
 @NullMarked
-public final class MojangSkinService implements SkinService {
+public final class MojangSkinService {
 
     private static final String NAME_TO_UUID = "https://api.mojang.com/users/profiles/minecraft/";
     private static final String PROFILE = "https://sessionserver.mojang.com/session/minecraft/profile/";
@@ -58,7 +58,10 @@ public final class MojangSkinService implements SkinService {
                 .build();
     }
 
-    @Override
+    /**
+     * Resolve {@code username}'s signed skin off-thread, completing with the present skin or with
+     * {@link Optional#empty()} for any miss. Never completes exceptionally; never blocks the calling thread.
+     */
     public CompletableFuture<Optional<NpcSkin>> fetchByName(String username) {
         Objects.requireNonNull(username, "username");
         String key = username.strip().toLowerCase(Locale.ROOT);
