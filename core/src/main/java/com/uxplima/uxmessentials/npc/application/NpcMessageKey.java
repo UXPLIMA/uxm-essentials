@@ -82,6 +82,7 @@ public enum NpcMessageKey implements MessageKey {
     NPC_INVALID_TRIGGER("npc.invalid-trigger"),
     NPC_INVALID_ACTION_TYPE("npc.invalid-action-type"),
     NPC_INVALID_ACTION_VALUE("npc.invalid-action-value"),
+    NPC_GIVE_EMPTY_HAND("npc.action.give-empty-hand"),
     NPC_ACTION_INDEX_INVALID("npc.action.index-invalid"),
 
     // runtime action feedback

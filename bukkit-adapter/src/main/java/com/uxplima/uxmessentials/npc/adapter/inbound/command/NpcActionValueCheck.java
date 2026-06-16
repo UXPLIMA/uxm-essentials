@@ -11,15 +11,17 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Validates an {@code /npc action add} value against its {@link NpcActionType} at add time, so an operator gets a
  * clear rejection rather than a silently-broken action that only fails on click. Only the cheap, structural
- * checks live here — a numeric {@code DELAY}/{@code CHANCE}/{@code COST} and a resolvable {@code GIVE} material;
- * the free-text gates ({@code PERMISSION}, {@code CONDITION}) and the operator-content effects ({@code MESSAGE},
- * commands, …) accept any value. A rejection carries a short {@code hint} the catalog message interpolates so the
- * operator is told the expected shape.
+ * checks live here — a numeric {@code DELAY}/{@code CHANCE}/{@code COST}, a positive-int {@code RANDOM} group
+ * count, and a resolvable {@code GIVE} material (or an accepted serialized token); the free-text gates
+ * ({@code PERMISSION}, {@code CONDITION}) and the operator-content effects ({@code MESSAGE}, commands, …) accept
+ * any value. A rejection carries a short {@code hint} the catalog message interpolates so the operator is told
+ * the expected shape.
  */
 @NullMarked
 final class NpcActionValueCheck {
 
     private static final double FULL_PERCENT = 100.0;
+    private static final String SERIALIZED_PREFIX = "b64:";
 
     private NpcActionValueCheck() {}
 
@@ -59,9 +61,18 @@ final class NpcActionValueCheck {
             case DELAY -> nonNegativeLong(value, "delay must be a whole number of ticks, e.g. 40");
             case CHANCE -> percent(value);
             case COST -> nonNegativeNumber(value, "cost must be a number, e.g. 50");
-            case GIVE -> material(value);
+            case RANDOM -> positiveInt(value, "random needs a positive count of the actions that follow, e.g. 3");
+            case GIVE -> give(value);
             default -> Result.valid();
         };
+    }
+
+    private static Result positiveInt(String value, String hint) {
+        try {
+            return Integer.parseInt(value.strip()) > 0 ? Result.valid() : Result.invalid(hint);
+        } catch (NumberFormatException notANumber) {
+            return Result.invalid(hint);
+        }
     }
 
     private static Result nonNegativeLong(String value, String hint) {
@@ -90,14 +101,21 @@ final class NpcActionValueCheck {
         }
     }
 
-    private static Result material(String value) {
+    /**
+     * A give value is either a serialized item token ({@code b64:…}, what {@code give hand} captures — accepted
+     * as-is, its shape is the codec's concern) or a {@code <material>[:amount]} the material registry resolves.
+     */
+    private static Result give(String value) {
         String spec = value.strip();
+        if (spec.startsWith(SERIALIZED_PREFIX)) {
+            return Result.valid();
+        }
         int colon = spec.indexOf(':');
         String name = colon < 0 ? spec : spec.substring(0, colon);
         Material material = Material.matchMaterial(name.strip().toUpperCase(Locale.ROOT));
         return material != null && material.isItem()
                 ? Result.valid()
-                : Result.invalid("give needs a material like DIAMOND or DIAMOND:3");
+                : Result.invalid("give needs a material like DIAMOND or DIAMOND:3, or hand to capture your held item");
     }
 
     /** Map the operator's type word to an {@link NpcActionType}, or empty when unknown (case-insensitive). */
@@ -111,6 +129,7 @@ final class NpcActionValueCheck {
             case "sound" -> Optional.of(NpcActionType.SOUND);
             case "connect" -> Optional.of(NpcActionType.CONNECT);
             case "delay" -> Optional.of(NpcActionType.DELAY);
+            case "random" -> Optional.of(NpcActionType.RANDOM);
             case "chance" -> Optional.of(NpcActionType.CHANCE);
             case "permission" -> Optional.of(NpcActionType.PERMISSION);
             case "condition" -> Optional.of(NpcActionType.CONDITION);

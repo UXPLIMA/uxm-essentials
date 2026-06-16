@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.IntUnaryOperator;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -18,6 +20,7 @@ import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionGates.Verdict;
 import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.npc.domain.NpcAction;
+import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
@@ -41,7 +44,9 @@ import org.jspecify.annotations.Nullable;
  * chain: the tail is re-scheduled after the stated tick count through the {@link Scheduler} port (ticks converted
  * at the fixed 50&nbsp;ms cadence) and then hops back onto the viewer's entity region to resume — a tiny
  * in-adapter sequencer rather than a single straight loop. A viewer who logs off during the wait aborts the rest
- * silently (the entity hop no-ops on a despawned entity).
+ * silently (the entity hop no-ops on a despawned entity). A {@code RANDOM n} marker names the next {@code n}
+ * actions as a group: exactly one of them — picked uniformly at random — runs, the rest of the group is skipped,
+ * and the chain continues after the whole group (see {@link #runFrom}).
  *
  * <p>Command dispatch (console/player) reuses the same {@link NpcCommandRunner} and {@code [console]}/{@code
  * [player]}/{@code {player}} convention the single click command uses; message/action-bar/title text is resolved
@@ -65,6 +70,9 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
     private final NpcGifts gifts;
     private final Logger log;
 
+    /** Picks the chosen offset within a {@code RANDOM} group; given the group size it returns {@code [0, size)}. */
+    private final IntUnaryOperator pickOffset;
+
     public BukkitNpcActionRunner(
             NpcCommandRunner commandRunner,
             NpcServerConnector connector,
@@ -73,10 +81,35 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
             Optional<NpcEconomy> economy,
             Messages messages,
             Logger log) {
+        this(
+                commandRunner,
+                connector,
+                scheduler,
+                permissions,
+                economy,
+                messages,
+                log,
+                ThreadLocalRandom.current()::nextInt);
+    }
+
+    /**
+     * Test seam: takes the {@code RANDOM}-group offset picker explicitly so a deterministic stub can pin which
+     * group member runs. Production wiring uses the public constructor, which supplies {@link ThreadLocalRandom}.
+     */
+    BukkitNpcActionRunner(
+            NpcCommandRunner commandRunner,
+            NpcServerConnector connector,
+            Scheduler scheduler,
+            Permissions permissions,
+            Optional<NpcEconomy> economy,
+            Messages messages,
+            Logger log,
+            IntUnaryOperator pickOffset) {
         this.commandRunner = Objects.requireNonNull(commandRunner, "commandRunner");
         this.connector = Objects.requireNonNull(connector, "connector");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
+        this.pickOffset = Objects.requireNonNull(pickOffset, "pickOffset");
         this.gates = new NpcActionGates(
                 Objects.requireNonNull(permissions, "permissions"),
                 Objects.requireNonNull(economy, "economy"),
@@ -98,23 +131,68 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
         runFrom(viewer, List.copyOf(matching), 0);
     }
 
-    /** Run the already-trigger-filtered {@code actions} from {@code index} onward, honouring gates and delays. */
+    /**
+     * Run the already-trigger-filtered {@code actions} from {@code index} onward, honouring gates and delays.
+     *
+     * <p>A {@code RANDOM n} marker treats the immediately-following {@code n} actions as a group: exactly one
+     * member, picked uniformly at random, runs through the normal single-action handling; the rest of the group
+     * is skipped and the chain continues after the whole group ({@code at + n + 1}). The count clamps to the
+     * actions that remain (a marker near the end), and a non-positive count skips the marker (a no-op) so the
+     * actions after it run as ordinary, un-grouped actions. The chosen member runs exactly as it would inline —
+     * so a chosen gate that denies still stops the chain, and a chosen {@code DELAY} still parks the tail (which
+     * then resumes after the group); both are acceptable and intentional.
+     */
     private void runFrom(Player viewer, List<NpcAction> actions, int index) {
         for (int at = index; at < actions.size(); at++) {
             NpcAction action = actions.get(at);
-            switch (action.type()) {
-                case DELAY -> {
-                    delayThenContinue(viewer, actions, at, action.value());
-                    return; // the tail resumes from the scheduler; this invocation is done
-                }
-                case CHANCE, PERMISSION, CONDITION, COST -> {
-                    if (gate(viewer, action) == Verdict.DENY) {
-                        return; // a denied (or failed-to-evaluate) gate stops the rest of the chain
+            if (action.type() == NpcActionType.RANDOM) {
+                int present = Math.min(Math.max(groupCount(action.value()), 0), actions.size() - (at + 1));
+                int afterGroup = (at + 1) + present; // resume past the present members (a count past the end clamps)
+                if (present > 0) {
+                    int chosen = (at + 1) + boundedPick(present);
+                    if (step(viewer, actions, chosen, afterGroup) == Step.PARKED) {
+                        return; // a chosen DELAY parked the tail to resume after the group; this invocation is done
                     }
                 }
-                default -> effect(viewer, action);
+                at = afterGroup - 1; // -1 so the loop's increment lands the next iteration after the group
+                continue;
+            }
+            if (step(viewer, actions, at, at + 1) != Step.CONTINUE) {
+                return; // STOP (a denied gate) or PARKED (a DELAY resumes from the scheduler) ends this invocation
             }
         }
+    }
+
+    /** The outcome of running a single action: continue the chain, stop it, or it parked the tail itself. */
+    private enum Step {
+        CONTINUE,
+        STOP,
+        PARKED
+    }
+
+    /**
+     * Run the single action at {@code at}, resuming the chain at {@code continueIndex} once it completes or its
+     * parked delay elapses. A {@code DELAY} parks the tail via {@link #delayThenContinue} and reports
+     * {@link Step#PARKED}; a denied gate reports {@link Step#STOP}; every effect reports {@link Step#CONTINUE}.
+     * The {@code continueIndex} is {@code at + 1} inline, or the index past the whole {@code RANDOM} group when the
+     * action is the group's chosen member — so a chosen {@code DELAY} resumes after the group, not inside it.
+     */
+    private Step step(Player viewer, List<NpcAction> actions, int at, int continueIndex) {
+        NpcAction action = actions.get(at);
+        return switch (action.type()) {
+            case DELAY -> {
+                delayThenContinue(viewer, actions, continueIndex, action.value());
+                yield Step.PARKED;
+            }
+            case CHANCE, PERMISSION, CONDITION, COST -> gate(viewer, action) == Verdict.DENY
+                    ? Step.STOP
+                    : Step.CONTINUE;
+            case RANDOM -> Step.CONTINUE; // a RANDOM marker is sequenced in runFrom, never reached as a single step
+            default -> {
+                effect(viewer, action);
+                yield Step.CONTINUE;
+            }
+        };
     }
 
     private Verdict gate(Player viewer, NpcAction action) {
@@ -139,17 +217,17 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
         }
     }
 
-    /** Park the remaining actions for {@code ticks}, then resume on the viewer's entity region thread. */
-    private void delayThenContinue(Player viewer, List<NpcAction> actions, int index, String raw) {
+    /** Park the chain until {@code ticks} elapse, then resume at {@code resumeIndex} on the viewer's entity thread. */
+    private void delayThenContinue(Player viewer, List<NpcAction> actions, int resumeIndex, String raw) {
         long ticks = parseTicks(raw);
         if (ticks <= 0L) {
-            runFrom(viewer, actions, index + 1);
+            runFrom(viewer, actions, resumeIndex);
             return;
         }
         var ref = BukkitRefs.toRef(viewer);
         scheduler.asyncAfter(
                 Duration.ofMillis(ticks * MILLIS_PER_TICK),
-                () -> scheduler.onEntity(ref, () -> resume(ref, actions, index + 1)));
+                () -> scheduler.onEntity(ref, () -> resume(ref, actions, resumeIndex)));
     }
 
     /** Resume the parked chain for the still-online viewer, or abort silently when they have logged off. */
@@ -197,17 +275,35 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
         }
     }
 
+    /** Parse a {@code RANDOM} group count, or {@code 0} on a non-numeric value (which skips the marker, a no-op). */
+    private int groupCount(String raw) {
+        try {
+            return Integer.parseInt(raw.strip());
+        } catch (NumberFormatException notANumber) {
+            log.warn("event=npc_action_bad_random value={}", raw);
+            return 0;
+        }
+    }
+
+    /** Pick an offset in {@code [0, bound)} through the injected picker, clamped defensively into range. */
+    private int boundedPick(int bound) {
+        int picked = pickOffset.applyAsInt(bound);
+        return Math.floorMod(picked, bound);
+    }
+
     private void runConsole(Player viewer, String value) {
         commandRunner.runAsConsole(withPlayer(viewer, stripPrefix(value)));
     }
 
     private void showTitle(Player viewer, String value) {
-        int split = value.indexOf('|');
-        String titleSource = split < 0 ? value : value.substring(0, split);
-        String subtitleSource = split < 0 ? "" : value.substring(split + 1);
-        Component title = component(viewer, titleSource);
-        Component subtitle = subtitleSource.isEmpty() ? Component.empty() : component(viewer, subtitleSource);
-        viewer.showTitle(Title.title(title, subtitle));
+        TitleSpec spec = TitleSpec.parse(value);
+        Component title = component(viewer, spec.title());
+        Component subtitle = spec.subtitle().isEmpty() ? Component.empty() : component(viewer, spec.subtitle());
+        Title.Times times = Title.Times.times(
+                Duration.ofMillis(spec.fadeInTicks() * MILLIS_PER_TICK),
+                Duration.ofMillis(spec.stayTicks() * MILLIS_PER_TICK),
+                Duration.ofMillis(spec.fadeOutTicks() * MILLIS_PER_TICK));
+        viewer.showTitle(Title.title(title, subtitle, times));
     }
 
     private void playSound(Player viewer, String value) {
@@ -242,6 +338,60 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
             return stripped.substring(PLAYER_PREFIX.length()).strip();
         }
         return stripped;
+    }
+
+    /**
+     * A parsed {@code title|subtitle|fadeIn|stay|fadeOut} title value. The title is always present; the subtitle
+     * and the three tick counts are optional. The timings are taken as a set — either all three trailing segments
+     * parse as whole numbers, or the whole tail is ignored and the vanilla defaults apply (so a partial or
+     * non-numeric tail never half-applies). Defaults match vanilla: 10 fade-in, 70 stay, 20 fade-out ticks. The
+     * subtitle keeps any {@code |} the title text never can, because only the first {@code |} splits title from
+     * the rest and the timings are peeled off the right.
+     */
+    record TitleSpec(String title, String subtitle, int fadeInTicks, int stayTicks, int fadeOutTicks) {
+
+        private static final int DEFAULT_FADE_IN = 10;
+        private static final int DEFAULT_STAY = 70;
+        private static final int DEFAULT_FADE_OUT = 20;
+
+        static TitleSpec parse(String value) {
+            int firstBar = value.indexOf('|');
+            if (firstBar < 0) {
+                return new TitleSpec(value, "", DEFAULT_FADE_IN, DEFAULT_STAY, DEFAULT_FADE_OUT);
+            }
+            String title = value.substring(0, firstBar);
+            String rest = value.substring(firstBar + 1);
+            // The subtitle may itself hold '|', so peel the timings from the right: the trailing three segments are
+            // fade-in|stay|fade-out and everything before them is the subtitle. Anything but a clean trailing trio
+            // of whole numbers falls back to the vanilla defaults rather than half-applying.
+            List<String> parts = new ArrayList<>(Splitter.on('|').splitToList(rest));
+            if (parts.size() >= 4) {
+                Integer fadeOut = trailingInt(parts);
+                Integer stay = trailingInt(parts);
+                Integer fadeIn = trailingInt(parts);
+                if (fadeIn != null && stay != null && fadeOut != null) {
+                    return new TitleSpec(title, String.join("|", parts), fadeIn, stay, fadeOut);
+                }
+            }
+            return new TitleSpec(title, rest, DEFAULT_FADE_IN, DEFAULT_STAY, DEFAULT_FADE_OUT);
+        }
+
+        /** Pop the last segment as a non-negative whole number, or leave the list and return {@code null}. */
+        private static @Nullable Integer trailingInt(List<String> parts) {
+            if (parts.isEmpty()) {
+                return null;
+            }
+            try {
+                int parsed = Integer.parseInt(parts.get(parts.size() - 1).strip());
+                if (parsed < 0) {
+                    return null;
+                }
+                parts.remove(parts.size() - 1);
+                return parsed;
+            } catch (NumberFormatException notANumber) {
+                return null;
+            }
+        }
     }
 
     /**

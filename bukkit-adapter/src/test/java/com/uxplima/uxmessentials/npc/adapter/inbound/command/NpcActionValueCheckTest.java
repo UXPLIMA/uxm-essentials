@@ -28,12 +28,32 @@ class NpcActionValueCheckTest {
     @Test
     void parseTypeMapsTheNewTypesCaseInsensitively() {
         assertThat(NpcActionValueCheck.parseType("DELAY")).contains(NpcActionType.DELAY);
+        assertThat(NpcActionValueCheck.parseType("Random")).contains(NpcActionType.RANDOM);
         assertThat(NpcActionValueCheck.parseType("chance")).contains(NpcActionType.CHANCE);
         assertThat(NpcActionValueCheck.parseType("Permission")).contains(NpcActionType.PERMISSION);
         assertThat(NpcActionValueCheck.parseType("condition")).contains(NpcActionType.CONDITION);
         assertThat(NpcActionValueCheck.parseType("cost")).contains(NpcActionType.COST);
         assertThat(NpcActionValueCheck.parseType("give")).contains(NpcActionType.GIVE);
         assertThat(NpcActionValueCheck.parseType("nope")).isEmpty();
+    }
+
+    @Test
+    void randomMustBeAPositiveCount() {
+        assertThat(NpcActionValueCheck.check(NpcActionType.RANDOM, "3").isValid())
+                .isTrue();
+        assertThat(NpcActionValueCheck.check(NpcActionType.RANDOM, "0").isValid())
+                .isFalse();
+        assertThat(NpcActionValueCheck.check(NpcActionType.RANDOM, "-2").isValid())
+                .isFalse();
+        assertThat(NpcActionValueCheck.check(NpcActionType.RANDOM, "many").isValid())
+                .isFalse();
+    }
+
+    @Test
+    void giveAcceptsASerializedItemToken() {
+        // A b64: token (what 'give hand' stores) is accepted as-is — its shape is the codec's concern, not the check.
+        assertThat(NpcActionValueCheck.check(NpcActionType.GIVE, "b64:whatever").isValid())
+                .isTrue();
     }
 
     @Test

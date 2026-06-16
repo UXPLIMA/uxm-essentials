@@ -29,7 +29,11 @@ public enum NpcActionType {
     /** Show the value to the player on their action bar. */
     ACTIONBAR,
 
-    /** Show the value to the player as a title; {@code title|subtitle} splits the two lines. */
+    /**
+     * Show the value to the player as a title. The value is {@code title|subtitle|fadeIn|stay|fadeOut}: the
+     * subtitle and the three tick counts are each optional, so {@code title}, {@code title|subtitle} and the full
+     * form all parse; an absent or non-numeric timing tail falls back to the vanilla defaults (10/70/20 ticks).
+     */
     TITLE,
 
     /** Play the value as a sound to the player; {@code KEY[:volume[:pitch]]}. */
@@ -43,6 +47,14 @@ public enum NpcActionType {
      * through the scheduler; a viewer who disconnects during the wait aborts the rest silently.
      */
     DELAY,
+
+    /**
+     * Mark a random-pick group: the value is a positive count {@code n} naming the immediately-following {@code n}
+     * actions as the group, of which exactly one — chosen uniformly at random — runs; the rest of the group is
+     * skipped and the chain continues after it. A count past the end of the chain clamps to the actions that
+     * remain; a non-positive count skips the marker (a no-op).
+     */
+    RANDOM,
 
     /**
      * Roll a random gate. The value is a percent (0–100); on a failed roll the rest of the chain is aborted, so
@@ -66,6 +78,9 @@ public enum NpcActionType {
      */
     COST,
 
-    /** Give the viewer an item; the value is {@code <material>[:amount]} (default amount 1). Overflow drops. */
+    /**
+     * Give the viewer an item. The value is either {@code <material>[:amount]} (default amount 1) or a serialized
+     * full item ({@code b64:…}) carrying all of its NBT. Overflow drops at the viewer's feet.
+     */
     GIVE
 }

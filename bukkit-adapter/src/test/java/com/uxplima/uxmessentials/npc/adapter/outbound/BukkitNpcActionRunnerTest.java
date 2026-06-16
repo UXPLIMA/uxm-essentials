@@ -426,6 +426,143 @@ class BukkitNpcActionRunnerTest {
         assertThat(droppedDiamonds).isEqualTo(5);
     }
 
+    @Test
+    void giveDeliversAFullSerializedItemWithItsNbtIntact() {
+        ItemStack sword = new ItemStack(Material.DIAMOND_SWORD);
+        var meta = sword.getItemMeta();
+        meta.displayName(net.kyori.adventure.text.Component.text("Excalibur"));
+        meta.addEnchant(org.bukkit.enchantments.Enchantment.SHARPNESS, 5, true);
+        sword.setItemMeta(meta);
+        String token = EquipmentPayloads.serialize(sword);
+
+        runner().run(player, List.of(new NpcAction(ClickTrigger.ANY, NpcActionType.GIVE, token)), false);
+
+        ItemStack given = player.getInventory().getItem(0);
+        assertThat(given).isNotNull();
+        assertThat(given.getType()).isEqualTo(Material.DIAMOND_SWORD);
+        assertThat(given.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.SHARPNESS))
+                .isEqualTo(5);
+        assertThat(given.getItemMeta().displayName()).isEqualTo(net.kyori.adventure.text.Component.text("Excalibur"));
+    }
+
+    @Test
+    void giveWithACorruptSerializedTokenSkipsAndStillRunsTheRest() {
+        runner().run(
+                        player,
+                        List.of(
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.GIVE, "b64:not-valid-base64-@@@"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "next")),
+                        false);
+
+        assertThat(commandRunner.playerCommands).containsExactly("next");
+    }
+
+    // --- RANDOM ---------------------------------------------------------------------------------------------
+
+    @Test
+    void randomGroupOfOneAlwaysRunsThatSingleAction() {
+        runner().run(
+                        player,
+                        List.of(
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "1"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "only")),
+                        false);
+
+        assertThat(commandRunner.playerCommands).containsExactly("only");
+    }
+
+    @Test
+    void randomRunsExactlyOneOfTheGroupAndSkipsTheRestThenContinues() {
+        for (int trial = 0; trial < 60; trial++) {
+            commandRunner.playerCommands.clear();
+            runner().run(
+                            player,
+                            List.of(
+                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "3"),
+                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "a"),
+                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "b"),
+                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "c"),
+                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                            false);
+
+            // Exactly one of the three group members ran, then the chain continued past the whole group.
+            assertThat(commandRunner.playerCommands).hasSize(2);
+            assertThat(commandRunner.playerCommands.get(1)).isEqualTo("after");
+            assertThat(commandRunner.playerCommands.get(0)).isIn("a", "b", "c");
+        }
+    }
+
+    @Test
+    void randomWithAFixedPickerRunsTheChosenIndex() {
+        // Inject a deterministic picker: always the second member (offset 1) of the group.
+        BukkitNpcActionRunner deterministic = new BukkitNpcActionRunner(
+                commandRunner,
+                connector,
+                scheduler,
+                permissions,
+                Optional.of(economy),
+                messages,
+                new NoopLogger(),
+                bound -> 1);
+        deterministic.run(
+                player,
+                List.of(
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "3"),
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "a"),
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "b"),
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "c"),
+                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                false);
+
+        assertThat(commandRunner.playerCommands).containsExactly("b", "after");
+    }
+
+    @Test
+    void randomCountPastTheEndClampsToTheRemainingActions() {
+        // RANDOM 5 with only two members left: the group is those two, exactly one runs, nothing else follows.
+        for (int trial = 0; trial < 40; trial++) {
+            commandRunner.playerCommands.clear();
+            runner().run(
+                            player,
+                            List.of(
+                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "5"),
+                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "x"),
+                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "y")),
+                            false);
+
+            assertThat(commandRunner.playerCommands).hasSize(1);
+            assertThat(commandRunner.playerCommands.get(0)).isIn("x", "y");
+        }
+    }
+
+    @Test
+    void randomCountOfZeroSkipsTheMarkerAndRunsTheFollowingActionsNormally() {
+        runner().run(
+                        player,
+                        List.of(
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "0"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "a"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "b")),
+                        false);
+
+        assertThat(commandRunner.playerCommands).containsExactly("a", "b");
+    }
+
+    @Test
+    void randomTriggerFiltersTheMarkerItself() {
+        // The RANDOM marker carries a trigger; on a non-matching click it is filtered out before the group runs,
+        // so the would-be group members run as ordinary actions (no random pick happens).
+        runner().run(
+                        player,
+                        List.of(
+                                new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.RANDOM, "2"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "a"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "b")),
+                        false);
+
+        assertThat(commandRunner.playerCommands).containsExactly("a", "b");
+    }
+
     // --- ordering -------------------------------------------------------------------------------------------
 
     @Test
@@ -439,6 +576,82 @@ class BukkitNpcActionRunnerTest {
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("first");
+    }
+
+    // --- TitleSpec (TITLE value parsing) --------------------------------------------------------------------
+
+    @Test
+    void titleWithNoSubtitleOrTimesUsesTheVanillaDefaults() {
+        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Welcome");
+
+        assertThat(spec.title()).isEqualTo("Welcome");
+        assertThat(spec.subtitle()).isEmpty();
+        assertThat(spec.fadeInTicks()).isEqualTo(10);
+        assertThat(spec.stayTicks()).isEqualTo(70);
+        assertThat(spec.fadeOutTicks()).isEqualTo(20);
+    }
+
+    @Test
+    void titleWithASubtitleButNoTimesKeepsTheDefaults() {
+        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Title|Sub");
+
+        assertThat(spec.title()).isEqualTo("Title");
+        assertThat(spec.subtitle()).isEqualTo("Sub");
+        assertThat(spec.fadeInTicks()).isEqualTo(10);
+        assertThat(spec.stayTicks()).isEqualTo(70);
+        assertThat(spec.fadeOutTicks()).isEqualTo(20);
+    }
+
+    @Test
+    void titleWithFullTimesParsesAllThree() {
+        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Title|Sub|5|40|15");
+
+        assertThat(spec.title()).isEqualTo("Title");
+        assertThat(spec.subtitle()).isEqualTo("Sub");
+        assertThat(spec.fadeInTicks()).isEqualTo(5);
+        assertThat(spec.stayTicks()).isEqualTo(40);
+        assertThat(spec.fadeOutTicks()).isEqualTo(15);
+    }
+
+    @Test
+    void titleWithAMalformedTimingTailFallsBackToTheDefaults() {
+        // A non-numeric tail must not abort the title nor half-apply: the timings fall back to vanilla defaults and
+        // the whole text after the first '|' is taken as the subtitle (the operator did not author valid timings).
+        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Title|Sub|fast|slow|nope");
+
+        assertThat(spec.title()).isEqualTo("Title");
+        assertThat(spec.subtitle()).isEqualTo("Sub|fast|slow|nope");
+        assertThat(spec.fadeInTicks()).isEqualTo(10);
+        assertThat(spec.stayTicks()).isEqualTo(70);
+        assertThat(spec.fadeOutTicks()).isEqualTo(20);
+    }
+
+    @Test
+    void titleWithAPartialTimingTailFallsBackToTheDefaults() {
+        // Only fade-in given (no full stay/fade-out trio): the spec is incomplete, so all three timings fall back.
+        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Title|Sub|5");
+
+        assertThat(spec.title()).isEqualTo("Title");
+        assertThat(spec.subtitle()).isEqualTo("Sub|5");
+        assertThat(spec.fadeInTicks()).isEqualTo(10);
+        assertThat(spec.stayTicks()).isEqualTo(70);
+        assertThat(spec.fadeOutTicks()).isEqualTo(20);
+    }
+
+    @Test
+    void titleWithCustomTimesDispatchesWithoutThrowing() {
+        // End-to-end: a TITLE action carrying custom times builds a valid Title.Times and dispatches fail-soft, so
+        // the chain continues to the next action. (MockBukkit's PlayerMock does not capture the Adventure title's
+        // times, so the parsed timings themselves are pinned by the TitleSpec.parse tests above; this asserts the
+        // apply path is well-formed.)
+        runner().run(
+                        player,
+                        List.of(
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.TITLE, "Hi|there|5|40|15"),
+                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                        false);
+
+        assertThat(commandRunner.playerCommands).containsExactly("after");
     }
 
     // --- SoundSpec (unchanged behaviour) --------------------------------------------------------------------
