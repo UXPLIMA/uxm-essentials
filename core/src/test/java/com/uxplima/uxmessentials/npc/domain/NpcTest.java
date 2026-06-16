@@ -157,6 +157,33 @@ class NpcTest {
     }
 
     @Test
+    void everyTransitionPreservesEquipmentAndGlow() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET")
+                .withGlowing(true)
+                .withGlowColor("RED");
+        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+
+        assertThat(npc.movedTo(ELSEWHERE).equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+        assertThat(npc.withSkin(NpcSkin.unsigned("tex")).glowColor()).isEqualTo("RED");
+        assertThat(npc.withClickCommand("spawn").glowing()).isTrue();
+        assertThat(npc.withLookAtPlayer(false).equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+        assertThat(npc.withEntityType("VILLAGER").glowColor()).isEqualTo("RED");
+        assertThat(npc.withPose("SITTING").equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+        assertThat(npc.withScale(2.0).glowing()).isTrue();
+        assertThat(npc.withTypeData("baby", "true").glowColor()).isEqualTo("RED");
+        assertThat(npc.withActionAdded(action).equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+        Npc withTwo = npc.withActionAdded(action).withActionAdded(action);
+        assertThat(withTwo.withActionRemovedAt(0).glowing()).isTrue();
+        assertThat(withTwo.withActionsCleared().equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+        // Setting one half of the gear/glow trio preserves the other two.
+        assertThat(npc.withEquipment(EquipmentSlot.MAINHAND, "STICK").glowColor())
+                .isEqualTo("RED");
+        assertThat(npc.withGlowing(false).equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+        assertThat(npc.withGlowColor("AQUA").equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
+    }
+
+    @Test
     void createsWithNoActions() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
 
