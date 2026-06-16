@@ -22,10 +22,14 @@ public final class HologramCommands {
 
     /**
      * Every holograms command (one: {@code /hologram}). {@code hologramNames} is a side-effect-free, non-blocking
-     * source of the current hologram names used to tab-complete every {@code name} argument across the surface.
+     * source of the current hologram names used to tab-complete every {@code name} argument across the surface;
+     * {@code npcNames} is the same for the NPC argument of {@code /hologram linknpc}.
      */
     public static List<CommandRegistration> all(
-            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
-        return List.of(new HologramCommand(services, messages, hologramNames));
+            HologramServices services,
+            Messages messages,
+            Supplier<? extends Collection<String>> hologramNames,
+            Supplier<? extends Collection<String>> npcNames) {
+        return List.of(new HologramCommand(services, messages, hologramNames, npcNames));
     }
 }

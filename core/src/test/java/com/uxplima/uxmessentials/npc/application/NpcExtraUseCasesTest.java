@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.CapturingSink;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepository;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.KeyMessages;
+import com.uxplima.uxmessentials.npc.application.NpcTestSupport.RecordingEvents;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.RecordingView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
@@ -29,6 +30,7 @@ class NpcExtraUseCasesTest {
     private FakeNpcRepository repository;
     private RecordingView view;
     private NpcNotifier notifier;
+    private RecordingEvents events;
     private PlayerRef actor;
 
     @BeforeEach
@@ -36,6 +38,7 @@ class NpcExtraUseCasesTest {
         repository = new FakeNpcRepository();
         view = new RecordingView();
         notifier = new NpcNotifier(new KeyMessages(), new CapturingSink());
+        events = new RecordingEvents();
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
         repository.save(Npc.create(GUIDE, AT, null, Instant.ofEpochMilli(1_000)));
     }
@@ -107,7 +110,7 @@ class NpcExtraUseCasesTest {
 
     @Test
     void movesToExplicitCoordinatesKeepingTheWorld() {
-        new MoveNpcTo(repository, view, notifier).moveTo(actor, GUIDE, 100.5, 70.0, -40.0, 90f, 10f);
+        new MoveNpcTo(repository, view, notifier, events).moveTo(actor, GUIDE, 100.5, 70.0, -40.0, 90f, 10f);
 
         Npc loaded = reload();
         assertThat(loaded.location().x()).isEqualTo(100.5);
@@ -146,7 +149,7 @@ class NpcExtraUseCasesTest {
                         .setMirror(actor, ghost, true)
                         .errorOrThrow())
                 .isEqualTo(NpcError.NOT_FOUND);
-        assertThat(new MoveNpcTo(repository, view, notifier)
+        assertThat(new MoveNpcTo(repository, view, notifier, events)
                         .moveTo(actor, ghost, 0, 0, 0, 0f, 0f)
                         .errorOrThrow())
                 .isEqualTo(NpcError.NOT_FOUND);

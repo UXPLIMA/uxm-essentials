@@ -17,6 +17,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
+import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
@@ -81,6 +82,13 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class HologramRenderer implements HologramView {
 
+    /**
+     * How far above the linked NPC's feet a linked hologram floats, so it sits over the NPC's head rather than
+     * inside it — roughly a player's standing height plus a little clearance, matching FancyHolograms' default
+     * NPC-link offset.
+     */
+    static final double LINKED_NPC_Y_OFFSET = 2.2;
+
     private final Plugin plugin;
     private final HologramManager manager;
     private final Scheduler scheduler;
@@ -88,6 +96,7 @@ public final class HologramRenderer implements HologramView {
     private final UnaryOperator<String> placeholders;
     private final HologramViewers viewers;
     private final HologramTextOverrides textOverrides;
+    private final LinkedNpcLocator linkedNpcs;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final Map<String, Tracked> live = new ConcurrentHashMap<>();
 
@@ -98,7 +107,8 @@ public final class HologramRenderer implements HologramView {
             Logger log,
             UnaryOperator<String> placeholders,
             HologramViewers viewers,
-            HologramTextOverrides textOverrides) {
+            HologramTextOverrides textOverrides,
+            LinkedNpcLocator linkedNpcs) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.manager = Objects.requireNonNull(manager, "manager");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -106,21 +116,62 @@ public final class HologramRenderer implements HologramView {
         this.placeholders = Objects.requireNonNull(placeholders, "placeholders");
         this.viewers = Objects.requireNonNull(viewers, "viewers");
         this.textOverrides = Objects.requireNonNull(textOverrides, "textOverrides");
+        this.linkedNpcs = Objects.requireNonNull(linkedNpcs, "linkedNpcs");
     }
 
     @Override
     public void render(Hologram hologram) {
         Objects.requireNonNull(hologram, "hologram");
-        World world = Bukkit.getWorld(hologram.location().world().uid());
+        Position anchor = anchorFor(hologram);
+        World world = Bukkit.getWorld(anchor.world().uid());
         if (world == null) {
             log.warn(
                     "skipping hologram {} — world {} is not loaded",
                     hologram.name().value(),
-                    hologram.location().world().name());
+                    anchor.world().name());
             return;
         }
-        Location at = BukkitRefs.toLocation(world, hologram.location());
-        scheduler.onRegion(hologram.location(), () -> spawnReplacing(hologram, at));
+        Location at = BukkitRefs.toLocation(world, anchor);
+        // Spawn on the anchor's region thread (Folia): for a linked hologram that is the NPC's region, where the
+        // display entity actually lives, not the hologram's stored region.
+        scheduler.onRegion(anchor, () -> spawnReplacing(hologram, anchor, at));
+    }
+
+    private Position anchorFor(Hologram hologram) {
+        return anchorFor(hologram, linkedNpcs);
+    }
+
+    /**
+     * Where the hologram should render: when it is linked to an NPC that the locator can find, the NPC's current
+     * position raised by {@link #LINKED_NPC_Y_OFFSET} so it floats above the NPC's head; otherwise (not linked, or
+     * the linked NPC no longer exists) its own stored location. Failing soft on a missing NPC means a stale link
+     * never crashes or hides the hologram — it simply renders where it was placed. Pure of any Bukkit call, so the
+     * position math and the fail-soft fallback are unit-testable with a fake locator.
+     */
+    static Position anchorFor(Hologram hologram, LinkedNpcLocator linkedNpcs) {
+        String linked = hologram.linkedNpcName();
+        if (linked == null) {
+            return hologram.location();
+        }
+        return linkedNpcs.locate(linked).map(HologramRenderer::aboveNpc).orElseGet(hologram::location);
+    }
+
+    private static Position aboveNpc(Position npc) {
+        return new Position(npc.world(), npc.x(), npc.y() + LINKED_NPC_Y_OFFSET, npc.z(), npc.yaw(), npc.pitch());
+    }
+
+    /**
+     * Re-render every tracked hologram linked to the NPC {@code npcName}, picking up the NPC's new position (or
+     * falling back to the hologram's own location when the NPC was removed). Called off the npc-move/-delete event
+     * so a linked hologram visually follows the NPC; a hologram not linked to that NPC is untouched.
+     */
+    public void reanchorLinkedTo(String npcName) {
+        Objects.requireNonNull(npcName, "npcName");
+        for (Tracked tracked : live.values()) {
+            if (npcName.equals(tracked.hologram().linkedNpcName())) {
+                render(tracked.hologram());
+            }
+        }
     }
 
     /** Despawn every tracked hologram now — call on module stop so no display entity is orphaned. */
@@ -217,7 +268,7 @@ public final class HologramRenderer implements HologramView {
         });
     }
 
-    private void spawnReplacing(Hologram hologram, Location at) {
+    private void spawnReplacing(Hologram hologram, Position anchor, Location at) {
         Tracked previous = live.remove(hologram.name().value());
         if (previous != null) {
             // Despawn the old entity on its own region thread; on a cross-world move it lives in a
@@ -230,7 +281,9 @@ public final class HologramRenderer implements HologramView {
             return;
         }
         viewers.applyOnSpawn(spawned, hologram);
-        live.put(hologram.name().value(), new Tracked(spawned, hologram, hologram.location()));
+        // Track the anchor the entity actually spawned at (the NPC's position for a linked hologram), so a later
+        // despawn or replace is routed onto the entity's real region — not the hologram's stored location.
+        live.put(hologram.name().value(), new Tracked(spawned, hologram, anchor));
         sendPerViewerText(spawned, hologram);
     }
 

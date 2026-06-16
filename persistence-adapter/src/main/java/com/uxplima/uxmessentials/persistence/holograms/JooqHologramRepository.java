@@ -187,6 +187,7 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
                 .set(HOLOGRAMS.ROTATION_YAW, record.getRotationYaw())
                 .set(HOLOGRAMS.ROTATION_PITCH, record.getRotationPitch())
                 .set(HOLOGRAMS.REFRESH_INTERVAL_TICKS, record.getRefreshIntervalTicks())
+                .set(HOLOGRAMS.LINKED_NPC_NAME, record.getLinkedNpcName())
                 .execute();
     }
 

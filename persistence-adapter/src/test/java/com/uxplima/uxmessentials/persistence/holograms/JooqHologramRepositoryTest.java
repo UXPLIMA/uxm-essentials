@@ -193,6 +193,59 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsTheLinkedNpcName() {
+        repository.save(hologram("spawn", 1, 64, 1, "line").linkedTo("guide"));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.isLinked()).isTrue();
+        assertThat(loaded.linkedNpcName()).isEqualTo("guide");
+    }
+
+    @Test
+    void unlinkingClearsTheStoredNpcName() {
+        repository.save(hologram("spawn", 1, 64, 1, "line").linkedTo("guide"));
+        repository.save(repository.find(HologramName.of("spawn")).orElseThrow().unlinked());
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.isLinked()).isFalse();
+        assertThat(loaded.linkedNpcName()).isNull();
+    }
+
+    @Test
+    void aPreV50RowWithNoLinkedNpcNameReadsBackUnlinked() {
+        // A pre-V50 row leaves linked_npc_name NULL: insert it directly and prove it reads back as unlinked.
+        Holograms holograms = Holograms.HOLOGRAMS;
+        HologramLines lines = HologramLines.HOLOGRAM_LINES;
+        persistence.dsl().transaction(config -> {
+            config.dsl()
+                    .insertInto(holograms)
+                    .set(holograms.NAME, "legacy")
+                    .set(holograms.WORLD, WORLD.uid().toString())
+                    .set(holograms.WORLD_NAME, "world")
+                    .set(holograms.X, 0.0)
+                    .set(holograms.Y, 64.0)
+                    .set(holograms.Z, 0.0)
+                    .set(holograms.YAW, 0.0f)
+                    .set(holograms.PITCH, 0.0f)
+                    .set(holograms.CREATED_AT, 1_000L)
+                    .execute();
+            config.dsl()
+                    .insertInto(lines)
+                    .set(lines.HOLOGRAM, "legacy")
+                    .set(lines.IDX, 0)
+                    .set(lines.TEXT, "line")
+                    .execute();
+        });
+
+        Hologram loaded = repository.find(HologramName.of("legacy")).orElseThrow();
+
+        assertThat(loaded.isLinked()).isFalse();
+        assertThat(loaded.linkedNpcName()).isNull();
+    }
+
+    @Test
     void roundTripsAnItemHologramType() {
         repository.save(Hologram.createItem(
                 HologramName.of("loot"), Position.of(WORLD, 1, 64, 1), "DIAMOND", Instant.ofEpochMilli(1_000)));

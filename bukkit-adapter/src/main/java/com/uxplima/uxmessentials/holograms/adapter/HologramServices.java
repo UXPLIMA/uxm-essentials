@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.holograms.application.CreateHologram;
 import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
+import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
@@ -21,6 +22,7 @@ import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
 import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
 import com.uxplima.uxmessentials.holograms.application.TeleportToHologram;
+import com.uxplima.uxmessentials.holograms.application.UnlinkHologramFromNpc;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -48,6 +50,8 @@ import org.jspecify.annotations.NullMarked;
  * @param visibility {@code /hologram visibility|visibilitydistance}
  * @param viewers {@code /hologram show|hide}
  * @param model {@code /hologram item|block}
+ * @param linkNpc {@code /hologram linknpc}
+ * @param unlinkNpc {@code /hologram unlinknpc}
  */
 @NullMarked
 public record HologramServices(
@@ -69,7 +73,9 @@ public record HologramServices(
         SetHologramRefresh refresh,
         SetHologramVisibility visibility,
         ManageHologramViewer viewers,
-        SetHologramModel model) {
+        SetHologramModel model,
+        LinkHologramToNpc linkNpc,
+        UnlinkHologramFromNpc unlinkNpc) {
 
     public HologramServices {
         Objects.requireNonNull(create, "create");
@@ -91,5 +97,7 @@ public record HologramServices(
         Objects.requireNonNull(visibility, "visibility");
         Objects.requireNonNull(viewers, "viewers");
         Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(linkNpc, "linkNpc");
+        Objects.requireNonNull(unlinkNpc, "unlinkNpc");
     }
 }

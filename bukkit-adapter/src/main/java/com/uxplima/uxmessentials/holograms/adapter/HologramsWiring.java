@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import org.bukkit.plugin.Plugin;
 
@@ -11,6 +12,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramCommands;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.EventDrivenNpcLocator;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTeleportAdapter;
@@ -24,6 +26,7 @@ import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
+import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
@@ -36,16 +39,22 @@ import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
 import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
 import com.uxplima.uxmessentials.holograms.application.TeleportToHologram;
+import com.uxplima.uxmessentials.holograms.application.UnlinkHologramFromNpc;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.application.port.HologramTeleporter;
+import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
+import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
+import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmlib.hologram.HologramManager;
 import com.uxplima.uxmlib.npc.ChannelResolver;
 import com.uxplima.uxmlib.npc.PacketSender;
@@ -92,6 +101,16 @@ public final class HologramsWiring {
         HologramTextOverrides textOverrides = new HologramTextOverrides(
                 perViewerTextPackets(), PlaceholderApiSupport::messageBridge, MiniMessage.miniMessage(), kernel.log());
         HologramViewers viewers = new HologramViewers(plugin, kernel.permissions(), repository::manualViewers);
+        // The NPC-link seam: a locator over the npc context's stored set kept current by the domain-event bus,
+        // re-anchoring a linked hologram when its NPC moves or is removed. The locator reads the npc persistence
+        // directly (the npc table ships in the persistence V38 baseline, always applied), so a hologram may link to
+        // an NPC even with the npc module disabled — it simply sees no live moves in that case.
+        NpcRepository npcRepository = NpcRepositories.cached(persistence);
+        // Break the renderer↔locator construction cycle: the locator's re-anchor forwards through a holder the
+        // renderer is written into once it exists, so a move event re-renders only the holograms linked to that NPC.
+        RendererHolder rendererHolder = new RendererHolder();
+        EventDrivenNpcLocator npcLocator =
+                new EventDrivenNpcLocator(npcRepository, name -> rendererHolder.reanchor(name));
         HologramRenderer renderer = new HologramRenderer(
                 plugin,
                 manager,
@@ -99,9 +118,14 @@ public final class HologramsWiring {
                 kernel.log(),
                 PlaceholderApiSupport.globalBridge(),
                 viewers,
-                textOverrides);
+                textOverrides,
+                npcLocator);
+        rendererHolder.set(renderer);
+        InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
+        Consumer<DomainEvent> npcSubscriber = npcLocator;
+        events.subscribe(npcSubscriber);
         HologramNotifier notifier = new HologramNotifier(kernel.messages(), kernel.messageSink());
-        HologramServices services = assemble(kernel, repository, renderer, notifier);
+        HologramServices services = assemble(kernel, repository, renderer, notifier, npcLocator);
         spawnStored(repository, renderer);
         // A joining player must pick up the permission-gated holograms they qualify for at once, not after a
         // refresh tick; this listener re-evaluates only the gated holograms for that one player.
@@ -112,8 +136,37 @@ public final class HologramsWiring {
         java.util.function.Supplier<java.util.List<String>> hologramNames = () -> repository.all().stream()
                 .map(hologram -> hologram.name().value())
                 .toList();
+        // The same warm-set read for NPC names, so /hologram linknpc tab-completes against the current NPCs.
+        java.util.function.Supplier<java.util.List<String>> npcNames = () ->
+                npcRepository.all().stream().map(npc -> npc.name().value()).toList();
         return new Wired(
-                HologramCommands.all(services, kernel.messages(), hologramNames), renderer, repository, refreshTask);
+                HologramCommands.all(services, kernel.messages(), hologramNames, npcNames),
+                renderer,
+                repository,
+                refreshTask,
+                events,
+                npcSubscriber);
+    }
+
+    /**
+     * A write-once holder for the renderer so the event-driven NPC locator (built before the renderer, since the
+     * renderer needs it) can route a re-anchor back into the renderer once it exists. A re-anchor that somehow
+     * arrives before the renderer is set is dropped — there is nothing rendered yet to move.
+     */
+    private static final class RendererHolder {
+
+        private @Nullable HologramRenderer renderer;
+
+        void set(HologramRenderer renderer) {
+            this.renderer = Objects.requireNonNull(renderer, "renderer");
+        }
+
+        void reanchor(String npcName) {
+            HologramRenderer current = renderer;
+            if (current != null) {
+                current.reanchorLinkedTo(npcName);
+            }
+        }
     }
 
     /**
@@ -135,7 +188,11 @@ public final class HologramsWiring {
     }
 
     private static HologramServices assemble(
-            KernelPorts kernel, HologramRepository repository, HologramRenderer renderer, HologramNotifier notifier) {
+            KernelPorts kernel,
+            HologramRepository repository,
+            HologramRenderer renderer,
+            HologramNotifier notifier,
+            LinkedNpcLocator npcLocator) {
         Clock clock = Clock.systemUTC();
         HologramTeleporter teleporter = new HologramTeleportAdapter(kernel.scheduler(), kernel.log());
         return new HologramServices(
@@ -157,7 +214,9 @@ public final class HologramsWiring {
                 new SetHologramRefresh(repository, renderer, notifier),
                 new SetHologramVisibility(repository, renderer, notifier),
                 new ManageHologramViewer(repository, renderer, notifier),
-                new SetHologramModel(repository, renderer, notifier));
+                new SetHologramModel(repository, renderer, notifier),
+                new LinkHologramToNpc(repository, renderer, notifier, npcLocator),
+                new UnlinkHologramFromNpc(repository, renderer, notifier));
     }
 
     private static void spawnStored(HologramRepository repository, HologramRenderer renderer) {
@@ -176,22 +235,29 @@ public final class HologramsWiring {
      * @param renderer the live-entity renderer, despawned on stop
      * @param repository the cached hologram repository the PAPI seam reads the server-wide count from
      * @param refreshTask the global refresh timer handle, cancelled on stop so no task outlives a disable
+     * @param events the domain-event bus the npc-link locator subscribed to, dropped on stop
+     * @param npcSubscriber the npc-link locator subscription, unsubscribed on stop so it does not outlive a reload
      */
     public record Wired(
             List<CommandRegistration> commands,
             HologramRenderer renderer,
             HologramRepository repository,
-            AutoCloseable refreshTask) {
+            AutoCloseable refreshTask,
+            InProcessDomainEventPublisher events,
+            Consumer<DomainEvent> npcSubscriber) {
 
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(renderer, "renderer");
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(refreshTask, "refreshTask");
+            Objects.requireNonNull(events, "events");
+            Objects.requireNonNull(npcSubscriber, "npcSubscriber");
         }
 
-        /** Cancel the refresh timer and despawn every spawned hologram so nothing is orphaned across a reload. */
+        /** Cancel the refresh timer, drop the npc-link subscription, and despawn every spawned hologram. */
         public void stop() {
+            events.unsubscribe(npcSubscriber);
             closeQuietly(refreshTask);
             renderer.despawnAll();
         }

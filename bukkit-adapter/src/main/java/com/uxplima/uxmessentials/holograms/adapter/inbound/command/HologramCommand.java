@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
 import java.util.Collection;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
@@ -34,11 +35,16 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     private static final String PERMISSION = "uxmessentials.hologram.use";
 
     private final Supplier<? extends Collection<String>> hologramNames;
+    private final Supplier<? extends Collection<String>> npcNames;
 
     public HologramCommand(
-            HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
+            HologramServices services,
+            Messages messages,
+            Supplier<? extends Collection<String>> hologramNames,
+            Supplier<? extends Collection<String>> npcNames) {
         super(services, messages, hologramNames);
         this.hologramNames = hologramNames;
+        this.npcNames = Objects.requireNonNull(npcNames, "npcNames");
     }
 
     @Override
@@ -67,6 +73,10 @@ public final class HologramCommand extends HologramCommandSupport implements Com
         for (LiteralArgumentBuilder<CommandSourceStack> convenience :
                 new HologramConvenienceCommand(services, messages, hologramNames).nodes()) {
             root.then(convenience);
+        }
+        for (LiteralArgumentBuilder<CommandSourceStack> link :
+                new HologramNpcCommand(services, messages, hologramNames, npcNames).nodes()) {
+            root.then(link);
         }
         return root.build();
     }

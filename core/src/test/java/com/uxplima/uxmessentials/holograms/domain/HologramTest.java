@@ -41,6 +41,48 @@ class HologramTest {
     }
 
     @Test
+    void freshHologramIsNotLinked() {
+        Hologram hologram = twoLine();
+
+        assertThat(hologram.isLinked()).isFalse();
+        assertThat(hologram.linkedNpcName()).isNull();
+    }
+
+    @Test
+    void linkedToStoresTheNpcNameKeepingItsStoredLocation() {
+        Hologram linked = twoLine().linkedTo("guide");
+
+        assertThat(linked.isLinked()).isTrue();
+        assertThat(linked.linkedNpcName()).isEqualTo("guide");
+        // The own location is untouched, so an unlink restores it.
+        assertThat(linked.location()).isEqualTo(AT);
+        assertThat(linked.lines()).hasSize(2);
+        assertThat(linked.name().value()).isEqualTo("spawn");
+    }
+
+    @Test
+    void unlinkedClearsTheNpcLink() {
+        Hologram unlinked = twoLine().linkedTo("guide").unlinked();
+
+        assertThat(unlinked.isLinked()).isFalse();
+        assertThat(unlinked.linkedNpcName()).isNull();
+        assertThat(unlinked.location()).isEqualTo(AT);
+    }
+
+    @Test
+    void otherEditsPreserveTheNpcLink() {
+        Hologram linked = twoLine().linkedTo("guide");
+
+        assertThat(linked.withRefreshIntervalTicks(40).linkedNpcName()).isEqualTo("guide");
+        assertThat(linked.withAppearance(Appearance.defaults().withScale(2f)).linkedNpcName())
+                .isEqualTo("guide");
+        assertThat(linked.withLineAppended(new HologramLine("three")).linkedNpcName())
+                .isEqualTo("guide");
+        assertThat(linked.movedTo(Position.of(WORLD, 5, 5, 5)).linkedNpcName()).isEqualTo("guide");
+        assertThat(linked.renamedTo(HologramName.of("copy")).linkedNpcName()).isEqualTo("guide");
+    }
+
+    @Test
     void withLineAppendedAddsAtTheEnd() {
         Hologram three = twoLine().withLineAppended(new HologramLine("three"));
 

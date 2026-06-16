@@ -27,14 +27,21 @@ import org.jspecify.annotations.Nullable;
  * (rendered once, never re-rendered); a positive value means the live entity re-renders on that cadence so its
  * lines pick up fresh placeholder values. {@code createdAt} is preserved across every move or edit.
  *
+ * <p>{@link #linkedNpcName()} is the optional name of an NPC the hologram follows (the FancyHolograms
+ * link-with-NPC feature): when set, the renderer anchors the hologram above that NPC's head and re-anchors as it
+ * moves, falling back to {@link #location()} when no such NPC exists; when null the hologram stays anchored to its
+ * own stored location. It is a positioning concern only, so it lives on the aggregate as a plain name and is
+ * preserved across every other edit.
+ *
  * @param name the hologram's canonical, server-unique name
- * @param location where the hologram floats
+ * @param location where the hologram floats when it is not linked to an NPC
  * @param content the type and what it renders (text lines, item material, or block data)
  * @param appearance the visual styling (billboard, background, brightness, scale, …)
  * @param visibility who may see the hologram and how far away it stays visible
  * @param rotation the display's stored spin (yaw + pitch), only visible with a FIXED billboard
  * @param refreshIntervalTicks how often (in ticks) the live entity re-renders, or 0 for a static hologram
  * @param createdAt when the hologram was first created (preserved across a move or edit)
+ * @param linkedNpcName the name of the NPC the hologram follows, or null when it is anchored to its own location
  */
 public record Hologram(
         HologramName name,
@@ -44,7 +51,8 @@ public record Hologram(
         Visibility visibility,
         Rotation rotation,
         int refreshIntervalTicks,
-        Instant createdAt) {
+        Instant createdAt,
+        @Nullable String linkedNpcName) {
 
     /** A refresh interval of 0 means "static": render once on enable, never re-render. */
     public static final int STATIC = 0;
@@ -65,7 +73,9 @@ public record Hologram(
     /**
      * The legacy field-by-field constructor, retained so the persistence mapper and field-level callers are
      * unaffected by the content grouping. The type and what it renders are folded into a {@link HologramContent},
-     * which applies the same type invariants and defensive line copy it always did.
+     * which applies the same type invariants and defensive line copy it always did. The hologram is created
+     * unlinked; the persistence mapper applies a stored {@link #linkedNpcName()} afterwards through
+     * {@link #linkedTo(String)}, so a row threads the link through this same field-by-field path.
      */
     public Hologram(
             HologramName name,
@@ -87,7 +97,8 @@ public record Hologram(
                 visibility,
                 rotation,
                 refreshIntervalTicks,
-                createdAt);
+                createdAt,
+                null);
     }
 
     /**
@@ -117,7 +128,8 @@ public record Hologram(
                 Visibility.everyone(),
                 Rotation.NONE,
                 STATIC,
-                createdAt);
+                createdAt,
+                null);
     }
 
     // --- Content accessors (delegated, so existing call sites are unchanged) ---
@@ -148,24 +160,65 @@ public record Hologram(
         return refreshIntervalTicks > STATIC;
     }
 
+    /** Whether this hologram follows an NPC rather than anchoring to its own stored location. */
+    public boolean isLinked() {
+        return linkedNpcName != null;
+    }
+
     // --- Transitions (createdAt and the untouched fields are always preserved) ---
 
-    /** A copy re-anchored to {@code newLocation}, keeping everything else. */
+    /** A copy re-anchored to {@code newLocation}, keeping everything else (including any NPC link). */
     public Hologram movedTo(Position newLocation) {
         Objects.requireNonNull(newLocation, "newLocation");
         return new Hologram(
-                name, newLocation, content, appearance, visibility, rotation, refreshIntervalTicks, createdAt);
+                name,
+                newLocation,
+                content,
+                appearance,
+                visibility,
+                rotation,
+                refreshIntervalTicks,
+                createdAt,
+                linkedNpcName);
+    }
+
+    /**
+     * A copy linked to the NPC named {@code npcName}, so the renderer anchors it above that NPC and follows the
+     * NPC as it moves; the hologram's own stored {@link #location()} is kept untouched so unlinking restores it.
+     * Backs {@code /hologram linknpc}.
+     */
+    public Hologram linkedTo(String npcName) {
+        Objects.requireNonNull(npcName, "npcName");
+        return new Hologram(
+                name, location, content, appearance, visibility, rotation, refreshIntervalTicks, createdAt, npcName);
+    }
+
+    /**
+     * A copy with any NPC link cleared, so the hologram anchors to its own stored {@link #location()} again. Backs
+     * {@code /hologram unlinknpc}; a no-op in effect on an already-unlinked hologram.
+     */
+    public Hologram unlinked() {
+        return new Hologram(
+                name, location, content, appearance, visibility, rotation, refreshIntervalTicks, createdAt, null);
     }
 
     /**
      * A full clone under {@code newName}, keeping every other property — location, content, appearance, visibility,
-     * rotation, refresh interval and creation time. Backs {@code /hologram copy}: the duplicate is the same hologram
-     * in every way but its name.
+     * rotation, refresh interval, creation time and any NPC link. Backs {@code /hologram copy}: the duplicate is the
+     * same hologram in every way but its name.
      */
     public Hologram renamedTo(HologramName newName) {
         Objects.requireNonNull(newName, "newName");
         return new Hologram(
-                newName, location, content, appearance, visibility, rotation, refreshIntervalTicks, createdAt);
+                newName,
+                location,
+                content,
+                appearance,
+                visibility,
+                rotation,
+                refreshIntervalTicks,
+                createdAt,
+                linkedNpcName);
     }
 
     /** A copy with {@code line} appended after the current last line. */
@@ -210,21 +263,45 @@ public record Hologram(
     public Hologram withAppearance(Appearance newAppearance) {
         Objects.requireNonNull(newAppearance, "newAppearance");
         return new Hologram(
-                name, location, content, newAppearance, visibility, rotation, refreshIntervalTicks, createdAt);
+                name,
+                location,
+                content,
+                newAppearance,
+                visibility,
+                rotation,
+                refreshIntervalTicks,
+                createdAt,
+                linkedNpcName);
     }
 
     /** A copy with a new {@link Visibility}, keeping everything else. */
     public Hologram withVisibility(Visibility newVisibility) {
         Objects.requireNonNull(newVisibility, "newVisibility");
         return new Hologram(
-                name, location, content, appearance, newVisibility, rotation, refreshIntervalTicks, createdAt);
+                name,
+                location,
+                content,
+                appearance,
+                newVisibility,
+                rotation,
+                refreshIntervalTicks,
+                createdAt,
+                linkedNpcName);
     }
 
     /** A copy with a new {@link Rotation}, keeping everything else. */
     public Hologram withRotation(Rotation newRotation) {
         Objects.requireNonNull(newRotation, "newRotation");
         return new Hologram(
-                name, location, content, appearance, visibility, newRotation, refreshIntervalTicks, createdAt);
+                name,
+                location,
+                content,
+                appearance,
+                visibility,
+                newRotation,
+                refreshIntervalTicks,
+                createdAt,
+                linkedNpcName);
     }
 
     /** A copy that re-renders every {@code ticks} ticks (0 = static); rejects a negative interval. */
@@ -232,11 +309,19 @@ public record Hologram(
         if (ticks < 0) {
             throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + ticks);
         }
-        return new Hologram(name, location, content, appearance, visibility, rotation, ticks, createdAt);
+        return new Hologram(name, location, content, appearance, visibility, rotation, ticks, createdAt, linkedNpcName);
     }
 
     private Hologram withContent(HologramContent newContent) {
         return new Hologram(
-                name, location, newContent, appearance, visibility, rotation, refreshIntervalTicks, createdAt);
+                name,
+                location,
+                newContent,
+                appearance,
+                visibility,
+                rotation,
+                refreshIntervalTicks,
+                createdAt,
+                linkedNpcName);
     }
 }

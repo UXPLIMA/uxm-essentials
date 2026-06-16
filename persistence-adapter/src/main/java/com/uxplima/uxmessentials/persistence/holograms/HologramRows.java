@@ -50,7 +50,7 @@ final class HologramRows {
                 row.get(HOLOGRAMS.PITCH));
         List<HologramLine> lines =
                 orderedLineTexts.stream().map(HologramLine::new).toList();
-        return new Hologram(
+        Hologram hologram = new Hologram(
                 HologramName.of(row.get(HOLOGRAMS.NAME)),
                 position,
                 typeOf(row.get(HOLOGRAMS.TYPE)),
@@ -62,6 +62,14 @@ final class HologramRows {
                 rotationOf(row),
                 intOr(row.get(HOLOGRAMS.REFRESH_INTERVAL_TICKS), Hologram.STATIC),
                 Instant.ofEpochMilli(row.get(HOLOGRAMS.CREATED_AT)));
+        // A pre-V50 row (NULL linked_npc_name) — and any row that never linked — reads back unlinked, so an
+        // existing hologram keeps anchoring to its own coordinates with no data migration.
+        return linkedNpcOf(row, hologram);
+    }
+
+    private static Hologram linkedNpcOf(Record row, Hologram hologram) {
+        String linkedNpcName = row.get(HOLOGRAMS.LINKED_NPC_NAME);
+        return linkedNpcName == null ? hologram : hologram.linkedTo(linkedNpcName);
     }
 
     /** Populate a {@link HologramsRecord} from a domain {@link Hologram} for an upsert (the name row only). */
@@ -104,7 +112,8 @@ final class HologramRows {
                 .setVisibilityDistance(visibility.distance())
                 .setRotationYaw(rotation.yaw())
                 .setRotationPitch(rotation.pitch())
-                .setRefreshIntervalTicks(hologram.refreshIntervalTicks());
+                .setRefreshIntervalTicks(hologram.refreshIntervalTicks())
+                .setLinkedNpcName(hologram.linkedNpcName());
     }
 
     private static Appearance appearanceOf(Record row) {

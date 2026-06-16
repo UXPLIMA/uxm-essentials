@@ -7,10 +7,12 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.CapturingSink;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepository;
+import com.uxplima.uxmessentials.npc.application.NpcTestSupport.RecordingEvents;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.RecordingView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.npc.domain.event.NpcMoved;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -28,6 +30,7 @@ class MoveNpcTest {
     private FakeNpcRepository repository;
     private RecordingView view;
     private CapturingSink sink;
+    private RecordingEvents events;
     private MoveNpc move;
     private PlayerRef actor;
 
@@ -36,12 +39,13 @@ class MoveNpcTest {
         repository = new FakeNpcRepository();
         view = new RecordingView();
         sink = new CapturingSink();
-        move = new MoveNpc(repository, view, new NpcNotifier(new NpcTestSupport.KeyMessages(), sink));
+        events = new RecordingEvents();
+        move = new MoveNpc(repository, view, new NpcNotifier(new NpcTestSupport.KeyMessages(), sink), events);
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 
     @Test
-    void reanchorsSavesRendersAndNotifies() {
+    void reanchorsSavesRendersNotifiesAndPublishes() {
         repository.save(Npc.create(NpcName.of("guide"), AT, null, Instant.ofEpochMilli(1_000)));
 
         Result<Unit, NpcError> result = move.move(actor, NpcName.of("guide"), ELSEWHERE);
@@ -51,6 +55,11 @@ class MoveNpcTest {
                 .isEqualTo(ELSEWHERE);
         assertThat(view.rendered).hasSize(1);
         assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_MOVED.key());
+        assertThat(events.published)
+                .hasSize(1)
+                .first()
+                .isInstanceOf(NpcMoved.class)
+                .isEqualTo(new NpcMoved(NpcName.of("guide"), ELSEWHERE));
     }
 
     @Test
@@ -60,5 +69,6 @@ class MoveNpcTest {
         assertThat(result.errorOrThrow()).isEqualTo(NpcError.NOT_FOUND);
         assertThat(view.rendered).isEmpty();
         assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_NOT_FOUND.key());
+        assertThat(events.published).isEmpty();
     }
 }

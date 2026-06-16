@@ -9,6 +9,6 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
  * Bukkit event so other plugins observe NPC changes without importing this package.
  *
  * <p>Names are past tense — a domain event records something that already happened ({@code NpcCreated},
- * {@code NpcDeleted}), never an imperative command.
+ * {@code NpcMoved}, {@code NpcDeleted}), never an imperative command.
  */
-public sealed interface NpcEvent extends DomainEvent permits NpcCreated, NpcDeleted {}
+public sealed interface NpcEvent extends DomainEvent permits NpcCreated, NpcMoved, NpcDeleted {}

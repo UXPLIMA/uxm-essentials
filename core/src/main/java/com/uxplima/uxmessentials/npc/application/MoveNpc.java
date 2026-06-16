@@ -9,6 +9,8 @@ import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.npc.domain.event.NpcMoved;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -17,18 +19,21 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 /**
  * {@code /npc movehere <name>}: re-anchor an existing NPC to the operator's current position, save the new
  * snapshot, and re-render the fake player at its new location. A name no NPC exists at is rejected with
- * {@link NpcError#NOT_FOUND}. The operator-only permission is enforced at the adapter gate.
+ * {@link NpcError#NOT_FOUND}. {@code NpcMoved} is published so anything pinned to the NPC (a hologram linked to
+ * it) re-anchors. The operator-only permission is enforced at the adapter gate.
  */
 public final class MoveNpc {
 
     private final NpcRepository repository;
     private final NpcView view;
     private final NpcNotifier notifier;
+    private final DomainEventPublisher events;
 
-    public MoveNpc(NpcRepository repository, NpcView view, NpcNotifier notifier) {
+    public MoveNpc(NpcRepository repository, NpcView view, NpcNotifier notifier, DomainEventPublisher events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
     /** Re-anchor the NPC {@code name} to {@code at}, or reject when no such NPC exists. */
@@ -44,6 +49,7 @@ public final class MoveNpc {
         Npc moved = existing.get().movedTo(at);
         repository.save(moved);
         view.render(moved);
+        events.publish(new NpcMoved(name, at));
         notifier.send(actor, NpcMessageKey.NPC_MOVED, Map.of("name", name.value()));
         return Result.ok();
     }

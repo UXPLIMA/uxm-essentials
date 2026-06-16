@@ -22,6 +22,12 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_COPIED("hologram.copied"),
     HOLOGRAM_ROTATED("hologram.rotated"),
 
+    // npc-link feedback
+    HOLOGRAM_LINKED("hologram.linked"),
+    HOLOGRAM_UNLINKED("hologram.unlinked"),
+    HOLOGRAM_NOT_LINKED("hologram.not-linked"),
+    HOLOGRAM_NPC_NOT_FOUND("hologram.npc-not-found"),
+
     // line editing feedback
     HOLOGRAM_LINE_ADDED("hologram.line.added"),
     HOLOGRAM_LINE_SET("hologram.line.set"),
