@@ -122,17 +122,25 @@ public final class TablistSuppression {
      * filler-id snapshot is refreshed and, on the entering edge, the interceptor is injected and the real players
      * relisted unlisted at once. When false the viewer is taken out of suppress mode (eject + relist real players back)
      * if they were in it. Runs on the viewer's region/entity thread, like the rest of the render path.
+     *
+     * <p>The renderer calls this <em>before</em> it paints the fillers, passing the ids the layout is about to paint, so
+     * for an already-suppressed viewer the snapshot already protects a filler when its {@code ADD_PLAYER} crosses the
+     * live interceptor — otherwise that first paint would be force-unlisted and the per-cell flicker guard would never
+     * repaint it.
+     *
+     * @param plannedFillerIds the filler entry ids the layout will paint this tick (the entries kept listed)
      */
-    public void apply(Player viewer, boolean suppress, Set<UUID> currentFillerIds) {
+    public void apply(Player viewer, boolean suppress, Set<UUID> plannedFillerIds) {
         Objects.requireNonNull(viewer, "viewer");
-        Objects.requireNonNull(currentFillerIds, "currentFillerIds");
+        Objects.requireNonNull(plannedFillerIds, "plannedFillerIds");
         UUID viewerId = viewer.getUniqueId();
         if (!suppress) {
             disable(viewer);
             return;
         }
-        // Refresh the protected-id snapshot first so the listener never suppresses a freshly-added filler this tick.
-        fillerIds.put(viewerId, Set.copyOf(currentFillerIds));
+        // Refresh the protected-id snapshot before the fillers are painted, so the listener never suppresses a filler
+        // this layout is about to add for an already-suppressed viewer.
+        fillerIds.put(viewerId, Set.copyOf(plannedFillerIds));
         if (active.add(viewerId)) {
             gate.inject(viewer);
             relistReal(viewer, false);

@@ -184,6 +184,25 @@ final class FillerPainter {
         return ids;
     }
 
+    /**
+     * The deterministic ids the filler cells of {@code layout} <em>will</em> carry for {@code viewer}, computed from the
+     * layout's slots without painting anything. The suppress mechanism primes its protected-id snapshot with these
+     * <em>before</em> {@link #applyFillers} sends a single packet, so a filler painted into a viewer who is already
+     * suppressed is protected the instant its {@code ADD_PLAYER} crosses the live interceptor — otherwise that first
+     * paint would be force-unlisted, and the per-cell flicker guard would never repaint it, leaving the new filler
+     * permanently hidden. An empty layout yields an empty set. Pure: same {@link #fillerId} derivation as the painted ids.
+     */
+    Set<UUID> plannedFillerIds(Player viewer, TablistLayout layout) {
+        if (layout.isEmpty()) {
+            return Set.of();
+        }
+        Set<UUID> ids = new java.util.HashSet<>(layout.fillers().size());
+        for (TablistFiller filler : layout.fillers()) {
+            ids.add(fillerId(viewer.getUniqueId(), filler.slot()));
+        }
+        return ids;
+    }
+
     /** Remove every filler entry this painter sent for {@code viewer}, and drop the viewer's filler tracking. */
     void clear(Player viewer) {
         Map<Integer, AppliedFiller> painted = appliedFillers.remove(viewer.getUniqueId());

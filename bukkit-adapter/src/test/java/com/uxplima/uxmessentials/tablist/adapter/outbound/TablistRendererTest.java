@@ -760,6 +760,46 @@ class TablistRendererTest {
     }
 
     @Test
+    void aFillerPaintedWhileAlreadySuppressedIsProtectedAtSendTimeAndNotForcedUnlisted() {
+        // Regression: a filler added to the layout while the viewer is ALREADY suppressed must be in the suppress
+        // snapshot at the instant its ADD_PLAYER crosses the live interceptor. Otherwise that first paint is force-
+        // unlisted and the per-cell flicker guard never repaints it, leaving the new filler permanently hidden. The
+        // gate's interceptor is modelled by consulting the live suppress predicate at packet-send time for every filler
+        // entry that goes out — exactly what NmsPlayerInfoUpdates.forceUnlisted does on the wire.
+        PlayerMock viewer = server.addPlayer();
+        SnapshotProbingPackets packets = new SnapshotProbingPackets();
+        TablistSuppression suppression = new TablistSuppression(
+                new RecordingGate(),
+                new com.uxplima.uxmlib.npc.PacketListenerRegistry(),
+                packets,
+                server::getOnlinePlayers,
+                new TestLogger(),
+                (p, s) -> null);
+        packets.bind(suppression);
+        AtomicReference<TablistFormatConfig> ref =
+                new AtomicReference<>(new TablistFormatConfig(List.of(suppressFillerFormat("synthetic", layoutOf()))));
+        TablistRenderer renderer = new TablistRenderer(
+                ref::get,
+                new AnimationRegistry(List.of()),
+                packets,
+                new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
+                server::getOnlinePlayers,
+                suppression);
+
+        // Enter suppress mode with no fillers, then grow the layout to add a filler while still suppressed.
+        renderer.renderFor(viewer);
+        ref.set(new TablistFormatConfig(List.of(suppressFillerFormat(
+                "synthetic", layoutOf(new TablistFiller(5, "<gold>play.example.net", Optional.empty()))))));
+        renderer.renderFor(viewer);
+
+        UUID fillerId = fillerId(viewer.getUniqueId(), 5);
+        // The filler entry was actually sent, and at the moment it crossed the (modelled) interceptor the suppress
+        // predicate kept it LISTED — proving the snapshot already protected it before the packet went out.
+        assertThat(packets.sentFillerIds).contains(fillerId);
+        assertThat(packets.fillerIdsThatWouldBeHidden).doesNotContain(fillerId);
+    }
+
+    @Test
     void aNoFillerFormatPaintsNoFillerEntriesAndRemovesNothing() {
         PlayerMock viewer = server.addPlayer();
         RecordingPackets packets = new RecordingPackets();
@@ -814,7 +854,7 @@ class TablistRendererTest {
      * so a recorded {@code (viewer, packet)} send pair carries the {@link TabEntry} that reached that viewer — this lets
      * a late-joiner test assert which entries a single viewer received.
      */
-    private static final class RecordingPackets implements TabListPackets {
+    private static class RecordingPackets implements TabListPackets {
         private final List<TabEntry> added = new ArrayList<>();
         private final List<Sent> sent = new ArrayList<>();
         private final List<List<UUID>> removed = new ArrayList<>();
@@ -881,6 +921,32 @@ class TablistRendererTest {
         private record Removal(List<UUID> ids) {}
 
         private record Relist(List<UUID> ids, boolean listed) {}
+    }
+
+    /**
+     * A {@link RecordingPackets} that models the live suppress interceptor: at {@code addOrUpdate} send time it asks the
+     * bound {@link TablistSuppression}'s predicate whether the entry's id would be forced unlisted, so a test can prove a
+     * filler is protected at the exact moment its packet crosses the wire — the ordering the real defect turned on.
+     */
+    private static final class SnapshotProbingPackets extends RecordingPackets {
+        private final List<UUID> sentFillerIds = new ArrayList<>();
+        private final List<UUID> fillerIdsThatWouldBeHidden = new ArrayList<>();
+        private @Nullable TablistSuppression suppression;
+
+        void bind(TablistSuppression suppression) {
+            this.suppression = suppression;
+        }
+
+        @Override
+        public void send(org.bukkit.entity.Player viewer, Object packet) {
+            super.send(viewer, packet);
+            if (suppression != null && packet instanceof TabEntry entry) {
+                sentFillerIds.add(entry.id());
+                if (suppression.suppressPredicate(viewer.getUniqueId()).test(entry.id())) {
+                    fillerIdsThatWouldBeHidden.add(entry.id());
+                }
+            }
+        }
     }
 
     /** A fake profile source: an online map for inline reads, a fetchable map for the "off-thread" fetch. */
@@ -1047,6 +1113,22 @@ class TablistRendererTest {
                 OptionalInt.empty(),
                 Optional.empty(),
                 TablistLayout.empty(),
+                true);
+    }
+
+    /** A header-only format carrying both a filler {@code layout} and {@code suppress-real-players = true}. */
+    private static TablistFormat suppressFillerFormat(String name, TablistLayout layout) {
+        TablistContent content =
+                new TablistContent(List.of("<gold>" + name), List.of(), Duration.ofSeconds(1L), Set.of());
+        return new TablistFormat(
+                name,
+                DisplayCondition.always(),
+                0,
+                content,
+                Optional.empty(),
+                OptionalInt.empty(),
+                Optional.empty(),
+                layout,
                 true);
     }
 

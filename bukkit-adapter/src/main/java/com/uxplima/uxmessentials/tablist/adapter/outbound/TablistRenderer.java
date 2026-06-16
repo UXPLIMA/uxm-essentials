@@ -153,12 +153,16 @@ public final class TablistRenderer {
         }
         applyHeaderFooter(player, content, tick);
         rowPainter.applyRow(player, format, tick);
-        fillerPainter.applyFillers(player, format.layout(), tick);
-        // After the fillers are painted (so the protected-id snapshot is current), reconcile the opt-in suppress mode:
-        // hide the real players from this viewer's tab when the format asks, restore them when it does not.
+        // Reconcile the opt-in suppress mode BEFORE the fillers are painted, priming the protected-id snapshot with the
+        // ids the layout is about to paint. The interceptor is live for an already-suppressed viewer, so a filler whose
+        // ADD_PLAYER crosses it must already be in the snapshot or it would be force-unlisted on its first (and, thanks
+        // to the per-cell flicker guard, only) paint and stay hidden. Priming from the planned ids closes that window
+        // for a layout that grows mid-suppression; the entering edge is unaffected because the snapshot is a superset.
         if (suppression != null) {
-            suppression.apply(player, format.suppressRealPlayers(), fillerPainter.fillerIdsFor(player));
+            suppression.apply(
+                    player, format.suppressRealPlayers(), fillerPainter.plannedFillerIds(player, format.layout()));
         }
+        fillerPainter.applyFillers(player, format.layout(), tick);
     }
 
     /**
