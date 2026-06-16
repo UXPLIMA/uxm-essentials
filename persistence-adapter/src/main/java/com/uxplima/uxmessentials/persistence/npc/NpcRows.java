@@ -33,6 +33,9 @@ import org.jspecify.annotations.Nullable;
  * A slot with both columns NULL is empty. {@code glowing} is a SMALLINT 0/1 and {@code glow_color} the optional
  * outline colour name. The {@code entity_type} column is the uppercase Bukkit {@code EntityType} name the NPC
  * renders as ({@code PLAYER} by default, the fake-player path), NOT NULL so an older row reads back as a player.
+ * The {@code pose} column is the uppercase pose name the NPC is frozen in ({@code STANDING} by default), NOT NULL
+ * so an older row reads upright; {@code scale} is the size multiplier in a REAL column ({@code 1.0} by default,
+ * narrowed to a float on save and widened back on read), NOT NULL so an older row reads back natural-sized.
  * The click-action chain lives in the child {@code npc_action} table and is passed in already ordered — each
  * row's {@code click_trigger}/{@code type} are the enum names and {@code value} the raw operator payload. This
  * class is the single place that translation lives.
@@ -60,6 +63,8 @@ final class NpcRows {
                 row.get(NPC.GLOW_COLOR),
                 orderedActions,
                 row.get(NPC.ENTITY_TYPE),
+                row.get(NPC.POSE),
+                row.get(NPC.SCALE),
                 Instant.ofEpochMilli(row.get(NPC.CREATED_AT)));
     }
 
@@ -91,6 +96,10 @@ final class NpcRows {
                 .setGlowing((short) (npc.glowing() ? 1 : 0))
                 .setGlowColor(npc.glowColor())
                 .setEntityType(npc.entityType())
+                .setPose(npc.pose())
+                // scale is a REAL column (jOOQ maps it to Float); the domain carries the wider double, narrowed
+                // here for storage and widened back on read — the protocol's scale range fits a float exactly.
+                .setScale((float) npc.scale())
                 .setCreatedAt(npc.createdAt().toEpochMilli());
     }
 

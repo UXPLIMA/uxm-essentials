@@ -315,6 +315,58 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesPoseAndScaleOnSpawnForAnInRangeViewer() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        Npc npc = npcAt(viewer, 1.0).withPose("SITTING").withScale(2.5);
+        renderer.render(npc);
+
+        // A non-default pose and a non-default scale each ship their packet on spawn.
+        assertThat(packets.poses).hasSize(1);
+        assertThat(packets.poses.get(0).pose()).isEqualTo(com.uxplima.uxmlib.packet.npc.NpcPose.SITTING);
+        assertThat(packets.scales).hasSize(1);
+        assertThat(packets.scales.get(0).scale()).isEqualTo(2.5);
+    }
+
+    @Test
+    void sendsNoPoseOrScaleForADefaultNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)); // STANDING, scale 1.0 — the entity already renders this way
+
+        assertThat(packets.poses).isEmpty();
+        assertThat(packets.scales).isEmpty();
+    }
+
+    @Test
+    void failsSoftAndSkipsThePosePacketForAnUnknownStoredPose() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // An unknown pose name renders standing rather than failing — no pose packet, but the spawn still went out.
+        Npc npc = npcAt(viewer, 1.0).withPose("NOT_A_REAL_POSE");
+        assertThatCode(() -> renderer.render(npc)).doesNotThrowAnyException();
+
+        assertThat(packets.poses).isEmpty();
+        assertThat(packets.spawns).hasSize(1);
+    }
+
+    @Test
+    void appliesScaleToAMobNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("ZOMBIE").withScale(0.5));
+
+        // Scale applies to every entity type, mob included.
+        assertThat(packets.spawnEntities).hasSize(1);
+        assertThat(packets.scales).hasSize(1);
+        assertThat(packets.scales.get(0).scale()).isEqualTo(0.5);
+    }
+
+    @Test
     void equipsAStoredSerializedItemWithItsMetaIntact() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -577,6 +629,8 @@ class NpcRendererTest {
         private final List<Equipment> equipments = new ArrayList<>();
         private final List<Glow> glows = new ArrayList<>();
         private final List<GlowColor> glowColors = new ArrayList<>();
+        private final List<PoseSet> poses = new ArrayList<>();
+        private final List<Scale> scales = new ArrayList<>();
         private final List<Sent> sent = new ArrayList<>();
 
         @Override
@@ -660,6 +714,20 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object pose(int entityId, com.uxplima.uxmlib.packet.npc.NpcPose pose) {
+            PoseSet packet = new PoseSet(entityId, pose);
+            poses.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object scale(int entityId, double scale) {
+            Scale packet = new Scale(entityId, scale);
+            scales.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -732,6 +800,10 @@ class NpcRendererTest {
         private record Equipment(int entityId, Map<com.uxplima.uxmlib.packet.npc.EquipmentSlot, ItemStack> items) {}
 
         private record Glow(int entityId, boolean glowing) {}
+
+        private record PoseSet(int entityId, com.uxplima.uxmlib.packet.npc.NpcPose pose) {}
+
+        private record Scale(int entityId, double scale) {}
 
         private record GlowColor(String teamName, String memberName, @Nullable NamedColor color) {}
 

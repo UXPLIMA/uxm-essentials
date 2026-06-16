@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.packet.npc.EquipmentSlot;
 import com.uxplima.uxmlib.packet.npc.NamedColor;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
+import com.uxplima.uxmlib.packet.npc.NpcPose;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -150,6 +151,24 @@ public final class NpcViewSpawner {
             NamedColor color = npc.hasGlowColor() ? parseColor(npc.glowColor()) : null;
             packets.send(viewer, packets.glowColor(glowTeam(npc), profileName(npc), color));
         }
+        applyShape(viewer, rendered, npc);
+    }
+
+    /**
+     * Apply the NPC's pose and scale for this viewer. A non-default pose resolves to a packet-layer {@link NpcPose}
+     * (an unknown name renders standing — fail-soft, never thrown on the render thread); a non-default scale ships
+     * the resize attribute. The natural-size, standing default sends nothing — the entity already renders that way.
+     */
+    private void applyShape(Player viewer, RenderedNpc rendered, Npc npc) {
+        if (npc.hasPose()) {
+            NpcPose pose = parsePose(npc.pose());
+            if (pose != null) {
+                packets.send(viewer, packets.pose(rendered.entityId(), pose));
+            }
+        }
+        if (npc.hasScale()) {
+            packets.send(viewer, packets.scale(rendered.entityId(), npc.scale()));
+        }
     }
 
     /**
@@ -205,6 +224,15 @@ public final class NpcViewSpawner {
         }
         try {
             return NamedColor.valueOf(name.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
+    }
+
+    /** Parse a stored pose name to an {@link NpcPose}, or {@code null} when the name names no known pose (renders standing). */
+    private static @Nullable NpcPose parsePose(String name) {
+        try {
+            return NpcPose.valueOf(name.strip().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException unknown) {
             return null;
         }

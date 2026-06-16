@@ -44,6 +44,12 @@ import org.jspecify.annotations.Nullable;
  * adapter is the only place that resolves it to a real {@code EntityType} and decides whether the type is a valid
  * living one. The skin is kept across a type change, so flipping a mob back to {@code PLAYER} restores its skin.
  *
+ * <p>{@code pose} is the body pose the NPC is frozen in — the uppercase pose name ({@code "STANDING"} by default,
+ * or {@code "SITTING"}, {@code "SLEEPING"}, …). It is a plain string so the domain stays Bukkit-free: which pose
+ * names are valid is resolved against the packet layer at render time, so an unknown name simply renders standing
+ * rather than failing here. {@code scale} resizes the NPC ({@code 1.0} is the natural size; {@code 2.0} twice as
+ * tall, {@code 0.5} half) and must be finite and positive; the command clamps it to the protocol's usable range.
+ *
  * @param name the NPC's canonical, server-unique name
  * @param location where the NPC stands and which way it faces
  * @param skin the fake player's skin, or {@code null} for the default skin
@@ -54,6 +60,8 @@ import org.jspecify.annotations.Nullable;
  * @param glowColor the glow outline colour name, or {@code null} for the default white outline
  * @param actions the ordered list of typed actions a click runs, after the single click command
  * @param entityType the uppercase Bukkit {@code EntityType} name the NPC renders as ({@code "PLAYER"} by default)
+ * @param pose the uppercase pose name the NPC is frozen in ({@code "STANDING"} by default)
+ * @param scale the NPC's size multiplier ({@code 1.0} is the natural size); finite and positive
  * @param createdAt when the NPC was first created (preserved across a move, re-skin, or rebind)
  */
 public record Npc(
@@ -67,10 +75,18 @@ public record Npc(
         @Nullable String glowColor,
         List<NpcAction> actions,
         String entityType,
+        String pose,
+        double scale,
         Instant createdAt) {
 
     /** The default entity type: a fake player, the one type with the tab-entry + skin path. */
     public static final String DEFAULT_ENTITY_TYPE = "PLAYER";
+
+    /** The default body pose: the natural upright stance. */
+    public static final String DEFAULT_POSE = "STANDING";
+
+    /** The default size multiplier: the NPC's natural size. */
+    public static final double DEFAULT_SCALE = 1.0;
 
     public Npc {
         Objects.requireNonNull(name, "name");
@@ -79,12 +95,26 @@ public record Npc(
         equipment = copyEquipment(equipment);
         actions = List.copyOf(Objects.requireNonNull(actions, "actions"));
         entityType = normalizeType(entityType);
+        pose = normalizePose(pose);
+        scale = validateScale(scale);
     }
 
     /** A new NPC created now at {@code location} with the given (possibly {@code null}) skin, no command, looking. */
     public static Npc create(NpcName name, Position location, @Nullable NpcSkin skin, Instant createdAt) {
         return new Npc(
-                name, location, skin, null, true, Map.of(), false, null, List.of(), DEFAULT_ENTITY_TYPE, createdAt);
+                name,
+                location,
+                skin,
+                null,
+                true,
+                Map.of(),
+                false,
+                null,
+                List.of(),
+                DEFAULT_ENTITY_TYPE,
+                DEFAULT_POSE,
+                DEFAULT_SCALE,
+                createdAt);
     }
 
     /** A copy re-anchored to {@code newLocation}, keeping everything else. */
@@ -101,6 +131,8 @@ public record Npc(
                 glowColor,
                 actions,
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -117,6 +149,8 @@ public record Npc(
                 glowColor,
                 actions,
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -133,6 +167,8 @@ public record Npc(
                 glowColor,
                 actions,
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -149,6 +185,8 @@ public record Npc(
                 glowColor,
                 actions,
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -169,6 +207,8 @@ public record Npc(
                 glowColor,
                 actions,
                 newEntityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -199,6 +239,8 @@ public record Npc(
                 glowColor,
                 actions,
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -215,6 +257,8 @@ public record Npc(
                 glowColor,
                 actions,
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -232,6 +276,48 @@ public record Npc(
                 color,
                 actions,
                 entityType,
+                pose,
+                scale,
+                createdAt);
+    }
+
+    /**
+     * A copy frozen in {@code newPose} (the pose name, upper-cased and required non-blank), keeping everything else.
+     * Whether the name is one the renderer can strike is the adapter's concern, validated at the command boundary;
+     * an unknown name renders standing rather than failing here.
+     */
+    public Npc withPose(String newPose) {
+        return new Npc(
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                actions,
+                entityType,
+                newPose,
+                scale,
+                createdAt);
+    }
+
+    /** A copy resized to {@code newScale} ({@code 1.0} is the natural size), keeping everything else. */
+    public Npc withScale(double newScale) {
+        return new Npc(
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                actions,
+                entityType,
+                pose,
+                newScale,
                 createdAt);
     }
 
@@ -251,6 +337,8 @@ public record Npc(
                 glowColor,
                 updated,
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -275,6 +363,8 @@ public record Npc(
                 glowColor,
                 updated,
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -291,6 +381,8 @@ public record Npc(
                 glowColor,
                 List.of(),
                 entityType,
+                pose,
+                scale,
                 createdAt);
     }
 
@@ -324,6 +416,16 @@ public record Npc(
         return !actions.isEmpty();
     }
 
+    /** Whether this NPC is frozen in a non-default pose (a default-posed NPC needs no pose packet). */
+    public boolean hasPose() {
+        return !DEFAULT_POSE.equals(pose);
+    }
+
+    /** Whether this NPC is resized (a natural-size NPC needs no scale packet). */
+    public boolean hasScale() {
+        return Double.compare(scale, DEFAULT_SCALE) != 0;
+    }
+
     /** Upper-case the entity-type name and reject a blank one — the type is always a non-blank uppercase name. */
     private static String normalizeType(String entityType) {
         Objects.requireNonNull(entityType, "entityType");
@@ -332,6 +434,24 @@ public record Npc(
             throw new IllegalArgumentException("entityType must not be blank");
         }
         return trimmed.toUpperCase(java.util.Locale.ROOT);
+    }
+
+    /** Upper-case the pose name and reject a blank one — the pose is always a non-blank uppercase name. */
+    private static String normalizePose(String pose) {
+        Objects.requireNonNull(pose, "pose");
+        String trimmed = pose.strip();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("pose must not be blank");
+        }
+        return trimmed.toUpperCase(java.util.Locale.ROOT);
+    }
+
+    /** Reject a non-finite or non-positive scale — the size multiplier is always a finite, positive number. */
+    private static double validateScale(double scale) {
+        if (!Double.isFinite(scale) || scale <= 0.0) {
+            throw new IllegalArgumentException("scale must be finite and positive, was " + scale);
+        }
+        return scale;
     }
 
     /** An immutable, empty-tolerant copy of the equipment map keyed in slot order. */

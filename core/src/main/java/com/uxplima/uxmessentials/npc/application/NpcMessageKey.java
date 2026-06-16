@@ -42,8 +42,10 @@ public enum NpcMessageKey implements MessageKey {
     NPC_GLOW_DISABLED("npc.glow.disabled"),
     NPC_GLOW_SET("npc.glow.set"),
 
-    // entity-type feedback
+    // entity-type / pose / scale feedback
     NPC_TYPE_SET("npc.type.set"),
+    NPC_POSE_SET("npc.pose.set"),
+    NPC_SCALE_SET("npc.scale.set"),
 
     // listing
     NPC_LIST_HEADER("npc.list.header"),
@@ -66,6 +68,8 @@ public enum NpcMessageKey implements MessageKey {
     NPC_INVALID_MATERIAL("npc.invalid-material"),
     NPC_INVALID_COLOR("npc.invalid-color"),
     NPC_INVALID_ENTITY_TYPE("npc.invalid-entity-type"),
+    NPC_INVALID_POSE("npc.invalid-pose"),
+    NPC_INVALID_SCALE("npc.invalid-scale"),
     NPC_SKIN_ONLY_PLAYER("npc.skin-only-player"),
     NPC_INVALID_TRIGGER("npc.invalid-trigger"),
     NPC_INVALID_ACTION_TYPE("npc.invalid-action-type"),

@@ -300,6 +300,66 @@ class JooqNpcRepositoryTest {
     }
 
     @Test
+    void defaultsPoseAndScaleForACreatedNpc() {
+        repository.save(
+                Npc.create(NpcName.of("plain"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
+
+        Npc loaded = repository.find(NpcName.of("plain")).orElseThrow();
+        assertThat(loaded.pose()).isEqualTo("STANDING");
+        assertThat(loaded.scale()).isEqualTo(1.0);
+    }
+
+    @Test
+    void roundTripsANonDefaultPoseAndScale() {
+        repository.save(
+                Npc.create(NpcName.of("statue"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                        .withPose("SITTING")
+                        .withScale(2.5));
+
+        Npc loaded = repository.find(NpcName.of("statue")).orElseThrow();
+
+        assertThat(loaded.pose()).isEqualTo("SITTING");
+        assertThat(loaded.scale()).isEqualTo(2.5f); // REAL storage round-trips through a float
+        // An upsert to a new pose/scale overwrites the stored value in place (the name-key upsert path).
+        repository.save(loaded.withPose("SLEEPING").withScale(0.5));
+        Npc reloaded = repository.find(NpcName.of("statue")).orElseThrow();
+        assertThat(reloaded.pose()).isEqualTo("SLEEPING");
+        assertThat(reloaded.scale()).isEqualTo(0.5f);
+    }
+
+    @Test
+    void readsTheV46DefaultsForALegacyRowWithoutPoseOrScaleSet() {
+        // Simulate an NPC stored before V46: the row is inserted without the pose/scale columns, so the V46
+        // NOT NULL DEFAULTs (STANDING / 1.0) must apply and the mapper must read them back correctly. The data
+        // source runs with auto-commit off, so the seed insert is wrapped in a transaction to commit before the read.
+        com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
+                com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
+        persistence.dsl().transaction(cfg -> org.jooq
+                .impl
+                .DSL
+                .using(cfg)
+                .insertInto(npc)
+                .set(npc.NAME, "ancient")
+                .set(npc.WORLD, WORLD.uid().toString())
+                .set(npc.WORLD_NAME, WORLD.name())
+                .set(npc.X, 0.0)
+                .set(npc.Y, 64.0)
+                .set(npc.Z, 0.0)
+                .set(npc.YAW, 0.0f)
+                .set(npc.PITCH, 0.0f)
+                .set(npc.LOOK_AT_PLAYER, (short) 1)
+                .set(npc.GLOWING, (short) 0)
+                .set(npc.ENTITY_TYPE, "PLAYER")
+                .set(npc.CREATED_AT, 1_000L)
+                .execute());
+
+        Npc loaded = repository.find(NpcName.of("ancient")).orElseThrow();
+
+        assertThat(loaded.pose()).isEqualTo("STANDING");
+        assertThat(loaded.scale()).isEqualTo(1.0f);
+    }
+
+    @Test
     void defaultsLookAtPlayerToTrueForACreatedNpc() {
         repository.save(
                 Npc.create(NpcName.of("plain"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));

@@ -38,6 +38,8 @@ import com.uxplima.uxmessentials.npc.application.SetNpcEntityType;
 import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
+import com.uxplima.uxmessentials.npc.application.SetNpcPose;
+import com.uxplima.uxmessentials.npc.application.SetNpcScale;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
@@ -140,6 +142,8 @@ public final class NpcWiring {
                 new SetNpcLookAtPlayer(repository, renderer, notifier),
                 new SetNpcEquipment(repository, renderer, notifier),
                 new SetNpcGlowing(repository, renderer, notifier),
+                new SetNpcPose(repository, renderer, notifier),
+                new SetNpcScale(repository, renderer, notifier),
                 new AddNpcAction(repository, notifier),
                 new ListNpcActions(repository, notifier),
                 new RemoveNpcAction(repository, notifier),

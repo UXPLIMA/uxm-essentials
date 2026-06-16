@@ -236,6 +236,93 @@ class NpcTest {
         assertThat(npc.withGlowing(true).actions()).containsExactly(action);
         assertThat(npc.withGlowColor("RED").actions()).containsExactly(action);
         assertThat(npc.withEntityType("VILLAGER").actions()).containsExactly(action);
+        assertThat(npc.withPose("SITTING").actions()).containsExactly(action);
+        assertThat(npc.withScale(2.0).actions()).containsExactly(action);
+    }
+
+    @Test
+    void createsWithTheDefaultPoseAndScale() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        assertThat(npc.pose()).isEqualTo("STANDING");
+        assertThat(npc.hasPose()).isFalse();
+        assertThat(npc.scale()).isEqualTo(1.0);
+        assertThat(npc.hasScale()).isFalse();
+    }
+
+    @Test
+    void withPoseUpperCasesAndKeepsEverythingElse() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
+                .withClickCommand("spawn")
+                .withPose("sitting");
+
+        assertThat(npc.pose()).isEqualTo("SITTING");
+        assertThat(npc.hasPose()).isTrue();
+        assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+        assertThat(npc.clickCommand()).isEqualTo("spawn");
+    }
+
+    @Test
+    void withScaleResizesAndKeepsEverythingElse() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
+                .withClickCommand("spawn")
+                .withScale(2.5);
+
+        assertThat(npc.scale()).isEqualTo(2.5);
+        assertThat(npc.hasScale()).isTrue();
+        assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+        assertThat(npc.clickCommand()).isEqualTo("spawn");
+    }
+
+    @Test
+    void rejectsABlankPoseAtConstruction() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> Npc.create(NpcName.of("guide"), AT, null, CREATED).withPose(" "))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> Npc.create(NpcName.of("guide"), AT, null, CREATED).withPose(""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsANonFiniteOrNonPositiveScale() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withScale(0.0))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withScale(-1.0))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withScale(Double.NaN))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withScale(Double.POSITIVE_INFINITY))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void everyTransitionPreservesPoseAndScale() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
+                .withPose("SITTING")
+                .withScale(2.5);
+        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+
+        assertThat(npc.movedTo(ELSEWHERE).pose()).isEqualTo("SITTING");
+        assertThat(npc.movedTo(ELSEWHERE).scale()).isEqualTo(2.5);
+        assertThat(npc.withSkin(NpcSkin.unsigned("tex")).pose()).isEqualTo("SITTING");
+        assertThat(npc.withSkin(NpcSkin.unsigned("tex")).scale()).isEqualTo(2.5);
+        assertThat(npc.withClickCommand("spawn").pose()).isEqualTo("SITTING");
+        assertThat(npc.withLookAtPlayer(false).scale()).isEqualTo(2.5);
+        assertThat(npc.withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET").pose())
+                .isEqualTo("SITTING");
+        assertThat(npc.withGlowing(true).scale()).isEqualTo(2.5);
+        assertThat(npc.withGlowColor("RED").pose()).isEqualTo("SITTING");
+        assertThat(npc.withEntityType("VILLAGER").scale()).isEqualTo(2.5);
+        assertThat(npc.withActionAdded(action).pose()).isEqualTo("SITTING");
+        Npc withTwo = npc.withActionAdded(action).withActionAdded(action);
+        assertThat(withTwo.withActionRemovedAt(0).scale()).isEqualTo(2.5);
+        assertThat(withTwo.withActionsCleared().pose()).isEqualTo("SITTING");
+        // The pose/scale transitions preserve each other.
+        assertThat(npc.withScale(3.0).pose()).isEqualTo("SITTING");
+        assertThat(npc.withPose("SLEEPING").scale()).isEqualTo(2.5);
     }
 
     @Test
@@ -285,6 +372,8 @@ class NpcTest {
         assertThat(npc.withGlowing(true).entityType()).isEqualTo("ZOMBIE");
         assertThat(npc.withGlowColor("RED").entityType()).isEqualTo("ZOMBIE");
         assertThat(npc.withActionAdded(action).entityType()).isEqualTo("ZOMBIE");
+        assertThat(npc.withPose("SITTING").entityType()).isEqualTo("ZOMBIE");
+        assertThat(npc.withScale(2.0).entityType()).isEqualTo("ZOMBIE");
         Npc withTwo = npc.withActionAdded(action).withActionAdded(action);
         assertThat(withTwo.withActionRemovedAt(0).entityType()).isEqualTo("ZOMBIE");
         assertThat(withTwo.withActionsCleared().entityType()).isEqualTo("ZOMBIE");

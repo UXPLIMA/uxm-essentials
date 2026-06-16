@@ -163,6 +163,8 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
                 .set(NPC.GLOWING, record.getGlowing())
                 .set(NPC.GLOW_COLOR, record.getGlowColor())
                 .set(NPC.ENTITY_TYPE, record.getEntityType())
+                .set(NPC.POSE, record.getPose())
+                .set(NPC.SCALE, record.getScale())
                 .set(NPC.CREATED_AT, record.getCreatedAt())
                 .execute();
     }

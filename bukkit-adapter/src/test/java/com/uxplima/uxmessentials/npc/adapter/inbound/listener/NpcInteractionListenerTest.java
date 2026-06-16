@@ -324,6 +324,16 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object pose(int entityId, com.uxplima.uxmlib.packet.npc.NpcPose pose) {
+            return new Object();
+        }
+
+        @Override
+        public Object scale(int entityId, double scale) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }

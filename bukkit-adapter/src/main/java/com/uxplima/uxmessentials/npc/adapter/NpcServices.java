@@ -15,6 +15,8 @@ import com.uxplima.uxmessentials.npc.application.SetNpcEntityType;
 import com.uxplima.uxmessentials.npc.application.SetNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.SetNpcGlowing;
 import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
+import com.uxplima.uxmessentials.npc.application.SetNpcPose;
+import com.uxplima.uxmessentials.npc.application.SetNpcScale;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,6 +36,8 @@ import org.jspecify.annotations.NullMarked;
  * @param look {@code /npc lookatplayer}
  * @param equip {@code /npc equip}
  * @param glow {@code /npc glow}
+ * @param pose {@code /npc pose}
+ * @param scale {@code /npc scale}
  * @param addAction {@code /npc action add}
  * @param listActions {@code /npc action list}
  * @param removeAction {@code /npc action remove}
@@ -51,6 +55,8 @@ public record NpcServices(
         SetNpcLookAtPlayer look,
         SetNpcEquipment equip,
         SetNpcGlowing glow,
+        SetNpcPose pose,
+        SetNpcScale scale,
         AddNpcAction addAction,
         ListNpcActions listActions,
         RemoveNpcAction removeAction,
@@ -67,6 +73,8 @@ public record NpcServices(
         Objects.requireNonNull(look, "look");
         Objects.requireNonNull(equip, "equip");
         Objects.requireNonNull(glow, "glow");
+        Objects.requireNonNull(pose, "pose");
+        Objects.requireNonNull(scale, "scale");
         Objects.requireNonNull(addAction, "addAction");
         Objects.requireNonNull(listActions, "listActions");
         Objects.requireNonNull(removeAction, "removeAction");
