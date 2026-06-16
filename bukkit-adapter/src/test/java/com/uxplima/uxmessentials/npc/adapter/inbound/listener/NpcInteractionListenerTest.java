@@ -404,6 +404,16 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object catVariant(int entityId, String name) {
+            return new Object();
+        }
+
+        @Override
+        public Object frogVariant(int entityId, String name) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }

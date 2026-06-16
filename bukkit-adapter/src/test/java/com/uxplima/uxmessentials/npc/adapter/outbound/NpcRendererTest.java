@@ -507,6 +507,64 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesCatVariantToACatNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("CAT").withTypeData("cat_variant", "calico"));
+
+        // The cat variant resolves by name; the recording fake stands in for the live-registry holder.
+        assertThat(packets.catVariants).hasSize(1);
+        assertThat(packets.catVariants.get(0).name()).isEqualTo("calico");
+    }
+
+    @Test
+    void appliesFrogVariantToAFrogNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("FROG").withTypeData("frog_variant", "warm"));
+
+        assertThat(packets.frogVariants).hasSize(1);
+        assertThat(packets.frogVariants.get(0).name()).isEqualTo("warm");
+    }
+
+    @Test
+    void doesNotSendACatVariantToAFrogNorAFrogVariantToACat() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // Each name variant reaches only its own type; the cross pair is skipped, the spawn still goes out.
+        assertThatCode(() -> renderer.render(npcAt(viewer, 1.0)
+                        .withEntityType("FROG")
+                        .withTypeData("cat_variant", "calico")
+                        .withTypeData("frog_variant", "warm")))
+                .doesNotThrowAnyException();
+
+        assertThat(packets.catVariants).isEmpty(); // a cat variant never reaches a frog
+        assertThat(packets.frogVariants).hasSize(1); // the frog's own variant does
+        assertThat(packets.spawnEntities).hasSize(1);
+    }
+
+    @Test
+    void dropsANameVariantPacketWhenTheLibCannotResolveTheHolder() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+        packets.dropNameVariants = true; // mimic the live registry being unavailable / the name unresolved
+
+        // A null packet from the lib (its fail-soft signal) is dropped, never sent — the spawn still succeeds.
+        assertThatCode(() ->
+                        renderer.render(npcAt(viewer, 1.0).withEntityType("CAT").withTypeData("cat_variant", "calico")))
+                .doesNotThrowAnyException();
+
+        // The build was attempted (the name reached the right type) but its null result was not sent on.
+        assertThat(packets.catVariants).hasSize(1);
+        assertThat(packets.sentTo(viewer.getUniqueId(), RecordingNpcPackets.CatVariant.class))
+                .isEmpty();
+        assertThat(packets.spawnEntities).hasSize(1);
+    }
+
+    @Test
     void doesNotSendAVariantToTheWrongTypeFailSoft() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -940,6 +998,10 @@ class NpcRendererTest {
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
         private final List<RabbitType> rabbitTypes = new ArrayList<>();
+        private final List<CatVariant> catVariants = new ArrayList<>();
+        private final List<FrogVariant> frogVariants = new ArrayList<>();
+        // When set, catVariant/frogVariant return null to mimic the lib's fail-soft signal (registry not resolved).
+        private boolean dropNameVariants;
         private final List<Sent> sent = new ArrayList<>();
 
         @Override
@@ -1135,6 +1197,22 @@ class NpcRendererTest {
         }
 
         @Override
+        public @Nullable Object catVariant(int entityId, String name) {
+            CatVariant packet = new CatVariant(entityId, name);
+            catVariants.add(packet);
+            // The real lib resolves a holder off the live registry and returns null when it cannot; mimic the
+            // resolved case by default, and the dropped case when the test asks for it.
+            return dropNameVariants ? null : packet;
+        }
+
+        @Override
+        public @Nullable Object frogVariant(int entityId, String name) {
+            FrogVariant packet = new FrogVariant(entityId, name);
+            frogVariants.add(packet);
+            return dropNameVariants ? null : packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -1237,6 +1315,10 @@ class NpcRendererTest {
         private record FoxType(int entityId, int type) {}
 
         private record RabbitType(int entityId, int type) {}
+
+        private record CatVariant(int entityId, String name) {}
+
+        private record FrogVariant(int entityId, String name) {}
 
         private record VillagerData(int entityId, String type, String profession, int level) {}
 

@@ -46,9 +46,26 @@ final class NpcDataCommands extends NpcCommandSupport {
             "parrot_variant",
             "axolotl_variant",
             "fox_type",
-            "rabbit_type");
+            "rabbit_type",
+            "cat_variant",
+            "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
     private static final List<String> BOOLEAN_VALUES = List.of("true", "false");
+    /** The cat-variant names, offered as tab completions for {@code cat_variant}. */
+    private static final List<String> CAT_VARIANT_VALUES = List.of(
+            "tabby",
+            "black",
+            "red",
+            "siamese",
+            "british_shorthair",
+            "calico",
+            "persian",
+            "ragdoll",
+            "white",
+            "jellie",
+            "all_black");
+    /** The frog-variant names, offered as tab completions for {@code frog_variant}. */
+    private static final List<String> FROG_VARIANT_VALUES = List.of("temperate", "warm", "cold");
 
     NpcDataCommands(NpcServices services, Messages messages) {
         super(services, messages);
@@ -117,13 +134,15 @@ final class NpcDataCommands extends NpcCommandSupport {
         return suggest(builder, DATA_KEYS);
     }
 
-    /** Suggest the boolean values for a {@code baby}/{@code charged} key; other keys take a free value. */
+    /** Suggest the values for a key whose set is fixed ({@code baby}/{@code charged}, cat/frog); others take a free value. */
     private CompletableFuture<Suggestions> suggestDataValues(
             CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
         String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
-        if (key.equals("baby") || key.equals("charged")) {
-            return suggest(builder, BOOLEAN_VALUES);
-        }
-        return builder.buildFuture();
+        return switch (key) {
+            case "baby", "charged" -> suggest(builder, BOOLEAN_VALUES);
+            case "cat_variant" -> suggest(builder, CAT_VARIANT_VALUES);
+            case "frog_variant" -> suggest(builder, FROG_VARIANT_VALUES);
+            default -> builder.buildFuture();
+        };
     }
 }

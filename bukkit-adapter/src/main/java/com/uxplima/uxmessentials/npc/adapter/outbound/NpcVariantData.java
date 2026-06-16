@@ -24,7 +24,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Most variants are a bounded integer on one type, so a small {@link IntVariant} table drives them uniformly.
  * Two are special: the horse packs a colour and a marking into one packet (so the two keys collapse), and the
- * sheep colour accepts a {@link DyeColor} name as well as the raw 0–15 wool id.
+ * sheep colour accepts a {@link DyeColor} name as well as the raw 0–15 wool id. The by-name dynamic-registry
+ * variants (cat, frog) live in {@link NpcNameVariantData}; this class delegates the known-key, validity, and apply
+ * paths to it so the two stay under the size limit.
  */
 @NullMarked
 final class NpcVariantData {
@@ -72,6 +74,7 @@ final class NpcVariantData {
         for (IntVariant variant : INT_VARIANTS) {
             applyIntVariant(packets, viewer, id, type, data, npc, log, variant);
         }
+        NpcNameVariantData.apply(packets, viewer, id, type, data, npc, log);
     }
 
     private static void applyHorse(
@@ -156,7 +159,7 @@ final class NpcVariantData {
 
     /** Whether {@code key} is one of the variant keys this class applies — the set the command validates against. */
     static boolean isKnownKey(String key) {
-        return KEYS.contains(key.toLowerCase(Locale.ROOT));
+        return KEYS.contains(key.toLowerCase(Locale.ROOT)) || NpcNameVariantData.isKnownKey(key);
     }
 
     /**
@@ -174,6 +177,9 @@ final class NpcVariantData {
                 yield parsed != null && isRabbitType(parsed);
             }
             default -> {
+                if (NpcNameVariantData.isKnownKey(lower)) {
+                    yield NpcNameVariantData.isValidValue(lower, value);
+                }
                 IntVariant variant = byKey(lower);
                 yield variant != null && isInRange(value, variant.max());
             }
