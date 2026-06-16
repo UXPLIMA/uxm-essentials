@@ -8,6 +8,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
@@ -15,14 +17,23 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
 
 /**
- * A Caffeine read-cache decorator over a delegate {@link HologramRepository}. Holograms are server-wide and
- * the full set is small and read on enable (spawn-on-enable), on {@code /hologram list}, and on every edit,
- * so the cache holds the <em>whole</em> hologram set under one sentinel key (an ordered name → hologram map)
- * rather than caching each name separately. A write to any hologram invalidates that one entry, so the next
- * read reloads the full set — write-through at the delegate, invalidate here, never a write-back cache that
- * could lose a mutation. The durable source of truth is always the delegate.
+ * An in-memory-authoritative decorator over a delegate {@link HologramRepository}. Holograms are server-wide
+ * and the full set is small; it is loaded once — the renderer's spawn-on-enable reads {@link #all()} — and
+ * thereafter the loaded set is the authoritative answer for {@code find}/{@code exists}/{@code all}: a name not
+ * in the set is absent rather than a trigger to re-query the database. This matters most for the refresh tick,
+ * which reads {@code all()} once a second on the global tick thread; re-querying SQLite there on a miss (after a
+ * TTL expiry or an edit's invalidation) would block that thread. Serving from the loaded set keeps both the
+ * refresh tick and the {@code /hologram} command checks off the database after the one warm load.
  *
- * <p>The MANUAL-visibility viewer set is cached the same way, but keyed by hologram name in a second cache: it
+ * <p>Every hologram mutation goes through this repository, so the in-memory set stays complete: a {@code save}
+ * writes through to the delegate then publishes a new set with the hologram added, and a {@code delete} writes
+ * through then publishes one with it removed — write-through at the delegate, applied here, never a reload and
+ * never a write-back cache that could lose a mutation. The set is held in an {@link AtomicReference} and swapped
+ * copy-on-write (the set is tiny and edits are rare operator commands), so a reader on the tick thread always
+ * sees a consistent immutable snapshot while a writer publishes the next one. The durable source of truth is
+ * always the delegate; the set is rebuilt on the next load after an {@link #invalidateAll()} (a module reload).
+ *
+ * <p>The MANUAL-visibility viewer set is cached separately, keyed by hologram name in a Caffeine read-cache: it
  * is read on every render (so a refreshing MANUAL hologram queries it each refresh tick) and on every join, yet
  * mutated only on {@code /hologram show|hide} — exactly the small, hot-read, rare-write shape a read cache is
  * for. A {@code showTo}/{@code hideFrom}/{@code delete} writes through the delegate then invalidates that name,
@@ -32,13 +43,13 @@ import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
  */
 public final class CachedHologramRepository implements HologramRepository {
 
-    private static final String ALL_KEY = "all";
-    private static final long SINGLE_ENTRY = 1L;
     private static final long MAX_VIEWER_SETS = 512L;
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(10);
 
     private final HologramRepository delegate;
-    private final ReadThroughCache<String, Map<String, Hologram>> cache;
+    /** The loaded name → hologram set, or {@code null} until the first load warms it (lazily or via enable). */
+    private final AtomicReference<Map<String, Hologram>> loaded = new AtomicReference<>();
+
     private final ReadThroughCache<String, Set<UUID>> viewers;
 
     public CachedHologramRepository(HologramRepository delegate) {
@@ -48,7 +59,6 @@ public final class CachedHologramRepository implements HologramRepository {
     public CachedHologramRepository(HologramRepository delegate, Duration ttl) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         Objects.requireNonNull(ttl, "ttl");
-        this.cache = ReadThroughCache.create(key -> loadAll(), SINGLE_ENTRY, ttl);
         this.viewers =
                 ReadThroughCache.create(name -> delegate.manualViewers(HologramName.of(name)), MAX_VIEWER_SETS, ttl);
     }
@@ -56,32 +66,32 @@ public final class CachedHologramRepository implements HologramRepository {
     @Override
     public Optional<Hologram> find(HologramName name) {
         Objects.requireNonNull(name, "name");
-        return Optional.ofNullable(snapshot().get(name.value()));
+        return Optional.ofNullable(index().get(name.value()));
     }
 
     @Override
     public List<Hologram> all() {
-        return List.copyOf(snapshot().values());
+        return List.copyOf(index().values());
     }
 
     @Override
     public boolean exists(HologramName name) {
         Objects.requireNonNull(name, "name");
-        return snapshot().containsKey(name.value());
+        return index().containsKey(name.value());
     }
 
     @Override
     public void save(Hologram hologram) {
         Objects.requireNonNull(hologram, "hologram");
         delegate.save(hologram);
-        cache.invalidate(ALL_KEY);
+        republish(next -> next.put(hologram.name().value(), hologram));
     }
 
     @Override
     public void delete(HologramName name) {
         Objects.requireNonNull(name, "name");
         delegate.delete(name);
-        cache.invalidate(ALL_KEY);
+        republish(next -> next.remove(name.value()));
         viewers.invalidate(name.value());
     }
 
@@ -110,14 +120,40 @@ public final class CachedHologramRepository implements HologramRepository {
         viewers.invalidate(name.value());
     }
 
-    /** Drop the cached sets; call on a module reload. */
+    /** Drop the loaded set and the viewer cache; call on a module reload. */
     public void invalidateAll() {
-        cache.invalidateAll();
+        loaded.set(null);
         viewers.invalidateAll();
     }
 
-    private Map<String, Hologram> snapshot() {
-        return cache.get(ALL_KEY);
+    /**
+     * The authoritative in-memory set, loaded from the delegate on the first access and reused thereafter. The
+     * load is idempotent: a concurrent loser reuses the winner's published set so the next write applies to the
+     * live snapshot rather than being lost to a racing reload.
+     */
+    private Map<String, Hologram> index() {
+        Map<String, Hologram> current = loaded.get();
+        if (current != null) {
+            return current;
+        }
+        Map<String, Hologram> fresh = loadAll();
+        if (loaded.compareAndSet(null, fresh)) {
+            return fresh;
+        }
+        Map<String, Hologram> winner = loaded.get();
+        return winner != null ? winner : fresh;
+    }
+
+    /** Publish a fresh set with {@code edit} applied, retrying if a racing load or write swapped under us. */
+    private void republish(Consumer<Map<String, Hologram>> edit) {
+        while (true) {
+            Map<String, Hologram> current = index();
+            Map<String, Hologram> next = new LinkedHashMap<>(current);
+            edit.accept(next);
+            if (loaded.compareAndSet(current, next)) {
+                return;
+            }
+        }
     }
 
     private Map<String, Hologram> loadAll() {

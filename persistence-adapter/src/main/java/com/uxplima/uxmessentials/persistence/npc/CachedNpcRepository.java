@@ -1,82 +1,109 @@
 package com.uxplima.uxmessentials.persistence.npc;
 
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
-import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
 
 /**
- * A Caffeine read-cache decorator over a delegate {@link NpcRepository}. NPCs are server-wide and the full set
- * is small and read on enable (spawn-on-enable), on {@code /npc list}, on every player join (which NPCs to show
- * the joiner), and on every edit, so the cache holds the <em>whole</em> NPC set under one sentinel key (an
- * ordered name → npc map) rather than caching each name separately. A write to any NPC invalidates that one
- * entry, so the next read reloads the full set — write-through at the delegate, invalidate here, never a
- * write-back cache that could lose a mutation. The durable source of truth is always the delegate.
+ * An in-memory-authoritative decorator over a delegate {@link NpcRepository}. The full NPC set is small and
+ * server-wide, and is loaded once — the renderer's spawn-on-enable reads {@link #all()} — and thereafter the
+ * loaded set is the authoritative answer for {@code find}/{@code exists}/{@code all}: a name not in the set is
+ * absent rather than a trigger to re-query the database. The {@code /npc} use cases run those existence checks on
+ * the command (tick/region) thread, so re-querying SQLite on a miss would block that thread; serving from the
+ * loaded set keeps the lookup off the database entirely after the one warm load.
+ *
+ * <p>Every NPC mutation goes through this repository, so the in-memory set stays complete: a {@code save} writes
+ * through to the delegate then publishes a new set with the NPC added (immediately findable), and a {@code
+ * delete} writes through then publishes one with it removed (immediately absent) — write-through at the delegate,
+ * applied here, never a reload and never a write-back cache that could lose a mutation. The set is held in an
+ * {@link AtomicReference} and swapped copy-on-write (the set is tiny and edits are rare operator commands), so a
+ * reader on a command thread always sees a consistent immutable snapshot while a writer publishes the next one.
+ * The durable source of truth is always the delegate; the set is rebuilt from it on the next load after an
+ * {@link #invalidateAll()} (a module reload), which the next read triggers lazily.
  */
 public final class CachedNpcRepository implements NpcRepository {
 
-    private static final String ALL_KEY = "all";
-    private static final long SINGLE_ENTRY = 1L;
-    private static final Duration DEFAULT_TTL = Duration.ofMinutes(10);
-
     private final NpcRepository delegate;
-    private final ReadThroughCache<String, Map<String, Npc>> cache;
+    /** The loaded name → npc set, or {@code null} until the first load warms it (lazily, or via spawn-on-enable). */
+    private final AtomicReference<Map<String, Npc>> loaded = new AtomicReference<>();
 
     public CachedNpcRepository(NpcRepository delegate) {
-        this(delegate, DEFAULT_TTL);
-    }
-
-    public CachedNpcRepository(NpcRepository delegate, Duration ttl) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
-        Objects.requireNonNull(ttl, "ttl");
-        this.cache = ReadThroughCache.create(key -> loadAll(), SINGLE_ENTRY, ttl);
     }
 
     @Override
     public Optional<Npc> find(NpcName name) {
         Objects.requireNonNull(name, "name");
-        return Optional.ofNullable(snapshot().get(name.value()));
+        return Optional.ofNullable(index().get(name.value()));
     }
 
     @Override
     public List<Npc> all() {
-        return List.copyOf(snapshot().values());
+        return List.copyOf(index().values());
     }
 
     @Override
     public boolean exists(NpcName name) {
         Objects.requireNonNull(name, "name");
-        return snapshot().containsKey(name.value());
+        return index().containsKey(name.value());
     }
 
     @Override
     public void save(Npc npc) {
         Objects.requireNonNull(npc, "npc");
         delegate.save(npc);
-        cache.invalidate(ALL_KEY);
+        republish(next -> next.put(npc.name().value(), npc));
     }
 
     @Override
     public void delete(NpcName name) {
         Objects.requireNonNull(name, "name");
         delegate.delete(name);
-        cache.invalidate(ALL_KEY);
+        republish(next -> next.remove(name.value()));
     }
 
-    /** Drop the cached set; call on a module reload. */
+    /** Drop the loaded set so the next read rebuilds it from the delegate; call on a module reload. */
     public void invalidateAll() {
-        cache.invalidateAll();
+        loaded.set(null);
     }
 
-    private Map<String, Npc> snapshot() {
-        return cache.get(ALL_KEY);
+    /**
+     * The authoritative in-memory set, loaded from the delegate on the first access and reused thereafter. The
+     * load is idempotent: a concurrent loser discards its own snapshot and reads the winner's, so the next write
+     * is applied to the published set rather than lost to a racing reload.
+     */
+    private Map<String, Npc> index() {
+        Map<String, Npc> current = loaded.get();
+        if (current != null) {
+            return current;
+        }
+        Map<String, Npc> fresh = loadAll();
+        if (loaded.compareAndSet(null, fresh)) {
+            return fresh;
+        }
+        // A racing load won; reuse its published set so a later write applies to the live snapshot, not ours.
+        Map<String, Npc> winner = loaded.get();
+        return winner != null ? winner : fresh;
+    }
+
+    /** Publish a fresh set with {@code edit} applied, retrying if a racing load or write swapped under us. */
+    private void republish(Consumer<Map<String, Npc>> edit) {
+        while (true) {
+            Map<String, Npc> current = index();
+            Map<String, Npc> next = new LinkedHashMap<>(current);
+            edit.accept(next);
+            if (loaded.compareAndSet(current, next)) {
+                return;
+            }
+        }
     }
 
     private Map<String, Npc> loadAll() {
