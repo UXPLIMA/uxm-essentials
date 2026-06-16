@@ -19,8 +19,11 @@ import com.uxplima.uxmessentials.tablist.adapter.outbound.BukkitMojangProfileSou
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistRenderTask;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistRenderer;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistSkinResolver;
+import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistSuppression;
 import com.uxplima.uxmlib.hud.Tablist;
 import com.uxplima.uxmlib.npc.ChannelResolver;
+import com.uxplima.uxmlib.npc.PacketListenerRegistry;
+import com.uxplima.uxmlib.npc.PacketPipeline;
 import com.uxplima.uxmlib.npc.PacketSender;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import com.uxplima.uxmlib.packet.tablist.internal.NmsTabListPackets;
@@ -70,13 +73,47 @@ public final class TablistWiring {
         TabListPackets packets = new NmsTabListPackets(new PacketSender(new ChannelResolver()));
         TablistSkinResolver skinResolver =
                 new TablistSkinResolver(new BukkitMojangProfileSource(kernel.log()), kernel.scheduler());
-        TablistRenderer renderer = new TablistRenderer(settings::formats, animations, packets, skinResolver);
+
+        // The opt-in "suppress real players" interception (TAB-C): a pipeline splices a per-viewer interceptor that
+        // rewrites outbound player-info packets to force every non-filler entry unlisted while the viewer's selected
+        // format asks for it. The pipeline owns its own listener registry (namespaced handler) so it never collides
+        // with the nametag/npc packet stacks, and listener faults are logged off the I/O thread through the kernel log.
+        PacketListenerRegistry suppressRegistry = new PacketListenerRegistry();
+        PacketPipeline suppressPipeline = new PacketPipeline(
+                new ChannelResolver(), suppressRegistry, "uxmessentials:tablist-suppress", fault -> kernel.log()
+                        .error("tablist suppress listener fault", fault));
+        TablistSuppression suppression = new TablistSuppression(
+                new ConnectionGate(suppressPipeline),
+                suppressRegistry,
+                packets,
+                Bukkit::getOnlinePlayers,
+                kernel.log());
+        TablistRenderer renderer = new TablistRenderer(
+                settings::formats, animations, packets, skinResolver, Bukkit::getOnlinePlayers, suppression);
         TablistRenderTask renderTask = new TablistRenderTask(
                 kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
 
         List<CommandRegistration> commands = List.of();
         List<Listener> listeners = List.of(new TablistConnectionListener(renderer));
         return new Wired(commands, listeners, renderer, renderTask, running);
+    }
+
+    /** Bridges {@link TablistSuppression}'s connection seam onto uxmLib's {@link PacketPipeline} inject/eject. */
+    private record ConnectionGate(PacketPipeline pipeline) implements TablistSuppression.ConnectionGate {
+
+        private ConnectionGate {
+            Objects.requireNonNull(pipeline, "pipeline");
+        }
+
+        @Override
+        public boolean inject(Player viewer) {
+            return pipeline.inject(viewer);
+        }
+
+        @Override
+        public boolean eject(Player viewer) {
+            return pipeline.eject(viewer);
+        }
     }
 
     /**

@@ -35,6 +35,12 @@ import com.uxplima.uxmessentials.shared.display.DisplayCondition;
  * the adapter paints them per viewer through packets (real players keep the early slots, the fillers fill the rest);
  * {@link TablistLayout#empty() an empty layout} (the default) leaves the tab exactly as it was before fillers existed.
  *
+ * <p>The {@code suppressRealPlayers} flag is the opt-in synthetic-tab switch: when {@code true} the adapter hides the
+ * real players from the viewer's tab list entirely (only this format's filler rows are drawn), delivered by rewriting the
+ * outbound player-info packets to force every non-filler entry unlisted. It defaults to {@code false}, leaving the tab
+ * unchanged — real players show alongside any fillers, the historical behaviour. The flag only makes visual sense with a
+ * filler {@code layout}; with neither layout nor suppression the format is the plain header/footer/name case.
+ *
  * @param name the format name, non-blank (the config map key; used only for operator-facing identification and tie-break)
  * @param condition the per-viewer gate; {@link DisplayCondition#always()} for an unconditional format
  * @param priority the selection rank; higher wins, ties broken by name (see {@link TablistFormatConfig#select})
@@ -43,6 +49,7 @@ import com.uxplima.uxmessentials.shared.display.DisplayCondition;
  * @param sortOrder the per-viewer {@code setPlayerListOrder} value, or empty to leave the vanilla sort order untouched
  * @param skin the custom-skin source, or empty to keep the native list-name/order delivery (the default, no skin)
  * @param layout the fixed-slot filler grid, or {@link TablistLayout#empty()} for no fillers (the default)
+ * @param suppressRealPlayers true to hide real players from the viewer's tab (only fillers drawn); false to leave it
  */
 public record TablistFormat(
         String name,
@@ -52,7 +59,8 @@ public record TablistFormat(
         Optional<String> nameFormat,
         OptionalInt sortOrder,
         Optional<TablistSkinSource> skin,
-        TablistLayout layout) {
+        TablistLayout layout,
+        boolean suppressRealPlayers) {
 
     public TablistFormat {
         Objects.requireNonNull(name, "name");
@@ -67,6 +75,19 @@ public record TablistFormat(
         }
     }
 
+    /** A format with a layout but no real-player suppression — fillers sit alongside the real players (the default). */
+    public TablistFormat(
+            String name,
+            DisplayCondition condition,
+            int priority,
+            TablistContent content,
+            Optional<String> nameFormat,
+            OptionalInt sortOrder,
+            Optional<TablistSkinSource> skin,
+            TablistLayout layout) {
+        this(name, condition, priority, content, nameFormat, sortOrder, skin, layout, false);
+    }
+
     /** A format with a custom skin but no filler layout — the skin path with the native tab grid untouched. */
     public TablistFormat(
             String name,
@@ -76,7 +97,7 @@ public record TablistFormat(
             Optional<String> nameFormat,
             OptionalInt sortOrder,
             Optional<TablistSkinSource> skin) {
-        this(name, condition, priority, content, nameFormat, sortOrder, skin, TablistLayout.empty());
+        this(name, condition, priority, content, nameFormat, sortOrder, skin, TablistLayout.empty(), false);
     }
 
     /** A format with no custom skin and no filler layout — the common case, the native list-name/order delivery. */
@@ -87,6 +108,6 @@ public record TablistFormat(
             TablistContent content,
             Optional<String> nameFormat,
             OptionalInt sortOrder) {
-        this(name, condition, priority, content, nameFormat, sortOrder, Optional.empty(), TablistLayout.empty());
+        this(name, condition, priority, content, nameFormat, sortOrder, Optional.empty(), TablistLayout.empty(), false);
     }
 }

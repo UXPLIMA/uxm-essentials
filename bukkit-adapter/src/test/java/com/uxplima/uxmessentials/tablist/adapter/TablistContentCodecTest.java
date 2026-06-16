@@ -360,6 +360,60 @@ class TablistContentCodecTest {
     }
 
     @Test
+    void suppressRealPlayersDefaultsToFalse(@TempDir Path dir) throws Exception {
+        // The gate is off unless explicitly set, so a format authored without it leaves the tab unchanged.
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  default { condition = "", priority = 0, header = [ "<gold>Welcome" ] }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(select(parsed, n -> true, "world").suppressRealPlayers()).isFalse();
+    }
+
+    @Test
+    void suppressRealPlayersIsTrueWhenSet(@TempDir Path dir) throws Exception {
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  synthetic {
+                    condition = ""
+                    priority = 0
+                    suppress-real-players = true
+                    layout { fillers = [ { slot = 1, text = "<gold>play.example.net" } ] }
+                  }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(select(parsed, n -> true, "world").suppressRealPlayers()).isTrue();
+    }
+
+    @Test
+    void aSuppressOnlyFormatIsKept(@TempDir Path dir) throws Exception {
+        // A format that sets no header/footer, name, order, skin, or layout but DOES suppress real players still alters
+        // the tab, so it must survive the "drop the do-nothing format" filter.
+        ConfigurationNode root = load(
+                dir,
+                """
+                formats {
+                  hide { condition = "", priority = 0, suppress-real-players = true }
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(parsed.formats().formats()).hasSize(1);
+        assertThat(select(parsed, n -> true, "world").suppressRealPlayers()).isTrue();
+    }
+
+    @Test
     void backCompatWrapsTheTopLevelTablistAsOneDefaultFormat(@TempDir Path dir) throws Exception {
         ConfigurationNode root = load(
                 dir,

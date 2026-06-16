@@ -137,15 +137,23 @@ final class TablistContentCodec {
         OptionalInt sortOrder = sortOrder(node.node("sort-order"));
         Optional<TablistSkinSource> skin = skinSource(node.node("skin"));
         TablistLayout layout = layout(node.node("layout"), name, log);
-        // A format that neither shows header/footer nor sets a name, order, skin, nor paints fillers does nothing;
-        // drop.
-        if (content.isBlank() && nameFormat.isEmpty() && sortOrder.isEmpty() && skin.isEmpty() && layout.isEmpty()) {
+        // Default false, so an unauthored or malformed value leaves the tab unchanged (real players show as before).
+        boolean suppressRealPlayers = node.node("suppress-real-players").getBoolean(false);
+        // A format that neither shows header/footer nor sets a name, order, skin, paints fillers, nor suppresses real
+        // players does nothing; drop. A suppress-only format still alters the tab, so it survives.
+        if (content.isBlank()
+                && nameFormat.isEmpty()
+                && sortOrder.isEmpty()
+                && skin.isEmpty()
+                && layout.isEmpty()
+                && !suppressRealPlayers) {
             return Optional.empty();
         }
         DisplayCondition condition =
                 ConditionParser.parse(node.node("condition").getString());
         int priority = node.node("priority").getInt(0);
-        return Optional.of(new TablistFormat(name, condition, priority, content, nameFormat, sortOrder, skin, layout));
+        return Optional.of(new TablistFormat(
+                name, condition, priority, content, nameFormat, sortOrder, skin, layout, suppressRealPlayers));
     }
 
     /**

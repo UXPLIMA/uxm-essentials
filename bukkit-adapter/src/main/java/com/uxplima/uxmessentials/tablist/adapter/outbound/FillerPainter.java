@@ -167,6 +167,23 @@ final class FillerPainter {
         }
     }
 
+    /**
+     * The deterministic ids of the filler cells currently painted for {@code viewer} — the entries a "suppress real
+     * players" mode must keep listed while it hides everything else. An empty set when no fillers are painted. Read on
+     * the viewer's region thread, so the snapshot is taken from the per-viewer tracking without extra synchronisation.
+     */
+    Set<UUID> fillerIdsFor(Player viewer) {
+        Map<Integer, AppliedFiller> painted = appliedFillers.get(viewer.getUniqueId());
+        if (painted == null || painted.isEmpty()) {
+            return Set.of();
+        }
+        Set<UUID> ids = new java.util.HashSet<>(painted.size());
+        for (Integer slot : painted.keySet()) {
+            ids.add(fillerId(viewer.getUniqueId(), slot));
+        }
+        return ids;
+    }
+
     /** Remove every filler entry this painter sent for {@code viewer}, and drop the viewer's filler tracking. */
     void clear(Player viewer) {
         Map<Integer, AppliedFiller> painted = appliedFillers.remove(viewer.getUniqueId());

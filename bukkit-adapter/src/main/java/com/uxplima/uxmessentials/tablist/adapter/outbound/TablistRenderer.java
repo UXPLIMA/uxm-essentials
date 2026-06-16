@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmlib.hud.Tablist;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Renders the per-player tablist from the live {@link TablistFormatConfig}, dogfooding uxmLib's {@link Tablist}. Each
@@ -86,6 +87,14 @@ public final class TablistRenderer {
     /** Paints the fixed-slot {@link TablistLayout filler grid} a selected format may carry; see {@link FillerPainter}. */
     private final FillerPainter fillerPainter;
 
+    /**
+     * The opt-in "suppress real players" mechanism, or {@code null} when the packet-interception pipeline is not wired
+     * (every constructor but the suppression-enabled one). A {@code null} suppression means the {@code suppress-real-
+     * players} flag is inert — the tab is never rewritten — so the gate is default-off and the historical behaviour
+     * stands; this keeps the renderer's many existing call sites unchanged.
+     */
+    private final @Nullable TablistSuppression suppression;
+
     /** Build a renderer with the full packet path. {@code viewers} supplies who a skin packet is broadcast to. */
     public TablistRenderer(
             Supplier<TablistFormatConfig> formats,
@@ -93,6 +102,17 @@ public final class TablistRenderer {
             TabListPackets packets,
             TablistSkinResolver skinResolver,
             Supplier<? extends Collection<? extends Player>> viewers) {
+        this(formats, animations, packets, skinResolver, viewers, null);
+    }
+
+    /** Build a renderer with the full packet path plus the {@code suppression} collaborator driving TAB-C. */
+    public TablistRenderer(
+            Supplier<TablistFormatConfig> formats,
+            AnimationRegistry animations,
+            TabListPackets packets,
+            TablistSkinResolver skinResolver,
+            Supplier<? extends Collection<? extends Player>> viewers,
+            @Nullable TablistSuppression suppression) {
         this.formats = Objects.requireNonNull(formats, "formats");
         this.animations = Objects.requireNonNull(animations, "animations");
         Objects.requireNonNull(packets, "packets");
@@ -101,6 +121,7 @@ public final class TablistRenderer {
         this.tablist = new Tablist();
         this.rowPainter = new RealPlayerRowPainter(packets, skinResolver, this::render, animations::tick, viewers);
         this.fillerPainter = new FillerPainter(packets, skinResolver, this::render);
+        this.suppression = suppression;
     }
 
     /** Build a renderer whose viewers are every online player — the production fan-out. */
@@ -109,7 +130,7 @@ public final class TablistRenderer {
             AnimationRegistry animations,
             TabListPackets packets,
             TablistSkinResolver skinResolver) {
-        this(formats, animations, packets, skinResolver, Bukkit::getOnlinePlayers);
+        this(formats, animations, packets, skinResolver, Bukkit::getOnlinePlayers, null);
     }
 
     /** Render (or clear) {@code player}'s tablist from the selected format. Must run on the player's region thread. */
@@ -133,6 +154,11 @@ public final class TablistRenderer {
         applyHeaderFooter(player, content, tick);
         rowPainter.applyRow(player, format, tick);
         fillerPainter.applyFillers(player, format.layout(), tick);
+        // After the fillers are painted (so the protected-id snapshot is current), reconcile the opt-in suppress mode:
+        // hide the real players from this viewer's tab when the format asks, restore them when it does not.
+        if (suppression != null) {
+            suppression.apply(player, format.suppressRealPlayers(), fillerPainter.fillerIdsFor(player));
+        }
     }
 
     /**
@@ -155,6 +181,10 @@ public final class TablistRenderer {
         appliedHeaderFooter.remove(player.getUniqueId());
         fillerPainter.clear(player);
         rowPainter.resetRow(player);
+        // Take the viewer out of suppress mode and relist the real players so a cleared tab is never left synthetic.
+        if (suppression != null) {
+            suppression.disable(player);
+        }
     }
 
     /** Clear {@code player}'s header/footer and forget their name/order/skin/filler tracking on quit. */
@@ -166,6 +196,10 @@ public final class TablistRenderer {
         // is a no-op, so revert is skipped — only the tracking is forgotten so a relog re-paints from scratch.
         fillerPainter.forget(player);
         rowPainter.forget(player);
+        // Drop the suppress tracking and eject the interceptor without a relist packet to the closing channel.
+        if (suppression != null) {
+            suppression.forget(player);
+        }
     }
 
     /**

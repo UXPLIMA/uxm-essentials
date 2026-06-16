@@ -701,6 +701,65 @@ class TablistRendererTest {
     }
 
     @Test
+    void aSuppressFormatEntersSuppressModeAndASwitchAwayRestoresRealPlayers() {
+        // The renderer drives the TAB-C suppression off the selected format's flag: a suppress=true format enters
+        // suppress mode (inject + relist real players unlisted), and a switch to a non-suppress format restores them.
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        RecordingGate gate = new RecordingGate();
+        TablistSuppression suppression = new TablistSuppression(
+                gate,
+                new com.uxplima.uxmlib.npc.PacketListenerRegistry(),
+                packets,
+                server::getOnlinePlayers,
+                new TestLogger(),
+                (p, s) -> null);
+        AtomicReference<TablistFormatConfig> ref =
+                new AtomicReference<>(new TablistFormatConfig(List.of(suppressFormat("synthetic"))));
+        TablistRenderer renderer = new TablistRenderer(
+                ref::get,
+                new AnimationRegistry(List.of()),
+                packets,
+                new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
+                server::getOnlinePlayers,
+                suppression);
+
+        renderer.renderFor(viewer);
+        assertThat(gate.injected).contains(viewer.getUniqueId());
+
+        // Switch to a plain format with no suppression: the renderer takes the viewer back out of suppress mode.
+        ref.set(new TablistFormatConfig(List.of(format("default", DisplayCondition.always(), 0, "<gold>{player}", 5))));
+        renderer.renderFor(viewer);
+        assertThat(gate.ejected).contains(viewer.getUniqueId());
+    }
+
+    @Test
+    void clearTakesAViewerOutOfSuppressMode() {
+        PlayerMock viewer = server.addPlayer();
+        RecordingPackets packets = new RecordingPackets();
+        RecordingGate gate = new RecordingGate();
+        TablistSuppression suppression = new TablistSuppression(
+                gate,
+                new com.uxplima.uxmlib.npc.PacketListenerRegistry(),
+                packets,
+                server::getOnlinePlayers,
+                new TestLogger(),
+                (p, s) -> null);
+        TablistRenderer renderer = new TablistRenderer(
+                new AtomicReference<>(new TablistFormatConfig(List.of(suppressFormat("synthetic"))))::get,
+                new AnimationRegistry(List.of()),
+                packets,
+                new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
+                server::getOnlinePlayers,
+                suppression);
+
+        renderer.renderFor(viewer);
+        renderer.clear(viewer);
+
+        assertThat(gate.ejected).contains(viewer.getUniqueId());
+    }
+
+    @Test
     void aNoFillerFormatPaintsNoFillerEntriesAndRemovesNothing() {
         PlayerMock viewer = server.addPlayer();
         RecordingPackets packets = new RecordingPackets();
@@ -785,6 +844,11 @@ class TablistRendererTest {
         }
 
         @Override
+        public Object relist(List<UUID> ids, boolean listed) {
+            return new Relist(List.copyOf(ids), listed);
+        }
+
+        @Override
         public void send(org.bukkit.entity.Player viewer, Object packet) {
             sends++;
             sent.add(new Sent(viewer.getUniqueId(), packet));
@@ -815,6 +879,8 @@ class TablistRendererTest {
         private record Sent(UUID viewer, Object packet) {}
 
         private record Removal(List<UUID> ids) {}
+
+        private record Relist(List<UUID> ids, boolean listed) {}
     }
 
     /** A fake profile source: an online map for inline reads, a fetchable map for the "off-thread" fetch. */
@@ -966,6 +1032,55 @@ class TablistRendererTest {
                 OptionalInt.empty(),
                 Optional.empty(),
                 layout);
+    }
+
+    /** A header-only format with {@code suppress-real-players = true} so the TAB-C suppression path is exercised. */
+    private static TablistFormat suppressFormat(String name) {
+        TablistContent content =
+                new TablistContent(List.of("<gold>" + name), List.of(), Duration.ofSeconds(1L), Set.of());
+        return new TablistFormat(
+                name,
+                DisplayCondition.always(),
+                0,
+                content,
+                Optional.empty(),
+                OptionalInt.empty(),
+                Optional.empty(),
+                TablistLayout.empty(),
+                true);
+    }
+
+    /** A connection gate that records which viewers were injected/ejected by the suppression lifecycle. */
+    private static final class RecordingGate implements TablistSuppression.ConnectionGate {
+        private final List<UUID> injected = new ArrayList<>();
+        private final List<UUID> ejected = new ArrayList<>();
+
+        @Override
+        public boolean inject(org.bukkit.entity.Player viewer) {
+            injected.add(viewer.getUniqueId());
+            return true;
+        }
+
+        @Override
+        public boolean eject(org.bukkit.entity.Player viewer) {
+            ejected.add(viewer.getUniqueId());
+            return true;
+        }
+    }
+
+    /** A no-op logger so the renderer's suppression collaborator has somewhere to route a fail-soft fault. */
+    private static final class TestLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static TablistLayout layoutOf(TablistFiller... fillers) {
