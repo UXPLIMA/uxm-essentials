@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.holograms.adapter.outbound;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -193,12 +194,14 @@ public final class HologramRenderer implements HologramView {
     private void applyJoiner(RenderedHologram live, Hologram hologram, Player joiner, Set<UUID> shown, boolean gated) {
         Visibility visibility = hologram.visibility();
         if (gated) {
+            // Showing/hiding the shared entity touches the hologram's own viewer set, so it stays on this
+            // (the hologram's) region thread.
             applyViewer(live, visibility, joiner, shown);
         }
         if (maySee(permissions, visibility, BukkitRefs.toRef(joiner), shown)
                 && textOverrides.hasPerViewerText(hologram)
                 && live.textEntityId() != RenderedHologram.NO_ENTITY) {
-            textOverrides.sendOverride(joiner, live.textEntityId(), hologram);
+            dispatchPerViewerText(scheduler, textOverrides, List.of(joiner), live.textEntityId(), hologram);
         }
     }
 
@@ -243,19 +246,44 @@ public final class HologramRenderer implements HologramView {
         sendPerViewerText(spawned, hologram);
     }
 
-    /** Send each eligible viewer their per-viewer text override over the just-spawned entity (no-op if not PAPI). */
+    /**
+     * Send each eligible viewer their per-viewer text override over the just-spawned entity (no-op if not PAPI).
+     * The eligibility scan runs here on the hologram's region thread (as the visibility scan does), but each
+     * viewer's resolve is hopped onto that viewer's own entity thread: resolving a player-relative placeholder
+     * reads the viewer's live state, which is not safe to read off the hologram's region thread under Folia.
+     */
     private void sendPerViewerText(RenderedHologram spawned, Hologram hologram) {
         if (!textOverrides.hasPerViewerText(hologram) || spawned.textEntityId() == RenderedHologram.NO_ENTITY) {
             return;
         }
-        textOverrides.sendOverrides(eligibleViewers(hologram), spawned.textEntityId(), hologram);
+        dispatchPerViewerText(scheduler, textOverrides, eligibleViewers(hologram), spawned.textEntityId(), hologram);
+    }
+
+    /**
+     * Hop each viewer's per-viewer text resolve onto <em>that viewer's</em> entity thread before resolving and
+     * sending the override. Resolving a player-relative {@code %papi%} token reads the viewer's live entity
+     * state, which under Folia is only safe to touch from the entity's owning thread — never the hologram's
+     * region thread the spawn/refresh runs on, where a viewer may sit in a different region or world. This
+     * mirrors the scoreboard and tablist render loops, which {@code onEntity}-hop per viewer for the same
+     * reason. Pure of any spawn or live-entity read, so the dispatch is unit-testable with a recording
+     * scheduler and fake viewers.
+     */
+    static void dispatchPerViewerText(
+            Scheduler scheduler,
+            HologramTextOverrides textOverrides,
+            List<? extends Player> eligible,
+            int entityId,
+            Hologram hologram) {
+        for (Player viewer : eligible) {
+            scheduler.onEntity(BukkitRefs.toRef(viewer), () -> textOverrides.sendOverride(viewer, entityId, hologram));
+        }
     }
 
     /** The online players who may currently see {@code hologram} under its visibility — the override audience. */
-    private java.util.List<Player> eligibleViewers(Hologram hologram) {
+    private List<Player> eligibleViewers(Hologram hologram) {
         Visibility visibility = hologram.visibility();
         Set<UUID> shown = shownViewersFor(hologram);
-        java.util.List<Player> eligible = new java.util.ArrayList<>();
+        List<Player> eligible = new java.util.ArrayList<>();
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (maySee(permissions, visibility, BukkitRefs.toRef(online), shown)) {
                 eligible.add(online);
