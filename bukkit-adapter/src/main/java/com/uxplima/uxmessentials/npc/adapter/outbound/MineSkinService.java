@@ -8,6 +8,8 @@ import java.util.concurrent.CompletableFuture;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -21,11 +23,13 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The blocking HTTP runs on the {@link Scheduler}'s async pool, never a tick thread; the returned future is
  * completed from there. Every miss — a malformed image URL, a generation error, a rate limit ({@code 429}), a
- * timeout, a response carrying no texture, malformed JSON — completes the future with {@link Optional#empty()}
- * after logging the cause with the URL; the future never completes exceptionally. A bounded Caffeine cache keyed
- * by the image URL holds the result (present or absent) for several hours: a generated texture for a stable URL
- * does not change, so a re-skin of the same image is served from cache rather than re-generated against the
- * rate-limited endpoint.
+ * timeout, a response carrying no texture, malformed JSON, or any unexpected throw from the fetcher or parser —
+ * completes the future with {@link Optional#empty()} after logging the cause with the URL; the future never
+ * completes exceptionally and never stays uncompleted, so the command never hangs on the "generating" line. Two
+ * bounded Caffeine caches keyed by the image URL hold the result: a generated texture is held for several hours
+ * (a stable URL's texture does not change, so a re-skin of the same image is served from cache rather than
+ * re-generated against the rate-limited endpoint), while a miss is held only briefly so a transient outage does
+ * not block that URL for the full positive window once MineSkin recovers.
  *
  * <p>Heavy use of MineSkin wants an API key (a higher rate limit). This wires the unauthenticated public
  * endpoint, which suffices for occasional operator skinning; an operator hitting the rate limit needs an
@@ -45,21 +49,32 @@ public final class MineSkinService {
     /** Longer than the Mojang lookup: generating a fresh texture from an image takes a few seconds. */
     public static final Duration GENERATE_TIMEOUT = Duration.ofSeconds(12L);
 
+    /** Stateless and thread-safe; reused to build the request body without re-instantiating per call. */
+    private static final Gson GSON = new Gson();
+
     private static final long MAX_CACHED_URLS = 256L;
-    private static final Duration CACHE_TTL = Duration.ofHours(12L);
+    /** A generated texture for a stable image URL does not change, so a hit is held for the rest of the day. */
+    private static final Duration POSITIVE_TTL = Duration.ofHours(12L);
+    /** A miss is a transient failure as often as not (a 429/5xx/timeout), so it is held only briefly. */
+    private static final Duration NEGATIVE_TTL = Duration.ofMinutes(5L);
 
     private final Scheduler scheduler;
     private final Logger log;
     private final HttpFetcher fetcher;
-    private final Cache<String, Optional<NpcSkin>> cache;
+    private final Cache<String, Optional<NpcSkin>> positive;
+    private final Cache<String, Optional<NpcSkin>> negative;
 
     public MineSkinService(Scheduler scheduler, Logger log, HttpFetcher fetcher) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.fetcher = Objects.requireNonNull(fetcher, "fetcher");
-        this.cache = Caffeine.newBuilder()
+        this.positive = Caffeine.newBuilder()
                 .maximumSize(MAX_CACHED_URLS)
-                .expireAfterWrite(CACHE_TTL)
+                .expireAfterWrite(POSITIVE_TTL)
+                .build();
+        this.negative = Caffeine.newBuilder()
+                .maximumSize(MAX_CACHED_URLS)
+                .expireAfterWrite(NEGATIVE_TTL)
                 .build();
     }
 
@@ -73,19 +88,42 @@ public final class MineSkinService {
         if (key.isEmpty() || uri(GENERATE_URL_ENDPOINT).isEmpty() || !isUsableImageUrl(key)) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
-        Optional<NpcSkin> cached = cache.getIfPresent(key);
-        if (cached != null) {
-            return CompletableFuture.completedFuture(cached);
+        Optional<NpcSkin> hit = positive.getIfPresent(key);
+        if (hit != null) {
+            return CompletableFuture.completedFuture(hit);
+        }
+        Optional<NpcSkin> miss = negative.getIfPresent(key);
+        if (miss != null) {
+            return CompletableFuture.completedFuture(miss);
         }
         CompletableFuture<Optional<NpcSkin>> result = new CompletableFuture<>();
-        scheduler.async(() -> result.complete(load(key)));
+        // Guarantee the future always completes: a throw from the generate seam (the injected fetcher, gson, the
+        // cache) must not escape the async stage and orphan the future, or the operator hangs on the "generating"
+        // line forever. Any unexpected throw completes the future empty after logging.
+        scheduler.async(() -> {
+            try {
+                result.complete(load(key));
+            } catch (RuntimeException unexpected) {
+                log.error("Unexpected failure generating MineSkin skin for image URL " + key, unexpected);
+                result.complete(Optional.empty());
+            }
+        });
         return result;
     }
 
-    /** The blocking generate POST for an already-validated {@code imageUrl}, caching and returning the outcome. */
+    /**
+     * The blocking generate POST for an already-validated {@code imageUrl}, caching and returning the outcome. A
+     * generated texture is cached long (a stable URL's texture does not change); a miss — an error, a {@code 429}
+     * rate limit, a timeout, a textureless response — is cached only briefly so a transient MineSkin outage does
+     * not block that URL for the full positive TTL, while still absorbing a burst of command retries.
+     */
     private Optional<NpcSkin> load(String imageUrl) {
         Optional<NpcSkin> skin = generate(imageUrl);
-        cache.put(imageUrl, skin);
+        if (skin.isPresent()) {
+            positive.put(imageUrl, skin);
+        } else {
+            negative.put(imageUrl, skin);
+        }
         return skin;
     }
 
@@ -107,14 +145,16 @@ public final class MineSkinService {
         return skin;
     }
 
-    /** The generate-from-URL JSON body: the image URL and a private visibility so the skin is not listed. */
+    /**
+     * The generate-from-URL JSON body: the image URL and a private visibility so the skin is not listed. Built
+     * through gson so the URL — which may carry a quote, a backslash, or a control character — is escaped exactly
+     * as JSON requires and can never break the body or inject a field, rather than relying on hand-rolled escaping.
+     */
     private static String requestBody(String imageUrl) {
-        return "{\"url\":\"" + jsonEscape(imageUrl) + "\",\"visibility\":0}";
-    }
-
-    /** Escape the characters that would break a JSON string literal, so an odd URL cannot malform the body. */
-    private static String jsonEscape(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        JsonObject body = new JsonObject();
+        body.addProperty("url", imageUrl);
+        body.addProperty("visibility", 0);
+        return GSON.toJson(body);
     }
 
     /**

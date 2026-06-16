@@ -10,11 +10,14 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -116,6 +119,55 @@ class MineSkinServiceTest {
         assertThat(fetcher.posts).isEqualTo(1);
     }
 
+    @Test
+    void aThrowingFetcherCompletesTheFutureEmptyRatherThanOrphaningIt() {
+        FakePostFetcher fetcher = new FakePostFetcher();
+        // Model a fetcher that throws an unchecked exception inside the async stage (a faulty/strict seam): the
+        // future must still complete empty, never hang the operator on the "generating" line.
+        fetcher.thrower = new IllegalStateException("boom");
+        MineSkinService service = newService(fetcher);
+
+        CompletableFuture<Optional<NpcSkin>> future = service.fetchFromUrl(IMAGE_URL);
+
+        assertThat(future).isCompleted();
+        assertThat(future).isNotCompletedExceptionally();
+        assertThat(future.join()).isEmpty();
+        assertThat(fetcher.posts).isEqualTo(1);
+    }
+
+    @Test
+    void anIllegalUrlCompletesEmptyWithoutEverPosting() {
+        // A throwing fetcher proves the no-POST guarantee: the validation rejects the spec before the async stage,
+        // so the seam (which would throw if reached) is never touched and the future still completes empty.
+        FakePostFetcher fetcher = new FakePostFetcher();
+        fetcher.thrower = new IllegalStateException("must never be reached");
+        MineSkinService service = newService(fetcher);
+
+        CompletableFuture<Optional<NpcSkin>> future = service.fetchFromUrl("not a url");
+
+        assertThat(future).isCompleted();
+        assertThat(future.join()).isEmpty();
+        assertThat(fetcher.posts).isZero();
+    }
+
+    @Test
+    void theRequestBodyIsValidJsonCarryingTheUrlVerbatim() {
+        FakePostFetcher fetcher = new FakePostFetcher();
+        fetcher.response = Optional.of(GENERATED);
+        MineSkinService service = newService(fetcher);
+        // A real URL with query params and percent-escapes: the body must be parseable JSON whose url field is
+        // the input verbatim and whose visibility is 0 — proving it is built (and escaped) through gson rather
+        // than hand-concatenated, so an awkward URL can never break the body or inject a field.
+        String url = "https://example.com/path/skin%20file.png?a=1&b=two";
+
+        await(service.fetchFromUrl(url));
+
+        JsonObject body = JsonParser.parseString(fetcher.lastBody).getAsJsonObject();
+        assertThat(body.get("url").getAsString()).isEqualTo(url);
+        assertThat(body.get("visibility").getAsInt()).isZero();
+        assertThat(body.size()).isEqualTo(2);
+    }
+
     private static MineSkinService newService(FakePostFetcher fetcher) {
         return new MineSkinService(new ImmediateScheduler(), new NoOpLogger(), fetcher);
     }
@@ -125,9 +177,13 @@ class MineSkinServiceTest {
         return future.join();
     }
 
-    /** A stubbed POST seam: returns the canned response for every POST and records the body of the last one. */
+    /**
+     * A stubbed POST seam: records each POST (count + last body) and returns the canned response, or — when
+     * {@code thrower} is set — throws it, modelling a faulty seam that must not orphan the service's future.
+     */
     private static final class FakePostFetcher implements HttpFetcher {
         private Optional<String> response = Optional.empty();
+        private @Nullable RuntimeException thrower;
         private int posts;
         private String lastBody = "";
 
@@ -140,6 +196,9 @@ class MineSkinServiceTest {
         public Optional<String> post(URI uri, String body) {
             posts++;
             lastBody = body;
+            if (thrower != null) {
+                throw thrower;
+            }
             return response;
         }
     }

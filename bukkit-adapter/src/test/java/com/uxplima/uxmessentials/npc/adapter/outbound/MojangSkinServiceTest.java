@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -106,6 +107,21 @@ class MojangSkinServiceTest {
     }
 
     @Test
+    void aThrowingFetcherCompletesTheFutureEmptyRatherThanOrphaningIt() {
+        FakeFetcher fetcher = new FakeFetcher();
+        // A seam that throws an unchecked exception inside the async stage must not escape and orphan the future,
+        // or the operator hangs on the "fetching" line forever; it must complete empty instead.
+        fetcher.thrower = new IllegalStateException("boom");
+        MojangSkinService service = newService(fetcher);
+
+        CompletableFuture<Optional<NpcSkin>> future = service.fetchByName("Notch");
+
+        assertThat(future).isCompleted();
+        assertThat(future).isNotCompletedExceptionally();
+        assertThat(future.join()).isEmpty();
+    }
+
+    @Test
     void aSecondLookupForTheSameNameIsServedFromCache() {
         FakeFetcher fetcher = new FakeFetcher();
         fetcher.bodies.put(PROFILE_URI, "{\"id\":\"069a79f444e94726a5befca90e38aaf5\",\"name\":\"Notch\"}");
@@ -144,14 +160,21 @@ class MojangSkinServiceTest {
         return future.join();
     }
 
-    /** A stubbed HTTP seam: each URI maps to a canned body, with an absent mapping standing in for a 404. */
+    /**
+     * A stubbed HTTP seam: each URI maps to a canned body, with an absent mapping standing in for a 404. When
+     * {@code thrower} is set, a fetch throws it instead, modelling a faulty seam that must not orphan the future.
+     */
     private static final class FakeFetcher implements HttpFetcher {
         private final Map<String, String> bodies = new HashMap<>();
         private final Map<String, Integer> calls = new HashMap<>();
+        private @Nullable RuntimeException thrower;
 
         @Override
         public Optional<String> get(URI uri) {
             calls.merge(uri.toString(), 1, Integer::sum);
+            if (thrower != null) {
+                throw thrower;
+            }
             return Optional.ofNullable(bodies.get(uri.toString()));
         }
     }

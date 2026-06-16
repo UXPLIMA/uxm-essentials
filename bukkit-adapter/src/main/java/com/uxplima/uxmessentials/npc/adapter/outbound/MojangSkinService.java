@@ -73,7 +73,17 @@ public final class MojangSkinService {
             return CompletableFuture.completedFuture(cached);
         }
         CompletableFuture<Optional<NpcSkin>> result = new CompletableFuture<>();
-        scheduler.async(() -> result.complete(load(key)));
+        // Guarantee the future always completes: a throw from the resolve seam (the injected fetcher, gson, the
+        // cache) must not escape the async stage and orphan the future, or the operator hangs on the "fetching"
+        // line forever. Any unexpected throw completes the future empty after logging.
+        scheduler.async(() -> {
+            try {
+                result.complete(load(key));
+            } catch (RuntimeException unexpected) {
+                log.error("Unexpected failure resolving Mojang skin for username " + key, unexpected);
+                result.complete(Optional.empty());
+            }
+        });
         return result;
     }
 
