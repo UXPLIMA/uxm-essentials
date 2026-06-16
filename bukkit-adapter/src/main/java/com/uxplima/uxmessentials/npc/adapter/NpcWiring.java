@@ -106,7 +106,8 @@ public final class NpcWiring {
         MineSkinService mineSkins = new MineSkinService(
                 kernel.scheduler(),
                 kernel.log(),
-                new HttpClientFetcher(kernel.log(), MineSkinService.GENERATE_TIMEOUT));
+                new HttpClientFetcher(kernel.log(), MineSkinService.GENERATE_TIMEOUT),
+                settings.mineSkinApiKey());
         SkinService skinService = new CompositeSkinService(mojangSkins, mineSkins);
         NpcSkinByName skinByName =
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());

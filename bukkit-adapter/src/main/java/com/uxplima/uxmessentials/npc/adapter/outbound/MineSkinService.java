@@ -8,49 +8,62 @@ import java.util.concurrent.CompletableFuture;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Generates a signed Minecraft skin from a custom image URL through the public MineSkin service, the source for
- * {@code /npc skin <name> url:<image-url>}. It is a single JSON POST: {@code {"url":"<imageUrl>","visibility":0}}
- * to {@link #GENERATE_URL_ENDPOINT}, whose response carries the base64 texture {@code value} and its
- * {@code signature} ({@link MineSkinJson} reads them across the shapes the API has used).
+ * Generates a signed Minecraft skin from a custom image URL through the MineSkin v2 service, the source for
+ * {@code /npc skin <name> url:<image-url>}. The v2 API is queue-based and auth-aware: a {@code POST} to
+ * {@link #GENERATE_V2_ENDPOINT} with {@code {"url":...,"visibility":"unlisted"}} returns the signed texture
+ * inline when generation is immediate, or a job id to poll {@link #QUEUE_V2_ENDPOINT}{@code <jobId>} until it is
+ * ready. An optional API key (config {@code skin.mineskin-api-key}) is sent as an {@code Authorization: Bearer}
+ * header to raise the rate limit; the unauthenticated tier still works for light operator use. The v2 wire flow,
+ * defensive parsing ({@link MineSkinJson}, across the v2 {@code skin.texture.data.*} and the legacy v1
+ * {@code data.texture.*} shapes) and bounded queue-poll / rate-limit backoff live in {@link MineSkinV2}; this
+ * class owns input validation, the async hop, the fail-soft contract, and the URL-keyed cache.
  *
- * <p>The blocking HTTP runs on the {@link Scheduler}'s async pool, never a tick thread; the returned future is
- * completed from there. Every miss — a malformed image URL, a generation error, a rate limit ({@code 429}), a
- * timeout, a response carrying no texture, malformed JSON, or any unexpected throw from the fetcher or parser —
- * completes the future with {@link Optional#empty()} after logging the cause with the URL; the future never
- * completes exceptionally and never stays uncompleted, so the command never hangs on the "generating" line. Two
- * bounded Caffeine caches keyed by the image URL hold the result: a generated texture is held for several hours
- * (a stable URL's texture does not change, so a re-skin of the same image is served from cache rather than
+ * <p>The blocking HTTP and the bounded inter-poll/backoff sleep run on the {@link Scheduler}'s async pool, never a
+ * tick thread; the returned future is completed from there. Every miss — a malformed image URL, a generation
+ * error, a rate limit ({@code 429}) that outlasts the bounded backoff, a queued job not ready within the bounded
+ * polls, a timeout, a response carrying no texture, malformed JSON, or any unexpected throw from the fetcher or
+ * parser — completes the future with {@link Optional#empty()} after logging the cause with the URL; the future
+ * never completes exceptionally and never stays uncompleted, so the command never hangs on the "generating" line.
+ * Two bounded Caffeine caches keyed by the image URL hold the result: a generated texture is held for several
+ * hours (a stable URL's texture does not change, so a re-skin of the same image is served from cache rather than
  * re-generated against the rate-limited endpoint), while a miss is held only briefly so a transient outage does
  * not block that URL for the full positive window once MineSkin recovers.
  *
- * <p>Heavy use of MineSkin wants an API key (a higher rate limit). This wires the unauthenticated public
- * endpoint, which suffices for occasional operator skinning; an operator hitting the rate limit needs an
- * authenticated key wired in — at that point {@link #GENERATE_URL_ENDPOINT} (and an {@code Authorization} header)
- * is the single place to adjust.
+ * <p>Maintainer-verify: the exact v2 endpoints, the {@code visibility} enum, whether a queue submit answers
+ * {@code 200}-with-skin or {@code 202}-with-job, and the JSON paths are read from the documented v2 API (no live
+ * MineSkin in tests). They are kept as the constants below plus one {@link MineSkinJson} parser, so a maintainer
+ * can confirm and adjust them in one place; an API key raises the rate limit.
  */
 @NullMarked
 public final class MineSkinService {
 
-    /**
-     * The documented generate-from-URL endpoint. The classic public endpoint returns the signed texture under
-     * {@code data.texture.{value,signature}} without an API key for light use; the v2 {@code /v2/generate}
-     * endpoint is queue-based. Kept a single constant so a maintainer can repoint it (or move to v2) in one edit.
-     */
-    public static final String GENERATE_URL_ENDPOINT = "https://api.mineskin.org/generate/url";
+    /** The documented v2 generate endpoint: queue generation and return the result (inline or a job to poll). */
+    public static final String GENERATE_V2_ENDPOINT = "https://api.mineskin.org/v2/generate";
+
+    /** The v2 queue-poll base; the job id is appended ({@code .../v2/queue/<jobId>}). */
+    public static final String QUEUE_V2_ENDPOINT = "https://api.mineskin.org/v2/queue/";
+
+    /** v2 visibility is a string (not the v1 int); {@code unlisted} keeps the skin out of the public gallery. */
+    public static final String VISIBILITY = "unlisted";
+
+    /** Bounded queue polls before a queued job is given up as a miss. */
+    public static final int MAX_POLL_ATTEMPTS = 6;
+
+    /** Bounded retries of a {@code 429}-rate-limited generate before failing soft. */
+    public static final int MAX_RATE_LIMIT_RETRIES = 2;
 
     /** Longer than the Mojang lookup: generating a fresh texture from an image takes a few seconds. */
     public static final Duration GENERATE_TIMEOUT = Duration.ofSeconds(12L);
 
-    /** Stateless and thread-safe; reused to build the request body without re-instantiating per call. */
-    private static final Gson GSON = new Gson();
+    /** The default bounded delay between queue polls (and the rate-limit backoff when no {@code Retry-After}). */
+    public static final Duration DEFAULT_POLL_DELAY = Duration.ofMillis(800L);
 
     private static final long MAX_CACHED_URLS = 256L;
     /** A generated texture for a stable image URL does not change, so a hit is held for the rest of the day. */
@@ -60,14 +73,33 @@ public final class MineSkinService {
 
     private final Scheduler scheduler;
     private final Logger log;
-    private final HttpFetcher fetcher;
+    private final MineSkinV2 v2;
     private final Cache<String, Optional<NpcSkin>> positive;
     private final Cache<String, Optional<NpcSkin>> negative;
 
-    public MineSkinService(Scheduler scheduler, Logger log, HttpFetcher fetcher) {
+    /** Wires the v2 flow with the default {@link #DEFAULT_POLL_DELAY}; {@code apiKey} may be blank/null. */
+    public MineSkinService(Scheduler scheduler, Logger log, HttpFetcher fetcher, @Nullable String apiKey) {
+        this(scheduler, log, fetcher, apiKey, DEFAULT_POLL_DELAY);
+    }
+
+    /** Wires the v2 flow with an explicit bounded poll/backoff delay (tests pass {@link Duration#ZERO}). */
+    public MineSkinService(
+            Scheduler scheduler, Logger log, HttpFetcher fetcher, @Nullable String apiKey, Duration pollDelay) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
-        this.fetcher = Objects.requireNonNull(fetcher, "fetcher");
+        Objects.requireNonNull(fetcher, "fetcher");
+        Objects.requireNonNull(pollDelay, "pollDelay");
+        this.v2 = new MineSkinV2(
+                fetcher,
+                log,
+                URI.create(GENERATE_V2_ENDPOINT),
+                QUEUE_V2_ENDPOINT,
+                (apiKey == null || apiKey.isBlank()) ? null : apiKey,
+                VISIBILITY,
+                MAX_POLL_ATTEMPTS,
+                MAX_RATE_LIMIT_RETRIES,
+                pollDelay,
+                MineSkinV2.Sleeper::blocking);
         this.positive = Caffeine.newBuilder()
                 .maximumSize(MAX_CACHED_URLS)
                 .expireAfterWrite(POSITIVE_TTL)
@@ -85,7 +117,7 @@ public final class MineSkinService {
     public CompletableFuture<Optional<NpcSkin>> fetchFromUrl(String imageUrl) {
         Objects.requireNonNull(imageUrl, "imageUrl");
         String key = imageUrl.strip();
-        if (key.isEmpty() || uri(GENERATE_URL_ENDPOINT).isEmpty() || !isUsableImageUrl(key)) {
+        if (key.isEmpty() || !isUsableImageUrl(key)) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
         Optional<NpcSkin> hit = positive.getIfPresent(key);
@@ -112,13 +144,13 @@ public final class MineSkinService {
     }
 
     /**
-     * The blocking generate POST for an already-validated {@code imageUrl}, caching and returning the outcome. A
+     * The blocking v2 generate for an already-validated {@code imageUrl}, caching and returning the outcome. A
      * generated texture is cached long (a stable URL's texture does not change); a miss — an error, a {@code 429}
-     * rate limit, a timeout, a textureless response — is cached only briefly so a transient MineSkin outage does
-     * not block that URL for the full positive TTL, while still absorbing a burst of command retries.
+     * rate limit, a timeout, a textureless response, an exhausted poll — is cached only briefly so a transient
+     * MineSkin outage does not block that URL for the full positive TTL, while still absorbing a burst of retries.
      */
     private Optional<NpcSkin> load(String imageUrl) {
-        Optional<NpcSkin> skin = generate(imageUrl);
+        Optional<NpcSkin> skin = v2.generate(imageUrl);
         if (skin.isPresent()) {
             positive.put(imageUrl, skin);
         } else {
@@ -127,58 +159,21 @@ public final class MineSkinService {
         return skin;
     }
 
-    private Optional<NpcSkin> generate(String imageUrl) {
-        Optional<URI> endpoint = uri(GENERATE_URL_ENDPOINT);
-        if (endpoint.isEmpty()) {
-            log.warn("MineSkin endpoint {} is not a valid URI", GENERATE_URL_ENDPOINT);
-            return Optional.empty();
-        }
-        Optional<String> body = fetcher.post(endpoint.get(), requestBody(imageUrl));
-        if (body.isEmpty()) {
-            log.debug("MineSkin generate for image URL {} returned no body (error, rate limit, or timeout)", imageUrl);
-            return Optional.empty();
-        }
-        Optional<NpcSkin> skin = MineSkinJson.skin(body.get());
-        if (skin.isEmpty()) {
-            log.warn("MineSkin generate response for image URL {} carried no texture value", imageUrl);
-        }
-        return skin;
-    }
-
-    /**
-     * The generate-from-URL JSON body: the image URL and a private visibility so the skin is not listed. Built
-     * through gson so the URL — which may carry a quote, a backslash, or a control character — is escaped exactly
-     * as JSON requires and can never break the body or inject a field, rather than relying on hand-rolled escaping.
-     */
-    private static String requestBody(String imageUrl) {
-        JsonObject body = new JsonObject();
-        body.addProperty("url", imageUrl);
-        body.addProperty("visibility", 0);
-        return GSON.toJson(body);
-    }
-
     /**
      * Whether {@code spec} looks like a fetchable image URL: a syntactically valid http/https URI with a host.
      * A garbage or relative string is rejected as a miss up front, so the rate-limited endpoint is never POSTed a
      * URL it can only reject anyway.
      */
     private static boolean isUsableImageUrl(String spec) {
-        Optional<URI> parsed = uri(spec);
-        if (parsed.isEmpty()) {
+        URI uri;
+        try {
+            uri = URI.create(spec);
+        } catch (IllegalArgumentException malformed) {
             return false;
         }
-        URI uri = parsed.get();
         String scheme = uri.getScheme();
         return uri.getHost() != null
                 && scheme != null
                 && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"));
-    }
-
-    private static Optional<URI> uri(String spec) {
-        try {
-            return Optional.of(URI.create(spec));
-        } catch (IllegalArgumentException malformed) {
-            return Optional.empty();
-        }
     }
 }

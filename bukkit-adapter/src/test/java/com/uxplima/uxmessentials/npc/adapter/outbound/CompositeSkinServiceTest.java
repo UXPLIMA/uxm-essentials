@@ -58,7 +58,8 @@ class CompositeSkinServiceTest {
     private static SkinService composite(FakeFetcher mojang, FakeFetcher mineskin) {
         return new CompositeSkinService(
                 new MojangSkinService(new ImmediateScheduler(), new NoOpLogger(), mojang),
-                new MineSkinService(new ImmediateScheduler(), new NoOpLogger(), mineskin));
+                new MineSkinService(
+                        new ImmediateScheduler(), new NoOpLogger(), mineskin, null, java.time.Duration.ZERO));
     }
 
     private static Optional<NpcSkin> await(CompletableFuture<Optional<NpcSkin>> future) {

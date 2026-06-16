@@ -10,14 +10,16 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Extracts the signed texture value/signature from a MineSkin generate response, isolated here so the
- * {@link MineSkinService} orchestration stays free of gson and the parsing is testable on its own. The public
- * MineSkin API has carried the texture pair under a few shapes across versions — {@code data.texture.value} /
- * {@code data.texture.signature} (the classic generate-from-url response), a top-level {@code texture.value}, and
- * a {@code texture.data.value} nesting — so the texture object is located defensively by walking those candidate
- * paths and the strings are read wherever they sit. Every method is fail-soft: a body that does not parse, or
- * that lacks the texture/value, yields an empty {@link Optional} rather than throwing, because a malformed or
- * partial response is just another "no skin" the service caches as a miss.
+ * Extracts the signed texture value/signature (and a queue job id) from a MineSkin generate response, isolated
+ * here so the {@link MineSkinService} orchestration stays free of gson and the parsing is testable on its own.
+ * The MineSkin API has carried the texture pair under several shapes across versions — {@code data.texture.value}
+ * / {@code data.texture.signature} (the classic v1 generate-from-url response), a top-level {@code texture.value},
+ * a {@code texture.data.value} nesting, and the v2 {@code skin.texture.data.value} (the shape the official v2
+ * client reads) / {@code skin.data.texture.value} — so the texture object is located defensively by walking those
+ * candidate paths and the strings are read wherever they sit. The v2 queue submit can instead return a job
+ * reference; {@link #jobId(String)} reads that id so the service can poll for completion. Every method is
+ * fail-soft: a body that does not parse, or that lacks the texture/value/job, yields an empty {@link Optional}
+ * rather than throwing, because a malformed or partial response is just another "no skin" the service handles.
  *
  * <p>gson is on the server classpath at runtime (the plugin loader provisions it), so this carries no shaded
  * dependency.
@@ -37,10 +39,45 @@ final class MineSkinJson {
     }
 
     /**
-     * Locate the texture object across the response shapes the API has used: {@code data.texture}, a top-level
-     * {@code texture}, or {@code texture.data}. Returns the first object found, or empty when none is present.
+     * The v2 queue job id from a submit/poll response, or empty when the body carries no job reference (it is a
+     * direct skin result, or malformed). Read defensively from {@code job.id}, {@code job.uuid}, or a flat
+     * top-level {@code id}/{@code uuid}, since the exact field is a v2 wire detail a maintainer may need to
+     * confirm against the live API.
+     */
+    static Optional<String> jobId(String body) {
+        Optional<JsonObject> root = object(body);
+        if (root.isEmpty()) {
+            return Optional.empty();
+        }
+        JsonObject job = child(root.get(), "job");
+        JsonObject holder = (job != null) ? job : root.get();
+        String id = string(holder, "id");
+        if (id == null) {
+            id = string(holder, "uuid");
+        }
+        return (id == null || id.isBlank()) ? Optional.empty() : Optional.of(id);
+    }
+
+    /**
+     * Locate the texture object across the response shapes the API has used. The v2 success nests the pair under a
+     * {@code skin} object ({@code skin.texture.data} or {@code skin.data.texture}); the v1 shapes sit at the root
+     * ({@code data.texture}, a top-level {@code texture}, or {@code texture.data}). The {@code skin} wrapper is
+     * unwrapped first, then the same root paths are walked, so a v1-shaped response still resolves. Returns the
+     * first texture object found, or empty when none is present.
      */
     private static Optional<JsonObject> texture(JsonObject root) {
+        JsonObject skin = child(root, "skin");
+        if (skin != null) {
+            Optional<JsonObject> underSkin = textureAtRoot(skin);
+            if (underSkin.isPresent()) {
+                return underSkin;
+            }
+        }
+        return textureAtRoot(root);
+    }
+
+    /** Walk the v1 root paths — {@code data.texture}, a top-level {@code texture}, or {@code texture.data}. */
+    private static Optional<JsonObject> textureAtRoot(JsonObject root) {
         JsonObject data = child(root, "data");
         Optional<JsonObject> underData =
                 (data == null) ? Optional.empty() : Optional.ofNullable(child(data, "texture"));

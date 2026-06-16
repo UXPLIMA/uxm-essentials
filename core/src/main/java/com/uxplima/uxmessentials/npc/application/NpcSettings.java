@@ -20,6 +20,7 @@ public final class NpcSettings {
     private static final double DEFAULT_LOOK_RANGE = 12.0;
     private static final long DEFAULT_LOOK_PERIOD_TICKS = 3;
     private static final long DEFAULT_CLICK_COOLDOWN_MILLIS = 500;
+    private static final String DEFAULT_MINESKIN_API_KEY = "";
 
     private final ConfigStore config;
 
@@ -42,5 +43,16 @@ public final class NpcSettings {
     public Duration clickCooldown() {
         long millis = Math.max(0L, config.getLong("click-cooldown-millis", DEFAULT_CLICK_COOLDOWN_MILLIS));
         return Duration.ofMillis(millis);
+    }
+
+    /**
+     * The optional MineSkin API key used to generate signed skins from an image URL ({@code /npc skin ... url:}).
+     * Empty by default — the unauthenticated public tier works for occasional skinning; a key raises the rate
+     * limit and is sent as an {@code Authorization: Bearer} header. The returned value is stripped, so surrounding
+     * whitespace in the config never reaches the header.
+     */
+    public String mineSkinApiKey() {
+        return config.getString("skin.mineskin-api-key", DEFAULT_MINESKIN_API_KEY)
+                .strip();
     }
 }

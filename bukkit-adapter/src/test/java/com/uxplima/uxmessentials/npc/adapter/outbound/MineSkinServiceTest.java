@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -21,155 +24,236 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit-tests {@link MineSkinService}'s single-POST generate flow, defensive parsing, fail-soft empties and
- * URL-keyed caching against a fake HTTP seam — no live MineSkin call is ever made. The fake records each POST
- * (uri + body) and returns a canned response (or empty, modelling a 429/error/timeout); a deferred scheduler
- * runs the async work synchronously so the returned future is already complete when the test reads it.
+ * Unit-tests {@link MineSkinService}'s MineSkin v2 generate/queue flow, defensive parsing, fail-soft empties and
+ * URL-keyed caching against a fake HTTP seam — no live MineSkin call is ever made. The fake records each call
+ * (count + last body + the {@code Authorization} token it was handed) and returns a scripted sequence of
+ * {@link HttpResponseView}s, so a test can model a {@code 200} inline skin, a {@code 202} queued job followed by
+ * a ready poll, a {@code 429} rate limit, or a transport error. A deferred scheduler runs the async work (and the
+ * bounded inter-poll sleep) synchronously, so the returned future is already complete when the test reads it.
  */
 class MineSkinServiceTest {
 
     private static final String IMAGE_URL = "https://example.com/skin.png";
-    private static final String GENERATED =
+
+    /** A v1-shaped success body (data.texture.*) — proves the v2 service still parses a v1 response. */
+    private static final String V1_GENERATED =
             "{\"data\":{\"texture\":{\"value\":\"Z2VuZXJhdGVk\",\"signature\":\"genSig=\"}}}";
 
+    /** A v2-shaped inline success body (skin.texture.data.*). */
+    private static final String V2_GENERATED =
+            "{\"skin\":{\"texture\":{\"data\":{\"value\":\"djJnZW4=\",\"signature\":\"v2Sig=\"}}}}";
+
+    /** A v2 queue body that defers the texture to a job poll. */
+    private static final String V2_QUEUED = "{\"job\":{\"id\":\"job-77\",\"status\":\"waiting\"}}";
+
+    private static final NpcSkin V1_SKIN = new NpcSkin("Z2VuZXJhdGVk", "genSig=");
+    private static final NpcSkin V2_SKIN = new NpcSkin("djJnZW4=", "v2Sig=");
+
     @Test
-    void generatesASignedSkinFromAnImageUrl() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        fetcher.response = Optional.of(GENERATED);
-        MineSkinService service = newService(fetcher);
+    void generatesASignedSkinFromAnImageUrlViaTheV2InlineResponse() {
+        FakeSeam seam = new FakeSeam();
+        seam.script(HttpResponseView.of(200, V2_GENERATED));
+        MineSkinService service = newService(seam, null);
 
         Optional<NpcSkin> skin = await(service.fetchFromUrl(IMAGE_URL));
 
-        assertThat(skin).contains(new NpcSkin("Z2VuZXJhdGVk", "genSig="));
-        // The image URL is carried in the JSON POST body, not the request line.
-        assertThat(fetcher.lastBody).contains(IMAGE_URL);
-        assertThat(fetcher.posts).isEqualTo(1);
+        assertThat(skin).contains(V2_SKIN);
+        // The image URL is carried in the JSON POST body, and the v2 endpoint is hit.
+        assertThat(seam.lastBody).contains(IMAGE_URL);
+        assertThat(seam.lastPostUri).isEqualTo(MineSkinService.GENERATE_V2_ENDPOINT);
+        assertThat(seam.posts).isEqualTo(1);
     }
 
     @Test
-    void aRateLimitOrErrorResponseYieldsEmpty() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        // An empty seam result models a 429/5xx/timeout — the production fetcher maps all of those to empty.
-        fetcher.response = Optional.empty();
-        MineSkinService service = newService(fetcher);
+    void stillParsesAV1ShapedResponseForBackCompat() {
+        FakeSeam seam = new FakeSeam();
+        seam.script(HttpResponseView.of(200, V1_GENERATED));
+        MineSkinService service = newService(seam, null);
+
+        assertThat(await(service.fetchFromUrl(IMAGE_URL))).contains(V1_SKIN);
+    }
+
+    @Test
+    void aQueuedJobIsPolledUntilTheTextureIsReady() {
+        FakeSeam seam = new FakeSeam();
+        // First the POST returns 202 + a job id, then the GET poll returns the ready skin.
+        seam.script(new HttpResponseView(202, Optional.of(V2_QUEUED), OptionalLong.empty()));
+        seam.scriptGet(HttpResponseView.of(200, V2_GENERATED));
+        MineSkinService service = newService(seam, null);
+
+        assertThat(await(service.fetchFromUrl(IMAGE_URL))).contains(V2_SKIN);
+        assertThat(seam.posts).isEqualTo(1);
+        assertThat(seam.gets).isEqualTo(1);
+        // The poll hit the queue endpoint with the job id appended.
+        assertThat(seam.lastGetUri).contains(MineSkinService.QUEUE_V2_ENDPOINT).contains("job-77");
+    }
+
+    @Test
+    void aQueuedJobStillPendingAcrossEveryAttemptYieldsEmpty() {
+        FakeSeam seam = new FakeSeam();
+        seam.script(new HttpResponseView(202, Optional.of(V2_QUEUED), OptionalLong.empty()));
+        // Every poll re-answers "still queued" (echoes the job, no texture) — the bound must give up, not loop.
+        seam.getDefault = new HttpResponseView(200, Optional.of(V2_QUEUED), OptionalLong.empty());
+        MineSkinService service = newService(seam, null);
 
         assertThat(await(service.fetchFromUrl(IMAGE_URL))).isEmpty();
-        assertThat(fetcher.posts).isEqualTo(1);
+        assertThat(seam.gets).isEqualTo(MineSkinService.MAX_POLL_ATTEMPTS);
     }
 
     @Test
-    void aResponseWithNoTextureYieldsEmpty() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        fetcher.response = Optional.of("{\"data\":{\"id\":7}}");
-        MineSkinService service = newService(fetcher);
+    void aRateLimitedResponseYieldsEmptyWithoutHammering() {
+        FakeSeam seam = new FakeSeam();
+        // 429 every time, with a small Retry-After the bounded backoff honours before giving up.
+        seam.getDefault = new HttpResponseView(429, Optional.of("{\"error\":\"rate_limit\"}"), OptionalLong.of(1));
+        seam.postDefault = new HttpResponseView(429, Optional.of("{\"error\":\"rate_limit\"}"), OptionalLong.of(1));
+        MineSkinService service = newService(seam, null);
+
+        assertThat(await(service.fetchFromUrl(IMAGE_URL))).isEmpty();
+        // At most a bounded number of POST attempts — never an unbounded retry storm.
+        assertThat(seam.posts).isLessThanOrEqualTo(MineSkinService.MAX_RATE_LIMIT_RETRIES + 1);
+    }
+
+    @Test
+    void aTransportErrorYieldsEmpty() {
+        FakeSeam seam = new FakeSeam();
+        seam.postDefault = HttpResponseView.transportError();
+        MineSkinService service = newService(seam, null);
+
+        assertThat(await(service.fetchFromUrl(IMAGE_URL))).isEmpty();
+        assertThat(seam.posts).isEqualTo(1);
+    }
+
+    @Test
+    void aResponseWithNoTextureAndNoJobYieldsEmpty() {
+        FakeSeam seam = new FakeSeam();
+        seam.script(HttpResponseView.of(200, "{\"skin\":{\"id\":7}}"));
+        MineSkinService service = newService(seam, null);
 
         assertThat(await(service.fetchFromUrl(IMAGE_URL))).isEmpty();
     }
 
     @Test
     void malformedJsonYieldsEmpty() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        fetcher.response = Optional.of("not json at all {");
-        MineSkinService service = newService(fetcher);
+        FakeSeam seam = new FakeSeam();
+        seam.script(HttpResponseView.of(200, "not json at all {"));
+        MineSkinService service = newService(seam, null);
 
         assertThat(await(service.fetchFromUrl(IMAGE_URL))).isEmpty();
     }
 
     @Test
-    void aBlankUrlYieldsEmptyWithoutAnyPost() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        MineSkinService service = newService(fetcher);
+    void aBlankUrlYieldsEmptyWithoutAnyCall() {
+        FakeSeam seam = new FakeSeam();
+        MineSkinService service = newService(seam, null);
 
         assertThat(await(service.fetchFromUrl("   "))).isEmpty();
-        assertThat(fetcher.posts).isZero();
+        assertThat(seam.posts).isZero();
     }
 
     @Test
-    void anImageUrlThatIsNotAValidUrlYieldsEmptyWithoutAnyPost() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        MineSkinService service = newService(fetcher);
+    void anImageUrlThatIsNotAValidUrlYieldsEmptyWithoutAnyCall() {
+        FakeSeam seam = new FakeSeam();
+        MineSkinService service = newService(seam, null);
 
-        // A spaced/garbage string is not a usable image URL — reject it as a miss rather than POST it on.
         assertThat(await(service.fetchFromUrl("not a url"))).isEmpty();
-        assertThat(fetcher.posts).isZero();
+        assertThat(seam.posts).isZero();
     }
 
     @Test
     void aSecondGenerateForTheSameUrlIsServedFromCache() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        fetcher.response = Optional.of(GENERATED);
-        MineSkinService service = newService(fetcher);
+        FakeSeam seam = new FakeSeam();
+        seam.script(HttpResponseView.of(200, V2_GENERATED));
+        MineSkinService service = newService(seam, null);
 
         assertThat(await(service.fetchFromUrl(IMAGE_URL))).isPresent();
         assertThat(await(service.fetchFromUrl(IMAGE_URL))).isPresent();
 
-        // A generated texture for a stable URL is cached, so the second call never re-POSTs.
-        assertThat(fetcher.posts).isEqualTo(1);
+        assertThat(seam.posts).isEqualTo(1);
     }
 
     @Test
     void afailedGenerateIsCachedSoItIsNotReGenerated() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        fetcher.response = Optional.empty();
-        MineSkinService service = newService(fetcher);
+        FakeSeam seam = new FakeSeam();
+        seam.postDefault = HttpResponseView.transportError();
+        MineSkinService service = newService(seam, null);
 
         assertThat(await(service.fetchFromUrl(IMAGE_URL))).isEmpty();
         assertThat(await(service.fetchFromUrl(IMAGE_URL))).isEmpty();
 
-        assertThat(fetcher.posts).isEqualTo(1);
+        assertThat(seam.posts).isEqualTo(1);
     }
 
     @Test
-    void aThrowingFetcherCompletesTheFutureEmptyRatherThanOrphaningIt() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        // Model a fetcher that throws an unchecked exception inside the async stage (a faulty/strict seam): the
-        // future must still complete empty, never hang the operator on the "generating" line.
-        fetcher.thrower = new IllegalStateException("boom");
-        MineSkinService service = newService(fetcher);
+    void whenAnApiKeyIsConfiguredItIsSentAsABearerToken() {
+        FakeSeam seam = new FakeSeam();
+        seam.script(HttpResponseView.of(200, V2_GENERATED));
+        MineSkinService service = newService(seam, "secret-key");
+
+        await(service.fetchFromUrl(IMAGE_URL));
+
+        assertThat(seam.lastPostToken).isEqualTo("secret-key");
+    }
+
+    @Test
+    void withoutAnApiKeyNoBearerTokenIsSent() {
+        FakeSeam seam = new FakeSeam();
+        seam.script(HttpResponseView.of(200, V2_GENERATED));
+        MineSkinService service = newService(seam, null);
+
+        await(service.fetchFromUrl(IMAGE_URL));
+
+        assertThat(seam.lastPostToken).isNull();
+    }
+
+    @Test
+    void aThrowingSeamCompletesTheFutureEmptyRatherThanOrphaningIt() {
+        FakeSeam seam = new FakeSeam();
+        seam.thrower = new IllegalStateException("boom");
+        MineSkinService service = newService(seam, null);
 
         CompletableFuture<Optional<NpcSkin>> future = service.fetchFromUrl(IMAGE_URL);
 
         assertThat(future).isCompleted();
         assertThat(future).isNotCompletedExceptionally();
         assertThat(future.join()).isEmpty();
-        assertThat(fetcher.posts).isEqualTo(1);
+        assertThat(seam.posts).isEqualTo(1);
     }
 
     @Test
-    void anIllegalUrlCompletesEmptyWithoutEverPosting() {
-        // A throwing fetcher proves the no-POST guarantee: the validation rejects the spec before the async stage,
-        // so the seam (which would throw if reached) is never touched and the future still completes empty.
-        FakePostFetcher fetcher = new FakePostFetcher();
-        fetcher.thrower = new IllegalStateException("must never be reached");
-        MineSkinService service = newService(fetcher);
+    void anIllegalUrlCompletesEmptyWithoutEverCalling() {
+        FakeSeam seam = new FakeSeam();
+        seam.thrower = new IllegalStateException("must never be reached");
+        MineSkinService service = newService(seam, null);
 
         CompletableFuture<Optional<NpcSkin>> future = service.fetchFromUrl("not a url");
 
         assertThat(future).isCompleted();
         assertThat(future.join()).isEmpty();
-        assertThat(fetcher.posts).isZero();
+        assertThat(seam.posts).isZero();
     }
 
     @Test
-    void theRequestBodyIsValidJsonCarryingTheUrlVerbatim() {
-        FakePostFetcher fetcher = new FakePostFetcher();
-        fetcher.response = Optional.of(GENERATED);
-        MineSkinService service = newService(fetcher);
+    void theRequestBodyIsValidJsonCarryingTheUrlVerbatimAndAStringVisibility() {
+        FakeSeam seam = new FakeSeam();
+        seam.script(HttpResponseView.of(200, V2_GENERATED));
+        MineSkinService service = newService(seam, null);
         // A real URL with query params and percent-escapes: the body must be parseable JSON whose url field is
-        // the input verbatim and whose visibility is 0 — proving it is built (and escaped) through gson rather
-        // than hand-concatenated, so an awkward URL can never break the body or inject a field.
+        // the input verbatim and whose visibility is the v2 string form — proving it is built (and escaped)
+        // through gson rather than hand-concatenated, so an awkward URL can never break the body or inject a field.
         String url = "https://example.com/path/skin%20file.png?a=1&b=two";
 
         await(service.fetchFromUrl(url));
 
-        JsonObject body = JsonParser.parseString(fetcher.lastBody).getAsJsonObject();
+        JsonObject body = JsonParser.parseString(seam.lastBody).getAsJsonObject();
         assertThat(body.get("url").getAsString()).isEqualTo(url);
-        assertThat(body.get("visibility").getAsInt()).isZero();
+        assertThat(body.get("visibility").getAsString()).isEqualTo(MineSkinService.VISIBILITY);
         assertThat(body.size()).isEqualTo(2);
     }
 
-    private static MineSkinService newService(FakePostFetcher fetcher) {
-        return new MineSkinService(new ImmediateScheduler(), new NoOpLogger(), fetcher);
+    private static MineSkinService newService(FakeSeam seam, @Nullable String apiKey) {
+        // Zero inter-poll/backoff delay keeps the queue-poll and rate-limit tests instant; production wires the
+        // real bounded delay.
+        return new MineSkinService(new ImmediateScheduler(), new NoOpLogger(), seam, apiKey, Duration.ZERO);
     }
 
     private static Optional<NpcSkin> await(CompletableFuture<Optional<NpcSkin>> future) {
@@ -178,14 +262,31 @@ class MineSkinServiceTest {
     }
 
     /**
-     * A stubbed POST seam: records each POST (count + last body) and returns the canned response, or — when
-     * {@code thrower} is set — throws it, modelling a faulty seam that must not orphan the service's future.
+     * A scripted HTTP seam over the v2 {@code exchange}/{@code exchangeGet} variants: records each call (count +
+     * last body + last uri + the {@code Authorization} token), and returns the next scripted response for that
+     * verb (falling back to a per-verb default once the script is drained), or — when {@code thrower} is set —
+     * throws it, modelling a faulty seam that must not orphan the service's future.
      */
-    private static final class FakePostFetcher implements HttpFetcher {
-        private Optional<String> response = Optional.empty();
+    private static final class FakeSeam implements HttpFetcher {
+        private final Deque<HttpResponseView> postScript = new ArrayDeque<>();
+        private final Deque<HttpResponseView> getScript = new ArrayDeque<>();
+        private HttpResponseView postDefault = HttpResponseView.transportError();
+        private HttpResponseView getDefault = HttpResponseView.transportError();
         private @Nullable RuntimeException thrower;
         private int posts;
+        private int gets;
         private String lastBody = "";
+        private String lastPostUri = "";
+        private String lastGetUri = "";
+        private @Nullable String lastPostToken;
+
+        void script(HttpResponseView response) {
+            postScript.add(response);
+        }
+
+        void scriptGet(HttpResponseView response) {
+            getScript.add(response);
+        }
 
         @Override
         public Optional<String> get(URI uri) {
@@ -193,13 +294,25 @@ class MineSkinServiceTest {
         }
 
         @Override
-        public Optional<String> post(URI uri, String body) {
+        public HttpResponseView exchange(URI uri, String body, @Nullable String authToken) {
             posts++;
             lastBody = body;
+            lastPostUri = uri.toString();
+            lastPostToken = authToken;
             if (thrower != null) {
                 throw thrower;
             }
-            return response;
+            return postScript.isEmpty() ? postDefault : postScript.poll();
+        }
+
+        @Override
+        public HttpResponseView exchangeGet(URI uri, @Nullable String authToken) {
+            gets++;
+            lastGetUri = uri.toString();
+            if (thrower != null) {
+                throw thrower;
+            }
+            return getScript.isEmpty() ? getDefault : getScript.poll();
         }
     }
 

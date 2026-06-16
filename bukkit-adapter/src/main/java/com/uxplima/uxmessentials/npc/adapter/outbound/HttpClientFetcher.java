@@ -8,19 +8,24 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The production {@link HttpFetcher}: a JDK {@link HttpClient} GET/POST with bounded connect and request
- * timeouts so a remote outage can never hang the caller's thread. A {@code 200} returns its body; any other
- * status, a timeout, or a transport error returns empty so the service treats it as a miss. The blocking
+ * timeouts so a remote outage can never hang the caller's thread. The body-or-empty methods map a {@code 200} to
+ * its body and anything else to empty (the service's miss); the {@code exchange}/{@code exchangeGet} variants
+ * return the full {@link HttpResponseView} (status + body + any {@code Retry-After}) the MineSkin v2 queue flow
+ * branches on. A transport error or timeout yields {@link HttpResponseView#transportError()}. The blocking
  * {@code send} is fine here because the service only ever calls this off the tick thread through the scheduler.
  *
  * <p>The request timeout is per-instance: the Mojang lookup wires a short one (its endpoints answer instantly),
  * the MineSkin generate POST a longer one (generating a fresh texture from an image takes a few seconds). The
- * POST sends its body as {@code application/json}.
+ * POST sends its body as {@code application/json}; a non-blank API key is sent as an {@code Authorization: Bearer}
+ * header.
  *
  * <p>An {@link InterruptedException} restores the thread's interrupt flag before returning empty, so a shutdown
  * that interrupts the async pool is observed rather than swallowed.
@@ -33,6 +38,9 @@ public final class HttpClientFetcher implements HttpFetcher {
     public static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(5L);
 
     private static final String JSON_CONTENT_TYPE = "application/json";
+    private static final String AUTHORIZATION = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String RETRY_AFTER = "Retry-After";
     private static final int HTTP_OK = 200;
 
     private final HttpClient client;
@@ -53,35 +61,80 @@ public final class HttpClientFetcher implements HttpFetcher {
 
     @Override
     public Optional<String> get(URI uri) {
+        return get(uri, null);
+    }
+
+    @Override
+    public Optional<String> get(URI uri, @Nullable String authToken) {
         Objects.requireNonNull(uri, "uri");
-        HttpRequest request =
-                HttpRequest.newBuilder(uri).timeout(requestTimeout).GET().build();
-        return send(request, "GET");
+        HttpResponseView view = exchangeGet(uri, authToken);
+        return view.status() == HTTP_OK ? view.body() : Optional.empty();
     }
 
     @Override
     public Optional<String> post(URI uri, String body) {
+        HttpResponseView view = exchange(uri, body, null);
+        return view.status() == HTTP_OK ? view.body() : Optional.empty();
+    }
+
+    @Override
+    public HttpResponseView exchange(URI uri, String body, @Nullable String authToken) {
         Objects.requireNonNull(uri, "uri");
         Objects.requireNonNull(body, "body");
-        HttpRequest request = HttpRequest.newBuilder(uri)
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .timeout(requestTimeout)
                 .header("Content-Type", JSON_CONTENT_TYPE)
                 .header("Accept", JSON_CONTENT_TYPE)
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
-        return send(request, "POST");
+                .POST(HttpRequest.BodyPublishers.ofString(body));
+        return send(withAuth(builder, authToken).build(), "POST");
     }
 
-    private Optional<String> send(HttpRequest request, String verb) {
+    @Override
+    public HttpResponseView exchangeGet(URI uri, @Nullable String authToken) {
+        Objects.requireNonNull(uri, "uri");
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                .timeout(requestTimeout)
+                .header("Accept", JSON_CONTENT_TYPE)
+                .GET();
+        return send(withAuth(builder, authToken).build(), "GET");
+    }
+
+    /** Attach the {@code Authorization: Bearer} header when a non-blank token is supplied, else leave it off. */
+    private static HttpRequest.Builder withAuth(HttpRequest.Builder builder, @Nullable String authToken) {
+        if (authToken != null && !authToken.isBlank()) {
+            builder.header(AUTHORIZATION, BEARER_PREFIX + authToken.strip());
+        }
+        return builder;
+    }
+
+    private HttpResponseView send(HttpRequest request, String verb) {
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            return response.statusCode() == HTTP_OK ? Optional.of(response.body()) : Optional.empty();
+            return new HttpResponseView(response.statusCode(), Optional.of(response.body()), retryAfter(response));
         } catch (IOException network) {
             log.debug("{} to {} failed: {}", verb, request.uri(), String.valueOf(network));
-            return Optional.empty();
+            return HttpResponseView.transportError();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
-            return Optional.empty();
+            return HttpResponseView.transportError();
+        }
+    }
+
+    /** The {@code Retry-After} delay in seconds when the server sent a numeric one (a {@code 429} backoff). */
+    private static OptionalLong retryAfter(HttpResponse<String> response) {
+        return response.headers()
+                .firstValue(RETRY_AFTER)
+                .map(HttpClientFetcher::parseSeconds)
+                .orElse(OptionalLong.empty());
+    }
+
+    private static OptionalLong parseSeconds(String raw) {
+        try {
+            return OptionalLong.of(Long.parseLong(raw.strip()));
+        } catch (NumberFormatException notSeconds) {
+            // Retry-After can also be an HTTP date; we only honour the simpler delta-seconds form and fall back
+            // to the service's own bounded backoff otherwise.
+            return OptionalLong.empty();
         }
     }
 }
