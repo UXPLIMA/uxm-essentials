@@ -21,15 +21,25 @@ import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
  * rather than caching each name separately. A write to any hologram invalidates that one entry, so the next
  * read reloads the full set — write-through at the delegate, invalidate here, never a write-back cache that
  * could lose a mutation. The durable source of truth is always the delegate.
+ *
+ * <p>The MANUAL-visibility viewer set is cached the same way, but keyed by hologram name in a second cache: it
+ * is read on every render (so a refreshing MANUAL hologram queries it each refresh tick) and on every join, yet
+ * mutated only on {@code /hologram show|hide} — exactly the small, hot-read, rare-write shape a read cache is
+ * for. A {@code showTo}/{@code hideFrom}/{@code delete} writes through the delegate then invalidates that name,
+ * so the next read reloads the durable set; the immediate show/hide path never serves a stale set because the
+ * mutation evicts before it returns. Caching it keeps the render path off a synchronous SQLite read on the tick
+ * thread.
  */
 public final class CachedHologramRepository implements HologramRepository {
 
     private static final String ALL_KEY = "all";
     private static final long SINGLE_ENTRY = 1L;
+    private static final long MAX_VIEWER_SETS = 512L;
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(10);
 
     private final HologramRepository delegate;
     private final ReadThroughCache<String, Map<String, Hologram>> cache;
+    private final ReadThroughCache<String, Set<UUID>> viewers;
 
     public CachedHologramRepository(HologramRepository delegate) {
         this(delegate, DEFAULT_TTL);
@@ -39,6 +49,8 @@ public final class CachedHologramRepository implements HologramRepository {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         Objects.requireNonNull(ttl, "ttl");
         this.cache = ReadThroughCache.create(key -> loadAll(), SINGLE_ENTRY, ttl);
+        this.viewers =
+                ReadThroughCache.create(name -> delegate.manualViewers(HologramName.of(name)), MAX_VIEWER_SETS, ttl);
     }
 
     @Override
@@ -70,29 +82,38 @@ public final class CachedHologramRepository implements HologramRepository {
         Objects.requireNonNull(name, "name");
         delegate.delete(name);
         cache.invalidate(ALL_KEY);
+        viewers.invalidate(name.value());
     }
 
     @Override
     public Set<UUID> manualViewers(HologramName name) {
-        // The manual viewer set is a small side-table read only on render/join and mutated on show/hide; it is
-        // not part of the cached Hologram snapshot, so it passes straight through to keep the immediate
-        // show/hide path from ever serving a stale set.
-        return delegate.manualViewers(name);
+        Objects.requireNonNull(name, "name");
+        // Served from memory after the first load: read on every render (each refresh tick of a refreshing
+        // MANUAL hologram) and on every join, so a synchronous SQLite read here would land on the tick thread.
+        // A show/hide/delete invalidates this name, so the next read reloads the durable set.
+        return viewers.get(name.value());
     }
 
     @Override
     public void showTo(HologramName name, UUID viewer) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
         delegate.showTo(name, viewer);
+        viewers.invalidate(name.value());
     }
 
     @Override
     public void hideFrom(HologramName name, UUID viewer) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
         delegate.hideFrom(name, viewer);
+        viewers.invalidate(name.value());
     }
 
-    /** Drop the cached set; call on a module reload. */
+    /** Drop the cached sets; call on a module reload. */
     public void invalidateAll() {
         cache.invalidateAll();
+        viewers.invalidateAll();
     }
 
     private Map<String, Hologram> snapshot() {
