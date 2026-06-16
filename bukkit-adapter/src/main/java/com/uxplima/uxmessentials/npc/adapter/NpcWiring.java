@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
+import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
@@ -41,6 +42,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
 import com.uxplima.uxmessentials.npc.application.SetNpcPose;
 import com.uxplima.uxmessentials.npc.application.SetNpcScale;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
+import com.uxplima.uxmessentials.npc.application.SetNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
@@ -147,7 +149,9 @@ public final class NpcWiring {
                 new AddNpcAction(repository, notifier),
                 new ListNpcActions(repository, notifier),
                 new RemoveNpcAction(repository, notifier),
-                new ClearNpcActions(repository, notifier));
+                new ClearNpcActions(repository, notifier),
+                new SetNpcTypeData(repository, renderer, notifier),
+                new ListNpcTypeData(repository, notifier));
     }
 
     private static void spawnStored(NpcRepository repository, NpcRenderer renderer) {

@@ -37,8 +37,10 @@ import org.jspecify.annotations.Nullable;
  * so an older row reads upright; {@code scale} is the size multiplier in a REAL column ({@code 1.0} by default,
  * narrowed to a float on save and widened back on read), NOT NULL so an older row reads back natural-sized.
  * The click-action chain lives in the child {@code npc_action} table and is passed in already ordered — each
- * row's {@code click_trigger}/{@code type} are the enum names and {@code value} the raw operator payload. This
- * class is the single place that translation lives.
+ * row's {@code click_trigger}/{@code type} are the enum names and {@code value} the raw operator payload. The
+ * per-entity-type appearance metadata likewise lives in the child {@code npc_type_data} table and is passed in
+ * already keyed — each row's {@code data_key}/{@code data_value} are the opaque key/value the domain carries
+ * verbatim. This class is the single place that translation lives.
  */
 final class NpcRows {
 
@@ -47,8 +49,8 @@ final class NpcRows {
 
     private NpcRows() {}
 
-    /** Rebuild a domain {@link Npc} from an {@code npc} row and its already-ordered action list. */
-    static Npc toNpc(Record row, List<NpcAction> orderedActions) {
+    /** Rebuild a domain {@link Npc} from an {@code npc} row, its already-ordered action list and its type data. */
+    static Npc toNpc(Record row, List<NpcAction> orderedActions, Map<String, String> typeData) {
         WorldRef world = new WorldRef(UUID.fromString(row.get(NPC.WORLD)), row.get(NPC.WORLD_NAME));
         Position position = new Position(
                 world, row.get(NPC.X), row.get(NPC.Y), row.get(NPC.Z), row.get(NPC.YAW), row.get(NPC.PITCH));
@@ -65,6 +67,7 @@ final class NpcRows {
                 row.get(NPC.ENTITY_TYPE),
                 row.get(NPC.POSE),
                 row.get(NPC.SCALE),
+                typeData,
                 Instant.ofEpochMilli(row.get(NPC.CREATED_AT)));
     }
 

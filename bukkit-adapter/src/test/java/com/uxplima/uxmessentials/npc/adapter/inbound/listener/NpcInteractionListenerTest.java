@@ -334,6 +334,26 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object baby(int entityId, boolean baby) {
+            return new Object();
+        }
+
+        @Override
+        public Object villagerData(int entityId, String type, String profession, int level) {
+            return new Object();
+        }
+
+        @Override
+        public Object slimeSize(int entityId, int size) {
+            return new Object();
+        }
+
+        @Override
+        public Object charged(int entityId, boolean charged) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }

@@ -29,6 +29,8 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
             com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
     private static final com.uxplima.uxmessentials.persistence.jooq.tables.NpcAction NPC_ACTION =
             com.uxplima.uxmessentials.persistence.jooq.tables.NpcAction.NPC_ACTION;
+    private static final com.uxplima.uxmessentials.persistence.jooq.tables.NpcTypeData NPC_TYPE_DATA =
+            com.uxplima.uxmessentials.persistence.jooq.tables.NpcTypeData.NPC_TYPE_DATA;
 
     public JooqNpcRepository(DSLContext dsl) {
         super(dsl);
@@ -40,17 +42,21 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
         return read(dsl -> dsl.selectFrom(NPC)
                 .where(NPC.NAME.eq(name.value()))
                 .fetchOptional()
-                .map(row -> NpcRows.toNpc(row, actions(dsl, name.value()))));
+                .map(row -> NpcRows.toNpc(row, actions(dsl, name.value()), typeData(dsl, name.value()))));
     }
 
     @Override
     public List<Npc> all() {
         return read(dsl -> {
             Map<String, List<NpcAction>> actionsByName = allActions(dsl);
+            Map<String, Map<String, String>> typeDataByName = allTypeData(dsl);
             return dsl.selectFrom(NPC)
                     .orderBy(NPC.CREATED_AT.asc(), NPC.NAME.asc())
                     .fetch()
-                    .map(row -> NpcRows.toNpc(row, actionsByName.getOrDefault(row.get(NPC.NAME), List.of())));
+                    .map(row -> NpcRows.toNpc(
+                            row,
+                            actionsByName.getOrDefault(row.get(NPC.NAME), List.of()),
+                            typeDataByName.getOrDefault(row.get(NPC.NAME), Map.of())));
         });
     }
 
@@ -66,6 +72,7 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
         write(dsl -> {
             upsert(dsl, npc);
             rewriteActions(dsl, npc);
+            rewriteTypeData(dsl, npc);
             return null;
         });
     }
@@ -76,6 +83,9 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
         write(dsl -> {
             dsl.deleteFrom(NPC_ACTION)
                     .where(NPC_ACTION.NPC_NAME.eq(name.value()))
+                    .execute();
+            dsl.deleteFrom(NPC_TYPE_DATA)
+                    .where(NPC_TYPE_DATA.NPC_NAME.eq(name.value()))
                     .execute();
             return dsl.deleteFrom(NPC).where(NPC.NAME.eq(name.value())).execute();
         });
@@ -109,6 +119,42 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
                 row.get(NPC_ACTION.CLICK_TRIGGER), row.get(NPC_ACTION.TYPE), row.get(NPC_ACTION.VALUE));
         if (action != null) {
             target.add(action);
+        }
+    }
+
+    private static Map<String, String> typeData(DSLContext dsl, String name) {
+        Map<String, String> data = new LinkedHashMap<>();
+        for (Record row : dsl.select(NPC_TYPE_DATA.DATA_KEY, NPC_TYPE_DATA.DATA_VALUE)
+                .from(NPC_TYPE_DATA)
+                .where(NPC_TYPE_DATA.NPC_NAME.eq(name))
+                .orderBy(NPC_TYPE_DATA.DATA_KEY.asc())
+                .fetch()) {
+            data.put(row.get(NPC_TYPE_DATA.DATA_KEY), row.get(NPC_TYPE_DATA.DATA_VALUE));
+        }
+        return data;
+    }
+
+    private static Map<String, Map<String, String>> allTypeData(DSLContext dsl) {
+        Map<String, Map<String, String>> byName = new LinkedHashMap<>();
+        for (Record row : dsl.select(NPC_TYPE_DATA.NPC_NAME, NPC_TYPE_DATA.DATA_KEY, NPC_TYPE_DATA.DATA_VALUE)
+                .from(NPC_TYPE_DATA)
+                .orderBy(NPC_TYPE_DATA.NPC_NAME.asc(), NPC_TYPE_DATA.DATA_KEY.asc())
+                .fetch()) {
+            byName.computeIfAbsent(row.get(NPC_TYPE_DATA.NPC_NAME), key -> new LinkedHashMap<>())
+                    .put(row.get(NPC_TYPE_DATA.DATA_KEY), row.get(NPC_TYPE_DATA.DATA_VALUE));
+        }
+        return byName;
+    }
+
+    private static void rewriteTypeData(DSLContext dsl, Npc npc) {
+        String name = npc.name().value();
+        dsl.deleteFrom(NPC_TYPE_DATA).where(NPC_TYPE_DATA.NPC_NAME.eq(name)).execute();
+        for (Map.Entry<String, String> entry : npc.typeData().entrySet()) {
+            dsl.insertInto(NPC_TYPE_DATA)
+                    .set(NPC_TYPE_DATA.NPC_NAME, name)
+                    .set(NPC_TYPE_DATA.DATA_KEY, entry.getKey())
+                    .set(NPC_TYPE_DATA.DATA_VALUE, entry.getValue())
+                    .execute();
         }
     }
 

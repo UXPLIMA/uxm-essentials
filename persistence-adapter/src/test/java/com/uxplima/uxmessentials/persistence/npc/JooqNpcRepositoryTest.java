@@ -275,6 +275,67 @@ class JooqNpcRepositoryTest {
     }
 
     @Test
+    void roundTripsTypeData() {
+        repository.save(Npc.create(NpcName.of("baby"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                .withEntityType("VILLAGER")
+                .withTypeData("baby", "true")
+                .withTypeData("villager_profession", "librarian")
+                .withTypeData("villager_level", "3"));
+
+        Npc loaded = repository.find(NpcName.of("baby")).orElseThrow();
+
+        assertThat(loaded.typeData())
+                .containsEntry("baby", "true")
+                .containsEntry("villager_profession", "librarian")
+                .containsEntry("villager_level", "3")
+                .hasSize(3);
+    }
+
+    @Test
+    void defaultsTypeDataEmptyForACreatedNpc() {
+        repository.save(
+                Npc.create(NpcName.of("bare"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
+
+        assertThat(repository.find(NpcName.of("bare")).orElseThrow().typeData()).isEmpty();
+    }
+
+    @Test
+    void replacesTypeDataOnSaveLeavingNoStaleRows() {
+        repository.save(Npc.create(NpcName.of("slime"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                .withEntityType("SLIME")
+                .withTypeData("size", "4")
+                .withTypeData("baby", "true"));
+
+        // Clear size and overwrite baby; the stale size row must not resurface.
+        repository.save(repository
+                .find(NpcName.of("slime"))
+                .orElseThrow()
+                .withTypeData("size", null)
+                .withTypeData("baby", "false"));
+
+        Npc reloaded = repository.find(NpcName.of("slime")).orElseThrow();
+        assertThat(reloaded.typeData())
+                .containsEntry("baby", "false")
+                .doesNotContainKey("size")
+                .hasSize(1);
+    }
+
+    @Test
+    void deleteRemovesTheTypeDataRowsToo() {
+        repository.save(Npc.create(NpcName.of("creep"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
+                .withEntityType("CREEPER")
+                .withTypeData("charged", "true"));
+
+        repository.delete(NpcName.of("creep"));
+        // Re-create under the same name; the type data must not resurface from a stale child row.
+        repository.save(
+                Npc.create(NpcName.of("creep"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(2_000)));
+
+        assertThat(repository.find(NpcName.of("creep")).orElseThrow().typeData())
+                .isEmpty();
+    }
+
+    @Test
     void defaultsEntityTypeToPlayerForACreatedNpc() {
         repository.save(
                 Npc.create(NpcName.of("plain"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
@@ -347,7 +408,9 @@ class JooqNpcRepositoryTest {
                 .withGlowColor("RED")
                 .withEntityType("VILLAGER")
                 .withPose("SITTING")
-                .withScale(2.5));
+                .withScale(2.5)
+                .withTypeData("baby", "true")
+                .withTypeData("villager_profession", "librarian"));
 
         // Re-save touching only the location; every other column goes through doUpdate() unchanged.
         repository.save(repository.find(NpcName.of("decked")).orElseThrow().movedTo(Position.of(WORLD, 100, 70, 100)));
@@ -366,6 +429,7 @@ class JooqNpcRepositoryTest {
         assertThat(reloaded.entityType()).isEqualTo("VILLAGER");
         assertThat(reloaded.pose()).isEqualTo("SITTING");
         assertThat(reloaded.scale()).isEqualTo(2.5f);
+        assertThat(reloaded.typeData()).containsEntry("baby", "true").containsEntry("villager_profession", "librarian");
         assertThat(reloaded.createdAt()).isEqualTo(Instant.ofEpochMilli(1_000));
     }
 

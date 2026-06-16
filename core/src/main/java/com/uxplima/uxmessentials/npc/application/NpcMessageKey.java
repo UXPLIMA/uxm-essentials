@@ -47,6 +47,13 @@ public enum NpcMessageKey implements MessageKey {
     NPC_POSE_SET("npc.pose.set"),
     NPC_SCALE_SET("npc.scale.set"),
 
+    // per-entity-type metadata feedback
+    NPC_DATA_SET("npc.data.set"),
+    NPC_DATA_CLEARED("npc.data.cleared"),
+    NPC_DATA_LIST_HEADER("npc.data.list-header"),
+    NPC_DATA_LIST_ENTRY("npc.data.list-entry"),
+    NPC_DATA_NONE("npc.data.none"),
+
     // listing
     NPC_LIST_HEADER("npc.list.header"),
     NPC_LIST_ENTRY("npc.list.entry"),
@@ -70,6 +77,7 @@ public enum NpcMessageKey implements MessageKey {
     NPC_INVALID_ENTITY_TYPE("npc.invalid-entity-type"),
     NPC_INVALID_POSE("npc.invalid-pose"),
     NPC_INVALID_SCALE("npc.invalid-scale"),
+    NPC_INVALID_DATA("npc.invalid-data"),
     NPC_SKIN_ONLY_PLAYER("npc.skin-only-player"),
     NPC_INVALID_TRIGGER("npc.invalid-trigger"),
     NPC_INVALID_ACTION_TYPE("npc.invalid-action-type"),

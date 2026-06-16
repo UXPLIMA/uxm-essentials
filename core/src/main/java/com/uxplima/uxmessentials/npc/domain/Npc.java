@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.npc.domain;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,6 +51,14 @@ import org.jspecify.annotations.Nullable;
  * rather than failing here. {@code scale} resizes the NPC ({@code 1.0} is the natural size; {@code 2.0} twice as
  * tall, {@code 0.5} half) and must be finite and positive; the command clamps it to the protocol's usable range.
  *
+ * <p>{@code typeData} is the per-entity-type appearance metadata — a small map of plain-string key/value pairs
+ * the domain stores verbatim and never interprets ({@code "baby" → "true"}, {@code "size" → "4"}, {@code
+ * "villager_profession" → "librarian"}, …). Whether a given key applies to the NPC's {@code entityType}, and how
+ * each value parses, is wholly the render adapter's concern; keeping both sides plain {@code String}s is what
+ * keeps the aggregate Bukkit-free. A key whose value is {@code null} or blank is absent. The map is copied
+ * defensively on construction so a stored snapshot is immutable; {@code withTypeData} produces a new instance,
+ * and every other transition preserves the type data unchanged.
+ *
  * @param name the NPC's canonical, server-unique name
  * @param location where the NPC stands and which way it faces
  * @param skin the fake player's skin, or {@code null} for the default skin
@@ -62,6 +71,7 @@ import org.jspecify.annotations.Nullable;
  * @param entityType the uppercase Bukkit {@code EntityType} name the NPC renders as ({@code "PLAYER"} by default)
  * @param pose the uppercase pose name the NPC is frozen in ({@code "STANDING"} by default)
  * @param scale the NPC's size multiplier ({@code 1.0} is the natural size); finite and positive
+ * @param typeData the per-entity-type appearance metadata as opaque key/value strings; absent key = unset
  * @param createdAt when the NPC was first created (preserved across a move, re-skin, or rebind)
  */
 public record Npc(
@@ -77,6 +87,7 @@ public record Npc(
         String entityType,
         String pose,
         double scale,
+        Map<String, String> typeData,
         Instant createdAt) {
 
     /** The default entity type: a fake player, the one type with the tab-entry + skin path. */
@@ -97,6 +108,7 @@ public record Npc(
         entityType = normalizeType(entityType);
         pose = normalizePose(pose);
         scale = validateScale(scale);
+        typeData = copyTypeData(typeData);
     }
 
     /** A new NPC created now at {@code location} with the given (possibly {@code null}) skin, no command, looking. */
@@ -114,6 +126,7 @@ public record Npc(
                 DEFAULT_ENTITY_TYPE,
                 DEFAULT_POSE,
                 DEFAULT_SCALE,
+                Map.of(),
                 createdAt);
     }
 
@@ -133,6 +146,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -151,6 +165,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -169,6 +184,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -187,6 +203,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -209,6 +226,7 @@ public record Npc(
                 newEntityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -241,6 +259,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -259,6 +278,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -278,6 +298,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -300,6 +321,7 @@ public record Npc(
                 entityType,
                 newPose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -318,6 +340,41 @@ public record Npc(
                 entityType,
                 pose,
                 newScale,
+                typeData,
+                createdAt);
+    }
+
+    /**
+     * A copy with the type-data {@code key} set to {@code value} (or cleared when {@code value} is {@code null} or
+     * blank), keeping everything else. The key must be non-blank; both key and value are stored verbatim and never
+     * interpreted here — whether the key applies to this NPC's entity type, and how the value parses, is the render
+     * adapter's concern, so an unsupported or unparseable pair simply renders nothing rather than failing here.
+     */
+    public Npc withTypeData(String key, @Nullable String value) {
+        String trimmedKey = Objects.requireNonNull(key, "key").strip();
+        if (trimmedKey.isEmpty()) {
+            throw new IllegalArgumentException("type-data key must not be blank");
+        }
+        Map<String, String> updated = new LinkedHashMap<>(typeData);
+        if (value == null || value.isBlank()) {
+            updated.remove(trimmedKey);
+        } else {
+            updated.put(trimmedKey, value);
+        }
+        return new Npc(
+                name,
+                location,
+                skin,
+                clickCommand,
+                lookAtPlayer,
+                equipment,
+                glowing,
+                glowColor,
+                actions,
+                entityType,
+                pose,
+                scale,
+                updated,
                 createdAt);
     }
 
@@ -339,6 +396,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -365,6 +423,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -383,6 +442,7 @@ public record Npc(
                 entityType,
                 pose,
                 scale,
+                typeData,
                 createdAt);
     }
 
@@ -426,6 +486,11 @@ public record Npc(
         return Double.compare(scale, DEFAULT_SCALE) != 0;
     }
 
+    /** Whether this NPC carries any per-entity-type appearance metadata (an empty map needs no metadata packet). */
+    public boolean hasTypeData() {
+        return !typeData.isEmpty();
+    }
+
     /** Upper-case the entity-type name and reject a blank one — the type is always a non-blank uppercase name. */
     private static String normalizeType(String entityType) {
         Objects.requireNonNull(entityType, "entityType");
@@ -460,5 +525,13 @@ public record Npc(
             return Map.of();
         }
         return Map.copyOf(new EnumMap<>(source));
+    }
+
+    /** An immutable, empty-tolerant copy of the type-data map. */
+    private static Map<String, String> copyTypeData(@Nullable Map<String, String> source) {
+        if (source == null || source.isEmpty()) {
+            return Map.of();
+        }
+        return Map.copyOf(source);
     }
 }

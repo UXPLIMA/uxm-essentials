@@ -326,6 +326,80 @@ class NpcTest {
     }
 
     @Test
+    void createsWithNoTypeData() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        assertThat(npc.typeData()).isEmpty();
+        assertThat(npc.hasTypeData()).isFalse();
+    }
+
+    @Test
+    void withTypeDataAddsReplacesAndRemovesAKeyKeepingTheRest() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
+                .withClickCommand("spawn")
+                .withTypeData("baby", "true")
+                .withTypeData("size", "4");
+
+        assertThat(npc.typeData())
+                .containsEntry("baby", "true")
+                .containsEntry("size", "4")
+                .hasSize(2);
+        assertThat(npc.hasTypeData()).isTrue();
+        assertThat(npc.clickCommand()).isEqualTo("spawn");
+        assertThat(npc.skin()).isEqualTo(NpcSkin.unsigned("tex"));
+
+        // Replacing a key keeps the value the latest write set.
+        Npc replaced = npc.withTypeData("baby", "false");
+        assertThat(replaced.typeData()).containsEntry("baby", "false").containsEntry("size", "4");
+
+        // A null or blank value removes the key.
+        Npc removedNull = npc.withTypeData("baby", null);
+        assertThat(removedNull.typeData()).doesNotContainKey("baby").containsEntry("size", "4");
+        Npc removedBlank = npc.withTypeData("size", " ");
+        assertThat(removedBlank.typeData()).doesNotContainKey("size").containsEntry("baby", "true");
+    }
+
+    @Test
+    void typeDataMapIsImmutable() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withTypeData("baby", "true");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.typeData().put("size", "4"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void withTypeDataRejectsABlankKey() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withTypeData(" ", "true"))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withTypeData("", "true"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void everyTransitionPreservesTypeData() {
+        Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withTypeData("baby", "true");
+        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+
+        assertThat(npc.movedTo(ELSEWHERE).typeData()).containsEntry("baby", "true");
+        assertThat(npc.withSkin(NpcSkin.unsigned("tex")).typeData()).containsEntry("baby", "true");
+        assertThat(npc.withClickCommand("spawn").typeData()).containsEntry("baby", "true");
+        assertThat(npc.withLookAtPlayer(false).typeData()).containsEntry("baby", "true");
+        assertThat(npc.withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET").typeData())
+                .containsEntry("baby", "true");
+        assertThat(npc.withGlowing(true).typeData()).containsEntry("baby", "true");
+        assertThat(npc.withGlowColor("RED").typeData()).containsEntry("baby", "true");
+        assertThat(npc.withEntityType("VILLAGER").typeData()).containsEntry("baby", "true");
+        assertThat(npc.withPose("SITTING").typeData()).containsEntry("baby", "true");
+        assertThat(npc.withScale(2.0).typeData()).containsEntry("baby", "true");
+        assertThat(npc.withActionAdded(action).typeData()).containsEntry("baby", "true");
+        Npc withTwo = npc.withActionAdded(action).withActionAdded(action);
+        assertThat(withTwo.withActionRemovedAt(0).typeData()).containsEntry("baby", "true");
+        assertThat(withTwo.withActionsCleared().typeData()).containsEntry("baby", "true");
+    }
+
+    @Test
     void createsAsAPlayerTypeByDefault() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
 

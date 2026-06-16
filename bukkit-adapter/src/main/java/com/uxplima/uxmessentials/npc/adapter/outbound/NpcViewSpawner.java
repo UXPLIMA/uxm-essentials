@@ -31,7 +31,8 @@ import org.jspecify.annotations.Nullable;
  * player path — a player-info ADD (carrying the name and skin) bundled with a spawn-player packet so they arrive
  * together, then a deferred tab-remove that hides the entry while the spawned fake player keeps its skin; any
  * other type spawns the mob through {@code spawnEntity} with no tab entry and no skin. Both paths then aim the
- * entity at its fixed facing and dress it (equipment + glow). The {@link NpcRenderer} owns which NPCs each viewer
+ * entity at its fixed facing and dress it (equipment + glow + pose/scale + per-type metadata). The
+ * {@link NpcRenderer} owns which NPCs each viewer
  * has been shown and only marks a viewer shown when {@link #spawn(Player, RenderedNpc)} reports the spawn went
  * out, so a skipped bad type never leaves a phantom in the tracking map.
  *
@@ -152,6 +153,9 @@ public final class NpcViewSpawner {
             packets.send(viewer, packets.glowColor(glowTeam(npc), profileName(npc), color));
         }
         applyShape(viewer, rendered, npc);
+        // The per-entity-type metadata (baby/size/charged/villager) is sent only for the type that carries each
+        // field, fail-soft per property — the support map lives in NpcTypeData to keep this class under its limit.
+        NpcTypeData.apply(packets, viewer, rendered.entityId(), npc, log);
     }
 
     /**

@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
+import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcLookAtPlayer;
 import com.uxplima.uxmessentials.npc.application.SetNpcPose;
 import com.uxplima.uxmessentials.npc.application.SetNpcScale;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
+import com.uxplima.uxmessentials.npc.application.SetNpcTypeData;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -42,6 +44,8 @@ import org.jspecify.annotations.NullMarked;
  * @param listActions {@code /npc action list}
  * @param removeAction {@code /npc action remove}
  * @param clearActions {@code /npc action clear}
+ * @param setData {@code /npc data set} / {@code /npc data clear}
+ * @param listData {@code /npc data list}
  */
 @NullMarked
 public record NpcServices(
@@ -60,7 +64,9 @@ public record NpcServices(
         AddNpcAction addAction,
         ListNpcActions listActions,
         RemoveNpcAction removeAction,
-        ClearNpcActions clearActions) {
+        ClearNpcActions clearActions,
+        SetNpcTypeData setData,
+        ListNpcTypeData listData) {
 
     public NpcServices {
         Objects.requireNonNull(create, "create");
@@ -79,5 +85,7 @@ public record NpcServices(
         Objects.requireNonNull(listActions, "listActions");
         Objects.requireNonNull(removeAction, "removeAction");
         Objects.requireNonNull(clearActions, "clearActions");
+        Objects.requireNonNull(setData, "setData");
+        Objects.requireNonNull(listData, "listData");
     }
 }

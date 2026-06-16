@@ -354,6 +354,91 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesBabyAndVillagerDataToABabyVillagerNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        Npc npc = npcAt(viewer, 1.0)
+                .withEntityType("VILLAGER")
+                .withTypeData("baby", "true")
+                .withTypeData("villager_profession", "librarian")
+                .withTypeData("villager_type", "desert")
+                .withTypeData("villager_level", "3");
+        renderer.render(npc);
+
+        // A baby villager carries both the baby flag (villager is ageable) and one grouped villager-data packet.
+        assertThat(packets.babies).hasSize(1);
+        assertThat(packets.babies.get(0).baby()).isTrue();
+        assertThat(packets.villagerDatas).hasSize(1);
+        assertThat(packets.villagerDatas.get(0).profession()).isEqualTo("librarian");
+        assertThat(packets.villagerDatas.get(0).type()).isEqualTo("desert");
+        assertThat(packets.villagerDatas.get(0).level()).isEqualTo(3);
+        // The three villager_* keys collapse into a single villagerData call, not three.
+        assertThat(packets.villagerDatas).hasSize(1);
+    }
+
+    @Test
+    void appliesSlimeSizeToASlimeNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("SLIME").withTypeData("size", "4"));
+
+        assertThat(packets.slimeSizes).hasSize(1);
+        assertThat(packets.slimeSizes.get(0).size()).isEqualTo(4);
+    }
+
+    @Test
+    void appliesChargedToACreeperNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("CREEPER").withTypeData("charged", "true"));
+
+        assertThat(packets.chargeds).hasSize(1);
+        assertThat(packets.chargeds.get(0).charged()).isTrue();
+    }
+
+    @Test
+    void skipsUnsupportedTypeDataFailSoftWithoutAPacketOrThrow() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // A creeper has no size field and a slime is not a creeper: each unsupported key is skipped, not sent, and
+        // the spawn still goes out.
+        Npc creeperWithSize = npcAt(viewer, 1.0).withEntityType("CREEPER").withTypeData("size", "4");
+        assertThatCode(() -> renderer.render(creeperWithSize)).doesNotThrowAnyException();
+
+        assertThat(packets.slimeSizes).isEmpty();
+        assertThat(packets.chargeds).isEmpty();
+        assertThat(packets.spawnEntities).hasSize(1);
+    }
+
+    @Test
+    void doesNotSendBabyToACreeper() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        // The key correctness property: a creeper is not ageable, so the baby flag is never sent to it (a wrong
+        // index would otherwise land on an unrelated creeper field).
+        renderer.render(npcAt(viewer, 1.0).withEntityType("CREEPER").withTypeData("baby", "true"));
+
+        assertThat(packets.babies).isEmpty();
+        assertThat(packets.spawnEntities).hasSize(1);
+    }
+
+    @Test
+    void clampsAnOversizedSlimeSize() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("SLIME").withTypeData("size", "9999"));
+
+        assertThat(packets.slimeSizes).hasSize(1);
+        assertThat(packets.slimeSizes.get(0).size()).isEqualTo(16);
+    }
+
+    @Test
     void appliesScaleToAMobNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -631,6 +716,10 @@ class NpcRendererTest {
         private final List<GlowColor> glowColors = new ArrayList<>();
         private final List<PoseSet> poses = new ArrayList<>();
         private final List<Scale> scales = new ArrayList<>();
+        private final List<Baby> babies = new ArrayList<>();
+        private final List<SlimeSize> slimeSizes = new ArrayList<>();
+        private final List<Charged> chargeds = new ArrayList<>();
+        private final List<VillagerData> villagerDatas = new ArrayList<>();
         private final List<Sent> sent = new ArrayList<>();
 
         @Override
@@ -728,6 +817,34 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object baby(int entityId, boolean baby) {
+            Baby packet = new Baby(entityId, baby);
+            babies.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object villagerData(int entityId, String type, String profession, int level) {
+            VillagerData packet = new VillagerData(entityId, type, profession, level);
+            villagerDatas.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object slimeSize(int entityId, int size) {
+            SlimeSize packet = new SlimeSize(entityId, size);
+            slimeSizes.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object charged(int entityId, boolean charged) {
+            Charged packet = new Charged(entityId, charged);
+            chargeds.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -804,6 +921,14 @@ class NpcRendererTest {
         private record PoseSet(int entityId, com.uxplima.uxmlib.packet.npc.NpcPose pose) {}
 
         private record Scale(int entityId, double scale) {}
+
+        private record Baby(int entityId, boolean baby) {}
+
+        private record SlimeSize(int entityId, int size) {}
+
+        private record Charged(int entityId, boolean charged) {}
+
+        private record VillagerData(int entityId, String type, String profession, int level) {}
 
         private record GlowColor(String teamName, String memberName, @Nullable NamedColor color) {}
 
