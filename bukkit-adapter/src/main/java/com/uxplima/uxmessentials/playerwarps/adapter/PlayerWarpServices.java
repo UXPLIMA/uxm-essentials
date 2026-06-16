@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import org.jspecify.annotations.NullMarked;
@@ -30,6 +31,8 @@ import org.jspecify.annotations.NullMarked;
  * @param repository the warp store, held only so the name-argument suggesters can peek an owner's warps
  *     without blocking (a join-warmed cache hit completes the names; a cold miss suggests nothing)
  * @param editorView the warp settings editor GUI
+ * @param scheduler the kernel scheduler the commands run their repository reads through off the tick thread,
+ *     bridging any Bukkit feedback back to the player's region thread (the homes async-read pattern)
  */
 @NullMarked
 public record PlayerWarpServices(
@@ -40,7 +43,8 @@ public record PlayerWarpServices(
         SetPlayerWarpVisibility visibility,
         PlayerLookup players,
         PlayerWarpRepository repository,
-        @org.jspecify.annotations.Nullable WarpEditorView editorView) {
+        @org.jspecify.annotations.Nullable WarpEditorView editorView,
+        Scheduler scheduler) {
 
     public PlayerWarpServices {
         Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
@@ -50,6 +54,7 @@ public record PlayerWarpServices(
         Objects.requireNonNull(visibility, "visibility");
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(repository, "repository");
+        Objects.requireNonNull(scheduler, "scheduler");
     }
 
     /**

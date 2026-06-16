@@ -51,7 +51,10 @@ public final class DelPlayerWarpCommand extends PlayerWarpCommandSupport impleme
         if (sender == null) {
             return 0;
         }
-        services.delPlayerWarp().delete(ref(sender), PlayerWarpName.of(ctx.getArgument("name", String.class)));
+        var who = ref(sender);
+        PlayerWarpName name = PlayerWarpName.of(ctx.getArgument("name", String.class));
+        // The delete reads then writes the database; run it off the tick thread.
+        services.scheduler().async(() -> services.delPlayerWarp().delete(who, name));
         return Command.SINGLE_SUCCESS;
     }
 }

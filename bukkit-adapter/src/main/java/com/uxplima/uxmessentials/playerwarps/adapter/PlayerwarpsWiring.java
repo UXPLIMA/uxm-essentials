@@ -108,7 +108,8 @@ public final class PlayerwarpsWiring {
                 new SetPlayerWarpVisibility(repository, notifier),
                 kernel.playerLookup(),
                 repository,
-                editorView);
+                editorView,
+                kernel.scheduler());
     }
 
     private static int defaultLimit(ModuleContext ctx) {

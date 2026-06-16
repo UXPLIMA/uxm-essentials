@@ -91,6 +91,11 @@ public final class WarpsWiring {
         // reports a change, and the broadcasting decorator announces this backend's own writes to peers.
         CachedWarpRepository cached = WarpRepositories.cachedConcrete(persistence);
         bus.registry().register(WarpSync.listener(cached));
+        // Warm the in-memory warp set once on enable so every later /warp resolve, gate, and tab-complete is
+        // served from memory — never a synchronous SQLite read on the command thread. This is the only load on
+        // the single-server path; the cross-server bus listener drops the set on a peer's change and the next
+        // read lazily reloads.
+        cached.all();
         WarpRepository repository = WarpSync.repository(cached, bus.publisher());
 
         // Wire Redis Pub/Sub syncing if enabled

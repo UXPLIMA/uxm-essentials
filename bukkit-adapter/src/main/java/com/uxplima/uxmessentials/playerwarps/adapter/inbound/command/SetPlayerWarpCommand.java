@@ -49,7 +49,11 @@ public final class SetPlayerWarpCommand extends PlayerWarpCommandSupport impleme
             return 0;
         }
         PlayerWarpName name = PlayerWarpName.of(ctx.getArgument("name", String.class));
-        services.setPlayerWarp().set(ref(sender), name, position(sender));
+        // Capture the position on the entity thread before hopping off; the use case's find + count + save touch
+        // the database, so it runs off the tick thread.
+        var who = ref(sender);
+        var at = position(sender);
+        services.scheduler().async(() -> services.setPlayerWarp().set(who, name, at));
         return Command.SINGLE_SUCCESS;
     }
 }

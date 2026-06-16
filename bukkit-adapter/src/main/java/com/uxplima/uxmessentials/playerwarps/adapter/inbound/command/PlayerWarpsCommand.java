@@ -52,7 +52,10 @@ public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implement
         if (sender == null) {
             return 0;
         }
-        services.listPlayerWarps().own(ref(sender));
+        PlayerRef viewer = ref(sender);
+        // The owned-warp read hits the database; run it off the tick thread (the listing is pushed through the
+        // sink, which delivers on the player's region thread itself).
+        services.scheduler().async(() -> services.listPlayerWarps().own(viewer));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -67,8 +70,9 @@ public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implement
             unknownPlayer(ctx.getSource().getSender(), ownerName);
             return 0;
         }
-        services.listPlayerWarps()
-                .publicOf(ref(sender), owner.get(), owner.get().name());
+        PlayerRef viewer = ref(sender);
+        PlayerRef resolved = owner.get();
+        services.scheduler().async(() -> services.listPlayerWarps().publicOf(viewer, resolved, resolved.name()));
         return Command.SINGLE_SUCCESS;
     }
 }

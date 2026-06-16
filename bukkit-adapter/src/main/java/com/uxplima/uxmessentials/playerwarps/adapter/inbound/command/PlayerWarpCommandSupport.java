@@ -59,6 +59,15 @@ abstract class PlayerWarpCommandSupport {
         feedback.send(sender, UNKNOWN_PLAYER, Map.of("player", name));
     }
 
+    /**
+     * Run {@code feedback} on {@code viewer}'s region thread. Inline command feedback calls
+     * {@code sender.sendMessage(...)}, a Bukkit interaction, so a continuation reached from an async read must
+     * bridge back to the player's entity thread before sending — the homes async-read pattern.
+     */
+    final void onPlayer(PlayerRef viewer, Runnable feedback) {
+        services.scheduler().onEntity(viewer, feedback);
+    }
+
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);

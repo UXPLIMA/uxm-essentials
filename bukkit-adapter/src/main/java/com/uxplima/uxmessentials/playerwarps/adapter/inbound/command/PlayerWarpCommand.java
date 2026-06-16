@@ -101,13 +101,20 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         }
         String name = ctx.getArgument("name", String.class);
         PlayerRef owner = ref(sender);
-        if (!services.repository().exists(owner, PlayerWarpName.of(name))) {
-            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", name));
-            return 0;
-        }
-        if (services.editorView() != null) {
-            services.editorView().open(sender, ref(sender), name, owner);
-        }
+        // The existence check reads the database; run it off the tick thread, then bridge the open (or the
+        // not-found feedback) back to the player's region thread.
+        services.scheduler().async(() -> {
+            boolean exists = services.repository().exists(owner, PlayerWarpName.of(name));
+            onPlayer(owner, () -> {
+                if (!exists) {
+                    feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", name));
+                    return;
+                }
+                if (services.editorView() != null) {
+                    services.editorView().open(sender, owner, name, owner);
+                }
+            });
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -116,7 +123,10 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
-        services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(ctx.getArgument("name", String.class)));
+        PlayerRef who = ref(sender);
+        PlayerWarpName warp = PlayerWarpName.of(ctx.getArgument("name", String.class));
+        // The use case reads the warp then delegates the hop to the teleport context; run the read off-thread.
+        services.scheduler().async(() -> services.usePlayerWarp().use(who, warp));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -125,15 +135,18 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
+        PlayerRef who = ref(sender);
         String warpName = ctx.getArgument("name", String.class);
         String arg1 = ctx.getArgument("arg1", String.class);
 
         Optional<PlayerRef> owner = services.players().findByName(arg1);
-        if (owner.isPresent()) {
-            services.usePlayerWarp().useFor(ref(sender), owner.get(), PlayerWarpName.of(warpName));
-        } else {
-            services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(warpName), arg1);
-        }
+        services.scheduler().async(() -> {
+            if (owner.isPresent()) {
+                services.usePlayerWarp().useFor(who, owner.get(), PlayerWarpName.of(warpName));
+            } else {
+                services.usePlayerWarp().use(who, PlayerWarpName.of(warpName), arg1);
+            }
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -142,6 +155,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
+        PlayerRef who = ref(sender);
         String warpName = ctx.getArgument("name", String.class);
         String ownerName = ctx.getArgument("arg1", String.class);
         String password = ctx.getArgument("arg2", String.class);
@@ -151,7 +165,8 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
             unknownPlayer(ctx.getSource().getSender(), ownerName);
             return 0;
         }
-        services.usePlayerWarp().useFor(ref(sender), owner.get(), PlayerWarpName.of(warpName), Optional.of(password));
+        services.scheduler().async(() -> services.usePlayerWarp()
+                .useFor(who, owner.get(), PlayerWarpName.of(warpName), Optional.of(password)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -160,7 +175,10 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
-        services.visibility().setPublic(ref(sender), PlayerWarpName.of(ctx.getArgument("name", String.class)));
+        PlayerRef who = ref(sender);
+        PlayerWarpName warp = PlayerWarpName.of(ctx.getArgument("name", String.class));
+        // The use case reads the warp then writes its visibility; run the read off the tick thread.
+        services.scheduler().async(() -> services.visibility().setPublic(who, warp));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -169,7 +187,9 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
-        services.visibility().setPrivate(ref(sender), PlayerWarpName.of(ctx.getArgument("name", String.class)));
+        PlayerRef who = ref(sender);
+        PlayerWarpName warp = PlayerWarpName.of(ctx.getArgument("name", String.class));
+        services.scheduler().async(() -> services.visibility().setPrivate(who, warp));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -178,20 +198,24 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
+        PlayerRef who = ref(sender);
         String warpName = ctx.getArgument("name", String.class);
-        Optional<PlayerWarp> opt = services.repository().find(ref(sender), PlayerWarpName.of(warpName));
-        if (opt.isEmpty()) {
-            services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(warpName));
-            return 0;
-        }
-        PlayerWarp warp = opt.get();
-        PlayerWarp updated = warp.withLocked(!warp.isLocked());
-        services.repository().save(updated);
-
-        feedback.send(
-                sender,
-                PlayerwarpsMessageKey.PWARP_LOCK_TOGGLED,
-                Map.of("warp", warpName, "state", Boolean.toString(updated.isLocked())));
+        // The find + save both touch the database; run them off the tick thread, then bridge the confirmation.
+        services.scheduler().async(() -> {
+            Optional<PlayerWarp> opt = services.repository().find(who, PlayerWarpName.of(warpName));
+            if (opt.isEmpty()) {
+                services.usePlayerWarp().use(who, PlayerWarpName.of(warpName));
+                return;
+            }
+            PlayerWarp updated = opt.get().withLocked(!opt.get().isLocked());
+            services.repository().save(updated);
+            onPlayer(
+                    who,
+                    () -> feedback.send(
+                            sender,
+                            PlayerwarpsMessageKey.PWARP_LOCK_TOGGLED,
+                            Map.of("warp", warpName, "state", Boolean.toString(updated.isLocked()))));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -200,17 +224,20 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
+        PlayerRef who = ref(sender);
         String warpName = ctx.getArgument("name", String.class);
-        Optional<PlayerWarp> opt = services.repository().find(ref(sender), PlayerWarpName.of(warpName));
-        if (opt.isEmpty()) {
-            services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(warpName));
-            return 0;
-        }
-        PlayerWarp warp = opt.get();
-        PlayerWarp updated = warp.withPassword(Optional.empty());
-        services.repository().save(updated);
-
-        feedback.send(sender, PlayerwarpsMessageKey.PWARP_PASSWORD_CLEARED, Map.of("warp", warpName));
+        services.scheduler().async(() -> {
+            Optional<PlayerWarp> opt = services.repository().find(who, PlayerWarpName.of(warpName));
+            if (opt.isEmpty()) {
+                services.usePlayerWarp().use(who, PlayerWarpName.of(warpName));
+                return;
+            }
+            services.repository().save(opt.get().withPassword(Optional.empty()));
+            onPlayer(
+                    who,
+                    () -> feedback.send(
+                            sender, PlayerwarpsMessageKey.PWARP_PASSWORD_CLEARED, Map.of("warp", warpName)));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -219,18 +246,23 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
+        PlayerRef who = ref(sender);
         String warpName = ctx.getArgument("name", String.class);
         String password = ctx.getArgument("password", String.class);
-        Optional<PlayerWarp> opt = services.repository().find(ref(sender), PlayerWarpName.of(warpName));
-        if (opt.isEmpty()) {
-            services.usePlayerWarp().use(ref(sender), PlayerWarpName.of(warpName));
-            return 0;
-        }
-        PlayerWarp warp = opt.get();
-        PlayerWarp updated = warp.withPassword(Optional.of(password));
-        services.repository().save(updated);
-
-        feedback.send(sender, PlayerwarpsMessageKey.PWARP_PASSWORD_SET, Map.of("warp", warpName, "password", password));
+        services.scheduler().async(() -> {
+            Optional<PlayerWarp> opt = services.repository().find(who, PlayerWarpName.of(warpName));
+            if (opt.isEmpty()) {
+                services.usePlayerWarp().use(who, PlayerWarpName.of(warpName));
+                return;
+            }
+            services.repository().save(opt.get().withPassword(Optional.of(password)));
+            onPlayer(
+                    who,
+                    () -> feedback.send(
+                            sender,
+                            PlayerwarpsMessageKey.PWARP_PASSWORD_SET,
+                            Map.of("warp", warpName, "password", password)));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -239,6 +271,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
+        PlayerRef rater = ref(sender);
         String warpName = ctx.getArgument("name", String.class);
         String ownerName = ctx.getArgument("owner", String.class);
         double rating = ctx.getArgument("rating", Double.class);
@@ -249,21 +282,29 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
             return 0;
         }
         PlayerRef owner = ownerOpt.get();
-
-        if (!services.repository().exists(owner, PlayerWarpName.of(warpName))) {
-            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", warpName));
-            return 0;
-        }
-
-        Optional<PlayerWarp> warpOpt = services.repository().find(owner, PlayerWarpName.of(warpName));
-        if (warpOpt.isPresent() && !warpOpt.get().isPublic() && !owner.uuid().equals(sender.getUniqueId())) {
-            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_PUBLIC, Map.of("warp", warpName));
-            return 0;
-        }
-
-        services.repository().rate(owner, PlayerWarpName.of(warpName), sender.getUniqueId(), rating);
-        feedback.send(
-                sender, PlayerwarpsMessageKey.PWARP_RATED, Map.of("warp", warpName, "rating", Double.toString(rating)));
+        // The existence + visibility check and the rating write all touch the database; run them off-thread.
+        services.scheduler().async(() -> {
+            Optional<PlayerWarp> warpOpt = services.repository().find(owner, PlayerWarpName.of(warpName));
+            if (warpOpt.isEmpty()) {
+                onPlayer(
+                        rater,
+                        () -> feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", warpName)));
+                return;
+            }
+            if (!warpOpt.get().isPublic() && !owner.uuid().equals(rater.uuid())) {
+                onPlayer(
+                        rater,
+                        () -> feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_PUBLIC, Map.of("warp", warpName)));
+                return;
+            }
+            services.repository().rate(owner, PlayerWarpName.of(warpName), rater.uuid(), rating);
+            onPlayer(
+                    rater,
+                    () -> feedback.send(
+                            sender,
+                            PlayerwarpsMessageKey.PWARP_RATED,
+                            Map.of("warp", warpName, "rating", Double.toString(rating))));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -272,6 +313,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         if (sender == null) {
             return 0;
         }
+        PlayerRef viewer = ref(sender);
         String warpName = ctx.getArgument("name", String.class);
         String ownerName = ctx.getArgument("owner", String.class);
 
@@ -281,14 +323,22 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
             return 0;
         }
         PlayerRef owner = ownerOpt.get();
-
-        if (!services.repository().exists(owner, PlayerWarpName.of(warpName))) {
-            feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", warpName));
-            return 0;
-        }
-
-        double avg = services.repository().averageRating(owner, PlayerWarpName.of(warpName));
-        feedback.send(sender, PlayerwarpsMessageKey.PWARP_RATING, Map.of("warp", warpName, "rating", oneDecimal(avg)));
+        // The existence check and the rating read both touch the database; run them off the tick thread.
+        services.scheduler().async(() -> {
+            if (!services.repository().exists(owner, PlayerWarpName.of(warpName))) {
+                onPlayer(
+                        viewer,
+                        () -> feedback.send(sender, PlayerwarpsMessageKey.PWARP_NOT_FOUND, Map.of("warp", warpName)));
+                return;
+            }
+            double avg = services.repository().averageRating(owner, PlayerWarpName.of(warpName));
+            onPlayer(
+                    viewer,
+                    () -> feedback.send(
+                            sender,
+                            PlayerwarpsMessageKey.PWARP_RATING,
+                            Map.of("warp", warpName, "rating", oneDecimal(avg))));
+        });
         return Command.SINGLE_SUCCESS;
     }
 

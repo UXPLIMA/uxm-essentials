@@ -131,18 +131,24 @@ public final class VaultCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef viewer = BukkitRefs.toRef(player);
-        List<Integer> owned = ownedIndices(viewer);
-        // With several vaults owned, open the picker menu (or fall back to the chat list when it is disabled);
-        // a single owned vault (or none) opens vault 1 directly, as before.
-        if (owned.size() > 1) {
-            if (services.selectorEnabled()) {
-                services.selector().open(player, viewer);
-            } else {
-                notifier.list(viewer, owned);
-            }
-            return Command.SINGLE_SUCCESS;
-        }
-        return openOwn(ctx, owned.isEmpty() ? DEFAULT_INDEX : owned.get(0));
+        // The owned-vault index read is a database scan; run it off the tick thread, then decide on the
+        // viewer's region thread which window to open. With several vaults owned, open the picker menu (or fall
+        // back to the chat list when it is disabled); a single owned vault (or none) opens vault 1 directly.
+        scheduler.async(() -> {
+            List<Integer> owned = ownedIndices(viewer);
+            scheduler.onEntity(viewer, () -> {
+                if (owned.size() > 1) {
+                    if (services.selectorEnabled()) {
+                        services.selector().open(player, viewer);
+                    } else {
+                        notifier.list(viewer, owned);
+                    }
+                    return;
+                }
+                openOwn(player, viewer, owned.isEmpty() ? DEFAULT_INDEX : owned.get(0));
+            });
+        });
+        return Command.SINGLE_SUCCESS;
     }
 
     /** The ascending one-based indices of {@code viewer}'s vaults, read from the summary listing. */
@@ -158,12 +164,16 @@ public final class VaultCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef viewer = BukkitRefs.toRef(player);
-        List<Integer> owned = ownedIndices(viewer);
-        notifier.showInfo(
-                viewer,
-                owned.size(),
-                services.amountQuota().resolve(viewer),
-                services.sizeQuota().resolve(viewer));
+        // The owned-count read scans the database; run it off the tick thread. The info notice is read-only and
+        // delivered through the sink, which bridges to the viewer's region thread itself.
+        scheduler.async(() -> {
+            int owned = ownedIndices(viewer).size();
+            notifier.showInfo(
+                    viewer,
+                    owned,
+                    services.amountQuota().resolve(viewer),
+                    services.sizeQuota().resolve(viewer));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -172,14 +182,24 @@ public final class VaultCommand implements CommandRegistration {
         if (player == null) {
             return Command.SINGLE_SUCCESS;
         }
-        PlayerRef viewer = BukkitRefs.toRef(player);
-        Result<Vault, VaultError> resolved = services.openVault().open(viewer, index);
-        if (resolved.isErr()) {
-            rejectOwn(viewer, index, resolved.errorOrThrow());
-            return Command.SINGLE_SUCCESS;
-        }
-        openWindow(player, viewer, viewer, resolved.orElseThrow());
+        openOwn(player, BukkitRefs.toRef(player), index);
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Resolve and open {@code viewer}'s vault {@code index}. The open reads the vault's contents from the
+     * database, so the read runs off the tick thread; the window open (and any rejection) bridges back to the
+     * viewer's region thread.
+     */
+    private void openOwn(Player player, PlayerRef viewer, int index) {
+        scheduler.async(() -> {
+            Result<Vault, VaultError> resolved = services.openVault().open(viewer, index);
+            if (resolved.isErr()) {
+                rejectOwn(viewer, index, resolved.errorOrThrow());
+                return;
+            }
+            openWindow(player, viewer, viewer, resolved.orElseThrow());
+        });
     }
 
     private int openOther(CommandContext<CommandSourceStack> ctx, int index) {
@@ -193,9 +213,13 @@ public final class VaultCommand implements CommandRegistration {
             return Command.SINGLE_SUCCESS;
         }
         PlayerRef owner = BukkitRefs.toRef(resolved.get());
-        Vault vault = services.openAdminVault().open(actor, owner, index);
-        openWindow(staff, actor, owner, vault);
-        notifier.adminOpened(actor, owner, index);
+        // The admin open reads the owner's vault contents from the database; run it off the tick thread, then
+        // bridge the window open back to the staff member's region thread (the staff member is the one viewing).
+        scheduler.async(() -> {
+            Vault vault = services.openAdminVault().open(actor, owner, index);
+            openWindow(staff, actor, owner, vault);
+            notifier.adminOpened(actor, owner, index);
+        });
         return Command.SINGLE_SUCCESS;
     }
 
