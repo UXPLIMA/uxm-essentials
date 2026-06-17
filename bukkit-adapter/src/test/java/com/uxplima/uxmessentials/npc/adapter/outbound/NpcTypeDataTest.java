@@ -73,6 +73,8 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("armor_stand_right_leg")).isTrue();
         assertThat(NpcTypeData.isKnownKey("interaction_width")).isTrue();
         assertThat(NpcTypeData.isKnownKey("interaction_height")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("block")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("item")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -206,5 +208,15 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("interaction_width", "0")).isTrue();
         assertThat(NpcTypeData.isValidValue("interaction_width", "-1")).isFalse();
         assertThat(NpcTypeData.isValidValue("interaction_height", "wide")).isFalse();
+    }
+
+    @Test
+    void blockAndItemContentAcceptAnyNonBlankValue() {
+        // Validated leniently (non-blank) at command time so the check stays Bukkit-free; the render path resolves
+        // the BlockData/item and skips fail-soft if it cannot.
+        assertThat(NpcTypeData.isValidValue("block", "stone")).isTrue();
+        assertThat(NpcTypeData.isValidValue("item", "diamond")).isTrue();
+        assertThat(NpcTypeData.isValidValue("block", "   ")).isFalse();
+        assertThat(NpcTypeData.isValidValue("item", "")).isFalse();
     }
 }

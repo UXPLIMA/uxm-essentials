@@ -156,10 +156,11 @@ abstract class NpcCommandSupport {
      * Whether {@code type} is a non-living display/interaction entity an NPC can render as. These are packet-spawned
      * like any other type and carry their visual through display-content type-data keys; the set grows as each
      * type's content support lands. Currently: {@link EntityType#INTERACTION} (an invisible, sized, clickable
-     * hitbox that still carries the NPC's click command and action chain).
+     * hitbox that still carries the NPC's click command and action chain), {@link EntityType#BLOCK_DISPLAY} and
+     * {@link EntityType#ITEM_DISPLAY} (a floating block/item, content set via the {@code block}/{@code item} keys).
      */
     static boolean isSupportedDisplayType(EntityType type) {
-        return type == EntityType.INTERACTION;
+        return type == EntityType.INTERACTION || type == EntityType.BLOCK_DISPLAY || type == EntityType.ITEM_DISPLAY;
     }
 
     /** Suggest the {@code words} that start with what the operator has typed, case-insensitively. */

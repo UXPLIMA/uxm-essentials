@@ -74,6 +74,8 @@ final class NpcDataCommands extends NpcCommandSupport {
             "armor_stand_right_leg",
             "interaction_width",
             "interaction_height",
+            "block",
+            "item",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -119,6 +121,10 @@ final class NpcDataCommands extends NpcCommandSupport {
     private static final List<String> ARMOR_STAND_POSE_VALUES = List.of("0,0,0");
     /** Sample interaction hitbox sizes (blocks), offered as a hint for the interaction width/height keys. */
     private static final List<String> INTERACTION_SIZE_VALUES = List.of("1.0", "2.0");
+    /** Sample block-data strings, offered as a hint for {@code block} (any block data is accepted). */
+    private static final List<String> BLOCK_VALUES = List.of("stone", "oak_log", "glass");
+    /** Sample item names, offered as a hint for {@code item} (any material name or {@code b64:} token is accepted). */
+    private static final List<String> ITEM_VALUES = List.of("diamond", "golden_apple", "diamond_sword");
 
     NpcDataCommands(
             NpcServices services,
@@ -222,6 +228,8 @@ final class NpcDataCommands extends NpcCommandSupport {
                     "armor_stand_left_leg",
                     "armor_stand_right_leg" -> suggest(builder, ARMOR_STAND_POSE_VALUES);
             case "interaction_width", "interaction_height" -> suggest(builder, INTERACTION_SIZE_VALUES);
+            case "block" -> suggest(builder, BLOCK_VALUES);
+            case "item" -> suggest(builder, ITEM_VALUES);
             default -> builder.buildFuture();
         };
     }

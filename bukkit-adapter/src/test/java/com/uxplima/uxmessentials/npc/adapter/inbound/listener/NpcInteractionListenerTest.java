@@ -496,6 +496,16 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object blockDisplayState(int entityId, org.bukkit.block.data.BlockData blockData) {
+            return new Object();
+        }
+
+        @Override
+        public Object itemDisplayItem(int entityId, org.bukkit.inventory.ItemStack item) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

@@ -5,10 +5,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import org.bukkit.Bukkit;
 import org.bukkit.DyeColor;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Horse;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -21,7 +24,8 @@ import org.jspecify.annotations.Nullable;
  * The per-entity-type appearance variants beyond the baby/size/charged/villager core of {@link NpcTypeData}: a
  * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
  * colour, a shulker's peek, a panda's gene, a tropical fish's variant, the goat/allay/piglin/camel/bee/vex state
- * flags, an armor stand's client flags and six poses, and an interaction entity's hitbox size. Kept in its own class so
+ * flags, an armor stand's client flags and six poses, an interaction entity's hitbox size, and a block/item
+ * display's shown block/item. Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -69,6 +73,8 @@ final class NpcVariantData {
     static final String KEY_AS_RIGHT_LEG = "armor_stand_right_leg";
     static final String KEY_INTERACTION_WIDTH = "interaction_width";
     static final String KEY_INTERACTION_HEIGHT = "interaction_height";
+    static final String KEY_BLOCK = "block";
+    static final String KEY_ITEM = "item";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -157,6 +163,8 @@ final class NpcVariantData {
             applyArmorStandPose(packets, viewer, id, type, data, npc, log, pose);
         }
         applyInteraction(packets, viewer, id, type, data, npc, log);
+        applyBlockDisplay(packets, viewer, id, type, data, npc, log);
+        applyItemDisplay(packets, viewer, id, type, data, npc, log);
         NpcNameVariantData.apply(packets, viewer, id, type, data, npc, log);
     }
 
@@ -367,6 +375,65 @@ final class NpcVariantData {
         packets.send(viewer, packets.interactionSize(id, width, height));
     }
 
+    /**
+     * Apply a block-display entity's shown block: the {@code block} key (a BlockData string like {@code stone} or
+     * {@code minecraft:oak_log[axis=y]}) sets it. Sent only to {@code BLOCK_DISPLAY}; an unparseable block-data
+     * string is skipped fail-soft.
+     */
+    private static void applyBlockDisplay(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_BLOCK);
+        if (value == null) {
+            return;
+        }
+        if (type != EntityType.BLOCK_DISPLAY) {
+            skip(log, npc, KEY_BLOCK, type, "type is not a block display");
+            return;
+        }
+        BlockData block = parseBlockData(value);
+        if (block == null) {
+            skip(log, npc, KEY_BLOCK, type, "value is not valid block data: " + value);
+            return;
+        }
+        packets.send(viewer, packets.blockDisplayState(id, block));
+    }
+
+    /**
+     * Apply an item-display entity's shown item: the {@code item} key (a material name or a {@code b64:} item
+     * token, the same grammar as equipment) sets it. Sent only to {@code ITEM_DISPLAY}; an unresolvable token is
+     * skipped fail-soft.
+     */
+    private static void applyItemDisplay(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_ITEM);
+        if (value == null) {
+            return;
+        }
+        if (type != EntityType.ITEM_DISPLAY) {
+            skip(log, npc, KEY_ITEM, type, "type is not an item display");
+            return;
+        }
+        ItemStack item = EquipmentPayloads.resolve(value).orElse(null);
+        if (item == null) {
+            skip(log, npc, KEY_ITEM, type, "value is not a material or item token: " + value);
+            return;
+        }
+        packets.send(viewer, packets.itemDisplayItem(id, item));
+    }
+
+    /** Parse a BlockData string (material or full state), or {@code null} when it is blank or invalid. */
+    private static @Nullable BlockData parseBlockData(String value) {
+        String trimmed = value.strip();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        try {
+            return Bukkit.createBlockData(trimmed.toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException invalid) {
+            return null;
+        }
+    }
+
     /** A stored interaction dimension as a non-negative finite float, defaulting an absent/invalid one to 1 block. */
     private static float dimension(@Nullable String value) {
         Float parsed = value == null ? null : parseFloat(value);
@@ -438,6 +505,9 @@ final class NpcVariantData {
                     KEY_AS_LEFT_LEG,
                     KEY_AS_RIGHT_LEG -> parseAngles(value) != null;
             case KEY_INTERACTION_WIDTH, KEY_INTERACTION_HEIGHT -> isDimension(value);
+                // Block/item content is validated leniently (non-blank) so this stays Bukkit-free; the apply path
+                // resolves the BlockData/item and skips fail-soft if it is unparseable.
+            case KEY_BLOCK, KEY_ITEM -> !value.isBlank();
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -616,5 +686,7 @@ final class NpcVariantData {
             KEY_AS_LEFT_LEG,
             KEY_AS_RIGHT_LEG,
             KEY_INTERACTION_WIDTH,
-            KEY_INTERACTION_HEIGHT);
+            KEY_INTERACTION_HEIGHT,
+            KEY_BLOCK,
+            KEY_ITEM);
 }

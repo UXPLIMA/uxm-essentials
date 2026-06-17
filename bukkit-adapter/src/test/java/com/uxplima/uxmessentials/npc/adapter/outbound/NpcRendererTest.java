@@ -788,6 +788,28 @@ class NpcRendererTest {
     }
 
     @Test
+    void showsTheBlockOnABlockDisplayNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("BLOCK_DISPLAY").withTypeData("block", "stone"));
+
+        assertThat(packets.blockDisplayStates).hasSize(1);
+        assertThat(packets.blockDisplayStates.get(0).material()).isEqualTo(org.bukkit.Material.STONE);
+    }
+
+    @Test
+    void showsTheItemOnAnItemDisplayNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("ITEM_DISPLAY").withTypeData("item", "DIAMOND"));
+
+        assertThat(packets.itemDisplayItems).hasSize(1);
+        assertThat(packets.itemDisplayItems.get(0).material()).isEqualTo(org.bukkit.Material.DIAMOND);
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1337,6 +1359,8 @@ class NpcRendererTest {
         private final List<ArmorStandFlags> armorStandFlags = new ArrayList<>();
         private final List<ArmorStandPose> armorStandPoses = new ArrayList<>();
         private final List<InteractionSize> interactionSizes = new ArrayList<>();
+        private final List<BlockDisplayState> blockDisplayStates = new ArrayList<>();
+        private final List<ItemDisplayItem> itemDisplayItems = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1633,6 +1657,20 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object blockDisplayState(int entityId, org.bukkit.block.data.BlockData blockData) {
+            BlockDisplayState packet = new BlockDisplayState(entityId, blockData.getMaterial());
+            blockDisplayStates.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object itemDisplayItem(int entityId, org.bukkit.inventory.ItemStack item) {
+            ItemDisplayItem packet = new ItemDisplayItem(entityId, item.getType());
+            itemDisplayItems.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1807,6 +1845,10 @@ class NpcRendererTest {
                 int entityId, com.uxplima.uxmlib.packet.npc.ArmorStandPart part, float x, float y, float z) {}
 
         private record InteractionSize(int entityId, float width, float height) {}
+
+        private record BlockDisplayState(int entityId, org.bukkit.Material material) {}
+
+        private record ItemDisplayItem(int entityId, org.bukkit.Material material) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 
