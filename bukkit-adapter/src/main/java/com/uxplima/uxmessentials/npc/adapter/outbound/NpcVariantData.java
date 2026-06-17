@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The per-entity-type appearance variants beyond the baby/size/charged/villager core of {@link NpcTypeData}: a
  * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
- * colour, a shulker's peek, a panda's gene, and the goat/allay/piglin/camel state flags. Kept in its own class so
+ * colour, a shulker's peek, a panda's gene, and the goat/allay/piglin/camel/bee/vex state flags. Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -52,6 +52,8 @@ final class NpcVariantData {
     static final String KEY_ALLAY_DANCING = "allay_dancing";
     static final String KEY_PIGLIN_DANCING = "piglin_dancing";
     static final String KEY_CAMEL_DASH = "camel_dash";
+    static final String KEY_BEE_NECTAR = "bee_nectar";
+    static final String KEY_VEX_CHARGING = "vex_charging";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -93,7 +95,9 @@ final class NpcVariantData {
             new BoolVariant(KEY_GOAT_SCREAMING, EntityType.GOAT, NpcPackets::goatScreaming),
             new BoolVariant(KEY_ALLAY_DANCING, EntityType.ALLAY, NpcPackets::allayDancing),
             new BoolVariant(KEY_PIGLIN_DANCING, EntityType.PIGLIN, NpcPackets::piglinDancing),
-            new BoolVariant(KEY_CAMEL_DASH, EntityType.CAMEL, NpcPackets::camelDash));
+            new BoolVariant(KEY_CAMEL_DASH, EntityType.CAMEL, NpcPackets::camelDash),
+            new BoolVariant(KEY_BEE_NECTAR, EntityType.BEE, NpcPackets::beeNectar),
+            new BoolVariant(KEY_VEX_CHARGING, EntityType.VEX, NpcPackets::vexCharging));
 
     private NpcVariantData() {}
 
@@ -258,7 +262,12 @@ final class NpcVariantData {
             case KEY_HORSE_MARKINGS -> isInRange(value, MAX_HORSE_MARKINGS);
             case KEY_HORSE_STYLE -> parseStyle(value) != null;
             case KEY_SHEEP_COLOR, KEY_WOLF_COLLAR, KEY_SHULKER_COLOR -> parseColorId(value) != null;
-            case KEY_GOAT_SCREAMING, KEY_ALLAY_DANCING, KEY_PIGLIN_DANCING, KEY_CAMEL_DASH -> parseBool(value) != null;
+            case KEY_GOAT_SCREAMING,
+                    KEY_ALLAY_DANCING,
+                    KEY_PIGLIN_DANCING,
+                    KEY_CAMEL_DASH,
+                    KEY_BEE_NECTAR,
+                    KEY_VEX_CHARGING -> parseBool(value) != null;
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -419,5 +428,7 @@ final class NpcVariantData {
             KEY_GOAT_SCREAMING,
             KEY_ALLAY_DANCING,
             KEY_PIGLIN_DANCING,
-            KEY_CAMEL_DASH);
+            KEY_CAMEL_DASH,
+            KEY_BEE_NECTAR,
+            KEY_VEX_CHARGING);
 }

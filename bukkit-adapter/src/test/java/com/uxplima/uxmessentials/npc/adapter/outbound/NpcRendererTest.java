@@ -706,6 +706,28 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesBeeNectarToABeeNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("BEE").withTypeData("bee_nectar", "true"));
+
+        assertThat(packets.beeNectars).hasSize(1);
+        assertThat(packets.beeNectars.get(0).hasNectar()).isTrue();
+    }
+
+    @Test
+    void appliesVexChargingToAVexNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("VEX").withTypeData("vex_charging", "true"));
+
+        assertThat(packets.vexChargings).hasSize(1);
+        assertThat(packets.vexChargings.get(0).charging()).isTrue();
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1249,6 +1271,8 @@ class NpcRendererTest {
         private final List<AllayDancing> allayDancings = new ArrayList<>();
         private final List<PiglinDancing> piglinDancings = new ArrayList<>();
         private final List<CamelDash> camelDashes = new ArrayList<>();
+        private final List<BeeNectar> beeNectars = new ArrayList<>();
+        private final List<VexCharging> vexChargings = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1501,6 +1525,20 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object beeNectar(int entityId, boolean hasNectar) {
+            BeeNectar packet = new BeeNectar(entityId, hasNectar);
+            beeNectars.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object vexCharging(int entityId, boolean charging) {
+            VexCharging packet = new VexCharging(entityId, charging);
+            vexChargings.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1661,6 +1699,10 @@ class NpcRendererTest {
         private record PiglinDancing(int entityId, boolean dancing) {}
 
         private record CamelDash(int entityId, boolean dashing) {}
+
+        private record BeeNectar(int entityId, boolean hasNectar) {}
+
+        private record VexCharging(int entityId, boolean charging) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

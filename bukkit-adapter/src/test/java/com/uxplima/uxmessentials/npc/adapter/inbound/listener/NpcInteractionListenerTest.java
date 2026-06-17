@@ -464,6 +464,16 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object beeNectar(int entityId, boolean hasNectar) {
+            return new Object();
+        }
+
+        @Override
+        public Object vexCharging(int entityId, boolean charging) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

@@ -59,6 +59,8 @@ final class NpcDataCommands extends NpcCommandSupport {
             "allay_dancing",
             "piglin_dancing",
             "camel_dash",
+            "bee_nectar",
+            "vex_charging",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -170,8 +172,14 @@ final class NpcDataCommands extends NpcCommandSupport {
             CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
         String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
         return switch (key) {
-            case "baby", "charged", "goat_screaming", "allay_dancing", "piglin_dancing", "camel_dash" -> suggest(
-                    builder, BOOLEAN_VALUES);
+            case "baby",
+                    "charged",
+                    "goat_screaming",
+                    "allay_dancing",
+                    "piglin_dancing",
+                    "camel_dash",
+                    "bee_nectar",
+                    "vex_charging" -> suggest(builder, BOOLEAN_VALUES);
             case "cat_variant" -> suggest(builder, CAT_VARIANT_VALUES);
             case "frog_variant" -> suggest(builder, FROG_VARIANT_VALUES);
             case "horse_color" -> suggest(builder, HORSE_COLOR_VALUES);
