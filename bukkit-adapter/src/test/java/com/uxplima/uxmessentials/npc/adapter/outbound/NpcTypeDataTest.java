@@ -214,6 +214,15 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("axolotl_playing_dead", "true")).isTrue();
         assertThat(NpcTypeData.isValidValue("illager_celebrating", "false")).isTrue();
         assertThat(NpcTypeData.isValidValue("illager_celebrating", "party")).isFalse();
+        assertThat(NpcTypeData.isKnownKey("wolf_sitting")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("cat_sitting")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("panda_eating")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("fox_pose")).isTrue();
+        assertThat(NpcTypeData.isValidValue("wolf_sitting", "true")).isTrue();
+        assertThat(NpcTypeData.isValidValue("panda_eating", "false")).isTrue();
+        assertThat(NpcTypeData.isValidValue("fox_pose", "sleeping")).isTrue();
+        assertThat(NpcTypeData.isValidValue("fox_pose", "crouching")).isTrue();
+        assertThat(NpcTypeData.isValidValue("fox_pose", "dancing")).isFalse();
     }
 
     @Test

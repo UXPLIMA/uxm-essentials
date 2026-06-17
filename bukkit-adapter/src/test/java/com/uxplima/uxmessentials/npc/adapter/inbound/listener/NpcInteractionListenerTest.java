@@ -601,6 +601,21 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object tameableSitting(int entityId, boolean sitting) {
+            return new Object();
+        }
+
+        @Override
+        public Object foxFlags(int entityId, boolean sitting, boolean sleeping, boolean crouching) {
+            return new Object();
+        }
+
+        @Override
+        public Object pandaEating(int entityId, boolean eating) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }

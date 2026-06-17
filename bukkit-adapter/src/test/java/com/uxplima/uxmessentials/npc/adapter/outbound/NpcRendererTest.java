@@ -982,6 +982,26 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesSittingPosesAndFoxPoseAndPandaEating() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("WOLF").withTypeData("wolf_sitting", "true"));
+        renderer.render(npcAt(viewer, 2.0).withEntityType("CAT").withTypeData("cat_sitting", "true"));
+        renderer.render(npcAt(viewer, 3.0).withEntityType("FOX").withTypeData("fox_pose", "sleeping"));
+        renderer.render(npcAt(viewer, 4.0).withEntityType("PANDA").withTypeData("panda_eating", "true"));
+
+        assertThat(packets.tameableSittings).hasSize(2);
+        assertThat(packets.tameableSittings).allMatch(rec -> rec.value());
+        assertThat(packets.foxFlagsList).hasSize(1);
+        assertThat(packets.foxFlagsList.get(0).sleeping()).isTrue();
+        assertThat(packets.foxFlagsList.get(0).sitting()).isFalse();
+        assertThat(packets.foxFlagsList.get(0).crouching()).isFalse();
+        assertThat(packets.pandaEatings).hasSize(1);
+        assertThat(packets.pandaEatings.get(0).value()).isTrue();
+    }
+
+    @Test
     void doesNotSendACatVariantToAFrogNorAFrogVariantToACat() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1485,6 +1505,9 @@ class NpcRendererTest {
         private final List<NameVariantRec> pigVariants = new ArrayList<>();
         private final List<BoolRec> axolotlPlayingDeads = new ArrayList<>();
         private final List<BoolRec> raiderCelebratings = new ArrayList<>();
+        private final List<BoolRec> tameableSittings = new ArrayList<>();
+        private final List<BoolRec> pandaEatings = new ArrayList<>();
+        private final List<FoxRec> foxFlagsList = new ArrayList<>();
         // When set, catVariant/frogVariant return null to mimic the lib's fail-soft signal (registry not resolved).
         private boolean dropNameVariants;
         private final List<Sent> sent = new ArrayList<>();
@@ -1926,6 +1949,27 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object tameableSitting(int entityId, boolean sitting) {
+            BoolRec packet = new BoolRec(entityId, sitting);
+            tameableSittings.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object foxFlags(int entityId, boolean sitting, boolean sleeping, boolean crouching) {
+            FoxRec packet = new FoxRec(entityId, sitting, sleeping, crouching);
+            foxFlagsList.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object pandaEating(int entityId, boolean eating) {
+            BoolRec packet = new BoolRec(entityId, eating);
+            pandaEatings.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -2088,6 +2132,8 @@ class NpcRendererTest {
         private record NameVariantRec(int entityId, String name) {}
 
         private record BoolRec(int entityId, boolean value) {}
+
+        private record FoxRec(int entityId, boolean sitting, boolean sleeping, boolean crouching) {}
 
         private record FrogVariant(int entityId, String name) {}
 

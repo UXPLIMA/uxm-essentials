@@ -63,6 +63,10 @@ final class NpcDataCommands extends NpcCommandSupport {
             "vex_charging",
             "axolotl_playing_dead",
             "illager_celebrating",
+            "wolf_sitting",
+            "cat_sitting",
+            "panda_eating",
+            "fox_pose",
             "tropical_fish",
             "armor_stand_small",
             "armor_stand_arms",
@@ -107,6 +111,8 @@ final class NpcDataCommands extends NpcCommandSupport {
             "all_black");
     /** The frog-variant names, offered as tab completions for {@code frog_variant}. */
     private static final List<String> FROG_VARIANT_VALUES = List.of("temperate", "warm", "cold");
+
+    private static final List<String> FOX_POSE_VALUES = List.of("standing", "sitting", "sleeping", "crouching");
     /** The wolf coat-variant names, offered as tab completions for {@code wolf_variant}. */
     private static final List<String> WOLF_VARIANT_VALUES =
             List.of("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped");
@@ -236,10 +242,14 @@ final class NpcDataCommands extends NpcCommandSupport {
                     "vex_charging",
                     "axolotl_playing_dead",
                     "illager_celebrating",
+                    "wolf_sitting",
+                    "cat_sitting",
+                    "panda_eating",
                     "armor_stand_small",
                     "armor_stand_arms",
                     "armor_stand_no_baseplate",
                     "armor_stand_marker" -> suggest(builder, BOOLEAN_VALUES);
+            case "fox_pose" -> suggest(builder, FOX_POSE_VALUES);
             case "cat_variant" -> suggest(builder, CAT_VARIANT_VALUES);
             case "frog_variant" -> suggest(builder, FROG_VARIANT_VALUES);
             case "wolf_variant" -> suggest(builder, WOLF_VARIANT_VALUES);

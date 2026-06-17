@@ -88,6 +88,10 @@ final class NpcVariantData {
     static final String KEY_DISPLAY_TRANSLATION = "display_translation";
     static final String KEY_AXOLOTL_PLAYING_DEAD = "axolotl_playing_dead";
     static final String KEY_ILLAGER_CELEBRATING = "illager_celebrating";
+    static final String KEY_WOLF_SITTING = "wolf_sitting";
+    static final String KEY_CAT_SITTING = "cat_sitting";
+    static final String KEY_PANDA_EATING = "panda_eating";
+    static final String KEY_FOX_POSE = "fox_pose";
 
     /** The raider types a {@code Raider}-level attribute (celebrating) may render on. */
     private static final Set<EntityType> RAIDER_TYPES = Set.of(
@@ -159,7 +163,13 @@ final class NpcVariantData {
             new BoolVariant(KEY_CAMEL_DASH, EntityType.CAMEL, NpcPackets::camelDash),
             new BoolVariant(KEY_BEE_NECTAR, EntityType.BEE, NpcPackets::beeNectar),
             new BoolVariant(KEY_VEX_CHARGING, EntityType.VEX, NpcPackets::vexCharging),
-            new BoolVariant(KEY_AXOLOTL_PLAYING_DEAD, EntityType.AXOLOTL, NpcPackets::axolotlPlayingDead));
+            new BoolVariant(KEY_AXOLOTL_PLAYING_DEAD, EntityType.AXOLOTL, NpcPackets::axolotlPlayingDead),
+            new BoolVariant(KEY_WOLF_SITTING, EntityType.WOLF, NpcPackets::tameableSitting),
+            new BoolVariant(KEY_CAT_SITTING, EntityType.CAT, NpcPackets::tameableSitting),
+            new BoolVariant(KEY_PANDA_EATING, EntityType.PANDA, NpcPackets::pandaEating));
+
+    /** The fox pose values the {@code fox_pose} key accepts; each lights exactly one bit (or none for standing). */
+    private static final Set<String> FOX_POSE_VALUES = Set.of("standing", "sitting", "sleeping", "crouching");
 
     private NpcVariantData() {}
 
@@ -187,6 +197,7 @@ final class NpcVariantData {
         }
         applyInteraction(packets, viewer, id, type, data, npc, log);
         applyCelebrating(packets, viewer, id, type, data, npc, log);
+        applyFoxPose(packets, viewer, id, type, data, npc, log);
         applyBlockDisplay(packets, viewer, id, type, data, npc, log);
         applyItemDisplay(packets, viewer, id, type, data, npc, log);
         applyTextDisplay(packets, viewer, id, type, data, npc, log);
@@ -474,6 +485,30 @@ final class NpcVariantData {
         packets.send(viewer, packets.raiderCelebrating(id, celebrating));
     }
 
+    /**
+     * Apply a fox's pose (the {@code fox_pose} key): one of {@code standing}/{@code sitting}/{@code sleeping}/{@code
+     * crouching}. The three poses are mutually exclusive bits in the one fox flags byte, so exactly one is lit.
+     */
+    private static void applyFoxPose(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_FOX_POSE);
+        if (value == null) {
+            return;
+        }
+        if (type != EntityType.FOX) {
+            skip(log, npc, KEY_FOX_POSE, type, "type is not a fox");
+            return;
+        }
+        String pose = value.toLowerCase(Locale.ROOT);
+        if (!FOX_POSE_VALUES.contains(pose)) {
+            skip(log, npc, KEY_FOX_POSE, type, "value is not a known fox pose: " + value);
+            return;
+        }
+        packets.send(
+                viewer,
+                packets.foxFlags(id, pose.equals("sitting"), pose.equals("sleeping"), pose.equals("crouching")));
+    }
+
     /** Whether {@code type} is a visible display entity (block/item/text) the shared scale/billboard apply to. */
     private static boolean isVisualDisplay(EntityType type) {
         return type == EntityType.BLOCK_DISPLAY || type == EntityType.ITEM_DISPLAY || type == EntityType.TEXT_DISPLAY;
@@ -721,10 +756,14 @@ final class NpcVariantData {
                     KEY_VEX_CHARGING,
                     KEY_AXOLOTL_PLAYING_DEAD,
                     KEY_ILLAGER_CELEBRATING,
+                    KEY_WOLF_SITTING,
+                    KEY_CAT_SITTING,
+                    KEY_PANDA_EATING,
                     KEY_AS_SMALL,
                     KEY_AS_ARMS,
                     KEY_AS_NO_BASEPLATE,
                     KEY_AS_MARKER -> parseBool(value) != null;
+            case KEY_FOX_POSE -> FOX_POSE_VALUES.contains(value.toLowerCase(Locale.ROOT));
             case KEY_AS_HEAD,
                     KEY_AS_BODY,
                     KEY_AS_LEFT_ARM,
@@ -918,6 +957,10 @@ final class NpcVariantData {
             KEY_VEX_CHARGING,
             KEY_AXOLOTL_PLAYING_DEAD,
             KEY_ILLAGER_CELEBRATING,
+            KEY_WOLF_SITTING,
+            KEY_CAT_SITTING,
+            KEY_PANDA_EATING,
+            KEY_FOX_POSE,
             KEY_TROPICAL_FISH,
             KEY_AS_SMALL,
             KEY_AS_ARMS,
