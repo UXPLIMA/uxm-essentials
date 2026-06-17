@@ -61,6 +61,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             "camel_dash",
             "bee_nectar",
             "vex_charging",
+            "tropical_fish",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -98,6 +99,10 @@ final class NpcDataCommands extends NpcCommandSupport {
     private static final List<String> SHULKER_PEEK_VALUES = List.of("0", "25", "50", "75", "100");
     /** The panda gene ids (0–6), offered as tab completions for {@code panda_gene}. */
     private static final List<String> PANDA_GENE_VALUES = List.of("0", "1", "2", "3", "4", "5", "6");
+    /** The predefined tropical-fish variant indices (0–21), offered as tab completions for {@code tropical_fish}. */
+    private static final List<String> TROPICAL_FISH_VALUES = java.util.stream.IntStream.rangeClosed(0, 21)
+            .mapToObj(Integer::toString)
+            .toList();
 
     NpcDataCommands(
             NpcServices services,
@@ -189,6 +194,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             case "sheep_color", "wolf_collar", "shulker_color" -> suggest(builder, SHEEP_COLOR_VALUES);
             case "shulker_peek" -> suggest(builder, SHULKER_PEEK_VALUES);
             case "panda_gene" -> suggest(builder, PANDA_GENE_VALUES);
+            case "tropical_fish" -> suggest(builder, TROPICAL_FISH_VALUES);
             default -> builder.buildFuture();
         };
     }

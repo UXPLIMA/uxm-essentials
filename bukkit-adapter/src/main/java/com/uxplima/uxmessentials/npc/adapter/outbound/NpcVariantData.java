@@ -54,6 +54,7 @@ final class NpcVariantData {
     static final String KEY_CAMEL_DASH = "camel_dash";
     static final String KEY_BEE_NECTAR = "bee_nectar";
     static final String KEY_VEX_CHARGING = "vex_charging";
+    static final String KEY_TROPICAL_FISH = "tropical_fish";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -67,6 +68,8 @@ final class NpcVariantData {
     private static final int MAX_SHULKER_PEEK = 100;
     /** The seven panda genes (0–6: normal, lazy, worried, playful, brown, weak, aggressive). */
     private static final int MAX_PANDA_GENE = 6;
+    /** The highest index into the server's 22 predefined common tropical-fish variants. */
+    private static final int MAX_TROPICAL_FISH_VARIANT = 21;
 
     /**
      * The single-key bounded-int variants: each is one Bukkit type, an inclusive max, and the lib method that
@@ -78,7 +81,12 @@ final class NpcVariantData {
             new IntVariant(KEY_AXOLOTL_VARIANT, EntityType.AXOLOTL, 4, NpcPackets::axolotlVariant),
             new IntVariant(KEY_FOX_TYPE, EntityType.FOX, 1, NpcPackets::foxType),
             new IntVariant(KEY_SHULKER_PEEK, EntityType.SHULKER, MAX_SHULKER_PEEK, NpcPackets::shulkerPeek),
-            new IntVariant(KEY_PANDA_GENE, EntityType.PANDA, MAX_PANDA_GENE, NpcPackets::pandaGene));
+            new IntVariant(KEY_PANDA_GENE, EntityType.PANDA, MAX_PANDA_GENE, NpcPackets::pandaGene),
+            new IntVariant(
+                    KEY_TROPICAL_FISH,
+                    EntityType.TROPICAL_FISH,
+                    MAX_TROPICAL_FISH_VARIANT,
+                    NpcPackets::tropicalFishVariant));
 
     /**
      * The single-key dye-colour variants: each is one Bukkit type and the lib method that ships a 0–15 colour id,
@@ -430,5 +438,6 @@ final class NpcVariantData {
             KEY_PIGLIN_DANCING,
             KEY_CAMEL_DASH,
             KEY_BEE_NECTAR,
-            KEY_VEX_CHARGING);
+            KEY_VEX_CHARGING,
+            KEY_TROPICAL_FISH);
 }

@@ -728,6 +728,17 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesTropicalFishVariantToATropicalFishNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("TROPICAL_FISH").withTypeData("tropical_fish", "7"));
+
+        assertThat(packets.tropicalFishVariants).hasSize(1);
+        assertThat(packets.tropicalFishVariants.get(0).variantIndex()).isEqualTo(7);
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1273,6 +1284,7 @@ class NpcRendererTest {
         private final List<CamelDash> camelDashes = new ArrayList<>();
         private final List<BeeNectar> beeNectars = new ArrayList<>();
         private final List<VexCharging> vexChargings = new ArrayList<>();
+        private final List<TropicalFishVariant> tropicalFishVariants = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1539,6 +1551,13 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object tropicalFishVariant(int entityId, int variantIndex) {
+            TropicalFishVariant packet = new TropicalFishVariant(entityId, variantIndex);
+            tropicalFishVariants.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1703,6 +1722,8 @@ class NpcRendererTest {
         private record BeeNectar(int entityId, boolean hasNectar) {}
 
         private record VexCharging(int entityId, boolean charging) {}
+
+        private record TropicalFishVariant(int entityId, int variantIndex) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

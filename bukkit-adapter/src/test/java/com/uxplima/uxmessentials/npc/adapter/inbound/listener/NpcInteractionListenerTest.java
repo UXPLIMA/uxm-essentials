@@ -474,6 +474,11 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object tropicalFishVariant(int entityId, int variantIndex) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

@@ -64,6 +64,7 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("camel_dash")).isTrue();
         assertThat(NpcTypeData.isKnownKey("bee_nectar")).isTrue();
         assertThat(NpcTypeData.isKnownKey("vex_charging")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("tropical_fish")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -106,6 +107,9 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("shulker_peek", "101")).isFalse();
         assertThat(NpcTypeData.isValidValue("panda_gene", "6")).isTrue();
         assertThat(NpcTypeData.isValidValue("panda_gene", "7")).isFalse();
+        assertThat(NpcTypeData.isValidValue("tropical_fish", "0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("tropical_fish", "21")).isTrue();
+        assertThat(NpcTypeData.isValidValue("tropical_fish", "22")).isFalse();
     }
 
     @Test
