@@ -67,6 +67,8 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                         .then(nameArgument()
                                 .then(Commands.argument("target", StringArgumentType.word())
                                         .executes(this::copy))))
+                .then(name("center", this::center))
+                .then(name("fix", this::fix))
                 .then(greedy("command", this::command))
                 .then(bool("lookatplayer", this::lookAtPlayer))
                 .then(skinCommands.node())
@@ -130,6 +132,24 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
         }
         NpcName target = NpcName.of(ctx.getArgument("target", String.class));
         services.copy().copy(ref(sender), nameArg(ctx), target, position(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int center(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.center().center(ref(sender), nameArg(ctx));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int fix(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.fix().fix(ref(sender), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 

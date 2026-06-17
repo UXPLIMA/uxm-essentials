@@ -3,10 +3,12 @@ package com.uxplima.uxmessentials.npc.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
+import com.uxplima.uxmessentials.npc.application.CenterNpc;
 import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
 import com.uxplima.uxmessentials.npc.application.CopyNpc;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
+import com.uxplima.uxmessentials.npc.application.FixNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
 import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
@@ -43,6 +45,8 @@ import org.jspecify.annotations.NullMarked;
  * @param list {@code /npc list}
  * @param move {@code /npc movehere}
  * @param copy {@code /npc copy}
+ * @param center {@code /npc center}
+ * @param fix {@code /npc fix}
  * @param skin {@code /npc skin}
  * @param type {@code /npc type}
  * @param command {@code /npc command}
@@ -74,6 +78,8 @@ public record NpcServices(
         ListNpcs list,
         MoveNpc move,
         CopyNpc copy,
+        CenterNpc center,
+        FixNpc fix,
         SetNpcSkin skin,
         SetNpcEntityType type,
         SetNpcClickCommand command,
@@ -104,6 +110,8 @@ public record NpcServices(
         Objects.requireNonNull(list, "list");
         Objects.requireNonNull(move, "move");
         Objects.requireNonNull(copy, "copy");
+        Objects.requireNonNull(center, "center");
+        Objects.requireNonNull(fix, "fix");
         Objects.requireNonNull(skin, "skin");
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(command, "command");
