@@ -159,278 +159,64 @@ public record Warp(
                 Optional.empty());
     }
 
+    /** A pre-filled builder for the internal transitions; the public surface is unchanged. */
+    WarpBuilder toBuilder() {
+        return new WarpBuilder(this);
+    }
+
     /** A copy re-anchored to {@code newLocation}, keeping the name, owner, gates, and original creation time. */
     public Warp movedTo(Position newLocation) {
-        return new Warp(
-                name,
-                Objects.requireNonNull(newLocation, "newLocation"),
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder()
+                .location(Objects.requireNonNull(newLocation, "newLocation"))
+                .build();
     }
 
     public Warp withCost(WarpCost newCost) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                Objects.requireNonNull(newCost, "newCost"),
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().cost(Objects.requireNonNull(newCost, "newCost")).build();
     }
 
     public Warp incrementedVisitors() {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors + 1,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().visitors(visitors + 1).build();
     }
 
     public Warp withPassword(Optional<String> newPassword) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                normalisePermission(newPassword),
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().password(normalisePermission(newPassword)).build();
     }
 
     public Warp withLocked(boolean locked) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                locked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().isLocked(locked).build();
     }
 
     public Warp withWelcomeMessages(java.util.List<WelcomeMessage> messages) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                Objects.requireNonNull(messages),
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().welcomeMessages(Objects.requireNonNull(messages)).build();
     }
 
     public Warp withDepartureSound(Optional<String> sound) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                sound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().departureSound(sound).build();
     }
 
     public Warp withArrivalSound(Optional<String> sound) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                sound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().arrivalSound(sound).build();
     }
 
     public Warp withDepartureParticle(Optional<String> particle) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                particle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().departureParticle(particle).build();
     }
 
     public Warp withArrivalParticle(Optional<String> particle) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                particle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().arrivalParticle(particle).build();
     }
 
     public Warp withWarmupOverride(Optional<Double> seconds) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                seconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().warmupOverrideSeconds(seconds).build();
     }
 
     public Warp withCooldownOverride(Optional<Double> seconds) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                seconds,
-                iconMaterial);
+        return toBuilder().cooldownOverrideSeconds(seconds).build();
     }
 
     public Warp withIconMaterial(Optional<String> material) {
-        return new Warp(
-                name,
-                location,
-                owner,
-                createdAt,
-                cost,
-                requiredPermission,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                material);
+        return toBuilder().iconMaterial(material).build();
     }
 
     /** True when the warp sets a cost the economy gate should charge (a non-free price). */
