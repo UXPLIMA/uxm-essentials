@@ -55,6 +55,9 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("llama_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("sheep_color")).isTrue();
         assertThat(NpcTypeData.isKnownKey("wolf_collar")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("shulker_color")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("shulker_peek")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("panda_gene")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -92,6 +95,11 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("fox_type", "1")).isTrue();
         assertThat(NpcTypeData.isValidValue("fox_type", "2")).isFalse();
         assertThat(NpcTypeData.isValidValue("fox_type", "-1")).isFalse();
+        assertThat(NpcTypeData.isValidValue("shulker_peek", "0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("shulker_peek", "100")).isTrue();
+        assertThat(NpcTypeData.isValidValue("shulker_peek", "101")).isFalse();
+        assertThat(NpcTypeData.isValidValue("panda_gene", "6")).isTrue();
+        assertThat(NpcTypeData.isValidValue("panda_gene", "7")).isFalse();
     }
 
     @Test
@@ -134,5 +142,15 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("wolf_collar", "15")).isTrue();
         assertThat(NpcTypeData.isValidValue("wolf_collar", "16")).isFalse();
         assertThat(NpcTypeData.isValidValue("wolf_collar", "not_a_color")).isFalse();
+    }
+
+    @Test
+    void shulkerColorAcceptsADyeColorNameOrARawId() {
+        assertThat(NpcTypeData.isValidValue("shulker_color", "red")).isTrue();
+        assertThat(NpcTypeData.isValidValue("shulker_color", "LIGHT_BLUE")).isTrue();
+        assertThat(NpcTypeData.isValidValue("shulker_color", "0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("shulker_color", "15")).isTrue();
+        assertThat(NpcTypeData.isValidValue("shulker_color", "16")).isFalse();
+        assertThat(NpcTypeData.isValidValue("shulker_color", "not_a_color")).isFalse();
     }
 }

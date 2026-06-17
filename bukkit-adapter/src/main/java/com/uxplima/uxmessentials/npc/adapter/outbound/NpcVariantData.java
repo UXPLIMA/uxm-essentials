@@ -18,17 +18,17 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The per-entity-type appearance variants beyond the baby/size/charged/villager core of {@link NpcTypeData}: a
- * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, and a sheep's wool
- * colour. Kept in its own class so {@code NpcTypeData} stays focused and under the size limit; the same support-map
- * correctness invariant holds — a value is sent only to the one Bukkit type that carries that field, and an
- * unsupported key or unparseable value is skipped fail-soft (logged at debug), never thrown on the render thread.
+ * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
+ * colour, a shulker's peek, and a panda's gene. Kept in its own class so {@code NpcTypeData} stays focused; the same
+ * support-map correctness invariant holds — a value is sent only to the one Bukkit type that carries that field, and
+ * an unsupported key or unparseable value is skipped fail-soft (logged at debug), never thrown on the render thread.
  *
- * <p>Most variants are a bounded integer on one type, so a small {@link IntVariant} table drives them uniformly.
- * Two are special: the horse packs a colour and a marking into one packet (with {@code horse_style} a friendly
- * {@link Horse.Style}-named alias for the marking id), and the sheep colour accepts a {@link DyeColor} name as well
- * as the raw 0–15 wool id. The by-name dynamic-registry
- * variants (cat, frog) live in {@link NpcNameVariantData}; this class delegates the known-key, validity, and apply
- * paths to it so the two stay under the size limit.
+ * <p>Most variants are a bounded integer on one type, so a small {@link IntVariant} table drives them uniformly, and
+ * the dye-coloured ones (sheep wool, wolf collar, shulker shell) share a {@link ColorVariant} table that accepts a
+ * {@link DyeColor} name or the raw 0–15 id alike. The horse is the one special case: it packs a colour and a marking
+ * into one packet (with {@code horse_style} a friendly {@link Horse.Style}-named alias for the marking id). The
+ * by-name dynamic-registry variants (cat, frog) live in {@link NpcNameVariantData}; this class delegates the
+ * known-key, validity, and apply paths to it so the two stay focused.
  */
 @NullMarked
 final class NpcVariantData {
@@ -39,6 +39,9 @@ final class NpcVariantData {
     static final String KEY_LLAMA_VARIANT = "llama_variant";
     static final String KEY_SHEEP_COLOR = "sheep_color";
     static final String KEY_WOLF_COLLAR = "wolf_collar";
+    static final String KEY_SHULKER_COLOR = "shulker_color";
+    static final String KEY_SHULKER_PEEK = "shulker_peek";
+    static final String KEY_PANDA_GENE = "panda_gene";
     static final String KEY_PARROT_VARIANT = "parrot_variant";
     static final String KEY_AXOLOTL_VARIANT = "axolotl_variant";
     static final String KEY_FOX_TYPE = "fox_type";
@@ -52,6 +55,10 @@ final class NpcVariantData {
     private static final int MAX_DYE_COLOR = 15;
     /** The killer (toast) rabbit's wire type id — valid even though it sits outside the 0–5 coat run. */
     private static final int RABBIT_KILLER = 99;
+    /** A shulker shell opens from 0 (closed) to 100 (fully open). */
+    private static final int MAX_SHULKER_PEEK = 100;
+    /** The seven panda genes (0–6: normal, lazy, worried, playful, brown, weak, aggressive). */
+    private static final int MAX_PANDA_GENE = 6;
 
     /**
      * The single-key bounded-int variants: each is one Bukkit type, an inclusive max, and the lib method that
@@ -61,7 +68,19 @@ final class NpcVariantData {
             new IntVariant(KEY_LLAMA_VARIANT, EntityType.LLAMA, 3, NpcPackets::llamaVariant),
             new IntVariant(KEY_PARROT_VARIANT, EntityType.PARROT, 4, NpcPackets::parrotVariant),
             new IntVariant(KEY_AXOLOTL_VARIANT, EntityType.AXOLOTL, 4, NpcPackets::axolotlVariant),
-            new IntVariant(KEY_FOX_TYPE, EntityType.FOX, 1, NpcPackets::foxType));
+            new IntVariant(KEY_FOX_TYPE, EntityType.FOX, 1, NpcPackets::foxType),
+            new IntVariant(KEY_SHULKER_PEEK, EntityType.SHULKER, MAX_SHULKER_PEEK, NpcPackets::shulkerPeek),
+            new IntVariant(KEY_PANDA_GENE, EntityType.PANDA, MAX_PANDA_GENE, NpcPackets::pandaGene));
+
+    /**
+     * The single-key dye-colour variants: each is one Bukkit type and the lib method that ships a 0–15 colour id,
+     * accepting a {@link DyeColor} name or the raw id alike. Folded into one table because the sheep wool, wolf
+     * collar, and shulker shell colours share the exact apply and validation path.
+     */
+    private static final List<ColorVariant> COLOR_VARIANTS = List.of(
+            new ColorVariant(KEY_SHEEP_COLOR, EntityType.SHEEP, NpcPackets::sheepColor),
+            new ColorVariant(KEY_WOLF_COLLAR, EntityType.WOLF, NpcPackets::wolfCollar),
+            new ColorVariant(KEY_SHULKER_COLOR, EntityType.SHULKER, NpcPackets::shulkerColor));
 
     private NpcVariantData() {}
 
@@ -73,8 +92,9 @@ final class NpcVariantData {
     static void apply(
             NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
         applyHorse(packets, viewer, id, type, data, npc, log);
-        applySheep(packets, viewer, id, type, data, npc, log);
-        applyWolf(packets, viewer, id, type, data, npc, log);
+        for (ColorVariant variant : COLOR_VARIANTS) {
+            applyColorVariant(packets, viewer, id, type, data, npc, log, variant);
+        }
         applyRabbit(packets, viewer, id, type, data, npc, log);
         for (IntVariant variant : INT_VARIANTS) {
             applyIntVariant(packets, viewer, id, type, data, npc, log, variant);
@@ -98,40 +118,34 @@ final class NpcVariantData {
         packets.send(viewer, packets.horseVariant(id, color, markings));
     }
 
-    private static void applySheep(
-            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
-        String value = data.get(KEY_SHEEP_COLOR);
+    private static void applyColorVariant(
+            NpcPackets packets,
+            Player viewer,
+            int id,
+            EntityType type,
+            Map<String, String> data,
+            Npc npc,
+            Logger log,
+            ColorVariant variant) {
+        String value = data.get(variant.key());
         if (value == null) {
             return;
         }
-        if (type != EntityType.SHEEP) {
-            skip(log, npc, KEY_SHEEP_COLOR, type, "type is not a sheep");
+        if (type != variant.type()) {
+            skip(
+                    log,
+                    npc,
+                    variant.key(),
+                    type,
+                    "type is not a " + variant.type().name().toLowerCase(Locale.ROOT));
             return;
         }
         Integer color = parseColorId(value);
         if (color == null) {
-            skip(log, npc, KEY_SHEEP_COLOR, type, "value is not a dye colour or 0-15 id: " + value);
+            skip(log, npc, variant.key(), type, "value is not a dye colour or 0-15 id: " + value);
             return;
         }
-        packets.send(viewer, packets.sheepColor(id, color));
-    }
-
-    private static void applyWolf(
-            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
-        String value = data.get(KEY_WOLF_COLLAR);
-        if (value == null) {
-            return;
-        }
-        if (type != EntityType.WOLF) {
-            skip(log, npc, KEY_WOLF_COLLAR, type, "type is not a wolf");
-            return;
-        }
-        Integer color = parseColorId(value);
-        if (color == null) {
-            skip(log, npc, KEY_WOLF_COLLAR, type, "value is not a dye colour or 0-15 id: " + value);
-            return;
-        }
-        packets.send(viewer, packets.wolfCollar(id, color));
+        variant.send().accept(packets, viewer, id, color);
     }
 
     private static void applyRabbit(
@@ -197,8 +211,7 @@ final class NpcVariantData {
             case KEY_HORSE_COLOR -> isInRange(value, MAX_HORSE_COLOR);
             case KEY_HORSE_MARKINGS -> isInRange(value, MAX_HORSE_MARKINGS);
             case KEY_HORSE_STYLE -> parseStyle(value) != null;
-            case KEY_SHEEP_COLOR -> parseColorId(value) != null;
-            case KEY_WOLF_COLLAR -> parseColorId(value) != null;
+            case KEY_SHEEP_COLOR, KEY_WOLF_COLLAR, KEY_SHULKER_COLOR -> parseColorId(value) != null;
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -305,6 +318,9 @@ final class NpcVariantData {
     /** A single-key bounded-int variant: its key, the one type that carries it, the inclusive max, and its packet. */
     private record IntVariant(String key, EntityType type, int max, IntVariantSender send) {}
 
+    /** A single-key dye-colour variant: its key, the one type that carries it, and the lib packet it ships. */
+    private record ColorVariant(String key, EntityType type, IntVariantSender send) {}
+
     /** A four-argument send hook bound to a lib {@code (entityId, int)} variant method via a method reference. */
     @FunctionalInterface
     private interface IntVariantSender {
@@ -323,6 +339,9 @@ final class NpcVariantData {
             KEY_LLAMA_VARIANT,
             KEY_SHEEP_COLOR,
             KEY_WOLF_COLLAR,
+            KEY_SHULKER_COLOR,
+            KEY_SHULKER_PEEK,
+            KEY_PANDA_GENE,
             KEY_PARROT_VARIANT,
             KEY_AXOLOTL_VARIANT,
             KEY_FOX_TYPE,

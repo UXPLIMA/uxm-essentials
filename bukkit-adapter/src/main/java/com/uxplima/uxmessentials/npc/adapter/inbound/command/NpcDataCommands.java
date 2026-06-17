@@ -48,6 +48,9 @@ final class NpcDataCommands extends NpcCommandSupport {
             "llama_variant",
             "sheep_color",
             "wolf_collar",
+            "shulker_color",
+            "shulker_peek",
+            "panda_gene",
             "parrot_variant",
             "axolotl_variant",
             "fox_type",
@@ -85,6 +88,10 @@ final class NpcDataCommands extends NpcCommandSupport {
     private static final List<String> SHEEP_COLOR_VALUES = Arrays.stream(DyeColor.values())
             .map(color -> color.name().toLowerCase(Locale.ROOT))
             .toList();
+    /** The shulker peek stops (0 closed … 100 open), offered as tab completions for {@code shulker_peek}. */
+    private static final List<String> SHULKER_PEEK_VALUES = List.of("0", "25", "50", "75", "100");
+    /** The panda gene ids (0–6), offered as tab completions for {@code panda_gene}. */
+    private static final List<String> PANDA_GENE_VALUES = List.of("0", "1", "2", "3", "4", "5", "6");
 
     NpcDataCommands(
             NpcServices services,
@@ -166,7 +173,9 @@ final class NpcDataCommands extends NpcCommandSupport {
             case "horse_markings" -> suggest(builder, HORSE_MARKINGS_VALUES);
             case "horse_style" -> suggest(builder, HORSE_STYLE_VALUES);
             case "llama_variant" -> suggest(builder, LLAMA_VARIANT_VALUES);
-            case "sheep_color", "wolf_collar" -> suggest(builder, SHEEP_COLOR_VALUES);
+            case "sheep_color", "wolf_collar", "shulker_color" -> suggest(builder, SHEEP_COLOR_VALUES);
+            case "shulker_peek" -> suggest(builder, SHULKER_PEEK_VALUES);
+            case "panda_gene" -> suggest(builder, PANDA_GENE_VALUES);
             default -> builder.buildFuture();
         };
     }

@@ -429,6 +429,21 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object shulkerColor(int entityId, int color) {
+            return new Object();
+        }
+
+        @Override
+        public Object shulkerPeek(int entityId, int peek) {
+            return new Object();
+        }
+
+        @Override
+        public Object pandaGene(int entityId, int gene) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }
