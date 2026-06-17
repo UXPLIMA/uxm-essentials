@@ -66,6 +66,12 @@ final class NpcDataCommands extends NpcCommandSupport {
             "armor_stand_arms",
             "armor_stand_no_baseplate",
             "armor_stand_marker",
+            "armor_stand_head",
+            "armor_stand_body",
+            "armor_stand_left_arm",
+            "armor_stand_right_arm",
+            "armor_stand_left_leg",
+            "armor_stand_right_leg",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -107,6 +113,8 @@ final class NpcDataCommands extends NpcCommandSupport {
     private static final List<String> TROPICAL_FISH_VALUES = java.util.stream.IntStream.rangeClosed(0, 21)
             .mapToObj(Integer::toString)
             .toList();
+    /** A sample {@code x,y,z} degrees triple, offered as a hint for the armor-stand pose keys. */
+    private static final List<String> ARMOR_STAND_POSE_VALUES = List.of("0,0,0");
 
     NpcDataCommands(
             NpcServices services,
@@ -203,6 +211,12 @@ final class NpcDataCommands extends NpcCommandSupport {
             case "shulker_peek" -> suggest(builder, SHULKER_PEEK_VALUES);
             case "panda_gene" -> suggest(builder, PANDA_GENE_VALUES);
             case "tropical_fish" -> suggest(builder, TROPICAL_FISH_VALUES);
+            case "armor_stand_head",
+                    "armor_stand_body",
+                    "armor_stand_left_arm",
+                    "armor_stand_right_arm",
+                    "armor_stand_left_leg",
+                    "armor_stand_right_leg" -> suggest(builder, ARMOR_STAND_POSE_VALUES);
             default -> builder.buildFuture();
         };
     }

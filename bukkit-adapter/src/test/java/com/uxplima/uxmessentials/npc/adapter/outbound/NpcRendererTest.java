@@ -757,6 +757,22 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesAnArmorStandPoseFromAnAngleTriple() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(
+                npcAt(viewer, 1.0).withEntityType("ARMOR_STAND").withTypeData("armor_stand_left_arm", "10,-20,30.5"));
+
+        assertThat(packets.armorStandPoses).hasSize(1);
+        assertThat(packets.armorStandPoses.get(0).part())
+                .isEqualTo(com.uxplima.uxmlib.packet.npc.ArmorStandPart.LEFT_ARM);
+        assertThat(packets.armorStandPoses.get(0).x()).isEqualTo(10f);
+        assertThat(packets.armorStandPoses.get(0).y()).isEqualTo(-20f);
+        assertThat(packets.armorStandPoses.get(0).z()).isEqualTo(30.5f);
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1304,6 +1320,7 @@ class NpcRendererTest {
         private final List<VexCharging> vexChargings = new ArrayList<>();
         private final List<TropicalFishVariant> tropicalFishVariants = new ArrayList<>();
         private final List<ArmorStandFlags> armorStandFlags = new ArrayList<>();
+        private final List<ArmorStandPose> armorStandPoses = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1585,6 +1602,14 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object armorStandPose(
+                int entityId, com.uxplima.uxmlib.packet.npc.ArmorStandPart part, float x, float y, float z) {
+            ArmorStandPose packet = new ArmorStandPose(entityId, part, x, y, z);
+            armorStandPoses.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1754,6 +1779,9 @@ class NpcRendererTest {
 
         private record ArmorStandFlags(
                 int entityId, boolean small, boolean showArms, boolean noBasePlate, boolean marker) {}
+
+        private record ArmorStandPose(
+                int entityId, com.uxplima.uxmlib.packet.npc.ArmorStandPart part, float x, float y, float z) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

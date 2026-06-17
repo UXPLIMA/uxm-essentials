@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.packet.npc.ArmorStandPart;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -20,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  * The per-entity-type appearance variants beyond the baby/size/charged/villager core of {@link NpcTypeData}: a
  * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
  * colour, a shulker's peek, a panda's gene, a tropical fish's variant, the goat/allay/piglin/camel/bee/vex state
- * flags, and an armor stand's client flags. Kept in its own class so
+ * flags, and an armor stand's client flags and six poses. Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -60,6 +61,12 @@ final class NpcVariantData {
     static final String KEY_AS_ARMS = "armor_stand_arms";
     static final String KEY_AS_NO_BASEPLATE = "armor_stand_no_baseplate";
     static final String KEY_AS_MARKER = "armor_stand_marker";
+    static final String KEY_AS_HEAD = "armor_stand_head";
+    static final String KEY_AS_BODY = "armor_stand_body";
+    static final String KEY_AS_LEFT_ARM = "armor_stand_left_arm";
+    static final String KEY_AS_RIGHT_ARM = "armor_stand_right_arm";
+    static final String KEY_AS_LEFT_LEG = "armor_stand_left_leg";
+    static final String KEY_AS_RIGHT_LEG = "armor_stand_right_leg";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -103,6 +110,15 @@ final class NpcVariantData {
             new ColorVariant(KEY_WOLF_COLLAR, EntityType.WOLF, NpcPackets::wolfCollar),
             new ColorVariant(KEY_SHULKER_COLOR, EntityType.SHULKER, NpcPackets::shulkerColor));
 
+    /** The six armor-stand pose keys, each mapping a {@code "x,y,z"} degrees value onto one {@link ArmorStandPart}. */
+    private static final List<PoseVariant> ARMOR_STAND_POSES = List.of(
+            new PoseVariant(KEY_AS_HEAD, ArmorStandPart.HEAD),
+            new PoseVariant(KEY_AS_BODY, ArmorStandPart.BODY),
+            new PoseVariant(KEY_AS_LEFT_ARM, ArmorStandPart.LEFT_ARM),
+            new PoseVariant(KEY_AS_RIGHT_ARM, ArmorStandPart.RIGHT_ARM),
+            new PoseVariant(KEY_AS_LEFT_LEG, ArmorStandPart.LEFT_LEG),
+            new PoseVariant(KEY_AS_RIGHT_LEG, ArmorStandPart.RIGHT_LEG));
+
     /** The single-key boolean state variants: each is one Bukkit type and the lib method that ships a true/false. */
     private static final List<BoolVariant> BOOL_VARIANTS = List.of(
             new BoolVariant(KEY_GOAT_SCREAMING, EntityType.GOAT, NpcPackets::goatScreaming),
@@ -133,6 +149,9 @@ final class NpcVariantData {
             applyBoolVariant(packets, viewer, id, type, data, npc, log, variant);
         }
         applyArmorStand(packets, viewer, id, type, data, npc, log);
+        for (PoseVariant pose : ARMOR_STAND_POSES) {
+            applyArmorStandPose(packets, viewer, id, type, data, npc, log, pose);
+        }
         NpcNameVariantData.apply(packets, viewer, id, type, data, npc, log);
     }
 
@@ -293,6 +312,62 @@ final class NpcVariantData {
         return value != null && Boolean.TRUE.equals(parseBool(value));
     }
 
+    /**
+     * Apply one armor-stand pose: the stored {@code "x,y,z"} degrees set the {@link ArmorStandPart}'s rotation.
+     * Each part is its own field, so each is an independent packet. Fail-soft on a wrong type or a value that is
+     * not three comma-separated angles.
+     */
+    private static void applyArmorStandPose(
+            NpcPackets packets,
+            Player viewer,
+            int id,
+            EntityType type,
+            Map<String, String> data,
+            Npc npc,
+            Logger log,
+            PoseVariant pose) {
+        String value = data.get(pose.key());
+        if (value == null) {
+            return;
+        }
+        if (type != EntityType.ARMOR_STAND) {
+            skip(log, npc, pose.key(), type, "type is not an armor stand");
+            return;
+        }
+        float[] angles = parseAngles(value);
+        if (angles == null) {
+            skip(log, npc, pose.key(), type, "value is not three comma-separated angles: " + value);
+            return;
+        }
+        packets.send(viewer, packets.armorStandPose(id, pose.part(), angles[0], angles[1], angles[2]));
+    }
+
+    /** Parse a {@code "x,y,z"} triple of finite degree angles, or {@code null} when it is not three valid floats. */
+    private static float @Nullable [] parseAngles(String value) {
+        // Keep trailing empties (limit -1) so "1,2,3," is four parts and fails the count, not a silent three.
+        String[] parts = value.split(",", -1);
+        if (parts.length != 3) {
+            return null;
+        }
+        float[] angles = new float[3];
+        for (int i = 0; i < 3; i++) {
+            Float angle = parseFloat(parts[i]);
+            if (angle == null || !Float.isFinite(angle)) {
+                return null;
+            }
+            angles[i] = angle;
+        }
+        return angles;
+    }
+
+    private static @Nullable Float parseFloat(String value) {
+        try {
+            return Float.valueOf(value.strip());
+        } catch (NumberFormatException notAFloat) {
+            return null;
+        }
+    }
+
     /** Whether {@code key} is one of the variant keys this class applies — the set the command validates against. */
     static boolean isKnownKey(String key) {
         return KEYS.contains(key.toLowerCase(Locale.ROOT)) || NpcNameVariantData.isKnownKey(key);
@@ -319,6 +394,12 @@ final class NpcVariantData {
                     KEY_AS_ARMS,
                     KEY_AS_NO_BASEPLATE,
                     KEY_AS_MARKER -> parseBool(value) != null;
+            case KEY_AS_HEAD,
+                    KEY_AS_BODY,
+                    KEY_AS_LEFT_ARM,
+                    KEY_AS_RIGHT_ARM,
+                    KEY_AS_LEFT_LEG,
+                    KEY_AS_RIGHT_LEG -> parseAngles(value) != null;
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -441,6 +522,9 @@ final class NpcVariantData {
     /** A single-key boolean state variant: its key, the one type that carries it, and the lib packet it ships. */
     private record BoolVariant(String key, EntityType type, BoolVariantSender send) {}
 
+    /** An armor-stand pose key bound to the {@link ArmorStandPart} it sets from a {@code "x,y,z"} degrees value. */
+    private record PoseVariant(String key, ArmorStandPart part) {}
+
     /** A four-argument send hook bound to a lib {@code (entityId, boolean)} variant method via a method reference. */
     @FunctionalInterface
     private interface BoolVariantSender {
@@ -486,5 +570,11 @@ final class NpcVariantData {
             KEY_AS_SMALL,
             KEY_AS_ARMS,
             KEY_AS_NO_BASEPLATE,
-            KEY_AS_MARKER);
+            KEY_AS_MARKER,
+            KEY_AS_HEAD,
+            KEY_AS_BODY,
+            KEY_AS_LEFT_ARM,
+            KEY_AS_RIGHT_ARM,
+            KEY_AS_LEFT_LEG,
+            KEY_AS_RIGHT_LEG);
 }

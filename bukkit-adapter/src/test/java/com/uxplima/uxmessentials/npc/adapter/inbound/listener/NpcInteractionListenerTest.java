@@ -485,6 +485,12 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object armorStandPose(
+                int entityId, com.uxplima.uxmlib.packet.npc.ArmorStandPart part, float x, float y, float z) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }
