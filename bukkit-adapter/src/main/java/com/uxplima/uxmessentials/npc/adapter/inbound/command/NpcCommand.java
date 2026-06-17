@@ -9,11 +9,13 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
+import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -61,6 +63,10 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                 .then(name("delete", this::delete))
                 .then(Commands.literal("list").executes(this::list))
                 .then(name("movehere", this::move))
+                .then(Commands.literal("copy")
+                        .then(nameArgument()
+                                .then(Commands.argument("target", StringArgumentType.word())
+                                        .executes(this::copy))))
                 .then(greedy("command", this::command))
                 .then(bool("lookatplayer", this::lookAtPlayer))
                 .then(skinCommands.node())
@@ -114,6 +120,16 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             return 0;
         }
         services.move().move(ref(sender), nameArg(ctx), position(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int copy(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        NpcName target = NpcName.of(ctx.getArgument("target", String.class));
+        services.copy().copy(ref(sender), nameArg(ctx), target, position(sender));
         return Command.SINGLE_SUCCESS;
     }
 

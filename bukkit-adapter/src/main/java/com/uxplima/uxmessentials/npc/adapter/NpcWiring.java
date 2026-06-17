@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
 import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
+import com.uxplima.uxmessentials.npc.application.CopyNpc;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
@@ -149,6 +150,7 @@ public final class NpcWiring {
                 new DeleteNpc(repository, renderer, notifier, kernel.events()),
                 new ListNpcs(repository, notifier),
                 new MoveNpc(repository, renderer, notifier, kernel.events()),
+                new CopyNpc(repository, renderer, notifier, kernel.events(), clock),
                 new SetNpcSkin(repository, renderer, notifier),
                 new SetNpcEntityType(repository, renderer, notifier),
                 new SetNpcClickCommand(repository, notifier),

@@ -19,6 +19,7 @@ public enum NpcMessageKey implements MessageKey {
     NPC_DELETED("npc.deleted"),
     NPC_MOVED("npc.moved"),
     NPC_MOVED_TO("npc.moved-to"),
+    NPC_COPIED("npc.copied"),
 
     // skin / command feedback
     NPC_SKIN_SET("npc.skin.set"),

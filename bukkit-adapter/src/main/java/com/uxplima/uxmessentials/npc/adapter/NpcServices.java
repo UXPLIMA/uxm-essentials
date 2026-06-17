@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
 import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
+import com.uxplima.uxmessentials.npc.application.CopyNpc;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
@@ -41,6 +42,7 @@ import org.jspecify.annotations.NullMarked;
  * @param delete {@code /npc delete}
  * @param list {@code /npc list}
  * @param move {@code /npc movehere}
+ * @param copy {@code /npc copy}
  * @param skin {@code /npc skin}
  * @param type {@code /npc type}
  * @param command {@code /npc command}
@@ -71,6 +73,7 @@ public record NpcServices(
         DeleteNpc delete,
         ListNpcs list,
         MoveNpc move,
+        CopyNpc copy,
         SetNpcSkin skin,
         SetNpcEntityType type,
         SetNpcClickCommand command,
@@ -100,6 +103,7 @@ public record NpcServices(
         Objects.requireNonNull(delete, "delete");
         Objects.requireNonNull(list, "list");
         Objects.requireNonNull(move, "move");
+        Objects.requireNonNull(copy, "copy");
         Objects.requireNonNull(skin, "skin");
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(command, "command");
