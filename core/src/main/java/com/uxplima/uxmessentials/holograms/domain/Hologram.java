@@ -53,7 +53,8 @@ public record Hologram(
         int refreshIntervalTicks,
         Instant createdAt,
         @Nullable String linkedNpcName,
-        @Nullable String clickCommand) {
+        @Nullable String clickCommand,
+        @Nullable LeaderboardSpec leaderboard) {
 
     /** A refresh interval of 0 means "static": render once on enable, never re-render. */
     public static final int STATIC = 0;
@@ -102,6 +103,7 @@ public record Hologram(
                 refreshIntervalTicks,
                 createdAt,
                 null,
+                null,
                 null);
     }
 
@@ -143,6 +145,7 @@ public record Hologram(
                 Rotation.NONE,
                 STATIC,
                 createdAt,
+                null,
                 null,
                 null);
     }
@@ -227,6 +230,23 @@ public record Hologram(
      */
     public Hologram withClickCommand(@Nullable String command) {
         return toBuilder().clickCommand(command).build();
+    }
+
+    /**
+     * A copy made a leaderboard showing {@code spec}'s ranked source, or {@code null} to clear it (the hologram is
+     * then a normal hologram again). Backs {@code /hologram leaderboard}; the renderer regenerates the displayed
+     * lines from the provider on each refresh.
+     */
+    public Hologram withLeaderboard(@Nullable LeaderboardSpec spec) {
+        return toBuilder().leaderboard(spec).build();
+    }
+
+    /**
+     * A copy whose text lines are replaced wholesale, keeping every other field. Used by the renderer to lay a
+     * leaderboard's provider-generated rows onto the hologram for one render without persisting them.
+     */
+    public Hologram withLines(List<HologramLine> newLines) {
+        return withContent(content.withLines(newLines));
     }
 
     /**

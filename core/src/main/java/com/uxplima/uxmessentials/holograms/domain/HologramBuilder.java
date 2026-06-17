@@ -25,6 +25,7 @@ final class HologramBuilder {
     private Instant createdAt;
     private @Nullable String linkedNpcName;
     private @Nullable String clickCommand;
+    private @Nullable LeaderboardSpec leaderboard;
 
     HologramBuilder(Hologram source) {
         Objects.requireNonNull(source, "source");
@@ -38,6 +39,7 @@ final class HologramBuilder {
         this.createdAt = source.createdAt();
         this.linkedNpcName = source.linkedNpcName();
         this.clickCommand = source.clickCommand();
+        this.leaderboard = source.leaderboard();
     }
 
     HologramBuilder name(HologramName value) {
@@ -85,6 +87,11 @@ final class HologramBuilder {
         return this;
     }
 
+    HologramBuilder leaderboard(@Nullable LeaderboardSpec value) {
+        this.leaderboard = value;
+        return this;
+    }
+
     Hologram build() {
         return new Hologram(
                 name,
@@ -96,6 +103,7 @@ final class HologramBuilder {
                 refreshIntervalTicks,
                 createdAt,
                 linkedNpcName,
-                clickCommand);
+                clickCommand,
+                leaderboard);
     }
 }

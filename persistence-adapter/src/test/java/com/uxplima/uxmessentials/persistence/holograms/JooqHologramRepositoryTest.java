@@ -306,6 +306,19 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsALeaderboard() {
+        repository.save(hologram("top", 1, 64, 1, "line")
+                .withLeaderboard(new com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec("balance", 5)));
+
+        Hologram loaded = repository.find(HologramName.of("top")).orElseThrow();
+
+        com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec spec =
+                java.util.Objects.requireNonNull(loaded.leaderboard());
+        assertThat(spec.providerId()).isEqualTo("balance");
+        assertThat(spec.limit()).isEqualTo(5);
+    }
+
+    @Test
     void roundTripsAClickCommand() {
         repository.save(hologram("spawn", 1, 64, 1, "line").withClickCommand("warp pvp"));
 

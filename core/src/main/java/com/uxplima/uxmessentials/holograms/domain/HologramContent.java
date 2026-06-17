@@ -83,6 +83,11 @@ public record HologramContent(
                 HologramType.ENTITY, List.of(), null, null, null, Objects.requireNonNull(entityType, "entityType"));
     }
 
+    /** Replace the text lines wholesale, keeping the type and model content. The type invariants still apply. */
+    HologramContent withLines(List<HologramLine> newLines) {
+        return new HologramContent(type, newLines, itemMaterial, blockData, headTexture, entityType);
+    }
+
     HologramContent withLineAppended(HologramLine line) {
         Objects.requireNonNull(line, "line");
         List<HologramLine> next = new ArrayList<>(lines);

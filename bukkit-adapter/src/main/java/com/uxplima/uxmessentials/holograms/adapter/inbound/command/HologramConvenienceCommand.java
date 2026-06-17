@@ -49,7 +49,24 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
                 name("teleport", this::teleport),
                 rotateNode(),
                 insertLineNode(),
-                clickCommandNode());
+                clickCommandNode(),
+                leaderboardNode());
+    }
+
+    private static final int DEFAULT_LEADERBOARD_LIMIT = 10;
+
+    private LiteralArgumentBuilder<CommandSourceStack> leaderboardNode() {
+        return Commands.literal("leaderboard")
+                .then(nameArgument("name")
+                        .then(Commands.argument("provider", StringArgumentType.word())
+                                .executes(ctx -> leaderboard(ctx, DEFAULT_LEADERBOARD_LIMIT))
+                                .then(Commands.argument(
+                                                "limit",
+                                                IntegerArgumentType.integer(
+                                                        1,
+                                                        com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec
+                                                                .MAX_LIMIT))
+                                        .executes(ctx -> leaderboard(ctx, ctx.getArgument("limit", Integer.class))))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> clickCommandNode() {
@@ -160,6 +177,20 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
         int index = ctx.getArgument("index", Integer.class) - 1;
         HologramLine line = HologramLine.of(ctx.getArgument("text", String.class));
         services.insertLine().insert(ref(sender), nameArg(ctx), index, line);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int leaderboard(CommandContext<CommandSourceStack> ctx, int limit) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String provider = ctx.getArgument("provider", String.class).strip();
+        com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec spec =
+                provider.equalsIgnoreCase("none") || provider.equalsIgnoreCase("clear")
+                        ? null
+                        : new com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec(provider, limit);
+        services.leaderboard().set(ref(sender), nameArg(ctx), spec);
         return Command.SINGLE_SUCCESS;
     }
 

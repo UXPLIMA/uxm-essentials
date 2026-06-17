@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramType;
+import com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.TextAlignment;
 import com.uxplima.uxmessentials.holograms.domain.Transform;
@@ -67,7 +68,7 @@ final class HologramRows {
         // A pre-V50 row (NULL linked_npc_name) — and any row that never linked — reads back unlinked, so an
         // existing hologram keeps anchoring to its own coordinates with no data migration. The V54 click command
         // is layered on the same way: a pre-V54 / never-clickable row (NULL) reads back without a click action.
-        return clickCommandOf(row, linkedNpcOf(row, hologram));
+        return leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram)));
     }
 
     private static Hologram linkedNpcOf(Record row, Hologram hologram) {
@@ -78,6 +79,16 @@ final class HologramRows {
     private static Hologram clickCommandOf(Record row, Hologram hologram) {
         String clickCommand = row.get(HOLOGRAMS.CLICK_COMMAND);
         return clickCommand == null ? hologram : hologram.withClickCommand(clickCommand);
+    }
+
+    private static Hologram leaderboardOf(Record row, Hologram hologram) {
+        String provider = row.get(HOLOGRAMS.LEADERBOARD_PROVIDER);
+        if (provider == null) {
+            return hologram;
+        }
+        // Clamp a stored limit into the spec's accepted range so a hand-edited row never throws on load.
+        int limit = Math.min(LeaderboardSpec.MAX_LIMIT, Math.max(1, intOr(row.get(HOLOGRAMS.LEADERBOARD_LIMIT), 10)));
+        return hologram.withLeaderboard(new LeaderboardSpec(provider, limit));
     }
 
     /** Populate a {@link HologramsRecord} from a domain {@link Hologram} for an upsert (the name row only). */
@@ -126,7 +137,15 @@ final class HologramRows {
                 .setRotationPitch(rotation.pitch())
                 .setRefreshIntervalTicks(hologram.refreshIntervalTicks())
                 .setLinkedNpcName(hologram.linkedNpcName())
-                .setClickCommand(hologram.clickCommand());
+                .setClickCommand(hologram.clickCommand())
+                .setLeaderboardProvider(
+                        hologram.leaderboard() == null
+                                ? null
+                                : hologram.leaderboard().providerId())
+                .setLeaderboardLimit(
+                        hologram.leaderboard() == null
+                                ? null
+                                : hologram.leaderboard().limit());
     }
 
     private static Appearance appearanceOf(Record row) {

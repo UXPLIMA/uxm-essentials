@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
+import com.uxplima.uxmessentials.holograms.application.SetHologramLeaderboard;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
@@ -83,6 +84,16 @@ public final class HologramsWiring {
 
     private HologramsWiring() {}
 
+    /**
+     * The leaderboard data-source registry the renderer resolves a leaderboard hologram's provider id against.
+     * Empty for now — the {@code balance} provider (and others) are supplied through the composition root in a
+     * follow-up (B13/B7b); an unregistered id renders "(no data)" rather than failing, so a leaderboard set
+     * against a not-yet-wired provider degrades gracefully.
+     */
+    private static com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboardProviders() {
+        return new com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders(java.util.Map.of());
+    }
+
     /** The smallest cadence the refresh timer fires at — one second, the floor a refresh interval rounds to. */
     private static final Duration REFRESH_BASE = Duration.ofSeconds(1);
 
@@ -127,7 +138,8 @@ public final class HologramsWiring {
                 MiniPlaceholdersSupport::globalResolver,
                 viewers,
                 textOverrides,
-                npcLocator);
+                npcLocator,
+                leaderboardProviders());
         rendererHolder.set(renderer);
         InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
         Consumer<DomainEvent> npcSubscriber = npcLocator;
@@ -225,6 +237,7 @@ public final class HologramsWiring {
                 new ManageHologramViewer(repository, renderer, notifier),
                 new SetHologramModel(repository, renderer, notifier),
                 new SetHologramClickCommand(repository, renderer, notifier),
+                new SetHologramLeaderboard(repository, renderer, notifier),
                 new LinkHologramToNpc(repository, renderer, notifier, npcLocator),
                 new UnlinkHologramFromNpc(repository, renderer, notifier));
     }

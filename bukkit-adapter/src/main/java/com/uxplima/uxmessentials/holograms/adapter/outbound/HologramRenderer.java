@@ -21,6 +21,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
+import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -100,6 +101,7 @@ public final class HologramRenderer implements HologramView {
     private final HologramViewers viewers;
     private final HologramTextOverrides textOverrides;
     private final LinkedNpcLocator linkedNpcs;
+    private final com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final Map<String, Tracked> live = new ConcurrentHashMap<>();
     /** The PDC key stamped on a clickable hologram's Interaction hitbox; the click listener reads the same key. */
@@ -117,7 +119,9 @@ public final class HologramRenderer implements HologramView {
             Supplier<TagResolver> globalTags,
             HologramViewers viewers,
             HologramTextOverrides textOverrides,
-            LinkedNpcLocator linkedNpcs) {
+            LinkedNpcLocator linkedNpcs,
+            com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards) {
+        this.leaderboards = Objects.requireNonNull(leaderboards, "leaderboards");
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.manager = Objects.requireNonNull(manager, "manager");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -143,9 +147,39 @@ public final class HologramRenderer implements HologramView {
             return;
         }
         Location at = BukkitRefs.toLocation(world, anchor);
-        // Spawn on the anchor's region thread (Folia): for a linked hologram that is the NPC's region, where the
-        // display entity actually lives, not the hologram's stored region.
-        scheduler.onRegion(anchor, () -> spawnReplacing(hologram, anchor, at));
+        com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec leaderboard = hologram.leaderboard();
+        if (leaderboard == null) {
+            // Spawn on the anchor's region thread (Folia): for a linked hologram that is the NPC's region, where
+            // the display entity actually lives, not the hologram's stored region.
+            scheduler.onRegion(anchor, () -> spawnReplacing(hologram, anchor, at));
+            return;
+        }
+        // A leaderboard's rows come from a (possibly DB-backed) provider, so fetch them off the region thread, then
+        // hop back to render the hologram with the generated lines swapped in (not persisted).
+        scheduler.async(() -> {
+            List<HologramLine> rows = generateLeaderboardLines(leaderboard);
+            scheduler.onRegion(anchor, () -> spawnReplacing(hologram.withLines(rows), anchor, at));
+        });
+    }
+
+    /** The top rows of {@code spec}'s provider, laid out into ranked lines; a single placeholder line when empty. */
+    private List<HologramLine> generateLeaderboardLines(
+            com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec spec) {
+        List<com.uxplima.uxmessentials.holograms.application.port.LeaderboardEntry> entries = leaderboards
+                .find(spec.providerId())
+                .map(provider -> provider.top(spec.limit()))
+                .orElse(List.of());
+        if (entries.isEmpty()) {
+            return List.of(new HologramLine("<gray>(no data)"));
+        }
+        List<HologramLine> rows = new java.util.ArrayList<>(entries.size());
+        int rank = 1;
+        for (com.uxplima.uxmessentials.holograms.application.port.LeaderboardEntry entry : entries) {
+            rows.add(new HologramLine(
+                    "<gray>#" + rank + " <white>" + entry.name() + " <gray>- <green>" + entry.score()));
+            rank++;
+        }
+        return rows;
     }
 
     private Position anchorFor(Hologram hologram) {

@@ -73,6 +73,8 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_ENTITY_SET("hologram.entity.set"),
     HOLOGRAM_CLICKCOMMAND_SET("hologram.clickcommand.set"),
     HOLOGRAM_CLICKCOMMAND_CLEARED("hologram.clickcommand.cleared"),
+    HOLOGRAM_LEADERBOARD_SET("hologram.leaderboard.set"),
+    HOLOGRAM_LEADERBOARD_CLEARED("hologram.leaderboard.cleared"),
     HOLOGRAM_ITEM_INVALID("hologram.item-invalid"),
     HOLOGRAM_BLOCK_INVALID("hologram.block-invalid"),
     HOLOGRAM_HEAD_INVALID("hologram.head-invalid"),

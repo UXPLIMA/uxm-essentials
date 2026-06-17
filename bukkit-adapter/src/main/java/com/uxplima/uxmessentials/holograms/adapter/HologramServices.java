@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
+import com.uxplima.uxmessentials.holograms.application.SetHologramLeaderboard;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
@@ -76,6 +77,7 @@ public record HologramServices(
         ManageHologramViewer viewers,
         SetHologramModel model,
         SetHologramClickCommand clickCommand,
+        SetHologramLeaderboard leaderboard,
         LinkHologramToNpc linkNpc,
         UnlinkHologramFromNpc unlinkNpc) {
 
@@ -100,6 +102,7 @@ public record HologramServices(
         Objects.requireNonNull(viewers, "viewers");
         Objects.requireNonNull(model, "model");
         Objects.requireNonNull(clickCommand, "clickCommand");
+        Objects.requireNonNull(leaderboard, "leaderboard");
         Objects.requireNonNull(linkNpc, "linkNpc");
         Objects.requireNonNull(unlinkNpc, "unlinkNpc");
     }

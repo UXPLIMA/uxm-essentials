@@ -242,6 +242,33 @@ class HologramTest {
     }
 
     @Test
+    void withLeaderboardStoresAndClears() {
+        Hologram board = twoLine().withLeaderboard(new LeaderboardSpec("balance", 10));
+
+        LeaderboardSpec spec = java.util.Objects.requireNonNull(board.leaderboard());
+        assertThat(spec.providerId()).isEqualTo("balance");
+        assertThat(spec.limit()).isEqualTo(10);
+        assertThat(board.withLeaderboard(null).leaderboard()).isNull();
+    }
+
+    @Test
+    void leaderboardSpecRejectsABadLimit() {
+        assertThatThrownBy(() -> new LeaderboardSpec("balance", 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new LeaderboardSpec("balance", LeaderboardSpec.MAX_LIMIT + 1))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new LeaderboardSpec(" ", 5)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void withLinesReplacesEveryLineKeepingTheRest() {
+        Hologram one = twoLine().withRefreshIntervalTicks(40).withLines(List.of(new HologramLine("only")));
+
+        assertThat(one.lines()).map(HologramLine::value).containsExactly("only");
+        assertThat(one.refreshIntervalTicks()).isEqualTo(40);
+        assertThat(one.name().value()).isEqualTo("spawn");
+    }
+
+    @Test
     void withClickCommandStoresAndClearsKeepingEverythingElse() {
         Hologram clickable = twoLine().withRefreshIntervalTicks(40).withClickCommand("warp pvp");
 
