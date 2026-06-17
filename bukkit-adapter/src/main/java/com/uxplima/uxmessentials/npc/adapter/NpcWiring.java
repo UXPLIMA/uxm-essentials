@@ -32,15 +32,18 @@ import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.DescribeNpc;
 import com.uxplima.uxmessentials.npc.application.FixNpc;
+import com.uxplima.uxmessentials.npc.application.InsertNpcAction;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
 import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
+import com.uxplima.uxmessentials.npc.application.MoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
+import com.uxplima.uxmessentials.npc.application.SetNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
 import com.uxplima.uxmessentials.npc.application.SetNpcCollidable;
 import com.uxplima.uxmessentials.npc.application.SetNpcDisplayName;
@@ -174,6 +177,9 @@ public final class NpcWiring {
                 new ListNpcActions(repository, notifier),
                 new RemoveNpcAction(repository, notifier),
                 new ClearNpcActions(repository, notifier),
+                new InsertNpcAction(repository, notifier),
+                new SetNpcAction(repository, notifier),
+                new MoveNpcAction(repository, notifier),
                 new SetNpcTypeData(repository, renderer, notifier),
                 new ListNpcTypeData(repository, notifier),
                 new MoveNpcTo(repository, renderer, notifier, kernel.events()),

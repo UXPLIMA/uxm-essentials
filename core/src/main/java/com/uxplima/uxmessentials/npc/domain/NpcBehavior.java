@@ -78,6 +78,36 @@ public record NpcBehavior(
         return new NpcBehavior(clickCommand, lookAtPlayer, List.of(), interactionCooldownMillis);
     }
 
+    NpcBehavior withActionInsertedAt(int index, NpcAction action) {
+        Objects.requireNonNull(action, "action");
+        if (index < 0 || index > actions.size()) {
+            throw new IndexOutOfBoundsException("action insert index out of range: " + index);
+        }
+        List<NpcAction> updated = new ArrayList<>(actions);
+        updated.add(index, action);
+        return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
+    }
+
+    NpcBehavior withActionSetAt(int index, NpcAction action) {
+        Objects.requireNonNull(action, "action");
+        if (index < 0 || index >= actions.size()) {
+            throw new IndexOutOfBoundsException("action index out of range: " + index);
+        }
+        List<NpcAction> updated = new ArrayList<>(actions);
+        updated.set(index, action);
+        return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
+    }
+
+    NpcBehavior withActionMoved(int from, int to) {
+        if (from < 0 || from >= actions.size() || to < 0 || to >= actions.size()) {
+            throw new IndexOutOfBoundsException("action move index out of range: " + from + " -> " + to);
+        }
+        List<NpcAction> updated = new ArrayList<>(actions);
+        NpcAction moved = updated.remove(from);
+        updated.add(to, moved);
+        return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
+    }
+
     boolean hasClickCommand() {
         return clickCommand != null && !clickCommand.isBlank();
     }

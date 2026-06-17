@@ -10,13 +10,16 @@ import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
 import com.uxplima.uxmessentials.npc.application.DescribeNpc;
 import com.uxplima.uxmessentials.npc.application.FixNpc;
+import com.uxplima.uxmessentials.npc.application.InsertNpcAction;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
 import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
+import com.uxplima.uxmessentials.npc.application.MoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
+import com.uxplima.uxmessentials.npc.application.SetNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
 import com.uxplima.uxmessentials.npc.application.SetNpcCollidable;
 import com.uxplima.uxmessentials.npc.application.SetNpcDisplayName;
@@ -65,6 +68,9 @@ import org.jspecify.annotations.NullMarked;
  * @param listActions {@code /npc action list}
  * @param removeAction {@code /npc action remove}
  * @param clearActions {@code /npc action clear}
+ * @param insertAction {@code /npc action add_before} / {@code add_after}
+ * @param setAction {@code /npc action set}
+ * @param moveAction {@code /npc action move_up} / {@code move_down}
  * @param setData {@code /npc data set} / {@code /npc data clear}
  * @param listData {@code /npc data list}
  * @param moveTo {@code /npc moveto}
@@ -101,6 +107,9 @@ public record NpcServices(
         ListNpcActions listActions,
         RemoveNpcAction removeAction,
         ClearNpcActions clearActions,
+        InsertNpcAction insertAction,
+        SetNpcAction setAction,
+        MoveNpcAction moveAction,
         SetNpcTypeData setData,
         ListNpcTypeData listData,
         MoveNpcTo moveTo,
@@ -136,6 +145,9 @@ public record NpcServices(
         Objects.requireNonNull(listActions, "listActions");
         Objects.requireNonNull(removeAction, "removeAction");
         Objects.requireNonNull(clearActions, "clearActions");
+        Objects.requireNonNull(insertAction, "insertAction");
+        Objects.requireNonNull(setAction, "setAction");
+        Objects.requireNonNull(moveAction, "moveAction");
         Objects.requireNonNull(setData, "setData");
         Objects.requireNonNull(listData, "listData");
         Objects.requireNonNull(moveTo, "moveTo");

@@ -320,6 +320,21 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
         return new Npc(name, location, appearance, behavior.withActionsCleared(), createdAt);
     }
 
+    /** A copy with {@code action} inserted at the 0-based {@code index} (an {@code index} of the size appends). */
+    public Npc withActionInsertedAt(int index, NpcAction action) {
+        return new Npc(name, location, appearance, behavior.withActionInsertedAt(index, action), createdAt);
+    }
+
+    /** A copy with the action at the 0-based {@code index} replaced by {@code action}, keeping everything else. */
+    public Npc withActionSetAt(int index, NpcAction action) {
+        return new Npc(name, location, appearance, behavior.withActionSetAt(index, action), createdAt);
+    }
+
+    /** A copy with the action at 0-based {@code from} moved to 0-based {@code to}, keeping everything else. */
+    public Npc withActionMoved(int from, int to) {
+        return new Npc(name, location, appearance, behavior.withActionMoved(from, to), createdAt);
+    }
+
     // --- Predicates (delegated) ---
 
     /** Whether this NPC renders as a fake player (the default type with the tab-entry + skin path). */

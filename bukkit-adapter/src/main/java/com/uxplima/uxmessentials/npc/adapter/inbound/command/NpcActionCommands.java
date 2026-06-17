@@ -74,6 +74,11 @@ final class NpcActionCommands extends NpcCommandSupport {
     LiteralArgumentBuilder<CommandSourceStack> node() {
         return Commands.literal("action")
                 .then(actionAddNode())
+                .then(actionEditNode("add_before", this::actionAddBefore))
+                .then(actionEditNode("add_after", this::actionAddAfter))
+                .then(actionEditNode("set", this::actionSet))
+                .then(actionMoveNode("move_up", this::actionMoveUp))
+                .then(actionMoveNode("move_down", this::actionMoveDown))
                 .then(Commands.literal("list").then(nameArgument().executes(this::actionList)))
                 .then(Commands.literal("remove")
                         .then(nameArgument()
@@ -93,28 +98,117 @@ final class NpcActionCommands extends NpcCommandSupport {
                                                 .executes(this::actionAdd)))));
     }
 
+    /** A {@code <literal> <name> <index> <trigger> <type> <value…>} node, for the index-relative action edits. */
+    private LiteralArgumentBuilder<CommandSourceStack> actionEditNode(
+            String literal, Command<CommandSourceStack> exec) {
+        return Commands.literal(literal)
+                .then(nameArgument()
+                        .then(Commands.argument("index", IntegerArgumentType.integer(1))
+                                .then(Commands.argument("trigger", StringArgumentType.word())
+                                        .suggests(this::suggestTriggers)
+                                        .then(Commands.argument("type", StringArgumentType.word())
+                                                .suggests(this::suggestTypes)
+                                                .then(Commands.argument("value", StringArgumentType.greedyString())
+                                                        .executes(exec))))));
+    }
+
+    /** A {@code <literal> <name> <index>} node, for the reorder edits. */
+    private LiteralArgumentBuilder<CommandSourceStack> actionMoveNode(
+            String literal, Command<CommandSourceStack> exec) {
+        return Commands.literal(literal)
+                .then(nameArgument()
+                        .then(Commands.argument("index", IntegerArgumentType.integer(1))
+                                .executes(exec)));
+    }
+
     private int actionAdd(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
+        NpcAction action = parseAction(sender, ctx);
+        if (action == null) {
+            return 0;
+        }
+        services.addAction().add(ref(sender), nameArg(ctx), action);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int actionAddBefore(CommandContext<CommandSourceStack> ctx) {
+        return insertAt(ctx, false);
+    }
+
+    private int actionAddAfter(CommandContext<CommandSourceStack> ctx) {
+        return insertAt(ctx, true);
+    }
+
+    private int insertAt(CommandContext<CommandSourceStack> ctx, boolean after) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        NpcAction action = parseAction(sender, ctx);
+        if (action == null) {
+            return 0;
+        }
+        services.insertAction()
+                .insert(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class), after, action);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int actionSet(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        NpcAction action = parseAction(sender, ctx);
+        if (action == null) {
+            return 0;
+        }
+        services.setAction().set(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class), action);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int actionMoveUp(CommandContext<CommandSourceStack> ctx) {
+        return moveAction(ctx, true);
+    }
+
+    private int actionMoveDown(CommandContext<CommandSourceStack> ctx) {
+        return moveAction(ctx, false);
+    }
+
+    private int moveAction(CommandContext<CommandSourceStack> ctx, boolean up) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.moveAction().move(ref(sender), nameArg(ctx), ctx.getArgument("index", Integer.class), up);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Parse the {@code trigger}/{@code type}/{@code value} args into an {@link NpcAction}, sending the matching
+     * validation feedback and returning {@code null} when any part is invalid (or a {@code give hand} capture
+     * failed). Shared by {@code add}, {@code add_before}/{@code add_after} and {@code set}.
+     */
+    private @Nullable NpcAction parseAction(Player sender, CommandContext<CommandSourceStack> ctx) {
         ClickTrigger trigger = parseTrigger(ctx.getArgument("trigger", String.class));
         if (trigger == null) {
             feedback.send(
                     sender,
                     NpcMessageKey.NPC_INVALID_TRIGGER,
                     Map.of("trigger", ctx.getArgument("trigger", String.class)));
-            return 0;
+            return null;
         }
         String typeWord = ctx.getArgument("type", String.class);
         NpcActionType type = NpcActionValueCheck.parseType(typeWord).orElse(null);
         if (type == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_ACTION_TYPE, Map.of("type", typeWord));
-            return 0;
+            return null;
         }
         String value = resolveValue(sender, type, value(ctx));
         if (value == null) {
-            return 0; // the capture failed (empty hand) and its feedback was already sent
+            return null; // the capture failed (empty hand) and its feedback was already sent
         }
         NpcActionValueCheck.Result check = NpcActionValueCheck.check(type, value);
         if (check instanceof NpcActionValueCheck.Result.Invalid invalid) {
@@ -122,10 +216,9 @@ final class NpcActionCommands extends NpcCommandSupport {
                     sender,
                     NpcMessageKey.NPC_INVALID_ACTION_VALUE,
                     Map.of("value", value, "type", typeWord.toLowerCase(Locale.ROOT), "hint", invalid.hint()));
-            return 0;
+            return null;
         }
-        services.addAction().add(ref(sender), nameArg(ctx), new NpcAction(trigger, type, value));
-        return Command.SINGLE_SUCCESS;
+        return new NpcAction(trigger, type, value);
     }
 
     /**
