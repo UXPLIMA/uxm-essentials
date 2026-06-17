@@ -821,6 +821,37 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesScaleAndBillboardToADisplayNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("ITEM_DISPLAY")
+                .withTypeData("item", "DIAMOND")
+                .withTypeData("display_scale", "2.0")
+                .withTypeData("display_billboard", "center"));
+
+        assertThat(packets.displayScales).hasSize(1);
+        assertThat(packets.displayScales.get(0).scale()).isEqualTo(2.0f);
+        assertThat(packets.displayBillboards).hasSize(1);
+        assertThat(packets.displayBillboards.get(0).constraint()).isEqualTo((byte) 3);
+    }
+
+    @Test
+    void appliesBackgroundToATextDisplayNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("TEXT_DISPLAY")
+                .withTypeData("text", "Hi")
+                .withTypeData("text_background", "#80FF0000"));
+
+        assertThat(packets.textDisplayBackgrounds).hasSize(1);
+        assertThat(packets.textDisplayBackgrounds.get(0).argb()).isEqualTo(0x80FF0000);
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1373,6 +1404,9 @@ class NpcRendererTest {
         private final List<BlockDisplayState> blockDisplayStates = new ArrayList<>();
         private final List<ItemDisplayItem> itemDisplayItems = new ArrayList<>();
         private final List<TextDisplayText> textDisplayTexts = new ArrayList<>();
+        private final List<DisplayScale> displayScales = new ArrayList<>();
+        private final List<DisplayBillboard> displayBillboards = new ArrayList<>();
+        private final List<TextDisplayBackground> textDisplayBackgrounds = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1692,6 +1726,27 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object displayScale(int entityId, float scale) {
+            DisplayScale packet = new DisplayScale(entityId, scale);
+            displayScales.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object displayBillboard(int entityId, byte constraint) {
+            DisplayBillboard packet = new DisplayBillboard(entityId, constraint);
+            displayBillboards.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object textDisplayBackground(int entityId, int argb) {
+            TextDisplayBackground packet = new TextDisplayBackground(entityId, argb);
+            textDisplayBackgrounds.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1872,6 +1927,12 @@ class NpcRendererTest {
         private record ItemDisplayItem(int entityId, org.bukkit.Material material) {}
 
         private record TextDisplayText(int entityId, String plain) {}
+
+        private record DisplayScale(int entityId, float scale) {}
+
+        private record DisplayBillboard(int entityId, byte constraint) {}
+
+        private record TextDisplayBackground(int entityId, int argb) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

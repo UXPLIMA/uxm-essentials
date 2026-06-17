@@ -76,6 +76,9 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("block")).isTrue();
         assertThat(NpcTypeData.isKnownKey("item")).isTrue();
         assertThat(NpcTypeData.isKnownKey("text")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("display_scale")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("display_billboard")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("text_background")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -221,5 +224,18 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("block", "   ")).isFalse();
         assertThat(NpcTypeData.isValidValue("item", "")).isFalse();
         assertThat(NpcTypeData.isValidValue("text", " ")).isFalse();
+    }
+
+    @Test
+    void displaySharedPropertiesValidateScaleBillboardAndBackground() {
+        assertThat(NpcTypeData.isValidValue("display_scale", "2.0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("display_scale", "0")).isFalse();
+        assertThat(NpcTypeData.isValidValue("display_scale", "big")).isFalse();
+        assertThat(NpcTypeData.isValidValue("display_billboard", "center")).isTrue();
+        assertThat(NpcTypeData.isValidValue("display_billboard", "FIXED")).isTrue();
+        assertThat(NpcTypeData.isValidValue("display_billboard", "sideways")).isFalse();
+        assertThat(NpcTypeData.isValidValue("text_background", "#80FF0000")).isTrue();
+        assertThat(NpcTypeData.isValidValue("text_background", "ff0000")).isTrue();
+        assertThat(NpcTypeData.isValidValue("text_background", "notacolor")).isFalse();
     }
 }

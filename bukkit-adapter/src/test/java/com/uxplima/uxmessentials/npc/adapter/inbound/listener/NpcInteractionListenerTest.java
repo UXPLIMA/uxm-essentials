@@ -511,6 +511,21 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object displayScale(int entityId, float scale) {
+            return new Object();
+        }
+
+        @Override
+        public Object displayBillboard(int entityId, byte constraint) {
+            return new Object();
+        }
+
+        @Override
+        public Object textDisplayBackground(int entityId, int argb) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

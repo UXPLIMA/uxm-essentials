@@ -27,7 +27,8 @@ import org.jspecify.annotations.Nullable;
  * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
  * colour, a shulker's peek, a panda's gene, a tropical fish's variant, the goat/allay/piglin/camel/bee/vex state
  * flags, an armor stand's client flags and six poses, an interaction entity's hitbox size, and a display entity's
- * content (a block/item/text display's shown block/item/text). Kept in its own class so
+ * content (a block/item/text display's shown block/item/text, plus a display's scale/billboard and a text
+ * display's background colour). Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -78,6 +79,9 @@ final class NpcVariantData {
     static final String KEY_BLOCK = "block";
     static final String KEY_ITEM = "item";
     static final String KEY_TEXT = "text";
+    static final String KEY_DISPLAY_SCALE = "display_scale";
+    static final String KEY_DISPLAY_BILLBOARD = "display_billboard";
+    static final String KEY_TEXT_BACKGROUND = "text_background";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -169,6 +173,9 @@ final class NpcVariantData {
         applyBlockDisplay(packets, viewer, id, type, data, npc, log);
         applyItemDisplay(packets, viewer, id, type, data, npc, log);
         applyTextDisplay(packets, viewer, id, type, data, npc, log);
+        applyDisplayScale(packets, viewer, id, type, data, npc, log);
+        applyDisplayBillboard(packets, viewer, id, type, data, npc, log);
+        applyTextBackground(packets, viewer, id, type, data, npc, log);
         NpcNameVariantData.apply(packets, viewer, id, type, data, npc, log);
     }
 
@@ -425,6 +432,98 @@ final class NpcVariantData {
         packets.send(viewer, packets.itemDisplayItem(id, item));
     }
 
+    /** Whether {@code type} is a visible display entity (block/item/text) the shared scale/billboard apply to. */
+    private static boolean isVisualDisplay(EntityType type) {
+        return type == EntityType.BLOCK_DISPLAY || type == EntityType.ITEM_DISPLAY || type == EntityType.TEXT_DISPLAY;
+    }
+
+    /** Apply a display entity's uniform scale (the {@code display_scale} key); fail-soft on a bad value or wrong type. */
+    private static void applyDisplayScale(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_DISPLAY_SCALE);
+        if (value == null) {
+            return;
+        }
+        if (!isVisualDisplay(type)) {
+            skip(log, npc, KEY_DISPLAY_SCALE, type, "type is not a block/item/text display");
+            return;
+        }
+        Float scale = parseFloat(value);
+        if (scale == null || !Float.isFinite(scale) || scale <= 0) {
+            skip(log, npc, KEY_DISPLAY_SCALE, type, "value is not a positive scale: " + value);
+            return;
+        }
+        packets.send(viewer, packets.displayScale(id, scale));
+    }
+
+    /** Apply a display entity's billboard constraint (the {@code display_billboard} key); fail-soft on a bad name. */
+    private static void applyDisplayBillboard(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_DISPLAY_BILLBOARD);
+        if (value == null) {
+            return;
+        }
+        if (!isVisualDisplay(type)) {
+            skip(log, npc, KEY_DISPLAY_BILLBOARD, type, "type is not a block/item/text display");
+            return;
+        }
+        Byte constraint = parseBillboard(value);
+        if (constraint == null) {
+            skip(log, npc, KEY_DISPLAY_BILLBOARD, type, "value is not a billboard mode: " + value);
+            return;
+        }
+        packets.send(viewer, packets.displayBillboard(id, constraint));
+    }
+
+    /** Apply a text-display entity's background colour (the {@code text_background} key); fail-soft on a bad colour. */
+    private static void applyTextBackground(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_TEXT_BACKGROUND);
+        if (value == null) {
+            return;
+        }
+        if (type != EntityType.TEXT_DISPLAY) {
+            skip(log, npc, KEY_TEXT_BACKGROUND, type, "type is not a text display");
+            return;
+        }
+        Integer argb = parseArgb(value);
+        if (argb == null) {
+            skip(log, npc, KEY_TEXT_BACKGROUND, type, "value is not a hex ARGB colour: " + value);
+            return;
+        }
+        packets.send(viewer, packets.textDisplayBackground(id, argb));
+    }
+
+    /** A billboard name to its wire byte (FIXED 0, VERTICAL 1, HORIZONTAL 2, CENTER 3), or {@code null} when unknown. */
+    private static @Nullable Byte parseBillboard(String value) {
+        return switch (value.strip().toUpperCase(Locale.ROOT)) {
+            case "FIXED" -> (byte) 0;
+            case "VERTICAL" -> (byte) 1;
+            case "HORIZONTAL" -> (byte) 2;
+            case "CENTER" -> (byte) 3;
+            default -> null;
+        };
+    }
+
+    /** Parse a hex colour ({@code #rrggbb}/{@code #aarrggbb}, optional {@code #}/{@code 0x}) to a packed ARGB int. */
+    private static @Nullable Integer parseArgb(String value) {
+        String hex = value.strip();
+        if (hex.startsWith("#")) {
+            hex = hex.substring(1);
+        } else if (hex.startsWith("0x") || hex.startsWith("0X")) {
+            hex = hex.substring(2);
+        }
+        if (hex.length() != 6 && hex.length() != 8) {
+            return null;
+        }
+        try {
+            long bits = Long.parseLong(hex, 16);
+            return hex.length() == 6 ? (0xFF000000 | (int) bits) : (int) bits;
+        } catch (NumberFormatException notHex) {
+            return null;
+        }
+    }
+
     /**
      * Apply a text-display entity's shown text: the {@code text} key (a MiniMessage string) is parsed to a
      * component. Sent only to {@code TEXT_DISPLAY}; a MiniMessage parse error is skipped fail-soft. The text is
@@ -536,6 +635,12 @@ final class NpcVariantData {
                 // Block/item content is validated leniently (non-blank) so this stays Bukkit-free; the apply path
                 // resolves the BlockData/item and skips fail-soft if it is unparseable.
             case KEY_BLOCK, KEY_ITEM, KEY_TEXT -> !value.isBlank();
+            case KEY_DISPLAY_SCALE -> {
+                Float scale = parseFloat(value);
+                yield scale != null && Float.isFinite(scale) && scale > 0;
+            }
+            case KEY_DISPLAY_BILLBOARD -> parseBillboard(value) != null;
+            case KEY_TEXT_BACKGROUND -> parseArgb(value) != null;
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -717,5 +822,8 @@ final class NpcVariantData {
             KEY_INTERACTION_HEIGHT,
             KEY_BLOCK,
             KEY_ITEM,
-            KEY_TEXT);
+            KEY_TEXT,
+            KEY_DISPLAY_SCALE,
+            KEY_DISPLAY_BILLBOARD,
+            KEY_TEXT_BACKGROUND);
 }

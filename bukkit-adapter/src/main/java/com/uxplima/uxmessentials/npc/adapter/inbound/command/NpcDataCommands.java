@@ -77,6 +77,9 @@ final class NpcDataCommands extends NpcCommandSupport {
             "block",
             "item",
             "text",
+            "display_scale",
+            "display_billboard",
+            "text_background",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -126,6 +129,12 @@ final class NpcDataCommands extends NpcCommandSupport {
     private static final List<String> BLOCK_VALUES = List.of("stone", "oak_log", "glass");
     /** Sample item names, offered as a hint for {@code item} (any material name or {@code b64:} token is accepted). */
     private static final List<String> ITEM_VALUES = List.of("diamond", "golden_apple", "diamond_sword");
+    /** Sample uniform scales, offered as a hint for {@code display_scale}. */
+    private static final List<String> DISPLAY_SCALE_VALUES = List.of("1.0", "2.0", "0.5");
+    /** The billboard modes, offered as tab completions for {@code display_billboard}. */
+    private static final List<String> BILLBOARD_VALUES = List.of("fixed", "vertical", "horizontal", "center");
+    /** Sample ARGB hex colours, offered as a hint for {@code text_background} (any {@code #aarrggbb}/{@code #rrggbb}). */
+    private static final List<String> BACKGROUND_VALUES = List.of("#80000000", "#FF1E1E1E", "#00000000");
 
     NpcDataCommands(
             NpcServices services,
@@ -231,6 +240,9 @@ final class NpcDataCommands extends NpcCommandSupport {
             case "interaction_width", "interaction_height" -> suggest(builder, INTERACTION_SIZE_VALUES);
             case "block" -> suggest(builder, BLOCK_VALUES);
             case "item" -> suggest(builder, ITEM_VALUES);
+            case "display_scale" -> suggest(builder, DISPLAY_SCALE_VALUES);
+            case "display_billboard" -> suggest(builder, BILLBOARD_VALUES);
+            case "text_background" -> suggest(builder, BACKGROUND_VALUES);
             default -> builder.buildFuture();
         };
     }
