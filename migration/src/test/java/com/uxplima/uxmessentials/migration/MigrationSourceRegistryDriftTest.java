@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
 import com.uxplima.uxmessentials.migration.convert.decentholograms.DecentHologramsConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
+import com.uxplima.uxmessentials.migration.convert.fancyholograms.FancyHologramsConvert;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConfig;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
 import com.uxplima.uxmessentials.migration.convert.live.BalanceFeed;
@@ -22,10 +23,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The source-registry drift guard (docs/12-migration §8.3). It keeps the multi-source machinery honest:
- * the built sources are EssentialsX plus the live economy sources Vault and PlayerPoints; the six planned
- * sources have a reserved id but no registry entry (planned ≠ stubbed, §1.2). The registry keys, the
- * per-source mapping tables, and the built-source roster stay in lock-step — a {@code Convert} impl with
- * no mapping table, or a planned id that tab-completes, fails here.
+ * the built sources are EssentialsX, the live economy sources Vault and PlayerPoints, LiteBans, and the two
+ * hologram sources DecentHolograms and FancyHolograms; the remaining planned sources have a reserved id but
+ * no registry entry (planned ≠ stubbed, §1.2). The registry keys, the per-source mapping tables, and the
+ * built-source roster stay in lock-step — a {@code Convert} impl with no mapping table, or a planned id that
+ * tab-completes, fails here.
  */
 class MigrationSourceRegistryDriftTest {
 
@@ -44,7 +46,8 @@ class MigrationSourceRegistryDriftTest {
                     SourceId.of("playerpoints"), "PlayerPoints", "the live PlayerPoints economy provider", emptyFeed()),
             new LiteBansConvert(
                     new LiteBansConfig(Optional.empty(), "", "", "litebans_", Optional.empty()), noOpLogger()),
-            new DecentHologramsConvert(name -> Optional.empty(), Path.of("DecentHolograms", "holograms"))));
+            new DecentHologramsConvert(name -> Optional.empty(), Path.of("DecentHolograms", "holograms")),
+            new FancyHologramsConvert(name -> Optional.empty(), Path.of("FancyHolograms", "holograms.yml"))));
 
     private static Logger noOpLogger() {
         return new Logger() {
@@ -77,14 +80,15 @@ class MigrationSourceRegistryDriftTest {
     }
 
     @Test
-    void theBuiltSourcesAreEssentialsxVaultPlayerpointsLitebansAndDecentHologramsAndResolve() {
+    void theBuiltSourcesAreEssentialsxVaultPlayerpointsLitebansAndTheHologramSourcesAndResolve() {
         assertThat(registry.builtIds())
                 .containsExactlyInAnyOrder(
                         SourceId.of("essentialsx"),
                         SourceId.of("vault"),
                         SourceId.of("playerpoints"),
                         SourceId.of("litebans"),
-                        SourceId.of("decentholograms"));
+                        SourceId.of("decentholograms"),
+                        SourceId.of("fancyholograms"));
         assertThat(registry.resolve(SourceId.of("essentialsx")))
                 .map(Convert::id)
                 .contains(SourceId.of("essentialsx"));
@@ -92,6 +96,9 @@ class MigrationSourceRegistryDriftTest {
         assertThat(registry.resolve(SourceId.of("decentholograms")))
                 .map(Convert::id)
                 .contains(SourceId.of("decentholograms"));
+        assertThat(registry.resolve(SourceId.of("fancyholograms")))
+                .map(Convert::id)
+                .contains(SourceId.of("fancyholograms"));
     }
 
     @Test

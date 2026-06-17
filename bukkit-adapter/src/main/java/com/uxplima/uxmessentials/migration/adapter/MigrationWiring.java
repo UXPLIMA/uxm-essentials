@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
 import com.uxplima.uxmessentials.migration.convert.decentholograms.DecentHologramsConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
+import com.uxplima.uxmessentials.migration.convert.fancyholograms.FancyHologramsConvert;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConfig;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
 import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
@@ -118,14 +119,24 @@ public final class MigrationWiring {
                 new PlayerPointsBalanceFeed(plugin, log)));
         built.add(new LiteBansConvert(liteBansConfig(plugin, migrationConfig), log));
         built.add(new DecentHologramsConvert(worlds, decentHologramsDirectory(plugin)));
+        built.add(new FancyHologramsConvert(worlds, fancyHologramsFile(plugin)));
         return new SourceRegistry(built);
     }
 
     /** The {@code plugins/DecentHolograms/holograms} directory the DecentHolograms source reads its files from. */
     private static Path decentHologramsDirectory(Plugin plugin) {
+        return pluginsDirectory(plugin).resolve("DecentHolograms").resolve("holograms");
+    }
+
+    /** The {@code plugins/FancyHolograms/holograms.yml} file the FancyHolograms source reads its holograms from. */
+    private static Path fancyHologramsFile(Plugin plugin) {
+        return pluginsDirectory(plugin).resolve("FancyHolograms").resolve("holograms.yml");
+    }
+
+    /** The server {@code plugins/} directory, falling back to a relative path when the data folder has no parent. */
+    private static Path pluginsDirectory(Plugin plugin) {
         Path pluginsDir = plugin.getDataFolder().toPath().getParent();
-        Path base = pluginsDir != null ? pluginsDir : Path.of("plugins");
-        return base.resolve("DecentHolograms").resolve("holograms");
+        return pluginsDir != null ? pluginsDir : Path.of("plugins");
     }
 
     /** Read the {@code modules.migration.litebans} subtree into the source's connection config. */
