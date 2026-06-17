@@ -104,6 +104,9 @@ public final class HologramRenderer implements HologramView {
     private final Map<String, Tracked> live = new ConcurrentHashMap<>();
     /** The PDC key stamped on a clickable hologram's Interaction hitbox; the click listener reads the same key. */
     private final org.bukkit.NamespacedKey clickKey;
+    /** The animation frame, advanced on every (re-)render so a line's {@code <anim:…>} directive moves on refresh. */
+    private final java.util.concurrent.atomic.AtomicInteger animationPhase =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     public HologramRenderer(
             Plugin plugin,
@@ -283,8 +286,12 @@ public final class HologramRenderer implements HologramView {
             // different world from the new one, so it must not be removed inline on this region thread.
             scheduler.onRegion(previous.position(), () -> previous.live().removeFrom(manager));
         }
+        // Compose the line transform: resolve server-global placeholders first, then expand any <anim:…> directive
+        // for the current frame. The frame advances per render, so a refreshing hologram's animated line moves.
+        int phase = animationPhase.getAndIncrement();
+        UnaryOperator<String> animated = source -> HologramAnimations.expand(placeholders.apply(source), phase);
         RenderedHologram spawned =
-                HologramSpawns.spawnFor(manager, log, hologram, at, placeholders, miniMessage, globalTags.get());
+                HologramSpawns.spawnFor(manager, log, hologram, at, animated, miniMessage, globalTags.get());
         if (spawned == null) {
             // Invalid item material or block data — already logged; leave nothing tracked rather than crash.
             return;

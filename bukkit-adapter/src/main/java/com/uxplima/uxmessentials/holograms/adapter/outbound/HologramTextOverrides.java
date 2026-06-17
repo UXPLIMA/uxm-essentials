@@ -107,7 +107,10 @@ public final class HologramTextOverrides {
         TagResolver tags = globalTags.get();
         java.util.List<Component> resolved = new java.util.ArrayList<>(hologram.lineCount());
         for (HologramLine line : hologram.lines()) {
-            resolved.add(miniMessage.deserialize(bridge.apply(line.value()), tags));
+            // The per-viewer path renders a static frame, so an inline animation directive is stripped rather than
+            // shown literally — animation and per-viewer placeholders do not combine (the placeholder wins).
+            String source = HologramAnimations.stripDirective(bridge.apply(line.value()));
+            resolved.add(miniMessage.deserialize(source, tags));
         }
         return Component.join(JoinConfiguration.newlines(), resolved);
     }
