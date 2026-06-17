@@ -11,12 +11,15 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcSkinByName;
+import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionListener;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
+import com.uxplima.uxmessentials.npc.adapter.outbound.BlockedCommands;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitServerConnector;
 import com.uxplima.uxmessentials.npc.adapter.outbound.CompositeSkinService;
+import com.uxplima.uxmessentials.npc.adapter.outbound.FilteredNpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.HttpClientFetcher;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
@@ -135,7 +138,8 @@ public final class NpcWiring {
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
         List<CommandRegistration> commands =
                 List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages()));
-        BukkitNpcCommandRunner commandRunner = new BukkitNpcCommandRunner();
+        NpcCommandRunner commandRunner = new FilteredNpcCommandRunner(
+                new BukkitNpcCommandRunner(), BlockedCommands.of(settings.blockedCommands()), kernel.log());
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
         NpcActionRunner actionRunner = new BukkitNpcActionRunner(
                 commandRunner,

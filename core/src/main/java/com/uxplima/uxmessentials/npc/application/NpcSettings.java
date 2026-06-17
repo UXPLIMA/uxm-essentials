@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.npc.application;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -64,5 +65,13 @@ public final class NpcSettings {
      */
     public int defaultLimit() {
         return (int) Math.max(-1L, config.getLong("default-limit", DEFAULT_NPC_LIMIT));
+    }
+
+    /**
+     * The command labels an NPC's bound command or click action may not run (case-insensitive, matched on the
+     * first word). Empty by default — nothing is blocked, so a server that configures no list behaves as before.
+     */
+    public List<String> blockedCommands() {
+        return config.getStringList("blocked-commands", List.of());
     }
 }
