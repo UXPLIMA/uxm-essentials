@@ -40,6 +40,7 @@ rclaim         = "2.6.0"        # com.github.Weesli:RClaim — JitPack, NOT Mave
 
 # placeholder integration (see docs/11-economy-integration.md soft-depend pattern, ADR 0004)
 placeholderapi = "2.11.6"       # me.clip:placeholderapi — extendedclip repo, NOT Maven Central (verified 2026-05-31)
+miniplaceholders = "3.1.0"      # io.github.miniplaceholders:miniplaceholders-api — Maven Central (verified 2026-06-17, javap; 3.2.0 needs Java 25, 3.1.0 targets Java 21)
 
 # map-plugin marker integrations — compileOnly soft-depends; the host map plugin provides them at runtime
 squaremap      = "1.3.13"       # xyz.jpenilla:squaremap-api — Maven Central (verified 2026-06-10)
@@ -107,6 +108,8 @@ hook-rclaim       = { module = "com.github.Weesli:RClaim",                      
 
 # placeholder API — compileOnly soft-depend; the expansion registers only when the plugin is present
 placeholderapi    = { module = "me.clip:placeholderapi",                         version.ref = "placeholderapi" }
+# MiniPlaceholders — compileOnly soft-depend; its MiniMessage tag resolvers merge in only when the plugin is present
+miniplaceholders  = { module = "io.github.miniplaceholders:miniplaceholders-api", version.ref = "miniplaceholders" }
 
 # map-plugin marker APIs — compileOnly soft-depends; the marker publishers bind to these only past the
 # plugin-present guard, so the plugin runs fully without Dynmap or squaremap installed.

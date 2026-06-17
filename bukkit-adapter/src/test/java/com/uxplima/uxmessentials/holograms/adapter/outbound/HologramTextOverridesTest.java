@@ -8,12 +8,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
@@ -77,6 +80,21 @@ class HologramTextOverridesTest {
     }
 
     @Test
+    void resolvesGlobalMiniPlaceholdersTagsInThePerViewerText() {
+        // The global MiniPlaceholders resolver (a <tag> source) is applied during deserialize, alongside the
+        // per-viewer %token% bridge — so a per-viewer hologram renders both for the viewer.
+        FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
+        Supplier<TagResolver> greeting = () -> Placeholder.parsed("greeting", "Howdy");
+        HologramTextOverrides overrides =
+                overrides(packets, perViewer(Map.of(ALICE, source -> source.replace("%name%", "Alice"))), greeting);
+        Hologram hologram = text("welcome", "<greeting> %name%");
+
+        overrides.sendOverride(player(ALICE), ENTITY_ID, hologram);
+
+        assertThat(plain(packets.textFor(ALICE))).isEqualTo("Howdy Alice");
+    }
+
+    @Test
     void multipleLinesAreJoinedWithNewlinesAsTheSharedEntityRendersThem() {
         FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
         HologramTextOverrides overrides =
@@ -135,7 +153,14 @@ class HologramTextOverridesTest {
 
     private static HologramTextOverrides overrides(
             FakeDisplayTextPackets packets, Function<UUID, UnaryOperator<String>> bridges) {
-        return new HologramTextOverrides(packets, bridges, MiniMessage.miniMessage(), noOpLogger());
+        return overrides(packets, bridges, TagResolver::empty);
+    }
+
+    private static HologramTextOverrides overrides(
+            FakeDisplayTextPackets packets,
+            Function<UUID, UnaryOperator<String>> bridges,
+            Supplier<TagResolver> globalTags) {
+        return new HologramTextOverrides(packets, bridges, MiniMessage.miniMessage(), globalTags, noOpLogger());
     }
 
     /** A bridge factory returning the per-viewer transform from {@code byViewer}, identity for an unknown uuid. */

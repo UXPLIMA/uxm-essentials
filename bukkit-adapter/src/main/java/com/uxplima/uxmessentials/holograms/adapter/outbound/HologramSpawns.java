@@ -7,6 +7,7 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
@@ -41,9 +42,11 @@ final class HologramSpawns {
             Hologram hologram,
             Location at,
             UnaryOperator<String> placeholders,
-            MiniMessage miniMessage) {
+            MiniMessage miniMessage,
+            TagResolver globalTags) {
         return switch (hologram.type()) {
-            case TEXT -> RenderedHologram.ofText(manager.spawn(builderFor(hologram, placeholders, miniMessage), at));
+            case TEXT -> RenderedHologram.ofText(
+                    manager.spawn(builderFor(hologram, placeholders, miniMessage, globalTags), at));
             case ITEM -> spawnItem(manager, log, hologram, at);
             case BLOCK -> spawnBlock(manager, log, hologram, at);
         };
@@ -94,15 +97,17 @@ final class HologramSpawns {
 
     /**
      * Build the configured uxmLib builder for {@code hologram}: each line's MiniMessage source run through
-     * {@code placeholders} before it is deserialised, the appearance applied, and a finite visibility distance
-     * mapped onto the native view range. Pure (no world, no entity), so the placeholder resolution, appearance
-     * mapping and distance-to-view-range mapping are unit-testable through {@code builder.spec()}.
+     * {@code placeholders} (the PlaceholderAPI {@code %token%} pre-parse transform) then deserialised with the
+     * {@code globalTags} resolver (the MiniPlaceholders server-global {@code <tag>}s, or an empty resolver when
+     * that plugin is absent), the appearance applied, and a finite visibility distance mapped onto the native view
+     * range. Pure (no world, no entity), so the placeholder resolution, appearance mapping and distance-to-view-range
+     * mapping are unit-testable through {@code builder.spec()}.
      */
     static Holograms.Builder builderFor(
-            Hologram hologram, UnaryOperator<String> placeholders, MiniMessage miniMessage) {
+            Hologram hologram, UnaryOperator<String> placeholders, MiniMessage miniMessage, TagResolver globalTags) {
         Holograms.Builder builder = Holograms.builder();
         for (HologramLine line : hologram.lines()) {
-            builder.line(miniMessage.deserialize(placeholders.apply(line.value())));
+            builder.line(miniMessage.deserialize(placeholders.apply(line.value()), globalTags));
         }
         HologramAppearances.apply(builder, hologram.appearance());
         Rotation rotation = hologram.rotation();

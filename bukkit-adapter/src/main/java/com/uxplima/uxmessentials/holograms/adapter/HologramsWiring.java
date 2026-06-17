@@ -50,6 +50,7 @@ import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.miniplaceholders.MiniPlaceholdersSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -99,7 +100,11 @@ public final class HologramsWiring {
         // top of that base, a line embedding a placeholder additionally renders per viewer through the text-override
         // collaborator below — each viewer sees their own resolved values over the one shared entity.
         HologramTextOverrides textOverrides = new HologramTextOverrides(
-                perViewerTextPackets(), PlaceholderApiSupport::messageBridge, MiniMessage.miniMessage(), kernel.log());
+                perViewerTextPackets(),
+                PlaceholderApiSupport::messageBridge,
+                MiniMessage.miniMessage(),
+                MiniPlaceholdersSupport::globalResolver,
+                kernel.log());
         HologramViewers viewers = new HologramViewers(plugin, kernel.permissions(), repository::manualViewers);
         // The NPC-link seam: a locator over the npc context's stored set kept current by the domain-event bus,
         // re-anchoring a linked hologram when its NPC moves or is removed. The locator reads the npc persistence
@@ -117,6 +122,7 @@ public final class HologramsWiring {
                 kernel.scheduler(),
                 kernel.log(),
                 PlaceholderApiSupport.globalBridge(),
+                MiniPlaceholdersSupport::globalResolver,
                 viewers,
                 textOverrides,
                 npcLocator);

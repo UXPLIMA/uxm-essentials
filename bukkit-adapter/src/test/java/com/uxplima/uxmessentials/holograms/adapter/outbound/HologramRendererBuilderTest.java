@@ -47,6 +47,22 @@ class HologramRendererBuilderTest {
     }
 
     @Test
+    void resolvesAGlobalMiniMessageTagThroughTheGlobalResolver() {
+        // The MiniPlaceholders server-global resolver is consulted during deserialize: a <tag> in the line resolves
+        // to its value (here a stand-in resolver), alongside the %token% bridge.
+        Hologram hologram = hologram(Appearance.defaults(), "<greeting> world");
+
+        HologramSpec spec = HologramSpawns.builderFor(
+                        hologram,
+                        UnaryOperator.identity(),
+                        MINI_MESSAGE,
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.parsed("greeting", "Hi"))
+                .spec();
+
+        assertThat(PLAIN.serialize(spec.asText())).isEqualTo("Hi world");
+    }
+
+    @Test
     void aLineWithNoPlaceholderIsLeftUntouchedByAnIdentityBridge() {
         Hologram hologram = hologram(Appearance.defaults(), "Welcome");
 

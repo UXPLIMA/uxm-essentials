@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.holograms.adapter.outbound;
 
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.entity.Player;
@@ -9,6 +10,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
@@ -43,16 +45,19 @@ public final class HologramTextOverrides {
     private final DisplayTextPackets packets;
     private final Function<java.util.UUID, UnaryOperator<String>> bridgeFactory;
     private final MiniMessage miniMessage;
+    private final Supplier<TagResolver> globalTags;
     private final Logger log;
 
     public HologramTextOverrides(
             DisplayTextPackets packets,
             Function<java.util.UUID, UnaryOperator<String>> bridgeFactory,
             MiniMessage miniMessage,
+            Supplier<TagResolver> globalTags,
             Logger log) {
         this.packets = Objects.requireNonNull(packets, "packets");
         this.bridgeFactory = Objects.requireNonNull(bridgeFactory, "bridgeFactory");
         this.miniMessage = Objects.requireNonNull(miniMessage, "miniMessage");
+        this.globalTags = Objects.requireNonNull(globalTags, "globalTags");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -99,9 +104,10 @@ public final class HologramTextOverrides {
     /** Resolve {@code hologram}'s lines for one viewer, joined with newlines as the shared entity renders them. */
     private Component resolveFor(java.util.UUID viewer, Hologram hologram) {
         UnaryOperator<String> bridge = bridgeFactory.apply(viewer);
+        TagResolver tags = globalTags.get();
         java.util.List<Component> resolved = new java.util.ArrayList<>(hologram.lineCount());
         for (HologramLine line : hologram.lines()) {
-            resolved.add(miniMessage.deserialize(bridge.apply(line.value())));
+            resolved.add(miniMessage.deserialize(bridge.apply(line.value()), tags));
         }
         return Component.join(JoinConfiguration.newlines(), resolved);
     }

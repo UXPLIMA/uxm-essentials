@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
@@ -15,6 +16,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
@@ -94,6 +96,7 @@ public final class HologramRenderer implements HologramView {
     private final Scheduler scheduler;
     private final Logger log;
     private final UnaryOperator<String> placeholders;
+    private final Supplier<TagResolver> globalTags;
     private final HologramViewers viewers;
     private final HologramTextOverrides textOverrides;
     private final LinkedNpcLocator linkedNpcs;
@@ -106,6 +109,7 @@ public final class HologramRenderer implements HologramView {
             Scheduler scheduler,
             Logger log,
             UnaryOperator<String> placeholders,
+            Supplier<TagResolver> globalTags,
             HologramViewers viewers,
             HologramTextOverrides textOverrides,
             LinkedNpcLocator linkedNpcs) {
@@ -114,6 +118,7 @@ public final class HologramRenderer implements HologramView {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.placeholders = Objects.requireNonNull(placeholders, "placeholders");
+        this.globalTags = Objects.requireNonNull(globalTags, "globalTags");
         this.viewers = Objects.requireNonNull(viewers, "viewers");
         this.textOverrides = Objects.requireNonNull(textOverrides, "textOverrides");
         this.linkedNpcs = Objects.requireNonNull(linkedNpcs, "linkedNpcs");
@@ -275,7 +280,8 @@ public final class HologramRenderer implements HologramView {
             // different world from the new one, so it must not be removed inline on this region thread.
             scheduler.onRegion(previous.position(), () -> previous.live().removeFrom(manager));
         }
-        RenderedHologram spawned = HologramSpawns.spawnFor(manager, log, hologram, at, placeholders, miniMessage);
+        RenderedHologram spawned =
+                HologramSpawns.spawnFor(manager, log, hologram, at, placeholders, miniMessage, globalTags.get());
         if (spawned == null) {
             // Invalid item material or block data — already logged; leave nothing tracked rather than crash.
             return;
@@ -337,10 +343,13 @@ public final class HologramRenderer implements HologramView {
         return node != null && permissions.has(who, node);
     }
 
-    /** The pure model-to-builder mapping, kept reachable here so the builder mapping stays unit-testable. */
+    /**
+     * The pure model-to-builder mapping, kept reachable here so the builder mapping stays unit-testable. Uses an
+     * empty MiniPlaceholders resolver — the global-tag resolution is exercised directly against {@link HologramSpawns}.
+     */
     static Holograms.Builder builderFor(
             Hologram hologram, UnaryOperator<String> placeholders, MiniMessage miniMessage) {
-        return HologramSpawns.builderFor(hologram, placeholders, miniMessage);
+        return HologramSpawns.builderFor(hologram, placeholders, miniMessage, TagResolver.empty());
     }
 
     /**

@@ -82,7 +82,12 @@ class HologramRendererPerViewerDispatchTest {
 
     private static HologramTextOverrides overrides(
             RecordingPackets packets, Function<UUID, UnaryOperator<String>> bridges) {
-        return new HologramTextOverrides(packets, bridges, MiniMessage.miniMessage(), noOpLogger());
+        return new HologramTextOverrides(
+                packets,
+                bridges,
+                MiniMessage.miniMessage(),
+                net.kyori.adventure.text.minimessage.tag.resolver.TagResolver::empty,
+                noOpLogger());
     }
 
     private static Function<UUID, UnaryOperator<String>> perViewer(Map<UUID, UnaryOperator<String>> byViewer) {
