@@ -119,12 +119,17 @@ public record NpcAppearance(
                 skin, DEFAULT_ENTITY_TYPE, Map.of(), false, null, DEFAULT_POSE, DEFAULT_SCALE, Map.of());
     }
 
+    /** A pre-filled builder for the internal {@code with*} transitions; the public surface is unchanged. */
+    NpcAppearanceBuilder toBuilder() {
+        return new NpcAppearanceBuilder(this);
+    }
+
     NpcAppearance withSkin(@Nullable NpcSkin newSkin) {
-        return copy(b -> b.skin = newSkin);
+        return toBuilder().skin(newSkin).build();
     }
 
     NpcAppearance withEntityType(String newEntityType) {
-        return copy(b -> b.entityType = newEntityType);
+        return toBuilder().entityType(newEntityType).build();
     }
 
     NpcAppearance withEquipment(EquipmentSlot slot, @Nullable String itemToken) {
@@ -137,59 +142,61 @@ public record NpcAppearance(
         } else {
             updated.put(slot, itemToken);
         }
-        return copy(b -> b.equipment = updated);
+        return toBuilder().equipment(updated).build();
     }
 
     NpcAppearance withGlowing(boolean newGlowing) {
-        return copy(b -> b.glowing = newGlowing);
+        return toBuilder().glowing(newGlowing).build();
     }
 
     NpcAppearance withGlowColor(@Nullable String newColor) {
-        return copy(b -> b.glowColor = newColor == null || newColor.isBlank() ? null : newColor);
+        return toBuilder()
+                .glowColor(newColor == null || newColor.isBlank() ? null : newColor)
+                .build();
     }
 
     NpcAppearance withPose(String newPose) {
-        return copy(b -> b.pose = newPose);
+        return toBuilder().pose(newPose).build();
     }
 
     NpcAppearance withScale(double newScale) {
-        return copy(b -> b.scale = newScale);
+        return toBuilder().scale(newScale).build();
     }
 
     NpcAppearance withDisplayName(@Nullable String newDisplayName) {
-        return copy(b -> b.displayName = newDisplayName);
+        return toBuilder().displayName(newDisplayName).build();
     }
 
     NpcAppearance withMirrorSkin(boolean newMirrorSkin) {
-        return copy(b -> b.mirrorSkin = newMirrorSkin);
+        return toBuilder().mirrorSkin(newMirrorSkin).build();
     }
 
     NpcAppearance withCollidable(boolean newCollidable) {
-        return copy(b -> b.collidable = newCollidable);
+        return toBuilder().collidable(newCollidable).build();
     }
 
     NpcAppearance withShowInTab(boolean newShowInTab) {
-        return copy(b -> b.showInTab = newShowInTab);
+        return toBuilder().showInTab(newShowInTab).build();
     }
 
     NpcAppearance withViewDistance(@Nullable Double newViewDistance) {
-        return copy(b -> b.viewDistance = newViewDistance);
+        return toBuilder().viewDistance(newViewDistance).build();
     }
 
     NpcAppearance withTurnDistance(@Nullable Double newTurnDistance) {
-        return copy(b -> b.turnDistance = newTurnDistance);
+        return toBuilder().turnDistance(newTurnDistance).build();
     }
 
     NpcAppearance withOnFire(boolean newOnFire) {
-        return copy(b -> b.onFire = newOnFire);
+        return toBuilder().onFire(newOnFire).build();
     }
 
     NpcAppearance withInvisible(boolean newInvisible) {
-        return copy(b -> b.invisible = newInvisible);
+        return toBuilder().invisible(newInvisible).build();
     }
 
     NpcAppearance withSilent(boolean newSilent) {
-        return copy(b -> b.silent = newSilent);
+        return toBuilder().silent(newSilent).build();
     }
 
     NpcAppearance withTypeData(String key, @Nullable String value) {
@@ -203,7 +210,7 @@ public record NpcAppearance(
         } else {
             updated.put(trimmedKey, value);
         }
-        return copy(b -> b.typeData = updated);
+        return toBuilder().typeData(updated).build();
     }
 
     boolean isPlayerType() {
@@ -236,13 +243,6 @@ public record NpcAppearance(
 
     boolean hasDisplayName() {
         return displayName != null && !displayName.isBlank();
-    }
-
-    /** Apply one field edit to a mutable snapshot of this appearance and rebuild — keeps each {@code with*} a line. */
-    private NpcAppearance copy(java.util.function.Consumer<Fields> edit) {
-        Fields fields = new Fields(this);
-        edit.accept(fields);
-        return fields.build();
     }
 
     /** Upper-case the entity-type name and reject a blank one — the type is always a non-blank uppercase name. */
@@ -302,67 +302,5 @@ public record NpcAppearance(
             return Map.of();
         }
         return Map.copyOf(source);
-    }
-
-    /** A mutable carrier for the appearance fields, used only to keep each single-field {@code with*} a one-liner. */
-    private static final class Fields {
-        private @Nullable NpcSkin skin;
-        private String entityType;
-        private Map<EquipmentSlot, String> equipment;
-        private boolean glowing;
-        private @Nullable String glowColor;
-        private String pose;
-        private double scale;
-        private Map<String, String> typeData;
-        private @Nullable String displayName;
-        private boolean mirrorSkin;
-        private boolean collidable;
-        private boolean showInTab;
-        private @Nullable Double viewDistance;
-        private @Nullable Double turnDistance;
-        private boolean onFire;
-        private boolean invisible;
-        private boolean silent;
-
-        private Fields(NpcAppearance a) {
-            this.skin = a.skin;
-            this.entityType = a.entityType;
-            this.equipment = a.equipment;
-            this.glowing = a.glowing;
-            this.glowColor = a.glowColor;
-            this.pose = a.pose;
-            this.scale = a.scale;
-            this.typeData = a.typeData;
-            this.displayName = a.displayName;
-            this.mirrorSkin = a.mirrorSkin;
-            this.collidable = a.collidable;
-            this.showInTab = a.showInTab;
-            this.viewDistance = a.viewDistance;
-            this.turnDistance = a.turnDistance;
-            this.onFire = a.onFire;
-            this.invisible = a.invisible;
-            this.silent = a.silent;
-        }
-
-        private NpcAppearance build() {
-            return new NpcAppearance(
-                    skin,
-                    entityType,
-                    equipment,
-                    glowing,
-                    glowColor,
-                    pose,
-                    scale,
-                    typeData,
-                    displayName,
-                    mirrorSkin,
-                    collidable,
-                    showInTab,
-                    viewDistance,
-                    turnDistance,
-                    onFire,
-                    invisible,
-                    silent);
-        }
     }
 }
