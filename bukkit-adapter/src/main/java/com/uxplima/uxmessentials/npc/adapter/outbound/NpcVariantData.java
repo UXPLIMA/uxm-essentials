@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  * The per-entity-type appearance variants beyond the baby/size/charged/villager core of {@link NpcTypeData}: a
  * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
  * colour, a shulker's peek, a panda's gene, a tropical fish's variant, the goat/allay/piglin/camel/bee/vex state
- * flags, and an armor stand's client flags and six poses. Kept in its own class so
+ * flags, an armor stand's client flags and six poses, and an interaction entity's hitbox size. Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -67,6 +67,8 @@ final class NpcVariantData {
     static final String KEY_AS_RIGHT_ARM = "armor_stand_right_arm";
     static final String KEY_AS_LEFT_LEG = "armor_stand_left_leg";
     static final String KEY_AS_RIGHT_LEG = "armor_stand_right_leg";
+    static final String KEY_INTERACTION_WIDTH = "interaction_width";
+    static final String KEY_INTERACTION_HEIGHT = "interaction_height";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -76,6 +78,8 @@ final class NpcVariantData {
     private static final int MAX_DYE_COLOR = 15;
     /** The killer (toast) rabbit's wire type id — valid even though it sits outside the 0–5 coat run. */
     private static final int RABBIT_KILLER = 99;
+    /** The default interaction hitbox dimension (blocks) for a width/height that is absent or unparseable. */
+    private static final float DEFAULT_INTERACTION_SIZE = 1.0f;
     /** A shulker shell opens from 0 (closed) to 100 (fully open). */
     private static final int MAX_SHULKER_PEEK = 100;
     /** The seven panda genes (0–6: normal, lazy, worried, playful, brown, weak, aggressive). */
@@ -152,6 +156,7 @@ final class NpcVariantData {
         for (PoseVariant pose : ARMOR_STAND_POSES) {
             applyArmorStandPose(packets, viewer, id, type, data, npc, log, pose);
         }
+        applyInteraction(packets, viewer, id, type, data, npc, log);
         NpcNameVariantData.apply(packets, viewer, id, type, data, npc, log);
     }
 
@@ -342,6 +347,38 @@ final class NpcVariantData {
         packets.send(viewer, packets.armorStandPose(id, pose.part(), angles[0], angles[1], angles[2]));
     }
 
+    /**
+     * Apply an interaction entity's hitbox size: the {@code interaction_width}/{@code interaction_height} keys set
+     * the clickable box (defaulting a missing or unparseable dimension to 1 block) in one packet. An interaction
+     * NPC is invisible — the hitbox is its whole point — so this is what makes it clickable. Sent only to the
+     * {@code INTERACTION} type; fail-soft on a wrong type.
+     */
+    private static void applyInteraction(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        if (!data.containsKey(KEY_INTERACTION_WIDTH) && !data.containsKey(KEY_INTERACTION_HEIGHT)) {
+            return;
+        }
+        if (type != EntityType.INTERACTION) {
+            skip(log, npc, KEY_INTERACTION_WIDTH, type, "type is not an interaction entity");
+            return;
+        }
+        float width = dimension(data.get(KEY_INTERACTION_WIDTH));
+        float height = dimension(data.get(KEY_INTERACTION_HEIGHT));
+        packets.send(viewer, packets.interactionSize(id, width, height));
+    }
+
+    /** A stored interaction dimension as a non-negative finite float, defaulting an absent/invalid one to 1 block. */
+    private static float dimension(@Nullable String value) {
+        Float parsed = value == null ? null : parseFloat(value);
+        return parsed == null || !Float.isFinite(parsed) || parsed < 0 ? DEFAULT_INTERACTION_SIZE : parsed;
+    }
+
+    /** Whether {@code value} is a valid interaction dimension: a non-negative finite float. */
+    private static boolean isDimension(String value) {
+        Float parsed = parseFloat(value);
+        return parsed != null && Float.isFinite(parsed) && parsed >= 0;
+    }
+
     /** Parse a {@code "x,y,z"} triple of finite degree angles, or {@code null} when it is not three valid floats. */
     private static float @Nullable [] parseAngles(String value) {
         // Keep trailing empties (limit -1) so "1,2,3," is four parts and fails the count, not a silent three.
@@ -400,6 +437,7 @@ final class NpcVariantData {
                     KEY_AS_RIGHT_ARM,
                     KEY_AS_LEFT_LEG,
                     KEY_AS_RIGHT_LEG -> parseAngles(value) != null;
+            case KEY_INTERACTION_WIDTH, KEY_INTERACTION_HEIGHT -> isDimension(value);
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -576,5 +614,7 @@ final class NpcVariantData {
             KEY_AS_LEFT_ARM,
             KEY_AS_RIGHT_ARM,
             KEY_AS_LEFT_LEG,
-            KEY_AS_RIGHT_LEG);
+            KEY_AS_RIGHT_LEG,
+            KEY_INTERACTION_WIDTH,
+            KEY_INTERACTION_HEIGHT);
 }

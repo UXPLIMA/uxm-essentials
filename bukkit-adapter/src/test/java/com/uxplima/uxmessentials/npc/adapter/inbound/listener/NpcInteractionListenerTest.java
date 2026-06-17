@@ -491,6 +491,11 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object interactionSize(int entityId, float width, float height) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

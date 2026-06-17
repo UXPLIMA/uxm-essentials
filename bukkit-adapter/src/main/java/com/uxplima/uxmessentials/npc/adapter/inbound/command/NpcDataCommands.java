@@ -72,6 +72,8 @@ final class NpcDataCommands extends NpcCommandSupport {
             "armor_stand_right_arm",
             "armor_stand_left_leg",
             "armor_stand_right_leg",
+            "interaction_width",
+            "interaction_height",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -115,6 +117,8 @@ final class NpcDataCommands extends NpcCommandSupport {
             .toList();
     /** A sample {@code x,y,z} degrees triple, offered as a hint for the armor-stand pose keys. */
     private static final List<String> ARMOR_STAND_POSE_VALUES = List.of("0,0,0");
+    /** Sample interaction hitbox sizes (blocks), offered as a hint for the interaction width/height keys. */
+    private static final List<String> INTERACTION_SIZE_VALUES = List.of("1.0", "2.0");
 
     NpcDataCommands(
             NpcServices services,
@@ -217,6 +221,7 @@ final class NpcDataCommands extends NpcCommandSupport {
                     "armor_stand_right_arm",
                     "armor_stand_left_leg",
                     "armor_stand_right_leg" -> suggest(builder, ARMOR_STAND_POSE_VALUES);
+            case "interaction_width", "interaction_height" -> suggest(builder, INTERACTION_SIZE_VALUES);
             default -> builder.buildFuture();
         };
     }

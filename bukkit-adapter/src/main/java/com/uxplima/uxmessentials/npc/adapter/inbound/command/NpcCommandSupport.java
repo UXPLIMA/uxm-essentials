@@ -124,17 +124,23 @@ abstract class NpcCommandSupport {
 
     /**
      * Parse {@code word} case-insensitively to a Bukkit {@link EntityType} an NPC can render as — {@code PLAYER}
-     * (the fake-player path) or any living-entity type — or {@code null} for an unknown or non-living type, so the
-     * caller can report {@code NPC_INVALID_ENTITY_TYPE}. Shared by {@code /npc create [type]} and {@code /npc type}.
+     * (the fake-player path), any living-entity type, or a supported display/interaction type — or {@code null} for
+     * an unknown or unrenderable type, so the caller can report {@code NPC_INVALID_ENTITY_TYPE}. Shared by
+     * {@code /npc create [type]} and {@code /npc type}.
      */
-    static @Nullable EntityType parseLivingType(String word) {
+    static @Nullable EntityType parseRenderableType(String word) {
         EntityType type;
         try {
             type = EntityType.valueOf(word.strip().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException unknown) {
             return null;
         }
-        return isLiving(type) ? type : null;
+        return isRenderableType(type) ? type : null;
+    }
+
+    /** Whether an NPC may render as {@code type}: a fake player, a living entity, or a supported display type. */
+    static boolean isRenderableType(EntityType type) {
+        return isLiving(type) || isSupportedDisplayType(type);
     }
 
     /** Whether an NPC may render as {@code type}: a fake player, or any entity whose class is a living entity. */
@@ -144,6 +150,16 @@ abstract class NpcCommandSupport {
         }
         Class<?> entityClass = type.getEntityClass();
         return entityClass != null && LivingEntity.class.isAssignableFrom(entityClass);
+    }
+
+    /**
+     * Whether {@code type} is a non-living display/interaction entity an NPC can render as. These are packet-spawned
+     * like any other type and carry their visual through display-content type-data keys; the set grows as each
+     * type's content support lands. Currently: {@link EntityType#INTERACTION} (an invisible, sized, clickable
+     * hitbox that still carries the NPC's click command and action chain).
+     */
+    static boolean isSupportedDisplayType(EntityType type) {
+        return type == EntityType.INTERACTION;
     }
 
     /** Suggest the {@code words} that start with what the operator has typed, case-insensitively. */

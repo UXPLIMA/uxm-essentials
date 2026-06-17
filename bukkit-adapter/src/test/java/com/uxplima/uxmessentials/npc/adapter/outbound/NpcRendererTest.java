@@ -773,6 +773,21 @@ class NpcRendererTest {
     }
 
     @Test
+    void sizesAnInteractionNpcsHitbox() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("INTERACTION")
+                .withTypeData("interaction_width", "1.5")
+                .withTypeData("interaction_height", "2.0"));
+
+        assertThat(packets.interactionSizes).hasSize(1);
+        assertThat(packets.interactionSizes.get(0).width()).isEqualTo(1.5f);
+        assertThat(packets.interactionSizes.get(0).height()).isEqualTo(2.0f);
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1321,6 +1336,7 @@ class NpcRendererTest {
         private final List<TropicalFishVariant> tropicalFishVariants = new ArrayList<>();
         private final List<ArmorStandFlags> armorStandFlags = new ArrayList<>();
         private final List<ArmorStandPose> armorStandPoses = new ArrayList<>();
+        private final List<InteractionSize> interactionSizes = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1610,6 +1626,13 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object interactionSize(int entityId, float width, float height) {
+            InteractionSize packet = new InteractionSize(entityId, width, height);
+            interactionSizes.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1782,6 +1805,8 @@ class NpcRendererTest {
 
         private record ArmorStandPose(
                 int entityId, com.uxplima.uxmlib.packet.npc.ArmorStandPart part, float x, float y, float z) {}
+
+        private record InteractionSize(int entityId, float width, float height) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

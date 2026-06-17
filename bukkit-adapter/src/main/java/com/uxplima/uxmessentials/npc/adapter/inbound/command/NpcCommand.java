@@ -122,7 +122,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             return 0;
         }
         String word = ctx.getArgument("type", String.class);
-        EntityType type = parseLivingType(word);
+        EntityType type = parseRenderableType(word);
         if (type == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, java.util.Map.of("type", word));
             return 0;

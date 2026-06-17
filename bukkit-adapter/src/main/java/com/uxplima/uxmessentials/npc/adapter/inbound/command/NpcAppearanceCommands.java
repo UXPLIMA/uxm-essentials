@@ -98,7 +98,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
             return 0;
         }
         String word = ctx.getArgument("type", String.class);
-        EntityType entityType = parseLivingType(word);
+        EntityType entityType = parseRenderableType(word);
         if (entityType == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, Map.of("type", word));
             return 0;
@@ -111,7 +111,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
             CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
         String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
         for (EntityType type : EntityType.values()) {
-            if (isLiving(type) && type.name().toLowerCase(Locale.ROOT).startsWith(prefix)) {
+            if (isRenderableType(type) && type.name().toLowerCase(Locale.ROOT).startsWith(prefix)) {
                 builder.suggest(type.name());
             }
         }

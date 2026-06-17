@@ -71,6 +71,8 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("armor_stand_marker")).isTrue();
         assertThat(NpcTypeData.isKnownKey("armor_stand_head")).isTrue();
         assertThat(NpcTypeData.isKnownKey("armor_stand_right_leg")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("interaction_width")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("interaction_height")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -195,5 +197,14 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("armor_stand_body", "1,2")).isFalse();
         assertThat(NpcTypeData.isValidValue("armor_stand_body", "1,2,3,4")).isFalse();
         assertThat(NpcTypeData.isValidValue("armor_stand_right_leg", "a,b,c")).isFalse();
+    }
+
+    @Test
+    void interactionDimensionsAcceptANonNegativeFloat() {
+        assertThat(NpcTypeData.isValidValue("interaction_width", "1")).isTrue();
+        assertThat(NpcTypeData.isValidValue("interaction_height", "2.5")).isTrue();
+        assertThat(NpcTypeData.isValidValue("interaction_width", "0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("interaction_width", "-1")).isFalse();
+        assertThat(NpcTypeData.isValidValue("interaction_height", "wide")).isFalse();
     }
 }
