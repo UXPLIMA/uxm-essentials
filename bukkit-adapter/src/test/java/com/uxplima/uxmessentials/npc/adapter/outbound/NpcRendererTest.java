@@ -601,8 +601,9 @@ class NpcRendererTest {
 
         renderer.render(npcAt(viewer, 1.0).withEntityType("SHEEP").withTypeData("sheep_color", "14"));
 
-        assertThat(packets.sheepColors).hasSize(1);
-        assertThat(packets.sheepColors.get(0).color()).isEqualTo(14);
+        assertThat(packets.sheepWools).hasSize(1);
+        assertThat(packets.sheepWools.get(0).color()).isEqualTo(14);
+        assertThat(packets.sheepWools.get(0).sheared()).isFalse();
     }
 
     @Test
@@ -613,8 +614,23 @@ class NpcRendererTest {
         // A human-friendly DyeColor name resolves to its wool id (RED == 14) at apply time.
         renderer.render(npcAt(viewer, 1.0).withEntityType("SHEEP").withTypeData("sheep_color", "red"));
 
-        assertThat(packets.sheepColors).hasSize(1);
-        assertThat(packets.sheepColors.get(0).color()).isEqualTo(org.bukkit.DyeColor.RED.getWoolData());
+        assertThat(packets.sheepWools).hasSize(1);
+        assertThat(packets.sheepWools.get(0).color()).isEqualTo(org.bukkit.DyeColor.RED.getWoolData());
+    }
+
+    @Test
+    void composesSheepColourAndShearedIntoOneWoolPacket() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("SHEEP")
+                .withTypeData("sheep_color", "red")
+                .withTypeData("sheep_sheared", "true"));
+
+        assertThat(packets.sheepWools).hasSize(1);
+        assertThat(packets.sheepWools.get(0).color()).isEqualTo(org.bukkit.DyeColor.RED.getWoolData());
+        assertThat(packets.sheepWools.get(0).sheared()).isTrue();
     }
 
     @Test
@@ -706,14 +722,19 @@ class NpcRendererTest {
     }
 
     @Test
-    void appliesBeeNectarToABeeNpc() {
+    void composesBeeNectarRollingAndStungIntoOneFlagsPacket() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
 
-        renderer.render(npcAt(viewer, 1.0).withEntityType("BEE").withTypeData("bee_nectar", "true"));
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("BEE")
+                .withTypeData("bee_nectar", "true")
+                .withTypeData("bee_stung", "true"));
 
-        assertThat(packets.beeNectars).hasSize(1);
-        assertThat(packets.beeNectars.get(0).hasNectar()).isTrue();
+        assertThat(packets.beeFlags).hasSize(1);
+        assertThat(packets.beeFlags.get(0).nectar()).isTrue();
+        assertThat(packets.beeFlags.get(0).rolling()).isFalse();
+        assertThat(packets.beeFlags.get(0).stung()).isTrue();
     }
 
     @Test
@@ -1081,7 +1102,7 @@ class NpcRendererTest {
                 .doesNotThrowAnyException();
 
         assertThat(packets.horseVariants).isEmpty();
-        assertThat(packets.sheepColors).isEmpty();
+        assertThat(packets.sheepWools).isEmpty();
         assertThat(packets.foxTypes).isEmpty();
         assertThat(packets.spawnEntities).hasSize(1);
     }
@@ -1499,7 +1520,7 @@ class NpcRendererTest {
         private final List<VillagerData> villagerDatas = new ArrayList<>();
         private final List<HorseVariant> horseVariants = new ArrayList<>();
         private final List<LlamaVariant> llamaVariants = new ArrayList<>();
-        private final List<SheepColor> sheepColors = new ArrayList<>();
+        private final List<SheepWool> sheepWools = new ArrayList<>();
         private final List<WolfCollar> wolfCollars = new ArrayList<>();
         private final List<ShulkerColor> shulkerColors = new ArrayList<>();
         private final List<ShulkerPeek> shulkerPeeks = new ArrayList<>();
@@ -1508,7 +1529,7 @@ class NpcRendererTest {
         private final List<AllayDancing> allayDancings = new ArrayList<>();
         private final List<PiglinDancing> piglinDancings = new ArrayList<>();
         private final List<CamelDash> camelDashes = new ArrayList<>();
-        private final List<BeeNectar> beeNectars = new ArrayList<>();
+        private final List<BeeFlags> beeFlags = new ArrayList<>();
         private final List<VexCharging> vexChargings = new ArrayList<>();
         private final List<TropicalFishVariant> tropicalFishVariants = new ArrayList<>();
         private final List<ArmorStandFlags> armorStandFlags = new ArrayList<>();
@@ -1725,9 +1746,9 @@ class NpcRendererTest {
         }
 
         @Override
-        public Object sheepColor(int entityId, int color) {
-            SheepColor packet = new SheepColor(entityId, color);
-            sheepColors.add(packet);
+        public Object sheepWool(int entityId, int color, boolean sheared) {
+            SheepWool packet = new SheepWool(entityId, color, sheared);
+            sheepWools.add(packet);
             return packet;
         }
 
@@ -1788,9 +1809,9 @@ class NpcRendererTest {
         }
 
         @Override
-        public Object beeNectar(int entityId, boolean hasNectar) {
-            BeeNectar packet = new BeeNectar(entityId, hasNectar);
-            beeNectars.add(packet);
+        public Object beeFlags(int entityId, boolean nectar, boolean rolling, boolean stung) {
+            BeeFlags packet = new BeeFlags(entityId, nectar, rolling, stung);
+            beeFlags.add(packet);
             return packet;
         }
 
@@ -2131,7 +2152,7 @@ class NpcRendererTest {
 
         private record LlamaVariant(int entityId, int variant) {}
 
-        private record SheepColor(int entityId, int color) {}
+        private record SheepWool(int entityId, int color, boolean sheared) {}
 
         private record WolfCollar(int entityId, int color) {}
 
@@ -2149,7 +2170,7 @@ class NpcRendererTest {
 
         private record CamelDash(int entityId, boolean dashing) {}
 
-        private record BeeNectar(int entityId, boolean hasNectar) {}
+        private record BeeFlags(int entityId, boolean nectar, boolean rolling, boolean stung) {}
 
         private record VexCharging(int entityId, boolean charging) {}
 

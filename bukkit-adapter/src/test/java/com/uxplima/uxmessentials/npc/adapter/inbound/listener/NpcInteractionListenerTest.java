@@ -419,7 +419,7 @@ class NpcInteractionListenerTest {
         }
 
         @Override
-        public Object sheepColor(int entityId, int color) {
+        public Object sheepWool(int entityId, int color, boolean sheared) {
             return new Object();
         }
 
@@ -464,7 +464,7 @@ class NpcInteractionListenerTest {
         }
 
         @Override
-        public Object beeNectar(int entityId, boolean hasNectar) {
+        public Object beeFlags(int entityId, boolean nectar, boolean rolling, boolean stung) {
             return new Object();
         }
 

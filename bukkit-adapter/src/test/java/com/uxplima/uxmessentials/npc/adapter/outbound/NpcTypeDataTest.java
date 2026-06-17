@@ -237,6 +237,12 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("use_item", "third_hand")).isFalse();
         assertThat(NpcTypeData.isValidValue("shaking", "true")).isTrue();
         assertThat(NpcTypeData.isValidValue("shaking", "sometimes")).isFalse();
+        assertThat(NpcTypeData.isKnownKey("sheep_sheared")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("bee_rolling")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("bee_stung")).isTrue();
+        assertThat(NpcTypeData.isValidValue("sheep_sheared", "true")).isTrue();
+        assertThat(NpcTypeData.isValidValue("bee_rolling", "false")).isTrue();
+        assertThat(NpcTypeData.isValidValue("bee_stung", "maybe")).isFalse();
     }
 
     @Test

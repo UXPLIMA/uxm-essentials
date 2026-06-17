@@ -97,6 +97,9 @@ final class NpcVariantData {
     static final String KEY_ARMADILLO_STATE = "armadillo_state";
     static final String KEY_USE_ITEM = "use_item";
     static final String KEY_SHAKING = "shaking";
+    static final String KEY_SHEEP_SHEARED = "sheep_sheared";
+    static final String KEY_BEE_ROLLING = "bee_rolling";
+    static final String KEY_BEE_STUNG = "bee_stung";
 
     /** The raider types a {@code Raider}-level attribute (celebrating) may render on. */
     private static final Set<EntityType> RAIDER_TYPES = Set.of(
@@ -143,11 +146,11 @@ final class NpcVariantData {
 
     /**
      * The single-key dye-colour variants: each is one Bukkit type and the lib method that ships a 0–15 colour id,
-     * accepting a {@link DyeColor} name or the raw id alike. Folded into one table because the sheep wool, wolf
-     * collar, and shulker shell colours share the exact apply and validation path.
+     * accepting a {@link DyeColor} name or the raw id alike. The wolf collar and shulker shell share the exact apply
+     * and validation path; the sheep is handled separately ({@link #applySheep}) since its colour composes with the
+     * sheared flag into one wool byte.
      */
     private static final List<ColorVariant> COLOR_VARIANTS = List.of(
-            new ColorVariant(KEY_SHEEP_COLOR, EntityType.SHEEP, NpcPackets::sheepColor),
             new ColorVariant(KEY_WOLF_COLLAR, EntityType.WOLF, NpcPackets::wolfCollar),
             new ColorVariant(KEY_SHULKER_COLOR, EntityType.SHULKER, NpcPackets::shulkerColor));
 
@@ -166,7 +169,6 @@ final class NpcVariantData {
             new BoolVariant(KEY_ALLAY_DANCING, EntityType.ALLAY, NpcPackets::allayDancing),
             new BoolVariant(KEY_PIGLIN_DANCING, EntityType.PIGLIN, NpcPackets::piglinDancing),
             new BoolVariant(KEY_CAMEL_DASH, EntityType.CAMEL, NpcPackets::camelDash),
-            new BoolVariant(KEY_BEE_NECTAR, EntityType.BEE, NpcPackets::beeNectar),
             new BoolVariant(KEY_VEX_CHARGING, EntityType.VEX, NpcPackets::vexCharging),
             new BoolVariant(KEY_AXOLOTL_PLAYING_DEAD, EntityType.AXOLOTL, NpcPackets::axolotlPlayingDead),
             new BoolVariant(KEY_WOLF_SITTING, EntityType.WOLF, NpcPackets::tameableSitting),
@@ -202,6 +204,8 @@ final class NpcVariantData {
         for (ColorVariant variant : COLOR_VARIANTS) {
             applyColorVariant(packets, viewer, id, type, data, npc, log, variant);
         }
+        applySheep(packets, viewer, id, type, data, npc, log);
+        applyBee(packets, viewer, id, type, data, npc, log);
         applyRabbit(packets, viewer, id, type, data, npc, log);
         for (IntVariant variant : INT_VARIANTS) {
             applyIntVariant(packets, viewer, id, type, data, npc, log, variant);
@@ -527,6 +531,82 @@ final class NpcVariantData {
             return;
         }
         packets.send(viewer, packets.raiderCelebrating(id, celebrating));
+    }
+
+    /**
+     * Apply a sheep's wool: the {@code sheep_color} (a {@link DyeColor} name or 0–15 id) and the {@code sheep_sheared}
+     * flag compose into the one wool byte, so a sheared sheep keeps its colour underneath. Either key alone is
+     * enough; the other defaults (white, unsheared). Fail-soft on a bad value or non-sheep type.
+     */
+    private static void applySheep(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String colorValue = data.get(KEY_SHEEP_COLOR);
+        String shearedValue = data.get(KEY_SHEEP_SHEARED);
+        if (colorValue == null && shearedValue == null) {
+            return;
+        }
+        if (type != EntityType.SHEEP) {
+            skip(log, npc, colorValue != null ? KEY_SHEEP_COLOR : KEY_SHEEP_SHEARED, type, "type is not a sheep");
+            return;
+        }
+        int color = 0;
+        if (colorValue != null) {
+            Integer parsed = parseColorId(colorValue);
+            if (parsed == null) {
+                skip(log, npc, KEY_SHEEP_COLOR, type, "value is not a dye colour or 0–15 id: " + colorValue);
+                return;
+            }
+            color = parsed;
+        }
+        boolean sheared = false;
+        if (shearedValue != null) {
+            Boolean parsed = parseBool(shearedValue);
+            if (parsed == null) {
+                skip(log, npc, KEY_SHEEP_SHEARED, type, "value is not true or false: " + shearedValue);
+                return;
+            }
+            sheared = parsed;
+        }
+        packets.send(viewer, packets.sheepWool(id, color, sheared));
+    }
+
+    /**
+     * Apply a bee's state: the {@code bee_nectar}, {@code bee_rolling}, and {@code bee_stung} flags compose into the
+     * one bee flags byte. Any subset of the keys is enough; absent ones default false. Fail-soft on a bad value or
+     * non-bee type.
+     */
+    private static void applyBee(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String nectarValue = data.get(KEY_BEE_NECTAR);
+        String rollingValue = data.get(KEY_BEE_ROLLING);
+        String stungValue = data.get(KEY_BEE_STUNG);
+        if (nectarValue == null && rollingValue == null && stungValue == null) {
+            return;
+        }
+        if (type != EntityType.BEE) {
+            skip(log, npc, KEY_BEE_NECTAR, type, "type is not a bee");
+            return;
+        }
+        Boolean nectar = parseBeeFlag(nectarValue, KEY_BEE_NECTAR, type, npc, log);
+        Boolean rolling = parseBeeFlag(rollingValue, KEY_BEE_ROLLING, type, npc, log);
+        Boolean stung = parseBeeFlag(stungValue, KEY_BEE_STUNG, type, npc, log);
+        if (nectar == null || rolling == null || stung == null) {
+            return;
+        }
+        packets.send(viewer, packets.beeFlags(id, nectar, rolling, stung));
+    }
+
+    /** Parse one optional bee flag value: {@code false} when absent, the parsed bool when present, {@code null} on a bad value. */
+    private static @Nullable Boolean parseBeeFlag(
+            @Nullable String value, String key, EntityType type, Npc npc, Logger log) {
+        if (value == null) {
+            return Boolean.FALSE;
+        }
+        Boolean parsed = parseBool(value);
+        if (parsed == null) {
+            skip(log, npc, key, type, "value is not true or false: " + value);
+        }
+        return parsed;
     }
 
     /**
@@ -887,6 +967,9 @@ final class NpcVariantData {
                     KEY_WOLF_SITTING,
                     KEY_CAT_SITTING,
                     KEY_PANDA_EATING,
+                    KEY_SHEEP_SHEARED,
+                    KEY_BEE_ROLLING,
+                    KEY_BEE_STUNG,
                     KEY_AS_SMALL,
                     KEY_AS_ARMS,
                     KEY_AS_NO_BASEPLATE,
@@ -1103,6 +1186,9 @@ final class NpcVariantData {
             KEY_ARMADILLO_STATE,
             KEY_USE_ITEM,
             KEY_SHAKING,
+            KEY_SHEEP_SHEARED,
+            KEY_BEE_ROLLING,
+            KEY_BEE_STUNG,
             KEY_TROPICAL_FISH,
             KEY_AS_SMALL,
             KEY_AS_ARMS,
