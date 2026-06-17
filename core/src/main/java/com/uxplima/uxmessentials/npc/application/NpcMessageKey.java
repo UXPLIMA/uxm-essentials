@@ -83,6 +83,9 @@ public enum NpcMessageKey implements MessageKey {
     NPC_LIST_HEADER("npc.list.header"),
     NPC_LIST_ENTRY("npc.list.entry"),
     NPC_LIST_EMPTY("npc.list.empty"),
+    NPC_NEARBY_HEADER("npc.nearby.header"),
+    NPC_NEARBY_ENTRY("npc.nearby.entry"),
+    NPC_NEARBY_EMPTY("npc.nearby.empty"),
 
     // action-chain feedback
     NPC_ACTION_ADDED("npc.action.added"),

@@ -9,12 +9,14 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
+import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -62,6 +64,10 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                 .then(name("create", this::create))
                 .then(name("delete", this::delete))
                 .then(Commands.literal("list").executes(this::list))
+                .then(Commands.literal("nearby")
+                        .executes(ctx -> nearby(ctx, NearbyNpcs.DEFAULT_RADIUS))
+                        .then(Commands.argument("radius", IntegerArgumentType.integer(1, NearbyNpcs.MAX_RADIUS))
+                                .executes(ctx -> nearby(ctx, ctx.getArgument("radius", Integer.class)))))
                 .then(name("movehere", this::move))
                 .then(Commands.literal("copy")
                         .then(nameArgument()
@@ -113,6 +119,15 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             return 0;
         }
         services.list().list(ref(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int nearby(CommandContext<CommandSourceStack> ctx, int radius) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.nearby().nearby(ref(sender), position(sender), radius);
         return Command.SINGLE_SUCCESS;
     }
 
