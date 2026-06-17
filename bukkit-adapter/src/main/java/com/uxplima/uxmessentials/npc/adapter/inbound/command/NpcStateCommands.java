@@ -118,9 +118,9 @@ final class NpcStateCommands extends NpcCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> cooldownNode() {
         return Commands.literal("cooldown")
                 .then(nameArgument()
-                        .then(Commands.argument("millis", StringArgumentType.word())
+                        .then(Commands.argument("duration", StringArgumentType.word())
                                 .suggests((ctx, builder) ->
-                                        suggest(builder, List.of(DEFAULT_KEYWORD, "0", "500", "1000")))
+                                        suggest(builder, List.of(DEFAULT_KEYWORD, "0", "500ms", "30s", "5min")))
                                 .executes(this::cooldown)));
     }
 
@@ -129,8 +129,8 @@ final class NpcStateCommands extends NpcCommandSupport {
         if (sender == null) {
             return 0;
         }
-        String word = ctx.getArgument("millis", String.class).strip();
-        Long millis = word.equalsIgnoreCase(DEFAULT_KEYWORD) ? 0L : parseNonNegativeLong(word);
+        String word = ctx.getArgument("duration", String.class).strip();
+        Long millis = word.equalsIgnoreCase(DEFAULT_KEYWORD) ? 0L : parseFriendlyMillis(word);
         if (millis == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_COOLDOWN, Map.of("cooldown", word));
             return 0;
@@ -246,6 +246,36 @@ final class NpcStateCommands extends NpcCommandSupport {
         } catch (NumberFormatException notALong) {
             return null;
         }
+    }
+
+    /**
+     * Parse a per-NPC interaction cooldown into milliseconds: a plain non-negative number is milliseconds, or a
+     * number with a {@code ms}/{@code s}/{@code min}/{@code h} suffix (e.g. {@code 30s}, {@code 5min}, {@code 2h})
+     * is scaled. Returns {@code null} when the word is not a non-negative duration. Package-private for the parsing
+     * unit test.
+     */
+    static @org.jspecify.annotations.Nullable Long parseFriendlyMillis(String word) {
+        String s = word.strip().toLowerCase(Locale.ROOT);
+        int digits = 0;
+        while (digits < s.length() && Character.isDigit(s.charAt(digits))) {
+            digits++;
+        }
+        if (digits == 0) {
+            return null;
+        }
+        Long number = parseNonNegativeLong(s.substring(0, digits));
+        if (number == null) {
+            return null;
+        }
+        long multiplier =
+                switch (s.substring(digits).strip()) {
+                    case "", "ms" -> 1L;
+                    case "s", "sec", "secs", "seconds" -> 1_000L;
+                    case "m", "min", "mins", "minutes" -> 60_000L;
+                    case "h", "hr", "hrs", "hours" -> 3_600_000L;
+                    default -> -1L;
+                };
+        return multiplier < 0 ? null : number * multiplier;
     }
 
     /** Parse a finite, non-negative double, or {@code null} when the word is not one. */
