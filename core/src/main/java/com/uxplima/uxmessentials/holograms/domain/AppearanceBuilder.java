@@ -24,6 +24,8 @@ final class AppearanceBuilder {
     private TextAlignment alignment;
     private float shadowRadius;
     private float shadowStrength;
+    private int glowArgb;
+    private int textOpacity;
 
     AppearanceBuilder(Appearance source) {
         Objects.requireNonNull(source, "source");
@@ -39,6 +41,8 @@ final class AppearanceBuilder {
         this.alignment = source.alignment();
         this.shadowRadius = source.shadowRadius();
         this.shadowStrength = source.shadowStrength();
+        this.glowArgb = source.glowArgb();
+        this.textOpacity = source.textOpacity();
     }
 
     AppearanceBuilder billboard(Billboard value) {
@@ -97,6 +101,16 @@ final class AppearanceBuilder {
         return this;
     }
 
+    AppearanceBuilder glowArgb(int value) {
+        this.glowArgb = value;
+        return this;
+    }
+
+    AppearanceBuilder textOpacity(int value) {
+        this.textOpacity = value;
+        return this;
+    }
+
     Appearance build() {
         return new Appearance(
                 billboard,
@@ -110,6 +124,8 @@ final class AppearanceBuilder {
                 seeThrough,
                 alignment,
                 shadowRadius,
-                shadowStrength);
+                shadowStrength,
+                glowArgb,
+                textOpacity);
     }
 }

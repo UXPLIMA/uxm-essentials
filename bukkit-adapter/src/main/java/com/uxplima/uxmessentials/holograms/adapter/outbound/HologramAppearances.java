@@ -49,6 +49,12 @@ final class HologramAppearances {
         if (appearance.hasBrightness()) {
             builder.brightness(brightness(appearance));
         }
+        if (appearance.hasGlow()) {
+            builder.glow(Color.fromARGB(appearance.glowArgb()));
+        }
+        if (appearance.hasTextOpacity()) {
+            builder.textOpacity((byte) appearance.textOpacity());
+        }
         applyShadow(builder, appearance);
     }
 

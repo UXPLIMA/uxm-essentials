@@ -105,6 +105,8 @@ final class HologramRows {
                 .setTextAlignment(appearance.alignment().name())
                 .setShadowRadius(shadowColumn(appearance.shadowRadius()))
                 .setShadowStrength(shadowColumn(appearance.shadowStrength()))
+                .setGlowArgb(appearance.hasGlow() ? appearance.glowArgb() : null)
+                .setTextOpacity(appearance.hasTextOpacity() ? appearance.textOpacity() : null)
                 .setLineWidth(appearance.lineWidth())
                 .setViewRange(appearance.viewRange())
                 .setVisibilityMode(visibility.mode().name())
@@ -140,7 +142,9 @@ final class HologramRows {
                 shadowOf(row.get(HOLOGRAMS.SEE_THROUGH)),
                 alignmentOf(row.get(HOLOGRAMS.TEXT_ALIGNMENT)),
                 shadowValueOf(row.get(HOLOGRAMS.SHADOW_RADIUS)),
-                shadowValueOf(row.get(HOLOGRAMS.SHADOW_STRENGTH)));
+                shadowValueOf(row.get(HOLOGRAMS.SHADOW_STRENGTH)),
+                intOr(row.get(HOLOGRAMS.GLOW_ARGB), Appearance.DEFAULT_GLOW),
+                intOr(row.get(HOLOGRAMS.TEXT_OPACITY), Appearance.DEFAULT_OPACITY));
     }
 
     private static TextAlignment alignmentOf(@Nullable String stored) {

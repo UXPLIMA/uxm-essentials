@@ -58,6 +58,8 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
         return List.of(
                 choiceValueNode("billboard", BILLBOARDS, this::billboard),
                 valueNode("background", StringArgumentType.greedyString(), this::background),
+                valueNode("glow", StringArgumentType.greedyString(), this::glow),
+                valueNode("opacity", StringArgumentType.word(), this::opacity),
                 valueNode("shadow", BoolArgumentType.bool(), this::shadow),
                 brightnessNode(),
                 scaleNode(),
@@ -138,6 +140,57 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
             return 0;
         }
         return applyAppearance(ctx, sender, current -> current.withBackgroundArgb(argb.orElseThrow()));
+    }
+
+    private int glow(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String value = ctx.getArgument("value", String.class);
+        if (isClear(value)) {
+            return applyAppearance(ctx, sender, current -> current.withGlowArgb(Appearance.DEFAULT_GLOW));
+        }
+        Optional<Integer> argb = HologramColors.parse(value);
+        if (argb.isEmpty()) {
+            feedback.send(sender, HologramsMessageKey.HOLOGRAM_GLOW_INVALID, Map.of());
+            return 0;
+        }
+        return applyAppearance(ctx, sender, current -> current.withGlowArgb(argb.orElseThrow()));
+    }
+
+    private int opacity(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String value = ctx.getArgument("value", String.class);
+        if (isClear(value)) {
+            return applyAppearance(ctx, sender, current -> current.withTextOpacity(Appearance.DEFAULT_OPACITY));
+        }
+        Integer parsed = parseInt(value);
+        if (parsed == null) {
+            feedback.send(sender, HologramsMessageKey.HOLOGRAM_OPACITY_INVALID, Map.of());
+            return 0;
+        }
+        int opacity = Appearance.clampOpacity(parsed);
+        return applyAppearance(ctx, sender, current -> current.withTextOpacity(opacity));
+    }
+
+    /** Whether {@code value} is a keyword that clears the override back to the appearance default. */
+    private static boolean isClear(String value) {
+        return value.equalsIgnoreCase("reset")
+                || value.equalsIgnoreCase("none")
+                || value.equalsIgnoreCase("clear")
+                || value.equalsIgnoreCase("default");
+    }
+
+    private static @org.jspecify.annotations.Nullable Integer parseInt(String value) {
+        try {
+            return Integer.parseInt(value.strip());
+        } catch (NumberFormatException notAnInt) {
+            return null;
+        }
     }
 
     private int shadow(CommandContext<CommandSourceStack> ctx) {

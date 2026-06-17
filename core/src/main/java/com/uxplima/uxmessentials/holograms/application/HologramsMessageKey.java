@@ -62,6 +62,8 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_REFRESH_SET("hologram.refresh.set"),
     HOLOGRAM_BILLBOARD_INVALID("hologram.billboard-invalid"),
     HOLOGRAM_BACKGROUND_INVALID("hologram.background-invalid"),
+    HOLOGRAM_GLOW_INVALID("hologram.glow-invalid"),
+    HOLOGRAM_OPACITY_INVALID("hologram.opacity-invalid"),
     HOLOGRAM_ALIGNMENT_INVALID("hologram.alignment-invalid"),
 
     // item / block type feedback

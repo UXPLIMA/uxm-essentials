@@ -24,6 +24,10 @@ class AppearanceTest {
         assertThat(defaults.alignment()).isEqualTo(TextAlignment.CENTER);
         assertThat(defaults.hasShadowRadius()).isFalse();
         assertThat(defaults.hasShadowStrength()).isFalse();
+        assertThat(defaults.hasGlow()).isFalse();
+        assertThat(defaults.hasTextOpacity()).isFalse();
+        assertThat(defaults.glowArgb()).isEqualTo(Appearance.DEFAULT_GLOW);
+        assertThat(defaults.textOpacity()).isEqualTo(Appearance.DEFAULT_OPACITY);
         assertThat(defaults.transform()).isEqualTo(Transform.DEFAULT);
         assertThat(defaults.transform().isUniformScale()).isTrue();
     }
@@ -49,6 +53,32 @@ class AppearanceTest {
         assertThat(styled.scale()).isEqualTo(2.5f);
         assertThat(styled.lineWidth()).isEqualTo(120);
         assertThat(styled.viewRange()).isEqualTo(3.0f);
+    }
+
+    @Test
+    void glowAndOpacityRoundTripAndClearBackToTheDefault() {
+        Appearance styled = Appearance.defaults().withGlowArgb(0x80ff8800).withTextOpacity(200);
+
+        assertThat(styled.hasGlow()).isTrue();
+        assertThat(styled.glowArgb()).isEqualTo(0x80ff8800);
+        assertThat(styled.hasTextOpacity()).isTrue();
+        assertThat(styled.textOpacity()).isEqualTo(200);
+        // Other fields untouched by the glow/opacity transitions.
+        assertThat(styled.billboard()).isEqualTo(Appearance.defaults().billboard());
+
+        Appearance cleared = styled.withGlowArgb(Appearance.DEFAULT_GLOW).withTextOpacity(Appearance.DEFAULT_OPACITY);
+        assertThat(cleared.hasGlow()).isFalse();
+        assertThat(cleared.hasTextOpacity()).isFalse();
+    }
+
+    @Test
+    void textOpacityOutOfRangeIsRejected() {
+        assertThatThrownBy(() -> Appearance.defaults().withTextOpacity(256))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Appearance.defaults().withTextOpacity(-5))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Appearance.clampOpacity(999)).isEqualTo(255);
+        assertThat(Appearance.clampOpacity(-3)).isEqualTo(0);
     }
 
     @Test

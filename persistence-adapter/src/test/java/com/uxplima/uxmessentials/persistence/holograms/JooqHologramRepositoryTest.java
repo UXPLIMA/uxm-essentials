@@ -121,7 +121,9 @@ class JooqHologramRepositoryTest {
                 .withBrightness(15, 7)
                 .withScale(2.5f)
                 .withLineWidth(120)
-                .withViewRange(3.0f);
+                .withViewRange(3.0f)
+                .withGlowArgb(0x80ff8800)
+                .withTextOpacity(200);
         repository.save(
                 hologram("spawn", 1, 64, 1, "line").withAppearance(styled).withRefreshIntervalTicks(40));
 

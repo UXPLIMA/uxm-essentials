@@ -28,6 +28,8 @@ import java.util.Objects;
  * @param alignment how a TEXT hologram's lines align within their panel ({@link TextAlignment#CENTER} default)
  * @param shadowRadius the display drop-shadow radius on the ground, or {@link #DEFAULT_SHADOW} (the vanilla 0)
  * @param shadowStrength the display drop-shadow strength, or {@link #DEFAULT_SHADOW} (the vanilla 1.0 falloff)
+ * @param glowArgb the glowing-outline colour as a packed ARGB int, or {@link #DEFAULT_GLOW} for no glow
+ * @param textOpacity the text opacity 0–255, or {@link #DEFAULT_OPACITY} for the vanilla fully-opaque text
  */
 public record Appearance(
         Billboard billboard,
@@ -41,7 +43,9 @@ public record Appearance(
         boolean seeThrough,
         TextAlignment alignment,
         float shadowRadius,
-        float shadowStrength) {
+        float shadowStrength,
+        int glowArgb,
+        int textOpacity) {
 
     /** The background sentinel meaning "no override" — the vanilla translucent panel. */
     public static final int DEFAULT_BACKGROUND = Integer.MIN_VALUE;
@@ -51,6 +55,15 @@ public record Appearance(
 
     /** The shadow sentinel meaning "no override" — the display uses the vanilla drop-shadow. */
     public static final float DEFAULT_SHADOW = -1.0f;
+
+    /** The glow sentinel meaning "no glow" — the text carries no glowing outline. */
+    public static final int DEFAULT_GLOW = Integer.MIN_VALUE;
+
+    /** The opacity sentinel meaning "no override" — the vanilla fully-opaque text. */
+    public static final int DEFAULT_OPACITY = Integer.MIN_VALUE;
+
+    private static final int MIN_OPACITY = 0;
+    private static final int MAX_OPACITY = 255;
 
     private static final float DEFAULT_SCALE = 1.0f;
     private static final int DEFAULT_LINE_WIDTH = 200;
@@ -90,6 +103,9 @@ public record Appearance(
         if (!isDefaultShadow(shadowStrength) && (shadowStrength < MIN_SHADOW || shadowStrength > MAX_SHADOW)) {
             throw new IllegalArgumentException("shadowStrength out of range [0, 100]: " + shadowStrength);
         }
+        if (textOpacity != DEFAULT_OPACITY && (textOpacity < MIN_OPACITY || textOpacity > MAX_OPACITY)) {
+            throw new IllegalArgumentException("textOpacity out of range [0, 255]: " + textOpacity);
+        }
     }
 
     /**
@@ -119,7 +135,9 @@ public record Appearance(
                 false,
                 TextAlignment.CENTER,
                 DEFAULT_SHADOW,
-                DEFAULT_SHADOW);
+                DEFAULT_SHADOW,
+                DEFAULT_GLOW,
+                DEFAULT_OPACITY);
     }
 
     /** The default styling: centred billboard, no overrides, vanilla scale/width/view-range. */
@@ -161,6 +179,11 @@ public record Appearance(
         return Math.min(limit, Math.max(-limit, raw));
     }
 
+    /** Clamp a raw text opacity to the accepted 0–255 range, so operator input never throws at the boundary. */
+    public static int clampOpacity(int raw) {
+        return Math.min(MAX_OPACITY, Math.max(MIN_OPACITY, raw));
+    }
+
     /** Whether {@code brightness} is the "no override" sentinel. */
     public static boolean isDefaultBrightness(int brightness) {
         return brightness == DEFAULT_BRIGHTNESS;
@@ -194,6 +217,16 @@ public record Appearance(
     /** Whether the drop-shadow strength carries an override. */
     public boolean hasShadowStrength() {
         return !isDefaultShadow(shadowStrength);
+    }
+
+    /** Whether the text carries a glowing-outline colour. */
+    public boolean hasGlow() {
+        return glowArgb != DEFAULT_GLOW;
+    }
+
+    /** Whether the text carries an opacity override. */
+    public boolean hasTextOpacity() {
+        return textOpacity != DEFAULT_OPACITY;
     }
 
     /** A pre-filled builder for the internal {@code with*} transitions; the public surface is unchanged. */
@@ -259,5 +292,15 @@ public record Appearance(
 
     public Appearance withShadowStrength(float value) {
         return toBuilder().shadowStrength(value).build();
+    }
+
+    /** A copy with a glowing-outline colour (packed ARGB), or {@link #DEFAULT_GLOW} to clear the glow. */
+    public Appearance withGlowArgb(int value) {
+        return toBuilder().glowArgb(value).build();
+    }
+
+    /** A copy with a text-opacity override (0–255), or {@link #DEFAULT_OPACITY} to clear it. */
+    public Appearance withTextOpacity(int value) {
+        return toBuilder().textOpacity(value).build();
     }
 }
