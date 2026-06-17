@@ -116,265 +116,66 @@ public record PlayerWarp(
                 Optional.empty());
     }
 
+    /** A pre-filled builder for the internal transitions; the public surface is unchanged. */
+    PlayerWarpBuilder toBuilder() {
+        return new PlayerWarpBuilder(this);
+    }
+
     /** A copy re-anchored to {@code newLocation}, keeping the owner, name, visibility, and creation time. */
     public PlayerWarp movedTo(Position newLocation) {
-        return new PlayerWarp(
-                owner,
-                name,
-                Objects.requireNonNull(newLocation, "newLocation"),
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder()
+                .location(Objects.requireNonNull(newLocation, "newLocation"))
+                .build();
     }
 
     /** A copy with the visibility set to {@code makePublic}, keeping everything else. */
     public PlayerWarp withVisibility(boolean makePublic) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                makePublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().isPublic(makePublic).build();
     }
 
     public PlayerWarp incrementedVisitors() {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors + 1,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().visitors(visitors + 1).build();
     }
 
     public PlayerWarp withPassword(Optional<String> newPassword) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                newPassword.map(String::strip).filter(n -> !n.isEmpty()),
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder()
+                .password(newPassword.map(String::strip).filter(n -> !n.isEmpty()))
+                .build();
     }
 
     public PlayerWarp withLocked(boolean locked) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                locked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().isLocked(locked).build();
     }
 
     public PlayerWarp withWelcomeMessages(java.util.List<WelcomeMessage> messages) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                Objects.requireNonNull(messages),
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().welcomeMessages(Objects.requireNonNull(messages)).build();
     }
 
     public PlayerWarp withDepartureSound(Optional<String> sound) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                sound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().departureSound(sound).build();
     }
 
     public PlayerWarp withArrivalSound(Optional<String> sound) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                sound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().arrivalSound(sound).build();
     }
 
     public PlayerWarp withDepartureParticle(Optional<String> particle) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                particle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().departureParticle(particle).build();
     }
 
     public PlayerWarp withArrivalParticle(Optional<String> particle) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                particle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().arrivalParticle(particle).build();
     }
 
     public PlayerWarp withWarmupOverride(Optional<Double> seconds) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                seconds,
-                cooldownOverrideSeconds,
-                iconMaterial);
+        return toBuilder().warmupOverrideSeconds(seconds).build();
     }
 
     public PlayerWarp withCooldownOverride(Optional<Double> seconds) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                seconds,
-                iconMaterial);
+        return toBuilder().cooldownOverrideSeconds(seconds).build();
     }
 
     public PlayerWarp withIconMaterial(Optional<String> material) {
-        return new PlayerWarp(
-                owner,
-                name,
-                location,
-                isPublic,
-                createdAt,
-                visitors,
-                password,
-                isLocked,
-                welcomeMessages,
-                departureSound,
-                arrivalSound,
-                departureParticle,
-                arrivalParticle,
-                warmupOverrideSeconds,
-                cooldownOverrideSeconds,
-                material);
+        return toBuilder().iconMaterial(material).build();
     }
 }
