@@ -84,26 +84,21 @@ public final class HologramsWiring {
 
     private HologramsWiring() {}
 
-    /**
-     * The leaderboard data-source registry the renderer resolves a leaderboard hologram's provider id against.
-     * Empty for now — the {@code balance} provider (and others) are supplied through the composition root in a
-     * follow-up (B13/B7b); an unregistered id renders "(no data)" rather than failing, so a leaderboard set
-     * against a not-yet-wired provider degrades gracefully.
-     */
-    private static com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboardProviders() {
-        return new com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders(java.util.Map.of());
-    }
-
     /** The smallest cadence the refresh timer fires at — one second, the floor a refresh interval rounds to. */
     private static final Duration REFRESH_BASE = Duration.ofSeconds(1);
 
     private static final int REFRESH_BASE_TICKS = 20;
 
     /** Build the holograms adapters and use cases, and spawn the stored holograms. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence) {
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(leaderboards, "leaderboards");
         KernelPorts kernel = ctx.kernel();
         HologramRepository repository = HologramRepositories.cached(persistence);
         HologramManager manager = new HologramManager();
@@ -139,7 +134,7 @@ public final class HologramsWiring {
                 viewers,
                 textOverrides,
                 npcLocator,
-                leaderboardProviders());
+                leaderboards);
         rendererHolder.set(renderer);
         InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
         Consumer<DomainEvent> npcSubscriber = npcLocator;

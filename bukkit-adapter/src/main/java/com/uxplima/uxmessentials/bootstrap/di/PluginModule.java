@@ -30,8 +30,13 @@ import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
+import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.application.BalTop;
+import com.uxplima.uxmessentials.economy.application.MoneyFormat;
+import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.holograms.adapter.HologramsWiring;
+import com.uxplima.uxmessentials.holograms.application.port.LeaderboardEntry;
+import com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders;
 import com.uxplima.uxmessentials.homes.adapter.HomesWiring;
 import com.uxplima.uxmessentials.homes.adapter.outbound.RepositoryHomeRespawnLocator;
 import com.uxplima.uxmessentials.homes.application.HomeRespawnLocator;
@@ -447,6 +452,14 @@ public final class PluginModule {
         links.npcEconomy = wired.npcEconomy();
         links.placeholders.economy(new ProviderEconomyPlaceholders(
                 wired.provider(), wired.defaultCurrency(), wired.amountFormat(), BalTop.MAX_PAGE_SIZE));
+        // Publish a balance leaderboard source for the holograms module (wired later): the lock-free baltop
+        // snapshot, mapped into ranked name/score rows. The composition root is the only place that may bridge
+        // the two contexts, so the provider is a lambda here rather than a class in either context.
+        BaltopSnapshots baltop = wired.snapshots();
+        Currency currency = wired.defaultCurrency();
+        links.balanceLeaderboard = limit -> baltop.top(currency, limit).stream()
+                .map(row -> new LeaderboardEntry(row.owner().name(), MoneyFormat.withSymbol(row.balance())))
+                .toList();
     }
 
     private static void wireWarps(
@@ -652,10 +665,13 @@ public final class PluginModule {
             ContextLinks links) {
         // holograms builds its cached jOOQ HologramRepository over persistence.dsl() and its renderer over the
         // uxmLib native-Display API; the holograms / hologram_lines tables ship in the persistence V13 baseline,
-        // always applied. It carries no cross-context bridge — its only collaborators are the shared Scheduler,
-        // messages/messageSink, and event ports. On wire every stored hologram is spawned (each on its own region
-        // thread); on disable the spawned display entities are despawned so a reload re-spawns cleanly.
-        HologramsWiring.Wired wired = HologramsWiring.wire(plugin, ctx, persistence);
+        // always applied. Its one cross-context bridge is the leaderboard data-source registry: the economy module
+        // (when enabled, wired earlier) publishes a balance provider onto the links, which a leaderboard hologram
+        // renders; with economy disabled the registry is empty and a leaderboard reads "(no data)". On wire every
+        // stored hologram is spawned (each on its own region thread); on disable they are despawned cleanly.
+        LeaderboardProviders leaderboards = new LeaderboardProviders(
+                links.balanceLeaderboard == null ? Map.of() : Map.of("balance", links.balanceLeaderboard));
+        HologramsWiring.Wired wired = HologramsWiring.wire(plugin, ctx, persistence, leaderboards);
         wired.commands().forEach(resources::addCommand);
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
@@ -852,6 +868,8 @@ public final class PluginModule {
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;
         private @org.jspecify.annotations.Nullable NpcEconomy npcEconomy;
+        private com.uxplima.uxmessentials.holograms.application.port.@org.jspecify.annotations.Nullable LeaderboardProvider
+                balanceLeaderboard;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
         private @org.jspecify.annotations.Nullable MutableAfkStatus afkStatus;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
