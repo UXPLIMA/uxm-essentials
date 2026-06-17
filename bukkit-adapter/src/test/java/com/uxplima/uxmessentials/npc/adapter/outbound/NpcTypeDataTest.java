@@ -58,6 +58,10 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("shulker_color")).isTrue();
         assertThat(NpcTypeData.isKnownKey("shulker_peek")).isTrue();
         assertThat(NpcTypeData.isKnownKey("panda_gene")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("goat_screaming")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("allay_dancing")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("piglin_dancing")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("camel_dash")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -152,5 +156,15 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("shulker_color", "15")).isTrue();
         assertThat(NpcTypeData.isValidValue("shulker_color", "16")).isFalse();
         assertThat(NpcTypeData.isValidValue("shulker_color", "not_a_color")).isFalse();
+    }
+
+    @Test
+    void booleanStateVariantsAcceptOnlyTrueOrFalse() {
+        assertThat(NpcTypeData.isValidValue("goat_screaming", "true")).isTrue();
+        assertThat(NpcTypeData.isValidValue("allay_dancing", "FALSE")).isTrue();
+        assertThat(NpcTypeData.isValidValue("piglin_dancing", "true")).isTrue();
+        assertThat(NpcTypeData.isValidValue("camel_dash", "false")).isTrue();
+        assertThat(NpcTypeData.isValidValue("goat_screaming", "yes")).isFalse();
+        assertThat(NpcTypeData.isValidValue("camel_dash", "1")).isFalse();
     }
 }

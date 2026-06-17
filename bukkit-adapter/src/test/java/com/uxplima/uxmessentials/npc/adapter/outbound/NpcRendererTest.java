@@ -662,6 +662,50 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesGoatScreamingToAGoatNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("GOAT").withTypeData("goat_screaming", "true"));
+
+        assertThat(packets.goatScreamings).hasSize(1);
+        assertThat(packets.goatScreamings.get(0).screaming()).isTrue();
+    }
+
+    @Test
+    void appliesAllayDancingToAnAllayNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("ALLAY").withTypeData("allay_dancing", "true"));
+
+        assertThat(packets.allayDancings).hasSize(1);
+        assertThat(packets.allayDancings.get(0).dancing()).isTrue();
+    }
+
+    @Test
+    void appliesPiglinDancingToAPiglinNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("PIGLIN").withTypeData("piglin_dancing", "true"));
+
+        assertThat(packets.piglinDancings).hasSize(1);
+        assertThat(packets.piglinDancings.get(0).dancing()).isTrue();
+    }
+
+    @Test
+    void appliesCamelDashToACamelNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("CAMEL").withTypeData("camel_dash", "true"));
+
+        assertThat(packets.camelDashes).hasSize(1);
+        assertThat(packets.camelDashes.get(0).dashing()).isTrue();
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1201,6 +1245,10 @@ class NpcRendererTest {
         private final List<ShulkerColor> shulkerColors = new ArrayList<>();
         private final List<ShulkerPeek> shulkerPeeks = new ArrayList<>();
         private final List<PandaGene> pandaGenes = new ArrayList<>();
+        private final List<GoatScreaming> goatScreamings = new ArrayList<>();
+        private final List<AllayDancing> allayDancings = new ArrayList<>();
+        private final List<PiglinDancing> piglinDancings = new ArrayList<>();
+        private final List<CamelDash> camelDashes = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1425,6 +1473,34 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object goatScreaming(int entityId, boolean screaming) {
+            GoatScreaming packet = new GoatScreaming(entityId, screaming);
+            goatScreamings.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object allayDancing(int entityId, boolean dancing) {
+            AllayDancing packet = new AllayDancing(entityId, dancing);
+            allayDancings.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object piglinDancing(int entityId, boolean dancing) {
+            PiglinDancing packet = new PiglinDancing(entityId, dancing);
+            piglinDancings.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object camelDash(int entityId, boolean dashing) {
+            CamelDash packet = new CamelDash(entityId, dashing);
+            camelDashes.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1577,6 +1653,14 @@ class NpcRendererTest {
         private record ShulkerPeek(int entityId, int peek) {}
 
         private record PandaGene(int entityId, int gene) {}
+
+        private record GoatScreaming(int entityId, boolean screaming) {}
+
+        private record AllayDancing(int entityId, boolean dancing) {}
+
+        private record PiglinDancing(int entityId, boolean dancing) {}
+
+        private record CamelDash(int entityId, boolean dashing) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

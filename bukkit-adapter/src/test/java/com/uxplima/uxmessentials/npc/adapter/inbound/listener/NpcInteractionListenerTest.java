@@ -444,6 +444,26 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object goatScreaming(int entityId, boolean screaming) {
+            return new Object();
+        }
+
+        @Override
+        public Object allayDancing(int entityId, boolean dancing) {
+            return new Object();
+        }
+
+        @Override
+        public Object piglinDancing(int entityId, boolean dancing) {
+            return new Object();
+        }
+
+        @Override
+        public Object camelDash(int entityId, boolean dashing) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }
