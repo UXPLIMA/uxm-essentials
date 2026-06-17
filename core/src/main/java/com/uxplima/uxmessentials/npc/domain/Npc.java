@@ -214,6 +214,11 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
         return new Npc(name, location, appearance.withEquipment(slot, itemToken), behavior, createdAt);
     }
 
+    /** A copy with every equipment slot cleared, keeping everything else. */
+    public Npc withEquipmentCleared() {
+        return new Npc(name, location, appearance.withEquipmentCleared(), behavior, createdAt);
+    }
+
     /** A copy whose outline does or does not glow, keeping everything else (and its colour). */
     public Npc withGlowing(boolean newGlowing) {
         return new Npc(name, location, appearance.withGlowing(newGlowing), behavior, createdAt);

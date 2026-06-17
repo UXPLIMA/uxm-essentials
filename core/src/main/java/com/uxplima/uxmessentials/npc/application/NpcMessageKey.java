@@ -48,6 +48,10 @@ public enum NpcMessageKey implements MessageKey {
     // equipment / glow feedback
     NPC_EQUIP_SET("npc.equip.set"),
     NPC_EQUIP_CLEARED("npc.equip.cleared"),
+    NPC_EQUIP_CLEARED_ALL("npc.equip.cleared-all"),
+    NPC_EQUIP_LIST_HEADER("npc.equip.list-header"),
+    NPC_EQUIP_LIST_ENTRY("npc.equip.list-entry"),
+    NPC_EQUIP_LIST_EMPTY("npc.equip.list-empty"),
     NPC_GLOW_ENABLED("npc.glow.enabled"),
     NPC_GLOW_DISABLED("npc.glow.disabled"),
     NPC_GLOW_SET("npc.glow.set"),

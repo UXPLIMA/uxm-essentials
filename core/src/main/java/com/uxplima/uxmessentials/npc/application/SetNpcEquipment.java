@@ -51,6 +51,22 @@ public final class SetNpcEquipment {
         return Result.ok();
     }
 
+    /** Clear every equipment slot of the NPC {@code name}, or reject when no such NPC exists. */
+    public Result<Unit, NpcError> clearAll(PlayerRef actor, NpcName name) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(name, "name");
+        Optional<Npc> existing = repository.find(name);
+        if (existing.isEmpty()) {
+            notifier.send(actor, NpcError.NOT_FOUND.messageKey(), Map.of("name", name.value()));
+            return Result.err(NpcError.NOT_FOUND);
+        }
+        Npc updated = existing.get().withEquipmentCleared();
+        repository.save(updated);
+        view.render(updated);
+        notifier.send(actor, NpcMessageKey.NPC_EQUIP_CLEARED_ALL, Map.of("name", name.value()));
+        return Result.ok();
+    }
+
     private void feedback(PlayerRef actor, NpcName name, EquipmentSlot slot, boolean cleared, String materialName) {
         String slotLabel = slot.name().toLowerCase(java.util.Locale.ROOT);
         if (cleared) {

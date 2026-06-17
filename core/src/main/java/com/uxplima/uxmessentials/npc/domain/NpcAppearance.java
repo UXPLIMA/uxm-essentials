@@ -145,6 +145,10 @@ public record NpcAppearance(
         return toBuilder().equipment(updated).build();
     }
 
+    NpcAppearance withEquipmentCleared() {
+        return toBuilder().equipment(Map.of()).build();
+    }
+
     NpcAppearance withGlowing(boolean newGlowing) {
         return toBuilder().glowing(newGlowing).build();
     }

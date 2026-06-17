@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.npc.application.DescribeNpc;
 import com.uxplima.uxmessentials.npc.application.FixNpc;
 import com.uxplima.uxmessentials.npc.application.InsertNpcAction;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
+import com.uxplima.uxmessentials.npc.application.ListNpcEquipment;
 import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.ListNpcs;
 import com.uxplima.uxmessentials.npc.application.MoveNpc;
@@ -61,6 +62,7 @@ import org.jspecify.annotations.NullMarked;
  * @param command {@code /npc command}
  * @param look {@code /npc lookatplayer}
  * @param equip {@code /npc equip}
+ * @param listEquip {@code /npc equip list}
  * @param glow {@code /npc glow}
  * @param pose {@code /npc pose}
  * @param scale {@code /npc scale}
@@ -100,6 +102,7 @@ public record NpcServices(
         SetNpcClickCommand command,
         SetNpcLookAtPlayer look,
         SetNpcEquipment equip,
+        ListNpcEquipment listEquip,
         SetNpcGlowing glow,
         SetNpcPose pose,
         SetNpcScale scale,
@@ -138,6 +141,7 @@ public record NpcServices(
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(look, "look");
         Objects.requireNonNull(equip, "equip");
+        Objects.requireNonNull(listEquip, "listEquip");
         Objects.requireNonNull(glow, "glow");
         Objects.requireNonNull(pose, "pose");
         Objects.requireNonNull(scale, "scale");

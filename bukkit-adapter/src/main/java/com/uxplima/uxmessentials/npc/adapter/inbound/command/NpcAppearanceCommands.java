@@ -163,11 +163,31 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> equipNode() {
         return Commands.literal("equip")
                 .then(nameArgument()
+                        .then(Commands.literal("clear").executes(this::equipClear))
+                        .then(Commands.literal("list").executes(this::equipList))
                         .then(Commands.argument("slot", StringArgumentType.word())
                                 .suggests((ctx, builder) -> suggest(builder, SLOT_WORDS))
                                 .then(Commands.argument("material", StringArgumentType.word())
                                         .suggests(this::suggestMaterials)
                                         .executes(this::equip))));
+    }
+
+    private int equipClear(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.equip().clearAll(ref(sender), nameArg(ctx));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int equipList(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.listEquip().list(ref(sender), nameArg(ctx));
+        return Command.SINGLE_SUCCESS;
     }
 
     private int equip(CommandContext<CommandSourceStack> ctx) {
