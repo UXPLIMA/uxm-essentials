@@ -41,12 +41,15 @@ final class NpcSkinCommands extends NpcCommandSupport {
     private static final String NAME_PREFIX = "name:";
     private static final String URL_PREFIX = "url:";
     private static final String TEXTURE_PREFIX = "texture:";
+    /** The keyword that clears an NPC's stored skin, falling it back to the default model. */
+    private static final String NONE_KEYWORD = "@none";
     /**
      * The skin-spec prefixes suggested for {@code /npc skin}: {@code name:} fetches any account by username,
      * {@code url:} generates a signed skin from a custom image URL, {@code player:} copies an online player, and
      * {@code texture:} sets a raw base64 value (with an optional {@code :signature}).
      */
-    private static final List<String> SKIN_PREFIXES = List.of(NAME_PREFIX, URL_PREFIX, PLAYER_PREFIX, TEXTURE_PREFIX);
+    private static final List<String> SKIN_PREFIXES =
+            List.of(NAME_PREFIX, URL_PREFIX, PLAYER_PREFIX, TEXTURE_PREFIX, NONE_KEYWORD);
 
     private final NpcSkinByName skinByName;
 
@@ -74,6 +77,10 @@ final class NpcSkinCommands extends NpcCommandSupport {
             return 0;
         }
         String spec = value(ctx);
+        if (spec.strip().equalsIgnoreCase(NONE_KEYWORD) || spec.strip().equalsIgnoreCase("none")) {
+            services.skin().clearSkin(ref(sender), nameArg(ctx));
+            return Command.SINGLE_SUCCESS;
+        }
         if (spec.regionMatches(true, 0, NAME_PREFIX, 0, NAME_PREFIX.length())) {
             // The username path resolves off-thread (a Mojang round-trip), so it dispatches its own async flow
             // and reports success straight away rather than blocking the command thread on the lookup.

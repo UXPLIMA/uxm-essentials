@@ -55,4 +55,24 @@ public final class SetNpcSkin {
         notifier.send(actor, NpcMessageKey.NPC_SKIN_SET, Map.of("name", name.value()));
         return Result.ok();
     }
+
+    /**
+     * Clear the NPC {@code name}'s stored skin so it falls back to the default model (Steve/Alex), or reject when
+     * no such NPC exists. Unlike {@link #setSkin}, clearing is valid on any type — removing a stored skin is always
+     * safe (a mob keeps no skin, and a fake player shows the default), so there is no player-type gate.
+     */
+    public Result<Unit, NpcError> clearSkin(PlayerRef actor, NpcName name) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(name, "name");
+        Optional<Npc> existing = repository.find(name);
+        if (existing.isEmpty()) {
+            notifier.send(actor, NpcError.NOT_FOUND.messageKey(), Map.of("name", name.value()));
+            return Result.err(NpcError.NOT_FOUND);
+        }
+        Npc cleared = existing.get().withSkin(null);
+        repository.save(cleared);
+        view.render(cleared);
+        notifier.send(actor, NpcMessageKey.NPC_SKIN_CLEARED, Map.of("name", name.value()));
+        return Result.ok();
+    }
 }
