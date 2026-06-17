@@ -196,69 +196,25 @@ public record Appearance(
         return !isDefaultShadow(shadowStrength);
     }
 
+    /** A pre-filled builder for the internal {@code with*} transitions; the public surface is unchanged. */
+    AppearanceBuilder toBuilder() {
+        return new AppearanceBuilder(this);
+    }
+
     public Appearance withBillboard(Billboard value) {
-        Objects.requireNonNull(value, "value");
-        return new Appearance(
-                value,
-                backgroundArgb,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                lineWidth,
-                viewRange,
-                seeThrough,
-                alignment,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().billboard(Objects.requireNonNull(value, "value")).build();
     }
 
     public Appearance withBackgroundArgb(int value) {
-        return new Appearance(
-                billboard,
-                value,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                lineWidth,
-                viewRange,
-                seeThrough,
-                alignment,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().backgroundArgb(value).build();
     }
 
     public Appearance withTextShadow(boolean value) {
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                value,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                lineWidth,
-                viewRange,
-                seeThrough,
-                alignment,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().textShadow(value).build();
     }
 
     public Appearance withBrightness(int block, int sky) {
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                textShadow,
-                block,
-                sky,
-                transform,
-                lineWidth,
-                viewRange,
-                seeThrough,
-                alignment,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().brightness(block, sky).build();
     }
 
     /** A copy with a uniform scale on every axis (keeping any translation). */
@@ -278,116 +234,30 @@ public record Appearance(
 
     /** A copy with a new spatial {@link Transform}. */
     public Appearance withTransform(Transform value) {
-        Objects.requireNonNull(value, "value");
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                value,
-                lineWidth,
-                viewRange,
-                seeThrough,
-                alignment,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().transform(Objects.requireNonNull(value, "value")).build();
     }
 
     public Appearance withLineWidth(int value) {
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                value,
-                viewRange,
-                seeThrough,
-                alignment,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().lineWidth(value).build();
     }
 
     public Appearance withViewRange(float value) {
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                lineWidth,
-                value,
-                seeThrough,
-                alignment,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().viewRange(value).build();
     }
 
     public Appearance withSeeThrough(boolean value) {
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                lineWidth,
-                viewRange,
-                value,
-                alignment,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().seeThrough(value).build();
     }
 
     public Appearance withAlignment(TextAlignment value) {
-        Objects.requireNonNull(value, "value");
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                lineWidth,
-                viewRange,
-                seeThrough,
-                value,
-                shadowRadius,
-                shadowStrength);
+        return toBuilder().alignment(Objects.requireNonNull(value, "value")).build();
     }
 
     public Appearance withShadowRadius(float value) {
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                lineWidth,
-                viewRange,
-                seeThrough,
-                alignment,
-                value,
-                shadowStrength);
+        return toBuilder().shadowRadius(value).build();
     }
 
     public Appearance withShadowStrength(float value) {
-        return new Appearance(
-                billboard,
-                backgroundArgb,
-                textShadow,
-                brightnessBlock,
-                brightnessSky,
-                transform,
-                lineWidth,
-                viewRange,
-                seeThrough,
-                alignment,
-                shadowRadius,
-                value);
+        return toBuilder().shadowStrength(value).build();
     }
 }
