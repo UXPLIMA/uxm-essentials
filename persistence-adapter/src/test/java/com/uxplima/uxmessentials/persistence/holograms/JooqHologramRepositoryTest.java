@@ -293,6 +293,19 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsAnEntityHologramType() {
+        repository.save(Hologram.createEntity(
+                HologramName.of("guard"), Position.of(WORLD, 1, 64, 1), "ZOMBIE", Instant.ofEpochMilli(1_000)));
+
+        Hologram loaded = repository.find(HologramName.of("guard")).orElseThrow();
+
+        assertThat(loaded.type()).isEqualTo(com.uxplima.uxmessentials.holograms.domain.HologramType.ENTITY);
+        assertThat(loaded.entityType()).isEqualTo("ZOMBIE");
+        assertThat(loaded.itemMaterial()).isNull();
+        assertThat(loaded.lineCount()).isZero();
+    }
+
+    @Test
     void roundTripsAClickCommand() {
         repository.save(hologram("spawn", 1, 64, 1, "line").withClickCommand("warp pvp"));
 

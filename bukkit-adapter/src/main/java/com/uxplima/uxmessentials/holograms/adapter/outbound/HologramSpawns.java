@@ -50,7 +50,35 @@ final class HologramSpawns {
             case ITEM -> spawnItem(manager, log, hologram, at);
             case BLOCK -> spawnBlock(manager, log, hologram, at);
             case HEAD -> spawnHead(manager, log, hologram, at);
+            case ENTITY -> spawnEntity(log, hologram, at);
         };
+    }
+
+    private static @Nullable RenderedHologram spawnEntity(Logger log, Hologram hologram, Location at) {
+        org.bukkit.entity.EntityType type = HologramModels.entityTypeOf(hologram.entityType());
+        if (type == null) {
+            log.warn(
+                    "skipping entity hologram {} — unknown or non-living entity type {}",
+                    hologram.name().value(),
+                    String.valueOf(hologram.entityType()));
+            return null;
+        }
+        org.bukkit.entity.Entity entity = at.getWorld().spawnEntity(at, type);
+        freeze(entity);
+        return RenderedHologram.ofEntity(entity);
+    }
+
+    /** Make a spawned entity a static decoration: no AI, no gravity, invulnerable, silent, non-colliding, transient. */
+    private static void freeze(org.bukkit.entity.Entity entity) {
+        entity.setGravity(false);
+        entity.setInvulnerable(true);
+        entity.setSilent(true);
+        entity.setPersistent(false);
+        if (entity instanceof org.bukkit.entity.LivingEntity living) {
+            living.setAI(false);
+            living.setCollidable(false);
+            living.setRemoveWhenFarAway(false);
+        }
     }
 
     private static @Nullable RenderedHologram spawnHead(

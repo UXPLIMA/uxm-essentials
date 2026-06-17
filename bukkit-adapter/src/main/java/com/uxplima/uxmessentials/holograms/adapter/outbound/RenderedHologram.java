@@ -101,6 +101,40 @@ interface RenderedHologram {
     }
 
     /**
+     * A {@link RenderedHologram} over a frozen decorative {@code entity} (an ENTITY hologram). The mob is the whole
+     * hologram — there is no Display — so despawn removes the entity, visibility uses Paper's per-player entity
+     * show/hide (and the default-visible toggle for the restrict-to-viewers modes), and there is no text component.
+     */
+    static RenderedHologram ofEntity(org.bukkit.entity.Entity entity) {
+        return new RenderedHologram() {
+            @Override
+            public void removeFrom(HologramManager manager) {
+                entity.remove();
+            }
+
+            @Override
+            public void restrictToViewers() {
+                entity.setVisibleByDefault(false);
+            }
+
+            @Override
+            public void show(Plugin plugin, Player viewer) {
+                viewer.showEntity(plugin, entity);
+            }
+
+            @Override
+            public void hide(Plugin plugin, Player viewer) {
+                viewer.hideEntity(plugin, entity);
+            }
+
+            @Override
+            public int textEntityId() {
+                return NO_ENTITY;
+            }
+        };
+    }
+
+    /**
      * Wrap {@code delegate} so its lifecycle also owns the {@code clickBox} — the {@code Interaction} entity spawned
      * beside a clickable hologram. Despawning the hologram (on stop, move, edit) removes the box too, so a hologram
      * never leaves an orphaned hitbox; visibility and the text-entity id pass straight through to the delegate (the

@@ -51,6 +51,12 @@ public final class SetHologramModel {
         return apply(actor, name, hologram -> hologram.asHead(headTexture), HologramsMessageKey.HOLOGRAM_HEAD_SET);
     }
 
+    /** Switch hologram {@code name} to a frozen ENTITY of {@code entityType}, or reject when no such hologram. */
+    public Result<Unit, HologramError> setEntity(PlayerRef actor, HologramName name, String entityType) {
+        Objects.requireNonNull(entityType, "entityType");
+        return apply(actor, name, hologram -> hologram.asEntity(entityType), HologramsMessageKey.HOLOGRAM_ENTITY_SET);
+    }
+
     private Result<Unit, HologramError> apply(
             PlayerRef actor,
             HologramName name,

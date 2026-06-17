@@ -86,6 +86,7 @@ public record Hologram(
             @Nullable String itemMaterial,
             @Nullable String blockData,
             @Nullable String headTexture,
+            @Nullable String entityType,
             Appearance appearance,
             Visibility visibility,
             Rotation rotation,
@@ -94,7 +95,7 @@ public record Hologram(
         this(
                 name,
                 location,
-                new HologramContent(type, lines, itemMaterial, blockData, headTexture),
+                new HologramContent(type, lines, itemMaterial, blockData, headTexture, entityType),
                 appearance,
                 visibility,
                 rotation,
@@ -125,6 +126,11 @@ public record Hologram(
     /** A new HEAD hologram created now at {@code location} showing the player head with base64 {@code headTexture}. */
     public static Hologram createHead(HologramName name, Position location, String headTexture, Instant createdAt) {
         return fresh(name, location, HologramContent.head(headTexture), createdAt);
+    }
+
+    /** A new ENTITY hologram created now at {@code location} showing the frozen mob {@code entityType}. */
+    public static Hologram createEntity(HologramName name, Position location, String entityType, Instant createdAt) {
+        return fresh(name, location, HologramContent.entity(entityType), createdAt);
     }
 
     private static Hologram fresh(HologramName name, Position location, HologramContent content, Instant createdAt) {
@@ -161,6 +167,10 @@ public record Hologram(
 
     public @Nullable String headTexture() {
         return content.headTexture();
+    }
+
+    public @Nullable String entityType() {
+        return content.entityType();
     }
 
     /** The number of lines this hologram renders (0 for an item/block hologram with no label lines). */
@@ -269,6 +279,11 @@ public record Hologram(
     /** A copy switched to a HEAD hologram showing the player head with base64 {@code newHeadTexture} (lines kept). */
     public Hologram asHead(String newHeadTexture) {
         return withContent(content.asHead(newHeadTexture));
+    }
+
+    /** A copy switched to an ENTITY hologram showing the frozen mob {@code newEntityType} (lines kept). */
+    public Hologram asEntity(String newEntityType) {
+        return withContent(content.asEntity(newEntityType));
     }
 
     /** A copy restyled with {@code newAppearance}, keeping everything else. */

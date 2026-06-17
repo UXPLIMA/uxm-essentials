@@ -42,7 +42,38 @@ final class HologramModelCommand extends HologramCommandSupport {
     /** The {@code item}, {@code block} and {@code head} subcommand nodes the {@code /hologram} literal attaches. */
     List<LiteralArgumentBuilder<CommandSourceStack>> nodes() {
         return List.of(
-                contentNode("item", this::item), contentNode("block", this::block), contentNode("head", this::head));
+                contentNode("item", this::item),
+                contentNode("block", this::block),
+                contentNode("head", this::head),
+                contentNode("entity", this::entity));
+    }
+
+    private int entity(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String raw = content(ctx).strip();
+        org.bukkit.entity.EntityType type = parseEntityType(raw);
+        if (type == null) {
+            feedback.send(sender, HologramsMessageKey.HOLOGRAM_ENTITY_INVALID, Map.of("value", raw));
+            return 0;
+        }
+        services.model().setEntity(ref(sender), nameArg(ctx), type.name());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Resolve a spawnable, living entity-type name (so a frozen decorative mob can render), or {@code null}. */
+    private static org.bukkit.entity.@org.jspecify.annotations.Nullable EntityType parseEntityType(String raw) {
+        org.bukkit.entity.EntityType type;
+        try {
+            type = org.bukkit.entity.EntityType.valueOf(raw.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
+        Class<?> entityClass = type.getEntityClass();
+        boolean living = entityClass != null && org.bukkit.entity.LivingEntity.class.isAssignableFrom(entityClass);
+        return type.isSpawnable() && living ? type : null;
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> contentNode(String literal, Command<CommandSourceStack> action) {

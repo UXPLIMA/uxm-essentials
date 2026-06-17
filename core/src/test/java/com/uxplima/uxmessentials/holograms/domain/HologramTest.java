@@ -218,6 +218,30 @@ class HologramTest {
     }
 
     @Test
+    void createEntityHoldsTheTypeAndNeedsNoLines() {
+        Hologram entity = Hologram.createEntity(HologramName.of("guard"), AT, "ZOMBIE", Instant.ofEpochMilli(1_000));
+
+        assertThat(entity.type()).isEqualTo(HologramType.ENTITY);
+        assertThat(entity.entityType()).isEqualTo("ZOMBIE");
+        assertThat(entity.lineCount()).isZero();
+        assertThat(entity.itemMaterial()).isNull();
+    }
+
+    @Test
+    void asEntitySwitchesTypeAndContent() {
+        Hologram entity = twoLine().asEntity("VILLAGER");
+
+        assertThat(entity.type()).isEqualTo(HologramType.ENTITY);
+        assertThat(entity.entityType()).isEqualTo("VILLAGER");
+    }
+
+    @Test
+    void anEntityHologramRejectsABlankType() {
+        assertThatThrownBy(() -> Hologram.createEntity(HologramName.of("x"), AT, " ", Instant.ofEpochMilli(1_000)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void withClickCommandStoresAndClearsKeepingEverythingElse() {
         Hologram clickable = twoLine().withRefreshIntervalTicks(40).withClickCommand("warp pvp");
 

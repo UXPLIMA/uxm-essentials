@@ -78,4 +78,25 @@ final class HologramModels {
         head.setItemMeta(skull);
         return head;
     }
+
+    /**
+     * Resolve a stored entity-type name into a spawnable, living {@link org.bukkit.entity.EntityType}, or
+     * {@code null} for a blank, unknown, non-spawnable, or non-living name. Only a living entity can render as a
+     * frozen decorative hologram (the renderer disables its AI/gravity), so a non-living or unspawnable type is
+     * failed soft rather than spawned.
+     */
+    static org.bukkit.entity.@Nullable EntityType entityTypeOf(@Nullable String entityType) {
+        if (entityType == null || entityType.isBlank()) {
+            return null;
+        }
+        org.bukkit.entity.EntityType type;
+        try {
+            type = org.bukkit.entity.EntityType.valueOf(entityType.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
+        Class<?> entityClass = type.getEntityClass();
+        boolean living = entityClass != null && org.bukkit.entity.LivingEntity.class.isAssignableFrom(entityClass);
+        return type.isSpawnable() && living ? type : null;
+    }
 }

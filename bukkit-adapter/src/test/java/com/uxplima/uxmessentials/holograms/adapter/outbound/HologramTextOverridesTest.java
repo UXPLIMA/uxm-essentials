@@ -107,6 +107,7 @@ class HologramTextOverridesTest {
                 null,
                 null,
                 null,
+                null,
                 com.uxplima.uxmessentials.holograms.domain.Appearance.defaults(),
                 com.uxplima.uxmessentials.holograms.domain.Visibility.everyone(),
                 com.uxplima.uxmessentials.holograms.domain.Rotation.NONE,

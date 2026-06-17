@@ -23,13 +23,15 @@ import org.jspecify.annotations.Nullable;
  * @param itemMaterial the {@code Material} name shown by an ITEM hologram, or {@code null} for other types
  * @param blockData the BlockData string shown by a BLOCK hologram, or {@code null} for other types
  * @param headTexture the base64 skin-texture shown by a HEAD hologram, or {@code null} for other types
+ * @param entityType the entity-type name shown by an ENTITY hologram, or {@code null} for other types
  */
 public record HologramContent(
         HologramType type,
         List<HologramLine> lines,
         @Nullable String itemMaterial,
         @Nullable String blockData,
-        @Nullable String headTexture) {
+        @Nullable String headTexture,
+        @Nullable String entityType) {
 
     public HologramContent {
         Objects.requireNonNull(type, "type");
@@ -47,36 +49,45 @@ public record HologramContent(
         if (type == HologramType.HEAD && (headTexture == null || headTexture.isBlank())) {
             throw new IllegalArgumentException("a head hologram needs a skin texture");
         }
+        if (type == HologramType.ENTITY && (entityType == null || entityType.isBlank())) {
+            throw new IllegalArgumentException("an entity hologram needs an entity type");
+        }
     }
 
     /** Text content with the given ordered lines (at least one). */
     static HologramContent text(List<HologramLine> lines) {
-        return new HologramContent(HologramType.TEXT, lines, null, null, null);
+        return new HologramContent(HologramType.TEXT, lines, null, null, null, null);
     }
 
     /** Item content showing {@code itemMaterial}, with no lines. */
     static HologramContent item(String itemMaterial) {
         return new HologramContent(
-                HologramType.ITEM, List.of(), Objects.requireNonNull(itemMaterial, "itemMaterial"), null, null);
+                HologramType.ITEM, List.of(), Objects.requireNonNull(itemMaterial, "itemMaterial"), null, null, null);
     }
 
     /** Block content showing {@code blockData}, with no lines. */
     static HologramContent block(String blockData) {
         return new HologramContent(
-                HologramType.BLOCK, List.of(), null, Objects.requireNonNull(blockData, "blockData"), null);
+                HologramType.BLOCK, List.of(), null, Objects.requireNonNull(blockData, "blockData"), null, null);
     }
 
     /** Head content showing the player head with base64 {@code headTexture}, with no lines. */
     static HologramContent head(String headTexture) {
         return new HologramContent(
-                HologramType.HEAD, List.of(), null, null, Objects.requireNonNull(headTexture, "headTexture"));
+                HologramType.HEAD, List.of(), null, null, Objects.requireNonNull(headTexture, "headTexture"), null);
+    }
+
+    /** Entity content showing the frozen mob {@code entityType}, with no lines. */
+    static HologramContent entity(String entityType) {
+        return new HologramContent(
+                HologramType.ENTITY, List.of(), null, null, null, Objects.requireNonNull(entityType, "entityType"));
     }
 
     HologramContent withLineAppended(HologramLine line) {
         Objects.requireNonNull(line, "line");
         List<HologramLine> next = new ArrayList<>(lines);
         next.add(line);
-        return new HologramContent(type, next, itemMaterial, blockData, headTexture);
+        return new HologramContent(type, next, itemMaterial, blockData, headTexture, entityType);
     }
 
     HologramContent withLineReplaced(int index, HologramLine line) {
@@ -84,7 +95,7 @@ public record HologramContent(
         requireInRange(index);
         List<HologramLine> next = new ArrayList<>(lines);
         next.set(index, line);
-        return new HologramContent(type, next, itemMaterial, blockData, headTexture);
+        return new HologramContent(type, next, itemMaterial, blockData, headTexture, entityType);
     }
 
     HologramContent withLineInserted(int index, HologramLine line) {
@@ -94,7 +105,7 @@ public record HologramContent(
         }
         List<HologramLine> next = new ArrayList<>(lines);
         next.add(Math.min(index, next.size()), line);
-        return new HologramContent(type, next, itemMaterial, blockData, headTexture);
+        return new HologramContent(type, next, itemMaterial, blockData, headTexture, entityType);
     }
 
     HologramContent withLineRemoved(int index) {
@@ -104,25 +115,31 @@ public record HologramContent(
         }
         List<HologramLine> next = new ArrayList<>(lines);
         next.remove(index);
-        return new HologramContent(type, next, itemMaterial, blockData, headTexture);
+        return new HologramContent(type, next, itemMaterial, blockData, headTexture, entityType);
     }
 
     /** Switch to an ITEM hologram showing {@code newItemMaterial} (lines kept for a future label rendering). */
     HologramContent asItem(String newItemMaterial) {
         Objects.requireNonNull(newItemMaterial, "newItemMaterial");
-        return new HologramContent(HologramType.ITEM, lines, newItemMaterial, null, null);
+        return new HologramContent(HologramType.ITEM, lines, newItemMaterial, null, null, null);
     }
 
     /** Switch to a BLOCK hologram showing {@code newBlockData} (lines kept for a future label rendering). */
     HologramContent asBlock(String newBlockData) {
         Objects.requireNonNull(newBlockData, "newBlockData");
-        return new HologramContent(HologramType.BLOCK, lines, null, newBlockData, null);
+        return new HologramContent(HologramType.BLOCK, lines, null, newBlockData, null, null);
     }
 
     /** Switch to a HEAD hologram showing the player head with base64 {@code newHeadTexture} (lines kept). */
     HologramContent asHead(String newHeadTexture) {
         Objects.requireNonNull(newHeadTexture, "newHeadTexture");
-        return new HologramContent(HologramType.HEAD, lines, null, null, newHeadTexture);
+        return new HologramContent(HologramType.HEAD, lines, null, null, newHeadTexture, null);
+    }
+
+    /** Switch to an ENTITY hologram showing the frozen mob {@code newEntityType} (lines kept). */
+    HologramContent asEntity(String newEntityType) {
+        Objects.requireNonNull(newEntityType, "newEntityType");
+        return new HologramContent(HologramType.ENTITY, lines, null, null, null, newEntityType);
     }
 
     int lineCount() {

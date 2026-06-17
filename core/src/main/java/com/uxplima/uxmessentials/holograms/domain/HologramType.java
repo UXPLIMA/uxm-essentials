@@ -28,7 +28,10 @@ public enum HologramType {
     BLOCK,
 
     /** A single floating player head shown by an {@code ItemDisplay}, its content a base64 skin texture. */
-    HEAD;
+    HEAD,
+
+    /** A single frozen, decorative mob shown as a real (AI-less, weightless) entity, its content an entity-type name. */
+    ENTITY;
 
     /** Whether a hologram of this type must carry at least one text line (only {@link #TEXT} does). */
     public boolean requiresLines() {
