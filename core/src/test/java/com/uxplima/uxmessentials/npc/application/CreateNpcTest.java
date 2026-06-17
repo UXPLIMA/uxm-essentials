@@ -15,11 +15,15 @@ import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.npc.domain.event.NpcCreated;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
+import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,13 +45,18 @@ class CreateNpcTest {
         view = new RecordingView();
         events = new RecordingEvents();
         sink = new CapturingSink();
-        create = new CreateNpc(
+        create = createWith(new NpcQuota(new FixedPermissions(QuotaResult.unlimited()), -1));
+        actor = new PlayerRef(UUID.randomUUID(), "Operator");
+    }
+
+    private CreateNpc createWith(NpcQuota quota) {
+        return new CreateNpc(
                 repository,
                 view,
                 new NpcNotifier(new NpcTestSupport.KeyMessages(), sink),
                 events,
-                Clock.fixed(Instant.ofEpochMilli(5_000), ZoneOffset.UTC));
-        actor = new PlayerRef(UUID.randomUUID(), "Operator");
+                Clock.fixed(Instant.ofEpochMilli(5_000), ZoneOffset.UTC),
+                quota);
     }
 
     @Test
@@ -102,5 +111,49 @@ class CreateNpcTest {
         create.create(actor, NpcName.of("guide"), AT, null);
 
         assertThat(repository.find(NpcName.of("guide")).orElseThrow().owner()).isEqualTo(actor.uuid());
+    }
+
+    @Test
+    void rejectsCreateWhenTheOwnerIsAtTheirLimit() {
+        CreateNpc limited = createWith(new NpcQuota(new FixedPermissions(QuotaResult.limited(1)), 0));
+        limited.create(actor, NpcName.of("first"), AT, null);
+
+        Result<Unit, NpcError> result = limited.create(actor, NpcName.of("second"), AT, null);
+
+        assertThat(result.errorOrThrow()).isEqualTo(NpcError.LIMIT_REACHED);
+        assertThat(repository.exists(NpcName.of("second"))).isFalse();
+        assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_LIMIT_REACHED.key());
+    }
+
+    @Test
+    void countsOnlyTheOwnersOwnNpcsAgainstTheLimit() {
+        CreateNpc limited = createWith(new NpcQuota(new FixedPermissions(QuotaResult.limited(1)), 0));
+        PlayerRef other = new PlayerRef(UUID.randomUUID(), "Other");
+        limited.create(other, NpcName.of("theirs"), AT, null);
+
+        Result<Unit, NpcError> result = limited.create(actor, NpcName.of("mine"), AT, null);
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(repository.exists(NpcName.of("mine"))).isTrue();
+    }
+
+    private static final class FixedPermissions implements Permissions {
+
+        private final QuotaResult result;
+
+        FixedPermissions(QuotaResult result) {
+            this.result = result;
+        }
+
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return false;
+        }
+
+        @Override
+        public QuotaResult resolveQuota(
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+            return result;
+        }
     }
 }

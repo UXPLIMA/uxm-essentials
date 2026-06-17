@@ -15,6 +15,9 @@ public enum NpcError {
     /** {@code /npc create} for a name an NPC already exists under. */
     NAME_TAKEN(NpcMessageKey.NPC_NAME_TAKEN),
 
+    /** {@code /npc create} when the owner already holds their {@code uxmessentials.npc.limit.<n>} quota of NPCs. */
+    LIMIT_REACHED(NpcMessageKey.NPC_LIMIT_REACHED),
+
     /** {@code /npc action remove} with a 1-based index outside the NPC's action list. */
     ACTION_INDEX_INVALID(NpcMessageKey.NPC_ACTION_INDEX_INVALID),
 

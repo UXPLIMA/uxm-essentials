@@ -16,6 +16,7 @@ public enum NpcMessageKey implements MessageKey {
     // create / delete / move feedback
     NPC_CREATED("npc.created"),
     NPC_CREATED_NO_SKIN("npc.created-no-skin"),
+    NPC_LIMIT_REACHED("npc.limit-reached"),
     NPC_DELETED("npc.deleted"),
     NPC_MOVED("npc.moved"),
     NPC_MOVED_TO("npc.moved-to"),

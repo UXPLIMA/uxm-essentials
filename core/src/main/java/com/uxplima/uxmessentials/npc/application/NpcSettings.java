@@ -21,6 +21,7 @@ public final class NpcSettings {
     private static final long DEFAULT_LOOK_PERIOD_TICKS = 3;
     private static final long DEFAULT_CLICK_COOLDOWN_MILLIS = 500;
     private static final String DEFAULT_MINESKIN_API_KEY = "";
+    private static final long DEFAULT_NPC_LIMIT = -1;
 
     private final ConfigStore config;
 
@@ -54,5 +55,14 @@ public final class NpcSettings {
     public String mineSkinApiKey() {
         return config.getString("skin.mineskin-api-key", DEFAULT_MINESKIN_API_KEY)
                 .strip();
+    }
+
+    /**
+     * The default number of NPCs a player may own without a {@code uxmessentials.npc.limit.<n>} node; {@code -1}
+     * (the default) means unlimited, so an operator opts into capping via the config value or the numbered nodes.
+     * Clamped to {@code -1} at minimum so a stray smaller value cannot break the quota reducer.
+     */
+    public int defaultLimit() {
+        return (int) Math.max(-1L, config.getLong("default-limit", DEFAULT_NPC_LIMIT));
     }
 }

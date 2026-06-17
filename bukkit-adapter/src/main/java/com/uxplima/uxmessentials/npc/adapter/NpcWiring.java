@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.npc.application.MoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
+import com.uxplima.uxmessentials.npc.application.NpcQuota;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcAction;
@@ -119,7 +120,8 @@ public final class NpcWiring {
         NpcRenderer renderer =
                 new NpcRenderer(packets, spawner, kernel.scheduler(), RENDER_RANGE, settings.lookRange());
         NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
-        NpcServices services = assemble(kernel, repository, renderer, notifier);
+        NpcQuota quota = new NpcQuota(kernel.permissions(), settings.defaultLimit());
+        NpcServices services = assemble(kernel, repository, renderer, notifier, quota);
         spawnStored(repository, renderer);
         MojangSkinService mojangSkins =
                 new MojangSkinService(kernel.scheduler(), kernel.log(), new HttpClientFetcher(kernel.log()));
@@ -153,10 +155,10 @@ public final class NpcWiring {
     }
 
     private static NpcServices assemble(
-            KernelPorts kernel, NpcRepository repository, NpcRenderer renderer, NpcNotifier notifier) {
+            KernelPorts kernel, NpcRepository repository, NpcRenderer renderer, NpcNotifier notifier, NpcQuota quota) {
         Clock clock = Clock.systemUTC();
         return new NpcServices(
-                new CreateNpc(repository, renderer, notifier, kernel.events(), clock),
+                new CreateNpc(repository, renderer, notifier, kernel.events(), clock, quota),
                 new DeleteNpc(repository, renderer, notifier, kernel.events()),
                 new ListNpcs(repository, notifier),
                 new NearbyNpcs(repository, notifier),

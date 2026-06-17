@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
+import com.uxplima.uxmessentials.npc.domain.NpcLimit;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.npc.domain.event.NpcCreated;
@@ -33,14 +34,21 @@ public final class CreateNpc {
     private final NpcNotifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final NpcQuota quota;
 
     public CreateNpc(
-            NpcRepository repository, NpcView view, NpcNotifier notifier, DomainEventPublisher events, Clock clock) {
+            NpcRepository repository,
+            NpcView view,
+            NpcNotifier notifier,
+            DomainEventPublisher events,
+            Clock clock,
+            NpcQuota quota) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.quota = Objects.requireNonNull(quota, "quota");
     }
 
     /** Create the NPC {@code name} at {@code at} with {@code skin} (may be {@code null}), or reject a taken name. */
@@ -62,6 +70,11 @@ public final class CreateNpc {
             notifier.send(creator, NpcError.NAME_TAKEN.messageKey(), Map.of("name", name.value()));
             return Result.err(NpcError.NAME_TAKEN);
         }
+        NpcLimit limit = quota.resolve(creator);
+        if (limit.isReachedAt(ownedCount(creator))) {
+            notifier.send(creator, NpcError.LIMIT_REACHED.messageKey(), Map.of("limit", Integer.toString(limit.cap())));
+            return Result.err(NpcError.LIMIT_REACHED);
+        }
         Npc npc = Npc.create(name, at, skin, clock.instant()).withOwner(creator.uuid());
         if (entityType != null && !entityType.isBlank()) {
             npc = npc.withEntityType(entityType);
@@ -72,5 +85,12 @@ public final class CreateNpc {
         NpcMessageKey feedback = npc.hasSkin() ? NpcMessageKey.NPC_CREATED : NpcMessageKey.NPC_CREATED_NO_SKIN;
         notifier.send(creator, feedback, Map.of("name", name.value()));
         return Result.ok();
+    }
+
+    /** How many stored NPCs {@code owner} currently owns (the cached repository keeps {@code all()} in memory). */
+    private int ownedCount(PlayerRef owner) {
+        return (int) repository.all().stream()
+                .filter(npc -> owner.uuid().equals(npc.owner()))
+                .count();
     }
 }
