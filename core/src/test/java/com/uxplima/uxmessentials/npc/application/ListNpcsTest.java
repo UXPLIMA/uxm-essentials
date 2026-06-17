@@ -49,4 +49,25 @@ class ListNpcsTest {
         assertThat(sink.textFor(viewer).stream().filter(t -> t.equals(NpcMessageKey.NPC_LIST_ENTRY.key())))
                 .hasSize(2);
     }
+
+    @Test
+    void aTypeFilterNarrowsAndNameSortsTheList() {
+        repository.save(Npc.create(NpcName.of("zombieB"), AT, null, Instant.ofEpochMilli(1_000))
+                .withEntityType("ZOMBIE"));
+        repository.save(Npc.create(NpcName.of("player"), AT, null, Instant.ofEpochMilli(2_000)));
+        repository.save(Npc.create(NpcName.of("zombieA"), AT, null, Instant.ofEpochMilli(3_000))
+                .withEntityType("ZOMBIE"));
+
+        assertThat(list.list(viewer, "zombie"))
+                .extracting(npc -> npc.name().value())
+                .containsExactly("zombiea", "zombieb");
+    }
+
+    @Test
+    void aTypeFilterWithNoMatchesSendsTheEmptyNotice() {
+        repository.save(Npc.create(NpcName.of("player"), AT, null, Instant.ofEpochMilli(1_000)));
+
+        assertThat(list.list(viewer, "creeper")).isEmpty();
+        assertThat(sink.textFor(viewer)).contains(NpcMessageKey.NPC_LIST_EMPTY.key());
+    }
 }

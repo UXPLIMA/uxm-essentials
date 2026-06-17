@@ -17,6 +17,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
+import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -63,7 +64,11 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(name("create", this::create))
                 .then(name("delete", this::delete))
-                .then(Commands.literal("list").executes(this::list))
+                .then(Commands.literal("list")
+                        .executes(this::list)
+                        .then(Commands.argument("type", StringArgumentType.word())
+                                .executes(this::listFiltered)))
+                .then(Commands.literal("help").executes(this::help))
                 .then(Commands.literal("nearby")
                         .executes(ctx -> nearby(ctx, NearbyNpcs.DEFAULT_RADIUS))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, NearbyNpcs.MAX_RADIUS))
@@ -121,6 +126,20 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             return 0;
         }
         services.list().list(ref(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int listFiltered(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.list().list(ref(sender), ctx.getArgument("type", String.class));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int help(CommandContext<CommandSourceStack> ctx) {
+        feedback.send(ctx.getSource().getSender(), NpcMessageKey.NPC_HELP, java.util.Map.of());
         return Command.SINGLE_SUCCESS;
     }
 
