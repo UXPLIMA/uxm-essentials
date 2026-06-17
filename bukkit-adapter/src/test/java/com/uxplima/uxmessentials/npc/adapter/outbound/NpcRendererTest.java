@@ -1016,6 +1016,22 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesUseItemPoseAndShaking() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("ZOMBIE").withTypeData("use_item", "off_hand"));
+        renderer.render(npcAt(viewer, 2.0).withEntityType("SKELETON").withTypeData("shaking", "true"));
+        renderer.render(npcAt(viewer, 3.0).withEntityType("BLOCK_DISPLAY").withTypeData("use_item", "main_hand"));
+
+        assertThat(packets.useItems).hasSize(1);
+        assertThat(packets.useItems.get(0).using()).isTrue();
+        assertThat(packets.useItems.get(0).offHand()).isTrue();
+        assertThat(packets.frozenTicks).hasSize(1);
+        assertThat(packets.frozenTicks.get(0).ticks()).isGreaterThan(140);
+    }
+
+    @Test
     void doesNotSendACatVariantToAFrogNorAFrogVariantToACat() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1524,6 +1540,8 @@ class NpcRendererTest {
         private final List<FoxRec> foxFlagsList = new ArrayList<>();
         private final List<StateRec> snifferStates = new ArrayList<>();
         private final List<StateRec> armadilloStates = new ArrayList<>();
+        private final List<UseItemRec> useItems = new ArrayList<>();
+        private final List<FrozenRec> frozenTicks = new ArrayList<>();
         // When set, catVariant/frogVariant return null to mimic the lib's fail-soft signal (registry not resolved).
         private boolean dropNameVariants;
         private final List<Sent> sent = new ArrayList<>();
@@ -2000,6 +2018,20 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object usingItem(int entityId, boolean using, boolean offHand) {
+            UseItemRec packet = new UseItemRec(entityId, using, offHand);
+            useItems.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object frozenTicks(int entityId, int ticks) {
+            FrozenRec packet = new FrozenRec(entityId, ticks);
+            frozenTicks.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -2166,6 +2198,10 @@ class NpcRendererTest {
         private record FoxRec(int entityId, boolean sitting, boolean sleeping, boolean crouching) {}
 
         private record StateRec(int entityId, String state) {}
+
+        private record UseItemRec(int entityId, boolean using, boolean offHand) {}
+
+        private record FrozenRec(int entityId, int ticks) {}
 
         private record FrogVariant(int entityId, String name) {}
 

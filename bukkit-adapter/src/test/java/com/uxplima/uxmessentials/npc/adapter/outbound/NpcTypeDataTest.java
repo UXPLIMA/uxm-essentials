@@ -230,6 +230,13 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("sniffer_state", "dancing")).isFalse();
         assertThat(NpcTypeData.isValidValue("armadillo_state", "rolling")).isTrue();
         assertThat(NpcTypeData.isValidValue("armadillo_state", "spinning")).isFalse();
+        assertThat(NpcTypeData.isKnownKey("use_item")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("shaking")).isTrue();
+        assertThat(NpcTypeData.isValidValue("use_item", "off_hand")).isTrue();
+        assertThat(NpcTypeData.isValidValue("use_item", "none")).isTrue();
+        assertThat(NpcTypeData.isValidValue("use_item", "third_hand")).isFalse();
+        assertThat(NpcTypeData.isValidValue("shaking", "true")).isTrue();
+        assertThat(NpcTypeData.isValidValue("shaking", "sometimes")).isFalse();
     }
 
     @Test

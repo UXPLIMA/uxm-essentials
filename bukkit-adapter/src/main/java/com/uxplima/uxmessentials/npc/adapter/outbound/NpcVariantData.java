@@ -10,6 +10,7 @@ import org.bukkit.DyeColor;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Horse;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -94,6 +95,8 @@ final class NpcVariantData {
     static final String KEY_FOX_POSE = "fox_pose";
     static final String KEY_SNIFFER_STATE = "sniffer_state";
     static final String KEY_ARMADILLO_STATE = "armadillo_state";
+    static final String KEY_USE_ITEM = "use_item";
+    static final String KEY_SHAKING = "shaking";
 
     /** The raider types a {@code Raider}-level attribute (celebrating) may render on. */
     private static final Set<EntityType> RAIDER_TYPES = Set.of(
@@ -180,6 +183,12 @@ final class NpcVariantData {
     /** The four armadillo states the {@code armadillo_state} key accepts. */
     private static final Set<String> ARMADILLO_STATES = Set.of("idle", "rolling", "scared", "unrolling");
 
+    /** The hand the {@code use_item} key may raise an item in (or {@code none} to lower it). */
+    private static final Set<String> USE_ITEM_VALUES = Set.of("none", "main_hand", "off_hand");
+
+    /** A frozen-tick count comfortably past the vanilla freeze threshold (140), so the shiver renders at once. */
+    private static final int FREEZE_SHIVER_TICKS = 200;
+
     private NpcVariantData() {}
 
     /**
@@ -231,6 +240,8 @@ final class NpcVariantData {
                 EntityType.ARMADILLO,
                 ARMADILLO_STATES,
                 NpcPackets::armadilloState);
+        applyUseItem(packets, viewer, id, type, data, npc, log);
+        applyShaking(packets, viewer, id, type, data, npc, log);
         applyBlockDisplay(packets, viewer, id, type, data, npc, log);
         applyItemDisplay(packets, viewer, id, type, data, npc, log);
         applyTextDisplay(packets, viewer, id, type, data, npc, log);
@@ -579,9 +590,56 @@ final class NpcVariantData {
         packets.send(viewer, packet);
     }
 
+    /**
+     * Apply the item-use pose (the {@code use_item} key): {@code main_hand}/{@code off_hand} raises the held item
+     * (a shield blocks, food/potion lifts), {@code none} lowers it. Only a living entity carries the flags byte.
+     */
+    private static void applyUseItem(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_USE_ITEM);
+        if (value == null) {
+            return;
+        }
+        if (!isLiving(type)) {
+            skip(log, npc, KEY_USE_ITEM, type, "type is not a living entity");
+            return;
+        }
+        String hand = value.toLowerCase(Locale.ROOT);
+        if (!USE_ITEM_VALUES.contains(hand)) {
+            skip(log, npc, KEY_USE_ITEM, type, "value is not none/main_hand/off_hand: " + value);
+            return;
+        }
+        packets.send(viewer, packets.usingItem(id, !hand.equals("none"), hand.equals("off_hand")));
+    }
+
+    /** Apply the powder-snow shiver (the {@code shaking} key, a boolean) to a living entity via its frozen ticks. */
+    private static void applyShaking(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_SHAKING);
+        if (value == null) {
+            return;
+        }
+        if (!isLiving(type)) {
+            skip(log, npc, KEY_SHAKING, type, "type is not a living entity");
+            return;
+        }
+        Boolean shaking = parseBool(value);
+        if (shaking == null) {
+            skip(log, npc, KEY_SHAKING, type, "value is not true or false: " + value);
+            return;
+        }
+        packets.send(viewer, packets.frozenTicks(id, shaking ? FREEZE_SHIVER_TICKS : 0));
+    }
+
     /** Whether {@code type} is a visible display entity (block/item/text) the shared scale/billboard apply to. */
     private static boolean isVisualDisplay(EntityType type) {
         return type == EntityType.BLOCK_DISPLAY || type == EntityType.ITEM_DISPLAY || type == EntityType.TEXT_DISPLAY;
+    }
+
+    /** Whether {@code type} is a living entity (carries the {@code DATA_LIVING_ENTITY_FLAGS} / freeze-overlay state). */
+    private static boolean isLiving(EntityType type) {
+        Class<?> entityClass = type.getEntityClass();
+        return entityClass != null && LivingEntity.class.isAssignableFrom(entityClass);
     }
 
     /**
@@ -836,6 +894,8 @@ final class NpcVariantData {
             case KEY_FOX_POSE -> FOX_POSE_VALUES.contains(value.toLowerCase(Locale.ROOT));
             case KEY_SNIFFER_STATE -> SNIFFER_STATES.contains(value.toLowerCase(Locale.ROOT));
             case KEY_ARMADILLO_STATE -> ARMADILLO_STATES.contains(value.toLowerCase(Locale.ROOT));
+            case KEY_USE_ITEM -> USE_ITEM_VALUES.contains(value.toLowerCase(Locale.ROOT));
+            case KEY_SHAKING -> parseBool(value) != null;
             case KEY_AS_HEAD,
                     KEY_AS_BODY,
                     KEY_AS_LEFT_ARM,
@@ -1041,6 +1101,8 @@ final class NpcVariantData {
             KEY_FOX_POSE,
             KEY_SNIFFER_STATE,
             KEY_ARMADILLO_STATE,
+            KEY_USE_ITEM,
+            KEY_SHAKING,
             KEY_TROPICAL_FISH,
             KEY_AS_SMALL,
             KEY_AS_ARMS,

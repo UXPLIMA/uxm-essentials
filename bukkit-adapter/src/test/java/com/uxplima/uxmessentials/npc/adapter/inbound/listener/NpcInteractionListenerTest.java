@@ -626,6 +626,16 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object usingItem(int entityId, boolean using, boolean offHand) {
+            return new Object();
+        }
+
+        @Override
+        public Object frozenTicks(int entityId, int ticks) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }
