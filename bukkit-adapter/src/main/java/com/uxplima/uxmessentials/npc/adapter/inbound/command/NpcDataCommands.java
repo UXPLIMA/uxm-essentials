@@ -80,6 +80,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             "display_scale",
             "display_billboard",
             "text_background",
+            "text_line_width",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -135,6 +136,8 @@ final class NpcDataCommands extends NpcCommandSupport {
     private static final List<String> BILLBOARD_VALUES = List.of("fixed", "vertical", "horizontal", "center");
     /** Sample ARGB hex colours, offered as a hint for {@code text_background} (any {@code #aarrggbb}/{@code #rrggbb}). */
     private static final List<String> BACKGROUND_VALUES = List.of("#80000000", "#FF1E1E1E", "#00000000");
+    /** Sample text-wrap widths (pixels), offered as a hint for {@code text_line_width} (default 200). */
+    private static final List<String> LINE_WIDTH_VALUES = List.of("200", "100", "400");
 
     NpcDataCommands(
             NpcServices services,
@@ -243,6 +246,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             case "display_scale" -> suggest(builder, DISPLAY_SCALE_VALUES);
             case "display_billboard" -> suggest(builder, BILLBOARD_VALUES);
             case "text_background" -> suggest(builder, BACKGROUND_VALUES);
+            case "text_line_width" -> suggest(builder, LINE_WIDTH_VALUES);
             default -> builder.buildFuture();
         };
     }

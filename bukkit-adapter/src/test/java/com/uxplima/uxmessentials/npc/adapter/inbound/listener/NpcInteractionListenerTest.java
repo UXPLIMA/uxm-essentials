@@ -526,6 +526,11 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object textDisplayLineWidth(int entityId, int lineWidth) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

@@ -82,6 +82,7 @@ final class NpcVariantData {
     static final String KEY_DISPLAY_SCALE = "display_scale";
     static final String KEY_DISPLAY_BILLBOARD = "display_billboard";
     static final String KEY_TEXT_BACKGROUND = "text_background";
+    static final String KEY_TEXT_LINE_WIDTH = "text_line_width";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -176,6 +177,7 @@ final class NpcVariantData {
         applyDisplayScale(packets, viewer, id, type, data, npc, log);
         applyDisplayBillboard(packets, viewer, id, type, data, npc, log);
         applyTextBackground(packets, viewer, id, type, data, npc, log);
+        applyTextLineWidth(packets, viewer, id, type, data, npc, log);
         NpcNameVariantData.apply(packets, viewer, id, type, data, npc, log);
     }
 
@@ -494,6 +496,25 @@ final class NpcVariantData {
         packets.send(viewer, packets.textDisplayBackground(id, argb));
     }
 
+    /** Apply a text-display entity's line width (the {@code text_line_width} key, wrap pixels); fail-soft on a bad value. */
+    private static void applyTextLineWidth(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_TEXT_LINE_WIDTH);
+        if (value == null) {
+            return;
+        }
+        if (type != EntityType.TEXT_DISPLAY) {
+            skip(log, npc, KEY_TEXT_LINE_WIDTH, type, "type is not a text display");
+            return;
+        }
+        Integer width = parseInt(value);
+        if (width == null || width <= 0) {
+            skip(log, npc, KEY_TEXT_LINE_WIDTH, type, "value is not a positive line width: " + value);
+            return;
+        }
+        packets.send(viewer, packets.textDisplayLineWidth(id, width));
+    }
+
     /** A billboard name to its wire byte (FIXED 0, VERTICAL 1, HORIZONTAL 2, CENTER 3), or {@code null} when unknown. */
     private static @Nullable Byte parseBillboard(String value) {
         return switch (value.strip().toUpperCase(Locale.ROOT)) {
@@ -641,6 +662,10 @@ final class NpcVariantData {
             }
             case KEY_DISPLAY_BILLBOARD -> parseBillboard(value) != null;
             case KEY_TEXT_BACKGROUND -> parseArgb(value) != null;
+            case KEY_TEXT_LINE_WIDTH -> {
+                Integer width = parseInt(value);
+                yield width != null && width > 0;
+            }
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -825,5 +850,6 @@ final class NpcVariantData {
             KEY_TEXT,
             KEY_DISPLAY_SCALE,
             KEY_DISPLAY_BILLBOARD,
-            KEY_TEXT_BACKGROUND);
+            KEY_TEXT_BACKGROUND,
+            KEY_TEXT_LINE_WIDTH);
 }

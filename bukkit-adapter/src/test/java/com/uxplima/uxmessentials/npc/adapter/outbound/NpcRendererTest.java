@@ -852,6 +852,20 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesLineWidthToATextDisplayNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("TEXT_DISPLAY")
+                .withTypeData("text", "Hi")
+                .withTypeData("text_line_width", "150"));
+
+        assertThat(packets.textDisplayLineWidths).hasSize(1);
+        assertThat(packets.textDisplayLineWidths.get(0).lineWidth()).isEqualTo(150);
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1407,6 +1421,7 @@ class NpcRendererTest {
         private final List<DisplayScale> displayScales = new ArrayList<>();
         private final List<DisplayBillboard> displayBillboards = new ArrayList<>();
         private final List<TextDisplayBackground> textDisplayBackgrounds = new ArrayList<>();
+        private final List<TextDisplayLineWidth> textDisplayLineWidths = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1747,6 +1762,13 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object textDisplayLineWidth(int entityId, int lineWidth) {
+            TextDisplayLineWidth packet = new TextDisplayLineWidth(entityId, lineWidth);
+            textDisplayLineWidths.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1933,6 +1955,8 @@ class NpcRendererTest {
         private record DisplayBillboard(int entityId, byte constraint) {}
 
         private record TextDisplayBackground(int entityId, int argb) {}
+
+        private record TextDisplayLineWidth(int entityId, int lineWidth) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

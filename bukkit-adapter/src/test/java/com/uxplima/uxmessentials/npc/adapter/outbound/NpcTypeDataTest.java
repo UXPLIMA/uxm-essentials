@@ -79,6 +79,7 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("display_scale")).isTrue();
         assertThat(NpcTypeData.isKnownKey("display_billboard")).isTrue();
         assertThat(NpcTypeData.isKnownKey("text_background")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("text_line_width")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -237,5 +238,8 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("text_background", "#80FF0000")).isTrue();
         assertThat(NpcTypeData.isValidValue("text_background", "ff0000")).isTrue();
         assertThat(NpcTypeData.isValidValue("text_background", "notacolor")).isFalse();
+        assertThat(NpcTypeData.isValidValue("text_line_width", "200")).isTrue();
+        assertThat(NpcTypeData.isValidValue("text_line_width", "0")).isFalse();
+        assertThat(NpcTypeData.isValidValue("text_line_width", "wide")).isFalse();
     }
 }
