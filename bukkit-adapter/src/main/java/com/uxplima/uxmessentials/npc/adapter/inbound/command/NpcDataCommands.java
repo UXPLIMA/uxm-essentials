@@ -1,10 +1,13 @@
 package com.uxplima.uxmessentials.npc.adapter.inbound.command;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import org.bukkit.DyeColor;
+import org.bukkit.entity.Horse;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -41,6 +44,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             "villager_level",
             "horse_color",
             "horse_markings",
+            "horse_style",
             "llama_variant",
             "sheep_color",
             "parrot_variant",
@@ -66,6 +70,20 @@ final class NpcDataCommands extends NpcCommandSupport {
             "all_black");
     /** The frog-variant names, offered as tab completions for {@code frog_variant}. */
     private static final List<String> FROG_VARIANT_VALUES = List.of("temperate", "warm", "cold");
+    /** The horse coat-colour ids (0–6), offered as tab completions for {@code horse_color}. */
+    private static final List<String> HORSE_COLOR_VALUES = List.of("0", "1", "2", "3", "4", "5", "6");
+    /** The horse marking ids (0–4), offered as tab completions for {@code horse_markings}. */
+    private static final List<String> HORSE_MARKINGS_VALUES = List.of("0", "1", "2", "3", "4");
+    /** The horse style names (the named alias of the markings), offered as tab completions for {@code horse_style}. */
+    private static final List<String> HORSE_STYLE_VALUES = Arrays.stream(Horse.Style.values())
+            .map(style -> style.name().toLowerCase(Locale.ROOT))
+            .toList();
+    /** The llama coat-variant ids (0–3), offered as tab completions for {@code llama_variant}. */
+    private static final List<String> LLAMA_VARIANT_VALUES = List.of("0", "1", "2", "3");
+    /** The sheep wool-colour names, offered as tab completions for {@code sheep_color} (a 0–15 id is also accepted). */
+    private static final List<String> SHEEP_COLOR_VALUES = Arrays.stream(DyeColor.values())
+            .map(color -> color.name().toLowerCase(Locale.ROOT))
+            .toList();
 
     NpcDataCommands(
             NpcServices services,
@@ -143,6 +161,11 @@ final class NpcDataCommands extends NpcCommandSupport {
             case "baby", "charged" -> suggest(builder, BOOLEAN_VALUES);
             case "cat_variant" -> suggest(builder, CAT_VARIANT_VALUES);
             case "frog_variant" -> suggest(builder, FROG_VARIANT_VALUES);
+            case "horse_color" -> suggest(builder, HORSE_COLOR_VALUES);
+            case "horse_markings" -> suggest(builder, HORSE_MARKINGS_VALUES);
+            case "horse_style" -> suggest(builder, HORSE_STYLE_VALUES);
+            case "llama_variant" -> suggest(builder, LLAMA_VARIANT_VALUES);
+            case "sheep_color" -> suggest(builder, SHEEP_COLOR_VALUES);
             default -> builder.buildFuture();
         };
     }

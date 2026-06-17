@@ -553,6 +553,37 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesHorseStyleAsTheMarkingsToAHorseNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("HORSE")
+                .withTypeData("horse_color", "1")
+                .withTypeData("horse_style", "white_dots"));
+
+        // horse_style is the named alias of the markings id: WHITE_DOTS is markings 3.
+        assertThat(packets.horseVariants).hasSize(1);
+        assertThat(packets.horseVariants.get(0).color()).isEqualTo(1);
+        assertThat(packets.horseVariants.get(0).markings()).isEqualTo(3);
+    }
+
+    @Test
+    void prefersHorseStyleOverARawMarkingsWhenBothAreSet() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("HORSE")
+                .withTypeData("horse_markings", "1")
+                .withTypeData("horse_style", "black_dots"));
+
+        // The named style wins over a raw markings id when both are set: BLACK_DOTS is markings 4.
+        assertThat(packets.horseVariants).hasSize(1);
+        assertThat(packets.horseVariants.get(0).markings()).isEqualTo(4);
+    }
+
+    @Test
     void appliesLlamaVariantToALlamaNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());

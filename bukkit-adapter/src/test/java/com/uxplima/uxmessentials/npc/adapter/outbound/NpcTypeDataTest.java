@@ -51,6 +51,7 @@ class NpcTypeDataTest {
     void recognisesTheNewVariantKeys() {
         assertThat(NpcTypeData.isKnownKey("horse_color")).isTrue();
         assertThat(NpcTypeData.isKnownKey("HORSE_MARKINGS")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("horse_style")).isTrue();
         assertThat(NpcTypeData.isKnownKey("llama_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("sheep_color")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
@@ -90,6 +91,17 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("fox_type", "1")).isTrue();
         assertThat(NpcTypeData.isValidValue("fox_type", "2")).isFalse();
         assertThat(NpcTypeData.isValidValue("fox_type", "-1")).isFalse();
+    }
+
+    @Test
+    void validatesHorseStyleNames() {
+        // horse_style is the named alias of the markings: a Horse.Style name is valid (case-insensitive); an int or
+        // an unknown name is not (a raw markings id goes through horse_markings instead).
+        assertThat(NpcTypeData.isValidValue("horse_style", "white_dots")).isTrue();
+        assertThat(NpcTypeData.isValidValue("horse_style", "NONE")).isTrue();
+        assertThat(NpcTypeData.isValidValue("horse_style", "black_dots")).isTrue();
+        assertThat(NpcTypeData.isValidValue("horse_style", "stripes")).isFalse();
+        assertThat(NpcTypeData.isValidValue("horse_style", "3")).isFalse();
     }
 
     @Test

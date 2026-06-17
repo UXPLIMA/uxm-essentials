@@ -7,6 +7,7 @@ import java.util.Set;
 
 import org.bukkit.DyeColor;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Horse;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.npc.domain.Npc;
@@ -23,8 +24,9 @@ import org.jspecify.annotations.Nullable;
  * unsupported key or unparseable value is skipped fail-soft (logged at debug), never thrown on the render thread.
  *
  * <p>Most variants are a bounded integer on one type, so a small {@link IntVariant} table drives them uniformly.
- * Two are special: the horse packs a colour and a marking into one packet (so the two keys collapse), and the
- * sheep colour accepts a {@link DyeColor} name as well as the raw 0–15 wool id. The by-name dynamic-registry
+ * Two are special: the horse packs a colour and a marking into one packet (with {@code horse_style} a friendly
+ * {@link Horse.Style}-named alias for the marking id), and the sheep colour accepts a {@link DyeColor} name as well
+ * as the raw 0–15 wool id. The by-name dynamic-registry
  * variants (cat, frog) live in {@link NpcNameVariantData}; this class delegates the known-key, validity, and apply
  * paths to it so the two stay under the size limit.
  */
@@ -33,6 +35,7 @@ final class NpcVariantData {
 
     static final String KEY_HORSE_COLOR = "horse_color";
     static final String KEY_HORSE_MARKINGS = "horse_markings";
+    static final String KEY_HORSE_STYLE = "horse_style";
     static final String KEY_LLAMA_VARIANT = "llama_variant";
     static final String KEY_SHEEP_COLOR = "sheep_color";
     static final String KEY_PARROT_VARIANT = "parrot_variant";
@@ -79,7 +82,9 @@ final class NpcVariantData {
 
     private static void applyHorse(
             NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
-        if (!data.containsKey(KEY_HORSE_COLOR) && !data.containsKey(KEY_HORSE_MARKINGS)) {
+        if (!data.containsKey(KEY_HORSE_COLOR)
+                && !data.containsKey(KEY_HORSE_MARKINGS)
+                && !data.containsKey(KEY_HORSE_STYLE)) {
             return;
         }
         if (type != EntityType.HORSE) {
@@ -87,7 +92,7 @@ final class NpcVariantData {
             return;
         }
         int color = clampInt(data.get(KEY_HORSE_COLOR), MAX_HORSE_COLOR);
-        int markings = clampInt(data.get(KEY_HORSE_MARKINGS), MAX_HORSE_MARKINGS);
+        int markings = resolveMarkings(data);
         packets.send(viewer, packets.horseVariant(id, color, markings));
     }
 
@@ -171,6 +176,7 @@ final class NpcVariantData {
         return switch (lower) {
             case KEY_HORSE_COLOR -> isInRange(value, MAX_HORSE_COLOR);
             case KEY_HORSE_MARKINGS -> isInRange(value, MAX_HORSE_MARKINGS);
+            case KEY_HORSE_STYLE -> parseStyle(value) != null;
             case KEY_SHEEP_COLOR -> parseColorId(value) != null;
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
@@ -199,6 +205,39 @@ final class NpcVariantData {
     private static int clampInt(@Nullable String value, int max) {
         Integer parsed = parseInt(value);
         return parsed == null ? 0 : Math.clamp(parsed, 0, max);
+    }
+
+    /**
+     * The horse body markings 0–4 to ship: a {@link Horse.Style} name ({@code horse_style}) when one is set (its
+     * ordinal is the wire markings id), else the raw {@code horse_markings} integer. The style key is the friendly
+     * alias for the same field, so when both are present the named style wins.
+     */
+    private static int resolveMarkings(Map<String, String> data) {
+        Integer style = parseStyle(data.get(KEY_HORSE_STYLE));
+        return style != null ? style : clampInt(data.get(KEY_HORSE_MARKINGS), MAX_HORSE_MARKINGS);
+    }
+
+    /** A {@link Horse.Style} name resolved to its 0–4 markings id, or {@code null} when absent or not a style name. */
+    private static @Nullable Integer parseStyle(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return markingsOf(Horse.Style.valueOf(value.strip().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException notAStyle) {
+            return null;
+        }
+    }
+
+    /** The wire markings id for a horse style — an explicit map (not the enum ordinal, which Error Prone flags). */
+    private static int markingsOf(Horse.Style style) {
+        return switch (style) {
+            case NONE -> 0;
+            case WHITE -> 1;
+            case WHITEFIELD -> 2;
+            case WHITE_DOTS -> 3;
+            case BLACK_DOTS -> 4;
+        };
     }
 
     /**
@@ -259,6 +298,7 @@ final class NpcVariantData {
     private static final Set<String> KEYS = Set.of(
             KEY_HORSE_COLOR,
             KEY_HORSE_MARKINGS,
+            KEY_HORSE_STYLE,
             KEY_LLAMA_VARIANT,
             KEY_SHEEP_COLOR,
             KEY_PARROT_VARIANT,
