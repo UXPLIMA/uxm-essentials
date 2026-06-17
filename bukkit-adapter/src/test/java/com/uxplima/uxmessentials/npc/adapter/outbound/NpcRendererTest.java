@@ -103,6 +103,23 @@ class NpcRendererTest {
     }
 
     @Test
+    void forcesTheSlimModelOnTheTabAddForASlimSkin() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+        String classic = java.util.Base64.getEncoder()
+                .encodeToString("{\"textures\":{\"SKIN\":{\"url\":\"http://textures/abc\"}}}"
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        renderer.render(npc(locationOf(viewer), new NpcSkin(classic, "sig", true)));
+
+        TabSkin skin = java.util.Objects.requireNonNull(packets.tabAdds.get(0).skin(), "tab skin");
+        String decoded = new String(
+                java.util.Base64.getDecoder().decode(skin.textureValue()), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(decoded).contains("\"model\":\"slim\"");
+        assertThat(skin.signature()).isNull();
+    }
+
+    @Test
     void doesNotSpawnAnOutOfRangeViewer() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -236,7 +237,18 @@ public final class NpcViewSpawner {
     }
 
     private static @Nullable TabSkin tabSkin(@Nullable NpcSkin skin) {
-        return skin == null ? null : new TabSkin(skin.texture(), skin.signature());
+        if (skin == null) {
+            return null;
+        }
+        if (skin.slim()) {
+            // The model lives in the texture value, so forcing slim re-encodes it; the re-encoded value can no
+            // longer carry the original signature, so it goes out unsigned (fine for a synthetic NPC profile).
+            Optional<String> slimValue = NpcSkinModel.slimTexture(skin.texture());
+            if (slimValue.isPresent()) {
+                return TabSkin.unsigned(slimValue.get());
+            }
+        }
+        return new TabSkin(skin.texture(), skin.signature());
     }
 
     /** The viewer's own skin for a mirror-skin NPC, or {@code null} when the viewer carries none (default Steve). */
