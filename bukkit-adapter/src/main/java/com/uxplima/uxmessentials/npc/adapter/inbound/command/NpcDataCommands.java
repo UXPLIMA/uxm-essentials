@@ -67,6 +67,8 @@ final class NpcDataCommands extends NpcCommandSupport {
             "cat_sitting",
             "panda_eating",
             "fox_pose",
+            "sniffer_state",
+            "armadillo_state",
             "tropical_fish",
             "armor_stand_small",
             "armor_stand_arms",
@@ -113,6 +115,11 @@ final class NpcDataCommands extends NpcCommandSupport {
     private static final List<String> FROG_VARIANT_VALUES = List.of("temperate", "warm", "cold");
 
     private static final List<String> FOX_POSE_VALUES = List.of("standing", "sitting", "sleeping", "crouching");
+
+    private static final List<String> SNIFFER_STATE_VALUES =
+            List.of("idling", "feeling_happy", "scenting", "sniffing", "searching", "digging", "rising");
+
+    private static final List<String> ARMADILLO_STATE_VALUES = List.of("idle", "rolling", "scared", "unrolling");
     /** The wolf coat-variant names, offered as tab completions for {@code wolf_variant}. */
     private static final List<String> WOLF_VARIANT_VALUES =
             List.of("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped");
@@ -250,6 +257,8 @@ final class NpcDataCommands extends NpcCommandSupport {
                     "armor_stand_no_baseplate",
                     "armor_stand_marker" -> suggest(builder, BOOLEAN_VALUES);
             case "fox_pose" -> suggest(builder, FOX_POSE_VALUES);
+            case "sniffer_state" -> suggest(builder, SNIFFER_STATE_VALUES);
+            case "armadillo_state" -> suggest(builder, ARMADILLO_STATE_VALUES);
             case "cat_variant" -> suggest(builder, CAT_VARIANT_VALUES);
             case "frog_variant" -> suggest(builder, FROG_VARIANT_VALUES);
             case "wolf_variant" -> suggest(builder, WOLF_VARIANT_VALUES);

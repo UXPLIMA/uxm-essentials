@@ -1002,6 +1002,20 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesSnifferAndArmadilloStates() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("SNIFFER").withTypeData("sniffer_state", "digging"));
+        renderer.render(npcAt(viewer, 2.0).withEntityType("ARMADILLO").withTypeData("armadillo_state", "rolling"));
+
+        assertThat(packets.snifferStates).hasSize(1);
+        assertThat(packets.snifferStates.get(0).state()).isEqualTo("digging");
+        assertThat(packets.armadilloStates).hasSize(1);
+        assertThat(packets.armadilloStates.get(0).state()).isEqualTo("rolling");
+    }
+
+    @Test
     void doesNotSendACatVariantToAFrogNorAFrogVariantToACat() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1508,6 +1522,8 @@ class NpcRendererTest {
         private final List<BoolRec> tameableSittings = new ArrayList<>();
         private final List<BoolRec> pandaEatings = new ArrayList<>();
         private final List<FoxRec> foxFlagsList = new ArrayList<>();
+        private final List<StateRec> snifferStates = new ArrayList<>();
+        private final List<StateRec> armadilloStates = new ArrayList<>();
         // When set, catVariant/frogVariant return null to mimic the lib's fail-soft signal (registry not resolved).
         private boolean dropNameVariants;
         private final List<Sent> sent = new ArrayList<>();
@@ -1970,6 +1986,20 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object snifferState(int entityId, String state) {
+            StateRec packet = new StateRec(entityId, state);
+            snifferStates.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object armadilloState(int entityId, String state) {
+            StateRec packet = new StateRec(entityId, state);
+            armadilloStates.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -2134,6 +2164,8 @@ class NpcRendererTest {
         private record BoolRec(int entityId, boolean value) {}
 
         private record FoxRec(int entityId, boolean sitting, boolean sleeping, boolean crouching) {}
+
+        private record StateRec(int entityId, String state) {}
 
         private record FrogVariant(int entityId, String name) {}
 

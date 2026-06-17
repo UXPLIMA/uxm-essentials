@@ -92,6 +92,8 @@ final class NpcVariantData {
     static final String KEY_CAT_SITTING = "cat_sitting";
     static final String KEY_PANDA_EATING = "panda_eating";
     static final String KEY_FOX_POSE = "fox_pose";
+    static final String KEY_SNIFFER_STATE = "sniffer_state";
+    static final String KEY_ARMADILLO_STATE = "armadillo_state";
 
     /** The raider types a {@code Raider}-level attribute (celebrating) may render on. */
     private static final Set<EntityType> RAIDER_TYPES = Set.of(
@@ -171,6 +173,13 @@ final class NpcVariantData {
     /** The fox pose values the {@code fox_pose} key accepts; each lights exactly one bit (or none for standing). */
     private static final Set<String> FOX_POSE_VALUES = Set.of("standing", "sitting", "sleeping", "crouching");
 
+    /** The seven sniffer animation states the {@code sniffer_state} key accepts. */
+    private static final Set<String> SNIFFER_STATES =
+            Set.of("idling", "feeling_happy", "scenting", "sniffing", "searching", "digging", "rising");
+
+    /** The four armadillo states the {@code armadillo_state} key accepts. */
+    private static final Set<String> ARMADILLO_STATES = Set.of("idle", "rolling", "scared", "unrolling");
+
     private NpcVariantData() {}
 
     /**
@@ -198,6 +207,30 @@ final class NpcVariantData {
         applyInteraction(packets, viewer, id, type, data, npc, log);
         applyCelebrating(packets, viewer, id, type, data, npc, log);
         applyFoxPose(packets, viewer, id, type, data, npc, log);
+        applyEnumState(
+                packets,
+                viewer,
+                id,
+                type,
+                data,
+                npc,
+                log,
+                KEY_SNIFFER_STATE,
+                EntityType.SNIFFER,
+                SNIFFER_STATES,
+                NpcPackets::snifferState);
+        applyEnumState(
+                packets,
+                viewer,
+                id,
+                type,
+                data,
+                npc,
+                log,
+                KEY_ARMADILLO_STATE,
+                EntityType.ARMADILLO,
+                ARMADILLO_STATES,
+                NpcPackets::armadilloState);
         applyBlockDisplay(packets, viewer, id, type, data, npc, log);
         applyItemDisplay(packets, viewer, id, type, data, npc, log);
         applyTextDisplay(packets, viewer, id, type, data, npc, log);
@@ -509,6 +542,43 @@ final class NpcVariantData {
                 packets.foxFlags(id, pose.equals("sitting"), pose.equals("sleeping"), pose.equals("crouching")));
     }
 
+    /**
+     * Apply a named enum-state key (sniffer/armadillo): gate on the expected type, accept only a known state name,
+     * then ship the lib packet (which returns {@code null} for a name the running server does not know, skipped).
+     */
+    private static void applyEnumState(
+            NpcPackets packets,
+            Player viewer,
+            int id,
+            EntityType type,
+            Map<String, String> data,
+            Npc npc,
+            Logger log,
+            String key,
+            EntityType expected,
+            Set<String> values,
+            EnumStateSender sender) {
+        String value = data.get(key);
+        if (value == null) {
+            return;
+        }
+        if (type != expected) {
+            skip(log, npc, key, type, "type does not support this state");
+            return;
+        }
+        String state = value.toLowerCase(Locale.ROOT);
+        if (!values.contains(state)) {
+            skip(log, npc, key, type, "value is not a known state: " + value);
+            return;
+        }
+        Object packet = sender.build(packets, id, state);
+        if (packet == null) {
+            skip(log, npc, key, type, "server does not know this state: " + value);
+            return;
+        }
+        packets.send(viewer, packet);
+    }
+
     /** Whether {@code type} is a visible display entity (block/item/text) the shared scale/billboard apply to. */
     private static boolean isVisualDisplay(EntityType type) {
         return type == EntityType.BLOCK_DISPLAY || type == EntityType.ITEM_DISPLAY || type == EntityType.TEXT_DISPLAY;
@@ -764,6 +834,8 @@ final class NpcVariantData {
                     KEY_AS_NO_BASEPLATE,
                     KEY_AS_MARKER -> parseBool(value) != null;
             case KEY_FOX_POSE -> FOX_POSE_VALUES.contains(value.toLowerCase(Locale.ROOT));
+            case KEY_SNIFFER_STATE -> SNIFFER_STATES.contains(value.toLowerCase(Locale.ROOT));
+            case KEY_ARMADILLO_STATE -> ARMADILLO_STATES.contains(value.toLowerCase(Locale.ROOT));
             case KEY_AS_HEAD,
                     KEY_AS_BODY,
                     KEY_AS_LEFT_ARM,
@@ -924,6 +996,12 @@ final class NpcVariantData {
         }
     }
 
+    /** A send hook bound to a lib {@code (entityId, String)} enum-state method that may return {@code null}. */
+    @FunctionalInterface
+    private interface EnumStateSender {
+        @Nullable Object build(NpcPackets packets, int entityId, String state);
+    }
+
     /** A four-argument send hook bound to a lib {@code (entityId, int)} variant method via a method reference. */
     @FunctionalInterface
     private interface IntVariantSender {
@@ -961,6 +1039,8 @@ final class NpcVariantData {
             KEY_CAT_SITTING,
             KEY_PANDA_EATING,
             KEY_FOX_POSE,
+            KEY_SNIFFER_STATE,
+            KEY_ARMADILLO_STATE,
             KEY_TROPICAL_FISH,
             KEY_AS_SMALL,
             KEY_AS_ARMS,

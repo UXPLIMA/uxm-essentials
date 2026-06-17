@@ -223,6 +223,13 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("fox_pose", "sleeping")).isTrue();
         assertThat(NpcTypeData.isValidValue("fox_pose", "crouching")).isTrue();
         assertThat(NpcTypeData.isValidValue("fox_pose", "dancing")).isFalse();
+        assertThat(NpcTypeData.isKnownKey("sniffer_state")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("armadillo_state")).isTrue();
+        assertThat(NpcTypeData.isValidValue("sniffer_state", "digging")).isTrue();
+        assertThat(NpcTypeData.isValidValue("sniffer_state", "feeling_happy")).isTrue();
+        assertThat(NpcTypeData.isValidValue("sniffer_state", "dancing")).isFalse();
+        assertThat(NpcTypeData.isValidValue("armadillo_state", "rolling")).isTrue();
+        assertThat(NpcTypeData.isValidValue("armadillo_state", "spinning")).isFalse();
     }
 
     @Test

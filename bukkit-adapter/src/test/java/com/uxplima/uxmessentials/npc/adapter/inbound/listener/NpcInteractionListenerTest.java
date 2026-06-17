@@ -616,6 +616,16 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object snifferState(int entityId, String state) {
+            return new Object();
+        }
+
+        @Override
+        public Object armadilloState(int entityId, String state) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }
