@@ -618,6 +618,17 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesWolfCollarFromADyeColorNameToAWolfNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("WOLF").withTypeData("wolf_collar", "red"));
+
+        assertThat(packets.wolfCollars).hasSize(1);
+        assertThat(packets.wolfCollars.get(0).color()).isEqualTo(org.bukkit.DyeColor.RED.getWoolData());
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1153,6 +1164,7 @@ class NpcRendererTest {
         private final List<HorseVariant> horseVariants = new ArrayList<>();
         private final List<LlamaVariant> llamaVariants = new ArrayList<>();
         private final List<SheepColor> sheepColors = new ArrayList<>();
+        private final List<WolfCollar> wolfCollars = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1349,6 +1361,13 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object wolfCollar(int entityId, int color) {
+            WolfCollar packet = new WolfCollar(entityId, color);
+            wolfCollars.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1493,6 +1512,8 @@ class NpcRendererTest {
         private record LlamaVariant(int entityId, int variant) {}
 
         private record SheepColor(int entityId, int color) {}
+
+        private record WolfCollar(int entityId, int color) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

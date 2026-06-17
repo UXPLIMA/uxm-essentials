@@ -424,6 +424,11 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object wolfCollar(int entityId, int color) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

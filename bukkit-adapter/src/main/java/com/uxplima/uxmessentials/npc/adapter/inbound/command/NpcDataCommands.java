@@ -47,6 +47,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             "horse_style",
             "llama_variant",
             "sheep_color",
+            "wolf_collar",
             "parrot_variant",
             "axolotl_variant",
             "fox_type",
@@ -165,7 +166,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             case "horse_markings" -> suggest(builder, HORSE_MARKINGS_VALUES);
             case "horse_style" -> suggest(builder, HORSE_STYLE_VALUES);
             case "llama_variant" -> suggest(builder, LLAMA_VARIANT_VALUES);
-            case "sheep_color" -> suggest(builder, SHEEP_COLOR_VALUES);
+            case "sheep_color", "wolf_collar" -> suggest(builder, SHEEP_COLOR_VALUES);
             default -> builder.buildFuture();
         };
     }

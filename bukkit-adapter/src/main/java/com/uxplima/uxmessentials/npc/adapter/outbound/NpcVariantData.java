@@ -38,6 +38,7 @@ final class NpcVariantData {
     static final String KEY_HORSE_STYLE = "horse_style";
     static final String KEY_LLAMA_VARIANT = "llama_variant";
     static final String KEY_SHEEP_COLOR = "sheep_color";
+    static final String KEY_WOLF_COLLAR = "wolf_collar";
     static final String KEY_PARROT_VARIANT = "parrot_variant";
     static final String KEY_AXOLOTL_VARIANT = "axolotl_variant";
     static final String KEY_FOX_TYPE = "fox_type";
@@ -73,6 +74,7 @@ final class NpcVariantData {
             NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
         applyHorse(packets, viewer, id, type, data, npc, log);
         applySheep(packets, viewer, id, type, data, npc, log);
+        applyWolf(packets, viewer, id, type, data, npc, log);
         applyRabbit(packets, viewer, id, type, data, npc, log);
         for (IntVariant variant : INT_VARIANTS) {
             applyIntVariant(packets, viewer, id, type, data, npc, log, variant);
@@ -112,6 +114,24 @@ final class NpcVariantData {
             return;
         }
         packets.send(viewer, packets.sheepColor(id, color));
+    }
+
+    private static void applyWolf(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_WOLF_COLLAR);
+        if (value == null) {
+            return;
+        }
+        if (type != EntityType.WOLF) {
+            skip(log, npc, KEY_WOLF_COLLAR, type, "type is not a wolf");
+            return;
+        }
+        Integer color = parseColorId(value);
+        if (color == null) {
+            skip(log, npc, KEY_WOLF_COLLAR, type, "value is not a dye colour or 0-15 id: " + value);
+            return;
+        }
+        packets.send(viewer, packets.wolfCollar(id, color));
     }
 
     private static void applyRabbit(
@@ -178,6 +198,7 @@ final class NpcVariantData {
             case KEY_HORSE_MARKINGS -> isInRange(value, MAX_HORSE_MARKINGS);
             case KEY_HORSE_STYLE -> parseStyle(value) != null;
             case KEY_SHEEP_COLOR -> parseColorId(value) != null;
+            case KEY_WOLF_COLLAR -> parseColorId(value) != null;
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -301,6 +322,7 @@ final class NpcVariantData {
             KEY_HORSE_STYLE,
             KEY_LLAMA_VARIANT,
             KEY_SHEEP_COLOR,
+            KEY_WOLF_COLLAR,
             KEY_PARROT_VARIANT,
             KEY_AXOLOTL_VARIANT,
             KEY_FOX_TYPE,

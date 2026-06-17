@@ -54,6 +54,7 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("horse_style")).isTrue();
         assertThat(NpcTypeData.isKnownKey("llama_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("sheep_color")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("wolf_collar")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -123,5 +124,15 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("sheep_color", "15")).isTrue();
         assertThat(NpcTypeData.isValidValue("sheep_color", "16")).isFalse();
         assertThat(NpcTypeData.isValidValue("sheep_color", "not_a_color")).isFalse();
+    }
+
+    @Test
+    void wolfCollarAcceptsADyeColorNameOrARawId() {
+        assertThat(NpcTypeData.isValidValue("wolf_collar", "red")).isTrue();
+        assertThat(NpcTypeData.isValidValue("wolf_collar", "LIGHT_BLUE")).isTrue();
+        assertThat(NpcTypeData.isValidValue("wolf_collar", "0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("wolf_collar", "15")).isTrue();
+        assertThat(NpcTypeData.isValidValue("wolf_collar", "16")).isFalse();
+        assertThat(NpcTypeData.isValidValue("wolf_collar", "not_a_color")).isFalse();
     }
 }
