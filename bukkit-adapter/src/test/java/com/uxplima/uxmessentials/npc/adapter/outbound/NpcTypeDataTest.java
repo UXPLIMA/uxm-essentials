@@ -89,6 +89,21 @@ class NpcTypeDataTest {
     }
 
     @Test
+    void validatesTheRegistryCoatVariantNames() {
+        assertThat(NpcTypeData.isKnownKey("wolf_variant")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("chicken_variant")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("cow_variant")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("pig_variant")).isTrue();
+        assertThat(NpcTypeData.isValidValue("wolf_variant", "ashen")).isTrue();
+        assertThat(NpcTypeData.isValidValue("wolf_variant", "STRIPED")).isTrue();
+        assertThat(NpcTypeData.isValidValue("wolf_variant", "rainbow")).isFalse();
+        assertThat(NpcTypeData.isValidValue("chicken_variant", "warm")).isTrue();
+        assertThat(NpcTypeData.isValidValue("cow_variant", "cold")).isTrue();
+        assertThat(NpcTypeData.isValidValue("pig_variant", "temperate")).isTrue();
+        assertThat(NpcTypeData.isValidValue("pig_variant", "spicy")).isFalse();
+    }
+
+    @Test
     void validatesCatAndFrogVariantNamesAgainstTheKnownSet() {
         // The cat/frog variants are dynamic-registry values; the command validates the name against the vanilla
         // set before the lib resolves the holder off the live server (case-insensitive).

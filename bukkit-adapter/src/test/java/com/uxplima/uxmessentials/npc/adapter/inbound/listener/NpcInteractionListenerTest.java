@@ -571,6 +571,26 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object wolfVariant(int entityId, String name) {
+            return new Object();
+        }
+
+        @Override
+        public Object chickenVariant(int entityId, String name) {
+            return new Object();
+        }
+
+        @Override
+        public Object cowVariant(int entityId, String name) {
+            return new Object();
+        }
+
+        @Override
+        public Object pigVariant(int entityId, String name) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }

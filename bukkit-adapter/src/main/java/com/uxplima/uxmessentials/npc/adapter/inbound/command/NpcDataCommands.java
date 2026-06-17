@@ -82,6 +82,10 @@ final class NpcDataCommands extends NpcCommandSupport {
             "text_background",
             "text_line_width",
             "display_translation",
+            "wolf_variant",
+            "chicken_variant",
+            "cow_variant",
+            "pig_variant",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -101,6 +105,11 @@ final class NpcDataCommands extends NpcCommandSupport {
             "all_black");
     /** The frog-variant names, offered as tab completions for {@code frog_variant}. */
     private static final List<String> FROG_VARIANT_VALUES = List.of("temperate", "warm", "cold");
+    /** The wolf coat-variant names, offered as tab completions for {@code wolf_variant}. */
+    private static final List<String> WOLF_VARIANT_VALUES =
+            List.of("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped");
+    /** The chicken/cow/pig temperature-variant names, offered for {@code chicken_variant}/{@code cow_variant}/{@code pig_variant}. */
+    private static final List<String> TEMPERATURE_VARIANT_VALUES = List.of("temperate", "warm", "cold");
     /** The horse coat-colour ids (0–6), offered as tab completions for {@code horse_color}. */
     private static final List<String> HORSE_COLOR_VALUES = List.of("0", "1", "2", "3", "4", "5", "6");
     /** The horse marking ids (0–4), offered as tab completions for {@code horse_markings}. */
@@ -229,6 +238,8 @@ final class NpcDataCommands extends NpcCommandSupport {
                     "armor_stand_marker" -> suggest(builder, BOOLEAN_VALUES);
             case "cat_variant" -> suggest(builder, CAT_VARIANT_VALUES);
             case "frog_variant" -> suggest(builder, FROG_VARIANT_VALUES);
+            case "wolf_variant" -> suggest(builder, WOLF_VARIANT_VALUES);
+            case "chicken_variant", "cow_variant", "pig_variant" -> suggest(builder, TEMPERATURE_VARIANT_VALUES);
             case "horse_color" -> suggest(builder, HORSE_COLOR_VALUES);
             case "horse_markings" -> suggest(builder, HORSE_MARKINGS_VALUES);
             case "horse_style" -> suggest(builder, HORSE_STYLE_VALUES);

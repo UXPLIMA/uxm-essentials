@@ -15,7 +15,8 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The by-name dynamic-registry appearance variants: a cat's coat variant and a frog's variant. Unlike the bounded
+ * The by-name dynamic-registry appearance variants: a cat/wolf coat variant, a frog variant, and the chicken/cow/pig
+ * temperature variants. Unlike the bounded
  * integer variants of {@link NpcVariantData}, these are data-driven registry values addressed by name — the lib
  * resolves the matching {@code Holder} off the live server's cat-/frog-variant registry per call and returns null
  * fail-soft when it cannot (the server is not yet up, or the name is unknown), which {@link #apply} drops without
@@ -28,6 +29,17 @@ final class NpcNameVariantData {
 
     static final String KEY_CAT_VARIANT = "cat_variant";
     static final String KEY_FROG_VARIANT = "frog_variant";
+    static final String KEY_WOLF_VARIANT = "wolf_variant";
+    static final String KEY_CHICKEN_VARIANT = "chicken_variant";
+    static final String KEY_COW_VARIANT = "cow_variant";
+    static final String KEY_PIG_VARIANT = "pig_variant";
+
+    /** The vanilla wolf coat variants (the {@code minecraft:wolf_variant} registry keys). */
+    static final List<String> WOLF_VARIANTS =
+            List.of("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped");
+
+    /** The vanilla temperature variants shared by chicken/cow/pig (the 1.21.5 biome-variant registries). */
+    static final List<String> TEMPERATURE_VARIANTS = List.of("temperate", "warm", "cold");
 
     /** The vanilla cat variants, validated before the lib resolves the matching holder off the live registry. */
     static final List<String> CAT_VARIANTS = List.of(
@@ -53,7 +65,15 @@ final class NpcNameVariantData {
      */
     private static final List<NameVariant> NAME_VARIANTS = List.of(
             new NameVariant(KEY_CAT_VARIANT, EntityType.CAT, Set.copyOf(CAT_VARIANTS), NpcPackets::catVariant),
-            new NameVariant(KEY_FROG_VARIANT, EntityType.FROG, Set.copyOf(FROG_VARIANTS), NpcPackets::frogVariant));
+            new NameVariant(KEY_FROG_VARIANT, EntityType.FROG, Set.copyOf(FROG_VARIANTS), NpcPackets::frogVariant),
+            new NameVariant(KEY_WOLF_VARIANT, EntityType.WOLF, Set.copyOf(WOLF_VARIANTS), NpcPackets::wolfVariant),
+            new NameVariant(
+                    KEY_CHICKEN_VARIANT,
+                    EntityType.CHICKEN,
+                    Set.copyOf(TEMPERATURE_VARIANTS),
+                    NpcPackets::chickenVariant),
+            new NameVariant(KEY_COW_VARIANT, EntityType.COW, Set.copyOf(TEMPERATURE_VARIANTS), NpcPackets::cowVariant),
+            new NameVariant(KEY_PIG_VARIANT, EntityType.PIG, Set.copyOf(TEMPERATURE_VARIANTS), NpcPackets::pigVariant));
 
     private NpcNameVariantData() {}
 
@@ -107,7 +127,7 @@ final class NpcNameVariantData {
     /** Whether {@code key} is one of the name-variant keys this class applies — the set the command validates against. */
     static boolean isKnownKey(String key) {
         String lower = key.toLowerCase(Locale.ROOT);
-        return lower.equals(KEY_CAT_VARIANT) || lower.equals(KEY_FROG_VARIANT);
+        return byKey(lower) != null;
     }
 
     /**
@@ -116,12 +136,18 @@ final class NpcNameVariantData {
      * lib re-resolves the holder off the live registry at render time, so this is the command-time name gate.
      */
     static boolean isValidValue(String key, String value) {
-        String name = value.strip().toLowerCase(Locale.ROOT);
-        return switch (key.toLowerCase(Locale.ROOT)) {
-            case KEY_CAT_VARIANT -> CAT_VARIANTS.contains(name);
-            case KEY_FROG_VARIANT -> FROG_VARIANTS.contains(name);
-            default -> false;
-        };
+        NameVariant variant = byKey(key.toLowerCase(Locale.ROOT));
+        return variant != null && variant.names().contains(value.strip().toLowerCase(Locale.ROOT));
+    }
+
+    /** The name-variant for {@code key} (already lower-cased), or {@code null} when none matches. */
+    private static @Nullable NameVariant byKey(String key) {
+        for (NameVariant variant : NAME_VARIANTS) {
+            if (variant.key().equals(key)) {
+                return variant;
+            }
+        }
+        return null;
     }
 
     private static void skip(Logger log, Npc npc, String key, EntityType type, String reason) {

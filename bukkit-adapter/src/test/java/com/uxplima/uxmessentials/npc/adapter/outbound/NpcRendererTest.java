@@ -951,6 +951,23 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesWolfChickenCowPigCoatVariants() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("WOLF").withTypeData("wolf_variant", "ashen"));
+        renderer.render(npcAt(viewer, 2.0).withEntityType("CHICKEN").withTypeData("chicken_variant", "warm"));
+        renderer.render(npcAt(viewer, 3.0).withEntityType("COW").withTypeData("cow_variant", "cold"));
+        renderer.render(npcAt(viewer, 4.0).withEntityType("PIG").withTypeData("pig_variant", "temperate"));
+
+        assertThat(packets.wolfVariants).hasSize(1);
+        assertThat(packets.wolfVariants.get(0).name()).isEqualTo("ashen");
+        assertThat(packets.chickenVariants.get(0).name()).isEqualTo("warm");
+        assertThat(packets.cowVariants.get(0).name()).isEqualTo("cold");
+        assertThat(packets.pigVariants.get(0).name()).isEqualTo("temperate");
+    }
+
+    @Test
     void doesNotSendACatVariantToAFrogNorAFrogVariantToACat() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1448,6 +1465,10 @@ class NpcRendererTest {
         private final List<RabbitType> rabbitTypes = new ArrayList<>();
         private final List<CatVariant> catVariants = new ArrayList<>();
         private final List<FrogVariant> frogVariants = new ArrayList<>();
+        private final List<NameVariantRec> wolfVariants = new ArrayList<>();
+        private final List<NameVariantRec> chickenVariants = new ArrayList<>();
+        private final List<NameVariantRec> cowVariants = new ArrayList<>();
+        private final List<NameVariantRec> pigVariants = new ArrayList<>();
         // When set, catVariant/frogVariant return null to mimic the lib's fail-soft signal (registry not resolved).
         private boolean dropNameVariants;
         private final List<Sent> sent = new ArrayList<>();
@@ -1847,6 +1868,34 @@ class NpcRendererTest {
         }
 
         @Override
+        public @Nullable Object wolfVariant(int entityId, String name) {
+            NameVariantRec packet = new NameVariantRec(entityId, name);
+            wolfVariants.add(packet);
+            return dropNameVariants ? null : packet;
+        }
+
+        @Override
+        public @Nullable Object chickenVariant(int entityId, String name) {
+            NameVariantRec packet = new NameVariantRec(entityId, name);
+            chickenVariants.add(packet);
+            return dropNameVariants ? null : packet;
+        }
+
+        @Override
+        public @Nullable Object cowVariant(int entityId, String name) {
+            NameVariantRec packet = new NameVariantRec(entityId, name);
+            cowVariants.add(packet);
+            return dropNameVariants ? null : packet;
+        }
+
+        @Override
+        public @Nullable Object pigVariant(int entityId, String name) {
+            NameVariantRec packet = new NameVariantRec(entityId, name);
+            pigVariants.add(packet);
+            return dropNameVariants ? null : packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -2005,6 +2054,8 @@ class NpcRendererTest {
         private record RabbitType(int entityId, int type) {}
 
         private record CatVariant(int entityId, String name) {}
+
+        private record NameVariantRec(int entityId, String name) {}
 
         private record FrogVariant(int entityId, String name) {}
 
