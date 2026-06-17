@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -16,11 +17,14 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
+import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /hologram <create|delete|list|addline|setline|removeline|movehere|item|block|…>}: the single operator
@@ -57,7 +61,8 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 .then(textNode("addline", this::addLine))
                 .then(setLineNode())
                 .then(indexNode("removeline", this::removeLine))
-                .then(name("movehere", this::move));
+                .then(name("movehere", this::move))
+                .then(moveToNode());
         for (LiteralArgumentBuilder<CommandSourceStack> styling :
                 new HologramAppearanceCommand(services, messages, hologramNames).nodes()) {
             root.then(styling);
@@ -181,6 +186,59 @@ public final class HologramCommand extends HologramCommandSupport implements Com
         }
         services.move().move(ref(sender), nameArg(ctx), position(sender));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> moveToNode() {
+        return Commands.literal("moveto")
+                .then(nameArgument("name")
+                        .then(Commands.argument("x", StringArgumentType.word())
+                                .then(Commands.argument("y", StringArgumentType.word())
+                                        .then(Commands.argument("z", StringArgumentType.word())
+                                                .executes(this::moveTo)))));
+    }
+
+    private int moveTo(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        Position base = position(sender);
+        Double x = resolveCoord(ctx.getArgument("x", String.class), base.x());
+        Double y = resolveCoord(ctx.getArgument("y", String.class), base.y());
+        Double z = resolveCoord(ctx.getArgument("z", String.class), base.z());
+        if (x == null || y == null || z == null) {
+            feedback.send(
+                    sender,
+                    HologramsMessageKey.HOLOGRAM_INVALID_COORDS,
+                    Map.of(
+                            "coords",
+                            ctx.getArgument("x", String.class) + " " + ctx.getArgument("y", String.class) + " "
+                                    + ctx.getArgument("z", String.class)));
+            return 0;
+        }
+        services.move().move(ref(sender), nameArg(ctx), Position.of(base.world(), x, y, z));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Resolve a coordinate token relative to {@code base}: {@code ~} is the base, {@code ~n} is the base plus
+     * {@code n}, anything else is an absolute value; {@code null} when the token is not a finite number.
+     */
+    static @Nullable Double resolveCoord(String token, double base) {
+        String t = token.strip();
+        try {
+            double value;
+            if (t.equals("~")) {
+                value = base;
+            } else if (t.startsWith("~")) {
+                value = base + Double.parseDouble(t.substring(1));
+            } else {
+                value = Double.parseDouble(t);
+            }
+            return Double.isFinite(value) ? value : null;
+        } catch (NumberFormatException notANumber) {
+            return null;
+        }
     }
 
     private static HologramName nameArg(CommandContext<CommandSourceStack> ctx) {

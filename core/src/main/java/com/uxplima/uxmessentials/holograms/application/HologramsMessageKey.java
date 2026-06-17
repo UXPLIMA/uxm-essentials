@@ -92,6 +92,7 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_NOT_FOUND("hologram.not-found"),
     HOLOGRAM_NAME_TAKEN("hologram.name-taken"),
     HOLOGRAM_LINE_INDEX_INVALID("hologram.line-index-invalid"),
+    HOLOGRAM_INVALID_COORDS("hologram.invalid-coords"),
     HOLOGRAM_MIN_ONE_LINE("hologram.min-one-line"),
     HOLOGRAM_PLAYERS_ONLY("hologram.players-only");
 
