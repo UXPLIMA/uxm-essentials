@@ -810,6 +810,17 @@ class NpcRendererTest {
     }
 
     @Test
+    void showsTheTextOnATextDisplayNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("TEXT_DISPLAY").withTypeData("text", "<red>Welcome"));
+
+        assertThat(packets.textDisplayTexts).hasSize(1);
+        assertThat(packets.textDisplayTexts.get(0).plain()).isEqualTo("Welcome");
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1361,6 +1372,7 @@ class NpcRendererTest {
         private final List<InteractionSize> interactionSizes = new ArrayList<>();
         private final List<BlockDisplayState> blockDisplayStates = new ArrayList<>();
         private final List<ItemDisplayItem> itemDisplayItems = new ArrayList<>();
+        private final List<TextDisplayText> textDisplayTexts = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1671,6 +1683,15 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object textDisplayText(int entityId, net.kyori.adventure.text.Component text) {
+            String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                    .serialize(text);
+            TextDisplayText packet = new TextDisplayText(entityId, plain);
+            textDisplayTexts.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1849,6 +1870,8 @@ class NpcRendererTest {
         private record BlockDisplayState(int entityId, org.bukkit.Material material) {}
 
         private record ItemDisplayItem(int entityId, org.bukkit.Material material) {}
+
+        private record TextDisplayText(int entityId, String plain) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

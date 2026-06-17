@@ -75,6 +75,7 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("interaction_height")).isTrue();
         assertThat(NpcTypeData.isKnownKey("block")).isTrue();
         assertThat(NpcTypeData.isKnownKey("item")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("text")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -216,7 +217,9 @@ class NpcTypeDataTest {
         // the BlockData/item and skips fail-soft if it cannot.
         assertThat(NpcTypeData.isValidValue("block", "stone")).isTrue();
         assertThat(NpcTypeData.isValidValue("item", "diamond")).isTrue();
+        assertThat(NpcTypeData.isValidValue("text", "<red>Hi")).isTrue();
         assertThat(NpcTypeData.isValidValue("block", "   ")).isFalse();
         assertThat(NpcTypeData.isValidValue("item", "")).isFalse();
+        assertThat(NpcTypeData.isValidValue("text", " ")).isFalse();
     }
 }

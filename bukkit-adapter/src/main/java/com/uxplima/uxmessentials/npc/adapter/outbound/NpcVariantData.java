@@ -13,6 +13,8 @@ import org.bukkit.entity.Horse;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import net.kyori.adventure.text.minimessage.MiniMessage;
+
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.packet.npc.ArmorStandPart;
@@ -24,8 +26,8 @@ import org.jspecify.annotations.Nullable;
  * The per-entity-type appearance variants beyond the baby/size/charged/villager core of {@link NpcTypeData}: a
  * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
  * colour, a shulker's peek, a panda's gene, a tropical fish's variant, the goat/allay/piglin/camel/bee/vex state
- * flags, an armor stand's client flags and six poses, an interaction entity's hitbox size, and a block/item
- * display's shown block/item. Kept in its own class so
+ * flags, an armor stand's client flags and six poses, an interaction entity's hitbox size, and a display entity's
+ * content (a block/item/text display's shown block/item/text). Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -75,6 +77,7 @@ final class NpcVariantData {
     static final String KEY_INTERACTION_HEIGHT = "interaction_height";
     static final String KEY_BLOCK = "block";
     static final String KEY_ITEM = "item";
+    static final String KEY_TEXT = "text";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -165,6 +168,7 @@ final class NpcVariantData {
         applyInteraction(packets, viewer, id, type, data, npc, log);
         applyBlockDisplay(packets, viewer, id, type, data, npc, log);
         applyItemDisplay(packets, viewer, id, type, data, npc, log);
+        applyTextDisplay(packets, viewer, id, type, data, npc, log);
         NpcNameVariantData.apply(packets, viewer, id, type, data, npc, log);
     }
 
@@ -421,6 +425,30 @@ final class NpcVariantData {
         packets.send(viewer, packets.itemDisplayItem(id, item));
     }
 
+    /**
+     * Apply a text-display entity's shown text: the {@code text} key (a MiniMessage string) is parsed to a
+     * component. Sent only to {@code TEXT_DISPLAY}; a MiniMessage parse error is skipped fail-soft. The text is
+     * static (the same for every viewer) — per-viewer placeholder text is a hologram concern.
+     */
+    private static void applyTextDisplay(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_TEXT);
+        if (value == null) {
+            return;
+        }
+        if (type != EntityType.TEXT_DISPLAY) {
+            skip(log, npc, KEY_TEXT, type, "type is not a text display");
+            return;
+        }
+        try {
+            packets.send(
+                    viewer,
+                    packets.textDisplayText(id, MiniMessage.miniMessage().deserialize(value)));
+        } catch (RuntimeException badMiniMessage) {
+            skip(log, npc, KEY_TEXT, type, "value is not valid MiniMessage: " + badMiniMessage);
+        }
+    }
+
     /** Parse a BlockData string (material or full state), or {@code null} when it is blank or invalid. */
     private static @Nullable BlockData parseBlockData(String value) {
         String trimmed = value.strip();
@@ -507,7 +535,7 @@ final class NpcVariantData {
             case KEY_INTERACTION_WIDTH, KEY_INTERACTION_HEIGHT -> isDimension(value);
                 // Block/item content is validated leniently (non-blank) so this stays Bukkit-free; the apply path
                 // resolves the BlockData/item and skips fail-soft if it is unparseable.
-            case KEY_BLOCK, KEY_ITEM -> !value.isBlank();
+            case KEY_BLOCK, KEY_ITEM, KEY_TEXT -> !value.isBlank();
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -688,5 +716,6 @@ final class NpcVariantData {
             KEY_INTERACTION_WIDTH,
             KEY_INTERACTION_HEIGHT,
             KEY_BLOCK,
-            KEY_ITEM);
+            KEY_ITEM,
+            KEY_TEXT);
 }

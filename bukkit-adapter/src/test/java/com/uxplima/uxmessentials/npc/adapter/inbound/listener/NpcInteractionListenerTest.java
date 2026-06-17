@@ -506,6 +506,11 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object textDisplayText(int entityId, net.kyori.adventure.text.Component text) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

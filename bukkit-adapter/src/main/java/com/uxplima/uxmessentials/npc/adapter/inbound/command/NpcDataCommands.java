@@ -76,6 +76,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             "interaction_height",
             "block",
             "item",
+            "text",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */

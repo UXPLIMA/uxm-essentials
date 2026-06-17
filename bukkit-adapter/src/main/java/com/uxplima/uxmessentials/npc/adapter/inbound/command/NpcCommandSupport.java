@@ -160,7 +160,10 @@ abstract class NpcCommandSupport {
      * {@link EntityType#ITEM_DISPLAY} (a floating block/item, content set via the {@code block}/{@code item} keys).
      */
     static boolean isSupportedDisplayType(EntityType type) {
-        return type == EntityType.INTERACTION || type == EntityType.BLOCK_DISPLAY || type == EntityType.ITEM_DISPLAY;
+        return type == EntityType.INTERACTION
+                || type == EntityType.BLOCK_DISPLAY
+                || type == EntityType.ITEM_DISPLAY
+                || type == EntityType.TEXT_DISPLAY;
     }
 
     /** Suggest the {@code words} that start with what the operator has typed, case-insensitively. */
