@@ -72,6 +72,10 @@ public final class DescribeHologram {
                 HologramsMessageKey.HOLOGRAM_INFO_REFRESH,
                 Map.of("ticks", Integer.toString(hologram.refreshIntervalTicks())));
         notifier.send(viewer, HologramsMessageKey.HOLOGRAM_INFO_ROTATION, rotation(hologram.rotation()));
+        String linkedNpc = hologram.linkedNpcName();
+        if (linkedNpc != null) {
+            notifier.send(viewer, HologramsMessageKey.HOLOGRAM_INFO_LINKED_NPC, Map.of("npc", linkedNpc));
+        }
     }
 
     private void emitAppearance(PlayerRef viewer, Appearance appearance) {

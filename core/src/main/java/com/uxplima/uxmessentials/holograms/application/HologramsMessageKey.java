@@ -50,6 +50,7 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_INFO_SEE_THROUGH("hologram.info.see-through"),
     HOLOGRAM_INFO_TRANSLATION("hologram.info.translation"),
     HOLOGRAM_INFO_SHADOW("hologram.info.shadow"),
+    HOLOGRAM_INFO_LINKED_NPC("hologram.info.linked-npc"),
 
     // nearby listing
     HOLOGRAM_NEARBY_HEADER("hologram.nearby.header"),

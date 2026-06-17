@@ -150,6 +150,15 @@ class HologramConvenienceTest {
         assertThat(feedback()).containsExactly("hologram.not-found");
     }
 
+    @Test
+    void infoShowsTheLinkedNpcWhenLinked() {
+        repository.save(store("spawn", 1, 64, 2, "line").linkedTo("guard"));
+
+        new DescribeHologram(repository, notifier).describe(ACTOR, HologramName.of("spawn"));
+
+        assertThat(feedback()).contains("hologram.info.linked-npc");
+    }
+
     // ---- nearby ----
 
     @Test
