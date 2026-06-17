@@ -209,6 +209,11 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("goat_screaming", "yes")).isFalse();
         assertThat(NpcTypeData.isValidValue("camel_dash", "1")).isFalse();
         assertThat(NpcTypeData.isValidValue("vex_charging", "maybe")).isFalse();
+        assertThat(NpcTypeData.isKnownKey("axolotl_playing_dead")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("illager_celebrating")).isTrue();
+        assertThat(NpcTypeData.isValidValue("axolotl_playing_dead", "true")).isTrue();
+        assertThat(NpcTypeData.isValidValue("illager_celebrating", "false")).isTrue();
+        assertThat(NpcTypeData.isValidValue("illager_celebrating", "party")).isFalse();
     }
 
     @Test

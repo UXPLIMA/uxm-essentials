@@ -968,6 +968,20 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesAxolotlPlayDeadAndRaiderCelebrating() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0).withEntityType("AXOLOTL").withTypeData("axolotl_playing_dead", "true"));
+        renderer.render(npcAt(viewer, 2.0).withEntityType("PILLAGER").withTypeData("illager_celebrating", "true"));
+
+        assertThat(packets.axolotlPlayingDeads).hasSize(1);
+        assertThat(packets.axolotlPlayingDeads.get(0).value()).isTrue();
+        assertThat(packets.raiderCelebratings).hasSize(1);
+        assertThat(packets.raiderCelebratings.get(0).value()).isTrue();
+    }
+
+    @Test
     void doesNotSendACatVariantToAFrogNorAFrogVariantToACat() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1469,6 +1483,8 @@ class NpcRendererTest {
         private final List<NameVariantRec> chickenVariants = new ArrayList<>();
         private final List<NameVariantRec> cowVariants = new ArrayList<>();
         private final List<NameVariantRec> pigVariants = new ArrayList<>();
+        private final List<BoolRec> axolotlPlayingDeads = new ArrayList<>();
+        private final List<BoolRec> raiderCelebratings = new ArrayList<>();
         // When set, catVariant/frogVariant return null to mimic the lib's fail-soft signal (registry not resolved).
         private boolean dropNameVariants;
         private final List<Sent> sent = new ArrayList<>();
@@ -1896,6 +1912,20 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object axolotlPlayingDead(int entityId, boolean playingDead) {
+            BoolRec packet = new BoolRec(entityId, playingDead);
+            axolotlPlayingDeads.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object raiderCelebrating(int entityId, boolean celebrating) {
+            BoolRec packet = new BoolRec(entityId, celebrating);
+            raiderCelebratings.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new GlowColorRemove(teamName);
         }
@@ -2056,6 +2086,8 @@ class NpcRendererTest {
         private record CatVariant(int entityId, String name) {}
 
         private record NameVariantRec(int entityId, String name) {}
+
+        private record BoolRec(int entityId, boolean value) {}
 
         private record FrogVariant(int entityId, String name) {}
 

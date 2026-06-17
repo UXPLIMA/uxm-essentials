@@ -591,6 +591,16 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object axolotlPlayingDead(int entityId, boolean playingDead) {
+            return new Object();
+        }
+
+        @Override
+        public Object raiderCelebrating(int entityId, boolean celebrating) {
+            return new Object();
+        }
+
+        @Override
         public Object glowColorRemove(String teamName) {
             return new Object();
         }

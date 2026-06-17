@@ -86,6 +86,17 @@ final class NpcVariantData {
     static final String KEY_TEXT_BACKGROUND = "text_background";
     static final String KEY_TEXT_LINE_WIDTH = "text_line_width";
     static final String KEY_DISPLAY_TRANSLATION = "display_translation";
+    static final String KEY_AXOLOTL_PLAYING_DEAD = "axolotl_playing_dead";
+    static final String KEY_ILLAGER_CELEBRATING = "illager_celebrating";
+
+    /** The raider types a {@code Raider}-level attribute (celebrating) may render on. */
+    private static final Set<EntityType> RAIDER_TYPES = Set.of(
+            EntityType.PILLAGER,
+            EntityType.VINDICATOR,
+            EntityType.EVOKER,
+            EntityType.ILLUSIONER,
+            EntityType.RAVAGER,
+            EntityType.WITCH);
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -147,7 +158,8 @@ final class NpcVariantData {
             new BoolVariant(KEY_PIGLIN_DANCING, EntityType.PIGLIN, NpcPackets::piglinDancing),
             new BoolVariant(KEY_CAMEL_DASH, EntityType.CAMEL, NpcPackets::camelDash),
             new BoolVariant(KEY_BEE_NECTAR, EntityType.BEE, NpcPackets::beeNectar),
-            new BoolVariant(KEY_VEX_CHARGING, EntityType.VEX, NpcPackets::vexCharging));
+            new BoolVariant(KEY_VEX_CHARGING, EntityType.VEX, NpcPackets::vexCharging),
+            new BoolVariant(KEY_AXOLOTL_PLAYING_DEAD, EntityType.AXOLOTL, NpcPackets::axolotlPlayingDead));
 
     private NpcVariantData() {}
 
@@ -174,6 +186,7 @@ final class NpcVariantData {
             applyArmorStandPose(packets, viewer, id, type, data, npc, log, pose);
         }
         applyInteraction(packets, viewer, id, type, data, npc, log);
+        applyCelebrating(packets, viewer, id, type, data, npc, log);
         applyBlockDisplay(packets, viewer, id, type, data, npc, log);
         applyItemDisplay(packets, viewer, id, type, data, npc, log);
         applyTextDisplay(packets, viewer, id, type, data, npc, log);
@@ -438,6 +451,29 @@ final class NpcVariantData {
         packets.send(viewer, packets.itemDisplayItem(id, item));
     }
 
+    /**
+     * Apply a raider's celebrating state (the {@code illager_celebrating} key) — a {@code Raider}-level field, so it
+     * reaches any raider type (pillager/vindicator/evoker/illusioner/ravager/witch). Fail-soft on a wrong type or
+     * non-boolean value.
+     */
+    private static void applyCelebrating(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_ILLAGER_CELEBRATING);
+        if (value == null) {
+            return;
+        }
+        if (!RAIDER_TYPES.contains(type)) {
+            skip(log, npc, KEY_ILLAGER_CELEBRATING, type, "type is not a raider");
+            return;
+        }
+        Boolean celebrating = parseBool(value);
+        if (celebrating == null) {
+            skip(log, npc, KEY_ILLAGER_CELEBRATING, type, "value is not true or false: " + value);
+            return;
+        }
+        packets.send(viewer, packets.raiderCelebrating(id, celebrating));
+    }
+
     /** Whether {@code type} is a visible display entity (block/item/text) the shared scale/billboard apply to. */
     private static boolean isVisualDisplay(EntityType type) {
         return type == EntityType.BLOCK_DISPLAY || type == EntityType.ITEM_DISPLAY || type == EntityType.TEXT_DISPLAY;
@@ -683,6 +719,8 @@ final class NpcVariantData {
                     KEY_CAMEL_DASH,
                     KEY_BEE_NECTAR,
                     KEY_VEX_CHARGING,
+                    KEY_AXOLOTL_PLAYING_DEAD,
+                    KEY_ILLAGER_CELEBRATING,
                     KEY_AS_SMALL,
                     KEY_AS_ARMS,
                     KEY_AS_NO_BASEPLATE,
@@ -878,6 +916,8 @@ final class NpcVariantData {
             KEY_CAMEL_DASH,
             KEY_BEE_NECTAR,
             KEY_VEX_CHARGING,
+            KEY_AXOLOTL_PLAYING_DEAD,
+            KEY_ILLAGER_CELEBRATING,
             KEY_TROPICAL_FISH,
             KEY_AS_SMALL,
             KEY_AS_ARMS,
