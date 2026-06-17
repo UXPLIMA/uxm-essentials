@@ -39,6 +39,12 @@ final class NpcStateCommands extends NpcCommandSupport {
     private static final List<String> STATE_WORDS = List.of("on_fire", "invisible", "silent");
     /** The keyword that resets a per-NPC distance or cooldown override to the module default. */
     private static final String DEFAULT_KEYWORD = "default";
+    /** Distance sentinels for {@code /npc viewdistance|turndistance}: never visible, or visible from any range. */
+    private static final String NOT_VISIBLE_KEYWORD = "not_visible";
+
+    private static final String ALWAYS_VISIBLE_KEYWORD = "always_visible";
+    /** The block range that stands in for "always visible" — far beyond any practical view distance, still finite. */
+    private static final double ALWAYS_VISIBLE_BLOCKS = 100_000.0;
 
     NpcStateCommands(NpcServices services, Supplier<? extends Collection<String>> npcNames, Messages messages) {
         super(services, npcNames, messages);
@@ -143,8 +149,15 @@ final class NpcStateCommands extends NpcCommandSupport {
         return Commands.literal(literal)
                 .then(nameArgument()
                         .then(Commands.argument("blocks", StringArgumentType.word())
-                                .suggests(
-                                        (ctx, builder) -> suggest(builder, List.of(DEFAULT_KEYWORD, "16", "48", "64")))
+                                .suggests((ctx, builder) -> suggest(
+                                        builder,
+                                        List.of(
+                                                DEFAULT_KEYWORD,
+                                                NOT_VISIBLE_KEYWORD,
+                                                ALWAYS_VISIBLE_KEYWORD,
+                                                "16",
+                                                "48",
+                                                "64")))
                                 .executes(ctx -> distance(ctx, kind))));
     }
 
@@ -158,13 +171,25 @@ final class NpcStateCommands extends NpcCommandSupport {
             services.range().setRange(ref(sender), nameArg(ctx), kind, null);
             return Command.SINGLE_SUCCESS;
         }
-        Double blocks = parseNonNegativeDouble(word);
+        Double sentinel = sentinelBlocks(word);
+        Double blocks = sentinel != null ? sentinel : parseNonNegativeDouble(word);
         if (blocks == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_DISTANCE, Map.of("distance", word));
             return 0;
         }
         services.range().setRange(ref(sender), nameArg(ctx), kind, blocks);
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** Resolve a visibility sentinel to its block range — 0 for {@code not_visible}, far for {@code always_visible} — or {@code null}. */
+    static @org.jspecify.annotations.Nullable Double sentinelBlocks(String word) {
+        if (word.equalsIgnoreCase(NOT_VISIBLE_KEYWORD)) {
+            return 0.0;
+        }
+        if (word.equalsIgnoreCase(ALWAYS_VISIBLE_KEYWORD)) {
+            return ALWAYS_VISIBLE_BLOCKS;
+        }
+        return null;
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> stateNode() {

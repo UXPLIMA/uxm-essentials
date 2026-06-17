@@ -28,4 +28,12 @@ class NpcStateCommandsTest {
         assertThat(NpcStateCommands.parseFriendlyMillis("-5s")).isNull();
         assertThat(NpcStateCommands.parseFriendlyMillis("")).isNull();
     }
+
+    @Test
+    void resolvesVisibilitySentinels() {
+        assertThat(NpcStateCommands.sentinelBlocks("not_visible")).isEqualTo(0.0);
+        assertThat(NpcStateCommands.sentinelBlocks("ALWAYS_VISIBLE")).isEqualTo(100_000.0);
+        assertThat(NpcStateCommands.sentinelBlocks("48")).isNull();
+        assertThat(NpcStateCommands.sentinelBlocks("default")).isNull();
+    }
 }
