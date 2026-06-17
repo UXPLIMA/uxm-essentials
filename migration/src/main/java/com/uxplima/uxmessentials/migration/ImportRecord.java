@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.migration.convert.map.ImportedHologram;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
@@ -99,6 +100,18 @@ public sealed interface ImportRecord {
         @Override
         public String kind() {
             return "warn";
+        }
+    }
+
+    /** A mapped server-wide hologram, keyed by its name. */
+    record HologramRecord(ImportedHologram hologram) implements ImportRecord {
+        public HologramRecord {
+            Objects.requireNonNull(hologram, "hologram");
+        }
+
+        @Override
+        public String kind() {
+            return "hologram";
         }
     }
 }

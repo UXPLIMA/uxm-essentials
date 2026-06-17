@@ -159,6 +159,7 @@ class RepositoryRecordWriterSanctionTest {
                 mock(WalletRepository.class),
                 moderation,
                 mock(KitRepository.class),
+                mock(com.uxplima.uxmessentials.holograms.application.port.HologramRepository.class),
                 mock(Currency.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }

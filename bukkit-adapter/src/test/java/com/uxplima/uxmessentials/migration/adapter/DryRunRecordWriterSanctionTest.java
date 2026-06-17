@@ -92,7 +92,11 @@ class DryRunRecordWriterSanctionTest {
 
     private RecordWriter writer() {
         return new DryRunRecordWriter(
-                mock(WarpRepository.class), moderation, mock(KitRepository.class), Clock.fixed(NOW, ZoneOffset.UTC));
+                mock(WarpRepository.class),
+                moderation,
+                mock(KitRepository.class),
+                mock(com.uxplima.uxmessentials.holograms.application.port.HologramRepository.class),
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static ImportOptions options(ConflictPolicy onConflict) {

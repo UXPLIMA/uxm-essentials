@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -9,6 +10,7 @@ import java.util.stream.Stream;
 import com.uxplima.uxmessentials.migration.convert.Convert;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
+import com.uxplima.uxmessentials.migration.convert.decentholograms.DecentHologramsConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConfig;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
@@ -41,7 +43,8 @@ class MigrationSourceRegistryDriftTest {
             new LiveBalanceConvert(
                     SourceId.of("playerpoints"), "PlayerPoints", "the live PlayerPoints economy provider", emptyFeed()),
             new LiteBansConvert(
-                    new LiteBansConfig(Optional.empty(), "", "", "litebans_", Optional.empty()), noOpLogger())));
+                    new LiteBansConfig(Optional.empty(), "", "", "litebans_", Optional.empty()), noOpLogger()),
+            new DecentHologramsConvert(name -> Optional.empty(), Path.of("DecentHolograms", "holograms"))));
 
     private static Logger noOpLogger() {
         return new Logger() {
@@ -74,17 +77,21 @@ class MigrationSourceRegistryDriftTest {
     }
 
     @Test
-    void theBuiltSourcesAreEssentialsxVaultPlayerpointsAndLitebansAndResolve() {
+    void theBuiltSourcesAreEssentialsxVaultPlayerpointsLitebansAndDecentHologramsAndResolve() {
         assertThat(registry.builtIds())
                 .containsExactlyInAnyOrder(
                         SourceId.of("essentialsx"),
                         SourceId.of("vault"),
                         SourceId.of("playerpoints"),
-                        SourceId.of("litebans"));
+                        SourceId.of("litebans"),
+                        SourceId.of("decentholograms"));
         assertThat(registry.resolve(SourceId.of("essentialsx")))
                 .map(Convert::id)
                 .contains(SourceId.of("essentialsx"));
         assertThat(registry.resolve(SourceId.of("litebans"))).map(Convert::id).contains(SourceId.of("litebans"));
+        assertThat(registry.resolve(SourceId.of("decentholograms")))
+                .map(Convert::id)
+                .contains(SourceId.of("decentholograms"));
     }
 
     @Test

@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.migration.adapter;
 import java.time.Clock;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
+import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
@@ -36,12 +38,19 @@ public final class DryRunRecordWriter implements RecordWriter {
     private final WarpRepository warps;
     private final ModerationRepository moderation;
     private final KitRepository kits;
+    private final HologramRepository holograms;
     private final Clock clock;
 
-    public DryRunRecordWriter(WarpRepository warps, ModerationRepository moderation, KitRepository kits, Clock clock) {
+    public DryRunRecordWriter(
+            WarpRepository warps,
+            ModerationRepository moderation,
+            KitRepository kits,
+            HologramRepository holograms,
+            Clock clock) {
         this.warps = Objects.requireNonNull(warps, "warps");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
+        this.holograms = Objects.requireNonNull(holograms, "holograms");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -57,7 +66,17 @@ public final class DryRunRecordWriter implements RecordWriter {
             case ImportRecord.BanRecord ban -> banOutcome(ban.target(), options);
             case ImportRecord.IpBanRecord ban -> ipBanOutcome(ban.ban(), options);
             case ImportRecord.WarnRecord warn -> warnOutcome(warn.target(), warn.warn());
+            case ImportRecord.HologramRecord hologram -> hologramOutcome(
+                    hologram.hologram().hologram().name(), options);
         };
+    }
+
+    private RecordOutcome hologramOutcome(HologramName name, ImportOptions options) {
+        boolean existed = holograms.exists(name);
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
     }
 
     private RecordOutcome warpOutcome(WarpName name, ImportOptions options) {

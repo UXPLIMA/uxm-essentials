@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.migration.convert.SourceId;
+import com.uxplima.uxmessentials.migration.convert.decentholograms.DecentHologramsMappings;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXMappings;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansMappings;
 import com.uxplima.uxmessentials.migration.convert.live.LiveSourceMappings;
@@ -14,7 +15,8 @@ import org.jspecify.annotations.NullMarked;
  * Aggregates every <em>built</em> source's per-source mapping table (docs/12-migration §5). It is the
  * single greppable answer to "what does the importer claim to migrate?", scoped by source. The built
  * sources are EssentialsX (a full on-disk source), the live economy sources Vault and PlayerPoints
- * (balance only), and LiteBans (a JDBC source for bans/ip-bans/mutes/warns). Only built sources
+ * (balance only), LiteBans (a JDBC source for bans/ip-bans/mutes/warns), and DecentHolograms (an on-disk
+ * source for server-wide holograms). Only built sources
  * contribute rows — a planned source has no code table, so it appears nowhere here until it is built
  * (planned ≠ stubbed, §1.2). The drift guard reads this aggregate to assert the three-way equality
  * code ⇄ doc ⇄ fixtures.
@@ -26,7 +28,8 @@ public final class SupportedMappings {
             Map.entry(SourceId.of("essentialsx"), EssentialsXMappings.rows()),
             Map.entry(SourceId.of("vault"), LiveSourceMappings.vaultRows()),
             Map.entry(SourceId.of("playerpoints"), LiveSourceMappings.playerPointsRows()),
-            Map.entry(SourceId.of("litebans"), LiteBansMappings.rows()));
+            Map.entry(SourceId.of("litebans"), LiteBansMappings.rows()),
+            Map.entry(SourceId.of("decentholograms"), DecentHologramsMappings.rows()));
 
     private SupportedMappings() {}
 

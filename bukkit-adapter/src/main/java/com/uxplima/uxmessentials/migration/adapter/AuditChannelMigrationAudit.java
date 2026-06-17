@@ -58,7 +58,18 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
             case ImportRecord.BanRecord ban -> recordBan(source, ban, outcome);
             case ImportRecord.IpBanRecord ban -> recordIpBan(source, ban, outcome);
             case ImportRecord.WarnRecord warn -> recordWarn(source, warn, outcome);
+            case ImportRecord.HologramRecord hologram -> recordHologram(source, hologram, outcome);
         }
+    }
+
+    private void recordHologram(SourceId source, ImportRecord.HologramRecord rec, RecordOutcome outcome) {
+        audit.info(
+                "event=migration_import_hologram source={} hologram={} lines={} conflict={} ok={}",
+                source,
+                rec.hologram().hologram().name().value(),
+                rec.hologram().hologram().lines().size(),
+                outcome.token(),
+                outcome.ok());
     }
 
     private void recordUser(SourceId source, ImportRecord.UserRecord rec, RecordOutcome outcome) {

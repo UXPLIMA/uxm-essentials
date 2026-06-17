@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyConfig;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
@@ -28,6 +29,7 @@ import com.uxplima.uxmessentials.migration.RecordWriter;
 import com.uxplima.uxmessentials.migration.convert.Convert;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
+import com.uxplima.uxmessentials.migration.convert.decentholograms.DecentHologramsConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.EssentialsXConvert;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
 import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConfig;
@@ -35,6 +37,7 @@ import com.uxplima.uxmessentials.migration.convert.litebans.LiteBansConvert;
 import com.uxplima.uxmessentials.migration.convert.live.LiveBalanceConvert;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
+import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -114,7 +117,15 @@ public final class MigrationWiring {
                 "the live PlayerPoints plugin",
                 new PlayerPointsBalanceFeed(plugin, log)));
         built.add(new LiteBansConvert(liteBansConfig(plugin, migrationConfig), log));
+        built.add(new DecentHologramsConvert(worlds, decentHologramsDirectory(plugin)));
         return new SourceRegistry(built);
+    }
+
+    /** The {@code plugins/DecentHolograms/holograms} directory the DecentHolograms source reads its files from. */
+    private static Path decentHologramsDirectory(Plugin plugin) {
+        Path pluginsDir = plugin.getDataFolder().toPath().getParent();
+        Path base = pluginsDir != null ? pluginsDir : Path.of("plugins");
+        return base.resolve("DecentHolograms").resolve("holograms");
     }
 
     /** Read the {@code modules.migration.litebans} subtree into the source's connection config. */
@@ -134,12 +145,14 @@ public final class MigrationWiring {
         WarpRepository warps = WarpRepositories.cached(persistence);
         ModerationRepository moderation = ModerationStores.repository(persistence);
         KitRepository kits = kitRepository(plugin, log);
+        HologramRepository holograms = HologramRepositories.cached(persistence);
         CurrencyRegistry currencies = new EconomyConfig(economyConfig).currencies();
         Currency defaultCurrency = currencies.defaultCurrency();
         Clock clock = Clock.systemUTC();
         WalletRepository wallets = WalletRepositories.repository(persistence, currencies, clock);
-        RecordWriter live = new RepositoryRecordWriter(homes, warps, wallets, moderation, kits, defaultCurrency, clock);
-        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation, kits, clock);
+        RecordWriter live =
+                new RepositoryRecordWriter(homes, warps, wallets, moderation, kits, holograms, defaultCurrency, clock);
+        RecordWriter dryRun = new DryRunRecordWriter(warps, moderation, kits, holograms, clock);
         return new Writers(live, dryRun);
     }
 

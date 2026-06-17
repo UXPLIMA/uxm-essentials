@@ -11,6 +11,9 @@ import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
+import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
+import com.uxplima.uxmessentials.holograms.domain.Hologram;
+import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
@@ -56,6 +59,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
     private final WalletRepository wallets;
     private final ModerationRepository moderation;
     private final KitRepository kits;
+    private final HologramRepository holograms;
     private final Currency defaultCurrency;
     private final Clock clock;
 
@@ -65,6 +69,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
             WalletRepository wallets,
             ModerationRepository moderation,
             KitRepository kits,
+            HologramRepository holograms,
             Currency defaultCurrency,
             Clock clock) {
         this.homes = Objects.requireNonNull(homes, "homes");
@@ -72,6 +77,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         this.wallets = Objects.requireNonNull(wallets, "wallets");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
+        this.holograms = Objects.requireNonNull(holograms, "holograms");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -88,7 +94,19 @@ public final class RepositoryRecordWriter implements RecordWriter {
             case ImportRecord.BanRecord ban -> writeBan(ban, options);
             case ImportRecord.IpBanRecord ban -> writeIpBan(ban.ban(), options);
             case ImportRecord.WarnRecord warn -> writeWarn(warn);
+            case ImportRecord.HologramRecord hologram -> writeHologram(
+                    hologram.hologram().hologram(), options);
         };
+    }
+
+    private RecordOutcome writeHologram(Hologram hologram, ImportOptions options) {
+        HologramName name = hologram.name();
+        boolean existed = holograms.exists(name);
+        if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            return RecordOutcome.SKIPPED;
+        }
+        holograms.save(hologram);
+        return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
     }
 
     private RecordOutcome writeUser(ImportedUser user, ImportOptions options) {

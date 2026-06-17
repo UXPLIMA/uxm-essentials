@@ -105,6 +105,7 @@ class RepositoryRecordWriterKitTest {
                 mock(WalletRepository.class),
                 mock(ModerationRepository.class),
                 kits,
+                mock(com.uxplima.uxmessentials.holograms.application.port.HologramRepository.class),
                 mock(Currency.class),
                 java.time.Clock.systemUTC());
     }
