@@ -84,6 +84,7 @@ public record Hologram(
             List<HologramLine> lines,
             @Nullable String itemMaterial,
             @Nullable String blockData,
+            @Nullable String headTexture,
             Appearance appearance,
             Visibility visibility,
             Rotation rotation,
@@ -92,7 +93,7 @@ public record Hologram(
         this(
                 name,
                 location,
-                new HologramContent(type, lines, itemMaterial, blockData),
+                new HologramContent(type, lines, itemMaterial, blockData, headTexture),
                 appearance,
                 visibility,
                 rotation,
@@ -117,6 +118,11 @@ public record Hologram(
     /** A new BLOCK hologram created now at {@code location} showing {@code blockData}, with no lines. */
     public static Hologram createBlock(HologramName name, Position location, String blockData, Instant createdAt) {
         return fresh(name, location, HologramContent.block(blockData), createdAt);
+    }
+
+    /** A new HEAD hologram created now at {@code location} showing the player head with base64 {@code headTexture}. */
+    public static Hologram createHead(HologramName name, Position location, String headTexture, Instant createdAt) {
+        return fresh(name, location, HologramContent.head(headTexture), createdAt);
     }
 
     private static Hologram fresh(HologramName name, Position location, HologramContent content, Instant createdAt) {
@@ -148,6 +154,10 @@ public record Hologram(
 
     public @Nullable String blockData() {
         return content.blockData();
+    }
+
+    public @Nullable String headTexture() {
+        return content.headTexture();
     }
 
     /** The number of lines this hologram renders (0 for an item/block hologram with no label lines). */
@@ -243,6 +253,11 @@ public record Hologram(
     /** A copy switched to a BLOCK hologram showing {@code newBlockData} (lines and styling kept). */
     public Hologram asBlock(String newBlockData) {
         return withContent(content.asBlock(newBlockData));
+    }
+
+    /** A copy switched to a HEAD hologram showing the player head with base64 {@code newHeadTexture} (lines kept). */
+    public Hologram asHead(String newHeadTexture) {
+        return withContent(content.asHead(newHeadTexture));
     }
 
     /** A copy restyled with {@code newAppearance}, keeping everything else. */

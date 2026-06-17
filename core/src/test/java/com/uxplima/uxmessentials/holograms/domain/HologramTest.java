@@ -199,6 +199,31 @@ class HologramTest {
     }
 
     @Test
+    void createHeadHoldsTheTextureAndNeedsNoLines() {
+        Hologram head =
+                Hologram.createHead(HologramName.of("greeter"), AT, "dGV4dHVyZQ==", Instant.ofEpochMilli(1_000));
+
+        assertThat(head.type()).isEqualTo(HologramType.HEAD);
+        assertThat(head.headTexture()).isEqualTo("dGV4dHVyZQ==");
+        assertThat(head.lineCount()).isZero();
+        assertThat(head.itemMaterial()).isNull();
+    }
+
+    @Test
+    void asHeadSwitchesTypeAndContentKeepingName() {
+        Hologram head = twoLine().asHead("dGV4dHVyZQ==");
+
+        assertThat(head.type()).isEqualTo(HologramType.HEAD);
+        assertThat(head.headTexture()).isEqualTo("dGV4dHVyZQ==");
+    }
+
+    @Test
+    void aHeadHologramRejectsABlankTexture() {
+        assertThatThrownBy(() -> Hologram.createHead(HologramName.of("x"), AT, "  ", Instant.ofEpochMilli(1_000)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void asItemSwitchesTypeAndContentKeepingNameAndStyling() {
         Hologram item = twoLine().withRefreshIntervalTicks(40).asItem("EMERALD");
 

@@ -25,7 +25,10 @@ public enum HologramType {
     ITEM,
 
     /** A single floating block model shown by a {@code BlockDisplay}, its content a BlockData string. */
-    BLOCK;
+    BLOCK,
+
+    /** A single floating player head shown by an {@code ItemDisplay}, its content a base64 skin texture. */
+    HEAD;
 
     /** Whether a hologram of this type must carry at least one text line (only {@link #TEXT} does). */
     public boolean requiresLines() {

@@ -57,6 +57,7 @@ final class HologramRows {
                 lines,
                 row.get(HOLOGRAMS.ITEM_MATERIAL),
                 row.get(HOLOGRAMS.BLOCK_DATA),
+                row.get(HOLOGRAMS.HEAD_TEXTURE),
                 appearanceOf(row),
                 visibilityOf(row),
                 rotationOf(row),
@@ -82,6 +83,7 @@ final class HologramRows {
                 .setType(hologram.type().name())
                 .setItemMaterial(hologram.itemMaterial())
                 .setBlockData(hologram.blockData())
+                .setHeadTexture(hologram.headTexture())
                 .setWorld(location.world().uid().toString())
                 .setWorldName(location.world().name())
                 .setX(location.x())

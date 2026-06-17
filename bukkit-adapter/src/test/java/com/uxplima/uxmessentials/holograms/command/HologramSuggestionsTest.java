@@ -92,6 +92,6 @@ class HologramSuggestionsTest {
                 Arrays.stream(HologramType.values()).map(Enum::name).toList();
         SuggestionProvider<CommandSourceStack> provider = CommandSuggestions.fromStrings(() -> values);
 
-        assertThat(complete(provider, "")).containsExactlyInAnyOrder("TEXT", "ITEM", "BLOCK");
+        assertThat(complete(provider, "")).containsExactlyInAnyOrder("TEXT", "ITEM", "BLOCK", "HEAD");
     }
 }

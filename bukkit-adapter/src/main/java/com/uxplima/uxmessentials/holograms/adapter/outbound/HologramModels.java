@@ -1,12 +1,17 @@
 package com.uxplima.uxmessentials.holograms.adapter.outbound;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.SkullMeta;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
+import com.destroystokyo.paper.profile.ProfileProperty;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -51,5 +56,26 @@ final class HologramModels {
         } catch (IllegalArgumentException invalid) {
             return null;
         }
+    }
+
+    /**
+     * Build a {@code PLAYER_HEAD} {@link ItemStack} wearing the skin carried by the base64 textures-property
+     * value, or {@code null} for a blank texture. The profile uuid is derived deterministically from the texture
+     * so a re-render reuses the same profile (no client-side skin-cache churn on reload). The texture carries the
+     * skin itself, so a skull item needs no signature to render it.
+     */
+    static @Nullable ItemStack headOf(@Nullable String texture) {
+        if (texture == null || texture.isBlank()) {
+            return null;
+        }
+        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+        if (!(head.getItemMeta() instanceof SkullMeta skull)) {
+            return null;
+        }
+        PlayerProfile profile = Bukkit.createProfile(UUID.nameUUIDFromBytes(texture.getBytes(StandardCharsets.UTF_8)));
+        profile.setProperty(new ProfileProperty("textures", texture));
+        skull.setPlayerProfile(profile);
+        head.setItemMeta(skull);
+        return head;
     }
 }

@@ -106,6 +106,7 @@ class HologramTextOverridesTest {
                 List.of(new HologramLine("top %name%"), new HologramLine("bottom")),
                 null,
                 null,
+                null,
                 com.uxplima.uxmessentials.holograms.domain.Appearance.defaults(),
                 com.uxplima.uxmessentials.holograms.domain.Visibility.everyone(),
                 com.uxplima.uxmessentials.holograms.domain.Rotation.NONE,

@@ -45,6 +45,12 @@ public final class SetHologramModel {
         return apply(actor, name, hologram -> hologram.asBlock(blockData), HologramsMessageKey.HOLOGRAM_BLOCK_SET);
     }
 
+    /** Switch hologram {@code name} to a HEAD showing the base64 {@code headTexture}, or reject when no such hologram. */
+    public Result<Unit, HologramError> setHead(PlayerRef actor, HologramName name, String headTexture) {
+        Objects.requireNonNull(headTexture, "headTexture");
+        return apply(actor, name, hologram -> hologram.asHead(headTexture), HologramsMessageKey.HOLOGRAM_HEAD_SET);
+    }
+
     private Result<Unit, HologramError> apply(
             PlayerRef actor,
             HologramName name,

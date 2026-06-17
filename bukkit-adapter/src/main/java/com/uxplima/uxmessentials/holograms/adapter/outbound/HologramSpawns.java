@@ -49,7 +49,23 @@ final class HologramSpawns {
                     manager.spawn(builderFor(hologram, placeholders, miniMessage, globalTags), at));
             case ITEM -> spawnItem(manager, log, hologram, at);
             case BLOCK -> spawnBlock(manager, log, hologram, at);
+            case HEAD -> spawnHead(manager, log, hologram, at);
         };
+    }
+
+    private static @Nullable RenderedHologram spawnHead(
+            HologramManager manager, Logger log, Hologram hologram, Location at) {
+        ItemStack head = HologramModels.headOf(hologram.headTexture());
+        if (head == null) {
+            log.warn(
+                    "skipping head hologram {} — unusable skin texture",
+                    hologram.name().value());
+            return null;
+        }
+        Holograms.ItemBuilder builder = Holograms.item(head);
+        HologramAppearances.applyDisplay(builder, hologram.appearance());
+        applyRotation(builder, hologram);
+        return RenderedHologram.ofModel(manager.spawn(builder, at));
     }
 
     private static @Nullable RenderedHologram spawnItem(

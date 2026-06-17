@@ -69,8 +69,10 @@ public enum HologramsMessageKey implements MessageKey {
     // item / block type feedback
     HOLOGRAM_ITEM_SET("hologram.item.set"),
     HOLOGRAM_BLOCK_SET("hologram.block.set"),
+    HOLOGRAM_HEAD_SET("hologram.head.set"),
     HOLOGRAM_ITEM_INVALID("hologram.item-invalid"),
     HOLOGRAM_BLOCK_INVALID("hologram.block-invalid"),
+    HOLOGRAM_HEAD_INVALID("hologram.head-invalid"),
 
     // visibility feedback
     HOLOGRAM_VISIBILITY_SET("hologram.visibility.set"),

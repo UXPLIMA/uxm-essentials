@@ -276,6 +276,23 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsAHeadHologramType() {
+        repository.save(Hologram.createHead(
+                HologramName.of("greeter"),
+                Position.of(WORLD, 1, 64, 1),
+                "dGVzdC10ZXh0dXJl",
+                Instant.ofEpochMilli(1_000)));
+
+        Hologram loaded = repository.find(HologramName.of("greeter")).orElseThrow();
+
+        assertThat(loaded.type()).isEqualTo(com.uxplima.uxmessentials.holograms.domain.HologramType.HEAD);
+        assertThat(loaded.headTexture()).isEqualTo("dGVzdC10ZXh0dXJl");
+        assertThat(loaded.itemMaterial()).isNull();
+        assertThat(loaded.blockData()).isNull();
+        assertThat(loaded.lineCount()).isZero();
+    }
+
+    @Test
     void aRowWithNoTypeColumnReadsBackAsText() {
         // A pre-V37 row: insert the name row directly leaving the type/item/block columns NULL, plus one line.
         Holograms holograms = Holograms.HOLOGRAMS;
