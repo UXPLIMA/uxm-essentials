@@ -102,6 +102,8 @@ public final class HologramRenderer implements HologramView {
     private final LinkedNpcLocator linkedNpcs;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final Map<String, Tracked> live = new ConcurrentHashMap<>();
+    /** The PDC key stamped on a clickable hologram's Interaction hitbox; the click listener reads the same key. */
+    private final org.bukkit.NamespacedKey clickKey;
 
     public HologramRenderer(
             Plugin plugin,
@@ -122,6 +124,7 @@ public final class HologramRenderer implements HologramView {
         this.viewers = Objects.requireNonNull(viewers, "viewers");
         this.textOverrides = Objects.requireNonNull(textOverrides, "textOverrides");
         this.linkedNpcs = Objects.requireNonNull(linkedNpcs, "linkedNpcs");
+        this.clickKey = new org.bukkit.NamespacedKey(plugin, HologramClickKey.PDC_KEY);
     }
 
     @Override
@@ -286,11 +289,39 @@ public final class HologramRenderer implements HologramView {
             // Invalid item material or block data — already logged; leave nothing tracked rather than crash.
             return;
         }
+        if (hologram.clickCommand() != null) {
+            spawned = withClickBox(spawned, at, hologram);
+        }
         viewers.applyOnSpawn(spawned, hologram);
         // Track the anchor the entity actually spawned at (the NPC's position for a linked hologram), so a later
         // despawn or replace is routed onto the entity's real region — not the hologram's stored location.
         live.put(hologram.name().value(), new Tracked(spawned, hologram, anchor));
         sendPerViewerText(spawned, hologram);
+    }
+
+    /**
+     * Spawn the invisible {@code Interaction} hitbox beside a clickable hologram and bundle it with {@code spawned}
+     * so it shares the lifecycle (despawned together, never orphaned). The box is stamped with the hologram's name
+     * so the click listener can resolve it, and is non-persistent — a restart drops it and {@code spawnStored}
+     * re-creates it, so a crash never leaves a stray hitbox. A text hologram's lines hang downward from the anchor,
+     * so the box brackets that span; an item/block/head model sits at the anchor, so the box centres on it.
+     */
+    private RenderedHologram withClickBox(RenderedHologram spawned, Location at, Hologram hologram) {
+        boolean text = hologram.type() == com.uxplima.uxmessentials.holograms.domain.HologramType.TEXT;
+        float height = text ? Math.max(1.0f, hologram.lines().size() * 0.28f + 0.4f) : 1.2f;
+        Location boxLocation =
+                text ? at.clone().subtract(0, height, 0) : at.clone().subtract(0, 0.6, 0);
+        String name = hologram.name().value();
+        org.bukkit.entity.Interaction box = at.getWorld()
+                .spawn(boxLocation, org.bukkit.entity.Interaction.class, entity -> {
+                    entity.setInteractionWidth(1.2f);
+                    entity.setInteractionHeight(height);
+                    entity.setResponsive(true);
+                    entity.setPersistent(false);
+                    entity.getPersistentDataContainer()
+                            .set(clickKey, org.bukkit.persistence.PersistentDataType.STRING, name);
+                });
+        return RenderedHologram.withClickBox(spawned, box);
     }
 
     /**

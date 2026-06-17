@@ -48,7 +48,15 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
                 name("center", this::center),
                 name("teleport", this::teleport),
                 rotateNode(),
-                insertLineNode());
+                insertLineNode(),
+                clickCommandNode());
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> clickCommandNode() {
+        return Commands.literal("clickcommand")
+                .then(nameArgument("name")
+                        .then(Commands.argument("command", StringArgumentType.greedyString())
+                                .executes(this::clickCommand)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> copyNode() {
@@ -152,6 +160,20 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
         int index = ctx.getArgument("index", Integer.class) - 1;
         HologramLine line = HologramLine.of(ctx.getArgument("text", String.class));
         services.insertLine().insert(ref(sender), nameArg(ctx), index, line);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int clickCommand(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String raw = ctx.getArgument("command", String.class).strip();
+        // A leading slash is optional; a 'none'/'clear' keyword removes the click action.
+        String command = raw.equalsIgnoreCase("none") || raw.equalsIgnoreCase("clear")
+                ? null
+                : (raw.startsWith("/") ? raw.substring(1) : raw);
+        services.clickCommand().set(ref(sender), nameArg(ctx), command);
         return Command.SINGLE_SUCCESS;
     }
 

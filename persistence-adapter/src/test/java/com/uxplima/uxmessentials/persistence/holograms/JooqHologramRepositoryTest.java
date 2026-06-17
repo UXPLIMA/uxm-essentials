@@ -293,6 +293,19 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsAClickCommand() {
+        repository.save(hologram("spawn", 1, 64, 1, "line").withClickCommand("warp pvp"));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.clickCommand()).isEqualTo("warp pvp");
+        // A pre-V54 / never-clickable hologram reads back with no click command.
+        repository.save(hologram("plain", 2, 64, 2, "line"));
+        assertThat(repository.find(HologramName.of("plain")).orElseThrow().clickCommand())
+                .isNull();
+    }
+
+    @Test
     void aRowWithNoTypeColumnReadsBackAsText() {
         // A pre-V37 row: insert the name row directly leaving the type/item/block columns NULL, plus one line.
         Holograms holograms = Holograms.HOLOGRAMS;

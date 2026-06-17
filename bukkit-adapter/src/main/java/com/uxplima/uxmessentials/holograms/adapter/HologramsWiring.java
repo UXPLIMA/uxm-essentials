@@ -11,6 +11,7 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramCommands;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramClickListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.EventDrivenNpcLocator;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
@@ -34,6 +35,7 @@ import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
+import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
@@ -136,6 +138,7 @@ public final class HologramsWiring {
         // A joining player must pick up the permission-gated holograms they qualify for at once, not after a
         // refresh tick; this listener re-evaluates only the gated holograms for that one player.
         plugin.getServer().getPluginManager().registerEvents(new HologramVisibilityListener(renderer), plugin);
+        plugin.getServer().getPluginManager().registerEvents(new HologramClickListener(plugin, repository), plugin);
         AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer);
         // The cached repository's all() is the authoritative in-memory set after the one warm load, so reading
         // names off it per keystroke is allocation-light and never touches the database — safe on the tick thread.
@@ -221,6 +224,7 @@ public final class HologramsWiring {
                 new SetHologramVisibility(repository, renderer, notifier),
                 new ManageHologramViewer(repository, renderer, notifier),
                 new SetHologramModel(repository, renderer, notifier),
+                new SetHologramClickCommand(repository, renderer, notifier),
                 new LinkHologramToNpc(repository, renderer, notifier, npcLocator),
                 new UnlinkHologramFromNpc(repository, renderer, notifier));
     }

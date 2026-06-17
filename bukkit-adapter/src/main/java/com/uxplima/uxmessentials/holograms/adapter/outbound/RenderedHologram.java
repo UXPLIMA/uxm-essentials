@@ -99,4 +99,40 @@ interface RenderedHologram {
             }
         };
     }
+
+    /**
+     * Wrap {@code delegate} so its lifecycle also owns the {@code clickBox} — the {@code Interaction} entity spawned
+     * beside a clickable hologram. Despawning the hologram (on stop, move, edit) removes the box too, so a hologram
+     * never leaves an orphaned hitbox; visibility and the text-entity id pass straight through to the delegate (the
+     * box is a non-persistent, invisible hitbox, not something a viewer is shown or hidden).
+     */
+    static RenderedHologram withClickBox(RenderedHologram delegate, org.bukkit.entity.Interaction clickBox) {
+        return new RenderedHologram() {
+            @Override
+            public void removeFrom(HologramManager manager) {
+                delegate.removeFrom(manager);
+                clickBox.remove();
+            }
+
+            @Override
+            public void restrictToViewers() {
+                delegate.restrictToViewers();
+            }
+
+            @Override
+            public void show(Plugin plugin, Player viewer) {
+                delegate.show(plugin, viewer);
+            }
+
+            @Override
+            public void hide(Plugin plugin, Player viewer) {
+                delegate.hide(plugin, viewer);
+            }
+
+            @Override
+            public int textEntityId() {
+                return delegate.textEntityId();
+            }
+        };
+    }
 }

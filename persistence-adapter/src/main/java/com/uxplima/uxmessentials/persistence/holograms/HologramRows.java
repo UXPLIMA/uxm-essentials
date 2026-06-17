@@ -64,13 +64,19 @@ final class HologramRows {
                 intOr(row.get(HOLOGRAMS.REFRESH_INTERVAL_TICKS), Hologram.STATIC),
                 Instant.ofEpochMilli(row.get(HOLOGRAMS.CREATED_AT)));
         // A pre-V50 row (NULL linked_npc_name) — and any row that never linked — reads back unlinked, so an
-        // existing hologram keeps anchoring to its own coordinates with no data migration.
-        return linkedNpcOf(row, hologram);
+        // existing hologram keeps anchoring to its own coordinates with no data migration. The V54 click command
+        // is layered on the same way: a pre-V54 / never-clickable row (NULL) reads back without a click action.
+        return clickCommandOf(row, linkedNpcOf(row, hologram));
     }
 
     private static Hologram linkedNpcOf(Record row, Hologram hologram) {
         String linkedNpcName = row.get(HOLOGRAMS.LINKED_NPC_NAME);
         return linkedNpcName == null ? hologram : hologram.linkedTo(linkedNpcName);
+    }
+
+    private static Hologram clickCommandOf(Record row, Hologram hologram) {
+        String clickCommand = row.get(HOLOGRAMS.CLICK_COMMAND);
+        return clickCommand == null ? hologram : hologram.withClickCommand(clickCommand);
     }
 
     /** Populate a {@link HologramsRecord} from a domain {@link Hologram} for an upsert (the name row only). */
@@ -117,7 +123,8 @@ final class HologramRows {
                 .setRotationYaw(rotation.yaw())
                 .setRotationPitch(rotation.pitch())
                 .setRefreshIntervalTicks(hologram.refreshIntervalTicks())
-                .setLinkedNpcName(hologram.linkedNpcName());
+                .setLinkedNpcName(hologram.linkedNpcName())
+                .setClickCommand(hologram.clickCommand());
     }
 
     private static Appearance appearanceOf(Record row) {

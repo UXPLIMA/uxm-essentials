@@ -24,6 +24,7 @@ final class HologramBuilder {
     private int refreshIntervalTicks;
     private Instant createdAt;
     private @Nullable String linkedNpcName;
+    private @Nullable String clickCommand;
 
     HologramBuilder(Hologram source) {
         Objects.requireNonNull(source, "source");
@@ -36,6 +37,7 @@ final class HologramBuilder {
         this.refreshIntervalTicks = source.refreshIntervalTicks();
         this.createdAt = source.createdAt();
         this.linkedNpcName = source.linkedNpcName();
+        this.clickCommand = source.clickCommand();
     }
 
     HologramBuilder name(HologramName value) {
@@ -78,6 +80,11 @@ final class HologramBuilder {
         return this;
     }
 
+    HologramBuilder clickCommand(@Nullable String value) {
+        this.clickCommand = value;
+        return this;
+    }
+
     Hologram build() {
         return new Hologram(
                 name,
@@ -88,6 +95,7 @@ final class HologramBuilder {
                 rotation,
                 refreshIntervalTicks,
                 createdAt,
-                linkedNpcName);
+                linkedNpcName,
+                clickCommand);
     }
 }

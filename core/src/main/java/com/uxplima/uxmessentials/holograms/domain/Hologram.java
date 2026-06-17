@@ -52,7 +52,8 @@ public record Hologram(
         Rotation rotation,
         int refreshIntervalTicks,
         Instant createdAt,
-        @Nullable String linkedNpcName) {
+        @Nullable String linkedNpcName,
+        @Nullable String clickCommand) {
 
     /** A refresh interval of 0 means "static": render once on enable, never re-render. */
     public static final int STATIC = 0;
@@ -99,6 +100,7 @@ public record Hologram(
                 rotation,
                 refreshIntervalTicks,
                 createdAt,
+                null,
                 null);
     }
 
@@ -135,6 +137,7 @@ public record Hologram(
                 Rotation.NONE,
                 STATIC,
                 createdAt,
+                null,
                 null);
     }
 
@@ -206,6 +209,14 @@ public record Hologram(
      */
     public Hologram unlinked() {
         return toBuilder().linkedNpcName(null).build();
+    }
+
+    /**
+     * A copy with the command run when a player clicks the hologram, or {@code null} to clear it (the hologram is
+     * then not clickable). Backs {@code /hologram clickcommand}; the command is run as the clicking player.
+     */
+    public Hologram withClickCommand(@Nullable String command) {
+        return toBuilder().clickCommand(command).build();
     }
 
     /**

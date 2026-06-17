@@ -218,6 +218,16 @@ class HologramTest {
     }
 
     @Test
+    void withClickCommandStoresAndClearsKeepingEverythingElse() {
+        Hologram clickable = twoLine().withRefreshIntervalTicks(40).withClickCommand("warp pvp");
+
+        assertThat(clickable.clickCommand()).isEqualTo("warp pvp");
+        assertThat(clickable.lines()).hasSize(2);
+        assertThat(clickable.refreshIntervalTicks()).isEqualTo(40);
+        assertThat(clickable.withClickCommand(null).clickCommand()).isNull();
+    }
+
+    @Test
     void aHeadHologramRejectsABlankTexture() {
         assertThatThrownBy(() -> Hologram.createHead(HologramName.of("x"), AT, "  ", Instant.ofEpochMilli(1_000)))
                 .isInstanceOf(IllegalArgumentException.class);
