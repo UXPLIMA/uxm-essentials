@@ -86,6 +86,12 @@ public enum NpcMessageKey implements MessageKey {
     NPC_NEARBY_HEADER("npc.nearby.header"),
     NPC_NEARBY_ENTRY("npc.nearby.entry"),
     NPC_NEARBY_EMPTY("npc.nearby.empty"),
+    NPC_INFO_HEADER("npc.info.header"),
+    NPC_INFO_LOCATION("npc.info.location"),
+    NPC_INFO_APPEARANCE("npc.info.appearance"),
+    NPC_INFO_FLAGS("npc.info.flags"),
+    NPC_INFO_RANGES("npc.info.ranges"),
+    NPC_INFO_BEHAVIOR("npc.info.behavior"),
 
     // action-chain feedback
     NPC_ACTION_ADDED("npc.action.added"),

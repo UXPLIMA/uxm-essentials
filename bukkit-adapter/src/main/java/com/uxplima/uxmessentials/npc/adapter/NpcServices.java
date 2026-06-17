@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
 import com.uxplima.uxmessentials.npc.application.CopyNpc;
 import com.uxplima.uxmessentials.npc.application.CreateNpc;
 import com.uxplima.uxmessentials.npc.application.DeleteNpc;
+import com.uxplima.uxmessentials.npc.application.DescribeNpc;
 import com.uxplima.uxmessentials.npc.application.FixNpc;
 import com.uxplima.uxmessentials.npc.application.ListNpcActions;
 import com.uxplima.uxmessentials.npc.application.ListNpcTypeData;
@@ -45,6 +46,7 @@ import org.jspecify.annotations.NullMarked;
  * @param delete {@code /npc delete}
  * @param list {@code /npc list}
  * @param nearby {@code /npc nearby}
+ * @param info {@code /npc info}
  * @param move {@code /npc movehere}
  * @param copy {@code /npc copy}
  * @param center {@code /npc center}
@@ -79,6 +81,7 @@ public record NpcServices(
         DeleteNpc delete,
         ListNpcs list,
         NearbyNpcs nearby,
+        DescribeNpc info,
         MoveNpc move,
         CopyNpc copy,
         CenterNpc center,
@@ -112,6 +115,7 @@ public record NpcServices(
         Objects.requireNonNull(delete, "delete");
         Objects.requireNonNull(list, "list");
         Objects.requireNonNull(nearby, "nearby");
+        Objects.requireNonNull(info, "info");
         Objects.requireNonNull(move, "move");
         Objects.requireNonNull(copy, "copy");
         Objects.requireNonNull(center, "center");

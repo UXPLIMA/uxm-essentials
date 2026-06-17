@@ -69,6 +69,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, NearbyNpcs.MAX_RADIUS))
                                 .executes(ctx -> nearby(ctx, ctx.getArgument("radius", Integer.class)))))
                 .then(name("movehere", this::move))
+                .then(name("info", this::info))
                 .then(Commands.literal("copy")
                         .then(nameArgument()
                                 .then(Commands.argument("target", StringArgumentType.word())
@@ -137,6 +138,15 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             return 0;
         }
         services.move().move(ref(sender), nameArg(ctx), position(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int info(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.info().describe(ref(sender), nameArg(ctx));
         return Command.SINGLE_SUCCESS;
     }
 
