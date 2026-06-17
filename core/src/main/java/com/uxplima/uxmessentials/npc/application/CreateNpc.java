@@ -45,6 +45,16 @@ public final class CreateNpc {
 
     /** Create the NPC {@code name} at {@code at} with {@code skin} (may be {@code null}), or reject a taken name. */
     public Result<Unit, NpcError> create(PlayerRef creator, NpcName name, Position at, @Nullable NpcSkin skin) {
+        return create(creator, name, at, skin, null);
+    }
+
+    /**
+     * Create the NPC {@code name} at {@code at} with {@code skin} (may be {@code null}) and, when {@code entityType}
+     * is given, rendered as that type instead of the default fake player; or reject a taken name. The type word is
+     * validated at the adapter boundary before this is called.
+     */
+    public Result<Unit, NpcError> create(
+            PlayerRef creator, NpcName name, Position at, @Nullable NpcSkin skin, @Nullable String entityType) {
         Objects.requireNonNull(creator, "creator");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(at, "at");
@@ -53,6 +63,9 @@ public final class CreateNpc {
             return Result.err(NpcError.NAME_TAKEN);
         }
         Npc npc = Npc.create(name, at, skin, clock.instant());
+        if (entityType != null && !entityType.isBlank()) {
+            npc = npc.withEntityType(entityType);
+        }
         repository.save(npc);
         view.render(npc);
         events.publish(new NpcCreated(name, creator, at));

@@ -82,6 +82,14 @@ class CreateNpcTest {
     }
 
     @Test
+    void createsAsTheGivenEntityType() {
+        create.create(actor, NpcName.of("piggy"), AT, null, "ZOMBIE");
+
+        assertThat(repository.find(NpcName.of("piggy")).orElseThrow().entityType())
+                .isEqualTo("ZOMBIE");
+    }
+
+    @Test
     void theCreatedNpcCarriesTheClockInstant() {
         create.create(actor, NpcName.of("guide"), AT, null);
 

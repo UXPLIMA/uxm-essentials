@@ -9,6 +9,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -118,6 +120,30 @@ abstract class NpcCommandSupport {
 
     static Position position(Player player) {
         return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
+    }
+
+    /**
+     * Parse {@code word} case-insensitively to a Bukkit {@link EntityType} an NPC can render as — {@code PLAYER}
+     * (the fake-player path) or any living-entity type — or {@code null} for an unknown or non-living type, so the
+     * caller can report {@code NPC_INVALID_ENTITY_TYPE}. Shared by {@code /npc create [type]} and {@code /npc type}.
+     */
+    static @Nullable EntityType parseLivingType(String word) {
+        EntityType type;
+        try {
+            type = EntityType.valueOf(word.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
+        return isLiving(type) ? type : null;
+    }
+
+    /** Whether an NPC may render as {@code type}: a fake player, or any entity whose class is a living entity. */
+    static boolean isLiving(EntityType type) {
+        if (type == EntityType.PLAYER) {
+            return true;
+        }
+        Class<?> entityClass = type.getEntityClass();
+        return entityClass != null && LivingEntity.class.isAssignableFrom(entityClass);
     }
 
     /** Suggest the {@code words} that start with what the operator has typed, case-insensitively. */

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.npc.adapter.inbound.command;
 import java.util.Collection;
 import java.util.function.Supplier;
 
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -62,7 +63,11 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("npc")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(name("create", this::create))
+                .then(Commands.literal("create")
+                        .then(nameArgument()
+                                .executes(this::create)
+                                .then(Commands.argument("type", StringArgumentType.word())
+                                        .executes(this::createTyped))))
                 .then(name("delete", this::delete))
                 .then(Commands.literal("list")
                         .executes(this::list)
@@ -108,6 +113,22 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
         }
         NpcSkin skin = BukkitNpcSkins.of(sender).orElse(null);
         services.create().create(ref(sender), nameArg(ctx), position(sender), skin);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int createTyped(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        String word = ctx.getArgument("type", String.class);
+        EntityType type = parseLivingType(word);
+        if (type == null) {
+            feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, java.util.Map.of("type", word));
+            return 0;
+        }
+        NpcSkin skin = BukkitNpcSkins.of(sender).orElse(null);
+        services.create().create(ref(sender), nameArg(ctx), position(sender), skin, type.name());
         return Command.SINGLE_SUCCESS;
     }
 

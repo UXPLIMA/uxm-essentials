@@ -8,7 +8,6 @@ import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -134,30 +133,6 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
             }
         }
         return builder.buildFuture();
-    }
-
-    /**
-     * Parse the type word case-insensitively to a Bukkit {@link EntityType}, accepting it only when it is a living
-     * type an NPC can render as ({@code PLAYER} or a living-entity class). Returns {@code null} for an unknown or
-     * non-living type so the caller reports {@link NpcMessageKey#NPC_INVALID_ENTITY_TYPE}.
-     */
-    private static @Nullable EntityType parseLivingType(String word) {
-        EntityType type;
-        try {
-            type = EntityType.valueOf(word.strip().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException unknown) {
-            return null;
-        }
-        return isLiving(type) ? type : null;
-    }
-
-    /** Whether an NPC may render as {@code type}: a fake player, or any entity whose class is a living entity. */
-    private static boolean isLiving(EntityType type) {
-        if (type == EntityType.PLAYER) {
-            return true;
-        }
-        Class<?> entityClass = type.getEntityClass();
-        return entityClass != null && LivingEntity.class.isAssignableFrom(entityClass);
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> equipNode() {
