@@ -96,4 +96,11 @@ class CreateNpcTest {
         assertThat(repository.find(NpcName.of("guide")).orElseThrow().createdAt())
                 .isEqualTo(Instant.ofEpochMilli(5_000));
     }
+
+    @Test
+    void recordsTheCreatorAsTheOwner() {
+        create.create(actor, NpcName.of("guide"), AT, null);
+
+        assertThat(repository.find(NpcName.of("guide")).orElseThrow().owner()).isEqualTo(actor.uuid());
+    }
 }

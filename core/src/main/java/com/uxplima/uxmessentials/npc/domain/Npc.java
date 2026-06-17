@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.Nullable;
@@ -30,8 +31,16 @@ import org.jspecify.annotations.Nullable;
  * @param appearance the visual half: skin, entity type, equipment, glow, pose, scale, type-data
  * @param behavior the interactive half: click command, look-at-player, action list
  * @param createdAt when the NPC was first created (preserved across every transition)
+ * @param owner the UUID of the player who created the NPC, or {@code null} for a server/console-created one with
+ *     no owner (preserved across every transition); used by the per-player creation quota
  */
-public record Npc(NpcName name, Position location, NpcAppearance appearance, NpcBehavior behavior, Instant createdAt) {
+public record Npc(
+        NpcName name,
+        Position location,
+        NpcAppearance appearance,
+        NpcBehavior behavior,
+        Instant createdAt,
+        @Nullable UUID owner) {
 
     /** The default entity type: a fake player, the one type with the tab-entry + skin path. */
     public static final String DEFAULT_ENTITY_TYPE = NpcAppearance.DEFAULT_ENTITY_TYPE;
@@ -76,12 +85,13 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
                 location,
                 new NpcAppearance(skin, entityType, equipment, glowing, glowColor, pose, scale, typeData),
                 new NpcBehavior(clickCommand, lookAtPlayer, actions),
-                createdAt);
+                createdAt,
+                null);
     }
 
     /** A new NPC created now at {@code location} with the given (possibly {@code null}) skin, no command, looking. */
     public static Npc create(NpcName name, Position location, @Nullable NpcSkin skin, Instant createdAt) {
-        return new Npc(name, location, NpcAppearance.defaults(skin), NpcBehavior.defaults(), createdAt);
+        return new Npc(name, location, NpcAppearance.defaults(skin), NpcBehavior.defaults(), createdAt, null);
     }
 
     // --- Appearance accessors (delegated, so existing call sites are unchanged) ---
@@ -177,22 +187,32 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
     /** A copy re-anchored to {@code newLocation}, keeping everything else. */
     public Npc movedTo(Position newLocation) {
         Objects.requireNonNull(newLocation, "newLocation");
-        return new Npc(name, newLocation, appearance, behavior, createdAt);
+        return new Npc(name, newLocation, appearance, behavior, createdAt, owner);
+    }
+
+    /** A copy owned by {@code newOwner} (or {@code null} for no owner), keeping everything else. */
+    public Npc withOwner(@Nullable UUID newOwner) {
+        return new Npc(name, location, appearance, behavior, createdAt, newOwner);
+    }
+
+    /** Whether this NPC has a recorded owner (a server/console-created NPC has none). */
+    public boolean hasOwner() {
+        return owner != null;
     }
 
     /** A copy wearing {@code newSkin} (or {@code null} to reset to the default skin), keeping everything else. */
     public Npc withSkin(@Nullable NpcSkin newSkin) {
-        return new Npc(name, location, appearance.withSkin(newSkin), behavior, createdAt);
+        return new Npc(name, location, appearance.withSkin(newSkin), behavior, createdAt, owner);
     }
 
     /** A copy whose click runs {@code newCommand} (or {@code null} to clear it), keeping everything else. */
     public Npc withClickCommand(@Nullable String newCommand) {
-        return new Npc(name, location, appearance, behavior.withClickCommand(newCommand), createdAt);
+        return new Npc(name, location, appearance, behavior.withClickCommand(newCommand), createdAt, owner);
     }
 
     /** A copy that does or does not rotate to face nearby viewers, keeping everything else. */
     public Npc withLookAtPlayer(boolean newLookAtPlayer) {
-        return new Npc(name, location, appearance, behavior.withLookAtPlayer(newLookAtPlayer), createdAt);
+        return new Npc(name, location, appearance, behavior.withLookAtPlayer(newLookAtPlayer), createdAt, owner);
     }
 
     /**
@@ -201,7 +221,7 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
      * the adapter's concern, validated at the command boundary before this is called.
      */
     public Npc withEntityType(String newEntityType) {
-        return new Npc(name, location, appearance.withEntityType(newEntityType), behavior, createdAt);
+        return new Npc(name, location, appearance.withEntityType(newEntityType), behavior, createdAt, owner);
     }
 
     /**
@@ -211,22 +231,22 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
      * so an unresolvable token simply renders no item in that slot rather than failing here.
      */
     public Npc withEquipment(EquipmentSlot slot, @Nullable String itemToken) {
-        return new Npc(name, location, appearance.withEquipment(slot, itemToken), behavior, createdAt);
+        return new Npc(name, location, appearance.withEquipment(slot, itemToken), behavior, createdAt, owner);
     }
 
     /** A copy with every equipment slot cleared, keeping everything else. */
     public Npc withEquipmentCleared() {
-        return new Npc(name, location, appearance.withEquipmentCleared(), behavior, createdAt);
+        return new Npc(name, location, appearance.withEquipmentCleared(), behavior, createdAt, owner);
     }
 
     /** A copy whose outline does or does not glow, keeping everything else (and its colour). */
     public Npc withGlowing(boolean newGlowing) {
-        return new Npc(name, location, appearance.withGlowing(newGlowing), behavior, createdAt);
+        return new Npc(name, location, appearance.withGlowing(newGlowing), behavior, createdAt, owner);
     }
 
     /** A copy whose glow outline is tinted {@code newColor} (or {@code null} for the default white), keeping the rest. */
     public Npc withGlowColor(@Nullable String newColor) {
-        return new Npc(name, location, appearance.withGlowColor(newColor), behavior, createdAt);
+        return new Npc(name, location, appearance.withGlowColor(newColor), behavior, createdAt, owner);
     }
 
     /**
@@ -235,12 +255,12 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
      * an unknown name renders standing rather than failing here.
      */
     public Npc withPose(String newPose) {
-        return new Npc(name, location, appearance.withPose(newPose), behavior, createdAt);
+        return new Npc(name, location, appearance.withPose(newPose), behavior, createdAt, owner);
     }
 
     /** A copy resized to {@code newScale} ({@code 1.0} is the natural size), keeping everything else. */
     public Npc withScale(double newScale) {
-        return new Npc(name, location, appearance.withScale(newScale), behavior, createdAt);
+        return new Npc(name, location, appearance.withScale(newScale), behavior, createdAt, owner);
     }
 
     /**
@@ -250,52 +270,52 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
      * adapter's concern, so an unsupported or unparseable pair simply renders nothing rather than failing here.
      */
     public Npc withTypeData(String key, @Nullable String value) {
-        return new Npc(name, location, appearance.withTypeData(key, value), behavior, createdAt);
+        return new Npc(name, location, appearance.withTypeData(key, value), behavior, createdAt, owner);
     }
 
     /** A copy whose shown name is {@code newDisplayName} (or {@code null}/blank to hide it), keeping everything else. */
     public Npc withDisplayName(@Nullable String newDisplayName) {
-        return new Npc(name, location, appearance.withDisplayName(newDisplayName), behavior, createdAt);
+        return new Npc(name, location, appearance.withDisplayName(newDisplayName), behavior, createdAt, owner);
     }
 
     /** A copy that does or does not mirror each viewer's own skin, keeping everything else. */
     public Npc withMirrorSkin(boolean newMirrorSkin) {
-        return new Npc(name, location, appearance.withMirrorSkin(newMirrorSkin), behavior, createdAt);
+        return new Npc(name, location, appearance.withMirrorSkin(newMirrorSkin), behavior, createdAt, owner);
     }
 
     /** A copy that does or does not collide with players, keeping everything else. */
     public Npc withCollidable(boolean newCollidable) {
-        return new Npc(name, location, appearance.withCollidable(newCollidable), behavior, createdAt);
+        return new Npc(name, location, appearance.withCollidable(newCollidable), behavior, createdAt, owner);
     }
 
     /** A copy that does or does not stay a tab-list entry, keeping everything else. */
     public Npc withShowInTab(boolean newShowInTab) {
-        return new Npc(name, location, appearance.withShowInTab(newShowInTab), behavior, createdAt);
+        return new Npc(name, location, appearance.withShowInTab(newShowInTab), behavior, createdAt, owner);
     }
 
     /** A copy with a per-NPC render distance ({@code null} to use the global default), keeping everything else. */
     public Npc withViewDistance(@Nullable Double newViewDistance) {
-        return new Npc(name, location, appearance.withViewDistance(newViewDistance), behavior, createdAt);
+        return new Npc(name, location, appearance.withViewDistance(newViewDistance), behavior, createdAt, owner);
     }
 
     /** A copy with a per-NPC look-at distance ({@code null} to use the global default), keeping everything else. */
     public Npc withTurnDistance(@Nullable Double newTurnDistance) {
-        return new Npc(name, location, appearance.withTurnDistance(newTurnDistance), behavior, createdAt);
+        return new Npc(name, location, appearance.withTurnDistance(newTurnDistance), behavior, createdAt, owner);
     }
 
     /** A copy that does or does not render on fire, keeping everything else. */
     public Npc withOnFire(boolean newOnFire) {
-        return new Npc(name, location, appearance.withOnFire(newOnFire), behavior, createdAt);
+        return new Npc(name, location, appearance.withOnFire(newOnFire), behavior, createdAt, owner);
     }
 
     /** A copy that is or is not invisible, keeping everything else. */
     public Npc withInvisible(boolean newInvisible) {
-        return new Npc(name, location, appearance.withInvisible(newInvisible), behavior, createdAt);
+        return new Npc(name, location, appearance.withInvisible(newInvisible), behavior, createdAt, owner);
     }
 
     /** A copy that is or is not silent, keeping everything else. */
     public Npc withSilent(boolean newSilent) {
-        return new Npc(name, location, appearance.withSilent(newSilent), behavior, createdAt);
+        return new Npc(name, location, appearance.withSilent(newSilent), behavior, createdAt, owner);
     }
 
     /**
@@ -304,12 +324,17 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
      */
     public Npc withInteractionCooldownMillis(long newCooldownMillis) {
         return new Npc(
-                name, location, appearance, behavior.withInteractionCooldownMillis(newCooldownMillis), createdAt);
+                name,
+                location,
+                appearance,
+                behavior.withInteractionCooldownMillis(newCooldownMillis),
+                createdAt,
+                owner);
     }
 
     /** A copy with {@code action} appended to the end of the action list, keeping everything else. */
     public Npc withActionAdded(NpcAction action) {
-        return new Npc(name, location, appearance, behavior.withActionAdded(action), createdAt);
+        return new Npc(name, location, appearance, behavior.withActionAdded(action), createdAt, owner);
     }
 
     /**
@@ -317,27 +342,27 @@ public record Npc(NpcName name, Position location, NpcAppearance appearance, Npc
      * {@link IndexOutOfBoundsException} when {@code index} is outside the current action list.
      */
     public Npc withActionRemovedAt(int index) {
-        return new Npc(name, location, appearance, behavior.withActionRemovedAt(index), createdAt);
+        return new Npc(name, location, appearance, behavior.withActionRemovedAt(index), createdAt, owner);
     }
 
     /** A copy with no actions, keeping everything else. */
     public Npc withActionsCleared() {
-        return new Npc(name, location, appearance, behavior.withActionsCleared(), createdAt);
+        return new Npc(name, location, appearance, behavior.withActionsCleared(), createdAt, owner);
     }
 
     /** A copy with {@code action} inserted at the 0-based {@code index} (an {@code index} of the size appends). */
     public Npc withActionInsertedAt(int index, NpcAction action) {
-        return new Npc(name, location, appearance, behavior.withActionInsertedAt(index, action), createdAt);
+        return new Npc(name, location, appearance, behavior.withActionInsertedAt(index, action), createdAt, owner);
     }
 
     /** A copy with the action at the 0-based {@code index} replaced by {@code action}, keeping everything else. */
     public Npc withActionSetAt(int index, NpcAction action) {
-        return new Npc(name, location, appearance, behavior.withActionSetAt(index, action), createdAt);
+        return new Npc(name, location, appearance, behavior.withActionSetAt(index, action), createdAt, owner);
     }
 
     /** A copy with the action at 0-based {@code from} moved to 0-based {@code to}, keeping everything else. */
     public Npc withActionMoved(int from, int to) {
-        return new Npc(name, location, appearance, behavior.withActionMoved(from, to), createdAt);
+        return new Npc(name, location, appearance, behavior.withActionMoved(from, to), createdAt, owner);
     }
 
     // --- Predicates (delegated) ---

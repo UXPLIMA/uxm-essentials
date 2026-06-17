@@ -223,6 +223,24 @@ class JooqNpcRepositoryTest {
     }
 
     @Test
+    void roundTripsTheOwnerUuid() {
+        UUID owner = UUID.randomUUID();
+        repository.save(Npc.create(NpcName.of("owned"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000))
+                .withOwner(owner));
+
+        assertThat(repository.find(NpcName.of("owned")).orElseThrow().owner()).isEqualTo(owner);
+    }
+
+    @Test
+    void readsAbsentOwnerAsNull() {
+        repository.save(
+                Npc.create(NpcName.of("ownerless"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
+
+        assertThat(repository.find(NpcName.of("ownerless")).orElseThrow().owner())
+                .isNull();
+    }
+
+    @Test
     void roundTripsActionsInOrder() {
         NpcAction first = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "<green>welcome");
         NpcAction second = new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.RUN_CONSOLE, "say hi {player}");

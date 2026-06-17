@@ -57,8 +57,8 @@ public final class CopyNpc {
             notifier.send(actor, NpcError.NAME_TAKEN.messageKey(), Map.of("name", target.value()));
             return Result.err(NpcError.NAME_TAKEN);
         }
-        Npc clone =
-                new Npc(target, at, original.get().appearance(), original.get().behavior(), clock.instant());
+        Npc clone = new Npc(
+                target, at, original.get().appearance(), original.get().behavior(), clock.instant(), actor.uuid());
         repository.save(clone);
         view.render(clone);
         events.publish(new NpcCreated(target, actor, at));

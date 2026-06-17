@@ -63,6 +63,7 @@ class CopyNpcTest {
         assertThat(clone.location()).isEqualTo(HERE);
         assertThat(clone.hasSkin()).isTrue();
         assertThat(clone.createdAt()).isEqualTo(Instant.ofEpochMilli(9_000));
+        assertThat(clone.owner()).isEqualTo(actor.uuid());
         assertThat(view.rendered).hasSize(1);
         assertThat(events.published).hasSize(1).first().isInstanceOf(NpcCreated.class);
         assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_COPIED.key());

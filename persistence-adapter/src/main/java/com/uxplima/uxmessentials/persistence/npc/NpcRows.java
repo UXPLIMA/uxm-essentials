@@ -84,7 +84,8 @@ final class NpcRows {
                 position,
                 appearance,
                 behavior,
-                Instant.ofEpochMilli(row.get(NPC.CREATED_AT)));
+                Instant.ofEpochMilli(row.get(NPC.CREATED_AT)),
+                ownerOf(row.get(NPC.OWNER_UUID)));
     }
 
     /** Populate an {@link NpcRecord} from a domain {@link Npc} for an upsert. */
@@ -132,7 +133,20 @@ final class NpcRows {
                 // narrowed from the domain's double exactly like scale; a distance fits a float without loss.
                 .setViewDistance(narrow(npc.viewDistance()))
                 .setTurnDistance(narrow(npc.turnDistance()))
+                .setOwnerUuid(npc.owner() == null ? null : npc.owner().toString())
                 .setCreatedAt(npc.createdAt().toEpochMilli());
+    }
+
+    /** Parse a stored owner uuid back to a {@link UUID}, or {@code null} for an absent or unparseable value. */
+    private static @Nullable UUID ownerOf(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException notAUuid) {
+            return null;
+        }
     }
 
     private static @Nullable NpcSkin skinOf(@Nullable String texture, @Nullable String signature, short slim) {

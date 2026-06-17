@@ -62,7 +62,7 @@ public final class CreateNpc {
             notifier.send(creator, NpcError.NAME_TAKEN.messageKey(), Map.of("name", name.value()));
             return Result.err(NpcError.NAME_TAKEN);
         }
-        Npc npc = Npc.create(name, at, skin, clock.instant());
+        Npc npc = Npc.create(name, at, skin, clock.instant()).withOwner(creator.uuid());
         if (entityType != null && !entityType.isBlank()) {
             npc = npc.withEntityType(entityType);
         }
