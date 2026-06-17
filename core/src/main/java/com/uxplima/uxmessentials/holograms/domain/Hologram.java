@@ -167,19 +167,16 @@ public record Hologram(
 
     // --- Transitions (createdAt and the untouched fields are always preserved) ---
 
+    /** A pre-filled builder for the internal transitions; the public surface is unchanged. */
+    HologramBuilder toBuilder() {
+        return new HologramBuilder(this);
+    }
+
     /** A copy re-anchored to {@code newLocation}, keeping everything else (including any NPC link). */
     public Hologram movedTo(Position newLocation) {
-        Objects.requireNonNull(newLocation, "newLocation");
-        return new Hologram(
-                name,
-                newLocation,
-                content,
-                appearance,
-                visibility,
-                rotation,
-                refreshIntervalTicks,
-                createdAt,
-                linkedNpcName);
+        return toBuilder()
+                .location(Objects.requireNonNull(newLocation, "newLocation"))
+                .build();
     }
 
     /**
@@ -188,9 +185,9 @@ public record Hologram(
      * Backs {@code /hologram linknpc}.
      */
     public Hologram linkedTo(String npcName) {
-        Objects.requireNonNull(npcName, "npcName");
-        return new Hologram(
-                name, location, content, appearance, visibility, rotation, refreshIntervalTicks, createdAt, npcName);
+        return toBuilder()
+                .linkedNpcName(Objects.requireNonNull(npcName, "npcName"))
+                .build();
     }
 
     /**
@@ -198,8 +195,7 @@ public record Hologram(
      * {@code /hologram unlinknpc}; a no-op in effect on an already-unlinked hologram.
      */
     public Hologram unlinked() {
-        return new Hologram(
-                name, location, content, appearance, visibility, rotation, refreshIntervalTicks, createdAt, null);
+        return toBuilder().linkedNpcName(null).build();
     }
 
     /**
@@ -208,17 +204,7 @@ public record Hologram(
      * same hologram in every way but its name.
      */
     public Hologram renamedTo(HologramName newName) {
-        Objects.requireNonNull(newName, "newName");
-        return new Hologram(
-                newName,
-                location,
-                content,
-                appearance,
-                visibility,
-                rotation,
-                refreshIntervalTicks,
-                createdAt,
-                linkedNpcName);
+        return toBuilder().name(Objects.requireNonNull(newName, "newName")).build();
     }
 
     /** A copy with {@code line} appended after the current last line. */
@@ -261,47 +247,23 @@ public record Hologram(
 
     /** A copy restyled with {@code newAppearance}, keeping everything else. */
     public Hologram withAppearance(Appearance newAppearance) {
-        Objects.requireNonNull(newAppearance, "newAppearance");
-        return new Hologram(
-                name,
-                location,
-                content,
-                newAppearance,
-                visibility,
-                rotation,
-                refreshIntervalTicks,
-                createdAt,
-                linkedNpcName);
+        return toBuilder()
+                .appearance(Objects.requireNonNull(newAppearance, "newAppearance"))
+                .build();
     }
 
     /** A copy with a new {@link Visibility}, keeping everything else. */
     public Hologram withVisibility(Visibility newVisibility) {
-        Objects.requireNonNull(newVisibility, "newVisibility");
-        return new Hologram(
-                name,
-                location,
-                content,
-                appearance,
-                newVisibility,
-                rotation,
-                refreshIntervalTicks,
-                createdAt,
-                linkedNpcName);
+        return toBuilder()
+                .visibility(Objects.requireNonNull(newVisibility, "newVisibility"))
+                .build();
     }
 
     /** A copy with a new {@link Rotation}, keeping everything else. */
     public Hologram withRotation(Rotation newRotation) {
-        Objects.requireNonNull(newRotation, "newRotation");
-        return new Hologram(
-                name,
-                location,
-                content,
-                appearance,
-                visibility,
-                newRotation,
-                refreshIntervalTicks,
-                createdAt,
-                linkedNpcName);
+        return toBuilder()
+                .rotation(Objects.requireNonNull(newRotation, "newRotation"))
+                .build();
     }
 
     /** A copy that re-renders every {@code ticks} ticks (0 = static); rejects a negative interval. */
@@ -309,19 +271,10 @@ public record Hologram(
         if (ticks < 0) {
             throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + ticks);
         }
-        return new Hologram(name, location, content, appearance, visibility, rotation, ticks, createdAt, linkedNpcName);
+        return toBuilder().refreshIntervalTicks(ticks).build();
     }
 
     private Hologram withContent(HologramContent newContent) {
-        return new Hologram(
-                name,
-                location,
-                newContent,
-                appearance,
-                visibility,
-                rotation,
-                refreshIntervalTicks,
-                createdAt,
-                linkedNpcName);
+        return toBuilder().content(newContent).build();
     }
 }
