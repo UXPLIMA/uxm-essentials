@@ -242,4 +242,13 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("text_line_width", "0")).isFalse();
         assertThat(NpcTypeData.isValidValue("text_line_width", "wide")).isFalse();
     }
+
+    @Test
+    void displayScaleAcceptsUniformOrXyzAndTranslationAcceptsAnyTriple() {
+        assertThat(NpcTypeData.isKnownKey("display_translation")).isTrue();
+        assertThat(NpcTypeData.isValidValue("display_scale", "2,1,3")).isTrue();
+        assertThat(NpcTypeData.isValidValue("display_scale", "2,0,3")).isFalse();
+        assertThat(NpcTypeData.isValidValue("display_translation", "0,-0.5,0")).isTrue();
+        assertThat(NpcTypeData.isValidValue("display_translation", "1,2")).isFalse();
+    }
 }

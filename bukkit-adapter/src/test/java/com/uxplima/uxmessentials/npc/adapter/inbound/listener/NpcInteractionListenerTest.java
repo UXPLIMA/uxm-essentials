@@ -516,6 +516,16 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object displayScale(int entityId, float x, float y, float z) {
+            return new Object();
+        }
+
+        @Override
+        public Object displayTranslation(int entityId, float x, float y, float z) {
+            return new Object();
+        }
+
+        @Override
         public Object displayBillboard(int entityId, byte constraint) {
             return new Object();
         }

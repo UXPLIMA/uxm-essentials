@@ -81,6 +81,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             "display_billboard",
             "text_background",
             "text_line_width",
+            "display_translation",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -130,8 +131,10 @@ final class NpcDataCommands extends NpcCommandSupport {
     private static final List<String> BLOCK_VALUES = List.of("stone", "oak_log", "glass");
     /** Sample item names, offered as a hint for {@code item} (any material name or {@code b64:} token is accepted). */
     private static final List<String> ITEM_VALUES = List.of("diamond", "golden_apple", "diamond_sword");
-    /** Sample uniform scales, offered as a hint for {@code display_scale}. */
-    private static final List<String> DISPLAY_SCALE_VALUES = List.of("1.0", "2.0", "0.5");
+    /** Sample scales (a uniform float or an {@code x,y,z} triple), offered as a hint for {@code display_scale}. */
+    private static final List<String> DISPLAY_SCALE_VALUES = List.of("1.0", "2.0", "0.5", "2,1,2");
+    /** Sample translation offsets ({@code x,y,z} blocks), offered as a hint for {@code display_translation}. */
+    private static final List<String> DISPLAY_TRANSLATION_VALUES = List.of("0,0,0", "0,0.5,0");
     /** The billboard modes, offered as tab completions for {@code display_billboard}. */
     private static final List<String> BILLBOARD_VALUES = List.of("fixed", "vertical", "horizontal", "center");
     /** Sample ARGB hex colours, offered as a hint for {@code text_background} (any {@code #aarrggbb}/{@code #rrggbb}). */
@@ -244,6 +247,7 @@ final class NpcDataCommands extends NpcCommandSupport {
             case "block" -> suggest(builder, BLOCK_VALUES);
             case "item" -> suggest(builder, ITEM_VALUES);
             case "display_scale" -> suggest(builder, DISPLAY_SCALE_VALUES);
+            case "display_translation" -> suggest(builder, DISPLAY_TRANSLATION_VALUES);
             case "display_billboard" -> suggest(builder, BILLBOARD_VALUES);
             case "text_background" -> suggest(builder, BACKGROUND_VALUES);
             case "text_line_width" -> suggest(builder, LINE_WIDTH_VALUES);

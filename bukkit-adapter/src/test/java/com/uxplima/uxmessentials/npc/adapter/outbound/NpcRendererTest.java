@@ -866,6 +866,24 @@ class NpcRendererTest {
     }
 
     @Test
+    void appliesNonUniformScaleAndTranslationToADisplayNpc() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("BLOCK_DISPLAY")
+                .withTypeData("block", "stone")
+                .withTypeData("display_scale", "2,1,3")
+                .withTypeData("display_translation", "0,-0.5,0"));
+
+        assertThat(packets.displayScaleXyzs).hasSize(1);
+        assertThat(packets.displayScaleXyzs.get(0).x()).isEqualTo(2f);
+        assertThat(packets.displayScaleXyzs.get(0).z()).isEqualTo(3f);
+        assertThat(packets.displayTranslations).hasSize(1);
+        assertThat(packets.displayTranslations.get(0).y()).isEqualTo(-0.5f);
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1419,6 +1437,8 @@ class NpcRendererTest {
         private final List<ItemDisplayItem> itemDisplayItems = new ArrayList<>();
         private final List<TextDisplayText> textDisplayTexts = new ArrayList<>();
         private final List<DisplayScale> displayScales = new ArrayList<>();
+        private final List<DisplayScaleXyz> displayScaleXyzs = new ArrayList<>();
+        private final List<DisplayTranslation> displayTranslations = new ArrayList<>();
         private final List<DisplayBillboard> displayBillboards = new ArrayList<>();
         private final List<TextDisplayBackground> textDisplayBackgrounds = new ArrayList<>();
         private final List<TextDisplayLineWidth> textDisplayLineWidths = new ArrayList<>();
@@ -1748,6 +1768,20 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object displayScale(int entityId, float x, float y, float z) {
+            DisplayScaleXyz packet = new DisplayScaleXyz(entityId, x, y, z);
+            displayScaleXyzs.add(packet);
+            return packet;
+        }
+
+        @Override
+        public Object displayTranslation(int entityId, float x, float y, float z) {
+            DisplayTranslation packet = new DisplayTranslation(entityId, x, y, z);
+            displayTranslations.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object displayBillboard(int entityId, byte constraint) {
             DisplayBillboard packet = new DisplayBillboard(entityId, constraint);
             displayBillboards.add(packet);
@@ -1951,6 +1985,10 @@ class NpcRendererTest {
         private record TextDisplayText(int entityId, String plain) {}
 
         private record DisplayScale(int entityId, float scale) {}
+
+        private record DisplayScaleXyz(int entityId, float x, float y, float z) {}
+
+        private record DisplayTranslation(int entityId, float x, float y, float z) {}
 
         private record DisplayBillboard(int entityId, byte constraint) {}
 

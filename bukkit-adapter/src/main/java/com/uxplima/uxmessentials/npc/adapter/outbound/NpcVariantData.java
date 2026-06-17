@@ -28,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  * colour, a shulker's peek, a panda's gene, a tropical fish's variant, the goat/allay/piglin/camel/bee/vex state
  * flags, an armor stand's client flags and six poses, an interaction entity's hitbox size, and a display entity's
  * content (a block/item/text display's shown block/item/text, plus a display's scale/billboard and a text
- * display's background colour). Kept in its own class so
+ * display's background colour and line width, plus a display's scale/billboard/translation). Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -83,6 +83,7 @@ final class NpcVariantData {
     static final String KEY_DISPLAY_BILLBOARD = "display_billboard";
     static final String KEY_TEXT_BACKGROUND = "text_background";
     static final String KEY_TEXT_LINE_WIDTH = "text_line_width";
+    static final String KEY_DISPLAY_TRANSLATION = "display_translation";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -175,6 +176,7 @@ final class NpcVariantData {
         applyItemDisplay(packets, viewer, id, type, data, npc, log);
         applyTextDisplay(packets, viewer, id, type, data, npc, log);
         applyDisplayScale(packets, viewer, id, type, data, npc, log);
+        applyDisplayTranslation(packets, viewer, id, type, data, npc, log);
         applyDisplayBillboard(packets, viewer, id, type, data, npc, log);
         applyTextBackground(packets, viewer, id, type, data, npc, log);
         applyTextLineWidth(packets, viewer, id, type, data, npc, log);
@@ -439,7 +441,10 @@ final class NpcVariantData {
         return type == EntityType.BLOCK_DISPLAY || type == EntityType.ITEM_DISPLAY || type == EntityType.TEXT_DISPLAY;
     }
 
-    /** Apply a display entity's uniform scale (the {@code display_scale} key); fail-soft on a bad value or wrong type. */
+    /**
+     * Apply a display entity's scale (the {@code display_scale} key): a single positive float scales uniformly,
+     * or a positive {@code "x,y,z"} triple scales each axis. Fail-soft on a bad value or wrong type.
+     */
     private static void applyDisplayScale(
             NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
         String value = data.get(KEY_DISPLAY_SCALE);
@@ -450,12 +455,40 @@ final class NpcVariantData {
             skip(log, npc, KEY_DISPLAY_SCALE, type, "type is not a block/item/text display");
             return;
         }
+        if (value.indexOf(',') >= 0) {
+            float[] axes = parseAngles(value);
+            if (axes == null || axes[0] <= 0 || axes[1] <= 0 || axes[2] <= 0) {
+                skip(log, npc, KEY_DISPLAY_SCALE, type, "value is not a positive x,y,z scale: " + value);
+                return;
+            }
+            packets.send(viewer, packets.displayScale(id, axes[0], axes[1], axes[2]));
+            return;
+        }
         Float scale = parseFloat(value);
         if (scale == null || !Float.isFinite(scale) || scale <= 0) {
             skip(log, npc, KEY_DISPLAY_SCALE, type, "value is not a positive scale: " + value);
             return;
         }
         packets.send(viewer, packets.displayScale(id, scale));
+    }
+
+    /** Apply a display entity's translation offset (the {@code display_translation} key, {@code "x,y,z"} blocks). */
+    private static void applyDisplayTranslation(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        String value = data.get(KEY_DISPLAY_TRANSLATION);
+        if (value == null) {
+            return;
+        }
+        if (!isVisualDisplay(type)) {
+            skip(log, npc, KEY_DISPLAY_TRANSLATION, type, "type is not a block/item/text display");
+            return;
+        }
+        float[] offset = parseAngles(value);
+        if (offset == null) {
+            skip(log, npc, KEY_DISPLAY_TRANSLATION, type, "value is not three comma-separated offsets: " + value);
+            return;
+        }
+        packets.send(viewer, packets.displayTranslation(id, offset[0], offset[1], offset[2]));
     }
 
     /** Apply a display entity's billboard constraint (the {@code display_billboard} key); fail-soft on a bad name. */
@@ -657,9 +690,14 @@ final class NpcVariantData {
                 // resolves the BlockData/item and skips fail-soft if it is unparseable.
             case KEY_BLOCK, KEY_ITEM, KEY_TEXT -> !value.isBlank();
             case KEY_DISPLAY_SCALE -> {
+                if (value.indexOf(',') >= 0) {
+                    float[] axes = parseAngles(value);
+                    yield axes != null && axes[0] > 0 && axes[1] > 0 && axes[2] > 0;
+                }
                 Float scale = parseFloat(value);
                 yield scale != null && Float.isFinite(scale) && scale > 0;
             }
+            case KEY_DISPLAY_TRANSLATION -> parseAngles(value) != null;
             case KEY_DISPLAY_BILLBOARD -> parseBillboard(value) != null;
             case KEY_TEXT_BACKGROUND -> parseArgb(value) != null;
             case KEY_TEXT_LINE_WIDTH -> {
@@ -851,5 +889,6 @@ final class NpcVariantData {
             KEY_DISPLAY_SCALE,
             KEY_DISPLAY_BILLBOARD,
             KEY_TEXT_BACKGROUND,
-            KEY_TEXT_LINE_WIDTH);
+            KEY_TEXT_LINE_WIDTH,
+            KEY_DISPLAY_TRANSLATION);
 }
