@@ -16,6 +16,8 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.shared.adapter.outbound.miniplaceholders.MiniPlaceholdersSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.packet.npc.ArmorStandPart;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
@@ -27,8 +29,8 @@ import org.jspecify.annotations.Nullable;
  * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
  * colour, a shulker's peek, a panda's gene, a tropical fish's variant, the goat/allay/piglin/camel/bee/vex state
  * flags, an armor stand's client flags and six poses, an interaction entity's hitbox size, and a display entity's
- * content (a block/item/text display's shown block/item/text, plus a display's scale/billboard and a text
- * display's background colour and line width, plus a display's scale/billboard/translation). Kept in its own class so
+ * content (a block/item/text display's shown block/item/text, a display's scale/billboard/translation, and a text
+ * display's background colour and line width — the text resolved per viewer). Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -579,9 +581,11 @@ final class NpcVariantData {
     }
 
     /**
-     * Apply a text-display entity's shown text: the {@code text} key (a MiniMessage string) is parsed to a
-     * component. Sent only to {@code TEXT_DISPLAY}; a MiniMessage parse error is skipped fail-soft. The text is
-     * static (the same for every viewer) — per-viewer placeholder text is a hologram concern.
+     * Apply a text-display entity's shown text: the {@code text} key (a MiniMessage string) is resolved <em>per
+     * viewer</em> — its {@code %papi%} tokens through that viewer's PlaceholderAPI bridge and its {@code <tag>}s
+     * through the MiniPlaceholders global resolver (both no-ops when their plugin is absent, so the text is then
+     * identical for everyone) — then deserialised. Since this runs once per viewer at render, each viewer sees
+     * their own values. Sent only to {@code TEXT_DISPLAY}; a MiniMessage parse error is skipped fail-soft.
      */
     private static void applyTextDisplay(
             NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
@@ -594,9 +598,13 @@ final class NpcVariantData {
             return;
         }
         try {
+            String resolved =
+                    PlaceholderApiSupport.messageBridge(viewer.getUniqueId()).apply(value);
             packets.send(
                     viewer,
-                    packets.textDisplayText(id, MiniMessage.miniMessage().deserialize(value)));
+                    packets.textDisplayText(
+                            id,
+                            MiniMessage.miniMessage().deserialize(resolved, MiniPlaceholdersSupport.globalResolver())));
         } catch (RuntimeException badMiniMessage) {
             skip(log, npc, KEY_TEXT, type, "value is not valid MiniMessage: " + badMiniMessage);
         }
