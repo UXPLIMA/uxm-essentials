@@ -479,6 +479,12 @@ class NpcInteractionListenerTest {
         }
 
         @Override
+        public Object armorStandFlags(
+                int entityId, boolean small, boolean showArms, boolean noBasePlate, boolean marker) {
+            return new Object();
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             return new Object();
         }

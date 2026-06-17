@@ -19,7 +19,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * The per-entity-type appearance variants beyond the baby/size/charged/villager core of {@link NpcTypeData}: a
  * horse's coat colour and markings, a llama/parrot/axolotl coat variant, a fox/rabbit type, a sheep/wolf/shulker
- * colour, a shulker's peek, a panda's gene, and the goat/allay/piglin/camel/bee/vex state flags. Kept in its own class so
+ * colour, a shulker's peek, a panda's gene, a tropical fish's variant, the goat/allay/piglin/camel/bee/vex state
+ * flags, and an armor stand's client flags. Kept in its own class so
  * {@code NpcTypeData} stays focused; the same support-map correctness invariant holds — a value is sent only to the
  * one Bukkit type that carries that field, and an unsupported key or unparseable value is skipped fail-soft (logged
  * at debug), never thrown on the render thread.
@@ -55,6 +56,10 @@ final class NpcVariantData {
     static final String KEY_BEE_NECTAR = "bee_nectar";
     static final String KEY_VEX_CHARGING = "vex_charging";
     static final String KEY_TROPICAL_FISH = "tropical_fish";
+    static final String KEY_AS_SMALL = "armor_stand_small";
+    static final String KEY_AS_ARMS = "armor_stand_arms";
+    static final String KEY_AS_NO_BASEPLATE = "armor_stand_no_baseplate";
+    static final String KEY_AS_MARKER = "armor_stand_marker";
 
     /** The horse coat colours (0–6) and body markings (0–4); the two pack into one variant integer. */
     private static final int MAX_HORSE_COLOR = 6;
@@ -127,6 +132,7 @@ final class NpcVariantData {
         for (BoolVariant variant : BOOL_VARIANTS) {
             applyBoolVariant(packets, viewer, id, type, data, npc, log, variant);
         }
+        applyArmorStand(packets, viewer, id, type, data, npc, log);
         NpcNameVariantData.apply(packets, viewer, id, type, data, npc, log);
     }
 
@@ -254,6 +260,39 @@ final class NpcVariantData {
         variant.send().accept(packets, viewer, id, parsed);
     }
 
+    /**
+     * Apply the armor-stand client flags: the four boolean keys compose into one {@code DATA_CLIENT_FLAGS} byte,
+     * so unlike the {@link BoolVariant} table (one bit per packet) they go out as a single packet. A flag is on
+     * only when its key is present and {@code true}; absent or {@code false} leaves it clear.
+     */
+    private static void applyArmorStand(
+            NpcPackets packets, Player viewer, int id, EntityType type, Map<String, String> data, Npc npc, Logger log) {
+        if (!data.containsKey(KEY_AS_SMALL)
+                && !data.containsKey(KEY_AS_ARMS)
+                && !data.containsKey(KEY_AS_NO_BASEPLATE)
+                && !data.containsKey(KEY_AS_MARKER)) {
+            return;
+        }
+        if (type != EntityType.ARMOR_STAND) {
+            skip(log, npc, KEY_AS_SMALL, type, "type is not an armor stand");
+            return;
+        }
+        packets.send(
+                viewer,
+                packets.armorStandFlags(
+                        id,
+                        boolFlag(data, KEY_AS_SMALL),
+                        boolFlag(data, KEY_AS_ARMS),
+                        boolFlag(data, KEY_AS_NO_BASEPLATE),
+                        boolFlag(data, KEY_AS_MARKER)));
+    }
+
+    /** A composed-flag read: {@code true} only when {@code key} is present and parses to {@code true}. */
+    private static boolean boolFlag(Map<String, String> data, String key) {
+        String value = data.get(key);
+        return value != null && Boolean.TRUE.equals(parseBool(value));
+    }
+
     /** Whether {@code key} is one of the variant keys this class applies — the set the command validates against. */
     static boolean isKnownKey(String key) {
         return KEYS.contains(key.toLowerCase(Locale.ROOT)) || NpcNameVariantData.isKnownKey(key);
@@ -275,7 +314,11 @@ final class NpcVariantData {
                     KEY_PIGLIN_DANCING,
                     KEY_CAMEL_DASH,
                     KEY_BEE_NECTAR,
-                    KEY_VEX_CHARGING -> parseBool(value) != null;
+                    KEY_VEX_CHARGING,
+                    KEY_AS_SMALL,
+                    KEY_AS_ARMS,
+                    KEY_AS_NO_BASEPLATE,
+                    KEY_AS_MARKER -> parseBool(value) != null;
             case KEY_RABBIT_TYPE -> {
                 Integer parsed = parseInt(value);
                 yield parsed != null && isRabbitType(parsed);
@@ -439,5 +482,9 @@ final class NpcVariantData {
             KEY_CAMEL_DASH,
             KEY_BEE_NECTAR,
             KEY_VEX_CHARGING,
-            KEY_TROPICAL_FISH);
+            KEY_TROPICAL_FISH,
+            KEY_AS_SMALL,
+            KEY_AS_ARMS,
+            KEY_AS_NO_BASEPLATE,
+            KEY_AS_MARKER);
 }

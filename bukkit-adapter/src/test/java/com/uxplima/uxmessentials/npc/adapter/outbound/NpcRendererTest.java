@@ -739,6 +739,24 @@ class NpcRendererTest {
     }
 
     @Test
+    void composesArmorStandClientFlagsIntoOnePacket() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)
+                .withEntityType("ARMOR_STAND")
+                .withTypeData("armor_stand_small", "true")
+                .withTypeData("armor_stand_arms", "true")
+                .withTypeData("armor_stand_marker", "false"));
+
+        assertThat(packets.armorStandFlags).hasSize(1);
+        assertThat(packets.armorStandFlags.get(0).small()).isTrue();
+        assertThat(packets.armorStandFlags.get(0).showArms()).isTrue();
+        assertThat(packets.armorStandFlags.get(0).noBasePlate()).isFalse();
+        assertThat(packets.armorStandFlags.get(0).marker()).isFalse();
+    }
+
+    @Test
     void appliesParrotVariantToAParrotNpc() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -1285,6 +1303,7 @@ class NpcRendererTest {
         private final List<BeeNectar> beeNectars = new ArrayList<>();
         private final List<VexCharging> vexChargings = new ArrayList<>();
         private final List<TropicalFishVariant> tropicalFishVariants = new ArrayList<>();
+        private final List<ArmorStandFlags> armorStandFlags = new ArrayList<>();
         private final List<ParrotVariant> parrotVariants = new ArrayList<>();
         private final List<AxolotlVariant> axolotlVariants = new ArrayList<>();
         private final List<FoxType> foxTypes = new ArrayList<>();
@@ -1558,6 +1577,14 @@ class NpcRendererTest {
         }
 
         @Override
+        public Object armorStandFlags(
+                int entityId, boolean small, boolean showArms, boolean noBasePlate, boolean marker) {
+            ArmorStandFlags packet = new ArmorStandFlags(entityId, small, showArms, noBasePlate, marker);
+            armorStandFlags.add(packet);
+            return packet;
+        }
+
+        @Override
         public Object parrotVariant(int entityId, int variant) {
             ParrotVariant packet = new ParrotVariant(entityId, variant);
             parrotVariants.add(packet);
@@ -1724,6 +1751,9 @@ class NpcRendererTest {
         private record VexCharging(int entityId, boolean charging) {}
 
         private record TropicalFishVariant(int entityId, int variantIndex) {}
+
+        private record ArmorStandFlags(
+                int entityId, boolean small, boolean showArms, boolean noBasePlate, boolean marker) {}
 
         private record ParrotVariant(int entityId, int variant) {}
 

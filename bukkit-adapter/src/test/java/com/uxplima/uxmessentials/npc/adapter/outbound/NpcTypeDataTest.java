@@ -65,6 +65,10 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isKnownKey("bee_nectar")).isTrue();
         assertThat(NpcTypeData.isKnownKey("vex_charging")).isTrue();
         assertThat(NpcTypeData.isKnownKey("tropical_fish")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("armor_stand_small")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("armor_stand_arms")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("armor_stand_no_baseplate")).isTrue();
+        assertThat(NpcTypeData.isKnownKey("armor_stand_marker")).isTrue();
         assertThat(NpcTypeData.isKnownKey("parrot_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("axolotl_variant")).isTrue();
         assertThat(NpcTypeData.isKnownKey("fox_type")).isTrue();
@@ -172,6 +176,10 @@ class NpcTypeDataTest {
         assertThat(NpcTypeData.isValidValue("camel_dash", "false")).isTrue();
         assertThat(NpcTypeData.isValidValue("bee_nectar", "true")).isTrue();
         assertThat(NpcTypeData.isValidValue("vex_charging", "false")).isTrue();
+        assertThat(NpcTypeData.isValidValue("armor_stand_small", "true")).isTrue();
+        assertThat(NpcTypeData.isValidValue("armor_stand_arms", "false")).isTrue();
+        assertThat(NpcTypeData.isValidValue("armor_stand_no_baseplate", "TRUE")).isTrue();
+        assertThat(NpcTypeData.isValidValue("armor_stand_marker", "nope")).isFalse();
         assertThat(NpcTypeData.isValidValue("goat_screaming", "yes")).isFalse();
         assertThat(NpcTypeData.isValidValue("camel_dash", "1")).isFalse();
         assertThat(NpcTypeData.isValidValue("vex_charging", "maybe")).isFalse();

@@ -62,6 +62,10 @@ final class NpcDataCommands extends NpcCommandSupport {
             "bee_nectar",
             "vex_charging",
             "tropical_fish",
+            "armor_stand_small",
+            "armor_stand_arms",
+            "armor_stand_no_baseplate",
+            "armor_stand_marker",
             "cat_variant",
             "frog_variant");
     /** The boolean keys' suggested values, offered as tab completions for {@code baby}/{@code charged}. */
@@ -184,7 +188,11 @@ final class NpcDataCommands extends NpcCommandSupport {
                     "piglin_dancing",
                     "camel_dash",
                     "bee_nectar",
-                    "vex_charging" -> suggest(builder, BOOLEAN_VALUES);
+                    "vex_charging",
+                    "armor_stand_small",
+                    "armor_stand_arms",
+                    "armor_stand_no_baseplate",
+                    "armor_stand_marker" -> suggest(builder, BOOLEAN_VALUES);
             case "cat_variant" -> suggest(builder, CAT_VARIANT_VALUES);
             case "frog_variant" -> suggest(builder, FROG_VARIANT_VALUES);
             case "horse_color" -> suggest(builder, HORSE_COLOR_VALUES);
