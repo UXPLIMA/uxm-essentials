@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
+import com.uxplima.uxmessentials.npc.adapter.outbound.NpcTeleportAdapter;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
 import com.uxplima.uxmessentials.npc.application.CenterNpc;
@@ -57,6 +58,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkinSlim;
 import com.uxplima.uxmessentials.npc.application.SetNpcState;
 import com.uxplima.uxmessentials.npc.application.SetNpcTypeData;
+import com.uxplima.uxmessentials.npc.application.TeleportToNpc;
 import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
@@ -155,6 +157,7 @@ public final class NpcWiring {
                 new ListNpcs(repository, notifier),
                 new NearbyNpcs(repository, notifier),
                 new DescribeNpc(repository, notifier),
+                new TeleportToNpc(repository, new NpcTeleportAdapter(kernel.scheduler(), kernel.log()), notifier),
                 new MoveNpc(repository, renderer, notifier, kernel.events()),
                 new CopyNpc(repository, renderer, notifier, kernel.events(), clock),
                 new CenterNpc(repository, renderer, notifier, kernel.events()),

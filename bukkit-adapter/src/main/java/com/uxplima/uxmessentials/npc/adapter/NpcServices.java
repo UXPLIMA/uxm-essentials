@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkinSlim;
 import com.uxplima.uxmessentials.npc.application.SetNpcState;
 import com.uxplima.uxmessentials.npc.application.SetNpcTypeData;
+import com.uxplima.uxmessentials.npc.application.TeleportToNpc;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -47,6 +48,7 @@ import org.jspecify.annotations.NullMarked;
  * @param list {@code /npc list}
  * @param nearby {@code /npc nearby}
  * @param info {@code /npc info}
+ * @param teleport {@code /npc teleport}
  * @param move {@code /npc movehere}
  * @param copy {@code /npc copy}
  * @param center {@code /npc center}
@@ -82,6 +84,7 @@ public record NpcServices(
         ListNpcs list,
         NearbyNpcs nearby,
         DescribeNpc info,
+        TeleportToNpc teleport,
         MoveNpc move,
         CopyNpc copy,
         CenterNpc center,
@@ -116,6 +119,7 @@ public record NpcServices(
         Objects.requireNonNull(list, "list");
         Objects.requireNonNull(nearby, "nearby");
         Objects.requireNonNull(info, "info");
+        Objects.requireNonNull(teleport, "teleport");
         Objects.requireNonNull(move, "move");
         Objects.requireNonNull(copy, "copy");
         Objects.requireNonNull(center, "center");

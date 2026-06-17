@@ -22,6 +22,7 @@ public enum NpcMessageKey implements MessageKey {
     NPC_COPIED("npc.copied"),
     NPC_CENTERED("npc.centered"),
     NPC_FIXED("npc.fixed"),
+    NPC_TELEPORTED("npc.teleported"),
 
     // skin / command feedback
     NPC_SKIN_SET("npc.skin.set"),
