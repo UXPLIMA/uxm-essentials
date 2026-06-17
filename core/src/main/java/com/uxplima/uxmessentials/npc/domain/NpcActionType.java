@@ -7,8 +7,8 @@ package com.uxplima.uxmessentials.npc.domain;
  * types and carries the value; how each one runs against Bukkit is an adapter concern.
  *
  * <p>The types split into two roles the adapter's sequencer treats differently. <em>Effect</em> types
- * ({@link #RUN_CONSOLE}, {@link #RUN_PLAYER}, {@link #MESSAGE}, {@link #ACTIONBAR}, {@link #TITLE},
- * {@link #SOUND}, {@link #CONNECT}, {@link #GIVE}) do something visible and are fail-soft — one bad effect is
+ * ({@link #RUN_CONSOLE}, {@link #RUN_PLAYER}, {@link #RUN_PLAYER_AS_OP}, {@link #MESSAGE}, {@link #ACTIONBAR},
+ * {@link #TITLE}, {@link #SOUND}, {@link #CONNECT}, {@link #GIVE}) do something visible and are fail-soft — one bad effect is
  * logged and skipped, the chain continues. <em>Gate</em> types ({@link #CHANCE}, {@link #PERMISSION},
  * {@link #CONDITION}, {@link #COST}) decide whether the rest of the chain runs at all: a failed gate stops the
  * remaining actions (a malformed gate spec is the exception — it is logged and skipped, never aborting).
@@ -22,6 +22,13 @@ public enum NpcActionType {
 
     /** Run the value as a command performed by the clicking player. */
     RUN_PLAYER,
+
+    /**
+     * Run the value as a command performed by the clicking player with operator permissions for that one dispatch.
+     * The adapter temporarily grants op, performs the command, and restores the prior op state even if it throws,
+     * so a normal player can trigger a privileged command without ever holding op.
+     */
+    RUN_PLAYER_AS_OP,
 
     /** Send the value to the player as a chat message. */
     MESSAGE,

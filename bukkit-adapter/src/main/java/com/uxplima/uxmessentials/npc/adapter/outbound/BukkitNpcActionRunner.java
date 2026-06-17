@@ -254,6 +254,7 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
         switch (action.type()) {
             case RUN_CONSOLE -> runConsole(viewer, value);
             case RUN_PLAYER -> commandRunner.runAsPlayer(viewer, withPlayer(viewer, stripPrefix(value)));
+            case RUN_PLAYER_AS_OP -> commandRunner.runAsPlayerOp(viewer, withPlayer(viewer, stripPrefix(value)));
             case MESSAGE -> viewer.sendMessage(component(viewer, value));
             case ACTIONBAR -> viewer.sendActionBar(component(viewer, value));
             case TITLE -> showTitle(viewer, value);

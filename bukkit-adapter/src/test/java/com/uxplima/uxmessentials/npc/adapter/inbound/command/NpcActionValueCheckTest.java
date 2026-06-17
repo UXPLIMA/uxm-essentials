@@ -34,6 +34,7 @@ class NpcActionValueCheckTest {
         assertThat(NpcActionValueCheck.parseType("condition")).contains(NpcActionType.CONDITION);
         assertThat(NpcActionValueCheck.parseType("cost")).contains(NpcActionType.COST);
         assertThat(NpcActionValueCheck.parseType("give")).contains(NpcActionType.GIVE);
+        assertThat(NpcActionValueCheck.parseType("player_op")).contains(NpcActionType.RUN_PLAYER_AS_OP);
         assertThat(NpcActionValueCheck.parseType("nope")).isEmpty();
     }
 

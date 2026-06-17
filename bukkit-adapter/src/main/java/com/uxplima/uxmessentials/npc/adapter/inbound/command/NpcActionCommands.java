@@ -47,6 +47,7 @@ final class NpcActionCommands extends NpcCommandSupport {
     private static final List<String> TYPE_WORDS = List.of(
             "console",
             "player",
+            "player_op",
             "message",
             "actionbar",
             "title",

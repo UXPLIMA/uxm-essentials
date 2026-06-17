@@ -123,6 +123,7 @@ final class NpcActionValueCheck {
         return switch (word.strip().toLowerCase(Locale.ROOT)) {
             case "console" -> Optional.of(NpcActionType.RUN_CONSOLE);
             case "player" -> Optional.of(NpcActionType.RUN_PLAYER);
+            case "player_op" -> Optional.of(NpcActionType.RUN_PLAYER_AS_OP);
             case "message" -> Optional.of(NpcActionType.MESSAGE);
             case "actionbar" -> Optional.of(NpcActionType.ACTIONBAR);
             case "title" -> Optional.of(NpcActionType.TITLE);

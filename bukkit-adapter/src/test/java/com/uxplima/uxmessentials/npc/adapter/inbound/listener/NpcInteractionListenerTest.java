@@ -513,6 +513,11 @@ class NpcInteractionListenerTest {
         public void runAsPlayer(Player player, String command) {
             playerCommands.add(command);
         }
+
+        @Override
+        public void runAsPlayerOp(Player player, String command) {
+            playerCommands.add(command);
+        }
     }
 
     /** One captured action-chain invocation: the actions passed and the attack flag they were run with. */

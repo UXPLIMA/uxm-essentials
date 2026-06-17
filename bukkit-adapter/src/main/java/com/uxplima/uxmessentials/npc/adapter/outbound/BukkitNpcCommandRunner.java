@@ -28,4 +28,22 @@ public final class BukkitNpcCommandRunner implements NpcCommandRunner {
         Objects.requireNonNull(command, "command");
         player.performCommand(command);
     }
+
+    @Override
+    public void runAsPlayerOp(Player player, String command) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(command, "command");
+        boolean wasOp = player.isOp();
+        try {
+            if (!wasOp) {
+                player.setOp(true);
+            }
+            player.performCommand(command);
+        } finally {
+            // Restore the prior op state even if the command threw, so the elevation never leaks past this dispatch.
+            if (!wasOp) {
+                player.setOp(false);
+            }
+        }
+    }
 }

@@ -98,6 +98,14 @@ class BukkitNpcActionRunnerTest {
     }
 
     @Test
+    void runsAPlayerOpActionThroughTheOpRunner() {
+        runner().run(player, List.of(new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER_AS_OP, "fly")), false);
+
+        assertThat(commandRunner.opCommands).containsExactly("fly");
+        assertThat(commandRunner.playerCommands).isEmpty();
+    }
+
+    @Test
     void runsOnlyTheActionsWhoseTriggerMatchesAnAttack() {
         runner().run(
                         player,
@@ -697,6 +705,7 @@ class BukkitNpcActionRunnerTest {
     private static final class RecordingRunner implements NpcCommandRunner {
         private final List<String> consoleCommands = new ArrayList<>();
         private final List<String> playerCommands = new ArrayList<>();
+        private final List<String> opCommands = new ArrayList<>();
 
         @Override
         public void runAsConsole(String command) {
@@ -706,6 +715,11 @@ class BukkitNpcActionRunnerTest {
         @Override
         public void runAsPlayer(Player player, String command) {
             playerCommands.add(command);
+        }
+
+        @Override
+        public void runAsPlayerOp(Player player, String command) {
+            opCommands.add(command);
         }
     }
 
