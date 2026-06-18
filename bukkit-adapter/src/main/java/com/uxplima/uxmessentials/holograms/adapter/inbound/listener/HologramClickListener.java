@@ -15,6 +15,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramClickKey;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramPageCycler;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -34,12 +35,14 @@ public final class HologramClickListener implements Listener {
 
     private final NamespacedKey clickKey;
     private final HologramRepository repository;
+    private final HologramPageCycler pageCycler;
     private final ConcurrentHashMap<UUID, Long> lastClick = new ConcurrentHashMap<>();
 
-    public HologramClickListener(Plugin plugin, HologramRepository repository) {
+    public HologramClickListener(Plugin plugin, HologramRepository repository, HologramPageCycler pageCycler) {
         Objects.requireNonNull(plugin, "plugin");
         this.clickKey = new NamespacedKey(plugin, HologramClickKey.PDC_KEY);
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.pageCycler = Objects.requireNonNull(pageCycler, "pageCycler");
     }
 
     @EventHandler
@@ -55,11 +58,17 @@ public final class HologramClickListener implements Listener {
         if (onCooldown(player.getUniqueId())) {
             return;
         }
-        repository
-                .find(HologramName.of(name))
-                .map(Hologram::clickCommand)
-                .filter(command -> !command.isBlank())
-                .ifPresent(player::performCommand);
+        Hologram hologram = repository.find(HologramName.of(name)).orElse(null);
+        if (hologram == null) {
+            return;
+        }
+        String command = hologram.clickCommand();
+        if (command != null && !command.isBlank()) {
+            // A command takes precedence; a multi-page hologram without a command cycles the viewer's page.
+            player.performCommand(command);
+        } else if (hologram.isMultiPage()) {
+            pageCycler.cyclePage(player, hologram.name());
+        }
     }
 
     /** True when this player clicked within the debounce window; records the click time otherwise. */

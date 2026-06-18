@@ -87,6 +87,7 @@ class HologramRendererPerViewerDispatchTest {
                 bridges,
                 MiniMessage.miniMessage(),
                 net.kyori.adventure.text.minimessage.tag.resolver.TagResolver::empty,
+                new HologramPageState(),
                 noOpLogger());
     }
 

@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramComma
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramClickListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.EventDrivenNpcLocator;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramPageState;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTeleportAdapter;
@@ -110,11 +111,15 @@ public final class HologramsWiring {
         // time, TPS); the identity transform when PlaceholderAPI is absent, so a default server pays nothing. On
         // top of that base, a line embedding a placeholder additionally renders per viewer through the text-override
         // collaborator below — each viewer sees their own resolved values over the one shared entity.
+        // The per-viewer current page of each multi-page hologram, shared by the text-override collaborator (which
+        // resolves a viewer's current page) and the renderer (which advances it on a click and clears it on despawn).
+        HologramPageState pageState = new HologramPageState();
         HologramTextOverrides textOverrides = new HologramTextOverrides(
                 perViewerTextPackets(),
                 PlaceholderApiSupport::messageBridge,
                 MiniMessage.miniMessage(),
                 MiniPlaceholdersSupport::globalResolver,
+                pageState,
                 kernel.log());
         HologramViewers viewers = new HologramViewers(plugin, kernel.permissions(), repository::manualViewers);
         // The NPC-link seam: a locator over the npc context's stored set kept current by the domain-event bus,
@@ -137,7 +142,8 @@ public final class HologramsWiring {
                 viewers,
                 textOverrides,
                 npcLocator,
-                leaderboards);
+                leaderboards,
+                pageState);
         rendererHolder.set(renderer);
         InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
         Consumer<DomainEvent> npcSubscriber = npcLocator;
@@ -148,7 +154,9 @@ public final class HologramsWiring {
         // A joining player must pick up the permission-gated holograms they qualify for at once, not after a
         // refresh tick; this listener re-evaluates only the gated holograms for that one player.
         plugin.getServer().getPluginManager().registerEvents(new HologramVisibilityListener(renderer), plugin);
-        plugin.getServer().getPluginManager().registerEvents(new HologramClickListener(plugin, repository), plugin);
+        plugin.getServer()
+                .getPluginManager()
+                .registerEvents(new HologramClickListener(plugin, repository, renderer), plugin);
         AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer);
         // The cached repository's all() is the authoritative in-memory set after the one warm load, so reading
         // names off it per keystroke is allocation-light and never touches the database — safe on the tick thread.

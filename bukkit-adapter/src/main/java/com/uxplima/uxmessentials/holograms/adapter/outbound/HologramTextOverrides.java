@@ -46,6 +46,7 @@ public final class HologramTextOverrides {
     private final Function<java.util.UUID, UnaryOperator<String>> bridgeFactory;
     private final MiniMessage miniMessage;
     private final Supplier<TagResolver> globalTags;
+    private final HologramPageState pageState;
     private final Logger log;
 
     public HologramTextOverrides(
@@ -53,16 +54,19 @@ public final class HologramTextOverrides {
             Function<java.util.UUID, UnaryOperator<String>> bridgeFactory,
             MiniMessage miniMessage,
             Supplier<TagResolver> globalTags,
+            HologramPageState pageState,
             Logger log) {
         this.packets = Objects.requireNonNull(packets, "packets");
         this.bridgeFactory = Objects.requireNonNull(bridgeFactory, "bridgeFactory");
         this.miniMessage = Objects.requireNonNull(miniMessage, "miniMessage");
         this.globalTags = Objects.requireNonNull(globalTags, "globalTags");
+        this.pageState = Objects.requireNonNull(pageState, "pageState");
         this.log = Objects.requireNonNull(log, "log");
     }
 
     /**
-     * Whether {@code hologram} needs per-viewer text: a {@link HologramType#TEXT} hologram with at least one line
+     * Whether {@code hologram} needs per-viewer text: a {@link HologramType#TEXT} hologram that is either
+     * multi-page (each viewer sees their own current page over the shared display) or has at least one line
      * carrying a {@code %...%} placeholder token. Item and block holograms render the model only (v1), so their
      * label lines are never a per-viewer target.
      */
@@ -70,6 +74,9 @@ public final class HologramTextOverrides {
         Objects.requireNonNull(hologram, "hologram");
         if (hologram.type() != HologramType.TEXT) {
             return false;
+        }
+        if (hologram.isMultiPage()) {
+            return true;
         }
         for (HologramLine line : hologram.lines()) {
             if (PlaceholderApiSupport.hasPlaceholder(line.value())) {
@@ -101,12 +108,19 @@ public final class HologramTextOverrides {
         }
     }
 
-    /** Resolve {@code hologram}'s lines for one viewer, joined with newlines as the shared entity renders them. */
+    /**
+     * Resolve {@code hologram}'s lines for one viewer, joined with newlines as the shared entity renders them.
+     * For a multi-page hologram the viewer's current page (page 0 by default) is resolved, so each viewer sees
+     * their own page over the one shared display; for a single-page hologram its lines are resolved as before.
+     */
     private Component resolveFor(java.util.UUID viewer, Hologram hologram) {
         UnaryOperator<String> bridge = bridgeFactory.apply(viewer);
         TagResolver tags = globalTags.get();
-        java.util.List<Component> resolved = new java.util.ArrayList<>(hologram.lineCount());
-        for (HologramLine line : hologram.lines()) {
+        java.util.List<HologramLine> lines = hologram.isMultiPage()
+                ? hologram.pageLines(pageState.currentPage(hologram.name().value(), viewer, hologram.pageCount()))
+                : hologram.lines();
+        java.util.List<Component> resolved = new java.util.ArrayList<>(lines.size());
+        for (HologramLine line : lines) {
             // The per-viewer path renders a static frame, so an inline animation directive is stripped rather than
             // shown literally — animation and per-viewer placeholders do not combine (the placeholder wins).
             String source = HologramAnimations.stripDirective(bridge.apply(line.value()));

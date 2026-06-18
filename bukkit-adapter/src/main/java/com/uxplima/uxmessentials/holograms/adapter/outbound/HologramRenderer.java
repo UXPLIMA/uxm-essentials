@@ -83,7 +83,7 @@ import org.jspecify.annotations.NullMarked;
  * view-range multiplier untouched.
  */
 @NullMarked
-public final class HologramRenderer implements HologramView {
+public final class HologramRenderer implements HologramView, HologramPageCycler {
 
     /**
      * How far above the linked NPC's feet a linked hologram floats, so it sits over the NPC's head rather than
@@ -102,6 +102,7 @@ public final class HologramRenderer implements HologramView {
     private final HologramTextOverrides textOverrides;
     private final LinkedNpcLocator linkedNpcs;
     private final com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards;
+    private final HologramPageState pageState;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final Map<String, Tracked> live = new ConcurrentHashMap<>();
     /** The PDC key stamped on a clickable hologram's Interaction hitbox; the click listener reads the same key. */
@@ -120,7 +121,8 @@ public final class HologramRenderer implements HologramView {
             HologramViewers viewers,
             HologramTextOverrides textOverrides,
             LinkedNpcLocator linkedNpcs,
-            com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards) {
+            com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards,
+            HologramPageState pageState) {
         this.leaderboards = Objects.requireNonNull(leaderboards, "leaderboards");
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.manager = Objects.requireNonNull(manager, "manager");
@@ -131,6 +133,7 @@ public final class HologramRenderer implements HologramView {
         this.viewers = Objects.requireNonNull(viewers, "viewers");
         this.textOverrides = Objects.requireNonNull(textOverrides, "textOverrides");
         this.linkedNpcs = Objects.requireNonNull(linkedNpcs, "linkedNpcs");
+        this.pageState = Objects.requireNonNull(pageState, "pageState");
         this.clickKey = new org.bukkit.NamespacedKey(plugin, HologramClickKey.PDC_KEY);
     }
 
@@ -226,12 +229,14 @@ public final class HologramRenderer implements HologramView {
             scheduler.onRegion(tracked.position(), () -> tracked.live().removeFrom(manager));
         }
         live.clear();
+        pageState.clearAll();
     }
 
     @Override
     public void despawn(HologramName name) {
         Objects.requireNonNull(name, "name");
         Tracked existing = live.remove(name.value());
+        pageState.clear(name.value());
         if (existing == null) {
             return;
         }
@@ -330,7 +335,9 @@ public final class HologramRenderer implements HologramView {
             // Invalid item material or block data — already logged; leave nothing tracked rather than crash.
             return;
         }
-        if (hologram.clickCommand() != null) {
+        if (hologram.clickCommand() != null || hologram.isMultiPage()) {
+            // A clickable hologram needs the hitbox to run its command; a multi-page hologram needs it so a
+            // right-click can cycle the viewer's page (the listener routes one or the other).
             spawned = withClickBox(spawned, at, hologram);
         }
         viewers.applyOnSpawn(spawned, hologram);
@@ -349,7 +356,9 @@ public final class HologramRenderer implements HologramView {
      */
     private RenderedHologram withClickBox(RenderedHologram spawned, Location at, Hologram hologram) {
         boolean text = hologram.type() == com.uxplima.uxmessentials.holograms.domain.HologramType.TEXT;
-        float height = text ? Math.max(1.0f, hologram.lines().size() * 0.28f + 0.4f) : 1.2f;
+        // Size the hitbox to the tallest page so it brackets every page of a multi-page hologram; for a
+        // single-page hologram maxPageLineCount() is just the line count, so the box is unchanged.
+        float height = text ? Math.max(1.0f, hologram.maxPageLineCount() * 0.28f + 0.4f) : 1.2f;
         Location boxLocation =
                 text ? at.clone().subtract(0, height, 0) : at.clone().subtract(0, 0.6, 0);
         String name = hologram.name().value();
@@ -376,6 +385,30 @@ public final class HologramRenderer implements HologramView {
             return;
         }
         dispatchPerViewerText(scheduler, textOverrides, viewers.eligible(hologram), spawned.textEntityId(), hologram);
+    }
+
+    /**
+     * Advance {@code viewer} to the next page of the multi-page hologram {@code name} and re-send only their text
+     * override, so the click flips just that viewer's page over the one shared display. A no-op when the hologram
+     * is not tracked, is not multi-page, or has no text entity. The page is advanced first (atomically in
+     * {@link HologramPageState}), then the viewer's resolve is hopped onto their own entity thread — where the
+     * override reads back the new page — exactly as the spawn/join paths dispatch per-viewer text.
+     */
+    @Override
+    public void cyclePage(Player viewer, HologramName name) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(name, "name");
+        Tracked tracked = live.get(name.value());
+        if (tracked == null) {
+            return;
+        }
+        Hologram hologram = tracked.hologram();
+        int entityId = tracked.live().textEntityId();
+        if (!hologram.isMultiPage() || entityId == RenderedHologram.NO_ENTITY) {
+            return;
+        }
+        pageState.advance(name.value(), viewer.getUniqueId(), hologram.pageCount());
+        dispatchPerViewerText(scheduler, textOverrides, List.of(viewer), entityId, hologram);
     }
 
     /**

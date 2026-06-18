@@ -120,6 +120,26 @@ class HologramTextOverridesTest {
     }
 
     @Test
+    void aMultiPageHologramRendersEachViewersCurrentPage() {
+        FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
+        HologramPageState pages = new HologramPageState();
+        HologramTextOverrides overrides = new HologramTextOverrides(
+                packets, perViewer(Map.of()), MiniMessage.miniMessage(), TagResolver::empty, pages, noOpLogger());
+        Hologram paged = text("guide", "page one")
+                .withPageAppended(com.uxplima.uxmessentials.holograms.domain.HologramPage.of(
+                        List.of(new HologramLine("page two"))));
+
+        // Alice is advanced to the next page, Bob is left on the default page 0; each is sent once, so each
+        // viewer's override carries their own current page over the one shared display.
+        pages.advance("guide", ALICE, paged.pageCount());
+        overrides.sendOverride(player(ALICE), ENTITY_ID, paged);
+        overrides.sendOverride(player(BOB), ENTITY_ID, paged);
+
+        assertThat(plain(packets.textFor(ALICE))).isEqualTo("page two");
+        assertThat(plain(packets.textFor(BOB))).isEqualTo("page one");
+    }
+
+    @Test
     void oneViewersResolveThrowingIsSwallowedSoTheRendererLoopContinues() {
         FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
         UnaryOperator<String> blowsUp = source -> {
@@ -162,7 +182,8 @@ class HologramTextOverridesTest {
             FakeDisplayTextPackets packets,
             Function<UUID, UnaryOperator<String>> bridges,
             Supplier<TagResolver> globalTags) {
-        return new HologramTextOverrides(packets, bridges, MiniMessage.miniMessage(), globalTags, noOpLogger());
+        return new HologramTextOverrides(
+                packets, bridges, MiniMessage.miniMessage(), globalTags, new HologramPageState(), noOpLogger());
     }
 
     /** A bridge factory returning the per-viewer transform from {@code byViewer}, identity for an unknown uuid. */
