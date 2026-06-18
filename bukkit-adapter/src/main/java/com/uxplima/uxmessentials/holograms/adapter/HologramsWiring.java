@@ -11,8 +11,10 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramCommands;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.DamageIndicatorListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramClickListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.DamageIndicatorConfig;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.EventDrivenNpcLocator;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramPageState;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
@@ -157,6 +159,14 @@ public final class HologramsWiring {
         plugin.getServer()
                 .getPluginManager()
                 .registerEvents(new HologramClickListener(plugin, repository, renderer), plugin);
+        // The damage-indicator feature ships disabled: only when its config switches it on is the combat listener
+        // registered, so a default server spawns no floating-number entities and the listener costs nothing.
+        DamageIndicatorConfig damageIndicators = DamageIndicatorConfig.fromConfig(ctx.config());
+        if (damageIndicators.enabled()) {
+            plugin.getServer()
+                    .getPluginManager()
+                    .registerEvents(new DamageIndicatorListener(damageIndicators, kernel.scheduler()), plugin);
+        }
         AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer);
         // The cached repository's all() is the authoritative in-memory set after the one warm load, so reading
         // names off it per keystroke is allocation-light and never touches the database — safe on the tick thread.
