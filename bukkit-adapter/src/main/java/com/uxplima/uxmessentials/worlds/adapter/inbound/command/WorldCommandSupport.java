@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
@@ -64,5 +65,14 @@ abstract class WorldCommandSupport {
     /** Run a world-mutating use case on the global region thread (Bukkit world ops require it). */
     final void onGlobal(Runnable op) {
         services.scheduler().onGlobal(op);
+    }
+
+    /**
+     * The player's current {@link Position}. Paper marks {@code Player#getLocation()} nullable (null only
+     * for an entity with no world, which a connected player never is), so the non-null assertion lives here
+     * once rather than at every command.
+     */
+    static Position position(Player player) {
+        return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
     }
 }

@@ -25,4 +25,12 @@ class WorldCommandSurfaceDriftTest {
         assertThat(worldsSpec("worlds").permission()).isEqualTo("uxmessentials.world.use");
         assertThat(worldsSpec("worldsconfirm").permission()).isEqualTo("uxmessentials.world.delete");
     }
+
+    @Test
+    void worldsExposesNoExtraTopLevelLiteral() {
+        FeatureModule worlds =
+                new DefaultModuleRegistry().byId(ModuleId.of("worlds")).orElseThrow();
+        assertThat(worlds.commands().stream().map(CommandSpec::literal).toList())
+                .containsExactlyInAnyOrder("worlds", "worldsconfirm");
+    }
 }

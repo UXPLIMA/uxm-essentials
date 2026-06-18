@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
@@ -44,6 +45,9 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     private static final String DELETE = "uxmessentials.world.delete";
     private static final String LIST = "uxmessentials.world.list";
     private static final String INFO = "uxmessentials.world.info";
+    private static final String SET = "uxmessentials.world.set";
+    private static final String GAMERULE = "uxmessentials.world.gamerule";
+    private static final String SETSPAWN = "uxmessentials.world.setspawn";
 
     public WorldCommand(WorldsServices services, Messages messages) {
         super(services, messages);
@@ -77,6 +81,23 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .then(Commands.literal("delete")
                         .requires(p(DELETE))
                         .then(nameArg().executes(this::runDelete)))
+                .then(Commands.literal("set")
+                        .requires(p(SET))
+                        .then(nameArg()
+                                .then(Commands.argument("property", StringArgumentType.word())
+                                        .suggests(CommandSuggestions.fromStrings(this::propertyKeys))
+                                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                                .executes(this::runSet)))))
+                .then(Commands.literal("gamerule")
+                        .requires(p(GAMERULE))
+                        .then(nameArg()
+                                .then(Commands.argument("rule", StringArgumentType.word())
+                                        .suggests(CommandSuggestions.fromStrings(services::gameRuleNames))
+                                        .then(Commands.argument("value", StringArgumentType.word())
+                                                .executes(this::runGamerule)))))
+                .then(Commands.literal("setspawn")
+                        .requires(p(SETSPAWN))
+                        .then(nameArg().executes(this::runSetSpawn)))
                 .build();
     }
 
@@ -229,6 +250,66 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 WorldsMessageKey.WORLD_INFO_TYPE,
                 Map.of("value", w.spec().worldType().name()));
         feedback.send(sender, WorldsMessageKey.WORLD_INFO_AUTOLOAD, Map.of("value", Boolean.toString(w.autoLoad())));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private java.util.List<String> propertyKeys() {
+        java.util.List<String> keys =
+                new java.util.ArrayList<>(com.uxplima.uxmessentials.worlds.domain.WorldProperties.ALL.stream()
+                        .map(com.uxplima.uxmessentials.worlds.domain.WorldProperty::key)
+                        .toList());
+        keys.add("alias");
+        return keys;
+    }
+
+    private int runSet(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        String property = ctx.getArgument("property", String.class);
+        String value = ctx.getArgument("value", String.class);
+        PlayerRef who = ref(sender);
+        if (property.equalsIgnoreCase("alias")) {
+            onGlobal(() -> services.setWorldAlias().set(who, name, Optional.of(value)));
+        } else {
+            onGlobal(() -> services.setWorldProperty().set(who, name, property, value));
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runGamerule(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        String rule = ctx.getArgument("rule", String.class);
+        String value = ctx.getArgument("value", String.class);
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.setGamerule().set(who, name, rule, value));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSetSpawn(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        Position spawn = position(sender);
+        onGlobal(() -> services.setWorldSpawn().set(who, name, spawn));
         return Command.SINGLE_SUCCESS;
     }
 
