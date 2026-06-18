@@ -2,24 +2,31 @@ package com.uxplima.uxmessentials.holograms.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.holograms.application.AddHologramAction;
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
 import com.uxplima.uxmessentials.holograms.application.AddHologramPage;
 import com.uxplima.uxmessentials.holograms.application.CenterHologram;
+import com.uxplima.uxmessentials.holograms.application.ClearHologramActions;
 import com.uxplima.uxmessentials.holograms.application.CopyHologram;
 import com.uxplima.uxmessentials.holograms.application.CreateHologram;
 import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
+import com.uxplima.uxmessentials.holograms.application.InsertHologramAction;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
+import com.uxplima.uxmessentials.holograms.application.ListHologramActions;
 import com.uxplima.uxmessentials.holograms.application.ListHologramPages;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramBlacklist;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
+import com.uxplima.uxmessentials.holograms.application.MoveHologramAction;
 import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
+import com.uxplima.uxmessentials.holograms.application.RemoveHologramAction;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramPage;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
+import com.uxplima.uxmessentials.holograms.application.SetHologramAction;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
 import com.uxplima.uxmessentials.holograms.application.SetHologramGrowUp;
@@ -64,6 +71,13 @@ import org.jspecify.annotations.NullMarked;
  * @param listPages {@code /hologram page <name> list}
  * @param growUp {@code /hologram growup}
  * @param blacklist {@code /hologram blacklist|unblacklist}
+ * @param addAction {@code /hologram action <name> add}
+ * @param insertAction {@code /hologram action <name> add_before|add_after}
+ * @param setAction {@code /hologram action <name> set}
+ * @param moveAction {@code /hologram action <name> move_up|move_down}
+ * @param removeAction {@code /hologram action <name> remove}
+ * @param clearActions {@code /hologram action <name> clear}
+ * @param listActions {@code /hologram action <name> list}
  */
 @NullMarked
 public record HologramServices(
@@ -94,7 +108,14 @@ public record HologramServices(
         RemoveHologramPage removePage,
         ListHologramPages listPages,
         SetHologramGrowUp growUp,
-        ManageHologramBlacklist blacklist) {
+        ManageHologramBlacklist blacklist,
+        AddHologramAction addAction,
+        InsertHologramAction insertAction,
+        SetHologramAction setAction,
+        MoveHologramAction moveAction,
+        RemoveHologramAction removeAction,
+        ClearHologramActions clearActions,
+        ListHologramActions listActions) {
 
     public HologramServices {
         Objects.requireNonNull(create, "create");
@@ -125,5 +146,12 @@ public record HologramServices(
         Objects.requireNonNull(listPages, "listPages");
         Objects.requireNonNull(growUp, "growUp");
         Objects.requireNonNull(blacklist, "blacklist");
+        Objects.requireNonNull(addAction, "addAction");
+        Objects.requireNonNull(insertAction, "insertAction");
+        Objects.requireNonNull(setAction, "setAction");
+        Objects.requireNonNull(moveAction, "moveAction");
+        Objects.requireNonNull(removeAction, "removeAction");
+        Objects.requireNonNull(clearActions, "clearActions");
+        Objects.requireNonNull(listActions, "listActions");
     }
 }

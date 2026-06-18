@@ -89,6 +89,18 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_PAGE_NOT_MULTIPAGE("hologram.page.not-multipage"),
     HOLOGRAM_PAGE_INDEX_INVALID("hologram.page-index-invalid"),
 
+    // click-action chain feedback
+    HOLOGRAM_ACTION_ADDED("hologram.action.added"),
+    HOLOGRAM_ACTION_INSERTED("hologram.action.inserted"),
+    HOLOGRAM_ACTION_SET("hologram.action.set"),
+    HOLOGRAM_ACTION_MOVED("hologram.action.moved"),
+    HOLOGRAM_ACTION_REMOVED("hologram.action.removed"),
+    HOLOGRAM_ACTION_CLEARED("hologram.action.cleared"),
+    HOLOGRAM_ACTION_LIST_HEADER("hologram.action.list-header"),
+    HOLOGRAM_ACTION_LIST_ENTRY("hologram.action.list-entry"),
+    HOLOGRAM_ACTION_LIST_EMPTY("hologram.action.list-empty"),
+    HOLOGRAM_ACTION_INDEX_INVALID("hologram.action.index-invalid"),
+
     // grow direction feedback
     HOLOGRAM_GROWUP_ENABLED("hologram.growup.enabled"),
     HOLOGRAM_GROWUP_DISABLED("hologram.growup.disabled"),

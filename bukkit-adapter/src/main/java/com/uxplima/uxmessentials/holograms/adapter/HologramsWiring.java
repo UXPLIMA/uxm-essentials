@@ -26,25 +26,32 @@ import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramSymbols;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTeleportAdapter;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTextOverrides;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramViewers;
+import com.uxplima.uxmessentials.holograms.application.AddHologramAction;
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
 import com.uxplima.uxmessentials.holograms.application.AddHologramPage;
 import com.uxplima.uxmessentials.holograms.application.CenterHologram;
+import com.uxplima.uxmessentials.holograms.application.ClearHologramActions;
 import com.uxplima.uxmessentials.holograms.application.CopyHologram;
 import com.uxplima.uxmessentials.holograms.application.CreateHologram;
 import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
+import com.uxplima.uxmessentials.holograms.application.InsertHologramAction;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
+import com.uxplima.uxmessentials.holograms.application.ListHologramActions;
 import com.uxplima.uxmessentials.holograms.application.ListHologramPages;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramBlacklist;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
+import com.uxplima.uxmessentials.holograms.application.MoveHologramAction;
 import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
+import com.uxplima.uxmessentials.holograms.application.RemoveHologramAction;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramPage;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
+import com.uxplima.uxmessentials.holograms.application.SetHologramAction;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
 import com.uxplima.uxmessentials.holograms.application.SetHologramGrowUp;
@@ -272,7 +279,14 @@ public final class HologramsWiring {
                 new RemoveHologramPage(repository, renderer, notifier),
                 new ListHologramPages(repository, notifier),
                 new SetHologramGrowUp(repository, renderer, notifier),
-                new ManageHologramBlacklist(repository, renderer, notifier));
+                new ManageHologramBlacklist(repository, renderer, notifier),
+                new AddHologramAction(repository, notifier),
+                new InsertHologramAction(repository, notifier),
+                new SetHologramAction(repository, notifier),
+                new MoveHologramAction(repository, notifier),
+                new RemoveHologramAction(repository, notifier),
+                new ClearHologramActions(repository, notifier),
+                new ListHologramActions(repository, notifier));
     }
 
     private static void spawnStored(HologramRepository repository, HologramRenderer renderer) {

@@ -29,7 +29,10 @@ public enum HologramError {
     NOT_MULTI_PAGE(HologramsMessageKey.HOLOGRAM_PAGE_NOT_MULTIPAGE),
 
     /** A page index outside the hologram's current page range ({@code /hologram page remove}). */
-    PAGE_INDEX_OUT_OF_RANGE(HologramsMessageKey.HOLOGRAM_PAGE_INDEX_INVALID);
+    PAGE_INDEX_OUT_OF_RANGE(HologramsMessageKey.HOLOGRAM_PAGE_INDEX_INVALID),
+
+    /** An action index outside the hologram's current action chain ({@code /hologram action set|move|remove}). */
+    ACTION_INDEX_OUT_OF_RANGE(HologramsMessageKey.HOLOGRAM_ACTION_INDEX_INVALID);
 
     private final HologramsMessageKey messageKey;
 
