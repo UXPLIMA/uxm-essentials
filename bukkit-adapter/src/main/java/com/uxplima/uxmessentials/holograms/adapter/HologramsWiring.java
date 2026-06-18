@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
 import com.uxplima.uxmessentials.holograms.application.ListHologramPages;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
+import com.uxplima.uxmessentials.holograms.application.ManageHologramBlacklist;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
 import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
@@ -133,7 +134,8 @@ public final class HologramsWiring {
                 MiniPlaceholdersSupport::globalResolver,
                 pageState,
                 kernel.log());
-        HologramViewers viewers = new HologramViewers(plugin, kernel.permissions(), repository::manualViewers);
+        HologramViewers viewers =
+                new HologramViewers(plugin, kernel.permissions(), repository::manualViewers, repository::blacklisted);
         // The NPC-link seam: a locator over the npc context's stored set kept current by the domain-event bus,
         // re-anchoring a linked hologram when its NPC moves or is removed. The locator reads the npc persistence
         // directly (the npc table ships in the persistence V38 baseline, always applied), so a hologram may link to
@@ -269,7 +271,8 @@ public final class HologramsWiring {
                 new AddHologramPage(repository, renderer, notifier),
                 new RemoveHologramPage(repository, renderer, notifier),
                 new ListHologramPages(repository, notifier),
-                new SetHologramGrowUp(repository, renderer, notifier));
+                new SetHologramGrowUp(repository, renderer, notifier),
+                new ManageHologramBlacklist(repository, renderer, notifier));
     }
 
     private static void spawnStored(HologramRepository repository, HologramRenderer renderer) {

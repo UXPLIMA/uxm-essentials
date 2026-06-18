@@ -277,15 +277,28 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
             boolean gated = visibility.isPermissionGated() || visibility.isManual();
             boolean perViewerText = textOverrides.hasPerViewerText(hologram)
                     && tracked.live().textEntityId() != RenderedHologram.NO_ENTITY;
-            if (gated || perViewerText) {
+            boolean blacklisted = viewers.isBlacklisted(hologram, joiner);
+            if (gated || perViewerText || blacklisted) {
                 scheduler.onRegion(
-                        tracked.position(), () -> applyJoiner(tracked.live(), hologram, joiner, shown, gated));
+                        tracked.position(),
+                        () -> applyJoiner(tracked.live(), hologram, joiner, shown, gated, blacklisted));
             }
         }
     }
 
     /** Apply a joiner's visibility (when gated) and their per-viewer text override (when they may see it). */
-    private void applyJoiner(RenderedHologram live, Hologram hologram, Player joiner, Set<UUID> shown, boolean gated) {
+    private void applyJoiner(
+            RenderedHologram live,
+            Hologram hologram,
+            Player joiner,
+            Set<UUID> shown,
+            boolean gated,
+            boolean blacklisted) {
+        if (blacklisted) {
+            // A blacklisted joiner is hidden regardless of mode; no override is sent (they cannot see the entity).
+            live.hide(plugin, joiner);
+            return;
+        }
         if (gated) {
             // Showing/hiding the shared entity touches the hologram's own viewer set, so it stays on this
             // (the hologram's) region thread.

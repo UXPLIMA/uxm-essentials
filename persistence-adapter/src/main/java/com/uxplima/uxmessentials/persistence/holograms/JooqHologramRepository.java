@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.holograms;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramBlacklist.HOLOGRAM_BLACKLIST;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramLines.HOLOGRAM_LINES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramManualViewer.HOLOGRAM_MANUAL_VIEWER;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramPages.HOLOGRAM_PAGES;
@@ -91,6 +92,9 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
             dsl.deleteFrom(HOLOGRAM_MANUAL_VIEWER)
                     .where(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME.eq(name.value()))
                     .execute();
+            dsl.deleteFrom(HOLOGRAM_BLACKLIST)
+                    .where(HOLOGRAM_BLACKLIST.HOLOGRAM_NAME.eq(name.value()))
+                    .execute();
             return dsl.deleteFrom(HOLOGRAMS)
                     .where(HOLOGRAMS.NAME.eq(name.value()))
                     .execute();
@@ -131,6 +135,43 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
         write(dsl -> dsl.deleteFrom(HOLOGRAM_MANUAL_VIEWER)
                 .where(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME.eq(name.value()))
                 .and(HOLOGRAM_MANUAL_VIEWER.PLAYER_UUID.eq(viewer.toString()))
+                .execute());
+    }
+
+    @Override
+    public Set<UUID> blacklisted(HologramName name) {
+        Objects.requireNonNull(name, "name");
+        return read(dsl -> {
+            Set<UUID> blacklisted = new LinkedHashSet<>();
+            for (String stored : dsl.select(HOLOGRAM_BLACKLIST.PLAYER_UUID)
+                    .from(HOLOGRAM_BLACKLIST)
+                    .where(HOLOGRAM_BLACKLIST.HOLOGRAM_NAME.eq(name.value()))
+                    .fetch(HOLOGRAM_BLACKLIST.PLAYER_UUID)) {
+                blacklisted.add(UUID.fromString(stored));
+            }
+            return blacklisted;
+        });
+    }
+
+    @Override
+    public void addToBlacklist(HologramName name, UUID viewer) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
+        write(dsl -> dsl.insertInto(HOLOGRAM_BLACKLIST)
+                .set(HOLOGRAM_BLACKLIST.HOLOGRAM_NAME, name.value())
+                .set(HOLOGRAM_BLACKLIST.PLAYER_UUID, viewer.toString())
+                .onConflict(HOLOGRAM_BLACKLIST.HOLOGRAM_NAME, HOLOGRAM_BLACKLIST.PLAYER_UUID)
+                .doNothing()
+                .execute());
+    }
+
+    @Override
+    public void removeFromBlacklist(HologramName name, UUID viewer) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
+        write(dsl -> dsl.deleteFrom(HOLOGRAM_BLACKLIST)
+                .where(HOLOGRAM_BLACKLIST.HOLOGRAM_NAME.eq(name.value()))
+                .and(HOLOGRAM_BLACKLIST.PLAYER_UUID.eq(viewer.toString()))
                 .execute());
     }
 

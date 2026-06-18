@@ -37,11 +37,17 @@ public final class HologramViewers {
     private final Plugin plugin;
     private final Permissions permissions;
     private final Function<HologramName, Set<UUID>> manualViewers;
+    private final Function<HologramName, Set<UUID>> blacklist;
 
-    public HologramViewers(Plugin plugin, Permissions permissions, Function<HologramName, Set<UUID>> manualViewers) {
+    public HologramViewers(
+            Plugin plugin,
+            Permissions permissions,
+            Function<HologramName, Set<UUID>> manualViewers,
+            Function<HologramName, Set<UUID>> blacklist) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.manualViewers = Objects.requireNonNull(manualViewers, "manualViewers");
+        this.blacklist = Objects.requireNonNull(blacklist, "blacklist");
     }
 
     /** The online players who may currently see {@code hologram} under its visibility — the override audience. */
@@ -65,14 +71,36 @@ public final class HologramViewers {
      */
     void applyOnSpawn(RenderedHologram spawned, Hologram hologram) {
         Visibility visibility = hologram.visibility();
-        if (!visibility.isPermissionGated() && !visibility.isManual()) {
+        if (visibility.isPermissionGated() || visibility.isManual()) {
+            Set<UUID> shown = shownViewersFor(hologram);
+            spawned.restrictToViewers();
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                applyViewer(spawned, visibility, online, shown);
+            }
+        }
+        hideBlacklisted(spawned, hologram);
+    }
+
+    /**
+     * Hide the shared entity from each online blacklisted player. Applied across every mode and last, so it
+     * overrides an {@code ALL} hologram's default visibility and a mode-based show for a blacklisted qualifier.
+     * A hologram with no blacklist (the common case) does no work, so it stays the cheap default.
+     */
+    private void hideBlacklisted(RenderedHologram spawned, Hologram hologram) {
+        Set<UUID> blacklisted = blacklist.apply(hologram.name());
+        if (blacklisted.isEmpty()) {
             return;
         }
-        Set<UUID> shown = shownViewersFor(hologram);
-        spawned.restrictToViewers();
         for (Player online : Bukkit.getOnlinePlayers()) {
-            applyViewer(spawned, visibility, online, shown);
+            if (blacklisted.contains(online.getUniqueId())) {
+                spawned.hide(plugin, online);
+            }
         }
+    }
+
+    /** Whether {@code viewer} is on {@code hologram}'s blacklist — hidden from it regardless of visibility mode. */
+    boolean isBlacklisted(Hologram hologram, Player viewer) {
+        return blacklist.apply(hologram.name()).contains(viewer.getUniqueId());
     }
 
     /** Show or hide the shared entity to a single {@code viewer} according to whether they may see {@code visibility}. */

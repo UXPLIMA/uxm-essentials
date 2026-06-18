@@ -54,7 +54,8 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
 
     /** The visibility subcommand nodes the {@code /hologram} literal attaches. */
     List<LiteralArgumentBuilder<CommandSourceStack>> nodes() {
-        return List.of(visibilityNode(), visibilityDistanceNode(), showNode(), hideNode());
+        return List.of(
+                visibilityNode(), visibilityDistanceNode(), showNode(), hideNode(), blacklistNode(), unblacklistNode());
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> showNode() {
@@ -67,6 +68,18 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
         return Commands.literal("hide")
                 .then(nameArgument("name")
                         .then(CommandSuggestions.playerArgument("player").executes(this::hide)));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> blacklistNode() {
+        return Commands.literal("blacklist")
+                .then(nameArgument("name")
+                        .then(CommandSuggestions.playerArgument("player").executes(this::blacklist)));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> unblacklistNode() {
+        return Commands.literal("unblacklist")
+                .then(nameArgument("name")
+                        .then(CommandSuggestions.playerArgument("player").executes(this::unblacklist)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> visibilityNode() {
@@ -151,6 +164,32 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
             return 0;
         }
         services.viewers().hide(ref(sender), nameArg(ctx), ref(target));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int blacklist(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        Player target = onlineTarget(ctx, sender);
+        if (target == null) {
+            return 0;
+        }
+        services.blacklist().blacklist(ref(sender), nameArg(ctx), ref(target));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int unblacklist(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        Player target = onlineTarget(ctx, sender);
+        if (target == null) {
+            return 0;
+        }
+        services.blacklist().unblacklist(ref(sender), nameArg(ctx), ref(target));
         return Command.SINGLE_SUCCESS;
     }
 

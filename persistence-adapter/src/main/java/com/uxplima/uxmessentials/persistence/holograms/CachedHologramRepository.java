@@ -51,6 +51,7 @@ public final class CachedHologramRepository implements HologramRepository {
     private final AtomicReference<Map<String, Hologram>> loaded = new AtomicReference<>();
 
     private final ReadThroughCache<String, Set<UUID>> viewers;
+    private final ReadThroughCache<String, Set<UUID>> blacklists;
 
     public CachedHologramRepository(HologramRepository delegate) {
         this(delegate, DEFAULT_TTL);
@@ -61,6 +62,8 @@ public final class CachedHologramRepository implements HologramRepository {
         Objects.requireNonNull(ttl, "ttl");
         this.viewers =
                 ReadThroughCache.create(name -> delegate.manualViewers(HologramName.of(name)), MAX_VIEWER_SETS, ttl);
+        this.blacklists =
+                ReadThroughCache.create(name -> delegate.blacklisted(HologramName.of(name)), MAX_VIEWER_SETS, ttl);
     }
 
     @Override
@@ -93,6 +96,7 @@ public final class CachedHologramRepository implements HologramRepository {
         delegate.delete(name);
         republish(next -> next.remove(name.value()));
         viewers.invalidate(name.value());
+        blacklists.invalidate(name.value());
     }
 
     @Override
@@ -120,10 +124,35 @@ public final class CachedHologramRepository implements HologramRepository {
         viewers.invalidate(name.value());
     }
 
-    /** Drop the loaded set and the viewer cache; call on a module reload. */
+    @Override
+    public Set<UUID> blacklisted(HologramName name) {
+        Objects.requireNonNull(name, "name");
+        // Served from memory like the manual viewer set — read on each spawn and join; an add/remove/delete
+        // invalidates this name so the next read reloads the durable set.
+        return blacklists.get(name.value());
+    }
+
+    @Override
+    public void addToBlacklist(HologramName name, UUID viewer) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
+        delegate.addToBlacklist(name, viewer);
+        blacklists.invalidate(name.value());
+    }
+
+    @Override
+    public void removeFromBlacklist(HologramName name, UUID viewer) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(viewer, "viewer");
+        delegate.removeFromBlacklist(name, viewer);
+        blacklists.invalidate(name.value());
+    }
+
+    /** Drop the loaded set and the viewer/blacklist caches; call on a module reload. */
     public void invalidateAll() {
         loaded.set(null);
         viewers.invalidateAll();
+        blacklists.invalidateAll();
     }
 
     /**

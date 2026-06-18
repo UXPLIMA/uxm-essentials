@@ -29,6 +29,7 @@ final class HologramTestSupport {
     static final class FakeHologramRepository implements HologramRepository {
         private final Map<String, Hologram> byName = new LinkedHashMap<>();
         private final Map<String, Set<UUID>> manualViewers = new LinkedHashMap<>();
+        private final Map<String, Set<UUID>> blacklists = new LinkedHashMap<>();
 
         @Override
         public Optional<Hologram> find(HologramName name) {
@@ -54,6 +55,7 @@ final class HologramTestSupport {
         public void delete(HologramName name) {
             byName.remove(name.value());
             manualViewers.remove(name.value());
+            blacklists.remove(name.value());
         }
 
         @Override
@@ -73,6 +75,26 @@ final class HologramTestSupport {
             Set<UUID> viewers = manualViewers.get(name.value());
             if (viewers != null) {
                 viewers.remove(viewer);
+            }
+        }
+
+        @Override
+        public Set<UUID> blacklisted(HologramName name) {
+            return new LinkedHashSet<>(blacklists.getOrDefault(name.value(), Set.of()));
+        }
+
+        @Override
+        public void addToBlacklist(HologramName name, UUID viewer) {
+            blacklists
+                    .computeIfAbsent(name.value(), key -> new LinkedHashSet<>())
+                    .add(viewer);
+        }
+
+        @Override
+        public void removeFromBlacklist(HologramName name, UUID viewer) {
+            Set<UUID> blacklisted = blacklists.get(name.value());
+            if (blacklisted != null) {
+                blacklisted.remove(viewer);
             }
         }
     }

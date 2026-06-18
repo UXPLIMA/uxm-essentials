@@ -361,6 +361,23 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsTheViewerBlacklistAndDropsItOnDelete() {
+        UUID banned = UUID.randomUUID();
+        repository.save(hologram("spawn", 1, 64, 1, "line"));
+        repository.addToBlacklist(HologramName.of("spawn"), banned);
+
+        assertThat(repository.blacklisted(HologramName.of("spawn"))).containsExactly(banned);
+
+        repository.removeFromBlacklist(HologramName.of("spawn"), banned);
+        assertThat(repository.blacklisted(HologramName.of("spawn"))).isEmpty();
+
+        // Re-add then delete the hologram — the blacklist rows go with it (no orphans under a reused name).
+        repository.addToBlacklist(HologramName.of("spawn"), banned);
+        repository.delete(HologramName.of("spawn"));
+        assertThat(repository.blacklisted(HologramName.of("spawn"))).isEmpty();
+    }
+
+    @Test
     void roundTripsTheGrowUpFlagIncludingTheUpdatePath() {
         repository.save(hologram("spawn", 1, 64, 1, "line"));
         Hologram base = repository.find(HologramName.of("spawn")).orElseThrow();

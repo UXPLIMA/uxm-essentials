@@ -145,12 +145,42 @@ class CachedHologramRepositoryTest {
         assertThat(cached.manualViewers(SPAWN)).isEmpty();
     }
 
+    @Test
+    void repeatedBlacklistReadsHitTheDelegateOnceThenServeFromMemory() {
+        CountingRepository delegate = new CountingRepository();
+        delegate.addToBlacklist(SPAWN, ALICE);
+        CachedHologramRepository cached = new CachedHologramRepository(delegate);
+
+        // The renderer reads the blacklist on every spawn and join, so it must be served from memory.
+        for (int i = 0; i < 100; i++) {
+            assertThat(cached.blacklisted(SPAWN)).containsExactly(ALICE);
+        }
+
+        assertThat(delegate.blacklistReads.get()).isEqualTo(1);
+    }
+
+    @Test
+    void aBlacklistChangeInvalidatesSoTheNextReadReflectsIt() {
+        CountingRepository delegate = new CountingRepository();
+        delegate.addToBlacklist(SPAWN, ALICE);
+        CachedHologramRepository cached = new CachedHologramRepository(delegate);
+
+        assertThat(cached.blacklisted(SPAWN)).containsExactly(ALICE);
+        cached.addToBlacklist(SPAWN, BOB);
+        assertThat(cached.blacklisted(SPAWN)).containsExactlyInAnyOrder(ALICE, BOB);
+
+        cached.removeFromBlacklist(SPAWN, ALICE);
+        assertThat(cached.blacklisted(SPAWN)).containsExactly(BOB);
+    }
+
     /** A fake delegate that counts {@code all}/{@code manualViewers} reads and holds both sets in memory. */
     private static final class CountingRepository implements HologramRepository {
 
         private final Map<String, Set<UUID>> sets = new ConcurrentHashMap<>();
+        private final Map<String, Set<UUID>> blacklistSets = new ConcurrentHashMap<>();
         private final Map<String, Hologram> stored = new LinkedHashMap<>();
         private final AtomicInteger manualViewerReads = new AtomicInteger();
+        private final AtomicInteger blacklistReads = new AtomicInteger();
         private final AtomicInteger allReads = new AtomicInteger();
 
         void store(Hologram hologram) {
@@ -177,8 +207,30 @@ class CachedHologramRepositoryTest {
         }
 
         @Override
+        public Set<UUID> blacklisted(HologramName name) {
+            blacklistReads.incrementAndGet();
+            return new LinkedHashSet<>(blacklistSets.getOrDefault(name.value(), Set.of()));
+        }
+
+        @Override
+        public void addToBlacklist(HologramName name, UUID viewer) {
+            blacklistSets
+                    .computeIfAbsent(name.value(), key -> new LinkedHashSet<>())
+                    .add(viewer);
+        }
+
+        @Override
+        public void removeFromBlacklist(HologramName name, UUID viewer) {
+            Set<UUID> set = blacklistSets.get(name.value());
+            if (set != null) {
+                set.remove(viewer);
+            }
+        }
+
+        @Override
         public void delete(HologramName name) {
             sets.remove(name.value());
+            blacklistSets.remove(name.value());
             stored.remove(name.value());
         }
 

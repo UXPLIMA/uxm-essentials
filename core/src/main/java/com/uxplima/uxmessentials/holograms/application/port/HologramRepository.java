@@ -48,4 +48,17 @@ public interface HologramRepository {
 
     /** Remove {@code viewer} from the manual viewer set of the hologram under {@code name}; a no-op when absent. */
     void hideFrom(HologramName name, UUID viewer);
+
+    /**
+     * The set of player uuids the hologram under {@code name} is hidden from regardless of its visibility mode;
+     * empty when none is blacklisted or no such hologram exists. The renderer hides the live entity from these
+     * players on spawn and on join.
+     */
+    Set<UUID> blacklisted(HologramName name);
+
+    /** Add {@code viewer} to the hologram {@code name}'s viewer blacklist; idempotent. */
+    void addToBlacklist(HologramName name, UUID viewer);
+
+    /** Remove {@code viewer} from the hologram {@code name}'s viewer blacklist; a no-op when absent. */
+    void removeFromBlacklist(HologramName name, UUID viewer);
 }

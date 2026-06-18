@@ -93,6 +93,12 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_GROWUP_ENABLED("hologram.growup.enabled"),
     HOLOGRAM_GROWUP_DISABLED("hologram.growup.disabled"),
 
+    // viewer blacklist feedback
+    HOLOGRAM_BLACKLISTED("hologram.blacklist.added"),
+    HOLOGRAM_UNBLACKLISTED("hologram.blacklist.removed"),
+    HOLOGRAM_ALREADY_BLACKLISTED("hologram.blacklist.already"),
+    HOLOGRAM_NOT_BLACKLISTED("hologram.blacklist.not-listed"),
+
     // visibility feedback
     HOLOGRAM_VISIBILITY_SET("hologram.visibility.set"),
     HOLOGRAM_VISIBILITY_DISTANCE_SET("hologram.visibility.distance-set"),
