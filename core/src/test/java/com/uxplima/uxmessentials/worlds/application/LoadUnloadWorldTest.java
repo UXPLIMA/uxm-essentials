@@ -5,12 +5,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
+import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldLoaded;
@@ -39,6 +43,25 @@ class LoadUnloadWorldTest {
         assertThat(result.isOk()).isTrue();
         assertThat(engine.isLoaded(WorldName.of("creative"))).isTrue();
         assertThat(events).first().isInstanceOf(WorldLoaded.class);
+    }
+
+    @Test
+    void carriesTheRegisteredSpecGeneratorIntoTheLoad() {
+        GeneratorRef voidGen = GeneratorRef.of("uxmEssentials:void");
+        WorldSpec spec = new WorldSpec(
+                WorldEnvironment.NORMAL,
+                WorldGenType.NORMAL,
+                Optional.empty(),
+                Optional.of(voidGen),
+                true,
+                Optional.empty());
+        repo.save(ManagedWorld.created(WorldName.of("empty"), spec, true, Optional.empty(), Instant.EPOCH));
+        engine.onDisk.add("empty");
+
+        assertThat(loadWorld.load(who, WorldName.of("empty")).isOk()).isTrue();
+
+        ManagedWorld passed = Objects.requireNonNull(engine.lastLoaded, "engine.load was never called");
+        assertThat(passed.spec().generator()).contains(voidGen);
     }
 
     @Test

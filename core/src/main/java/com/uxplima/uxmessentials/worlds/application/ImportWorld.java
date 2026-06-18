@@ -71,7 +71,7 @@ public final class ImportWorld {
         WorldSpec spec = new WorldSpec(
                 environment, WorldGenType.NORMAL, detected.get().seed(), generator, true, Optional.empty());
         ManagedWorld world = ManagedWorld.created(name, spec, true, Optional.of(importer.uuid()), clock.instant());
-        Result<Unit, WorldError> loaded = engine.load(name);
+        Result<Unit, WorldError> loaded = engine.load(world);
         if (loaded.isErr()) {
             return fail(importer, name, loaded.errorOrThrow());
         }

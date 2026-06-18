@@ -77,7 +77,7 @@ public final class ReconcileWorldsOnEnable {
             if (!world.autoLoad() || engine.isLoaded(world.name())) {
                 continue;
             }
-            if (engine.load(world.name()).isOk()) {
+            if (engine.load(world).isOk()) {
                 engine.uidOf(world.name()).ifPresent(uid -> repository.save(world.withKnownUid(uid)));
                 events.publish(new WorldLoaded(world.name()));
             }

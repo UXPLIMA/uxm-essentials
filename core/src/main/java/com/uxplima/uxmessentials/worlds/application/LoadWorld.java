@@ -52,7 +52,7 @@ public final class LoadWorld {
         if (engine.isLoaded(name)) {
             return fail(who, name, WorldError.ALREADY_LOADED);
         }
-        Result<Unit, WorldError> loaded = engine.load(name);
+        Result<Unit, WorldError> loaded = engine.load(known.get());
         if (loaded.isErr()) {
             return fail(who, name, loaded.errorOrThrow());
         }

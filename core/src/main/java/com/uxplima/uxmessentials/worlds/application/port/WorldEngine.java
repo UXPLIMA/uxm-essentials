@@ -22,8 +22,14 @@ public interface WorldEngine {
     /** Create and load the world described by the aggregate. */
     Result<Unit, WorldError> create(ManagedWorld world);
 
-    /** Load an existing (registered or on-disk) world. */
-    Result<Unit, WorldError> load(WorldName name);
+    /**
+     * Load an existing (registered or on-disk) world, re-applying its {@link ManagedWorld#spec()} —
+     * environment, type, seed, and generator — to the world handle. Re-applying the spec is what
+     * keeps a built-in {@code uxmEssentials:void|flat} world's object generator in force across
+     * restarts: Bukkit cannot persist an object generator, so without re-supplying it newly generated
+     * chunks would fall back to vanilla terrain.
+     */
+    Result<Unit, WorldError> load(ManagedWorld world);
 
     /** Unload a loaded world, optionally saving it first. */
     Result<Unit, WorldError> unload(WorldName name, boolean save);

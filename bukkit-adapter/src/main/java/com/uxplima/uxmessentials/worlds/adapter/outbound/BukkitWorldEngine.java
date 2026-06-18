@@ -56,8 +56,8 @@ public final class BukkitWorldEngine implements WorldEngine {
     }
 
     @Override
-    public Result<Unit, WorldError> load(WorldName name) {
-        return loadOrCreate(name, Optional.empty());
+    public Result<Unit, WorldError> load(ManagedWorld world) {
+        return loadOrCreate(world.name(), Optional.of(world.spec()));
     }
 
     private Result<Unit, WorldError> loadOrCreate(WorldName name, Optional<WorldSpec> spec) {
@@ -85,9 +85,11 @@ public final class BukkitWorldEngine implements WorldEngine {
 
     /**
      * Routes a generator ref onto the {@link WorldCreator}: our own {@code uxmEssentials:void|flat} refs
-     * take the object overload (the resolver's {@code ChunkGenerator}), so they behave identically whether
-     * a world is created internally or loaded via {@code server.properties}; any other token — an unknown
-     * built-in id or an external {@code plugin[:args]} ref — takes Bukkit's String overload unchanged.
+     * take the object overload (the resolver's {@code ChunkGenerator}), so they behave identically across
+     * every path that supplies the spec — an internal {@link #create}, a {@link #load} of a registered
+     * world (the spec is re-applied), and a world loaded via {@code server.properties} through the plugin's
+     * {@code getDefaultWorldGenerator} hook. Any other token — an unknown built-in id or an external
+     * {@code plugin[:args]} ref — takes Bukkit's String overload unchanged.
      */
     void applyGenerator(WorldCreator creator, GeneratorRef g) {
         BuiltInGenerators.idOf(g.value())

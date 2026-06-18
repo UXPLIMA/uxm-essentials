@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldError;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import org.jspecify.annotations.Nullable;
 
 final class FakeWorldEngine implements WorldEngine {
     final Set<String> loaded = new HashSet<>();
@@ -18,6 +19,8 @@ final class FakeWorldEngine implements WorldEngine {
     WorldName defaultWorld = WorldName.of("world");
     int playerCount;
     Optional<DetectedWorld> scanResult = Optional.empty();
+
+    @Nullable ManagedWorld lastLoaded;
 
     @Override
     public Result<Unit, WorldError> create(ManagedWorld world) {
@@ -27,8 +30,9 @@ final class FakeWorldEngine implements WorldEngine {
     }
 
     @Override
-    public Result<Unit, WorldError> load(WorldName name) {
-        loaded.add(name.value());
+    public Result<Unit, WorldError> load(ManagedWorld world) {
+        lastLoaded = world;
+        loaded.add(world.name().value());
         return Result.ok();
     }
 
