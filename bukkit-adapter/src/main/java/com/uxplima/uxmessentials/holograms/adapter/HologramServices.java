@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.holograms.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
+import com.uxplima.uxmessentials.holograms.application.AddHologramPage;
 import com.uxplima.uxmessentials.holograms.application.CenterHologram;
 import com.uxplima.uxmessentials.holograms.application.CopyHologram;
 import com.uxplima.uxmessentials.holograms.application.CreateHologram;
@@ -10,11 +11,13 @@ import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
+import com.uxplima.uxmessentials.holograms.application.ListHologramPages;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
 import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
+import com.uxplima.uxmessentials.holograms.application.RemoveHologramPage;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
@@ -54,6 +57,9 @@ import org.jspecify.annotations.NullMarked;
  * @param model {@code /hologram item|block}
  * @param linkNpc {@code /hologram linknpc}
  * @param unlinkNpc {@code /hologram unlinknpc}
+ * @param addPage {@code /hologram page <name> add}
+ * @param removePage {@code /hologram page <name> remove}
+ * @param listPages {@code /hologram page <name> list}
  */
 @NullMarked
 public record HologramServices(
@@ -79,7 +85,10 @@ public record HologramServices(
         SetHologramClickCommand clickCommand,
         SetHologramLeaderboard leaderboard,
         LinkHologramToNpc linkNpc,
-        UnlinkHologramFromNpc unlinkNpc) {
+        UnlinkHologramFromNpc unlinkNpc,
+        AddHologramPage addPage,
+        RemoveHologramPage removePage,
+        ListHologramPages listPages) {
 
     public HologramServices {
         Objects.requireNonNull(create, "create");
@@ -105,5 +114,8 @@ public record HologramServices(
         Objects.requireNonNull(leaderboard, "leaderboard");
         Objects.requireNonNull(linkNpc, "linkNpc");
         Objects.requireNonNull(unlinkNpc, "unlinkNpc");
+        Objects.requireNonNull(addPage, "addPage");
+        Objects.requireNonNull(removePage, "removePage");
+        Objects.requireNonNull(listPages, "listPages");
     }
 }

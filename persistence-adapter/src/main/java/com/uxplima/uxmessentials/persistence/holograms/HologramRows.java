@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.persistence.holograms;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -10,6 +11,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.HologramPage;
 import com.uxplima.uxmessentials.holograms.domain.HologramType;
 import com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
@@ -39,8 +41,12 @@ final class HologramRows {
 
     private HologramRows() {}
 
-    /** Rebuild a {@link Hologram} from a name row and its already-ordered line texts. */
-    static Hologram toHologram(Record row, List<String> orderedLineTexts) {
+    /**
+     * Rebuild a {@link Hologram} from a name row, its already-ordered page-0 line texts, and the extra pages
+     * 1..n (each an already-ordered list of line texts, in page order). A hologram with no extra pages reads
+     * back as an ordinary single-page hologram.
+     */
+    static Hologram toHologram(Record row, List<String> orderedLineTexts, List<List<String>> extraPageTexts) {
         WorldRef world = new WorldRef(UUID.fromString(row.get(HOLOGRAMS.WORLD)), row.get(HOLOGRAMS.WORLD_NAME));
         Position position = new Position(
                 world,
@@ -68,7 +74,22 @@ final class HologramRows {
         // A pre-V50 row (NULL linked_npc_name) — and any row that never linked — reads back unlinked, so an
         // existing hologram keeps anchoring to its own coordinates with no data migration. The V54 click command
         // is layered on the same way: a pre-V54 / never-clickable row (NULL) reads back without a click action.
-        return leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram)));
+        // The V57 extra pages are applied last: a row with no hologram_pages rows stays a single-page hologram.
+        return pagesOf(leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram))), extraPageTexts);
+    }
+
+    private static Hologram pagesOf(Hologram hologram, List<List<String>> extraPageTexts) {
+        // Pages are a text-hologram feature, so page 0 always has at least one line; guard the empty edge so a
+        // hand-edited item/block row that somehow carries page rows reads back single-page rather than throwing.
+        if (extraPageTexts.isEmpty() || hologram.lines().isEmpty()) {
+            return hologram;
+        }
+        List<HologramPage> pages = new ArrayList<>();
+        pages.add(HologramPage.of(hologram.lines()));
+        for (List<String> pageTexts : extraPageTexts) {
+            pages.add(HologramPage.of(pageTexts.stream().map(HologramLine::new).toList()));
+        }
+        return hologram.withPages(pages);
     }
 
     private static Hologram linkedNpcOf(Record row, Hologram hologram) {

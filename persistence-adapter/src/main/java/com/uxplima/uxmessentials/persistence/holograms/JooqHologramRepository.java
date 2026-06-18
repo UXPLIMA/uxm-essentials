@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.persistence.holograms;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramLines.HOLOGRAM_LINES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramManualViewer.HOLOGRAM_MANUAL_VIEWER;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramPages.HOLOGRAM_PAGES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Holograms.HOLOGRAMS;
 
 import java.util.ArrayList;
@@ -42,18 +43,21 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
         return read(dsl -> dsl.selectFrom(HOLOGRAMS)
                 .where(HOLOGRAMS.NAME.eq(name.value()))
                 .fetchOptional()
-                .map(row -> HologramRows.toHologram(row, lines(dsl, name.value()))));
+                .map(row -> HologramRows.toHologram(row, lines(dsl, name.value()), extraPages(dsl, name.value()))));
     }
 
     @Override
     public List<Hologram> all() {
         return read(dsl -> {
             Map<String, List<String>> linesByName = allLines(dsl);
+            Map<String, List<List<String>>> pagesByName = allExtraPages(dsl);
             return dsl.selectFrom(HOLOGRAMS)
                     .orderBy(HOLOGRAMS.CREATED_AT.asc(), HOLOGRAMS.NAME.asc())
                     .fetch()
-                    .map(row ->
-                            HologramRows.toHologram(row, linesByName.getOrDefault(row.get(HOLOGRAMS.NAME), List.of())));
+                    .map(row -> HologramRows.toHologram(
+                            row,
+                            linesByName.getOrDefault(row.get(HOLOGRAMS.NAME), List.of()),
+                            pagesByName.getOrDefault(row.get(HOLOGRAMS.NAME), List.of())));
         });
     }
 
@@ -69,6 +73,7 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
         write(dsl -> {
             upsertNameRow(dsl, hologram);
             rewriteLines(dsl, hologram);
+            rewritePages(dsl, hologram);
             return null;
         });
     }
@@ -79,6 +84,9 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
         write(dsl -> {
             dsl.deleteFrom(HOLOGRAM_LINES)
                     .where(HOLOGRAM_LINES.HOLOGRAM.eq(name.value()))
+                    .execute();
+            dsl.deleteFrom(HOLOGRAM_PAGES)
+                    .where(HOLOGRAM_PAGES.HOLOGRAM.eq(name.value()))
                     .execute();
             dsl.deleteFrom(HOLOGRAM_MANUAL_VIEWER)
                     .where(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME.eq(name.value()))
@@ -146,6 +154,43 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
         return byName;
     }
 
+    /** The extra pages 1..n of one hologram, each an ordered list of line texts, in page order. */
+    private static List<List<String>> extraPages(DSLContext dsl, String name) {
+        List<List<String>> pages = new ArrayList<>();
+        int currentPage = Integer.MIN_VALUE;
+        List<String> page = null;
+        for (Record row : dsl.select(HOLOGRAM_PAGES.PAGE_INDEX, HOLOGRAM_PAGES.TEXT)
+                .from(HOLOGRAM_PAGES)
+                .where(HOLOGRAM_PAGES.HOLOGRAM.eq(name))
+                .orderBy(HOLOGRAM_PAGES.PAGE_INDEX.asc(), HOLOGRAM_PAGES.IDX.asc())
+                .fetch()) {
+            int pageIndex = row.get(HOLOGRAM_PAGES.PAGE_INDEX);
+            if (page == null || pageIndex != currentPage) {
+                page = new ArrayList<>();
+                pages.add(page);
+                currentPage = pageIndex;
+            }
+            page.add(row.get(HOLOGRAM_PAGES.TEXT));
+        }
+        return pages;
+    }
+
+    /** Every hologram's extra pages, keyed by name — the {@link #all()} counterpart of {@link #extraPages}. */
+    private static Map<String, List<List<String>>> allExtraPages(DSLContext dsl) {
+        Map<String, Map<Integer, List<String>>> byName = new LinkedHashMap<>();
+        for (Record row : dsl.select(HOLOGRAM_PAGES.HOLOGRAM, HOLOGRAM_PAGES.PAGE_INDEX, HOLOGRAM_PAGES.TEXT)
+                .from(HOLOGRAM_PAGES)
+                .orderBy(HOLOGRAM_PAGES.HOLOGRAM.asc(), HOLOGRAM_PAGES.PAGE_INDEX.asc(), HOLOGRAM_PAGES.IDX.asc())
+                .fetch()) {
+            byName.computeIfAbsent(row.get(HOLOGRAM_PAGES.HOLOGRAM), key -> new LinkedHashMap<>())
+                    .computeIfAbsent(row.get(HOLOGRAM_PAGES.PAGE_INDEX), key -> new ArrayList<>())
+                    .add(row.get(HOLOGRAM_PAGES.TEXT));
+        }
+        Map<String, List<List<String>>> result = new LinkedHashMap<>();
+        byName.forEach((name, pagesByIndex) -> result.put(name, new ArrayList<>(pagesByIndex.values())));
+        return result;
+    }
+
     private static void upsertNameRow(DSLContext dsl, Hologram hologram) {
         HologramsRecord record = dsl.newRecord(HOLOGRAMS);
         HologramRows.apply(record, hologram);
@@ -211,6 +256,27 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
                     .set(HOLOGRAM_LINES.IDX, idx)
                     .set(HOLOGRAM_LINES.TEXT, lines.get(idx).value())
                     .execute();
+        }
+    }
+
+    private static void rewritePages(DSLContext dsl, Hologram hologram) {
+        // Page 0 lives in hologram_lines (rewritten above); only the extra pages 1..n are stored here. A
+        // single-page hologram clears any stale page rows so a removed page never lingers.
+        String name = hologram.name().value();
+        dsl.deleteFrom(HOLOGRAM_PAGES).where(HOLOGRAM_PAGES.HOLOGRAM.eq(name)).execute();
+        if (!hologram.isMultiPage()) {
+            return;
+        }
+        for (int pageIndex = 1; pageIndex < hologram.pageCount(); pageIndex++) {
+            List<HologramLine> lines = hologram.pageLines(pageIndex);
+            for (int idx = 0; idx < lines.size(); idx++) {
+                dsl.insertInto(HOLOGRAM_PAGES)
+                        .set(HOLOGRAM_PAGES.HOLOGRAM, name)
+                        .set(HOLOGRAM_PAGES.PAGE_INDEX, pageIndex)
+                        .set(HOLOGRAM_PAGES.IDX, idx)
+                        .set(HOLOGRAM_PAGES.TEXT, lines.get(idx).value())
+                        .execute();
+            }
         }
     }
 }

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.HologramPage;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.TextAlignment;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
@@ -357,6 +358,33 @@ class JooqHologramRepositoryTest {
 
         assertThat(repository.find(HologramName.of("spawn")).orElseThrow().headTexture())
                 .isEqualTo("dGVzdC10ZXh0dXJl");
+    }
+
+    @Test
+    void roundTripsAMultiPageHologram() {
+        repository.save(hologram("paged", 1, 64, 1, "p0-a", "p0-b")
+                .withPageAppended(HologramPage.of(List.of(new HologramLine("p1-a")))));
+
+        Hologram loaded = repository.find(HologramName.of("paged")).orElseThrow();
+
+        assertThat(loaded.isMultiPage()).isTrue();
+        assertThat(loaded.pageCount()).isEqualTo(2);
+        // Page 0 is the content line set (hologram_lines); the extra page comes from hologram_pages.
+        assertThat(loaded.lines().stream().map(HologramLine::value)).containsExactly("p0-a", "p0-b");
+        assertThat(loaded.pageLines(1).stream().map(HologramLine::value)).containsExactly("p1-a");
+    }
+
+    @Test
+    void removingPagesCollapsesToSinglePageAndClearsTheStalePageRows() {
+        repository.save(
+                hologram("paged", 1, 64, 1, "p0").withPageAppended(HologramPage.of(List.of(new HologramLine("p1")))));
+        Hologram twoPage = repository.find(HologramName.of("paged")).orElseThrow();
+        repository.save(twoPage.withPageRemoved(1));
+
+        Hologram loaded = repository.find(HologramName.of("paged")).orElseThrow();
+        assertThat(loaded.isMultiPage()).isFalse();
+        assertThat(loaded.pageCount()).isEqualTo(1);
+        assertThat(loaded.lines().stream().map(HologramLine::value)).containsExactly("p0");
     }
 
     @Test

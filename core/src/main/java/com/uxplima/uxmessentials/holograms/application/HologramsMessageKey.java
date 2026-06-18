@@ -80,6 +80,15 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_HEAD_INVALID("hologram.head-invalid"),
     HOLOGRAM_ENTITY_INVALID("hologram.entity-invalid"),
 
+    // page (multi-page hologram) feedback
+    HOLOGRAM_PAGE_ADDED("hologram.page.added"),
+    HOLOGRAM_PAGE_REMOVED("hologram.page.removed"),
+    HOLOGRAM_PAGE_LIST_HEADER("hologram.page.list-header"),
+    HOLOGRAM_PAGE_LIST_ENTRY("hologram.page.list-entry"),
+    HOLOGRAM_PAGE_NOT_TEXT("hologram.page.not-text"),
+    HOLOGRAM_PAGE_NOT_MULTIPAGE("hologram.page.not-multipage"),
+    HOLOGRAM_PAGE_INDEX_INVALID("hologram.page-index-invalid"),
+
     // visibility feedback
     HOLOGRAM_VISIBILITY_SET("hologram.visibility.set"),
     HOLOGRAM_VISIBILITY_DISTANCE_SET("hologram.visibility.distance-set"),

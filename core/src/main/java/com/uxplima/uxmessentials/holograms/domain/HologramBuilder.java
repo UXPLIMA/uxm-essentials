@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.holograms.domain;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -26,6 +27,7 @@ final class HologramBuilder {
     private @Nullable String linkedNpcName;
     private @Nullable String clickCommand;
     private @Nullable LeaderboardSpec leaderboard;
+    private @Nullable List<HologramPage> pages;
 
     HologramBuilder(Hologram source) {
         Objects.requireNonNull(source, "source");
@@ -40,6 +42,7 @@ final class HologramBuilder {
         this.linkedNpcName = source.linkedNpcName();
         this.clickCommand = source.clickCommand();
         this.leaderboard = source.leaderboard();
+        this.pages = source.pages();
     }
 
     HologramBuilder name(HologramName value) {
@@ -92,6 +95,11 @@ final class HologramBuilder {
         return this;
     }
 
+    HologramBuilder pages(@Nullable List<HologramPage> value) {
+        this.pages = value;
+        return this;
+    }
+
     Hologram build() {
         return new Hologram(
                 name,
@@ -104,6 +112,7 @@ final class HologramBuilder {
                 createdAt,
                 linkedNpcName,
                 clickCommand,
-                leaderboard);
+                leaderboard,
+                pages);
     }
 }

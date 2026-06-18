@@ -20,7 +20,16 @@ public enum HologramError {
     LINE_INDEX_OUT_OF_RANGE(HologramsMessageKey.HOLOGRAM_LINE_INDEX_INVALID),
 
     /** Removing the line would leave the hologram empty — a hologram must keep at least one line. */
-    WOULD_BE_EMPTY(HologramsMessageKey.HOLOGRAM_MIN_ONE_LINE);
+    WOULD_BE_EMPTY(HologramsMessageKey.HOLOGRAM_MIN_ONE_LINE),
+
+    /** {@code /hologram page add} on a non-text hologram — only text holograms render paged lines. */
+    NOT_TEXT_HOLOGRAM(HologramsMessageKey.HOLOGRAM_PAGE_NOT_TEXT),
+
+    /** {@code /hologram page remove} on a hologram that has no page set (it is an ordinary single-page hologram). */
+    NOT_MULTI_PAGE(HologramsMessageKey.HOLOGRAM_PAGE_NOT_MULTIPAGE),
+
+    /** A page index outside the hologram's current page range ({@code /hologram page remove}). */
+    PAGE_INDEX_OUT_OF_RANGE(HologramsMessageKey.HOLOGRAM_PAGE_INDEX_INVALID);
 
     private final HologramsMessageKey messageKey;
 

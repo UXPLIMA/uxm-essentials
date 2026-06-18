@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTeleportAdap
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTextOverrides;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramViewers;
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
+import com.uxplima.uxmessentials.holograms.application.AddHologramPage;
 import com.uxplima.uxmessentials.holograms.application.CenterHologram;
 import com.uxplima.uxmessentials.holograms.application.CopyHologram;
 import com.uxplima.uxmessentials.holograms.application.CreateHologram;
@@ -28,11 +29,13 @@ import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
+import com.uxplima.uxmessentials.holograms.application.ListHologramPages;
 import com.uxplima.uxmessentials.holograms.application.ListHolograms;
 import com.uxplima.uxmessentials.holograms.application.ManageHologramViewer;
 import com.uxplima.uxmessentials.holograms.application.MoveHologram;
 import com.uxplima.uxmessentials.holograms.application.NearbyHolograms;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
+import com.uxplima.uxmessentials.holograms.application.RemoveHologramPage;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
@@ -234,7 +237,10 @@ public final class HologramsWiring {
                 new SetHologramClickCommand(repository, renderer, notifier),
                 new SetHologramLeaderboard(repository, renderer, notifier),
                 new LinkHologramToNpc(repository, renderer, notifier, npcLocator),
-                new UnlinkHologramFromNpc(repository, renderer, notifier));
+                new UnlinkHologramFromNpc(repository, renderer, notifier),
+                new AddHologramPage(repository, renderer, notifier),
+                new RemoveHologramPage(repository, renderer, notifier),
+                new ListHologramPages(repository, notifier));
     }
 
     private static void spawnStored(HologramRepository repository, HologramRenderer renderer) {

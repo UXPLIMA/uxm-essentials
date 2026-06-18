@@ -42,6 +42,10 @@ import org.jspecify.annotations.Nullable;
  * @param refreshIntervalTicks how often (in ticks) the live entity re-renders, or 0 for a static hologram
  * @param createdAt when the hologram was first created (preserved across a move or edit)
  * @param linkedNpcName the name of the NPC the hologram follows, or null when it is anchored to its own location
+ * @param clickCommand the command run as the clicking player, or null when the hologram is not clickable
+ * @param leaderboard the ranked source a leaderboard hologram regenerates its lines from, or null
+ * @param pages the ordered page set of a multi-page hologram (at least two pages, page 0 == {@link #lines()}),
+ *     or null when the hologram is an ordinary single-page hologram
  */
 public record Hologram(
         HologramName name,
@@ -54,10 +58,14 @@ public record Hologram(
         Instant createdAt,
         @Nullable String linkedNpcName,
         @Nullable String clickCommand,
-        @Nullable LeaderboardSpec leaderboard) {
+        @Nullable LeaderboardSpec leaderboard,
+        @Nullable List<HologramPage> pages) {
 
     /** A refresh interval of 0 means "static": render once on enable, never re-render. */
     public static final int STATIC = 0;
+
+    /** The most pages one hologram may carry, a sanity cap on the page set. */
+    public static final int MAX_PAGES = 32;
 
     public Hologram {
         Objects.requireNonNull(name, "name");
@@ -69,6 +77,17 @@ public record Hologram(
         Objects.requireNonNull(createdAt, "createdAt");
         if (refreshIntervalTicks < 0) {
             throw new IllegalArgumentException("refreshIntervalTicks must not be negative: " + refreshIntervalTicks);
+        }
+        if (pages != null) {
+            // List.copyOf rejects a null element; the page set is only ever set through withPages(...), which
+            // collapses a zero/one-page list to null, so a non-null page set always carries at least two pages.
+            pages = List.copyOf(pages);
+            if (pages.size() < 2) {
+                throw new IllegalArgumentException("a multi-page hologram needs at least two pages");
+            }
+            if (pages.size() > MAX_PAGES) {
+                throw new IllegalArgumentException("a hologram may not exceed " + MAX_PAGES + " pages");
+            }
         }
     }
 
@@ -102,6 +121,7 @@ public record Hologram(
                 rotation,
                 refreshIntervalTicks,
                 createdAt,
+                null,
                 null,
                 null,
                 null);
@@ -147,6 +167,7 @@ public record Hologram(
                 createdAt,
                 null,
                 null,
+                null,
                 null);
     }
 
@@ -189,6 +210,50 @@ public record Hologram(
     /** Whether this hologram follows an NPC rather than anchoring to its own stored location. */
     public boolean isLinked() {
         return linkedNpcName != null;
+    }
+
+    /** Whether this hologram has a page set (two or more pages) rather than a single fixed set of lines. */
+    public boolean isMultiPage() {
+        return pages != null;
+    }
+
+    /** The number of pages this hologram carries (1 for an ordinary single-page hologram). */
+    public int pageCount() {
+        return pages == null ? 1 : pages.size();
+    }
+
+    /**
+     * The ordered lines of the page at {@code index}. For a single-page hologram only index 0 is valid and
+     * returns {@link #lines()}; for a multi-page hologram the index addresses its page set. Rejects an
+     * out-of-range index.
+     */
+    public List<HologramLine> pageLines(int index) {
+        if (pages == null) {
+            if (index != 0) {
+                throw new IndexOutOfBoundsException("page index out of range: " + index);
+            }
+            return lines();
+        }
+        if (index < 0 || index >= pages.size()) {
+            throw new IndexOutOfBoundsException("page index out of range: " + index);
+        }
+        return pages.get(index).lines();
+    }
+
+    /**
+     * The line count of the longest page — the number of text displays a multi-page hologram must spawn so
+     * every page fits, with shorter pages blanking the surplus. For a single-page hologram this is
+     * {@link #lineCount()}.
+     */
+    public int maxPageLineCount() {
+        if (pages == null) {
+            return lineCount();
+        }
+        int max = 0;
+        for (HologramPage page : pages) {
+            max = Math.max(max, page.lineCount());
+        }
+        return max;
     }
 
     // --- Transitions (createdAt and the untouched fields are always preserved) ---
@@ -239,6 +304,63 @@ public record Hologram(
      */
     public Hologram withLeaderboard(@Nullable LeaderboardSpec spec) {
         return toBuilder().leaderboard(spec).build();
+    }
+
+    /**
+     * A copy with its page set replaced. A {@code null} or single-page list clears the paging — the hologram
+     * becomes an ordinary single-page hologram, adopting that lone page's lines as its content when one is given.
+     * Two or more pages make it multi-page, and page 0's lines become the rendered {@link #content()} so the base
+     * spawn and every single-page code path keep showing the first page. Used by the page-management use cases.
+     */
+    public Hologram withPages(@Nullable List<HologramPage> newPages) {
+        if (newPages == null || newPages.size() <= 1) {
+            HologramBuilder builder = toBuilder().pages(null);
+            if (newPages != null && newPages.size() == 1) {
+                builder.content(content.withLines(newPages.get(0).lines()));
+            }
+            return builder.build();
+        }
+        List<HologramPage> copy = List.copyOf(newPages);
+        return toBuilder()
+                .pages(copy)
+                .content(content.withLines(copy.get(0).lines()))
+                .build();
+    }
+
+    /**
+     * A copy with {@code page} appended after the current last page. A single-page hologram's current lines
+     * become page 0 and {@code page} becomes page 1, so the first {@code add} promotes it to multi-page.
+     */
+    public Hologram withPageAppended(HologramPage page) {
+        Objects.requireNonNull(page, "page");
+        List<HologramPage> next = new java.util.ArrayList<>(currentPages());
+        next.add(page);
+        return withPages(next);
+    }
+
+    /**
+     * A copy with the page at {@code index} removed; rejects an out-of-range index and a hologram that is not
+     * multi-page. Removing down to a single page collapses the hologram back to an ordinary one showing that
+     * page's lines.
+     */
+    public Hologram withPageRemoved(int index) {
+        if (pages == null) {
+            throw new IllegalStateException("not a multi-page hologram");
+        }
+        if (index < 0 || index >= pages.size()) {
+            throw new IndexOutOfBoundsException("page index out of range: " + index);
+        }
+        List<HologramPage> next = new java.util.ArrayList<>(pages);
+        next.remove(index);
+        return withPages(next);
+    }
+
+    /** The current pages as an explicit list: the stored page set, or the lone implicit page 0 (the content lines). */
+    private List<HologramPage> currentPages() {
+        if (pages != null) {
+            return pages;
+        }
+        return lines().isEmpty() ? List.of() : List.of(HologramPage.of(lines()));
     }
 
     /**
@@ -336,6 +458,14 @@ public record Hologram(
     }
 
     private Hologram withContent(HologramContent newContent) {
-        return toBuilder().content(newContent).build();
+        HologramBuilder builder = toBuilder().content(newContent);
+        if (pages != null && !newContent.lines().isEmpty()) {
+            // Page 0 is the rendered content, so a line edit (or model switch that keeps the lines) flows into it,
+            // keeping the page set and the content in step — otherwise a reload would revert the edit from page 0.
+            List<HologramPage> synced = new java.util.ArrayList<>(pages);
+            synced.set(0, HologramPage.of(newContent.lines()));
+            builder.pages(synced);
+        }
+        return builder.build();
     }
 }
