@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.holograms;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramAction.HOLOGRAM_ACTION;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramBlacklist.HOLOGRAM_BLACKLIST;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramLines.HOLOGRAM_LINES;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.HologramManualViewer.HOLOGRAM_MANUAL_VIEWER;
@@ -22,6 +23,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.HologramsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 
@@ -44,7 +46,8 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
         return read(dsl -> dsl.selectFrom(HOLOGRAMS)
                 .where(HOLOGRAMS.NAME.eq(name.value()))
                 .fetchOptional()
-                .map(row -> HologramRows.toHologram(row, lines(dsl, name.value()), extraPages(dsl, name.value()))));
+                .map(row -> HologramRows.toHologram(
+                        row, lines(dsl, name.value()), extraPages(dsl, name.value()), actions(dsl, name.value()))));
     }
 
     @Override
@@ -52,13 +55,15 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
         return read(dsl -> {
             Map<String, List<String>> linesByName = allLines(dsl);
             Map<String, List<List<String>>> pagesByName = allExtraPages(dsl);
+            Map<String, List<ClickAction>> actionsByName = allActions(dsl);
             return dsl.selectFrom(HOLOGRAMS)
                     .orderBy(HOLOGRAMS.CREATED_AT.asc(), HOLOGRAMS.NAME.asc())
                     .fetch()
                     .map(row -> HologramRows.toHologram(
                             row,
                             linesByName.getOrDefault(row.get(HOLOGRAMS.NAME), List.of()),
-                            pagesByName.getOrDefault(row.get(HOLOGRAMS.NAME), List.of())));
+                            pagesByName.getOrDefault(row.get(HOLOGRAMS.NAME), List.of()),
+                            actionsByName.getOrDefault(row.get(HOLOGRAMS.NAME), List.of())));
         });
     }
 
@@ -75,6 +80,7 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
             upsertNameRow(dsl, hologram);
             rewriteLines(dsl, hologram);
             rewritePages(dsl, hologram);
+            rewriteActions(dsl, hologram);
             return null;
         });
     }
@@ -88,6 +94,9 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
                     .execute();
             dsl.deleteFrom(HOLOGRAM_PAGES)
                     .where(HOLOGRAM_PAGES.HOLOGRAM.eq(name.value()))
+                    .execute();
+            dsl.deleteFrom(HOLOGRAM_ACTION)
+                    .where(HOLOGRAM_ACTION.HOLOGRAM_NAME.eq(name.value()))
                     .execute();
             dsl.deleteFrom(HOLOGRAM_MANUAL_VIEWER)
                     .where(HOLOGRAM_MANUAL_VIEWER.HOLOGRAM_NAME.eq(name.value()))
@@ -230,6 +239,61 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
         Map<String, List<List<String>>> result = new LinkedHashMap<>();
         byName.forEach((name, pagesByIndex) -> result.put(name, new ArrayList<>(pagesByIndex.values())));
         return result;
+    }
+
+    /** One hologram's click-action chain, already ordered by {@code ordinal} and stripped of unparseable rows. */
+    private static List<ClickAction> actions(DSLContext dsl, String name) {
+        List<ClickAction> actions = new ArrayList<>();
+        for (Record row : dsl.select(HOLOGRAM_ACTION.CLICK_TRIGGER, HOLOGRAM_ACTION.TYPE, HOLOGRAM_ACTION.VALUE)
+                .from(HOLOGRAM_ACTION)
+                .where(HOLOGRAM_ACTION.HOLOGRAM_NAME.eq(name))
+                .orderBy(HOLOGRAM_ACTION.ORDINAL.asc())
+                .fetch()) {
+            addAction(actions, row);
+        }
+        return actions;
+    }
+
+    /** Every hologram's action chain, keyed by name — the {@link #all()} counterpart of {@link #actions}. */
+    private static Map<String, List<ClickAction>> allActions(DSLContext dsl) {
+        Map<String, List<ClickAction>> byName = new LinkedHashMap<>();
+        for (Record row : dsl.select(
+                        HOLOGRAM_ACTION.HOLOGRAM_NAME,
+                        HOLOGRAM_ACTION.CLICK_TRIGGER,
+                        HOLOGRAM_ACTION.TYPE,
+                        HOLOGRAM_ACTION.VALUE)
+                .from(HOLOGRAM_ACTION)
+                .orderBy(HOLOGRAM_ACTION.HOLOGRAM_NAME.asc(), HOLOGRAM_ACTION.ORDINAL.asc())
+                .fetch()) {
+            addAction(byName.computeIfAbsent(row.get(HOLOGRAM_ACTION.HOLOGRAM_NAME), key -> new ArrayList<>()), row);
+        }
+        return byName;
+    }
+
+    private static void addAction(List<ClickAction> target, Record row) {
+        ClickAction action = HologramRows.toAction(
+                row.get(HOLOGRAM_ACTION.CLICK_TRIGGER), row.get(HOLOGRAM_ACTION.TYPE), row.get(HOLOGRAM_ACTION.VALUE));
+        if (action != null) {
+            target.add(action);
+        }
+    }
+
+    private static void rewriteActions(DSLContext dsl, Hologram hologram) {
+        String name = hologram.name().value();
+        dsl.deleteFrom(HOLOGRAM_ACTION)
+                .where(HOLOGRAM_ACTION.HOLOGRAM_NAME.eq(name))
+                .execute();
+        List<ClickAction> actions = hologram.actions();
+        for (int ordinal = 0; ordinal < actions.size(); ordinal++) {
+            ClickAction action = actions.get(ordinal);
+            dsl.insertInto(HOLOGRAM_ACTION)
+                    .set(HOLOGRAM_ACTION.HOLOGRAM_NAME, name)
+                    .set(HOLOGRAM_ACTION.ORDINAL, ordinal)
+                    .set(HOLOGRAM_ACTION.CLICK_TRIGGER, action.trigger().name())
+                    .set(HOLOGRAM_ACTION.TYPE, action.type().name())
+                    .set(HOLOGRAM_ACTION.VALUE, action.value())
+                    .execute();
+        }
     }
 
     private static void upsertNameRow(DSLContext dsl, Hologram hologram) {

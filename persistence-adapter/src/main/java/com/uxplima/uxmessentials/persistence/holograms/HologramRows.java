@@ -22,6 +22,9 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.HologramsRecord;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.jooq.Record;
 import org.jspecify.annotations.Nullable;
 
@@ -33,6 +36,8 @@ import org.jspecify.annotations.Nullable;
  * {@link Appearance} default (or a static interval), and as {@link Visibility#everyone()}, so a pre-V35 row
  * keeps its current look and a pre-V36 row stays visible to everyone. The V37 type columns are likewise
  * nullable: a NULL type reads back as {@link HologramType#TEXT}, so a pre-V37 row keeps rendering its lines.
+ * The click-action chain lives in the child {@code hologram_action} table (V60) and is passed in already ordered
+ * — each row's {@code click_trigger}/{@code type} are the enum names and {@code value} the raw operator payload.
  * This class is the single place that translation lives.
  */
 final class HologramRows {
@@ -42,11 +47,16 @@ final class HologramRows {
     private HologramRows() {}
 
     /**
-     * Rebuild a {@link Hologram} from a name row, its already-ordered page-0 line texts, and the extra pages
-     * 1..n (each an already-ordered list of line texts, in page order). A hologram with no extra pages reads
-     * back as an ordinary single-page hologram.
+     * Rebuild a {@link Hologram} from a name row, its already-ordered page-0 line texts, the extra pages 1..n
+     * (each an already-ordered list of line texts, in page order) and its already-ordered click-action rows. A
+     * hologram with no extra pages reads back as an ordinary single-page hologram, and one with no action rows
+     * reads back with an empty action chain.
      */
-    static Hologram toHologram(Record row, List<String> orderedLineTexts, List<List<String>> extraPageTexts) {
+    static Hologram toHologram(
+            Record row,
+            List<String> orderedLineTexts,
+            List<List<String>> extraPageTexts,
+            List<ClickAction> orderedActions) {
         WorldRef world = new WorldRef(UUID.fromString(row.get(HOLOGRAMS.WORLD)), row.get(HOLOGRAMS.WORLD_NAME));
         Position position = new Position(
                 world,
@@ -74,9 +84,43 @@ final class HologramRows {
         // A pre-V50 row (NULL linked_npc_name) — and any row that never linked — reads back unlinked, so an
         // existing hologram keeps anchoring to its own coordinates with no data migration. The V54 click command
         // is layered on the same way: a pre-V54 / never-clickable row (NULL) reads back without a click action.
-        // The V57 extra pages are applied last: a row with no hologram_pages rows stays a single-page hologram.
-        return pagesOf(
-                growUpOf(row, leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram)))), extraPageTexts);
+        // The V57 extra pages and the V60 action chain are applied last: a row with no hologram_pages rows stays a
+        // single-page hologram, and a row with no hologram_action rows reads back with an empty action chain.
+        return actionsOf(
+                pagesOf(
+                        growUpOf(row, leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram)))),
+                        extraPageTexts),
+                orderedActions);
+    }
+
+    private static Hologram actionsOf(Hologram hologram, List<ClickAction> orderedActions) {
+        Hologram withActions = hologram;
+        for (ClickAction action : orderedActions) {
+            withActions = withActions.withActionAdded(action);
+        }
+        return withActions;
+    }
+
+    /**
+     * Build a domain {@link ClickAction} from a stored row's trigger/type/value, or {@code null} when the trigger
+     * or type enum name no longer parses (a forward-incompatible row is skipped on load rather than crashing the
+     * whole hologram set). The caller filters the nulls out. Mirrors the NPC action read.
+     */
+    static @Nullable ClickAction toAction(String trigger, String type, String value) {
+        ClickTrigger clickTrigger = enumOrNull(ClickTrigger.class, trigger);
+        ClickActionType actionType = enumOrNull(ClickActionType.class, type);
+        if (clickTrigger == null || actionType == null) {
+            return null;
+        }
+        return new ClickAction(clickTrigger, actionType, value);
+    }
+
+    private static <E extends Enum<E>> @Nullable E enumOrNull(Class<E> type, String name) {
+        try {
+            return Enum.valueOf(type, name);
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
     }
 
     private static Hologram growUpOf(Record row, Hologram hologram) {

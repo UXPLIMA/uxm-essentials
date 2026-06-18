@@ -24,6 +24,9 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -388,6 +391,65 @@ class JooqHologramRepositoryTest {
 
         assertThat(repository.find(HologramName.of("spawn")).orElseThrow().growUp())
                 .isTrue();
+    }
+
+    @Test
+    void roundTripsTheActionChainAndDropsItOnDelete() {
+        repository.save(hologram("spawn", 1, 64, 1, "line")
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi")));
+        assertThat(repository.find(HologramName.of("spawn")).orElseThrow().actions())
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.trigger()).isEqualTo(ClickTrigger.ANY);
+                    assertThat(a.type()).isEqualTo(ClickActionType.MESSAGE);
+                    assertThat(a.value()).isEqualTo("hi");
+                });
+
+        repository.delete(HologramName.of("spawn"));
+        // Re-create under the freed name; the actions must not resurface from a stale child row.
+        repository.save(hologram("spawn", 1, 64, 1, "line"));
+        assertThat(repository.find(HologramName.of("spawn")).orElseThrow().actions())
+                .isEmpty();
+    }
+
+    @Test
+    void roundTripsTheActionChainInOrder() {
+        ClickAction first = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, "<green>welcome");
+        ClickAction second = new ClickAction(ClickTrigger.LEFT_CLICK, ClickActionType.RUN_CONSOLE, "say hi {player}");
+        ClickAction third = new ClickAction(ClickTrigger.ANY, ClickActionType.SOUND, "ui.button.click:1:2");
+        repository.save(hologram("spawn", 1, 64, 1, "line")
+                .withActionAdded(first)
+                .withActionAdded(second)
+                .withActionAdded(third));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+
+        assertThat(loaded.actions()).containsExactly(first, second, third);
+    }
+
+    @Test
+    void replacesTheActionChainOnSaveLeavingNoStaleRows() {
+        repository.save(hologram("spawn", 1, 64, 1, "line")
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "one"))
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "two")));
+
+        ClickAction kept = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.ACTIONBAR, "only");
+        repository.save(repository
+                .find(HologramName.of("spawn"))
+                .orElseThrow()
+                .withActionsCleared()
+                .withActionAdded(kept));
+
+        assertThat(repository.find(HologramName.of("spawn")).orElseThrow().actions())
+                .containsExactly(kept);
+    }
+
+    @Test
+    void aFreshHologramDefaultsToAnEmptyActionChain() {
+        repository.save(hologram("spawn", 1, 64, 1, "line"));
+
+        assertThat(repository.find(HologramName.of("spawn")).orElseThrow().actions())
+                .isEmpty();
     }
 
     @Test
