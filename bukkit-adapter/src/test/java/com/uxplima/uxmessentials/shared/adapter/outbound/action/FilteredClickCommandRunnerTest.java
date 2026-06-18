@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -8,22 +8,21 @@ import java.util.List;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@link FilteredNpcCommandRunner}: a blocked command is dropped before the delegate on every dispatch path
+ * Pins {@link FilteredClickCommandRunner}: a blocked command is dropped before the delegate on every dispatch path
  * (console / player / op), while an allowed command passes straight through. The delegate is a recording fake, so
  * no Bukkit dispatch happens.
  */
-class FilteredNpcCommandRunnerTest {
+class FilteredClickCommandRunnerTest {
 
     @Test
     void dropsABlockedConsoleCommand() {
         RecordingRunner delegate = new RecordingRunner();
-        FilteredNpcCommandRunner runner =
-                new FilteredNpcCommandRunner(delegate, BlockedCommands.of(List.of("stop")), new NoOpLogger());
+        FilteredClickCommandRunner runner =
+                new FilteredClickCommandRunner(delegate, BlockedCommands.of(List.of("stop")), new NoOpLogger());
 
         runner.runAsConsole("stop");
 
@@ -33,8 +32,8 @@ class FilteredNpcCommandRunnerTest {
     @Test
     void passesAnAllowedConsoleCommandToTheDelegate() {
         RecordingRunner delegate = new RecordingRunner();
-        FilteredNpcCommandRunner runner =
-                new FilteredNpcCommandRunner(delegate, BlockedCommands.of(List.of("stop")), new NoOpLogger());
+        FilteredClickCommandRunner runner =
+                new FilteredClickCommandRunner(delegate, BlockedCommands.of(List.of("stop")), new NoOpLogger());
 
         runner.runAsConsole("say hello");
 
@@ -44,8 +43,8 @@ class FilteredNpcCommandRunnerTest {
     @Test
     void filtersThePlayerAndOpDispatchesToo() {
         RecordingRunner delegate = new RecordingRunner();
-        FilteredNpcCommandRunner runner =
-                new FilteredNpcCommandRunner(delegate, BlockedCommands.of(List.of("op")), new NoOpLogger());
+        FilteredClickCommandRunner runner =
+                new FilteredClickCommandRunner(delegate, BlockedCommands.of(List.of("op")), new NoOpLogger());
         Player player = mock(Player.class);
 
         runner.runAsPlayer(player, "op Notch");

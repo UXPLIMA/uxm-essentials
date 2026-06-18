@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

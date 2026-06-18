@@ -2,13 +2,16 @@ package com.uxplima.uxmessentials.holograms.adapter;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -36,6 +39,7 @@ import com.uxplima.uxmessentials.holograms.application.CreateHologram;
 import com.uxplima.uxmessentials.holograms.application.DeleteHologram;
 import com.uxplima.uxmessentials.holograms.application.DescribeHologram;
 import com.uxplima.uxmessentials.holograms.application.HologramNotifier;
+import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramAction;
 import com.uxplima.uxmessentials.holograms.application.InsertHologramLine;
 import com.uxplima.uxmessentials.holograms.application.LinkHologramToNpc;
@@ -71,11 +75,19 @@ import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.miniplaceholders.MiniPlaceholdersSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmlib.hologram.HologramManager;
@@ -113,11 +125,13 @@ public final class HologramsWiring {
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
-            com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards) {
+            com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards,
+            Optional<ClickActionEconomy> economy) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(leaderboards, "leaderboards");
+        Objects.requireNonNull(economy, "economy");
         KernelPorts kernel = ctx.kernel();
         HologramRepository repository = HologramRepositories.cached(persistence);
         HologramManager manager = new HologramManager();
@@ -175,9 +189,26 @@ public final class HologramsWiring {
         // A joining player must pick up the permission-gated holograms they qualify for at once, not after a
         // refresh tick; this listener re-evaluates only the gated holograms for that one player.
         plugin.getServer().getPluginManager().registerEvents(new HologramVisibilityListener(renderer), plugin);
-        plugin.getServer()
-                .getPluginManager()
-                .registerEvents(new HologramClickListener(plugin, repository, renderer), plugin);
+        // The shared click-action engine: a hologram's chain runs through the same BukkitClickActionRunner npc uses,
+        // built over the shared filtered command runner. Holograms ship no blocked-commands config key, so the
+        // blocklist is empty (a transparent pass-through — an operator-owned fixture, no command filtering needed yet).
+        // The b64 item resolver matches the token /hologram action … give hand stamps onto a GIVE action.
+        ClickCommandRunner commandRunner = new FilteredClickCommandRunner(
+                new BukkitClickCommandRunner(), BlockedCommands.of(List.of()), kernel.log());
+        BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
+        ClickActionRunner actionRunner = new BukkitClickActionRunner(
+                commandRunner,
+                connector,
+                kernel.scheduler(),
+                kernel.permissions(),
+                economy,
+                kernel.messages(),
+                HologramsMessageKey.HOLOGRAM_ACTION_COST_DENIED,
+                HologramsWiring::resolveSerializedItem,
+                kernel.log());
+        HologramClickListener clickListener =
+                new HologramClickListener(plugin, repository, renderer, actionRunner, kernel.scheduler());
+        plugin.getServer().getPluginManager().registerEvents(clickListener, plugin);
         // The damage-indicator feature ships disabled: only when its config switches it on is the combat listener
         // registered, so a default server spawns no floating-number entities and the listener costs nothing.
         DamageIndicatorConfig damageIndicators = DamageIndicatorConfig.fromConfig(ctx.config());
@@ -201,7 +232,8 @@ public final class HologramsWiring {
                 repository,
                 refreshTask,
                 events,
-                npcSubscriber);
+                npcSubscriber,
+                connector);
     }
 
     /**
@@ -233,6 +265,23 @@ public final class HologramsWiring {
      */
     private static DisplayTextPackets perViewerTextPackets() {
         return new NmsDisplayTextPackets(new PacketSender(new ChannelResolver()));
+    }
+
+    /**
+     * Resolve a {@code GIVE} action's serialized-item token to an {@link ItemStack}. A {@code /hologram action …
+     * give hand} stamps the held item as a {@code b64:<base64>} token (Bukkit's {@code serializeBytes}); anything
+     * without that prefix, or a token that fails to decode, yields empty so the give is skipped fail-soft rather
+     * than aborting the chain.
+     */
+    private static Optional<ItemStack> resolveSerializedItem(String spec) {
+        if (!spec.startsWith("b64:")) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(ItemStack.deserializeBytes(Base64.getDecoder().decode(spec.substring(4))));
+        } catch (RuntimeException invalid) {
+            return Optional.empty();
+        }
     }
 
     private static AutoCloseable scheduleRefresh(
@@ -307,6 +356,7 @@ public final class HologramsWiring {
      * @param refreshTask the global refresh timer handle, cancelled on stop so no task outlives a disable
      * @param events the domain-event bus the npc-link locator subscribed to, dropped on stop
      * @param npcSubscriber the npc-link locator subscription, unsubscribed on stop so it does not outlive a reload
+     * @param connector the proxy connect channel the click-action engine uses, unregistered on stop so nothing outlives a disable
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -314,7 +364,8 @@ public final class HologramsWiring {
             HologramRepository repository,
             AutoCloseable refreshTask,
             InProcessDomainEventPublisher events,
-            Consumer<DomainEvent> npcSubscriber) {
+            Consumer<DomainEvent> npcSubscriber,
+            BukkitServerConnector connector) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -323,12 +374,17 @@ public final class HologramsWiring {
             Objects.requireNonNull(refreshTask, "refreshTask");
             Objects.requireNonNull(events, "events");
             Objects.requireNonNull(npcSubscriber, "npcSubscriber");
+            Objects.requireNonNull(connector, "connector");
         }
 
-        /** Cancel the refresh timer, drop the npc-link subscription, and despawn every spawned hologram. */
+        /**
+         * Cancel the refresh timer, drop the npc-link subscription, unregister the proxy connect channel, and
+         * despawn every spawned hologram.
+         */
         public void stop() {
             events.unsubscribe(npcSubscriber);
             closeQuietly(refreshTask);
+            connector.close();
             renderer.despawnAll();
         }
 

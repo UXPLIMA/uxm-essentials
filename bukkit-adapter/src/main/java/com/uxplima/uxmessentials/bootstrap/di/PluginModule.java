@@ -671,7 +671,11 @@ public final class PluginModule {
         // stored hologram is spawned (each on its own region thread); on disable they are despawned cleanly.
         LeaderboardProviders leaderboards = new LeaderboardProviders(
                 links.balanceLeaderboard == null ? Map.of() : Map.of("balance", links.balanceLeaderboard));
-        HologramsWiring.Wired wired = HologramsWiring.wire(plugin, ctx, persistence, leaderboards);
+        // The same shared economy bridge npc charges its COST click actions through (captured during economy
+        // wiring, which lands long before holograms); absent on a server without economy, so a hologram COST gate
+        // is simply skipped there. It is a generic ClickActionEconomy, not an npc handle — holograms reaches no npc.
+        HologramsWiring.Wired wired =
+                HologramsWiring.wire(plugin, ctx, persistence, leaderboards, Optional.ofNullable(links.npcEconomy));
         wired.commands().forEach(resources::addCommand);
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).

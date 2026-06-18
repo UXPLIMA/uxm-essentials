@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import java.util.List;
 import java.util.Locale;
@@ -9,12 +9,12 @@ import java.util.stream.Collectors;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The set of command labels an NPC's bound command or click action may not run, matched case-insensitively on the
- * command's first word (its label) with any leading slash stripped. An empty set blocks nothing — the default, so
- * a server that configures no blocklist behaves exactly as before. Pure of any Bukkit reference so the matching is
- * unit-testable; {@link FilteredNpcCommandRunner} consults it before every NPC-driven dispatch, and the npc module
- * config supplies the labels. The blocklist guards a player-owned NPC's command actions from invoking dangerous
- * operator commands (the {@code uxmessentials.npc.admin} surface can be granted more broadly once NPCs are owned).
+ * The set of command labels a clickable fixture's bound command or click action may not run, matched
+ * case-insensitively on the command's first word (its label) with any leading slash stripped. An empty set blocks
+ * nothing — the default, so a server that configures no blocklist behaves exactly as before. Pure of any Bukkit
+ * reference so the matching is unit-testable; {@link FilteredClickCommandRunner} consults it before every
+ * fixture-driven dispatch, and each context's module config supplies the labels. The blocklist guards a
+ * player-owned fixture's command actions from invoking dangerous operator commands.
  */
 @NullMarked
 public final class BlockedCommands {

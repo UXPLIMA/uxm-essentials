@@ -13,11 +13,8 @@ import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcSkinByName;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionListener;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
-import com.uxplima.uxmessentials.npc.adapter.outbound.BlockedCommands;
-import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.CompositeSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
-import com.uxplima.uxmessentials.npc.adapter.outbound.FilteredNpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.HttpClientFetcher;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
@@ -71,10 +68,13 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
@@ -141,8 +141,8 @@ public final class NpcWiring {
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
         List<CommandRegistration> commands =
                 List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages()));
-        ClickCommandRunner commandRunner = new FilteredNpcCommandRunner(
-                new BukkitNpcCommandRunner(), BlockedCommands.of(settings.blockedCommands()), kernel.log());
+        ClickCommandRunner commandRunner = new FilteredClickCommandRunner(
+                new BukkitClickCommandRunner(), BlockedCommands.of(settings.blockedCommands()), kernel.log());
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
         ClickActionRunner actionRunner = new BukkitClickActionRunner(
                 commandRunner,

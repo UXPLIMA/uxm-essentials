@@ -1,20 +1,21 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import java.util.Objects;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * The Bukkit-backed {@link ClickCommandRunner}: a console command goes through {@code Bukkit.dispatchCommand} on
  * the console sender, a player command through {@code player.performCommand}. Both must run on the main/region
- * thread, which the interaction listener guarantees before calling in.
+ * thread, which the interaction listener guarantees before calling in. Generic to any clickable fixture (NPC or
+ * hologram) — it holds no context-specific state, so a single instance is shared by every context that runs a
+ * click-action chain.
  */
 @NullMarked
-public final class BukkitNpcCommandRunner implements ClickCommandRunner {
+public final class BukkitClickCommandRunner implements ClickCommandRunner {
 
     @Override
     public void runAsConsole(String command) {
