@@ -23,7 +23,8 @@ class LoadUnloadWorldTest {
     private final FakeWorldEngine engine = new FakeWorldEngine();
     private final List<DomainEvent> events = new ArrayList<>();
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Op");
-    private final LoadWorld loadWorld = new LoadWorld(repo, engine, TestSupport.notifier(), events::add);
+    private final LoadWorld loadWorld =
+            new LoadWorld(repo, engine, TestSupport.notifier(), events::add, TestSupport.inlineScheduler());
     private final UnloadWorld unloadWorld = new UnloadWorld(engine, TestSupport.notifier(), events::add, () -> true);
 
     private void register(String name) {

@@ -35,7 +35,8 @@ public final class UnloadWorld {
         if (!engine.isLoaded(name)) {
             return fail(who, name, WorldError.NOT_LOADED);
         }
-        if (protectDefault.getAsBoolean() && engine.defaultWorldName().equals(name)) {
+        if (protectDefault.getAsBoolean()
+                && engine.defaultWorldName().map(name::equals).orElse(false)) {
             return fail(who, name, WorldError.IS_PROTECTED);
         }
         if (engine.playerCount(name) > 0) {

@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -23,8 +24,9 @@ import com.uxplima.uxmessentials.worlds.domain.event.WorldImported;
 /**
  * Imports an existing on-disk world folder into management: rejects an already-registered name, a
  * missing folder, or a folder without a readable {@code level.dat}; otherwise builds the spec from
- * the detected environment/seed (plus an optional generator), loads the world, persists it, and
- * publishes {@link WorldImported}.
+ * the detected environment/seed (plus an optional generator) and loads the world (the Bukkit handle
+ * op, on the calling global thread), then persists it and publishes {@link WorldImported} on the
+ * {@code Scheduler}'s async executor, hopping back to the importer only to notify.
  */
 public final class ImportWorld {
 
@@ -32,6 +34,7 @@ public final class ImportWorld {
     private final WorldEngine engine;
     private final WorldNotifier notifier;
     private final DomainEventPublisher events;
+    private final Scheduler scheduler;
     private final Clock clock;
 
     public ImportWorld(
@@ -39,11 +42,13 @@ public final class ImportWorld {
             WorldEngine engine,
             WorldNotifier notifier,
             DomainEventPublisher events,
+            Scheduler scheduler,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -70,10 +75,16 @@ public final class ImportWorld {
         if (loaded.isErr()) {
             return fail(importer, name, loaded.errorOrThrow());
         }
+        scheduler.async(() -> persistOffTick(importer, name, world));
+        return Result.ok();
+    }
+
+    private void persistOffTick(PlayerRef importer, WorldName name, ManagedWorld world) {
         repository.save(engine.uidOf(name).map(world::withKnownUid).orElse(world));
         events.publish(new WorldImported(name));
-        notifier.send(importer, WorldsMessageKey.WORLD_IMPORTED, Map.of("world", name.value()));
-        return Result.ok();
+        scheduler.onEntity(
+                importer,
+                () -> notifier.send(importer, WorldsMessageKey.WORLD_IMPORTED, Map.of("world", name.value())));
     }
 
     private Result<Unit, WorldError> fail(PlayerRef who, WorldName name, WorldError error) {

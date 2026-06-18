@@ -67,8 +67,8 @@ final class FakeWorldEngine implements WorldEngine {
     }
 
     @Override
-    public WorldName defaultWorldName() {
-        return defaultWorld;
+    public Optional<WorldName> defaultWorldName() {
+        return Optional.ofNullable(defaultWorld);
     }
 
     @Override

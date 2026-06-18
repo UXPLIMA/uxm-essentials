@@ -24,7 +24,12 @@ class ImportWorldTest {
     private final FakeWorldEngine engine = new FakeWorldEngine();
     private final List<DomainEvent> events = new ArrayList<>();
     private final ImportWorld importWorld = new ImportWorld(
-            repo, engine, TestSupport.notifier(), events::add, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+            repo,
+            engine,
+            TestSupport.notifier(),
+            events::add,
+            TestSupport.inlineScheduler(),
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Op");
 
     @Test

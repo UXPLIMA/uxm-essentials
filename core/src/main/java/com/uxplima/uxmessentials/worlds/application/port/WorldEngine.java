@@ -40,7 +40,11 @@ public interface WorldEngine {
 
     Set<WorldName> loadedWorldNames();
 
-    WorldName defaultWorldName();
+    /**
+     * The server's default (primary) world, or empty when the server has no worlds loaded — which a
+     * caller comparing against a name must treat as "not the default" rather than dereferencing.
+     */
+    Optional<WorldName> defaultWorldName();
 
     Optional<UUID> uidOf(WorldName name);
 

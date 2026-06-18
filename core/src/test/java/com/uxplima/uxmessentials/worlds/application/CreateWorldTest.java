@@ -25,7 +25,12 @@ class CreateWorldTest {
     private final DomainEventPublisher publisher = events::add;
     private final PlayerRef creator = new PlayerRef(UUID.randomUUID(), "Op");
     private final CreateWorld createWorld = new CreateWorld(
-            repo, engine, TestSupport.notifier(), publisher, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+            repo,
+            engine,
+            TestSupport.notifier(),
+            publisher,
+            TestSupport.inlineScheduler(),
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
 
     @Test
     void createsPersistsAndPublishes() {

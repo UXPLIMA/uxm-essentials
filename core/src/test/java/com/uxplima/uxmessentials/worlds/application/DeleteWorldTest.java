@@ -35,6 +35,7 @@ class DeleteWorldTest {
             pending,
             TestSupport.notifier(),
             events::add,
+            TestSupport.inlineScheduler(),
             Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
             () -> true);
 

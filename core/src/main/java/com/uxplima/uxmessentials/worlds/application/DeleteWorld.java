@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -22,8 +23,9 @@ import com.uxplima.uxmessentials.worlds.domain.event.WorldDeleted;
  * Two-phase world deletion. {@code request} validates and stages a confirmation (no destruction);
  * {@code confirm} consumes the staged deletion, re-validates from scratch (never trusting the staged
  * value), unloads the world if loaded, deletes its files, drops the metadata row, and publishes
- * {@link WorldDeleted}. The default world is protected; the heavy file delete is run off-tick by the
- * adapter that invokes this use case.
+ * {@link WorldDeleted}. The default world is protected; the recursive file delete and the metadata
+ * drop run off-tick on the {@code Scheduler}'s async executor, hopping back to the requester only to
+ * notify — the synchronous gate (unload + protect-default check) stays on the calling global thread.
  */
 public final class DeleteWorld {
 
@@ -32,6 +34,7 @@ public final class DeleteWorld {
     private final PendingDeletionRegistry pending;
     private final WorldNotifier notifier;
     private final DomainEventPublisher events;
+    private final Scheduler scheduler;
     private final Clock clock;
     private final BooleanSupplier protectDefault;
 
@@ -41,6 +44,7 @@ public final class DeleteWorld {
             PendingDeletionRegistry pending,
             WorldNotifier notifier,
             DomainEventPublisher events,
+            Scheduler scheduler,
             Clock clock,
             BooleanSupplier protectDefault) {
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -48,6 +52,7 @@ public final class DeleteWorld {
         this.pending = Objects.requireNonNull(pending, "pending");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.protectDefault = Objects.requireNonNull(protectDefault, "protectDefault");
     }
@@ -84,22 +89,29 @@ public final class DeleteWorld {
                 return unloaded;
             }
         }
+        scheduler.async(() -> deleteOffTick(who, name));
+        return Result.ok();
+    }
+
+    private void deleteOffTick(PlayerRef who, WorldName name) {
         Result<Unit, WorldError> deleted = engine.deleteFiles(name);
         if (deleted.isErr()) {
-            notifier.send(who, deleted.errorOrThrow().messageKey(), Map.of("world", name.value()));
-            return deleted;
+            WorldError error = deleted.errorOrThrow();
+            scheduler.onEntity(who, () -> notifier.send(who, error.messageKey(), Map.of("world", name.value())));
+            return;
         }
         repository.delete(name);
         events.publish(new WorldDeleted(name));
-        notifier.send(who, WorldsMessageKey.WORLD_DELETED, Map.of("world", name.value()));
-        return Result.ok();
+        scheduler.onEntity(
+                who, () -> notifier.send(who, WorldsMessageKey.WORLD_DELETED, Map.of("world", name.value())));
     }
 
     private Optional<WorldError> validate(WorldName name) {
         if (!repository.exists(name) && !engine.exists(name)) {
             return Optional.of(WorldError.NOT_FOUND);
         }
-        if (protectDefault.getAsBoolean() && engine.defaultWorldName().equals(name)) {
+        if (protectDefault.getAsBoolean()
+                && engine.defaultWorldName().map(name::equals).orElse(false)) {
             return Optional.of(WorldError.IS_PROTECTED);
         }
         return Optional.empty();

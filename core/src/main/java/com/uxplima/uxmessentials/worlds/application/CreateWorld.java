@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -19,9 +20,10 @@ import com.uxplima.uxmessentials.worlds.domain.event.WorldCreated;
 
 /**
  * Creates a new world: rejects a name already in the registry or already present on disk, asks the
- * engine to build the world, persists the aggregate, and publishes {@link WorldCreated}. The engine
- * call is synchronous from the use case's perspective; the adapter runs the heavy work off-tick and
- * on the global thread.
+ * engine to build the world (the Bukkit handle op, on the calling global thread), then persists the
+ * aggregate and publishes {@link WorldCreated} on the {@code Scheduler}'s async executor, hopping back
+ * to the creator only to notify. The synchronous {@link Result} carries the gate/engine outcome; the
+ * persistence write is off-tick.
  */
 public final class CreateWorld {
 
@@ -29,6 +31,7 @@ public final class CreateWorld {
     private final WorldEngine engine;
     private final WorldNotifier notifier;
     private final DomainEventPublisher events;
+    private final Scheduler scheduler;
     private final Clock clock;
 
     public CreateWorld(
@@ -36,11 +39,13 @@ public final class CreateWorld {
             WorldEngine engine,
             WorldNotifier notifier,
             DomainEventPublisher events,
+            Scheduler scheduler,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -58,10 +63,14 @@ public final class CreateWorld {
             notifier.send(creator, created.errorOrThrow().messageKey(), Map.of("world", name.value()));
             return created;
         }
-        ManagedWorld persisted = engine.uidOf(name).map(world::withKnownUid).orElse(world);
-        repository.save(persisted);
-        events.publish(new WorldCreated(name));
-        notifier.send(creator, WorldsMessageKey.WORLD_CREATED, Map.of("world", name.value()));
+        scheduler.async(() -> persistOffTick(creator, name, world));
         return Result.ok();
+    }
+
+    private void persistOffTick(PlayerRef creator, WorldName name, ManagedWorld world) {
+        repository.save(engine.uidOf(name).map(world::withKnownUid).orElse(world));
+        events.publish(new WorldCreated(name));
+        scheduler.onEntity(
+                creator, () -> notifier.send(creator, WorldsMessageKey.WORLD_CREATED, Map.of("world", name.value())));
     }
 }

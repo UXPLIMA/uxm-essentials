@@ -20,7 +20,8 @@ class UnregisterWorldTest {
 
     private final FakeWorldRepository repo = new FakeWorldRepository();
     private final List<DomainEvent> events = new ArrayList<>();
-    private final UnregisterWorld unregister = new UnregisterWorld(repo, TestSupport.notifier(), events::add);
+    private final UnregisterWorld unregister =
+            new UnregisterWorld(repo, TestSupport.notifier(), events::add, TestSupport.inlineScheduler());
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Op");
 
     @Test

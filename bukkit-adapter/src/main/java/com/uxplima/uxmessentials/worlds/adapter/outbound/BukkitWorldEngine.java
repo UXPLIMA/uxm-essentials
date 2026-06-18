@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -180,8 +181,11 @@ public final class BukkitWorldEngine implements WorldEngine {
     }
 
     @Override
-    public WorldName defaultWorldName() {
-        return WorldName.of(server.getWorlds().get(0).getName());
+    public Optional<WorldName> defaultWorldName() {
+        List<World> worlds = server.getWorlds();
+        return worlds.isEmpty()
+                ? Optional.empty()
+                : Optional.of(WorldName.of(worlds.get(0).getName()));
     }
 
     @Override

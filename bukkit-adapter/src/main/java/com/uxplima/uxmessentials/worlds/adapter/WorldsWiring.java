@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.worlds.adapter;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.Server;
 
@@ -12,8 +14,10 @@ import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldEngine;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.InFlightScheduler;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingDeletionRegistry;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
@@ -42,6 +46,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WorldsWiring {
 
+    private static final Duration DRAIN_TIMEOUT = Duration.ofSeconds(5);
+
     private WorldsWiring() {}
 
     public static Wired wire(ModuleContext ctx, Persistence persistence, Server server) {
@@ -59,7 +65,10 @@ public final class WorldsWiring {
         InMemoryPendingDeletionRegistry pending = new InMemoryPendingDeletionRegistry();
         Clock clock = Clock.systemUTC();
 
-        WorldsServices services = assemble(kernel, repository, notifier, engine, pending, settings, clock);
+        AtomicInteger inFlight = new AtomicInteger();
+        Scheduler tracked = new InFlightScheduler(kernel.scheduler(), inFlight);
+
+        WorldsServices services = assemble(kernel, tracked, repository, notifier, engine, pending, settings, clock);
         ReconcileWorldsOnEnable reconcile = new ReconcileWorldsOnEnable(
                 repository, engine, kernel.events(), clock, settings::autoAdoptLoaded, settings::autoLoadRegistered);
 
@@ -69,24 +78,40 @@ public final class WorldsWiring {
             repository.invalidateAll(); // reconciliation mutated rows; drop the warm snapshot so the next read reloads
             services.refreshImportableFolders();
         });
-        return new Wired(commands, startReconcile, () -> {});
+        return new Wired(commands, startReconcile, () -> awaitDrain(inFlight));
+    }
+
+    /** Spin-wait until the off-tick write tails finish, bounded by {@link #DRAIN_TIMEOUT}, on stop/reload. */
+    private static void awaitDrain(AtomicInteger inFlight) {
+        long deadline = System.nanoTime() + DRAIN_TIMEOUT.toNanos();
+        while (inFlight.get() > 0 && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
     }
 
     private static WorldsServices assemble(
             KernelPorts kernel,
+            Scheduler scheduler,
             com.uxplima.uxmessentials.worlds.application.port.WorldRepository repository,
             WorldNotifier notifier,
             BukkitWorldEngine engine,
             InMemoryPendingDeletionRegistry pending,
             WorldsSettings settings,
             Clock clock) {
-        CreateWorld createWorld = new CreateWorld(repository, engine, notifier, kernel.events(), clock);
-        ImportWorld importWorld = new ImportWorld(repository, engine, notifier, kernel.events(), clock);
-        LoadWorld loadWorld = new LoadWorld(repository, engine, notifier, kernel.events());
+        CreateWorld createWorld = new CreateWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
+        ImportWorld importWorld = new ImportWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
+        LoadWorld loadWorld = new LoadWorld(repository, engine, notifier, kernel.events(), scheduler);
         UnloadWorld unloadWorld = new UnloadWorld(engine, notifier, kernel.events(), settings::protectDefaultWorld);
-        UnregisterWorld unregisterWorld = new UnregisterWorld(repository, notifier, kernel.events());
+        UnregisterWorld unregisterWorld = new UnregisterWorld(repository, notifier, kernel.events(), scheduler);
         DeleteWorld deleteWorld = new DeleteWorld(
-                repository, engine, pending, notifier, kernel.events(), clock, settings::protectDefaultWorld);
+                repository,
+                engine,
+                pending,
+                notifier,
+                kernel.events(),
+                scheduler,
+                clock,
+                settings::protectDefaultWorld);
         ListWorlds listWorlds = new ListWorlds(repository, engine);
         WorldInfo worldInfo = new WorldInfo(repository);
         return new WorldsServices(
