@@ -47,7 +47,7 @@ public final class BukkitServerConnector implements ServerConnector {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(server, "server");
         if (!isAvailable()) {
-            log.warn("event=npc_connect_skipped reason=channel_unregistered server={}", server);
+            log.warn("event=click_connect_skipped reason=channel_unregistered server={}", server);
             return;
         }
         player.sendPluginMessage(plugin, CHANNEL, connectFrame(server));

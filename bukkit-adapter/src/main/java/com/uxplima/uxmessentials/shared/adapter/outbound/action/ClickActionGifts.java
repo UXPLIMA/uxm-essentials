@@ -46,7 +46,7 @@ final class ClickActionGifts {
     void give(Player viewer, String value) {
         ItemStack item = parse(value);
         if (item == null) {
-            log.warn("event=npc_action_unknown_give value={}", value);
+            log.warn("event=click_action_unknown_give value={}", value);
             return;
         }
         var overflow = viewer.getInventory().addItem(item);

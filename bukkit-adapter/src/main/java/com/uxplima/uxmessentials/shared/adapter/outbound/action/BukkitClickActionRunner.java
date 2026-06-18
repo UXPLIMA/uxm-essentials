@@ -219,7 +219,7 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
             // than run the actions a passed gate would have unlocked — for COST especially, a thrown withdraw
             // leaves the charge outcome unknown, so handing out the reward could give it away for free.
             log.warn(
-                    "event=npc_action_gate_failed type={} value={}",
+                    "event=click_action_gate_failed type={} value={}",
                     action.type().name(),
                     action.value());
             return Verdict.DENY;
@@ -254,7 +254,7 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
             dispatch(viewer, action);
         } catch (RuntimeException failure) {
             // Fail-soft: a single malformed effect must not abort the rest of the chain.
-            log.warn("event=npc_action_failed type={} value={}", action.type().name(), action.value());
+            log.warn("event=click_action_failed type={} value={}", action.type().name(), action.value());
         }
     }
 
@@ -280,7 +280,7 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
         try {
             return Long.parseLong(raw.strip());
         } catch (NumberFormatException notANumber) {
-            log.warn("event=npc_action_bad_delay value={}", raw);
+            log.warn("event=click_action_bad_delay value={}", raw);
             return 0L; // a bad delay is treated as no delay — the chain continues immediately
         }
     }
@@ -290,7 +290,7 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
         try {
             return Integer.parseInt(raw.strip());
         } catch (NumberFormatException notANumber) {
-            log.warn("event=npc_action_bad_random value={}", raw);
+            log.warn("event=click_action_bad_random value={}", raw);
             return 0;
         }
     }
@@ -320,7 +320,7 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
         SoundSpec spec = SoundSpec.parse(value);
         Sound sound = BukkitRegistryKeys.resolveSound(spec.key());
         if (sound == null) {
-            log.warn("event=npc_action_unknown_sound value={}", value);
+            log.warn("event=click_action_unknown_sound value={}", value);
             return;
         }
         viewer.playSound(

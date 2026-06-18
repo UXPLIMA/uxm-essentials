@@ -66,7 +66,7 @@ final class ClickActionGates {
     Verdict chance(String value) {
         Double percent = parsePercent(value);
         if (percent == null) {
-            log.warn("event=npc_action_bad_chance value={}", value);
+            log.warn("event=click_action_bad_chance value={}", value);
             return Verdict.PASS; // a malformed gate is skipped, never aborting the chain
         }
         double roll = ThreadLocalRandom.current().nextDouble(FULL_PERCENT);
@@ -76,7 +76,7 @@ final class ClickActionGates {
     Verdict permission(Player viewer, String node) {
         String trimmed = node.strip();
         if (trimmed.isEmpty()) {
-            log.warn("event=npc_action_bad_permission value={}", node);
+            log.warn("event=click_action_bad_permission value={}", node);
             return Verdict.PASS;
         }
         return permissions.has(BukkitRefs.toRef(viewer), trimmed) ? Verdict.PASS : Verdict.DENY;
@@ -85,7 +85,7 @@ final class ClickActionGates {
     Verdict condition(Player viewer, String value) {
         Optional<Comparison> parsed = Comparison.parse(value);
         if (parsed.isEmpty()) {
-            log.warn("event=npc_action_bad_condition value={}", value);
+            log.warn("event=click_action_bad_condition value={}", value);
             return Verdict.PASS; // malformed: skip the gate, keep running
         }
         UnaryOperator<String> bridge = PlaceholderApiSupport.messageBridge(viewer.getUniqueId());
@@ -97,11 +97,11 @@ final class ClickActionGates {
     Verdict cost(Player viewer, String value) {
         BigDecimal amount = parseAmount(value);
         if (amount == null) {
-            log.warn("event=npc_action_bad_cost value={}", value);
+            log.warn("event=click_action_bad_cost value={}", value);
             return Verdict.PASS;
         }
         if (economy.isEmpty()) {
-            log.warn("event=npc_action_cost_no_economy value={}", value);
+            log.warn("event=click_action_cost_no_economy value={}", value);
             return Verdict.PASS; // no provider: the cost is ignored, the chain continues
         }
         if (economy.get().withdraw(BukkitRefs.toRef(viewer), amount, "default")) {
