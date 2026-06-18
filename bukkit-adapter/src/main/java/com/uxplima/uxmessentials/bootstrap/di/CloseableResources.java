@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -38,6 +39,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable LocaleBinding localeBinding;
     private @Nullable CatalogBinding catalogBinding;
     private @Nullable UsageBinding usageBinding;
+    private @Nullable WorldGeneratorResolver worldGeneratorResolver;
 
     /** Registers a teardown hook (typically a module's {@code stop}); closed in reverse order. */
     public void onClose(Runnable hook) {
@@ -67,6 +69,21 @@ public final class CloseableResources implements AutoCloseable {
     /** Sets the {@link UsageBinding} applied between the catalog and the locale wrap to inject usage executors. */
     public void usageBinding(UsageBinding binding) {
         this.usageBinding = Objects.requireNonNull(binding, "binding");
+    }
+
+    /**
+     * Captures the worlds context's built-in generator resolver so the plugin's
+     * {@code getDefaultWorldGenerator} hook can serve {@code uxmEssentials:void|flat} worlds loaded from
+     * server.properties. Set during {@code wireWorlds}; stays null when worlds is disabled (the module never
+     * wires), which the hook reads as "fall back to vanilla generation".
+     */
+    public void worldGeneratorResolver(WorldGeneratorResolver resolver) {
+        this.worldGeneratorResolver = Objects.requireNonNull(resolver, "resolver");
+    }
+
+    /** The captured worlds generator resolver, or null when worlds is disabled (vanilla fallback). */
+    public @Nullable WorldGeneratorResolver worldGeneratorResolver() {
+        return worldGeneratorResolver;
     }
 
     /** The raw, pre-binding registrations, so the catalog can be resolved over the code defaults. */

@@ -117,10 +117,15 @@ public final class WorldsWiring {
             repository.invalidateAll(); // reconciliation mutated rows; drop the warm snapshot so the next read reloads
             services.refreshImportableFolders();
         });
-        return new Wired(commands, listeners, startReconcile, () -> {
-            events.unsubscribe(applySubscriber);
-            awaitDrain(inFlight);
-        });
+        return new Wired(
+                commands,
+                listeners,
+                startReconcile,
+                () -> {
+                    events.unsubscribe(applySubscriber);
+                    awaitDrain(inFlight);
+                },
+                resolver);
     }
 
     /** Spin-wait until the off-tick write tails finish, bounded by {@link #DRAIN_TIMEOUT}, on stop/reload. */
@@ -181,16 +186,24 @@ public final class WorldsWiring {
     }
 
     /**
-     * The wired worlds adapters handed back to bootstrap: commands, listeners, the reconcile kick, and the
-     * stop hook (which unsubscribes the live-apply listener and drains in-flight off-tick writes).
+     * The wired worlds adapters handed back to bootstrap: commands, listeners, the reconcile kick, the
+     * stop hook (which unsubscribes the live-apply listener and drains in-flight off-tick writes), and the
+     * built-in generator resolver. The resolver is non-null whenever worlds wires (it is always built from
+     * the config); bootstrap captures it onto the holder the plugin retains so {@code getDefaultWorldGenerator}
+     * can serve {@code generator: uxmEssentials:void|flat} worlds loaded from server.properties.
      */
     public record Wired(
-            List<CommandRegistration> commands, List<Listener> listeners, Runnable startReconcile, Runnable stop) {
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            Runnable startReconcile,
+            Runnable stop,
+            WorldGeneratorResolver generatorResolver) {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(startReconcile, "startReconcile");
             Objects.requireNonNull(stop, "stop");
+            Objects.requireNonNull(generatorResolver, "generatorResolver");
         }
     }
 }

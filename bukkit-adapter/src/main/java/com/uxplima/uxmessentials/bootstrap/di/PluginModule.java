@@ -420,6 +420,10 @@ public final class PluginModule {
         WorldsWiring.Wired wired = WorldsWiring.wire(ctx, persistence, plugin.getServer(), events);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // Capture the generator resolver for the plugin's getDefaultWorldGenerator hook before kicking the
+        // reconcile: auto-load may load a world declaring generator: uxmEssentials:void|flat, which routes
+        // back through that hook, so the resolver must be reachable first.
+        resources.worldGeneratorResolver(wired.generatorResolver());
         wired.startReconcile().run();
         resources.onClose(wired.stop());
     }

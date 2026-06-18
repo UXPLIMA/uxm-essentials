@@ -8,16 +8,24 @@ import java.util.Optional;
 
 import org.bukkit.event.Listener;
 
+import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
+import com.uxplima.uxmessentials.worlds.domain.BiomeId;
+import com.uxplima.uxmessentials.worlds.domain.FlatLayerPlan;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
 
 class WorldsWiringSmokeTest {
 
@@ -67,9 +75,59 @@ class WorldsWiringSmokeTest {
     void wiredCarriesTheForceGamemodeListener() {
         List<Listener> listeners = List.of(new ForceGamemodeListener(new NoOpRepository(), new NoOpScheduler()));
 
-        WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), listeners, () -> {}, () -> {});
+        WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), listeners, () -> {}, () -> {}, resolver());
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
+    }
+
+    @Test
+    void wiredExposesAGeneratorResolverThatResolvesTheVoidId() {
+        WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver());
+
+        assertThat(wired.generatorResolver()).isNotNull();
+        assertThat(wired.generatorResolver().resolve("void")).isPresent();
+    }
+
+    @Test
+    void closeableResourcesRoundTripsTheCapturedResolver() {
+        WorldGeneratorResolver resolver = resolver();
+        CloseableResources resources = new CloseableResources();
+
+        assertThat(resources.worldGeneratorResolver()).isNull(); // null until worlds wires
+        resources.worldGeneratorResolver(resolver);
+
+        assertThat(resources.worldGeneratorResolver()).isSameAs(resolver);
+    }
+
+    // The void/flat generators resolve their biome through Registry.BIOME and their layers through
+    // Material.matchMaterial, so a running (mock) server is required to build the resolver.
+    @BeforeAll
+    static void startServer() {
+        MockBukkit.mock();
+    }
+
+    @AfterAll
+    static void stopServer() {
+        MockBukkit.unmock();
+    }
+
+    private static WorldGeneratorResolver resolver() {
+        return new WorldGeneratorResolver(
+                FlatLayerPlan.defaults(), BiomeId.of("plains"), BiomeId.of("plains"), new NoOpLogger());
+    }
+
+    private static final class NoOpLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class NoOpRepository implements WorldRepository {
