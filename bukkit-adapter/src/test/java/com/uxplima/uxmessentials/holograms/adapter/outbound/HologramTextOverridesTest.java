@@ -140,6 +140,31 @@ class HologramTextOverridesTest {
     }
 
     @Test
+    void resolvesTheBuiltInPlayerAndPageTokensPerViewer() {
+        FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
+        HologramPageState pages = new HologramPageState();
+        HologramTextOverrides overrides = new HologramTextOverrides(
+                packets, perViewer(Map.of()), MiniMessage.miniMessage(), TagResolver::empty, pages, noOpLogger());
+        Hologram paged = text("guide", "{player} - {page}/{pages}")
+                .withPageAppended(com.uxplima.uxmessentials.holograms.domain.HologramPage.of(
+                        List.of(new HologramLine("second"))));
+
+        // Alice stays on page 0 (the token line); it renders her name and her 1-based page over the 2-page total
+        // with no PlaceholderAPI involved.
+        overrides.sendOverride(player(ALICE, "Steve"), ENTITY_ID, paged);
+
+        assertThat(plain(packets.textFor(ALICE))).isEqualTo("Steve - 1/2");
+    }
+
+    @Test
+    void detectsTheBuiltInTokensAsPerViewerText() {
+        HologramTextOverrides overrides = overrides(perViewer(Map.of()));
+
+        assertThat(overrides.hasPerViewerText(text("welcome", "hi {player}"))).isTrue();
+        assertThat(overrides.hasPerViewerText(text("plain", "no tokens"))).isFalse();
+    }
+
+    @Test
     void oneViewersResolveThrowingIsSwallowedSoTheRendererLoopContinues() {
         FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
         UnaryOperator<String> blowsUp = source -> {
@@ -208,10 +233,17 @@ class HologramTextOverridesTest {
     }
 
     private static Player player(UUID uuid) {
+        return player(uuid, "Viewer");
+    }
+
+    private static Player player(UUID uuid, String name) {
         return (Player) java.lang.reflect.Proxy.newProxyInstance(
                 Player.class.getClassLoader(), new Class<?>[] {Player.class}, (proxy, method, args) -> {
                     if ("getUniqueId".equals(method.getName())) {
                         return uuid;
+                    }
+                    if ("getName".equals(method.getName())) {
+                        return name;
                     }
                     return null;
                 });

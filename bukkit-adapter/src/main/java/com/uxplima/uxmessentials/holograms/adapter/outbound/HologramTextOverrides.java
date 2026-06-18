@@ -67,8 +67,9 @@ public final class HologramTextOverrides {
     /**
      * Whether {@code hologram} needs per-viewer text: a {@link HologramType#TEXT} hologram that is either
      * multi-page (each viewer sees their own current page over the shared display) or has at least one line
-     * carrying a {@code %...%} placeholder token. Item and block holograms render the model only (v1), so their
-     * label lines are never a per-viewer target.
+     * carrying a {@code %...%} placeholder token or a built-in {@code {player}}/{@code {page}}/{@code {pages}}
+     * token. Item and block holograms render the model only (v1), so their label lines are never a per-viewer
+     * target.
      */
     boolean hasPerViewerText(Hologram hologram) {
         Objects.requireNonNull(hologram, "hologram");
@@ -79,7 +80,7 @@ public final class HologramTextOverrides {
             return true;
         }
         for (HologramLine line : hologram.lines()) {
-            if (PlaceholderApiSupport.hasPlaceholder(line.value())) {
+            if (PlaceholderApiSupport.hasPlaceholder(line.value()) || HologramTokens.hasToken(line.value())) {
                 return true;
             }
         }
@@ -97,7 +98,7 @@ public final class HologramTextOverrides {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(hologram, "hologram");
         try {
-            Component text = resolveFor(viewer.getUniqueId(), hologram);
+            Component text = resolveFor(viewer, hologram);
             packets.send(viewer, packets.textOverride(entityId, text));
         } catch (RuntimeException failure) {
             log.warn(
@@ -112,18 +113,23 @@ public final class HologramTextOverrides {
      * Resolve {@code hologram}'s lines for one viewer, joined with newlines as the shared entity renders them.
      * For a multi-page hologram the viewer's current page (page 0 by default) is resolved, so each viewer sees
      * their own page over the one shared display; for a single-page hologram its lines are resolved as before.
+     * The built-in {@code {player}}/{@code {page}}/{@code {pages}} tokens are substituted first (per viewer), then
+     * the placeholder bridge runs.
      */
-    private Component resolveFor(java.util.UUID viewer, Hologram hologram) {
-        UnaryOperator<String> bridge = bridgeFactory.apply(viewer);
+    private Component resolveFor(Player viewer, Hologram hologram) {
+        java.util.UUID uuid = viewer.getUniqueId();
+        UnaryOperator<String> bridge = bridgeFactory.apply(uuid);
         TagResolver tags = globalTags.get();
-        java.util.List<HologramLine> lines = hologram.isMultiPage()
-                ? hologram.pageLines(pageState.currentPage(hologram.name().value(), viewer, hologram.pageCount()))
-                : hologram.lines();
+        int pages = hologram.pageCount();
+        int page =
+                hologram.isMultiPage() ? pageState.currentPage(hologram.name().value(), uuid, pages) : 0;
+        java.util.List<HologramLine> lines = hologram.isMultiPage() ? hologram.pageLines(page) : hologram.lines();
         java.util.List<Component> resolved = new java.util.ArrayList<>(lines.size());
         for (HologramLine line : lines) {
+            String tokens = HologramTokens.resolve(line.value(), viewer.getName(), page + 1, pages);
             // The per-viewer path renders a static frame, so an inline animation directive is stripped rather than
             // shown literally — animation and per-viewer placeholders do not combine (the placeholder wins).
-            String source = HologramAnimations.stripDirective(bridge.apply(line.value()));
+            String source = HologramAnimations.stripDirective(bridge.apply(tokens));
             resolved.add(miniMessage.deserialize(source, tags));
         }
         return Component.join(JoinConfiguration.newlines(), resolved);
