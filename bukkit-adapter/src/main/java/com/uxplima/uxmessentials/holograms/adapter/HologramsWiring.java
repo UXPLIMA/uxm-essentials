@@ -4,7 +4,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.plugin.Plugin;
 
@@ -19,6 +22,7 @@ import com.uxplima.uxmessentials.holograms.adapter.outbound.EventDrivenNpcLocato
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramPageState;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramSymbols;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTeleportAdapter;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTextOverrides;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramViewers;
@@ -116,9 +120,14 @@ public final class HologramsWiring {
         // The per-viewer current page of each multi-page hologram, shared by the text-override collaborator (which
         // resolves a viewer's current page) and the renderer (which advances it on a click and clears it on despawn).
         HologramPageState pageState = new HologramPageState();
+        // Operator-defined text macros applied beneath the placeholder bridges, so a line's :token: expands on
+        // both the shared base render and each viewer's override; the identity transform when none are configured.
+        HologramSymbols symbols = HologramSymbols.fromConfig(ctx.config());
+        Function<UUID, UnaryOperator<String>> perViewerBridge =
+                viewer -> symbols.wrap(PlaceholderApiSupport.messageBridge(viewer));
         HologramTextOverrides textOverrides = new HologramTextOverrides(
                 perViewerTextPackets(),
-                PlaceholderApiSupport::messageBridge,
+                perViewerBridge,
                 MiniMessage.miniMessage(),
                 MiniPlaceholdersSupport::globalResolver,
                 pageState,
@@ -139,7 +148,7 @@ public final class HologramsWiring {
                 manager,
                 kernel.scheduler(),
                 kernel.log(),
-                PlaceholderApiSupport.globalBridge(),
+                symbols.wrap(PlaceholderApiSupport.globalBridge()),
                 MiniPlaceholdersSupport::globalResolver,
                 viewers,
                 textOverrides,
