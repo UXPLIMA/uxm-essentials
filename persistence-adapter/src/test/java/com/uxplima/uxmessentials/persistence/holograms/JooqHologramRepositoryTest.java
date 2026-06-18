@@ -361,6 +361,19 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void roundTripsTheGrowUpFlagIncludingTheUpdatePath() {
+        repository.save(hologram("spawn", 1, 64, 1, "line"));
+        Hologram base = repository.find(HologramName.of("spawn")).orElseThrow();
+        // A fresh row grows downward (the existing default); the V58 column reads back false.
+        assertThat(base.growUp()).isFalse();
+
+        repository.save(base.withGrowUp(true));
+
+        assertThat(repository.find(HologramName.of("spawn")).orElseThrow().growUp())
+                .isTrue();
+    }
+
+    @Test
     void roundTripsAMultiPageHologram() {
         repository.save(hologram("paged", 1, 64, 1, "p0-a", "p0-b")
                 .withPageAppended(HologramPage.of(List.of(new HologramLine("p1-a")))));

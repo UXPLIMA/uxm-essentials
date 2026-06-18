@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.holograms.application.RemoveHologramPage;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
+import com.uxplima.uxmessentials.holograms.application.SetHologramGrowUp;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLeaderboard;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
@@ -60,6 +61,7 @@ import org.jspecify.annotations.NullMarked;
  * @param addPage {@code /hologram page <name> add}
  * @param removePage {@code /hologram page <name> remove}
  * @param listPages {@code /hologram page <name> list}
+ * @param growUp {@code /hologram growup}
  */
 @NullMarked
 public record HologramServices(
@@ -88,7 +90,8 @@ public record HologramServices(
         UnlinkHologramFromNpc unlinkNpc,
         AddHologramPage addPage,
         RemoveHologramPage removePage,
-        ListHologramPages listPages) {
+        ListHologramPages listPages,
+        SetHologramGrowUp growUp) {
 
     public HologramServices {
         Objects.requireNonNull(create, "create");
@@ -117,5 +120,6 @@ public record HologramServices(
         Objects.requireNonNull(addPage, "addPage");
         Objects.requireNonNull(removePage, "removePage");
         Objects.requireNonNull(listPages, "listPages");
+        Objects.requireNonNull(growUp, "growUp");
     }
 }

@@ -67,6 +67,7 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
                 valueNode("viewrange", FloatArgumentType.floatArg(), this::viewRange),
                 choiceValueNode("alignment", ALIGNMENTS, this::alignment),
                 valueNode("seethrough", BoolArgumentType.bool(), this::seeThrough),
+                valueNode("growup", BoolArgumentType.bool(), this::growUp),
                 translationNode(),
                 valueNode("shadowradius", FloatArgumentType.floatArg(), this::shadowRadius),
                 valueNode("shadowstrength", FloatArgumentType.floatArg(), this::shadowStrength),
@@ -263,6 +264,18 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
         }
         boolean seeThrough = ctx.getArgument("value", Boolean.class);
         return applyAppearance(ctx, sender, current -> current.withSeeThrough(seeThrough));
+    }
+
+    private int growUp(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        // Grow direction is a hologram-level positioning flag (a spawn offset), not an Appearance property, so it
+        // routes to its own use case rather than applyAppearance.
+        boolean growUp = ctx.getArgument("value", Boolean.class);
+        services.growUp().set(ref(sender), nameArg(ctx), growUp);
+        return Command.SINGLE_SUCCESS;
     }
 
     private int shadowRadius(CommandContext<CommandSourceStack> ctx) {

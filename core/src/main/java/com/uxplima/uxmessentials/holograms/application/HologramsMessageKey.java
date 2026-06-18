@@ -89,6 +89,10 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_PAGE_NOT_MULTIPAGE("hologram.page.not-multipage"),
     HOLOGRAM_PAGE_INDEX_INVALID("hologram.page-index-invalid"),
 
+    // grow direction feedback
+    HOLOGRAM_GROWUP_ENABLED("hologram.growup.enabled"),
+    HOLOGRAM_GROWUP_DISABLED("hologram.growup.disabled"),
+
     // visibility feedback
     HOLOGRAM_VISIBILITY_SET("hologram.visibility.set"),
     HOLOGRAM_VISIBILITY_DISTANCE_SET("hologram.visibility.distance-set"),

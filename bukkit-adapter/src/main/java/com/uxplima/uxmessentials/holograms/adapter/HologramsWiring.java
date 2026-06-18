@@ -46,6 +46,7 @@ import com.uxplima.uxmessentials.holograms.application.RemoveHologramPage;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
+import com.uxplima.uxmessentials.holograms.application.SetHologramGrowUp;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLeaderboard;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
@@ -267,7 +268,8 @@ public final class HologramsWiring {
                 new UnlinkHologramFromNpc(repository, renderer, notifier),
                 new AddHologramPage(repository, renderer, notifier),
                 new RemoveHologramPage(repository, renderer, notifier),
-                new ListHologramPages(repository, notifier));
+                new ListHologramPages(repository, notifier),
+                new SetHologramGrowUp(repository, renderer, notifier));
     }
 
     private static void spawnStored(HologramRepository repository, HologramRenderer renderer) {

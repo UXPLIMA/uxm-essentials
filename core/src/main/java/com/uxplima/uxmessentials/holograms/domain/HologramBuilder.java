@@ -28,6 +28,7 @@ final class HologramBuilder {
     private @Nullable String clickCommand;
     private @Nullable LeaderboardSpec leaderboard;
     private @Nullable List<HologramPage> pages;
+    private boolean growUp;
 
     HologramBuilder(Hologram source) {
         Objects.requireNonNull(source, "source");
@@ -43,6 +44,7 @@ final class HologramBuilder {
         this.clickCommand = source.clickCommand();
         this.leaderboard = source.leaderboard();
         this.pages = source.pages();
+        this.growUp = source.growUp();
     }
 
     HologramBuilder name(HologramName value) {
@@ -100,6 +102,11 @@ final class HologramBuilder {
         return this;
     }
 
+    HologramBuilder growUp(boolean value) {
+        this.growUp = value;
+        return this;
+    }
+
     Hologram build() {
         return new Hologram(
                 name,
@@ -113,6 +120,7 @@ final class HologramBuilder {
                 linkedNpcName,
                 clickCommand,
                 leaderboard,
-                pages);
+                pages,
+                growUp);
     }
 }

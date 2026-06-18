@@ -46,6 +46,8 @@ import org.jspecify.annotations.Nullable;
  * @param leaderboard the ranked source a leaderboard hologram regenerates its lines from, or null
  * @param pages the ordered page set of a multi-page hologram (at least two pages, page 0 == {@link #lines()}),
  *     or null when the hologram is an ordinary single-page hologram
+ * @param growUp whether the lines grow upward from the anchor (the anchor is the bottom) instead of the default
+ *     downward (the anchor is the top)
  */
 public record Hologram(
         HologramName name,
@@ -59,7 +61,8 @@ public record Hologram(
         @Nullable String linkedNpcName,
         @Nullable String clickCommand,
         @Nullable LeaderboardSpec leaderboard,
-        @Nullable List<HologramPage> pages) {
+        @Nullable List<HologramPage> pages,
+        boolean growUp) {
 
     /** A refresh interval of 0 means "static": render once on enable, never re-render. */
     public static final int STATIC = 0;
@@ -124,7 +127,8 @@ public record Hologram(
                 null,
                 null,
                 null,
-                null);
+                null,
+                false);
     }
 
     /**
@@ -168,7 +172,8 @@ public record Hologram(
                 null,
                 null,
                 null,
-                null);
+                null,
+                false);
     }
 
     // --- Content accessors (delegated, so existing call sites are unchanged) ---
@@ -304,6 +309,15 @@ public record Hologram(
      */
     public Hologram withLeaderboard(@Nullable LeaderboardSpec spec) {
         return toBuilder().leaderboard(spec).build();
+    }
+
+    /**
+     * A copy whose lines grow upward from the anchor when {@code grow} is true (the anchor becomes the bottom of
+     * the text), or downward as usual when false. Backs {@code /hologram growup}; a pure positioning choice that
+     * the renderer applies as a spawn offset, so it never changes the stored {@link #location()}.
+     */
+    public Hologram withGrowUp(boolean grow) {
+        return toBuilder().growUp(grow).build();
     }
 
     /**

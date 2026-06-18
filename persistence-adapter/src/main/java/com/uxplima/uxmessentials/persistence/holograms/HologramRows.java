@@ -75,7 +75,14 @@ final class HologramRows {
         // existing hologram keeps anchoring to its own coordinates with no data migration. The V54 click command
         // is layered on the same way: a pre-V54 / never-clickable row (NULL) reads back without a click action.
         // The V57 extra pages are applied last: a row with no hologram_pages rows stays a single-page hologram.
-        return pagesOf(leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram))), extraPageTexts);
+        return pagesOf(
+                growUpOf(row, leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram)))), extraPageTexts);
+    }
+
+    private static Hologram growUpOf(Record row, Hologram hologram) {
+        // A pre-V58 row (NULL grow_up) reads back growing downward, the existing layout.
+        Short stored = row.get(HOLOGRAMS.GROW_UP);
+        return stored != null && stored != 0 ? hologram.withGrowUp(true) : hologram;
     }
 
     private static Hologram pagesOf(Hologram hologram, List<List<String>> extraPageTexts) {
@@ -166,7 +173,8 @@ final class HologramRows {
                 .setLeaderboardLimit(
                         hologram.leaderboard() == null
                                 ? null
-                                : hologram.leaderboard().limit());
+                                : hologram.leaderboard().limit())
+                .setGrowUp((short) (hologram.growUp() ? 1 : 0));
     }
 
     private static Appearance appearanceOf(Record row) {

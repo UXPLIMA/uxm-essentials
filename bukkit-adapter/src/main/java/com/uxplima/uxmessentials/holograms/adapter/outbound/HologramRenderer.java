@@ -92,6 +92,10 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
      */
     static final double LINKED_NPC_Y_OFFSET = 2.2;
 
+    /** The per-line height a grow-up hologram is raised by so its bottom sits at the anchor — the same per-line
+     * factor the click-box span uses, an estimate the operator can fine-tune with the translation setting. */
+    static final double LINE_HEIGHT = 0.28;
+
     private final Plugin plugin;
     private final HologramManager manager;
     private final Scheduler scheduler;
@@ -318,6 +322,11 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
         });
     }
 
+    /** The height a grow-up hologram's spawn is raised by — its text block, roughly one line height per line. */
+    private static double growUpHeight(Hologram hologram) {
+        return hologram.lineCount() * LINE_HEIGHT;
+    }
+
     private void spawnReplacing(Hologram hologram, Position anchor, Location at) {
         Tracked previous = live.remove(hologram.name().value());
         if (previous != null) {
@@ -325,12 +334,15 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
             // different world from the new one, so it must not be removed inline on this region thread.
             scheduler.onRegion(previous.position(), () -> previous.live().removeFrom(manager));
         }
+        // A grow-up hologram anchors at the bottom of its text, so raise the spawn by the text-block height to
+        // lay the lines out above the anchor instead of below it; the stored anchor (its region) is unchanged.
+        Location spawnAt = hologram.growUp() ? at.clone().add(0, growUpHeight(hologram), 0) : at;
         // Compose the line transform: resolve server-global placeholders first, then expand any <anim:…> directive
         // for the current frame. The frame advances per render, so a refreshing hologram's animated line moves.
         int phase = animationPhase.getAndIncrement();
         UnaryOperator<String> animated = source -> HologramAnimations.expand(placeholders.apply(source), phase);
         RenderedHologram spawned =
-                HologramSpawns.spawnFor(manager, log, hologram, at, animated, miniMessage, globalTags.get());
+                HologramSpawns.spawnFor(manager, log, hologram, spawnAt, animated, miniMessage, globalTags.get());
         if (spawned == null) {
             // Invalid item material or block data — already logged; leave nothing tracked rather than crash.
             return;
@@ -338,7 +350,7 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
         if (hologram.clickCommand() != null || hologram.isMultiPage()) {
             // A clickable hologram needs the hitbox to run its command; a multi-page hologram needs it so a
             // right-click can cycle the viewer's page (the listener routes one or the other).
-            spawned = withClickBox(spawned, at, hologram);
+            spawned = withClickBox(spawned, spawnAt, hologram);
         }
         viewers.applyOnSpawn(spawned, hologram);
         // Track the anchor the entity actually spawned at (the NPC's position for a linked hologram), so a later
