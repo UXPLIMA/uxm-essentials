@@ -100,6 +100,10 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_ACTION_LIST_ENTRY("hologram.action.list-entry"),
     HOLOGRAM_ACTION_LIST_EMPTY("hologram.action.list-empty"),
     HOLOGRAM_ACTION_INDEX_INVALID("hologram.action.index-invalid"),
+    HOLOGRAM_ACTION_INVALID_TRIGGER("hologram.action.invalid-trigger"),
+    HOLOGRAM_ACTION_INVALID_TYPE("hologram.action.invalid-type"),
+    HOLOGRAM_ACTION_INVALID_VALUE("hologram.action.invalid-value"),
+    HOLOGRAM_ACTION_GIVE_EMPTY_HAND("hologram.action.give-empty-hand"),
 
     // grow direction feedback
     HOLOGRAM_GROWUP_ENABLED("hologram.growup.enabled"),

@@ -87,6 +87,10 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 new HologramPageCommand(services, messages, hologramNames).nodes()) {
             root.then(page);
         }
+        for (LiteralArgumentBuilder<CommandSourceStack> action :
+                new HologramActionCommand(services, messages, hologramNames).nodes()) {
+            root.then(action);
+        }
         return root.build();
     }
 

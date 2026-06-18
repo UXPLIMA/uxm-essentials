@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.inbound.command;
+package com.uxplima.uxmessentials.shared.adapter.inbound.command;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -9,24 +9,27 @@ import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Validates an {@code /npc action add} value against its {@link ClickActionType} at add time, so an operator gets a
- * clear rejection rather than a silently-broken action that only fails on click. Only the cheap, structural
- * checks live here — a numeric {@code DELAY}/{@code CHANCE}/{@code COST}, a positive-int {@code RANDOM} group
- * count, and a resolvable {@code GIVE} material (or an accepted serialized token); the free-text gates
- * ({@code PERMISSION}, {@code CONDITION}) and the operator-content effects ({@code MESSAGE}, commands, …) accept
- * any value. A rejection carries a short {@code hint} the catalog message interpolates so the operator is told
- * the expected shape.
+ * Validates a click-action value against its {@link ClickActionType} at add time, so an operator gets a clear
+ * rejection rather than a silently-broken action that only fails on click. Only the cheap, structural checks live
+ * here — a numeric {@code DELAY}/{@code CHANCE}/{@code COST}, a positive-int {@code RANDOM} group count, and a
+ * resolvable {@code GIVE} material (or an accepted serialized token); the free-text gates ({@code PERMISSION},
+ * {@code CONDITION}) and the operator-content effects ({@code MESSAGE}, commands, …) accept any value. A rejection
+ * carries a short {@code hint} the catalog message interpolates so the operator is told the expected shape.
+ *
+ * <p>Shared by every command surface that edits a click-action chain — the {@code /npc action} and
+ * {@code /hologram action} groups both validate through this one helper, mirroring how the shared
+ * {@code ClickActionRunner} runs the chain for both contexts.
  */
 @NullMarked
-final class NpcActionValueCheck {
+public final class ClickActionValueCheck {
 
     private static final double FULL_PERCENT = 100.0;
     private static final String SERIALIZED_PREFIX = "b64:";
 
-    private NpcActionValueCheck() {}
+    private ClickActionValueCheck() {}
 
     /** The outcome of a value check: a passed value, or a rejection carrying the expected-shape hint. */
-    sealed interface Result permits Result.Valid, Result.Invalid {
+    public sealed interface Result permits Result.Valid, Result.Invalid {
 
         static Result valid() {
             return Result.Valid.INSTANCE;
@@ -56,7 +59,7 @@ final class NpcActionValueCheck {
     }
 
     /** Check {@code value} for {@code type}, returning {@link Result#valid()} for any type with no cheap check. */
-    static Result check(ClickActionType type, String value) {
+    public static Result check(ClickActionType type, String value) {
         return switch (type) {
             case DELAY -> nonNegativeLong(value, "delay must be a whole number of ticks, e.g. 40");
             case CHANCE -> percent(value);
@@ -119,7 +122,7 @@ final class NpcActionValueCheck {
     }
 
     /** Map the operator's type word to an {@link ClickActionType}, or empty when unknown (case-insensitive). */
-    static Optional<ClickActionType> parseType(String word) {
+    public static Optional<ClickActionType> parseType(String word) {
         return switch (word.strip().toLowerCase(Locale.ROOT)) {
             case "console" -> Optional.of(ClickActionType.RUN_CONSOLE);
             case "player" -> Optional.of(ClickActionType.RUN_PLAYER);

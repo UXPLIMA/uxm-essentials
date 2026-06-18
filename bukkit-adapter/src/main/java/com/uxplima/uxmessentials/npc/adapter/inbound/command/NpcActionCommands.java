@@ -21,6 +21,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValueCheck;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
@@ -202,7 +203,7 @@ final class NpcActionCommands extends NpcCommandSupport {
             return null;
         }
         String typeWord = ctx.getArgument("type", String.class);
-        ClickActionType type = NpcActionValueCheck.parseType(typeWord).orElse(null);
+        ClickActionType type = ClickActionValueCheck.parseType(typeWord).orElse(null);
         if (type == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_ACTION_TYPE, Map.of("type", typeWord));
             return null;
@@ -211,8 +212,8 @@ final class NpcActionCommands extends NpcCommandSupport {
         if (value == null) {
             return null; // the capture failed (empty hand) and its feedback was already sent
         }
-        NpcActionValueCheck.Result check = NpcActionValueCheck.check(type, value);
-        if (check instanceof NpcActionValueCheck.Result.Invalid invalid) {
+        ClickActionValueCheck.Result check = ClickActionValueCheck.check(type, value);
+        if (check instanceof ClickActionValueCheck.Result.Invalid invalid) {
             feedback.send(
                     sender,
                     NpcMessageKey.NPC_INVALID_ACTION_VALUE,
