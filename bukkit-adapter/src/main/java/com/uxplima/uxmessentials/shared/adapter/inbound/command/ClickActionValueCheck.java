@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.bukkit.Material;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import org.jspecify.annotations.NullMarked;
 
@@ -24,7 +25,6 @@ import org.jspecify.annotations.NullMarked;
 public final class ClickActionValueCheck {
 
     private static final double FULL_PERCENT = 100.0;
-    private static final String SERIALIZED_PREFIX = "b64:";
 
     private ClickActionValueCheck() {}
 
@@ -110,7 +110,7 @@ public final class ClickActionValueCheck {
      */
     private static Result give(String value) {
         String spec = value.strip();
-        if (spec.startsWith(SERIALIZED_PREFIX)) {
+        if (SerializedItems.isSerialized(spec)) {
             return Result.valid();
         }
         int colon = spec.indexOf(':');

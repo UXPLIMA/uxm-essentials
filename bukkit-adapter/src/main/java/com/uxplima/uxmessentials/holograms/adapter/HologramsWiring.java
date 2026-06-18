@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.holograms.adapter;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -11,7 +10,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -82,6 +80,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.miniplaceholders.MiniPlaceholdersSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
@@ -204,7 +203,7 @@ public final class HologramsWiring {
                 economy,
                 kernel.messages(),
                 HologramsMessageKey.HOLOGRAM_ACTION_COST_DENIED,
-                HologramsWiring::resolveSerializedItem,
+                SerializedItems::decode,
                 kernel.log());
         HologramClickListener clickListener =
                 new HologramClickListener(plugin, repository, renderer, actionRunner, kernel.scheduler());
@@ -265,23 +264,6 @@ public final class HologramsWiring {
      */
     private static DisplayTextPackets perViewerTextPackets() {
         return new NmsDisplayTextPackets(new PacketSender(new ChannelResolver()));
-    }
-
-    /**
-     * Resolve a {@code GIVE} action's serialized-item token to an {@link ItemStack}. A {@code /hologram action …
-     * give hand} stamps the held item as a {@code b64:<base64>} token (Bukkit's {@code serializeBytes}); anything
-     * without that prefix, or a token that fails to decode, yields empty so the give is skipped fail-soft rather
-     * than aborting the chain.
-     */
-    private static Optional<ItemStack> resolveSerializedItem(String spec) {
-        if (!spec.startsWith("b64:")) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(ItemStack.deserializeBytes(Base64.getDecoder().decode(spec.substring(4))));
-        } catch (RuntimeException invalid) {
-            return Optional.empty();
-        }
     }
 
     private static AutoCloseable scheduleRefresh(

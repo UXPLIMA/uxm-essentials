@@ -32,8 +32,6 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 final class ClickActionGifts {
 
-    private static final String SERIALIZED_PREFIX = "b64:";
-
     private final Function<String, Optional<ItemStack>> serializedResolver;
     private final Logger log;
 
@@ -66,7 +64,7 @@ final class ClickActionGifts {
      */
     private @Nullable ItemStack parse(String value) {
         String spec = value.strip();
-        if (spec.startsWith(SERIALIZED_PREFIX)) {
+        if (SerializedItems.isSerialized(spec)) {
             return serializedResolver.apply(spec).orElse(null);
         }
         int colon = spec.indexOf(':');

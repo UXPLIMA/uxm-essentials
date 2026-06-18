@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
-import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -22,6 +21,7 @@ import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValueCheck;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.SerializedItems;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
@@ -67,8 +67,6 @@ final class HologramActionCommand extends HologramCommandSupport {
 
     /** The {@code give} value word that captures the sender's currently-held item instead of naming a material. */
     private static final String HAND_KEYWORD = "hand";
-    /** The marker that distinguishes a serialized-item token, shared with the runner's give resolver. */
-    private static final String SERIALIZED_PREFIX = "b64:";
 
     HologramActionCommand(
             HologramServices services, Messages messages, Supplier<? extends Collection<String>> hologramNames) {
@@ -228,7 +226,7 @@ final class HologramActionCommand extends HologramCommandSupport {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_ACTION_GIVE_EMPTY_HAND, Map.of());
             return null;
         }
-        return SERIALIZED_PREFIX + Base64.getEncoder().encodeToString(hand.serializeAsBytes());
+        return SerializedItems.encode(hand);
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
