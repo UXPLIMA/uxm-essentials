@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -48,6 +49,8 @@ import org.jspecify.annotations.Nullable;
  *     or null when the hologram is an ordinary single-page hologram
  * @param growUp whether the lines grow upward from the anchor (the anchor is the bottom) instead of the default
  *     downward (the anchor is the top)
+ * @param actions the ordered click-action chain a click runs (parity with the NPC action list), copied defensively
+ *     and defaulting to empty; never null
  */
 public record Hologram(
         HologramName name,
@@ -62,13 +65,17 @@ public record Hologram(
         @Nullable String clickCommand,
         @Nullable LeaderboardSpec leaderboard,
         @Nullable List<HologramPage> pages,
-        boolean growUp) {
+        boolean growUp,
+        List<ClickAction> actions) {
 
     /** A refresh interval of 0 means "static": render once on enable, never re-render. */
     public static final int STATIC = 0;
 
     /** The most pages one hologram may carry, a sanity cap on the page set. */
     public static final int MAX_PAGES = 32;
+
+    /** The most click actions one hologram may carry, a sanity cap on the action chain. */
+    public static final int MAX_ACTIONS = 32;
 
     public Hologram {
         Objects.requireNonNull(name, "name");
@@ -91,6 +98,10 @@ public record Hologram(
             if (pages.size() > MAX_PAGES) {
                 throw new IllegalArgumentException("a hologram may not exceed " + MAX_PAGES + " pages");
             }
+        }
+        actions = actions == null ? List.of() : List.copyOf(actions);
+        if (actions.size() > MAX_ACTIONS) {
+            throw new IllegalArgumentException("a hologram may not exceed " + MAX_ACTIONS + " actions");
         }
     }
 
@@ -128,7 +139,8 @@ public record Hologram(
                 null,
                 null,
                 null,
-                false);
+                false,
+                List.of());
     }
 
     /**
@@ -173,7 +185,8 @@ public record Hologram(
                 null,
                 null,
                 null,
-                false);
+                false,
+                List.of());
     }
 
     // --- Content accessors (delegated, so existing call sites are unchanged) ---
@@ -318,6 +331,79 @@ public record Hologram(
      */
     public Hologram withGrowUp(boolean grow) {
         return toBuilder().growUp(grow).build();
+    }
+
+    /** A copy with {@code action} appended to the end of the click-action chain, keeping everything else. */
+    public Hologram withActionAdded(ClickAction action) {
+        Objects.requireNonNull(action, "action");
+        if (actions.size() >= MAX_ACTIONS) {
+            throw new IllegalArgumentException("a hologram may not exceed " + MAX_ACTIONS + " actions");
+        }
+        List<ClickAction> updated = new java.util.ArrayList<>(actions);
+        updated.add(action);
+        return toBuilder().actions(updated).build();
+    }
+
+    /**
+     * A copy with the action at the 0-based {@code index} removed, keeping everything else. Throws
+     * {@link IndexOutOfBoundsException} when {@code index} is outside the current action chain.
+     */
+    public Hologram withActionRemovedAt(int index) {
+        if (index < 0 || index >= actions.size()) {
+            throw new IndexOutOfBoundsException("action index out of range: " + index);
+        }
+        List<ClickAction> updated = new java.util.ArrayList<>(actions);
+        updated.remove(index);
+        return toBuilder().actions(updated).build();
+    }
+
+    /** A copy with no actions, keeping everything else. */
+    public Hologram withActionsCleared() {
+        return toBuilder().actions(List.of()).build();
+    }
+
+    /**
+     * A copy with {@code action} inserted at the 0-based {@code index} (an {@code index} of the size appends).
+     * Throws {@link IndexOutOfBoundsException} when {@code index} is negative or past the current size.
+     */
+    public Hologram withActionInsertedAt(int index, ClickAction action) {
+        Objects.requireNonNull(action, "action");
+        if (index < 0 || index > actions.size()) {
+            throw new IndexOutOfBoundsException("action insert index out of range: " + index);
+        }
+        if (actions.size() >= MAX_ACTIONS) {
+            throw new IllegalArgumentException("a hologram may not exceed " + MAX_ACTIONS + " actions");
+        }
+        List<ClickAction> updated = new java.util.ArrayList<>(actions);
+        updated.add(index, action);
+        return toBuilder().actions(updated).build();
+    }
+
+    /** A copy with the action at the 0-based {@code index} replaced by {@code action}, keeping everything else. */
+    public Hologram withActionSetAt(int index, ClickAction action) {
+        Objects.requireNonNull(action, "action");
+        if (index < 0 || index >= actions.size()) {
+            throw new IndexOutOfBoundsException("action index out of range: " + index);
+        }
+        List<ClickAction> updated = new java.util.ArrayList<>(actions);
+        updated.set(index, action);
+        return toBuilder().actions(updated).build();
+    }
+
+    /** A copy with the action at 0-based {@code from} moved to 0-based {@code to}, keeping everything else. */
+    public Hologram withActionMoved(int from, int to) {
+        if (from < 0 || from >= actions.size() || to < 0 || to >= actions.size()) {
+            throw new IndexOutOfBoundsException("action move index out of range: " + from + " -> " + to);
+        }
+        List<ClickAction> updated = new java.util.ArrayList<>(actions);
+        ClickAction moved = updated.remove(from);
+        updated.add(to, moved);
+        return toBuilder().actions(updated).build();
+    }
+
+    /** Whether clicking this hologram runs at least one action. */
+    public boolean hasActions() {
+        return !actions.isEmpty();
     }
 
     /**

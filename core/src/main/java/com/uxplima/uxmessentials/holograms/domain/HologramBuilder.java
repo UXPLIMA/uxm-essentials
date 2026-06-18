@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -29,6 +30,7 @@ final class HologramBuilder {
     private @Nullable LeaderboardSpec leaderboard;
     private @Nullable List<HologramPage> pages;
     private boolean growUp;
+    private List<ClickAction> actions;
 
     HologramBuilder(Hologram source) {
         Objects.requireNonNull(source, "source");
@@ -45,6 +47,7 @@ final class HologramBuilder {
         this.leaderboard = source.leaderboard();
         this.pages = source.pages();
         this.growUp = source.growUp();
+        this.actions = source.actions();
     }
 
     HologramBuilder name(HologramName value) {
@@ -107,6 +110,11 @@ final class HologramBuilder {
         return this;
     }
 
+    HologramBuilder actions(List<ClickAction> value) {
+        this.actions = value;
+        return this;
+    }
+
     Hologram build() {
         return new Hologram(
                 name,
@@ -121,6 +129,7 @@ final class HologramBuilder {
                 clickCommand,
                 leaderboard,
                 pages,
-                growUp);
+                growUp,
+                actions);
     }
 }
