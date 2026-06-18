@@ -16,6 +16,8 @@ import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import com.uxplima.uxmessentials.worlds.domain.WorldProperties;
+import com.uxplima.uxmessentials.worlds.domain.WorldSettings;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,6 +89,44 @@ class JooqWorldRepositoryTest {
         repo.save(w);
         repo.save(w.withAutoLoad(true)); // upsert
         assertThat(repo.find(WorldName.of("w")).orElseThrow().autoLoad()).isTrue();
+        repo.delete(WorldName.of("w"));
+        assertThat(repo.exists(WorldName.of("w"))).isFalse();
+    }
+
+    @Test
+    void roundTripsSettingsWithTheAggregate() {
+        WorldRepository repo = newRepository();
+        var w = ManagedWorld.created(
+                        WorldName.of("creative"),
+                        WorldSpec.normal(),
+                        true,
+                        java.util.Optional.empty(),
+                        java.time.Instant.EPOCH)
+                .withSettings(WorldSettings.defaults()
+                        .with(WorldProperties.PVP, false)
+                        .withRaw("gamerule.keepInventory", "true")
+                        .withRaw("spawn", "10;64;20;0.0;0.0"));
+        repo.save(w);
+
+        var found = repo.find(WorldName.of("creative")).orElseThrow();
+        assertThat(found.settings().get(WorldProperties.PVP)).isFalse();
+        assertThat(found.settings().gamerules()).containsEntry("keepInventory", "true");
+        assertThat(found.settings().spawn()).contains("10;64;20;0.0;0.0");
+    }
+
+    @Test
+    void saveReplacesSettingsAndDeleteRemovesThem() {
+        WorldRepository repo = newRepository();
+        var w = ManagedWorld.created(
+                        WorldName.of("w"),
+                        WorldSpec.normal(),
+                        false,
+                        java.util.Optional.empty(),
+                        java.time.Instant.EPOCH)
+                .withSettings(WorldSettings.defaults().with(WorldProperties.PVP, false));
+        repo.save(w);
+        repo.save(repo.find(WorldName.of("w")).orElseThrow().withSettings(WorldSettings.defaults())); // clear
+        assertThat(repo.find(WorldName.of("w")).orElseThrow().settings().raw()).isEmpty();
         repo.delete(WorldName.of("w"));
         assertThat(repo.exists(WorldName.of("w"))).isFalse();
     }

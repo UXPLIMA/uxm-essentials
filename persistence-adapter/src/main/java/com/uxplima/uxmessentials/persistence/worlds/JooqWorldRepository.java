@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.persistence.worlds;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.World.WORLD;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.WorldSetting.WORLD_SETTING;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.WorldRecord;
@@ -24,13 +26,15 @@ public final class JooqWorldRepository extends JooqRepository implements WorldRe
         return read(dsl -> dsl.selectFrom(WORLD)
                 .where(WORLD.NAME.eq(name.value()))
                 .fetchOptional()
-                .map(WorldRows::toWorld));
+                .map(row -> WorldRows.toWorld(row, loadSettings(dsl, name.value()))));
     }
 
     @Override
     public List<ManagedWorld> all() {
-        return read(
-                dsl -> dsl.selectFrom(WORLD).orderBy(WORLD.NAME.asc()).fetch().map(WorldRows::toWorld));
+        return read(dsl -> dsl.selectFrom(WORLD)
+                .orderBy(WORLD.NAME.asc())
+                .fetch()
+                .map(row -> WorldRows.toWorld(row, loadSettings(dsl, row.get(WORLD.NAME)))));
     }
 
     @Override
@@ -42,13 +46,32 @@ public final class JooqWorldRepository extends JooqRepository implements WorldRe
     public void save(ManagedWorld world) {
         write(dsl -> {
             upsert(dsl, world);
+            dsl.deleteFrom(WORLD_SETTING)
+                    .where(WORLD_SETTING.WORLD_NAME.eq(world.name().value()))
+                    .execute();
+            world.settings().raw().forEach((key, value) -> dsl.insertInto(WORLD_SETTING)
+                    .set(WORLD_SETTING.WORLD_NAME, world.name().value())
+                    .set(WORLD_SETTING.SETTING_KEY, key)
+                    .set(WORLD_SETTING.SETTING_VALUE, value)
+                    .execute());
             return null;
         });
     }
 
     @Override
     public void delete(WorldName name) {
-        write(dsl -> dsl.deleteFrom(WORLD).where(WORLD.NAME.eq(name.value())).execute());
+        write(dsl -> {
+            dsl.deleteFrom(WORLD_SETTING)
+                    .where(WORLD_SETTING.WORLD_NAME.eq(name.value()))
+                    .execute();
+            return dsl.deleteFrom(WORLD).where(WORLD.NAME.eq(name.value())).execute();
+        });
+    }
+
+    private static Map<String, String> loadSettings(DSLContext dsl, String worldName) {
+        return dsl.selectFrom(WORLD_SETTING)
+                .where(WORLD_SETTING.WORLD_NAME.eq(worldName))
+                .fetchMap(WORLD_SETTING.SETTING_KEY, WORLD_SETTING.SETTING_VALUE);
     }
 
     private static void upsert(DSLContext dsl, ManagedWorld world) {

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.worlds;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.World.WORLD;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,7 +22,7 @@ final class WorldRows {
 
     private WorldRows() {}
 
-    static ManagedWorld toWorld(Record row) {
+    static ManagedWorld toWorld(Record row, Map<String, String> settings) {
         WorldSpec spec = new WorldSpec(
                 WorldEnvironment.valueOf(row.get(WORLD.ENVIRONMENT)),
                 WorldGenType.valueOf(row.get(WORLD.WORLD_TYPE)),
@@ -39,7 +40,7 @@ final class WorldRows {
                 Optional.ofNullable(row.get(WORLD.UID)).map(UUID::fromString),
                 Instant.ofEpochMilli(row.get(WORLD.CREATED_AT)),
                 Optional.ofNullable(row.get(WORLD.CREATED_BY)).map(UUID::fromString),
-                WorldSettings.defaults());
+                WorldSettings.fromRaw(settings));
     }
 
     static void apply(WorldRecord record, ManagedWorld world) {
