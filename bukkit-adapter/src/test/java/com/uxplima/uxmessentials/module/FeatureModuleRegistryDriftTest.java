@@ -49,6 +49,7 @@ class FeatureModuleRegistryDriftTest {
         // context); it carries no cross-context bridge and lands last. The registry is a valid, immutable,
         // ordered set that resolves each by id and rejects a not-yet-landed context.
         assertThat(registry.byId(ModuleId.of("teleport"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("worlds"))).isPresent();
         assertThat(registry.byId(ModuleId.of("homes"))).isPresent();
         assertThat(registry.byId(ModuleId.of("economy"))).isPresent();
         assertThat(registry.byId(ModuleId.of("warps"))).isPresent();
@@ -72,6 +73,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
+                        "worlds",
                         "homes",
                         "economy",
                         "warps",
@@ -512,6 +514,29 @@ class FeatureModuleRegistryDriftTest {
         Set<String> literals = npc.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactly("npc");
         assertThat(npc.migrations()).isEmpty();
+    }
+
+    @Test
+    void worldsShipsEnabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule worlds =
+                registry.byId(ModuleId.of("worlds")).orElseThrow(() -> new AssertionError("worlds is not registered"));
+
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("worlds", "teleport");
+
+        Set<String> off = registry.enabledModules(new FixedConfig(Map.of("modules.worlds.enabled", false))).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("worlds");
+        assertThat(off).contains("teleport");
+
+        Set<String> literals =
+                worlds.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactlyInAnyOrder("worlds", "worldsconfirm");
+        assertThat(worlds.migrations()).isEmpty();
     }
 
     @Test

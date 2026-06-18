@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportModule;
 import com.uxplima.uxmessentials.vaults.application.VaultsModule;
 import com.uxplima.uxmessentials.vote.application.VoteModule;
 import com.uxplima.uxmessentials.warps.application.WarpsModule;
+import com.uxplima.uxmessentials.worlds.application.WorldsModule;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -52,6 +53,7 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // economy registers before warps because a warp may charge a per-warp cost through the economy
         // provider; the economy WarpEconomy bridge is captured during economy wiring and handed to warps.
         delegate.register(new TeleportModule());
+        delegate.register(new WorldsModule()); // worlds delegates teleport execution (sub-project D)
         delegate.register(new HomesModule());
         delegate.register(new EconomyModule());
         delegate.register(new WarpsModule());
