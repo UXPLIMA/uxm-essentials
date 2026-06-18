@@ -44,7 +44,10 @@ public final class WorldConfirmCommand extends WorldCommandSupport implements Co
         if (sender == null) {
             return 0;
         }
-        WorldName name = WorldName.of(ctx.getArgument("name", String.class));
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
         PlayerRef who = ref(sender);
         onGlobal(() -> services.deleteWorld().confirm(who, name)); // unload + off-tick file delete
         return Command.SINGLE_SUCCESS;

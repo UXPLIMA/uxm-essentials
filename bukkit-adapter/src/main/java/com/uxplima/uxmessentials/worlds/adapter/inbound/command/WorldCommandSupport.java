@@ -16,6 +16,8 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
+import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
+import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -47,6 +49,16 @@ abstract class WorldCommandSupport {
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
+    }
+
+    /** Parse a raw argument into a {@link WorldName}, or {@code null} (after sending the invalid-name reply). */
+    final @Nullable WorldName parseName(CommandSender sender, String raw) {
+        try {
+            return WorldName.of(raw);
+        } catch (IllegalArgumentException invalid) {
+            feedback.send(sender, WorldsMessageKey.WORLD_NAME_INVALID, Map.of("world", raw));
+            return null;
+        }
     }
 
     /** Run a world-mutating use case on the global region thread (Bukkit world ops require it). */

@@ -29,6 +29,7 @@ final class DefaultResources {
             "config.conf",
             "modules/teleport/config.conf",
             "modules/teleport/rtp.conf",
+            "modules/worlds/config.conf",
             "modules/homes/config.conf",
             "modules/warps/config.conf",
             "modules/economy/config.conf",

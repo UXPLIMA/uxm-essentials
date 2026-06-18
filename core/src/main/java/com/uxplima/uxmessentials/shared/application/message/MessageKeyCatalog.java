@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
+import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 
 /**
  * The single registry of every shipped {@link MessageKey} constant, across the {@code shared} common
@@ -41,6 +42,7 @@ public final class MessageKeyCatalog {
     private static final List<MessageKey[]> ENUMS = List.of(
             SharedMessageKey.values(),
             TeleportMessageKey.values(),
+            WorldsMessageKey.values(),
             HomesMessageKey.values(),
             EconomyMessageKey.values(),
             WarpsMessageKey.values(),

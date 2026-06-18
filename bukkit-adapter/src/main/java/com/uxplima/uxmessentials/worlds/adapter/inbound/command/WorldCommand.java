@@ -119,7 +119,10 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (sender == null) {
             return 0;
         }
-        WorldName name = WorldName.of(ctx.getArgument("name", String.class));
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
         WorldSpec spec = new WorldSpec(
                 arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL),
                 arg(ctx, "type", WorldGenType.class, WorldGenType.NORMAL),
@@ -138,7 +141,10 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (sender == null) {
             return 0;
         }
-        WorldName name = WorldName.of(ctx.getArgument("folder", String.class));
+        WorldName name = parseName(sender, ctx.getArgument("folder", String.class));
+        if (name == null) {
+            return 0;
+        }
         WorldEnvironment env = arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL);
         Optional<GeneratorRef> gen = optionalString(ctx, "generator").map(GeneratorRef::of);
         PlayerRef who = ref(sender);
@@ -164,7 +170,10 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (sender == null) {
             return 0;
         }
-        WorldName name = WorldName.of(ctx.getArgument("name", String.class));
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
         services.deleteWorld().request(ref(sender), name); // inline: validation + staging, no I/O
         return Command.SINGLE_SUCCESS;
     }
@@ -197,7 +206,10 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (sender == null) {
             return 0;
         }
-        WorldName name = WorldName.of(ctx.getArgument("name", String.class));
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
         Optional<ManagedWorld> found = services.worldInfo().find(name);
         if (found.isEmpty()) {
             feedback.send(sender, WorldsMessageKey.WORLD_NOT_FOUND, Map.of("world", name.value()));
@@ -225,7 +237,10 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (sender == null) {
             return 0;
         }
-        WorldName name = WorldName.of(ctx.getArgument("name", String.class));
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
         PlayerRef who = ref(sender);
         onGlobal(() -> mutation.run(who, name));
         return Command.SINGLE_SUCCESS;
