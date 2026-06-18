@@ -412,9 +412,14 @@ public final class PluginModule {
         // plugin's Server. It carries no cross-context bridge — its collaborators are the shared kernel ports and
         // the engine. The enable-time reconcile (adopt already-loaded worlds, auto-load registered ones) is kicked
         // on the global region thread the moment wiring completes, then drops the warm snapshot and refreshes the
-        // import-folder candidates off-tick.
-        WorldsWiring.Wired wired = WorldsWiring.wire(ctx, persistence, plugin.getServer());
+        // import-folder candidates off-tick. The in-process bus is the concrete publisher so the live-apply
+        // subscriber (re-apply stored settings on world load / setting change) can be registered here and
+        // unsubscribed on stop; the kernel port exposes only publish.
+        InProcessDomainEventPublisher events =
+                (InProcessDomainEventPublisher) ctx.kernel().events();
+        WorldsWiring.Wired wired = WorldsWiring.wire(ctx, persistence, plugin.getServer(), events);
         wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
         wired.startReconcile().run();
         resources.onClose(wired.stop());
     }

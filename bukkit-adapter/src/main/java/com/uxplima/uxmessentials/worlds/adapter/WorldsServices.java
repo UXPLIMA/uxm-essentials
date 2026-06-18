@@ -13,9 +13,14 @@ import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
+import com.uxplima.uxmessentials.worlds.application.SetGamerule;
+import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
+import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
+import com.uxplima.uxmessentials.worlds.application.SetWorldSpawn;
 import com.uxplima.uxmessentials.worlds.application.UnloadWorld;
 import com.uxplima.uxmessentials.worlds.application.UnregisterWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldInfo;
+import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
@@ -37,6 +42,11 @@ public final class WorldsServices {
     private final DeleteWorld deleteWorld;
     private final ListWorlds listWorlds;
     private final WorldInfo worldInfo;
+    private final SetWorldProperty setWorldProperty;
+    private final SetGamerule setGamerule;
+    private final SetWorldSpawn setWorldSpawn;
+    private final SetWorldAlias setWorldAlias;
+    private final GameRuleCatalog gameRuleCatalog;
     private final WorldRepository repository;
     private final Scheduler scheduler;
     private final Supplier<Set<WorldName>> onDiskScanner;
@@ -51,6 +61,11 @@ public final class WorldsServices {
             DeleteWorld deleteWorld,
             ListWorlds listWorlds,
             WorldInfo worldInfo,
+            SetWorldProperty setWorldProperty,
+            SetGamerule setGamerule,
+            SetWorldSpawn setWorldSpawn,
+            SetWorldAlias setWorldAlias,
+            GameRuleCatalog gameRuleCatalog,
             WorldRepository repository,
             Scheduler scheduler,
             Supplier<Set<WorldName>> onDiskScanner) {
@@ -62,6 +77,11 @@ public final class WorldsServices {
         this.deleteWorld = Objects.requireNonNull(deleteWorld, "deleteWorld");
         this.listWorlds = Objects.requireNonNull(listWorlds, "listWorlds");
         this.worldInfo = Objects.requireNonNull(worldInfo, "worldInfo");
+        this.setWorldProperty = Objects.requireNonNull(setWorldProperty, "setWorldProperty");
+        this.setGamerule = Objects.requireNonNull(setGamerule, "setGamerule");
+        this.setWorldSpawn = Objects.requireNonNull(setWorldSpawn, "setWorldSpawn");
+        this.setWorldAlias = Objects.requireNonNull(setWorldAlias, "setWorldAlias");
+        this.gameRuleCatalog = Objects.requireNonNull(gameRuleCatalog, "gameRuleCatalog");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.onDiskScanner = Objects.requireNonNull(onDiskScanner, "onDiskScanner");
@@ -97,6 +117,27 @@ public final class WorldsServices {
 
     public WorldInfo worldInfo() {
         return worldInfo;
+    }
+
+    public SetWorldProperty setWorldProperty() {
+        return setWorldProperty;
+    }
+
+    public SetGamerule setGamerule() {
+        return setGamerule;
+    }
+
+    public SetWorldSpawn setWorldSpawn() {
+        return setWorldSpawn;
+    }
+
+    public SetWorldAlias setWorldAlias() {
+        return setWorldAlias;
+    }
+
+    /** The server's gamerule names for {@code /world gamerule} tab-completion. */
+    public List<String> gameRuleNames() {
+        return gameRuleCatalog.names();
     }
 
     public WorldRepository repository() {
