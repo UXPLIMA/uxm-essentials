@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import com.uxplima.uxmessentials.worlds.domain.WorldSettings;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import org.jooq.Record;
 
@@ -37,7 +38,8 @@ final class WorldRows {
                 row.get(WORLD.ADOPTED) != 0,
                 Optional.ofNullable(row.get(WORLD.UID)).map(UUID::fromString),
                 Instant.ofEpochMilli(row.get(WORLD.CREATED_AT)),
-                Optional.ofNullable(row.get(WORLD.CREATED_BY)).map(UUID::fromString));
+                Optional.ofNullable(row.get(WORLD.CREATED_BY)).map(UUID::fromString),
+                WorldSettings.defaults());
     }
 
     static void apply(WorldRecord record, ManagedWorld world) {

@@ -5,7 +5,14 @@ import com.uxplima.uxmessentials.worlds.domain.WorldName;
 
 /** Sealed family of worlds-context domain events; bridged to Bukkit events only in the adapter. */
 public sealed interface WorldEvent extends DomainEvent
-        permits WorldCreated, WorldImported, WorldAdopted, WorldLoaded, WorldUnloaded, WorldUnregistered, WorldDeleted {
+        permits WorldCreated,
+                WorldImported,
+                WorldAdopted,
+                WorldLoaded,
+                WorldUnloaded,
+                WorldUnregistered,
+                WorldDeleted,
+                WorldSettingChanged {
 
     WorldName name();
 }

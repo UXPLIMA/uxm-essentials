@@ -37,7 +37,16 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_INFO_HEADER("world.info.header"),
     WORLD_INFO_ENVIRONMENT("world.info.environment"),
     WORLD_INFO_TYPE("world.info.type"),
-    WORLD_INFO_AUTOLOAD("world.info.autoload");
+    WORLD_INFO_AUTOLOAD("world.info.autoload"),
+
+    WORLD_SETTING_UPDATED("world.setting.updated"),
+    WORLD_SETTING_UNKNOWN("world.setting.unknown"),
+    WORLD_SETTING_INVALID_VALUE("world.setting.invalid-value"),
+    WORLD_GAMERULE_SET("world.gamerule.set"),
+    WORLD_GAMERULE_UNKNOWN("world.gamerule.unknown"),
+    WORLD_GAMERULE_INVALID_VALUE("world.gamerule.invalid-value"),
+    WORLD_SPAWN_SET("world.spawn-set"),
+    WORLD_ALIAS_SET("world.alias-set");
 
     private final String key;
 
