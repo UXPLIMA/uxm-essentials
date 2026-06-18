@@ -1,8 +1,11 @@
 package com.uxplima.uxmessentials.worlds.application;
 
+import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.worlds.domain.BiomeId;
+import com.uxplima.uxmessentials.worlds.domain.FlatLayerPlan;
 
 /**
  * A typed read view over the worlds module's config subtree. The use cases consult this rather than
@@ -34,5 +37,23 @@ public final class WorldsSettings {
     /** Whether the enable-time reconcile auto-loads registered worlds flagged for it; default true. */
     public boolean autoLoadRegistered() {
         return config.getBoolean("auto-load-registered", true);
+    }
+
+    /**
+     * The built-in flat generator's block bands, parsed from {@code generators.flat.layers} (each
+     * {@code "<blockId> <height>"}, bottom→top); the "Classic Flat" plan when the key is absent or empty.
+     */
+    public FlatLayerPlan flatLayers() {
+        return FlatLayerPlan.parse(config.getStringList("generators.flat.layers", List.of()));
+    }
+
+    /** The single biome the built-in void generator paints, {@code generators.void.biome}; default {@code plains}. */
+    public BiomeId voidBiome() {
+        return BiomeId.of(config.getString("generators.void.biome", "plains"));
+    }
+
+    /** The single biome the built-in flat generator paints, {@code generators.flat.biome}; default {@code plains}. */
+    public BiomeId flatBiome() {
+        return BiomeId.of(config.getString("generators.flat.biome", "plains"));
     }
 }

@@ -20,6 +20,8 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
+import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
+import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldError;
@@ -40,10 +42,12 @@ public final class BukkitWorldEngine implements WorldEngine {
 
     private final Server server;
     private final Logger log;
+    private final WorldGeneratorResolver generators;
 
-    public BukkitWorldEngine(Server server, Logger log) {
+    public BukkitWorldEngine(Server server, Logger log, WorldGeneratorResolver generators) {
         this.server = Objects.requireNonNull(server, "server");
         this.log = Objects.requireNonNull(log, "log");
+        this.generators = Objects.requireNonNull(generators, "generators");
     }
 
     @Override
@@ -75,8 +79,23 @@ public final class BukkitWorldEngine implements WorldEngine {
         creator.environment(toBukkitEnvironment(spec.environment()));
         creator.type(toBukkitType(spec.worldType()));
         spec.seed().ifPresent(creator::seed);
-        spec.generator().ifPresent(g -> creator.generator(g.value()));
+        spec.generator().ifPresent(g -> applyGenerator(creator, g));
         creator.generateStructures(spec.generateStructures());
+    }
+
+    /**
+     * Routes a generator ref onto the {@link WorldCreator}: our own {@code uxmEssentials:void|flat} refs
+     * take the object overload (the resolver's {@code ChunkGenerator}), so they behave identically whether
+     * a world is created internally or loaded via {@code server.properties}; any other token — an unknown
+     * built-in id or an external {@code plugin[:args]} ref — takes Bukkit's String overload unchanged.
+     */
+    void applyGenerator(WorldCreator creator, GeneratorRef g) {
+        BuiltInGenerators.idOf(g.value())
+                .ifPresentOrElse(
+                        id -> generators
+                                .resolve(id)
+                                .ifPresentOrElse(creator::generator, () -> creator.generator(g.value())),
+                        () -> creator.generator(g.value()));
     }
 
     @Override

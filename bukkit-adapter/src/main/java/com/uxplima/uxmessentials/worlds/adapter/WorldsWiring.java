@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldEngine;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldSettingApplier;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InFlightScheduler;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingDeletionRegistry;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import com.uxplima.uxmessentials.worlds.application.ApplyWorldSettingsOnLoad;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
@@ -79,7 +80,9 @@ public final class WorldsWiring {
 
         WorldNotifier notifier = new WorldNotifier(kernel.messages(), kernel.messageSink());
         WorldsSettings settings = new WorldsSettings(ctx.config());
-        BukkitWorldEngine engine = new BukkitWorldEngine(server, kernel.log());
+        WorldGeneratorResolver resolver = new WorldGeneratorResolver(
+                settings.flatLayers(), settings.voidBiome(), settings.flatBiome(), kernel.log());
+        BukkitWorldEngine engine = new BukkitWorldEngine(server, kernel.log(), resolver);
         InMemoryPendingDeletionRegistry pending = new InMemoryPendingDeletionRegistry();
         Clock clock = Clock.systemUTC();
 
