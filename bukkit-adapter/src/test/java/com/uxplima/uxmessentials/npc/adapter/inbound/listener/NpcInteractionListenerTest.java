@@ -18,12 +18,13 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
 import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
-import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -682,7 +683,7 @@ class NpcInteractionListenerTest {
     }
 
     /** Records which command went to console vs the player. */
-    private static final class RecordingRunner implements NpcCommandRunner {
+    private static final class RecordingRunner implements ClickCommandRunner {
         private final List<String> consoleCommands = new ArrayList<>();
         private final List<String> playerCommands = new ArrayList<>();
 
@@ -706,7 +707,7 @@ class NpcInteractionListenerTest {
     private record RunCall(List<ClickAction> actions, boolean attack) {}
 
     /** Records each action-chain invocation so the listener's pass-through can be asserted. */
-    private static final class RecordingActionRunner implements NpcActionRunner {
+    private static final class RecordingActionRunner implements ClickActionRunner {
         private final List<RunCall> calls = new ArrayList<>();
 
         @Override

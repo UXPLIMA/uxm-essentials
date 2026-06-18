@@ -55,7 +55,6 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
-import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
@@ -103,6 +102,7 @@ import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
+import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
 import com.uxplima.uxmessentials.tablist.adapter.TablistWiring;
@@ -867,7 +867,7 @@ public final class PluginModule {
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;
-        private @org.jspecify.annotations.Nullable NpcEconomy npcEconomy;
+        private @org.jspecify.annotations.Nullable ClickActionEconomy npcEconomy;
         private com.uxplima.uxmessentials.holograms.application.port.@org.jspecify.annotations.Nullable LeaderboardProvider
                 balanceLeaderboard;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;

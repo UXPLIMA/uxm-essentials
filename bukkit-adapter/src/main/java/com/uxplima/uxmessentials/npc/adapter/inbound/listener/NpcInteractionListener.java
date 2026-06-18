@@ -15,12 +15,13 @@ import org.bukkit.inventory.EquipmentSlot;
 import com.destroystokyo.paper.event.player.PlayerUseUnknownEntityEvent;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>On a click the single bound click command runs first (kept for backward-compat), then the ordered action
  * chain — every {@link com.uxplima.uxmessentials.shared.domain.action.ClickAction} whose trigger matches the click — runs
- * through the {@link NpcActionRunner}. The command may carry a routing prefix: {@code [console]} runs it as the
+ * through the {@link ClickActionRunner}. The command may carry a routing prefix: {@code [console]} runs it as the
  * server console, {@code [player]} (or no prefix) as the clicking player; a {@code {player}} token is replaced
  * with the clicker's name. The click command alone is right-click-only; the action chain carries its own
  * per-action trigger (left/right/any), so both an attack and an interact are now acted on — only the off-hand
@@ -59,8 +60,8 @@ public final class NpcInteractionListener implements Listener {
 
     private final NpcRenderer renderer;
     private final NpcRepository repository;
-    private final NpcCommandRunner runner;
-    private final NpcActionRunner actionRunner;
+    private final ClickCommandRunner runner;
+    private final ClickActionRunner actionRunner;
     private final Scheduler scheduler;
     private final long cooldownMillis;
     private final LongSupplier clock;
@@ -69,8 +70,8 @@ public final class NpcInteractionListener implements Listener {
     public NpcInteractionListener(
             NpcRenderer renderer,
             NpcRepository repository,
-            NpcCommandRunner runner,
-            NpcActionRunner actionRunner,
+            ClickCommandRunner runner,
+            ClickActionRunner actionRunner,
             Scheduler scheduler,
             Duration clickCooldown) {
         this(renderer, repository, runner, actionRunner, scheduler, clickCooldown, System::currentTimeMillis);
@@ -79,8 +80,8 @@ public final class NpcInteractionListener implements Listener {
     NpcInteractionListener(
             NpcRenderer renderer,
             NpcRepository repository,
-            NpcCommandRunner runner,
-            NpcActionRunner actionRunner,
+            ClickCommandRunner runner,
+            ClickActionRunner actionRunner,
             Scheduler scheduler,
             Duration clickCooldown,
             LongSupplier clock) {

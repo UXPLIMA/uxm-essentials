@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import org.bukkit.entity.Player;
 
@@ -8,7 +8,7 @@ import org.bukkit.entity.Player;
  * recording fake and lets a server with no outgoing proxy channel registered degrade to a logged no-op rather
  * than failing the click.
  */
-public interface NpcServerConnector {
+public interface ServerConnector {
 
     /** Whether the outgoing proxy channel is registered, so a connect request can actually leave this backend. */
     boolean isAvailable();

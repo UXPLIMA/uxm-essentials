@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -7,23 +7,25 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.title.Title;
 
 import com.google.common.base.Splitter;
-import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
-import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionGates.Verdict;
-import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionGates.Verdict;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -35,11 +37,11 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The Bukkit/Adventure {@link NpcActionRunner}: it filters an NPC's action chain by click trigger and runs the
+ * The Bukkit/Adventure {@link ClickActionRunner}: it filters an action chain by click trigger and runs the
  * matching actions as an ordered <em>sequence</em>. An effect action (console/player command, message/action-bar/
  * title, sound, connect, give) performs its effect and the sequence moves on, fail-soft — one bad effect logs a
  * one-line warning and is skipped, the chain continues. A gate action (chance, permission, condition, cost)
- * decides whether the rest of the chain runs at all through {@link NpcActionGates}: a denied gate stops the
+ * decides whether the rest of the chain runs at all through {@link ClickActionGates}: a denied gate stops the
  * remaining actions, a malformed gate spec is skipped (never aborting). A {@code DELAY} parks the rest of the
  * chain: the tail is re-scheduled after the stated tick count through the {@link Scheduler} port (ticks converted
  * at the fixed 50&nbsp;ms cadence) and then hops back onto the viewer's entity region to resume — a tiny
@@ -48,7 +50,7 @@ import org.jspecify.annotations.Nullable;
  * actions as a group: exactly one of them — picked uniformly at random — runs, the rest of the group is skipped,
  * and the chain continues after the whole group (see {@link #runFrom}).
  *
- * <p>Command dispatch (console/player) reuses the same {@link NpcCommandRunner} and {@code [console]}/{@code
+ * <p>Command dispatch (console/player) reuses the same {@link ClickCommandRunner} and {@code [console]}/{@code
  * [player]}/{@code {player}} convention the single click command uses; message/action-bar/title text is resolved
  * through the shared built-in tokens then the PlaceholderAPI + MiniMessage transform, so an action value may
  * embed {@code {player}}, built-in {@code {token}}s, and {@code %papi%} placeholders; a sound value is {@code
@@ -56,30 +58,32 @@ import org.jspecify.annotations.Nullable;
  * listener, so a delayed continuation never re-arms the cooldown.
  */
 @NullMarked
-public final class BukkitNpcActionRunner implements NpcActionRunner {
+public final class BukkitClickActionRunner implements ClickActionRunner {
 
     private static final String CONSOLE_PREFIX = "[console]";
     private static final String PLAYER_PREFIX = "[player]";
     private static final String PLAYER_TOKEN = "{player}";
     private static final long MILLIS_PER_TICK = 50L;
 
-    private final NpcCommandRunner commandRunner;
-    private final NpcServerConnector connector;
+    private final ClickCommandRunner commandRunner;
+    private final ServerConnector connector;
     private final Scheduler scheduler;
-    private final NpcActionGates gates;
-    private final NpcGifts gifts;
+    private final ClickActionGates gates;
+    private final ClickActionGifts gifts;
     private final Logger log;
 
     /** Picks the chosen offset within a {@code RANDOM} group; given the group size it returns {@code [0, size)}. */
     private final IntUnaryOperator pickOffset;
 
-    public BukkitNpcActionRunner(
-            NpcCommandRunner commandRunner,
-            NpcServerConnector connector,
+    public BukkitClickActionRunner(
+            ClickCommandRunner commandRunner,
+            ServerConnector connector,
             Scheduler scheduler,
             Permissions permissions,
-            Optional<NpcEconomy> economy,
+            Optional<ClickActionEconomy> economy,
             Messages messages,
+            MessageKey costDeniedKey,
+            Function<String, Optional<ItemStack>> serializedResolver,
             Logger log) {
         this(
                 commandRunner,
@@ -88,6 +92,8 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
                 permissions,
                 economy,
                 messages,
+                costDeniedKey,
+                serializedResolver,
                 log,
                 ThreadLocalRandom.current()::nextInt);
     }
@@ -96,13 +102,15 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
      * Test seam: takes the {@code RANDOM}-group offset picker explicitly so a deterministic stub can pin which
      * group member runs. Production wiring uses the public constructor, which supplies {@link ThreadLocalRandom}.
      */
-    BukkitNpcActionRunner(
-            NpcCommandRunner commandRunner,
-            NpcServerConnector connector,
+    BukkitClickActionRunner(
+            ClickCommandRunner commandRunner,
+            ServerConnector connector,
             Scheduler scheduler,
             Permissions permissions,
-            Optional<NpcEconomy> economy,
+            Optional<ClickActionEconomy> economy,
             Messages messages,
+            MessageKey costDeniedKey,
+            Function<String, Optional<ItemStack>> serializedResolver,
             Logger log,
             IntUnaryOperator pickOffset) {
         this.commandRunner = Objects.requireNonNull(commandRunner, "commandRunner");
@@ -110,12 +118,13 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.pickOffset = Objects.requireNonNull(pickOffset, "pickOffset");
-        this.gates = new NpcActionGates(
+        this.gates = new ClickActionGates(
                 Objects.requireNonNull(permissions, "permissions"),
                 Objects.requireNonNull(economy, "economy"),
                 new CommandFeedback(Objects.requireNonNull(messages, "messages")),
+                Objects.requireNonNull(costDeniedKey, "costDeniedKey"),
                 log);
-        this.gifts = new NpcGifts(log);
+        this.gifts = new ClickActionGifts(Objects.requireNonNull(serializedResolver, "serializedResolver"), log);
     }
 
     @Override

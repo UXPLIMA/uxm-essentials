@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import java.util.List;
 
@@ -7,12 +7,13 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 
 /**
- * The seam between the click-interaction listener and the engine that runs an NPC's ordered action chain. Pulling
- * it behind this port keeps the listener's resolve-and-dispatch flow unit-testable against a recording fake, with
+ * The seam between a click-interaction listener and the engine that runs an ordered action chain. Pulling it
+ * behind this port keeps the listener's resolve-and-dispatch flow unit-testable against a recording fake, with
  * the Bukkit/Adventure effects (console/player command dispatch, message/action-bar/title components, sounds,
- * cross-server connect) isolated in the single implementation.
+ * cross-server connect) isolated in the single implementation. Shared across the feature contexts whose
+ * interactable fixtures carry click actions (npc, holograms, …).
  */
-public interface NpcActionRunner {
+public interface ClickActionRunner {
 
     /**
      * Run, in order, every action in {@code actions} whose trigger matches the click described by {@code attack}

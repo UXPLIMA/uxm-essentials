@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The Bukkit-backed {@link NpcServerConnector}: it registers the standard proxy plugin-message channel
+ * The Bukkit-backed {@link ServerConnector}: it registers the standard proxy plugin-message channel
  * ({@code BungeeCord}, which Velocity also honours) once on construction and sends a {@code Connect} subchannel
  * frame through the clicking player's own connection to move them to another backend. A plugin message rides a
  * player connection, so the {@code viewer} carries the frame directly. With no proxy in front of the server the
@@ -21,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
  * behaviour.
  */
 @NullMarked
-public final class BukkitServerConnector implements NpcServerConnector {
+public final class BukkitServerConnector implements ServerConnector {
 
     /** Bukkit's well-known proxy channel; Velocity listens on the same legacy name for {@code Connect}. */
     private static final String CHANNEL = "BungeeCord";

@@ -4,25 +4,25 @@ import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * An {@link NpcCommandRunner} decorator that drops any command on the configured {@link BlockedCommands} list
+ * A {@link ClickCommandRunner} decorator that drops any command on the configured {@link BlockedCommands} list
  * before it reaches the delegate, logging the block. Both an NPC's single click command and its click-action
- * command effects (console/player/op) run through the one {@code NpcCommandRunner} the wiring shares between the
+ * command effects (console/player/op) run through the one {@code ClickCommandRunner} the wiring shares between the
  * interaction listener and the action runner, so wrapping that single instance filters every NPC-driven dispatch
  * from one place. With an empty blocklist this is a transparent pass-through, so a default server pays nothing.
  */
 @NullMarked
-public final class FilteredNpcCommandRunner implements NpcCommandRunner {
+public final class FilteredNpcCommandRunner implements ClickCommandRunner {
 
-    private final NpcCommandRunner delegate;
+    private final ClickCommandRunner delegate;
     private final BlockedCommands blocked;
     private final Logger log;
 
-    public FilteredNpcCommandRunner(NpcCommandRunner delegate, BlockedCommands blocked, Logger log) {
+    public FilteredNpcCommandRunner(ClickCommandRunner delegate, BlockedCommands blocked, Logger log) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.blocked = Objects.requireNonNull(blocked, "blocked");
         this.log = Objects.requireNonNull(log, "log");

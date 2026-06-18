@@ -67,7 +67,6 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.homes.adapter.outbound.ProviderHomeEconomy;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
-import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
 import com.uxplima.uxmessentials.persistence.economy.LockingWalletRepository;
 import com.uxplima.uxmessentials.persistence.economy.RedisWalletSync;
@@ -80,6 +79,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WalletSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.ProviderVaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
@@ -253,7 +253,7 @@ public final class EconomyWiring {
         KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency());
         HomeEconomy homeEconomy = new ProviderHomeEconomy(resolved, currencies.defaultCurrency());
         VaultEconomy vaultEconomy = new ProviderVaultEconomy(resolved, currencies.defaultCurrency());
-        NpcEconomy npcEconomy = new ProviderNpcEconomy(resolved, currencies.defaultCurrency());
+        ClickActionEconomy npcEconomy = new ProviderNpcEconomy(resolved, currencies.defaultCurrency());
 
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
@@ -588,7 +588,7 @@ public final class EconomyWiring {
             KitEconomy kitEconomy,
             HomeEconomy homeEconomy,
             VaultEconomy vaultEconomy,
-            NpcEconomy npcEconomy,
+            ClickActionEconomy npcEconomy,
             WalletLedger ledger,
             BaltopSnapshots snapshots,
             EconomyProvider provider,

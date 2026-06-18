@@ -8,7 +8,7 @@ import java.util.List;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.junit.jupiter.api.Test;
 
@@ -55,7 +55,7 @@ class FilteredNpcCommandRunnerTest {
         assertThat(delegate.opCommands).containsExactly("give @s diamond");
     }
 
-    private static final class RecordingRunner implements NpcCommandRunner {
+    private static final class RecordingRunner implements ClickCommandRunner {
         private final List<String> consoleCommands = new ArrayList<>();
         private final List<String> playerCommands = new ArrayList<>();
         private final List<String> opCommands = new ArrayList<>();

@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -9,11 +9,11 @@ import java.util.function.UnaryOperator;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
-import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import org.jspecify.annotations.NullMarked;
@@ -21,31 +21,39 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Evaluates the four gate action types — {@code CHANCE}, {@code PERMISSION}, {@code CONDITION}, {@code COST} —
- * for the {@link BukkitNpcActionRunner} sequencer, returning a {@link Verdict} that tells the runner whether to
+ * for the {@link BukkitClickActionRunner} sequencer, returning a {@link Verdict} that tells the runner whether to
  * keep running the rest of the chain. Pulled out of the runner so the runner stays the thin sequencer and the
- * gate semantics (roll, node check, comparison, charge) live in one focused, ≤300-line place.
+ * gate semantics (roll, node check, comparison, charge) live in one focused place.
  *
  * <p>Each gate's "denied" outcome stops the rest of the chain; a "passed" outcome continues. A malformed gate
  * spec is the deliberate exception: it is logged and treated as {@link Verdict#PASS} (the gate is skipped, never
  * the whole chain), so an operator typo degrades to "no gate" rather than silently swallowing every action after
- * it. {@code COST} is the one gate that also messages the viewer when it denies (insufficient funds), and the
- * one whose charge runs through the optional {@link NpcEconomy} seam — absent, the gate is skipped.
+ * it. {@code COST} is the one gate that also messages the viewer when it denies (insufficient funds), through the
+ * {@code costDeniedKey} the owning context supplies, and the one whose charge runs through the optional
+ * {@link ClickActionEconomy} seam — absent, the gate is skipped.
  */
 @NullMarked
-final class NpcActionGates {
+final class ClickActionGates {
 
     /** The whole-percent ceiling a {@code CHANCE} roll compares against. */
     private static final double FULL_PERCENT = 100.0;
 
     private final Permissions permissions;
-    private final Optional<NpcEconomy> economy;
+    private final Optional<ClickActionEconomy> economy;
     private final CommandFeedback feedback;
+    private final MessageKey costDeniedKey;
     private final Logger log;
 
-    NpcActionGates(Permissions permissions, Optional<NpcEconomy> economy, CommandFeedback feedback, Logger log) {
+    ClickActionGates(
+            Permissions permissions,
+            Optional<ClickActionEconomy> economy,
+            CommandFeedback feedback,
+            MessageKey costDeniedKey,
+            Logger log) {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.feedback = Objects.requireNonNull(feedback, "feedback");
+        this.costDeniedKey = Objects.requireNonNull(costDeniedKey, "costDeniedKey");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -99,7 +107,7 @@ final class NpcActionGates {
         if (economy.get().withdraw(BukkitRefs.toRef(viewer), amount, "default")) {
             return Verdict.PASS;
         }
-        feedback.send(viewer, NpcMessageKey.NPC_ACTION_COST_DENIED, Map.of("amount", amount.toPlainString()));
+        feedback.send(viewer, costDeniedKey, Map.of("amount", amount.toPlainString()));
         return Verdict.DENY;
     }
 

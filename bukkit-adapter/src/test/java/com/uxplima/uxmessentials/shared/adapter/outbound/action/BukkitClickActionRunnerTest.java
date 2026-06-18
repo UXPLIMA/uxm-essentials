@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -17,9 +18,8 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
-import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -37,14 +37,17 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * Covers {@link BukkitNpcActionRunner} as a sequenced executor with gates and a delay continuation. The first
+ * Covers {@link BukkitClickActionRunner} as a sequenced executor with gates and a delay continuation. The first
  * suite pins the original behaviour (trigger filtering, ordered command dispatch, fail-soft); the rest pin the
- * richer N12 action types: a {@code DELAY} schedules the tail and aborts on a viewer who logged off; the
+ * richer action types: a {@code DELAY} schedules the tail and aborts on a viewer who logged off; the
  * {@code CHANCE}/{@code PERMISSION}/{@code CONDITION}/{@code COST} gates abort the remaining chain on a failed
  * verdict (a malformed gate spec is skipped, never aborting); and {@code GIVE} delivers an item with overflow
  * dropping.
  */
-class BukkitNpcActionRunnerTest {
+class BukkitClickActionRunnerTest {
+
+    /** The cost-denied catalog key the owning context supplies; pinned here as the npc context's key. */
+    private static final MessageKey COST_DENIED = () -> "npc.action.cost-denied";
 
     private ServerMock server;
     private PlayerMock player;
@@ -73,12 +76,30 @@ class BukkitNpcActionRunnerTest {
         MockBukkit.unmock();
     }
 
-    private BukkitNpcActionRunner runnerWith(Optional<NpcEconomy> eco) {
-        return new BukkitNpcActionRunner(
-                commandRunner, connector, scheduler, permissions, eco, messages, new NoopLogger());
+    /** Deserialize the {@code b64:} token shape this test builds, mirroring the npc context's equipment codec. */
+    private static Optional<ItemStack> resolveSerialized(String token) {
+        try {
+            byte[] bytes = Base64.getDecoder().decode(token.substring("b64:".length()));
+            return Optional.of(ItemStack.deserializeBytes(bytes));
+        } catch (RuntimeException corrupt) {
+            return Optional.empty();
+        }
     }
 
-    private BukkitNpcActionRunner runner() {
+    private BukkitClickActionRunner runnerWith(Optional<ClickActionEconomy> eco) {
+        return new BukkitClickActionRunner(
+                commandRunner,
+                connector,
+                scheduler,
+                permissions,
+                eco,
+                messages,
+                COST_DENIED,
+                BukkitClickActionRunnerTest::resolveSerialized,
+                new NoopLogger());
+    }
+
+    private BukkitClickActionRunner runner() {
         return runnerWith(Optional.of(economy));
     }
 
@@ -445,7 +466,7 @@ class BukkitNpcActionRunnerTest {
         meta.displayName(net.kyori.adventure.text.Component.text("Excalibur"));
         meta.addEnchant(org.bukkit.enchantments.Enchantment.SHARPNESS, 5, true);
         sword.setItemMeta(meta);
-        String token = EquipmentPayloads.serialize(sword);
+        String token = "b64:" + Base64.getEncoder().encodeToString(sword.serializeAsBytes());
 
         runner().run(player, List.of(new ClickAction(ClickTrigger.ANY, ClickActionType.GIVE, token)), false);
 
@@ -507,13 +528,15 @@ class BukkitNpcActionRunnerTest {
     @Test
     void randomWithAFixedPickerRunsTheChosenIndex() {
         // Inject a deterministic picker: always the second member (offset 1) of the group.
-        BukkitNpcActionRunner deterministic = new BukkitNpcActionRunner(
+        BukkitClickActionRunner deterministic = new BukkitClickActionRunner(
                 commandRunner,
                 connector,
                 scheduler,
                 permissions,
                 Optional.of(economy),
                 messages,
+                COST_DENIED,
+                BukkitClickActionRunnerTest::resolveSerialized,
                 new NoopLogger(),
                 bound -> 1);
         deterministic.run(
@@ -564,13 +587,15 @@ class BukkitNpcActionRunnerTest {
     void aGateChosenInsideARandomGroupThatDeniesStopsTheRestOfTheChain() {
         // The group's chosen member is a CHANCE 0 gate (offset 0): a denied gate must stop the whole chain, exactly
         // as it would inline — the action after the group must not run.
-        BukkitNpcActionRunner deterministic = new BukkitNpcActionRunner(
+        BukkitClickActionRunner deterministic = new BukkitClickActionRunner(
                 commandRunner,
                 connector,
                 scheduler,
                 permissions,
                 Optional.of(economy),
                 messages,
+                COST_DENIED,
+                BukkitClickActionRunnerTest::resolveSerialized,
                 new NoopLogger(),
                 bound -> 0);
         deterministic.run(
@@ -621,7 +646,7 @@ class BukkitNpcActionRunnerTest {
 
     @Test
     void titleWithNoSubtitleOrTimesUsesTheVanillaDefaults() {
-        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Welcome");
+        BukkitClickActionRunner.TitleSpec spec = BukkitClickActionRunner.TitleSpec.parse("Welcome");
 
         assertThat(spec.title()).isEqualTo("Welcome");
         assertThat(spec.subtitle()).isEmpty();
@@ -632,7 +657,7 @@ class BukkitNpcActionRunnerTest {
 
     @Test
     void titleWithASubtitleButNoTimesKeepsTheDefaults() {
-        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Title|Sub");
+        BukkitClickActionRunner.TitleSpec spec = BukkitClickActionRunner.TitleSpec.parse("Title|Sub");
 
         assertThat(spec.title()).isEqualTo("Title");
         assertThat(spec.subtitle()).isEqualTo("Sub");
@@ -643,7 +668,7 @@ class BukkitNpcActionRunnerTest {
 
     @Test
     void titleWithFullTimesParsesAllThree() {
-        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Title|Sub|5|40|15");
+        BukkitClickActionRunner.TitleSpec spec = BukkitClickActionRunner.TitleSpec.parse("Title|Sub|5|40|15");
 
         assertThat(spec.title()).isEqualTo("Title");
         assertThat(spec.subtitle()).isEqualTo("Sub");
@@ -656,7 +681,7 @@ class BukkitNpcActionRunnerTest {
     void titleWithAMalformedTimingTailFallsBackToTheDefaults() {
         // A non-numeric tail must not abort the title nor half-apply: the timings fall back to vanilla defaults and
         // the whole text after the first '|' is taken as the subtitle (the operator did not author valid timings).
-        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Title|Sub|fast|slow|nope");
+        BukkitClickActionRunner.TitleSpec spec = BukkitClickActionRunner.TitleSpec.parse("Title|Sub|fast|slow|nope");
 
         assertThat(spec.title()).isEqualTo("Title");
         assertThat(spec.subtitle()).isEqualTo("Sub|fast|slow|nope");
@@ -668,7 +693,7 @@ class BukkitNpcActionRunnerTest {
     @Test
     void titleWithAPartialTimingTailFallsBackToTheDefaults() {
         // Only fade-in given (no full stay/fade-out trio): the spec is incomplete, so all three timings fall back.
-        BukkitNpcActionRunner.TitleSpec spec = BukkitNpcActionRunner.TitleSpec.parse("Title|Sub|5");
+        BukkitClickActionRunner.TitleSpec spec = BukkitClickActionRunner.TitleSpec.parse("Title|Sub|5");
 
         assertThat(spec.title()).isEqualTo("Title");
         assertThat(spec.subtitle()).isEqualTo("Sub|5");
@@ -697,7 +722,8 @@ class BukkitNpcActionRunnerTest {
 
     @Test
     void keepsTheNamespaceOfANamespacedSoundKey() {
-        BukkitNpcActionRunner.SoundSpec spec = BukkitNpcActionRunner.SoundSpec.parse("minecraft:entity.player.levelup");
+        BukkitClickActionRunner.SoundSpec spec =
+                BukkitClickActionRunner.SoundSpec.parse("minecraft:entity.player.levelup");
 
         assertThat(spec.key()).isEqualTo("minecraft:entity.player.levelup");
         assertThat(spec.volume()).isEqualTo(1.0f);
@@ -706,7 +732,7 @@ class BukkitNpcActionRunnerTest {
 
     // --- fakes ----------------------------------------------------------------------------------------------
 
-    private static final class RecordingRunner implements NpcCommandRunner {
+    private static final class RecordingRunner implements ClickCommandRunner {
         private final List<String> consoleCommands = new ArrayList<>();
         private final List<String> playerCommands = new ArrayList<>();
         private final List<String> opCommands = new ArrayList<>();
@@ -727,7 +753,7 @@ class BukkitNpcActionRunnerTest {
         }
     }
 
-    private static final class RecordingConnector implements NpcServerConnector {
+    private static final class RecordingConnector implements ServerConnector {
         private final List<String> servers = new ArrayList<>();
 
         @Override
@@ -822,7 +848,7 @@ class BukkitNpcActionRunnerTest {
         }
     }
 
-    private static final class RecordingEconomy implements NpcEconomy {
+    private static final class RecordingEconomy implements ClickActionEconomy {
         private final List<BigDecimal> withdrawals = new ArrayList<>();
         private boolean affordable = true;
         private boolean explode = false;

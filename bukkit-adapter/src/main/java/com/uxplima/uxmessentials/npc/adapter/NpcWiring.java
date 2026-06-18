@@ -11,19 +11,16 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcSkinByName;
-import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionListener;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BlockedCommands;
-import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcCommandRunner;
-import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitServerConnector;
 import com.uxplima.uxmessentials.npc.adapter.outbound.CompositeSkinService;
+import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
 import com.uxplima.uxmessentials.npc.adapter.outbound.FilteredNpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.HttpClientFetcher;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MineSkinService;
 import com.uxplima.uxmessentials.npc.adapter.outbound.MojangSkinService;
-import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcTeleportAdapter;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
@@ -44,6 +41,7 @@ import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.MoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
+import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcQuota;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
@@ -67,15 +65,19 @@ import com.uxplima.uxmessentials.npc.application.SetNpcSkinSlim;
 import com.uxplima.uxmessentials.npc.application.SetNpcState;
 import com.uxplima.uxmessentials.npc.application.SetNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.TeleportToNpc;
-import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmlib.npc.ChannelResolver;
 import com.uxplima.uxmlib.npc.PacketSender;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
@@ -94,9 +96,9 @@ import org.jspecify.annotations.Nullable;
  * online viewers in range; a global refresh timer re-evaluates range each second so an NPC appears/disappears as
  * players move, and a faster look timer turns each looking NPC toward its nearby viewers. The interaction
  * listener runs an NPC's bound click command when a player clicks its fake entity. A {@code COST} click action
- * charges through the optional {@link NpcEconomy} bridge captured during economy wiring — empty on a server
- * without economy, in which case the cost gate is simply skipped. On stop the {@code Wired} bundle cancels both
- * timers and removes every shown NPC from every viewer so nothing is orphaned across a reload.
+ * charges through the optional {@link ClickActionEconomy} bridge captured during economy wiring — empty on a
+ * server without economy, in which case the cost gate is simply skipped. On stop the {@code Wired} bundle cancels
+ * both timers and removes every shown NPC from every viewer so nothing is orphaned across a reload.
  */
 @NullMarked
 public final class NpcWiring {
@@ -110,7 +112,8 @@ public final class NpcWiring {
     private NpcWiring() {}
 
     /** Build the npc adapters and use cases, and spawn the stored NPCs to the online viewers in range. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Optional<NpcEconomy> economy) {
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, Persistence persistence, Optional<ClickActionEconomy> economy) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -138,16 +141,18 @@ public final class NpcWiring {
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
         List<CommandRegistration> commands =
                 List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages()));
-        NpcCommandRunner commandRunner = new FilteredNpcCommandRunner(
+        ClickCommandRunner commandRunner = new FilteredNpcCommandRunner(
                 new BukkitNpcCommandRunner(), BlockedCommands.of(settings.blockedCommands()), kernel.log());
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
-        NpcActionRunner actionRunner = new BukkitNpcActionRunner(
+        ClickActionRunner actionRunner = new BukkitClickActionRunner(
                 commandRunner,
                 connector,
                 kernel.scheduler(),
                 kernel.permissions(),
                 economy,
                 kernel.messages(),
+                NpcMessageKey.NPC_ACTION_COST_DENIED,
+                EquipmentPayloads::resolve,
                 kernel.log());
         NpcInteractionListener interaction = new NpcInteractionListener(
                 renderer, repository, commandRunner, actionRunner, kernel.scheduler(), settings.clickCooldown());

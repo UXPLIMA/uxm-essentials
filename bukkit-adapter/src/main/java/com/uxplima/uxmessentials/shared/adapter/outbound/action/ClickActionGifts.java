@@ -1,7 +1,9 @@
-package com.uxplima.uxmessentials.npc.adapter.outbound;
+package com.uxplima.uxmessentials.shared.adapter.outbound.action;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -19,8 +21,8 @@ import org.jspecify.annotations.Nullable;
  *   <li><b>{@code <material>[:amount]}</b> — a Bukkit material name (case-insensitive) and an optional positive
  *       amount (default 1), the plain-reward shape.
  *   <li><b>{@code b64:<base64>}</b> — a full serialized item (enchantments, custom name, lore, custom model data),
- *       resolved through {@link EquipmentPayloads}; this is what {@code /npc action add … give hand} stores, so a
- *       reward can carry NBT, not just a material.
+ *       resolved through the injected {@code serializedResolver} (the owning context's serialized-item codec);
+ *       this is what {@code add … give hand} stores, so a reward can carry NBT, not just a material.
  * </ul>
  *
  * <p>What does not fit the viewer's inventory drops at their feet rather than vanishing, so a full inventory never
@@ -28,13 +30,15 @@ import org.jspecify.annotations.Nullable;
  * treats this as a fail-soft effect, not a gate, so the rest of the chain still runs.
  */
 @NullMarked
-final class NpcGifts {
+final class ClickActionGifts {
 
     private static final String SERIALIZED_PREFIX = "b64:";
 
+    private final Function<String, Optional<ItemStack>> serializedResolver;
     private final Logger log;
 
-    NpcGifts(Logger log) {
+    ClickActionGifts(Function<String, Optional<ItemStack>> serializedResolver, Logger log) {
+        this.serializedResolver = Objects.requireNonNull(serializedResolver, "serializedResolver");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -56,14 +60,14 @@ final class NpcGifts {
     }
 
     /**
-     * Parse the give value into an item: a {@code b64:} token deserializes its full item through
-     * {@link EquipmentPayloads}, otherwise {@code <material>[:amount]} builds a plain stack. Returns {@code null}
+     * Parse the give value into an item: a {@code b64:} token deserializes its full item through the injected
+     * serialized resolver, otherwise {@code <material>[:amount]} builds a plain stack. Returns {@code null}
      * when the material is unknown or the serialized token is corrupt, so the caller skips the give fail-soft.
      */
-    private static @Nullable ItemStack parse(String value) {
+    private @Nullable ItemStack parse(String value) {
         String spec = value.strip();
         if (spec.startsWith(SERIALIZED_PREFIX)) {
-            return EquipmentPayloads.resolve(spec).orElse(null);
+            return serializedResolver.apply(spec).orElse(null);
         }
         int colon = spec.indexOf(':');
         String materialName = colon < 0 ? spec : spec.substring(0, colon);

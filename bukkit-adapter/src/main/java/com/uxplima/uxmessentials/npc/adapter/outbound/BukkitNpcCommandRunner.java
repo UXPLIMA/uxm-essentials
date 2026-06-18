@@ -5,16 +5,16 @@ import java.util.Objects;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The Bukkit-backed {@link NpcCommandRunner}: a console command goes through {@code Bukkit.dispatchCommand} on the
- * console sender, a player command through {@code player.performCommand}. Both must run on the main/region thread,
- * which the interaction listener guarantees before calling in.
+ * The Bukkit-backed {@link ClickCommandRunner}: a console command goes through {@code Bukkit.dispatchCommand} on
+ * the console sender, a player command through {@code player.performCommand}. Both must run on the main/region
+ * thread, which the interaction listener guarantees before calling in.
  */
 @NullMarked
-public final class BukkitNpcCommandRunner implements NpcCommandRunner {
+public final class BukkitNpcCommandRunner implements ClickCommandRunner {
 
     @Override
     public void runAsConsole(String command) {
