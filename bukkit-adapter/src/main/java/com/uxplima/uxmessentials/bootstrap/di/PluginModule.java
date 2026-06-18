@@ -114,6 +114,7 @@ import com.uxplima.uxmessentials.vaults.adapter.VaultsWiring;
 import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
+import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
 import com.uxplima.uxmlib.gui.Guis;
 import org.jspecify.annotations.NullMarked;
 
@@ -330,6 +331,8 @@ public final class PluginModule {
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, persistence, resources, links);
+        } else if (module.id().equals(ModuleId.of("worlds"))) {
+            wireWorlds(plugin, ctx, persistence, resources);
         } else if (module.id().equals(ModuleId.of("homes"))) {
             wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts);
         } else if (module.id().equals(ModuleId.of("economy"))) {
@@ -401,6 +404,19 @@ public final class PluginModule {
         links.jailGate = wired.jailGate();
         // Captured for homes, which lands later and rebinds this seam so the respawn chain's HOME step resolves.
         links.homeRespawnLocator = wired.homeRespawnLocator();
+    }
+
+    private static void wireWorlds(
+            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+        // worlds builds its cached jOOQ WorldRepository over persistence.dsl() and its BukkitWorldEngine over the
+        // plugin's Server. It carries no cross-context bridge — its collaborators are the shared kernel ports and
+        // the engine. The enable-time reconcile (adopt already-loaded worlds, auto-load registered ones) is kicked
+        // on the global region thread the moment wiring completes, then drops the warm snapshot and refreshes the
+        // import-folder candidates off-tick.
+        WorldsWiring.Wired wired = WorldsWiring.wire(ctx, persistence, plugin.getServer());
+        wired.commands().forEach(resources::addCommand);
+        wired.startReconcile().run();
+        resources.onClose(wired.stop());
     }
 
     private static void wireHomes(
