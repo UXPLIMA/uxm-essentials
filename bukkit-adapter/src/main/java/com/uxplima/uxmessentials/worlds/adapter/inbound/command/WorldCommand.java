@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.worlds.adapter.inbound.command;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
+import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
@@ -64,7 +66,9 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(this::runCreate)
                                 .then(envArg().executes(this::runCreate)
-                                        .then(typeArg().executes(this::runCreate)))))
+                                        .then(typeArg()
+                                                .executes(this::runCreate)
+                                                .then(generatorArg().executes(this::runCreate))))))
                 .then(Commands.literal("import")
                         .requires(p(IMPORT))
                         .then(folderArg()
@@ -135,6 +139,12 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         Arrays.stream(WorldGenType.values()).map(Enum::name).toList()));
     }
 
+    private RequiredArgumentBuilder<CommandSourceStack, String> generatorArg() {
+        return Commands.argument("generator", StringArgumentType.word())
+                .suggests(
+                        CommandSuggestions.fromStrings(() -> List.of(BuiltInGenerators.VOID, BuiltInGenerators.FLAT)));
+    }
+
     private int runCreate(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
@@ -148,13 +158,28 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL),
                 arg(ctx, "type", WorldGenType.class, WorldGenType.NORMAL),
                 Optional.empty(),
-                Optional.empty(),
+                parseGenerator(ctx),
                 true,
                 Optional.empty());
         PlayerRef who = ref(sender);
         feedback.send(sender, WorldsMessageKey.WORLD_CREATING, Map.of("world", name.value()));
         onGlobal(() -> services.createWorld().create(who, name, spec, true));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Maps the optional trailing {@code generator} token to a ref: a {@code void}/{@code flat} token
+     * (case-insensitive) becomes the namespaced built-in ref; any other non-blank token is an external
+     * generator ref passed through unchanged; absent or blank yields empty (vanilla generation).
+     */
+    private static Optional<GeneratorRef> parseGenerator(CommandContext<CommandSourceStack> ctx) {
+        return optionalString(ctx, "generator")
+                .filter(token -> !token.isBlank())
+                .map(token -> {
+                    String lower = token.toLowerCase(Locale.ROOT);
+                    boolean builtIn = lower.equals(BuiltInGenerators.VOID) || lower.equals(BuiltInGenerators.FLAT);
+                    return builtIn ? BuiltInGenerators.ref(lower) : GeneratorRef.of(token);
+                });
     }
 
     private int runImport(CommandContext<CommandSourceStack> ctx) {

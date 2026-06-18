@@ -1,11 +1,13 @@
 package com.uxplima.uxmessentials.bootstrap;
 
+import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.bootstrap.di.PluginModule;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -67,6 +69,23 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         getLogger().info("╔══════════════════════════════════════════════════════════╗");
         getLogger().info("║  UxmEssentials enabled successfully in " + loadTime + "ms!          ║");
         getLogger().info("╚══════════════════════════════════════════════════════════╝");
+    }
+
+    /**
+     * Serves our built-in {@code uxmEssentials:void|flat} generators to worlds whose
+     * {@code generator:} is configured in server.properties or requested by another plugin. Reads the
+     * resolver the worlds module captured during wiring; null (worlds disabled or an unknown id) falls
+     * back to vanilla generation.
+     */
+    @Override
+    public @Nullable ChunkGenerator getDefaultWorldGenerator(String worldName, @Nullable String id) {
+        CloseableResources wired = this.resources;
+        return resolveGenerator(wired == null ? null : wired.worldGeneratorResolver(), id);
+    }
+
+    /** The pure resolve step behind {@link #getDefaultWorldGenerator}, factored out for unit testing. */
+    static @Nullable ChunkGenerator resolveGenerator(@Nullable WorldGeneratorResolver resolver, @Nullable String id) {
+        return resolver == null || id == null ? null : resolver.resolve(id).orElse(null);
     }
 
     @Override
