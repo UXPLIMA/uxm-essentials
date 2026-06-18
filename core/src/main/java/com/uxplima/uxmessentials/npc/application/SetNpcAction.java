@@ -6,12 +6,12 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 
 /**
  * {@code /npc action set <name> <index> …}: replace the action at an existing position with a new one, keeping
@@ -30,7 +30,7 @@ public final class SetNpcAction {
     }
 
     /** Replace the {@code index1Based}-th action of NPC {@code name} with {@code action}, or reject out of range. */
-    public Result<Unit, NpcError> set(PlayerRef actor, NpcName name, int index1Based, NpcAction action) {
+    public Result<Unit, NpcError> set(PlayerRef actor, NpcName name, int index1Based, ClickAction action) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(action, "action");

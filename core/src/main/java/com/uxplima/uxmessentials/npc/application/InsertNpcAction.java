@@ -6,12 +6,12 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 
 /**
  * {@code /npc action add_before|add_after <name> <index> …}: insert one action into an NPC's chain relative to an
@@ -33,7 +33,7 @@ public final class InsertNpcAction {
 
     /** Insert {@code action} before/after the {@code index1Based}-th action of NPC {@code name}. */
     public Result<Unit, NpcError> insert(
-            PlayerRef actor, NpcName name, int index1Based, boolean after, NpcAction action) {
+            PlayerRef actor, NpcName name, int index1Based, boolean after, ClickAction action) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(action, "action");

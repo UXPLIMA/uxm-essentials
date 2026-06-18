@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -16,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  * <p>{@code clickCommand} is the raw command text run when a player clicks the NPC, or {@code null} for none —
  * running it is an adapter concern, so the domain only carries the binding. {@code lookAtPlayer} controls whether
  * the fake player turns to face each nearby viewer; it defaults to {@code true} so a freshly created NPC tracks
- * players out of the box. {@code actions} is the ordered list of {@link NpcAction}s a click runs, the richer
+ * players out of the box. {@code actions} is the ordered list of {@link ClickAction}s a click runs, the richer
  * mechanism alongside the single {@code clickCommand} (which still runs first). The list is copied defensively on
  * construction so the snapshot is immutable.
  *
@@ -26,7 +27,10 @@ import org.jspecify.annotations.Nullable;
  * each tune their own debounce; the listener resolves the effective value. Negative values are rejected.
  */
 public record NpcBehavior(
-        @Nullable String clickCommand, boolean lookAtPlayer, List<NpcAction> actions, long interactionCooldownMillis) {
+        @Nullable String clickCommand,
+        boolean lookAtPlayer,
+        List<ClickAction> actions,
+        long interactionCooldownMillis) {
 
     public NpcBehavior {
         actions = List.copyOf(Objects.requireNonNull(actions, "actions"));
@@ -37,7 +41,7 @@ public record NpcBehavior(
     }
 
     /** The legacy three-field constructor, retained so existing callers default the per-NPC cooldown to global. */
-    public NpcBehavior(@Nullable String clickCommand, boolean lookAtPlayer, List<NpcAction> actions) {
+    public NpcBehavior(@Nullable String clickCommand, boolean lookAtPlayer, List<ClickAction> actions) {
         this(clickCommand, lookAtPlayer, actions, 0L);
     }
 
@@ -58,9 +62,9 @@ public record NpcBehavior(
         return new NpcBehavior(clickCommand, lookAtPlayer, actions, newCooldownMillis);
     }
 
-    NpcBehavior withActionAdded(NpcAction action) {
+    NpcBehavior withActionAdded(ClickAction action) {
         Objects.requireNonNull(action, "action");
-        List<NpcAction> updated = new ArrayList<>(actions);
+        List<ClickAction> updated = new ArrayList<>(actions);
         updated.add(action);
         return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
     }
@@ -69,7 +73,7 @@ public record NpcBehavior(
         if (index < 0 || index >= actions.size()) {
             throw new IndexOutOfBoundsException("action index out of range: " + index);
         }
-        List<NpcAction> updated = new ArrayList<>(actions);
+        List<ClickAction> updated = new ArrayList<>(actions);
         updated.remove(index);
         return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
     }
@@ -78,22 +82,22 @@ public record NpcBehavior(
         return new NpcBehavior(clickCommand, lookAtPlayer, List.of(), interactionCooldownMillis);
     }
 
-    NpcBehavior withActionInsertedAt(int index, NpcAction action) {
+    NpcBehavior withActionInsertedAt(int index, ClickAction action) {
         Objects.requireNonNull(action, "action");
         if (index < 0 || index > actions.size()) {
             throw new IndexOutOfBoundsException("action insert index out of range: " + index);
         }
-        List<NpcAction> updated = new ArrayList<>(actions);
+        List<ClickAction> updated = new ArrayList<>(actions);
         updated.add(index, action);
         return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
     }
 
-    NpcBehavior withActionSetAt(int index, NpcAction action) {
+    NpcBehavior withActionSetAt(int index, ClickAction action) {
         Objects.requireNonNull(action, "action");
         if (index < 0 || index >= actions.size()) {
             throw new IndexOutOfBoundsException("action index out of range: " + index);
         }
-        List<NpcAction> updated = new ArrayList<>(actions);
+        List<ClickAction> updated = new ArrayList<>(actions);
         updated.set(index, action);
         return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
     }
@@ -102,8 +106,8 @@ public record NpcBehavior(
         if (from < 0 || from >= actions.size() || to < 0 || to >= actions.size()) {
             throw new IndexOutOfBoundsException("action move index out of range: " + from + " -> " + to);
         }
-        List<NpcAction> updated = new ArrayList<>(actions);
-        NpcAction moved = updated.remove(from);
+        List<ClickAction> updated = new ArrayList<>(actions);
+        ClickAction moved = updated.remove(from);
         updated.add(to, moved);
         return new NpcBehavior(clickCommand, lookAtPlayer, updated, interactionCooldownMillis);
     }

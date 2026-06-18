@@ -6,11 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcAppearance;
 import com.uxplima.uxmessentials.npc.domain.NpcBehavior;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
@@ -18,6 +15,9 @@ import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.NpcRecord;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.jooq.Record;
 import org.jspecify.annotations.Nullable;
 
@@ -52,7 +52,7 @@ final class NpcRows {
     private NpcRows() {}
 
     /** Rebuild a domain {@link Npc} from an {@code npc} row, its already-ordered action list and its type data. */
-    static Npc toNpc(Record row, List<NpcAction> orderedActions, Map<String, String> typeData) {
+    static Npc toNpc(Record row, List<ClickAction> orderedActions, Map<String, String> typeData) {
         WorldRef world = new WorldRef(UUID.fromString(row.get(NPC.WORLD)), row.get(NPC.WORLD_NAME));
         Position position = new Position(
                 world, row.get(NPC.X), row.get(NPC.Y), row.get(NPC.Z), row.get(NPC.YAW), row.get(NPC.PITCH));
@@ -192,17 +192,17 @@ final class NpcRows {
     }
 
     /**
-     * Build a domain {@link NpcAction} from a stored row's trigger/type/value, or {@code null} when the trigger
+     * Build a domain {@link ClickAction} from a stored row's trigger/type/value, or {@code null} when the trigger
      * or type enum name no longer parses (a forward-incompatible row is skipped on load rather than crashing the
      * whole NPC set). The caller filters the nulls out.
      */
-    static @Nullable NpcAction toAction(String trigger, String type, String value) {
+    static @Nullable ClickAction toAction(String trigger, String type, String value) {
         ClickTrigger clickTrigger = enumOrNull(ClickTrigger.class, trigger);
-        NpcActionType actionType = enumOrNull(NpcActionType.class, type);
+        ClickActionType actionType = enumOrNull(ClickActionType.class, type);
         if (clickTrigger == null || actionType == null) {
             return null;
         }
-        return new NpcAction(clickTrigger, actionType, value);
+        return new ClickAction(clickTrigger, actionType, value);
     }
 
     private static <E extends Enum<E>> @Nullable E enumOrNull(Class<E> type, String name) {

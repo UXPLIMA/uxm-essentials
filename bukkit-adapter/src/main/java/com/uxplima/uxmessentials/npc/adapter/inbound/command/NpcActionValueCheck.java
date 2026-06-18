@@ -5,11 +5,11 @@ import java.util.Optional;
 
 import org.bukkit.Material;
 
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Validates an {@code /npc action add} value against its {@link NpcActionType} at add time, so an operator gets a
+ * Validates an {@code /npc action add} value against its {@link ClickActionType} at add time, so an operator gets a
  * clear rejection rather than a silently-broken action that only fails on click. Only the cheap, structural
  * checks live here — a numeric {@code DELAY}/{@code CHANCE}/{@code COST}, a positive-int {@code RANDOM} group
  * count, and a resolvable {@code GIVE} material (or an accepted serialized token); the free-text gates
@@ -56,7 +56,7 @@ final class NpcActionValueCheck {
     }
 
     /** Check {@code value} for {@code type}, returning {@link Result#valid()} for any type with no cheap check. */
-    static Result check(NpcActionType type, String value) {
+    static Result check(ClickActionType type, String value) {
         return switch (type) {
             case DELAY -> nonNegativeLong(value, "delay must be a whole number of ticks, e.g. 40");
             case CHANCE -> percent(value);
@@ -118,24 +118,24 @@ final class NpcActionValueCheck {
                 : Result.invalid("give needs a material like DIAMOND or DIAMOND:3, or hand to capture your held item");
     }
 
-    /** Map the operator's type word to an {@link NpcActionType}, or empty when unknown (case-insensitive). */
-    static Optional<NpcActionType> parseType(String word) {
+    /** Map the operator's type word to an {@link ClickActionType}, or empty when unknown (case-insensitive). */
+    static Optional<ClickActionType> parseType(String word) {
         return switch (word.strip().toLowerCase(Locale.ROOT)) {
-            case "console" -> Optional.of(NpcActionType.RUN_CONSOLE);
-            case "player" -> Optional.of(NpcActionType.RUN_PLAYER);
-            case "player_op" -> Optional.of(NpcActionType.RUN_PLAYER_AS_OP);
-            case "message" -> Optional.of(NpcActionType.MESSAGE);
-            case "actionbar" -> Optional.of(NpcActionType.ACTIONBAR);
-            case "title" -> Optional.of(NpcActionType.TITLE);
-            case "sound" -> Optional.of(NpcActionType.SOUND);
-            case "connect" -> Optional.of(NpcActionType.CONNECT);
-            case "delay" -> Optional.of(NpcActionType.DELAY);
-            case "random" -> Optional.of(NpcActionType.RANDOM);
-            case "chance" -> Optional.of(NpcActionType.CHANCE);
-            case "permission" -> Optional.of(NpcActionType.PERMISSION);
-            case "condition" -> Optional.of(NpcActionType.CONDITION);
-            case "cost" -> Optional.of(NpcActionType.COST);
-            case "give" -> Optional.of(NpcActionType.GIVE);
+            case "console" -> Optional.of(ClickActionType.RUN_CONSOLE);
+            case "player" -> Optional.of(ClickActionType.RUN_PLAYER);
+            case "player_op" -> Optional.of(ClickActionType.RUN_PLAYER_AS_OP);
+            case "message" -> Optional.of(ClickActionType.MESSAGE);
+            case "actionbar" -> Optional.of(ClickActionType.ACTIONBAR);
+            case "title" -> Optional.of(ClickActionType.TITLE);
+            case "sound" -> Optional.of(ClickActionType.SOUND);
+            case "connect" -> Optional.of(ClickActionType.CONNECT);
+            case "delay" -> Optional.of(ClickActionType.DELAY);
+            case "random" -> Optional.of(ClickActionType.RANDOM);
+            case "chance" -> Optional.of(ClickActionType.CHANCE);
+            case "permission" -> Optional.of(ClickActionType.PERMISSION);
+            case "condition" -> Optional.of(ClickActionType.CONDITION);
+            case "cost" -> Optional.of(ClickActionType.COST);
+            case "give" -> Optional.of(ClickActionType.GIVE);
             default -> Optional.empty();
         };
     }

@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.npc.adapter.inbound.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,87 +27,89 @@ class NpcActionValueCheckTest {
 
     @Test
     void parseTypeMapsTheNewTypesCaseInsensitively() {
-        assertThat(NpcActionValueCheck.parseType("DELAY")).contains(NpcActionType.DELAY);
-        assertThat(NpcActionValueCheck.parseType("Random")).contains(NpcActionType.RANDOM);
-        assertThat(NpcActionValueCheck.parseType("chance")).contains(NpcActionType.CHANCE);
-        assertThat(NpcActionValueCheck.parseType("Permission")).contains(NpcActionType.PERMISSION);
-        assertThat(NpcActionValueCheck.parseType("condition")).contains(NpcActionType.CONDITION);
-        assertThat(NpcActionValueCheck.parseType("cost")).contains(NpcActionType.COST);
-        assertThat(NpcActionValueCheck.parseType("give")).contains(NpcActionType.GIVE);
-        assertThat(NpcActionValueCheck.parseType("player_op")).contains(NpcActionType.RUN_PLAYER_AS_OP);
+        assertThat(NpcActionValueCheck.parseType("DELAY")).contains(ClickActionType.DELAY);
+        assertThat(NpcActionValueCheck.parseType("Random")).contains(ClickActionType.RANDOM);
+        assertThat(NpcActionValueCheck.parseType("chance")).contains(ClickActionType.CHANCE);
+        assertThat(NpcActionValueCheck.parseType("Permission")).contains(ClickActionType.PERMISSION);
+        assertThat(NpcActionValueCheck.parseType("condition")).contains(ClickActionType.CONDITION);
+        assertThat(NpcActionValueCheck.parseType("cost")).contains(ClickActionType.COST);
+        assertThat(NpcActionValueCheck.parseType("give")).contains(ClickActionType.GIVE);
+        assertThat(NpcActionValueCheck.parseType("player_op")).contains(ClickActionType.RUN_PLAYER_AS_OP);
         assertThat(NpcActionValueCheck.parseType("nope")).isEmpty();
     }
 
     @Test
     void randomMustBeAPositiveCount() {
-        assertThat(NpcActionValueCheck.check(NpcActionType.RANDOM, "3").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.RANDOM, "3").isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.RANDOM, "0").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.RANDOM, "0").isValid())
                 .isFalse();
-        assertThat(NpcActionValueCheck.check(NpcActionType.RANDOM, "-2").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.RANDOM, "-2").isValid())
                 .isFalse();
-        assertThat(NpcActionValueCheck.check(NpcActionType.RANDOM, "many").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.RANDOM, "many").isValid())
                 .isFalse();
     }
 
     @Test
     void giveAcceptsASerializedItemToken() {
         // A b64: token (what 'give hand' stores) is accepted as-is — its shape is the codec's concern, not the check.
-        assertThat(NpcActionValueCheck.check(NpcActionType.GIVE, "b64:whatever").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.GIVE, "b64:whatever")
+                        .isValid())
                 .isTrue();
     }
 
     @Test
     void delayMustBeAWholeNumber() {
-        assertThat(NpcActionValueCheck.check(NpcActionType.DELAY, "40").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.DELAY, "40").isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.DELAY, "-1").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.DELAY, "-1").isValid())
                 .isFalse();
-        assertThat(NpcActionValueCheck.check(NpcActionType.DELAY, "abc").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.DELAY, "abc").isValid())
                 .isFalse();
     }
 
     @Test
     void chanceMustBeAPercent() {
-        assertThat(NpcActionValueCheck.check(NpcActionType.CHANCE, "25").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.CHANCE, "25").isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.CHANCE, "25.0").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.CHANCE, "25.0").isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.CHANCE, "150").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.CHANCE, "150").isValid())
                 .isFalse();
-        assertThat(NpcActionValueCheck.check(NpcActionType.CHANCE, "nope").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.CHANCE, "nope").isValid())
                 .isFalse();
     }
 
     @Test
     void costMustBeANonNegativeNumber() {
-        assertThat(NpcActionValueCheck.check(NpcActionType.COST, "50").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.COST, "50").isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.COST, "-5").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.COST, "-5").isValid())
                 .isFalse();
-        assertThat(NpcActionValueCheck.check(NpcActionType.COST, "free").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.COST, "free").isValid())
                 .isFalse();
     }
 
     @Test
     void giveMustNameAKnownMaterial() {
-        assertThat(NpcActionValueCheck.check(NpcActionType.GIVE, "DIAMOND").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.GIVE, "DIAMOND").isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.GIVE, "diamond:3").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.GIVE, "diamond:3").isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.GIVE, "NOT_A_REAL_MATERIAL")
+        assertThat(NpcActionValueCheck.check(ClickActionType.GIVE, "NOT_A_REAL_MATERIAL")
                         .isValid())
                 .isFalse();
     }
 
     @Test
     void freeTextGatesAndEffectsAcceptAnything() {
-        assertThat(NpcActionValueCheck.check(NpcActionType.PERMISSION, "anything at all")
+        assertThat(NpcActionValueCheck.check(ClickActionType.PERMISSION, "anything at all")
                         .isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.CONDITION, "garbage").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.CONDITION, "garbage")
+                        .isValid())
                 .isTrue();
-        assertThat(NpcActionValueCheck.check(NpcActionType.MESSAGE, "<red>hi").isValid())
+        assertThat(NpcActionValueCheck.check(ClickActionType.MESSAGE, "<red>hi").isValid())
                 .isTrue();
     }
 }

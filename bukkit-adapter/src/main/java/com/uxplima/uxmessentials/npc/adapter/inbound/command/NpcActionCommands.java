@@ -21,10 +21,10 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -127,7 +127,7 @@ final class NpcActionCommands extends NpcCommandSupport {
         if (sender == null) {
             return 0;
         }
-        NpcAction action = parseAction(sender, ctx);
+        ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;
         }
@@ -148,7 +148,7 @@ final class NpcActionCommands extends NpcCommandSupport {
         if (sender == null) {
             return 0;
         }
-        NpcAction action = parseAction(sender, ctx);
+        ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;
         }
@@ -162,7 +162,7 @@ final class NpcActionCommands extends NpcCommandSupport {
         if (sender == null) {
             return 0;
         }
-        NpcAction action = parseAction(sender, ctx);
+        ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;
         }
@@ -188,11 +188,11 @@ final class NpcActionCommands extends NpcCommandSupport {
     }
 
     /**
-     * Parse the {@code trigger}/{@code type}/{@code value} args into an {@link NpcAction}, sending the matching
+     * Parse the {@code trigger}/{@code type}/{@code value} args into a {@link ClickAction}, sending the matching
      * validation feedback and returning {@code null} when any part is invalid (or a {@code give hand} capture
      * failed). Shared by {@code add}, {@code add_before}/{@code add_after} and {@code set}.
      */
-    private @Nullable NpcAction parseAction(Player sender, CommandContext<CommandSourceStack> ctx) {
+    private @Nullable ClickAction parseAction(Player sender, CommandContext<CommandSourceStack> ctx) {
         ClickTrigger trigger = parseTrigger(ctx.getArgument("trigger", String.class));
         if (trigger == null) {
             feedback.send(
@@ -202,7 +202,7 @@ final class NpcActionCommands extends NpcCommandSupport {
             return null;
         }
         String typeWord = ctx.getArgument("type", String.class);
-        NpcActionType type = NpcActionValueCheck.parseType(typeWord).orElse(null);
+        ClickActionType type = NpcActionValueCheck.parseType(typeWord).orElse(null);
         if (type == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_ACTION_TYPE, Map.of("type", typeWord));
             return null;
@@ -219,7 +219,7 @@ final class NpcActionCommands extends NpcCommandSupport {
                     Map.of("value", value, "type", typeWord.toLowerCase(Locale.ROOT), "hint", invalid.hint()));
             return null;
         }
-        return new NpcAction(trigger, type, value);
+        return new ClickAction(trigger, type, value);
     }
 
     /**
@@ -227,8 +227,8 @@ final class NpcActionCommands extends NpcCommandSupport {
      * token (a single-quantity clone with all its NBT), failing with feedback on an empty hand; every other case
      * stores the raw value as typed. Returns {@code null} when the capture failed, signalling the handler to stop.
      */
-    private @Nullable String resolveValue(Player sender, NpcActionType type, String rawValue) {
-        if (type != NpcActionType.GIVE || !rawValue.strip().equalsIgnoreCase(HAND_KEYWORD)) {
+    private @Nullable String resolveValue(Player sender, ClickActionType type, String rawValue) {
+        if (type != ClickActionType.GIVE || !rawValue.strip().equalsIgnoreCase(HAND_KEYWORD)) {
             return rawValue;
         }
         ItemStack hand = sender.getInventory().getItemInMainHand();

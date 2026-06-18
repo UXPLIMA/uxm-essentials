@@ -33,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
  * safe).
  *
  * <p>On a click the single bound click command runs first (kept for backward-compat), then the ordered action
- * chain — every {@link com.uxplima.uxmessentials.npc.domain.NpcAction} whose trigger matches the click — runs
+ * chain — every {@link com.uxplima.uxmessentials.shared.domain.action.ClickAction} whose trigger matches the click — runs
  * through the {@link NpcActionRunner}. The command may carry a routing prefix: {@code [console]} runs it as the
  * server console, {@code [player]} (or no prefix) as the clicking player; a {@code {player}} token is replaced
  * with the clicker's name. The click command alone is right-click-only; the action chain carries its own

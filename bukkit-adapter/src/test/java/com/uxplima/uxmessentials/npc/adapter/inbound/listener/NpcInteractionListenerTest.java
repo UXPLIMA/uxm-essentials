@@ -22,14 +22,14 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcViewSpawner;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import com.uxplima.uxmlib.packet.npc.NamedColor;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
 import org.jspecify.annotations.Nullable;
@@ -223,7 +223,7 @@ class NpcInteractionListenerTest {
 
     @Test
     void runsTheClickCommandThenTheMatchingActionChainOnRightClick() {
-        NpcAction action = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "hi");
+        ClickAction action = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, "hi");
         PlayerMock player = renderNpcWithActions("guide", "warp spawn", action);
         NpcInteractionListener listener = listener(Duration.ofMillis(500));
 
@@ -235,7 +235,7 @@ class NpcInteractionListenerTest {
 
     @Test
     void runsTheActionChainOnAttackWithTheAttackFlag() {
-        NpcAction action = new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.MESSAGE, "ouch");
+        ClickAction action = new ClickAction(ClickTrigger.LEFT_CLICK, ClickActionType.MESSAGE, "ouch");
         PlayerMock player = renderNpcWithActions("guide", null, action);
         NpcInteractionListener listener = listener(Duration.ofMillis(500));
 
@@ -260,13 +260,13 @@ class NpcInteractionListenerTest {
         return renderNpcWithActions(name, command);
     }
 
-    private PlayerMock renderNpcWithActions(String name, @Nullable String command, NpcAction... actions) {
+    private PlayerMock renderNpcWithActions(String name, @Nullable String command, ClickAction... actions) {
         PlayerMock player = server.addPlayer();
         Position at = com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toPosition(
                 java.util.Objects.requireNonNull(player.getLocation(), "loc"));
         Npc npc = Npc.create(NpcName.of(name), at, null, Instant.ofEpochMilli(1_000))
                 .withClickCommand(command);
-        for (NpcAction action : actions) {
+        for (ClickAction action : actions) {
             npc = npc.withActionAdded(action);
         }
         repository.save(npc);
@@ -703,14 +703,14 @@ class NpcInteractionListenerTest {
     }
 
     /** One captured action-chain invocation: the actions passed and the attack flag they were run with. */
-    private record RunCall(List<NpcAction> actions, boolean attack) {}
+    private record RunCall(List<ClickAction> actions, boolean attack) {}
 
     /** Records each action-chain invocation so the listener's pass-through can be asserted. */
     private static final class RecordingActionRunner implements NpcActionRunner {
         private final List<RunCall> calls = new ArrayList<>();
 
         @Override
-        public void run(Player viewer, List<NpcAction> actions, boolean attack) {
+        public void run(Player viewer, List<ClickAction> actions, boolean attack) {
             calls.add(new RunCall(List.copyOf(actions), attack));
         }
     }

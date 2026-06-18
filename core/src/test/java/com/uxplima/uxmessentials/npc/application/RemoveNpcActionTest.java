@@ -7,10 +7,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.CapturingSink;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepository;
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -18,6 +15,9 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,8 +25,8 @@ class RemoveNpcActionTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
     private static final Position AT = Position.of(WORLD, 1, 64, 1);
-    private static final NpcAction FIRST = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "hi");
-    private static final NpcAction SECOND = new NpcAction(ClickTrigger.ANY, NpcActionType.ACTIONBAR, "bye");
+    private static final ClickAction FIRST = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, "hi");
+    private static final ClickAction SECOND = new ClickAction(ClickTrigger.ANY, ClickActionType.ACTIONBAR, "bye");
 
     private FakeNpcRepository repository;
     private CapturingSink sink;

@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -74,7 +75,7 @@ public record Npc(
             Map<EquipmentSlot, String> equipment,
             boolean glowing,
             @Nullable String glowColor,
-            List<NpcAction> actions,
+            List<ClickAction> actions,
             String entityType,
             String pose,
             double scale,
@@ -174,7 +175,7 @@ public record Npc(
         return behavior.lookAtPlayer();
     }
 
-    public List<NpcAction> actions() {
+    public List<ClickAction> actions() {
         return behavior.actions();
     }
 
@@ -333,7 +334,7 @@ public record Npc(
     }
 
     /** A copy with {@code action} appended to the end of the action list, keeping everything else. */
-    public Npc withActionAdded(NpcAction action) {
+    public Npc withActionAdded(ClickAction action) {
         return new Npc(name, location, appearance, behavior.withActionAdded(action), createdAt, owner);
     }
 
@@ -351,12 +352,12 @@ public record Npc(
     }
 
     /** A copy with {@code action} inserted at the 0-based {@code index} (an {@code index} of the size appends). */
-    public Npc withActionInsertedAt(int index, NpcAction action) {
+    public Npc withActionInsertedAt(int index, ClickAction action) {
         return new Npc(name, location, appearance, behavior.withActionInsertedAt(index, action), createdAt, owner);
     }
 
     /** A copy with the action at the 0-based {@code index} replaced by {@code action}, keeping everything else. */
-    public Npc withActionSetAt(int index, NpcAction action) {
+    public Npc withActionSetAt(int index, ClickAction action) {
         return new Npc(name, location, appearance, behavior.withActionSetAt(index, action), createdAt, owner);
     }
 

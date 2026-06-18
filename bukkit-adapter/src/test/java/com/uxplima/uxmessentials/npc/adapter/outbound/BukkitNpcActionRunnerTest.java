@@ -19,9 +19,6 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
 import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -29,6 +26,9 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -89,9 +89,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.RUN_PLAYER, "right"),
-                                new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.RUN_PLAYER, "left"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "any")),
+                                new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.RUN_PLAYER, "right"),
+                                new ClickAction(ClickTrigger.LEFT_CLICK, ClickActionType.RUN_PLAYER, "left"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "any")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("right", "any");
@@ -99,7 +99,10 @@ class BukkitNpcActionRunnerTest {
 
     @Test
     void runsAPlayerOpActionThroughTheOpRunner() {
-        runner().run(player, List.of(new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER_AS_OP, "fly")), false);
+        runner().run(
+                        player,
+                        List.of(new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER_AS_OP, "fly")),
+                        false);
 
         assertThat(commandRunner.opCommands).containsExactly("fly");
         assertThat(commandRunner.playerCommands).isEmpty();
@@ -110,9 +113,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.RUN_PLAYER, "right"),
-                                new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.RUN_PLAYER, "left"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "any")),
+                                new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.RUN_PLAYER, "right"),
+                                new ClickAction(ClickTrigger.LEFT_CLICK, ClickActionType.RUN_PLAYER, "left"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "any")),
                         true);
 
         assertThat(commandRunner.playerCommands).containsExactly("left", "any");
@@ -123,8 +126,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_CONSOLE, "give {player} diamond"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "msg {player} hi")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_CONSOLE, "give {player} diamond"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "msg {player} hi")),
                         false);
 
         assertThat(commandRunner.consoleCommands).containsExactly("give Steve diamond");
@@ -133,7 +136,7 @@ class BukkitNpcActionRunnerTest {
 
     @Test
     void sendsAConnectRequestForAConnectAction() {
-        runner().run(player, List.of(new NpcAction(ClickTrigger.ANY, NpcActionType.CONNECT, "lobby")), false);
+        runner().run(player, List.of(new ClickAction(ClickTrigger.ANY, ClickActionType.CONNECT, "lobby")), false);
 
         assertThat(connector.servers).containsExactly("lobby");
     }
@@ -143,9 +146,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "first"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.SOUND, "not.a.real.sound.key.at.all"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "third")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "first"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.SOUND, "not.a.real.sound.key.at.all"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "third")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("first", "third");
@@ -158,9 +161,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "before"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.DELAY, "40"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "before"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.DELAY, "40"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "after")),
                         false);
 
         // The pre-delay action ran inline; the tail is parked on the scheduler, not yet run.
@@ -176,11 +179,11 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "one"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.DELAY, "20"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "two"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.DELAY, "20"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "three")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "one"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.DELAY, "20"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "two"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.DELAY, "20"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "three")),
                         false);
 
         // First leg runs up to the first delay, then parks.
@@ -203,9 +206,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "before"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.DELAY, "40"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "before"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.DELAY, "40"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "after")),
                         false);
 
         scheduler.disconnect(player); // the viewer logs off while the tail is parked
@@ -221,8 +224,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CHANCE, "100"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "reward")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CHANCE, "100"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "reward")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("reward");
@@ -233,9 +236,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "always"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CHANCE, "0"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "reward")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "always"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CHANCE, "0"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "reward")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("always");
@@ -249,8 +252,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.PERMISSION, "npc.vip"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "vip")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.PERMISSION, "npc.vip"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "vip")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("vip");
@@ -261,8 +264,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.PERMISSION, "npc.vip"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "vip")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.PERMISSION, "npc.vip"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "vip")),
                         false);
 
         assertThat(commandRunner.playerCommands).isEmpty();
@@ -275,8 +278,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "5 > 3"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "ok")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CONDITION, "5 > 3"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "ok")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("ok");
@@ -287,8 +290,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "1 > 3"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "no")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CONDITION, "1 > 3"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "no")),
                         false);
 
         assertThat(commandRunner.playerCommands).isEmpty();
@@ -299,10 +302,10 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "alpha == alpha"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "same"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "alpha == beta"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "unreached")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CONDITION, "alpha == alpha"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "same"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CONDITION, "alpha == beta"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "unreached")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("same");
@@ -315,10 +318,10 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "5 >= 5"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "boundary-ok"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "5 <= 4"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "unreached")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CONDITION, "5 >= 5"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "boundary-ok"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CONDITION, "5 <= 4"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "unreached")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("boundary-ok");
@@ -329,8 +332,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CONDITION, "garbage with no operator"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "still-runs")),
+                                new ClickAction(
+                                        ClickTrigger.ANY, ClickActionType.CONDITION, "garbage with no operator"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "still-runs")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("still-runs");
@@ -344,8 +348,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.COST, "50"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "bought")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.COST, "50"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "bought")),
                         false);
 
         assertThat(economy.withdrawals).containsExactly(new BigDecimal("50"));
@@ -358,8 +362,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.COST, "50"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "bought")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.COST, "50"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "bought")),
                         false);
 
         assertThat(economy.withdrawals).containsExactly(new BigDecimal("50")); // charged exactly once (the failed try)
@@ -373,9 +377,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "before"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.COST, "50"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "before"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.COST, "50"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "after")),
                         false);
 
         // The throwing gate fails closed: actions before it ran, the rest are stopped, and no throwable reached us.
@@ -388,8 +392,8 @@ class BukkitNpcActionRunnerTest {
                 .run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.COST, "50"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "free")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.COST, "50"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "free")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("free");
@@ -399,7 +403,7 @@ class BukkitNpcActionRunnerTest {
 
     @Test
     void giveAddsTheItemToTheViewerInventory() {
-        runner().run(player, List.of(new NpcAction(ClickTrigger.ANY, NpcActionType.GIVE, "DIAMOND:3")), false);
+        runner().run(player, List.of(new ClickAction(ClickTrigger.ANY, ClickActionType.GIVE, "DIAMOND:3")), false);
 
         assertThat(player.getInventory().contains(Material.DIAMOND, 3)).isTrue();
     }
@@ -409,8 +413,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.GIVE, "NOT_A_REAL_MATERIAL"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "next")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.GIVE, "NOT_A_REAL_MATERIAL"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "next")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("next");
@@ -423,7 +427,7 @@ class BukkitNpcActionRunnerTest {
             player.getInventory().setItem(slot, new ItemStack(Material.STONE, 64));
         }
 
-        runner().run(player, List.of(new NpcAction(ClickTrigger.ANY, NpcActionType.GIVE, "DIAMOND:5")), false);
+        runner().run(player, List.of(new ClickAction(ClickTrigger.ANY, ClickActionType.GIVE, "DIAMOND:5")), false);
 
         long droppedDiamonds = player.getWorld().getEntities().stream()
                 .filter(e -> e instanceof org.bukkit.entity.Item)
@@ -443,7 +447,7 @@ class BukkitNpcActionRunnerTest {
         sword.setItemMeta(meta);
         String token = EquipmentPayloads.serialize(sword);
 
-        runner().run(player, List.of(new NpcAction(ClickTrigger.ANY, NpcActionType.GIVE, token)), false);
+        runner().run(player, List.of(new ClickAction(ClickTrigger.ANY, ClickActionType.GIVE, token)), false);
 
         ItemStack given = player.getInventory().getItem(0);
         assertThat(given).isNotNull();
@@ -458,8 +462,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.GIVE, "b64:not-valid-base64-@@@"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "next")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.GIVE, "b64:not-valid-base64-@@@"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "next")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("next");
@@ -472,8 +476,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "1"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "only")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RANDOM, "1"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "only")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("only");
@@ -486,11 +490,11 @@ class BukkitNpcActionRunnerTest {
             runner().run(
                             player,
                             List.of(
-                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "3"),
-                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "a"),
-                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "b"),
-                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "c"),
-                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                                    new ClickAction(ClickTrigger.ANY, ClickActionType.RANDOM, "3"),
+                                    new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "a"),
+                                    new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "b"),
+                                    new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "c"),
+                                    new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "after")),
                             false);
 
             // Exactly one of the three group members ran, then the chain continued past the whole group.
@@ -515,11 +519,11 @@ class BukkitNpcActionRunnerTest {
         deterministic.run(
                 player,
                 List.of(
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "3"),
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "a"),
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "b"),
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "c"),
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RANDOM, "3"),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "a"),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "b"),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "c"),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "after")),
                 false);
 
         assertThat(commandRunner.playerCommands).containsExactly("b", "after");
@@ -533,9 +537,9 @@ class BukkitNpcActionRunnerTest {
             runner().run(
                             player,
                             List.of(
-                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "5"),
-                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "x"),
-                                    new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "y")),
+                                    new ClickAction(ClickTrigger.ANY, ClickActionType.RANDOM, "5"),
+                                    new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "x"),
+                                    new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "y")),
                             false);
 
             assertThat(commandRunner.playerCommands).hasSize(1);
@@ -548,9 +552,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "0"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "a"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "b")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RANDOM, "0"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "a"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "b")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("a", "b");
@@ -572,11 +576,11 @@ class BukkitNpcActionRunnerTest {
         deterministic.run(
                 player,
                 List.of(
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "before"),
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RANDOM, "2"),
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.CHANCE, "0"),
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "in-group"),
-                        new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "before"),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RANDOM, "2"),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.CHANCE, "0"),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "in-group"),
+                        new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "after")),
                 false);
 
         // The chosen gate denied: "before" ran, the gate stopped the chain, and "after" (past the group) did not run.
@@ -590,9 +594,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.RANDOM, "2"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "a"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "b")),
+                                new ClickAction(ClickTrigger.LEFT_CLICK, ClickActionType.RANDOM, "2"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "a"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "b")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("a", "b");
@@ -605,9 +609,9 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "first"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.CHANCE, "0"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "second")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "first"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.CHANCE, "0"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "second")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("first");
@@ -682,8 +686,8 @@ class BukkitNpcActionRunnerTest {
         runner().run(
                         player,
                         List.of(
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.TITLE, "Hi|there|5|40|15"),
-                                new NpcAction(ClickTrigger.ANY, NpcActionType.RUN_PLAYER, "after")),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.TITLE, "Hi|there|5|40|15"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "after")),
                         false);
 
         assertThat(commandRunner.playerCommands).containsExactly("after");

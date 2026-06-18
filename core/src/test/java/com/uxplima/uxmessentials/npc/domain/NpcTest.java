@@ -7,6 +7,9 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.junit.jupiter.api.Test;
 
 class NpcTest {
@@ -162,7 +165,7 @@ class NpcTest {
                 .withEquipment(EquipmentSlot.HEAD, "DIAMOND_HELMET")
                 .withGlowing(true)
                 .withGlowColor("RED");
-        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+        ClickAction action = new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi");
 
         assertThat(npc.movedTo(ELSEWHERE).equipment()).containsEntry(EquipmentSlot.HEAD, "DIAMOND_HELMET");
         assertThat(npc.withSkin(NpcSkin.unsigned("tex")).glowColor()).isEqualTo("RED");
@@ -193,8 +196,8 @@ class NpcTest {
 
     @Test
     void withActionAddedAppendsInOrderKeepingTheRest() {
-        NpcAction first = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "hi");
-        NpcAction second = new NpcAction(ClickTrigger.ANY, NpcActionType.SOUND, "minecraft:ui.button.click");
+        ClickAction first = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, "hi");
+        ClickAction second = new ClickAction(ClickTrigger.ANY, ClickActionType.SOUND, "minecraft:ui.button.click");
         Npc npc = Npc.create(NpcName.of("guide"), AT, NpcSkin.unsigned("tex"), CREATED)
                 .withClickCommand("spawn")
                 .withActionAdded(first)
@@ -208,8 +211,8 @@ class NpcTest {
 
     @Test
     void withActionRemovedAtDropsTheChosenOne() {
-        NpcAction first = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "hi");
-        NpcAction second = new NpcAction(ClickTrigger.ANY, NpcActionType.ACTIONBAR, "bye");
+        ClickAction first = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, "hi");
+        ClickAction second = new ClickAction(ClickTrigger.ANY, ClickActionType.ACTIONBAR, "bye");
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
                 .withActionAdded(first)
                 .withActionAdded(second);
@@ -221,7 +224,7 @@ class NpcTest {
     @Test
     void withActionRemovedAtRejectsAnOutOfRangeIndex() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
-                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi"));
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi"));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> npc.withActionRemovedAt(1))
                 .isInstanceOf(IndexOutOfBoundsException.class);
@@ -232,7 +235,7 @@ class NpcTest {
     @Test
     void withActionsClearedEmptiesTheList() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
-                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi"))
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi"))
                 .withActionsCleared();
 
         assertThat(npc.actions()).isEmpty();
@@ -242,16 +245,16 @@ class NpcTest {
     @Test
     void actionsListIsImmutable() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
-                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi"));
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi"));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
-                        () -> npc.actions().add(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "x")))
+                        () -> npc.actions().add(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     void everyTransitionPreservesActions() {
-        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+        ClickAction action = new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi");
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withActionAdded(action);
 
         assertThat(npc.movedTo(ELSEWHERE).actions()).containsExactly(action);
@@ -330,7 +333,7 @@ class NpcTest {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED)
                 .withPose("SITTING")
                 .withScale(2.5);
-        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+        ClickAction action = new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi");
 
         assertThat(npc.movedTo(ELSEWHERE).pose()).isEqualTo("SITTING");
         assertThat(npc.movedTo(ELSEWHERE).scale()).isEqualTo(2.5);
@@ -407,7 +410,7 @@ class NpcTest {
     @Test
     void everyTransitionPreservesTypeData() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withTypeData("baby", "true");
-        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+        ClickAction action = new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi");
 
         assertThat(npc.movedTo(ELSEWHERE).typeData()).containsEntry("baby", "true");
         assertThat(npc.withSkin(NpcSkin.unsigned("tex")).typeData()).containsEntry("baby", "true");
@@ -462,7 +465,7 @@ class NpcTest {
     @Test
     void everyTransitionPreservesEntityType() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED).withEntityType("ZOMBIE");
-        NpcAction action = new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi");
+        ClickAction action = new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi");
 
         assertThat(npc.movedTo(ELSEWHERE).entityType()).isEqualTo("ZOMBIE");
         assertThat(npc.withSkin(NpcSkin.unsigned("tex")).entityType()).isEqualTo("ZOMBIE");

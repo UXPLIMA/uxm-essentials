@@ -9,10 +9,10 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.NpcRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 
@@ -48,7 +48,7 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
     @Override
     public List<Npc> all() {
         return read(dsl -> {
-            Map<String, List<NpcAction>> actionsByName = allActions(dsl);
+            Map<String, List<ClickAction>> actionsByName = allActions(dsl);
             Map<String, Map<String, String>> typeDataByName = allTypeData(dsl);
             return dsl.selectFrom(NPC)
                     .orderBy(NPC.CREATED_AT.asc(), NPC.NAME.asc())
@@ -91,8 +91,8 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
         });
     }
 
-    private static List<NpcAction> actions(DSLContext dsl, String name) {
-        List<NpcAction> actions = new ArrayList<>();
+    private static List<ClickAction> actions(DSLContext dsl, String name) {
+        List<ClickAction> actions = new ArrayList<>();
         for (Record row : dsl.select(NPC_ACTION.CLICK_TRIGGER, NPC_ACTION.TYPE, NPC_ACTION.VALUE)
                 .from(NPC_ACTION)
                 .where(NPC_ACTION.NPC_NAME.eq(name))
@@ -103,8 +103,8 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
         return actions;
     }
 
-    private static Map<String, List<NpcAction>> allActions(DSLContext dsl) {
-        Map<String, List<NpcAction>> byName = new LinkedHashMap<>();
+    private static Map<String, List<ClickAction>> allActions(DSLContext dsl) {
+        Map<String, List<ClickAction>> byName = new LinkedHashMap<>();
         for (Record row : dsl.select(NPC_ACTION.NPC_NAME, NPC_ACTION.CLICK_TRIGGER, NPC_ACTION.TYPE, NPC_ACTION.VALUE)
                 .from(NPC_ACTION)
                 .orderBy(NPC_ACTION.NPC_NAME.asc(), NPC_ACTION.ORDINAL.asc())
@@ -114,8 +114,8 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
         return byName;
     }
 
-    private static void addAction(List<NpcAction> target, Record row) {
-        NpcAction action = NpcRows.toAction(
+    private static void addAction(List<ClickAction> target, Record row) {
+        ClickAction action = NpcRows.toAction(
                 row.get(NPC_ACTION.CLICK_TRIGGER), row.get(NPC_ACTION.TYPE), row.get(NPC_ACTION.VALUE));
         if (action != null) {
             target.add(action);
@@ -161,9 +161,9 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
     private static void rewriteActions(DSLContext dsl, Npc npc) {
         String name = npc.name().value();
         dsl.deleteFrom(NPC_ACTION).where(NPC_ACTION.NPC_NAME.eq(name)).execute();
-        List<NpcAction> actions = npc.actions();
+        List<ClickAction> actions = npc.actions();
         for (int ordinal = 0; ordinal < actions.size(); ordinal++) {
-            NpcAction action = actions.get(ordinal);
+            ClickAction action = actions.get(ordinal);
             dsl.insertInto(NPC_ACTION)
                     .set(NPC_ACTION.NPC_NAME, name)
                     .set(NPC_ACTION.ORDINAL, ordinal)

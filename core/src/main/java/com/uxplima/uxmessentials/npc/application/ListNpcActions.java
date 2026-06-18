@@ -7,12 +7,12 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 
 /**
  * {@code /npc action list <name>}: show an NPC's action chain in run order, 1-based, with each action's trigger,
@@ -39,7 +39,7 @@ public final class ListNpcActions {
             notifier.send(viewer, NpcError.NOT_FOUND.messageKey(), Map.of("name", name.value()));
             return Result.err(NpcError.NOT_FOUND);
         }
-        List<NpcAction> actions = existing.get().actions();
+        List<ClickAction> actions = existing.get().actions();
         if (actions.isEmpty()) {
             notifier.send(viewer, NpcMessageKey.NPC_ACTION_NONE, Map.of("name", name.value()));
             return Result.ok();
@@ -49,7 +49,7 @@ public final class ListNpcActions {
                 NpcMessageKey.NPC_ACTION_LIST_HEADER,
                 Map.of("name", name.value(), "count", Integer.toString(actions.size())));
         for (int index = 0; index < actions.size(); index++) {
-            NpcAction action = actions.get(index);
+            ClickAction action = actions.get(index);
             notifier.send(
                     viewer,
                     NpcMessageKey.NPC_ACTION_LIST_ENTRY,

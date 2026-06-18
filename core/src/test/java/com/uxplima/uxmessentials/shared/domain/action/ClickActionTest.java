@@ -1,17 +1,17 @@
-package com.uxplima.uxmessentials.npc.domain;
+package com.uxplima.uxmessentials.shared.domain.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-class NpcActionTest {
+class ClickActionTest {
 
     @Test
     void carriesItsTriggerTypeAndValue() {
-        NpcAction action = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "<green>hi");
+        ClickAction action = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, "<green>hi");
 
         assertThat(action.trigger()).isEqualTo(ClickTrigger.RIGHT_CLICK);
-        assertThat(action.type()).isEqualTo(NpcActionType.MESSAGE);
+        assertThat(action.type()).isEqualTo(ClickActionType.MESSAGE);
         assertThat(action.value()).isEqualTo("<green>hi");
     }
 }

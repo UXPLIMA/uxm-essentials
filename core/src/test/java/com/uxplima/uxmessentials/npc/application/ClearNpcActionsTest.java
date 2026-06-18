@@ -7,10 +7,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.CapturingSink;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepository;
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -18,6 +15,9 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +39,7 @@ class ClearNpcActionsTest {
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
         repository.save(Npc.create(NpcName.of("guide"), AT, null, Instant.ofEpochMilli(1_000))
                 .withClickCommand("spawn")
-                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi")));
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi")));
     }
 
     @Test

@@ -8,11 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -20,6 +17,9 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -242,9 +242,9 @@ class JooqNpcRepositoryTest {
 
     @Test
     void roundTripsActionsInOrder() {
-        NpcAction first = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "<green>welcome");
-        NpcAction second = new NpcAction(ClickTrigger.LEFT_CLICK, NpcActionType.RUN_CONSOLE, "say hi {player}");
-        NpcAction third = new NpcAction(ClickTrigger.ANY, NpcActionType.SOUND, "ui.button.click:1:2");
+        ClickAction first = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, "<green>welcome");
+        ClickAction second = new ClickAction(ClickTrigger.LEFT_CLICK, ClickActionType.RUN_CONSOLE, "say hi {player}");
+        ClickAction third = new ClickAction(ClickTrigger.ANY, ClickActionType.SOUND, "ui.button.click:1:2");
         repository.save(Npc.create(NpcName.of("guide"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
                 .withActionAdded(first)
                 .withActionAdded(second)
@@ -258,10 +258,10 @@ class JooqNpcRepositoryTest {
     @Test
     void replacesActionsOnSaveLeavingNoStaleRows() {
         repository.save(Npc.create(NpcName.of("guide"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
-                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "one"))
-                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "two")));
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "one"))
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "two")));
 
-        NpcAction kept = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.ACTIONBAR, "only");
+        ClickAction kept = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.ACTIONBAR, "only");
         repository.save(repository
                 .find(NpcName.of("guide"))
                 .orElseThrow()
@@ -282,7 +282,7 @@ class JooqNpcRepositoryTest {
     @Test
     void deleteRemovesTheActionRowsToo() {
         repository.save(Npc.create(NpcName.of("guide"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
-                .withActionAdded(new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi")));
+                .withActionAdded(new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi")));
 
         repository.delete(NpcName.of("guide"));
         // Re-create under the same name; the actions must not resurface from a stale child row.

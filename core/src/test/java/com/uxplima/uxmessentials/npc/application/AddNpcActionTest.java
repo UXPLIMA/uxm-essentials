@@ -7,10 +7,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.CapturingSink;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepository;
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -18,6 +15,9 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,8 +42,8 @@ class AddNpcActionTest {
 
     @Test
     void appendsActionsInOrderSavesAndNotifies() {
-        NpcAction first = new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, "hi");
-        NpcAction second = new NpcAction(ClickTrigger.ANY, NpcActionType.SOUND, "ui.button.click");
+        ClickAction first = new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, "hi");
+        ClickAction second = new ClickAction(ClickTrigger.ANY, ClickActionType.SOUND, "ui.button.click");
 
         addAction.add(actor, NpcName.of("guide"), first);
         Result<Unit, NpcError> result = addAction.add(actor, NpcName.of("guide"), second);
@@ -55,8 +55,8 @@ class AddNpcActionTest {
 
     @Test
     void rejectsAnUnknownName() {
-        Result<Unit, NpcError> result =
-                addAction.add(actor, NpcName.of("ghost"), new NpcAction(ClickTrigger.ANY, NpcActionType.MESSAGE, "hi"));
+        Result<Unit, NpcError> result = addAction.add(
+                actor, NpcName.of("ghost"), new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi"));
 
         assertThat(result.errorOrThrow()).isEqualTo(NpcError.NOT_FOUND);
         assertThat(sink.textFor(actor)).contains(NpcMessageKey.NPC_NOT_FOUND.key());

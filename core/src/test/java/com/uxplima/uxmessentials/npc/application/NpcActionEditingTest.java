@@ -8,10 +8,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.CapturingSink;
 import com.uxplima.uxmessentials.npc.application.NpcTestSupport.FakeNpcRepository;
-import com.uxplima.uxmessentials.npc.domain.ClickTrigger;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -19,6 +16,9 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -46,8 +46,8 @@ class NpcActionEditingTest {
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 
-    private static NpcAction action(String value) {
-        return new NpcAction(ClickTrigger.RIGHT_CLICK, NpcActionType.MESSAGE, value);
+    private static ClickAction action(String value) {
+        return new ClickAction(ClickTrigger.RIGHT_CLICK, ClickActionType.MESSAGE, value);
     }
 
     private void seed(String... values) {
@@ -60,7 +60,7 @@ class NpcActionEditingTest {
 
     private List<String> values() {
         return repository.find(NAME).orElseThrow().actions().stream()
-                .map(NpcAction::value)
+                .map(ClickAction::value)
                 .toList();
     }
 

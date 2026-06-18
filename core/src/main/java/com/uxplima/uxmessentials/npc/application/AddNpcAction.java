@@ -6,15 +6,15 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 
 /**
- * {@code /npc action add <name> <trigger> <type> <value…>}: append one typed {@link NpcAction} to the end of an
+ * {@code /npc action add <name> <trigger> <type> <value…>}: append one typed {@link ClickAction} to the end of an
  * NPC's action list and save the new snapshot. A name no NPC exists at is rejected with {@link
  * NpcError#NOT_FOUND}. Appending does not touch the rendering — the fake player looks the same — so no re-render
  * is needed; the interaction listener reads the action list from the repository when the NPC is clicked. The
@@ -31,7 +31,7 @@ public final class AddNpcAction {
     }
 
     /** Append {@code action} to the NPC {@code name}'s action list, or reject if no such NPC exists. */
-    public Result<Unit, NpcError> add(PlayerRef actor, NpcName name, NpcAction action) {
+    public Result<Unit, NpcError> add(PlayerRef actor, NpcName name, ClickAction action) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(action, "action");

@@ -1,7 +1,7 @@
-package com.uxplima.uxmessentials.npc.domain;
+package com.uxplima.uxmessentials.shared.domain.action;
 
 /**
- * The kinds of effect an {@link NpcAction} produces when its {@link ClickTrigger} matches a click. Each type
+ * The kinds of effect a {@link ClickAction} produces when its {@link ClickTrigger} matches a click. Each type
  * interprets the action's raw string {@code value} its own way — a command line, a MiniMessage source, a sound
  * key, or a target server name — and the adapter's runner dispatches accordingly. The domain only names the
  * types and carries the value; how each one runs against Bukkit is an adapter concern.
@@ -15,7 +15,7 @@ package com.uxplima.uxmessentials.npc.domain;
  * {@link #DELAY} is neither: it pauses the chain and resumes the tail later. Whether a type gates or merely
  * effects is the runner's concern; the domain only names it.
  */
-public enum NpcActionType {
+public enum ClickActionType {
 
     /** Run the value as a command from the server console. */
     RUN_CONSOLE,

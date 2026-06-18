@@ -19,8 +19,6 @@ import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcCommandRunner;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcActionGates.Verdict;
 import com.uxplima.uxmessentials.npc.application.port.NpcEconomy;
-import com.uxplima.uxmessentials.npc.domain.NpcAction;
-import com.uxplima.uxmessentials.npc.domain.NpcActionType;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
@@ -31,6 +29,8 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -119,11 +119,11 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
     }
 
     @Override
-    public void run(Player viewer, List<NpcAction> actions, boolean attack) {
+    public void run(Player viewer, List<ClickAction> actions, boolean attack) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(actions, "actions");
-        List<NpcAction> matching = new ArrayList<>();
-        for (NpcAction action : actions) {
+        List<ClickAction> matching = new ArrayList<>();
+        for (ClickAction action : actions) {
             if (action.trigger().matches(attack)) {
                 matching.add(action);
             }
@@ -142,10 +142,10 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
      * so a chosen gate that denies still stops the chain, and a chosen {@code DELAY} still parks the tail (which
      * then resumes after the group); both are acceptable and intentional.
      */
-    private void runFrom(Player viewer, List<NpcAction> actions, int index) {
+    private void runFrom(Player viewer, List<ClickAction> actions, int index) {
         for (int at = index; at < actions.size(); at++) {
-            NpcAction action = actions.get(at);
-            if (action.type() == NpcActionType.RANDOM) {
+            ClickAction action = actions.get(at);
+            if (action.type() == ClickActionType.RANDOM) {
                 int present = Math.min(Math.max(groupCount(action.value()), 0), actions.size() - (at + 1));
                 int afterGroup = (at + 1) + present; // resume past the present members (a count past the end clamps)
                 if (present > 0) {
@@ -177,8 +177,8 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
      * The {@code continueIndex} is {@code at + 1} inline, or the index past the whole {@code RANDOM} group when the
      * action is the group's chosen member — so a chosen {@code DELAY} resumes after the group, not inside it.
      */
-    private Step step(Player viewer, List<NpcAction> actions, int at, int continueIndex) {
-        NpcAction action = actions.get(at);
+    private Step step(Player viewer, List<ClickAction> actions, int at, int continueIndex) {
+        ClickAction action = actions.get(at);
         return switch (action.type()) {
             case DELAY -> {
                 delayThenContinue(viewer, actions, continueIndex, action.value());
@@ -195,7 +195,7 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
         };
     }
 
-    private Verdict gate(Player viewer, NpcAction action) {
+    private Verdict gate(Player viewer, ClickAction action) {
         try {
             return switch (action.type()) {
                 case CHANCE -> gates.chance(action.value());
@@ -218,7 +218,7 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
     }
 
     /** Park the chain until {@code ticks} elapse, then resume at {@code resumeIndex} on the viewer's entity thread. */
-    private void delayThenContinue(Player viewer, List<NpcAction> actions, int resumeIndex, String raw) {
+    private void delayThenContinue(Player viewer, List<ClickAction> actions, int resumeIndex, String raw) {
         long ticks = parseTicks(raw);
         if (ticks <= 0L) {
             runFrom(viewer, actions, resumeIndex);
@@ -231,7 +231,7 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
     }
 
     /** Resume the parked chain for the still-online viewer, or abort silently when they have logged off. */
-    private void resume(PlayerRef ref, List<NpcAction> actions, int index) {
+    private void resume(PlayerRef ref, List<ClickAction> actions, int index) {
         Player viewer = org.bukkit.Bukkit.getPlayer(ref.uuid());
         if (viewer == null || !viewer.isOnline()) {
             return; // logged off during the wait — abort the rest of the chain
@@ -240,7 +240,7 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
     }
 
     /** Perform one effect action; never throws, so a single bad effect skips rather than aborting the chain. */
-    private void effect(Player viewer, NpcAction action) {
+    private void effect(Player viewer, ClickAction action) {
         try {
             dispatch(viewer, action);
         } catch (RuntimeException failure) {
@@ -249,7 +249,7 @@ public final class BukkitNpcActionRunner implements NpcActionRunner {
         }
     }
 
-    private void dispatch(Player viewer, NpcAction action) {
+    private void dispatch(Player viewer, ClickAction action) {
         String value = action.value();
         switch (action.type()) {
             case RUN_CONSOLE -> runConsole(viewer, value);
