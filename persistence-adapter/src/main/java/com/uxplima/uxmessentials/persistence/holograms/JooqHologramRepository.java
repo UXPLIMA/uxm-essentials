@@ -188,6 +188,16 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
                 .set(HOLOGRAMS.ROTATION_PITCH, record.getRotationPitch())
                 .set(HOLOGRAMS.REFRESH_INTERVAL_TICKS, record.getRefreshIntervalTicks())
                 .set(HOLOGRAMS.LINKED_NPC_NAME, record.getLinkedNpcName())
+                // The V52-V56 columns are updated here too, so a setting applied to an already-saved hologram
+                // (head/entity model, glow/opacity, click command, leaderboard) survives a restart rather than
+                // only persisting on the row's first insert.
+                .set(HOLOGRAMS.HEAD_TEXTURE, record.getHeadTexture())
+                .set(HOLOGRAMS.ENTITY_TYPE, record.getEntityType())
+                .set(HOLOGRAMS.GLOW_ARGB, record.getGlowArgb())
+                .set(HOLOGRAMS.TEXT_OPACITY, record.getTextOpacity())
+                .set(HOLOGRAMS.CLICK_COMMAND, record.getClickCommand())
+                .set(HOLOGRAMS.LEADERBOARD_PROVIDER, record.getLeaderboardProvider())
+                .set(HOLOGRAMS.LEADERBOARD_LIMIT, record.getLeaderboardLimit())
                 .execute();
     }
 

@@ -332,6 +332,34 @@ class JooqHologramRepositoryTest {
     }
 
     @Test
+    void persistsAClickCommandAndLeaderboardAppliedToAnAlreadySavedHologram() {
+        // The row exists after the first save, so the second save is an UPDATE: the V54/V56 columns must be
+        // written on conflict, not only on the initial insert, or the setting is lost on the next restart.
+        repository.save(hologram("spawn", 1, 64, 1, "line"));
+        Hologram base = repository.find(HologramName.of("spawn")).orElseThrow();
+        repository.save(base.withClickCommand("warp pvp")
+                .withLeaderboard(new com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec("balance", 7)));
+
+        Hologram loaded = repository.find(HologramName.of("spawn")).orElseThrow();
+        assertThat(loaded.clickCommand()).isEqualTo("warp pvp");
+        com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec spec =
+                java.util.Objects.requireNonNull(loaded.leaderboard());
+        assertThat(spec.providerId()).isEqualTo("balance");
+        assertThat(spec.limit()).isEqualTo(7);
+    }
+
+    @Test
+    void persistsAModelSwitchAppliedToAnAlreadySavedHologram() {
+        // The same UPDATE-path coverage for the V53/V55 model columns (head texture / entity type).
+        repository.save(hologram("spawn", 1, 64, 1, "line"));
+        Hologram base = repository.find(HologramName.of("spawn")).orElseThrow();
+        repository.save(base.asHead("dGVzdC10ZXh0dXJl"));
+
+        assertThat(repository.find(HologramName.of("spawn")).orElseThrow().headTexture())
+                .isEqualTo("dGVzdC10ZXh0dXJl");
+    }
+
+    @Test
     void aRowWithNoTypeColumnReadsBackAsText() {
         // A pre-V37 row: insert the name row directly leaving the type/item/block columns NULL, plus one line.
         Holograms holograms = Holograms.HOLOGRAMS;
