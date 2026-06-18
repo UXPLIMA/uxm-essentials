@@ -53,9 +53,15 @@ public final class BukkitServerConnector implements ServerConnector {
         player.sendPluginMessage(plugin, CHANNEL, connectFrame(server));
     }
 
-    /** Unregister the outgoing channel; called when the module stops so nothing outlives a disable. */
+    /**
+     * Stop hook, intentionally a no-op. The {@code BungeeCord} channel is registered against the plugin, not this
+     * connector, and is shared by every module that connects players ({@code npc} and {@code holograms} both build
+     * their own connector over the same channel). Unregistering here would pull the channel out from under a
+     * sibling module that is still enabled, so we leave it: Paper unregisters all of a plugin's outgoing channels
+     * automatically on disable, which is the only point at which the channel should actually go away.
+     */
     public void close() {
-        plugin.getServer().getMessenger().unregisterOutgoingPluginChannel(plugin, CHANNEL);
+        // No per-module teardown — see the method contract above.
     }
 
     private static byte[] connectFrame(String server) {
