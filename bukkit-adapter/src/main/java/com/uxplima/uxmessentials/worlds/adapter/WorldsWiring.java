@@ -21,6 +21,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWorldsPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.WorldsPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -49,6 +51,7 @@ import com.uxplima.uxmessentials.worlds.adapter.outbound.InFlightScheduler;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingDeletionRegistry;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingRestoreRegistry;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldArchiver;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldAutoUnloadSweep;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import com.uxplima.uxmessentials.worlds.application.ApplyWorldSettingsOnLoad;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
@@ -189,6 +192,14 @@ public final class WorldsWiring {
         ListBackups listBackups = new ListBackups(repository, archive);
         RestoreWorld restoreWorld = new RestoreWorld(repository, engine, archive, pendingRestore, notifier, tracked);
 
+        // The idle auto-unload sweep is opt-in: start() schedules nothing and returns a no-op handle when disabled,
+        // so a disabled sweep holds no runtime state. Its tick runs on the global region thread (where unloading a
+        // world handle is legal), so it takes the raw kernel scheduler rather than the in-flight async decorator.
+        WorldAutoUnloadSweep sweep = new WorldAutoUnloadSweep(
+                kernel.scheduler(), engine, kernel.events(), settings, kernel.log(), Clock.systemUTC());
+        AutoCloseable sweepHandle = sweep.start();
+        WorldsPlaceholders worldsPlaceholders = new RepositoryWorldsPlaceholders(repository, engine);
+
         Editor editor = buildEditor(kernel, guiLayouts, repository, engine, tracked);
         WorldsServices services = assemble(
                 kernel,
@@ -247,10 +258,21 @@ public final class WorldsWiring {
                 startReconcile,
                 () -> {
                     events.unsubscribe(applySubscriber);
+                    closeQuietly(sweepHandle, kernel); // stop the idle auto-unload sweep before the module tears down
                     pregen.stopAll(); // cancel every running pre-generation loop before the module tears down
                     awaitDrain(inFlight);
                 },
-                resolver);
+                resolver,
+                worldsPlaceholders);
+    }
+
+    /** Close a stop-time handle, logging any failure rather than stranding the rest of the teardown. */
+    private static void closeQuietly(AutoCloseable handle, KernelPorts kernel) {
+        try {
+            handle.close();
+        } catch (Exception e) {
+            kernel.log().error("failed to stop the world auto-unload sweep", e);
+        }
     }
 
     /** Spin-wait until the off-tick write tails finish, bounded by {@link #DRAIN_TIMEOUT}, on stop/reload. */
@@ -368,23 +390,27 @@ public final class WorldsWiring {
 
     /**
      * The wired worlds adapters handed back to bootstrap: commands, listeners, the reconcile kick, the
-     * stop hook (which unsubscribes the live-apply listener and drains in-flight off-tick writes), and the
-     * built-in generator resolver. The resolver is non-null whenever worlds wires (it is always built from
-     * the config); bootstrap captures it onto the holder the plugin retains so {@code getDefaultWorldGenerator}
-     * can serve {@code generator: uxmEssentials:void|flat} worlds loaded from server.properties.
+     * stop hook (which unsubscribes the live-apply listener, stops the idle auto-unload sweep, and drains
+     * in-flight off-tick writes), the built-in generator resolver, and the worlds placeholder seam. The
+     * resolver is non-null whenever worlds wires (it is always built from the config); bootstrap captures it
+     * onto the holder the plugin retains so {@code getDefaultWorldGenerator} can serve {@code generator:
+     * uxmEssentials:void|flat} worlds loaded from server.properties. The placeholder seam is registered onto
+     * the shared placeholder contexts so the {@code worlds_*} tokens resolve while the module is enabled.
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             Runnable startReconcile,
             Runnable stop,
-            WorldGeneratorResolver generatorResolver) {
+            WorldGeneratorResolver generatorResolver,
+            WorldsPlaceholders worldsPlaceholders) {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(startReconcile, "startReconcile");
             Objects.requireNonNull(stop, "stop");
             Objects.requireNonNull(generatorResolver, "generatorResolver");
+            Objects.requireNonNull(worldsPlaceholders, "worldsPlaceholders");
         }
     }
 }

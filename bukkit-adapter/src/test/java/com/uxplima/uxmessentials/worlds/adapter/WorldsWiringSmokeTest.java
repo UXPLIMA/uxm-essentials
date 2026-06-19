@@ -16,6 +16,8 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWorldsPlaceholders;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.WorldsPlaceholders;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -120,7 +122,8 @@ class WorldsWiringSmokeTest {
                 portalListener(),
                 editorListener());
 
-        WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), listeners, () -> {}, () -> {}, resolver());
+        WorldsWiring.Wired wired =
+                new WorldsWiring.Wired(List.of(), listeners, () -> {}, () -> {}, resolver(), placeholders());
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldAccessListener.class);
@@ -165,9 +168,18 @@ class WorldsWiringSmokeTest {
 
     @Test
     void runningTheStopHookDoesNotThrow() {
-        WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver());
+        WorldsWiring.Wired wired =
+                new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders());
 
         assertThatNoException().isThrownBy(() -> wired.stop().run());
+    }
+
+    @Test
+    void wiredExposesAWorldsPlaceholderSeam() {
+        WorldsWiring.Wired wired =
+                new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders());
+
+        assertThat(wired.worldsPlaceholders()).isNotNull();
     }
 
     private static WorldAccessListener accessListener() {
@@ -248,7 +260,8 @@ class WorldsWiringSmokeTest {
 
     @Test
     void wiredExposesAGeneratorResolverThatResolvesTheVoidId() {
-        WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver());
+        WorldsWiring.Wired wired =
+                new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders());
 
         assertThat(wired.generatorResolver()).isNotNull();
         assertThat(wired.generatorResolver().resolve("void")).isPresent();
@@ -280,6 +293,10 @@ class WorldsWiringSmokeTest {
     private static WorldGeneratorResolver resolver() {
         return new WorldGeneratorResolver(
                 FlatLayerPlan.defaults(), BiomeId.of("plains"), BiomeId.of("plains"), new NoOpLogger());
+    }
+
+    private static WorldsPlaceholders placeholders() {
+        return new RepositoryWorldsPlaceholders(new NoOpRepository(), mock(WorldEngine.class));
     }
 
     private static final class NoOpLogger implements Logger {

@@ -447,6 +447,7 @@ public final class PluginModule {
         // reconcile: auto-load may load a world declaring generator: uxmEssentials:void|flat, which routes
         // back through that hook, so the resolver must be reachable first.
         resources.worldGeneratorResolver(wired.generatorResolver());
+        links.placeholders.worlds(wired.worldsPlaceholders());
         wired.startReconcile().run();
         resources.onClose(wired.stop());
     }
