@@ -408,6 +408,9 @@ permissions:
   uxmessentials.world.use:
     description: '/world to show the world you are standing in.'
     default: true
+  uxmessentials.world.spawn:
+    description: '/worlds spawn to teleport to a world''s spawn (subject to per-world access rules).'
+    default: true
   uxmessentials.dimension.use:
     description: '/dimension to show the dimension you are standing in.'
     default: true
