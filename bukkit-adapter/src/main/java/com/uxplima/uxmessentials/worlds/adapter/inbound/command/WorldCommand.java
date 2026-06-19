@@ -56,6 +56,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     private static final String SPAWN = "uxmessentials.world.spawn";
     private static final String TP = "uxmessentials.world.tp";
     private static final String TP_OTHERS = "uxmessentials.world.tp.others";
+    private static final String GUI = "uxmessentials.world.gui";
 
     public WorldCommand(WorldsServices services, Messages messages) {
         super(services, messages);
@@ -119,12 +120,16 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                                 .then(Commands.argument("player", ArgumentTypes.player())
                                         .requires(p(TP_OTHERS))
                                         .executes(this::runTpOther))))
+                .then(Commands.literal("gui")
+                        .requires(p(GUI))
+                        .executes(this::runGuiList)
+                        .then(nameArg().executes(this::runGuiWorld)))
                 .build();
     }
 
     @Override
     public String description() {
-        return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp.";
+        return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp, gui.";
     }
 
     private static Predicate<CommandSourceStack> p(String node) {
@@ -411,6 +416,32 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         PlayerRef actor = ref(sender);
         PlayerRef subject = ref(target.get());
         onGlobal(() -> services.worldTeleport().forced(actor, subject, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runGuiList(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.worldListView().open(sender, ref(sender), 0); // the view self-schedules onEntity
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runGuiWorld(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        if (services.repository().find(name).isEmpty()) {
+            feedback.send(sender, WorldsMessageKey.WORLD_NOT_FOUND, Map.of("world", name.value()));
+            return 0;
+        }
+        services.worldMainView().open(sender, ref(sender), name); // the view self-schedules onEntity
         return Command.SINGLE_SUCCESS;
     }
 
