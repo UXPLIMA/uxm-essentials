@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
+import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 
 /**
@@ -43,6 +44,7 @@ public final class MessageKeyCatalog {
             SharedMessageKey.values(),
             TeleportMessageKey.values(),
             WorldsMessageKey.values(),
+            WorldEditorMessageKey.values(),
             HomesMessageKey.values(),
             EconomyMessageKey.values(),
             WarpsMessageKey.values(),
