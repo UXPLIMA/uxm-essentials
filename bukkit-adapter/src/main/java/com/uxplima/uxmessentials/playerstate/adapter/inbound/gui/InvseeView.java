@@ -10,9 +10,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -38,13 +38,11 @@ public final class InvseeView {
 
     private final Messages messages;
     private final Scheduler scheduler;
-    private final MiniMessage miniMessage;
     private final Set<InvseeHolder> open = ConcurrentHashMap.newKeySet();
 
     public InvseeView(Messages messages, Scheduler scheduler) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /**
@@ -110,6 +108,6 @@ public final class InvseeView {
         PlayerRef looker = new PlayerRef(viewer.getUniqueId(), viewer.getName());
         String rendered =
                 messages.resolve(looker, PlayerstateMessageKey.INVSEE_TITLE, Map.of("player", subject.name()));
-        return miniMessage.deserialize(rendered);
+        return StyledText.render(rendered);
     }
 }

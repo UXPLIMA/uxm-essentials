@@ -12,12 +12,12 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineHolder.Kind;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflineInventory;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -47,14 +47,12 @@ public final class OfflineContainerView {
     private final Messages messages;
     private final Scheduler scheduler;
     private final OfflinePlayerStorage storage;
-    private final MiniMessage miniMessage;
     private final Set<OfflineHolder> open = ConcurrentHashMap.newKeySet();
 
     public OfflineContainerView(Messages messages, Scheduler scheduler, OfflinePlayerStorage storage) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.storage = Objects.requireNonNull(storage, "storage");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Open {@code subject}'s stored inventory for {@code viewer}. */
@@ -191,6 +189,6 @@ public final class OfflineContainerView {
     private Component title(Player viewer, PlayerRef subject, MessageKey key) {
         PlayerRef looker = new PlayerRef(viewer.getUniqueId(), viewer.getName());
         String rendered = messages.resolve(looker, key, Map.of("player", subject.name()));
-        return miniMessage.deserialize(rendered);
+        return StyledText.render(rendered);
     }
 }
