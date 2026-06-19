@@ -13,6 +13,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -72,7 +73,7 @@ public final class CommandFeedback {
 
     private Component parse(PlayerRef viewer, String rendered) {
         TagResolver prefix = Placeholder.parsed("prefix", messages.resolve(viewer, PREFIX, Map.of()));
-        return miniMessage.deserialize(rendered, prefix);
+        return miniMessage.deserialize(rendered, prefix, StyleTags.resolver());
     }
 
     /**

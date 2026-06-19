@@ -7,6 +7,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -28,6 +29,6 @@ public final class HudText {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(miniMessageSource, "miniMessageSource");
         String expanded = PlaceholderApiSupport.messageBridge(viewer).apply(miniMessageSource);
-        return MINI_MESSAGE.deserialize(expanded);
+        return MINI_MESSAGE.deserialize(expanded, StyleTags.resolver());
     }
 }

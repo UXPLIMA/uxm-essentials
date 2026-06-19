@@ -13,6 +13,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -65,7 +66,7 @@ public final class BukkitMessageSink implements MessageSink {
         Objects.requireNonNull(renderedText, "renderedText");
         String expanded = preParse.apply(viewer.uuid()).apply(renderedText);
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
-        Component component = miniMessage.deserialize(expanded, prefix);
+        Component component = miniMessage.deserialize(expanded, prefix, StyleTags.resolver());
         scheduler.onEntity(viewer, () -> sendTo(viewer, component));
     }
 
