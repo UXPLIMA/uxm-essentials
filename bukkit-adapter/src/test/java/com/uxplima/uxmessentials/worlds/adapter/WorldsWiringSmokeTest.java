@@ -7,10 +7,14 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+import org.bukkit.Material;
 import org.bukkit.event.Listener;
+
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -19,6 +23,12 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorListener;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorText;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldPropertyGridView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
@@ -102,13 +112,15 @@ class WorldsWiringSmokeTest {
         List<Listener> listeners = List.of(
                 new ForceGamemodeListener(new NoOpRepository(), new NoOpScheduler()),
                 accessListener(),
-                portalListener());
+                portalListener(),
+                editorListener());
 
         WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), listeners, () -> {}, () -> {}, resolver());
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldAccessListener.class);
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldPortalListener.class);
+        assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldEditorListener.class);
     }
 
     @Test
@@ -120,6 +132,14 @@ class WorldsWiringSmokeTest {
 
         List<CommandRegistration> commands = WorldCommands.all(services, mock(Messages.class));
         assertThat(commands).isNotEmpty();
+    }
+
+    @Test
+    void servicesExposeTheEditorListAndMainViews() {
+        WorldsServices services = services(mock(WorldTeleportService.class));
+
+        assertThat(services.worldListView()).isNotNull();
+        assertThat(services.worldMainView()).isNotNull();
     }
 
     private static WorldAccessListener accessListener() {
@@ -160,7 +180,38 @@ class WorldsWiringSmokeTest {
                 new NoOpRepository(),
                 new NoOpScheduler(),
                 java.util.Set::of,
-                worldTeleport);
+                worldTeleport,
+                listView(),
+                mainView());
+    }
+
+    private static WorldListView listView() {
+        return new WorldListView(
+                editorText(), new NoOpRepository(), mock(WorldEngine.class), new NoOpScheduler(), listLayout());
+    }
+
+    private static WorldMainView mainView() {
+        return new WorldMainView(
+                editorText(), new NoOpRepository(), mock(WorldEngine.class), new NoOpScheduler(), listLayout());
+    }
+
+    private static WorldEditorText editorText() {
+        return new WorldEditorText(mock(Messages.class), MiniMessage.miniMessage());
+    }
+
+    private static GuiLayout listLayout() {
+        return GuiLayout.paginatedDefault(Material.GRASS_BLOCK);
+    }
+
+    private static WorldEditorListener editorListener() {
+        return new WorldEditorListener(
+                listView(),
+                mainView(),
+                new WorldGenerationView(editorText(), new NoOpRepository(), new NoOpScheduler(), listLayout()),
+                new WorldPropertyGridView(editorText(), new NoOpRepository(), new NoOpScheduler(), listLayout()),
+                services(mock(WorldTeleportService.class)),
+                new NoOpRepository(),
+                mock(WorldEngine.class));
     }
 
     @Test

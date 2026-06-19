@@ -9,7 +9,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
@@ -50,8 +49,7 @@ public final class WorldEditorListener implements Listener {
             WorldPropertyGridView gridView,
             WorldsServices services,
             WorldRepository repository,
-            WorldEngine engine,
-            Scheduler scheduler) {
+            WorldEngine engine) {
         this.listView = Objects.requireNonNull(listView, "listView");
         this.mainView = Objects.requireNonNull(mainView, "mainView");
         this.generationView = Objects.requireNonNull(generationView, "generationView");
@@ -60,8 +58,8 @@ public final class WorldEditorListener implements Listener {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         // The views and SetWorldProperty self-schedule their entity/async hops, so the listener holds no scheduler
-        // of its own; the parameter stays in the signature for wiring symmetry with the other editor collaborators.
-        Objects.requireNonNull(scheduler, "scheduler");
+        // of its own — the optimistic single-slot rebuild is the only synchronous work, and it runs on the click
+        // thread.
     }
 
     @EventHandler

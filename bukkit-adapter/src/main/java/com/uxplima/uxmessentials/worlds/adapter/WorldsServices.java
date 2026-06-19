@@ -8,6 +8,8 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
@@ -52,6 +54,8 @@ public final class WorldsServices {
     private final WorldRepository repository;
     private final Scheduler scheduler;
     private final Supplier<Set<WorldName>> onDiskScanner;
+    private final WorldListView worldListView;
+    private final WorldMainView worldMainView;
     private final AtomicReference<List<String>> importable = new AtomicReference<>(List.of());
 
     public WorldsServices(
@@ -71,7 +75,9 @@ public final class WorldsServices {
             WorldRepository repository,
             Scheduler scheduler,
             Supplier<Set<WorldName>> onDiskScanner,
-            WorldTeleportService worldTeleport) {
+            WorldTeleportService worldTeleport,
+            WorldListView worldListView,
+            WorldMainView worldMainView) {
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
         this.importWorld = Objects.requireNonNull(importWorld, "importWorld");
         this.loadWorld = Objects.requireNonNull(loadWorld, "loadWorld");
@@ -89,6 +95,8 @@ public final class WorldsServices {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.onDiskScanner = Objects.requireNonNull(onDiskScanner, "onDiskScanner");
         this.worldTeleport = Objects.requireNonNull(worldTeleport, "worldTeleport");
+        this.worldListView = Objects.requireNonNull(worldListView, "worldListView");
+        this.worldMainView = Objects.requireNonNull(worldMainView, "worldMainView");
     }
 
     public CreateWorld createWorld() {
@@ -141,6 +149,16 @@ public final class WorldsServices {
 
     public WorldTeleportService worldTeleport() {
         return worldTeleport;
+    }
+
+    /** The world-picker view {@code /worlds editor} opens, exposed so the command can launch it. */
+    public WorldListView worldListView() {
+        return worldListView;
+    }
+
+    /** The per-world hub view {@code /worlds editor <world>} opens, exposed so the command can launch it. */
+    public WorldMainView worldMainView() {
+        return worldMainView;
     }
 
     /** The server's gamerule names for {@code /world gamerule} tab-completion. */

@@ -7,13 +7,18 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+import org.bukkit.Material;
 import org.bukkit.Server;
 import org.bukkit.event.Listener;
+
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.worlds.CachedWorldRepository;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -21,6 +26,12 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorListener;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorText;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldPropertyGridView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
@@ -82,13 +93,15 @@ public final class WorldsWiring {
             Server server,
             InProcessDomainEventPublisher events,
             TeleportEngine teleportEngine,
-            WorldEntryFee entryFee) {
+            WorldEntryFee entryFee,
+            GuiLayouts guiLayouts) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(entryFee, "entryFee");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
 
         CachedWorldRepository repository = WorldRepositories.cachedConcrete(persistence);
@@ -137,8 +150,28 @@ public final class WorldsWiring {
         ResolvePortalDestination resolvePortal = new ResolvePortalDestination(repository);
         WorldPortalListener portalListener = new WorldPortalListener(resolvePortal, server, server.getLogger());
 
+        Editor editor = buildEditor(kernel, guiLayouts, repository, engine, tracked);
         WorldsServices services = assemble(
-                kernel, tracked, repository, notifier, engine, pending, settings, clock, ruleCatalog, worldTeleport);
+                kernel,
+                tracked,
+                repository,
+                notifier,
+                engine,
+                pending,
+                settings,
+                clock,
+                ruleCatalog,
+                worldTeleport,
+                editor.listView(),
+                editor.mainView());
+        WorldEditorListener editorListener = new WorldEditorListener(
+                editor.listView(),
+                editor.mainView(),
+                editor.generationView(),
+                editor.gridView(),
+                services,
+                repository,
+                engine);
         ReconcileWorldsOnEnable reconcile = new ReconcileWorldsOnEnable(
                 repository, engine, kernel.events(), clock, settings::autoAdoptLoaded, settings::autoLoadRegistered);
 
@@ -154,8 +187,11 @@ public final class WorldsWiring {
         };
         events.subscribe(applySubscriber);
 
-        List<Listener> listeners =
-                List.of(new ForceGamemodeListener(repository, kernel.scheduler()), accessListener, portalListener);
+        List<Listener> listeners = List.of(
+                new ForceGamemodeListener(repository, kernel.scheduler()),
+                accessListener,
+                portalListener,
+                editorListener);
         List<CommandRegistration> commands = WorldCommands.all(services, kernel.messages());
         Runnable startReconcile = () -> kernel.scheduler().onGlobal(() -> {
             reconcile.run();
@@ -191,7 +227,9 @@ public final class WorldsWiring {
             WorldsSettings settings,
             Clock clock,
             GameRuleCatalog ruleCatalog,
-            WorldTeleportService worldTeleport) {
+            WorldTeleportService worldTeleport,
+            WorldListView worldListView,
+            WorldMainView worldMainView) {
         CreateWorld createWorld = new CreateWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
         ImportWorld importWorld = new ImportWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
         LoadWorld loadWorld = new LoadWorld(repository, engine, notifier, kernel.events(), scheduler);
@@ -229,8 +267,52 @@ public final class WorldsWiring {
                 repository,
                 kernel.scheduler(),
                 engine::onDiskWorldNames,
-                worldTeleport);
+                worldTeleport,
+                worldListView,
+                worldMainView);
     }
+
+    /**
+     * Build the four world-editor views, their shared text helper, and bundle them so {@link #wire} can both feed the
+     * list/main views into {@link WorldsServices} and hand all four to the {@link WorldEditorListener}. The list and
+     * grid screens paginate (a chest default sized to the world or property count); the per-world main hub and the
+     * read-only generation screen are fixed three-row windows whose buttons sit at fixed slots, so a {@link #threeRow}
+     * layout supplies only the row count those two views read.
+     */
+    private static Editor buildEditor(
+            KernelPorts kernel,
+            GuiLayouts guiLayouts,
+            com.uxplima.uxmessentials.worlds.application.port.WorldRepository repository,
+            com.uxplima.uxmessentials.worlds.application.port.WorldEngine engine,
+            Scheduler tracked) {
+        GuiLayout listLayout =
+                guiLayouts.load("worlds", "editor-list", GuiLayout.paginatedDefault(Material.GRASS_BLOCK));
+        GuiLayout gridLayout = guiLayouts.load("worlds", "editor-grid", GuiLayout.paginatedDefault(Material.PAPER));
+        GuiLayout mainLayout = guiLayouts.load("worlds", "editor-main", threeRow());
+        GuiLayout genLayout = guiLayouts.load("worlds", "editor-generation", threeRow());
+        WorldEditorText editorText = new WorldEditorText(kernel.messages(), MiniMessage.miniMessage());
+        WorldListView listView = new WorldListView(editorText, repository, engine, tracked, listLayout);
+        WorldMainView mainView = new WorldMainView(editorText, repository, engine, tracked, mainLayout);
+        WorldGenerationView generationView = new WorldGenerationView(editorText, repository, tracked, genLayout);
+        WorldPropertyGridView gridView = new WorldPropertyGridView(editorText, repository, tracked, gridLayout);
+        return new Editor(listView, mainView, generationView, gridView);
+    }
+
+    /**
+     * A three-row (size-27) layout for the fixed-slot main and generation screens: only {@link GuiLayout#rows()} is
+     * read by those views (their buttons sit at hardcoded slots), so the nav icon and the two reserved nav slots are
+     * placeholders the screens never consult.
+     */
+    private static GuiLayout threeRow() {
+        return new GuiLayout(3, Material.GRAY_STAINED_GLASS_PANE, Material.ARROW, 0, 1, List.of());
+    }
+
+    /** The four world-editor views built together, so {@link #wire} threads them into the services and the listener. */
+    private record Editor(
+            WorldListView listView,
+            WorldMainView mainView,
+            WorldGenerationView generationView,
+            WorldPropertyGridView gridView) {}
 
     /**
      * The wired worlds adapters handed back to bootstrap: commands, listeners, the reconcile kick, the

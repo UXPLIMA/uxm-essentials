@@ -124,8 +124,8 @@ class WorldEditorListenerTest {
                 .thenReturn(Result.ok());
 
         WorldsServices services = services();
-        WorldEditorListener listener = new WorldEditorListener(
-                listView, mainView, generationView, gridView, services, repository, engine, scheduler);
+        WorldEditorListener listener =
+                new WorldEditorListener(listView, mainView, generationView, gridView, services, repository, engine);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -232,7 +232,9 @@ class WorldEditorListenerTest {
                 repository,
                 new SyncScheduler(),
                 Set::of,
-                mock(WorldTeleportService.class));
+                mock(WorldTeleportService.class),
+                listView,
+                mainView);
     }
 
     private static ManagedWorld world(WorldName name, WorldSettings settings) {

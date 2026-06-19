@@ -334,7 +334,7 @@ public final class PluginModule {
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
-            wireWorlds(plugin, ctx, persistence, resources, links);
+            wireWorlds(plugin, ctx, persistence, resources, links, guiLayouts);
         } else if (module.id().equals(ModuleId.of("homes"))) {
             wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts);
         } else if (module.id().equals(ModuleId.of("economy"))) {
@@ -413,7 +413,8 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            GuiLayouts guiLayouts) {
         // worlds builds its cached jOOQ WorldRepository over persistence.dsl() and its BukkitWorldEngine over the
         // plugin's Server. It delegates /worlds tp and /worlds spawn execution to the captured teleport engine (wired
         // earlier) and charges the per-world entry fee through the economy bridge — but economy lands after worlds, so
@@ -431,7 +432,8 @@ public final class PluginModule {
         WorldEntryFee entryFee = new LinkedWorldEntryFee(() -> links.economyProvider, () -> links.economyCurrency);
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        WorldsWiring.Wired wired = WorldsWiring.wire(ctx, persistence, plugin.getServer(), events, engine, entryFee);
+        WorldsWiring.Wired wired =
+                WorldsWiring.wire(ctx, persistence, plugin.getServer(), events, engine, entryFee, guiLayouts);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Capture the generator resolver for the plugin's getDefaultWorldGenerator hook before kicking the
