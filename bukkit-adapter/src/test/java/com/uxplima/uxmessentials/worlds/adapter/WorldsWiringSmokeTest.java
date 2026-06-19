@@ -35,13 +35,16 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessList
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
+import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
+import com.uxplima.uxmessentials.worlds.application.ListBackups;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
 import com.uxplima.uxmessentials.worlds.application.PregenWorld;
 import com.uxplima.uxmessentials.worlds.application.ResolvePortalDestination;
+import com.uxplima.uxmessentials.worlds.application.RestoreWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
@@ -152,6 +155,15 @@ class WorldsWiringSmokeTest {
     }
 
     @Test
+    void servicesExposeTheBackupAndRestoreUseCases() {
+        WorldsServices services = services(mock(WorldTeleportService.class));
+
+        assertThat(services.backupWorld()).isNotNull();
+        assertThat(services.listBackups()).isNotNull();
+        assertThat(services.restoreWorld()).isNotNull();
+    }
+
+    @Test
     void runningTheStopHookDoesNotThrow() {
         WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver());
 
@@ -198,6 +210,9 @@ class WorldsWiringSmokeTest {
                 new NoOpScheduler(),
                 java.util.Set::of,
                 worldTeleport,
+                mock(BackupWorld.class),
+                mock(ListBackups.class),
+                mock(RestoreWorld.class),
                 listView(),
                 mainView());
     }

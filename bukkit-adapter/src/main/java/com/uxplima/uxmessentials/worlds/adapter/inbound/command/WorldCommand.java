@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.worlds.adapter.inbound.command;
 
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +31,8 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
+import com.uxplima.uxmessentials.worlds.domain.BackupId;
+import com.uxplima.uxmessentials.worlds.domain.BackupRef;
 import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
@@ -37,8 +41,9 @@ import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
-/** The {@code /worlds} command: create/import/load/unload/unregister/delete/list/info. */
+/** The {@code /worlds} command: create/import/load/unload/unregister/delete/list/info/backup/restore. */
 @NullMarked
 public final class WorldCommand extends WorldCommandSupport implements CommandRegistration {
 
@@ -59,6 +64,11 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     private static final String TP_OTHERS = "uxmessentials.world.tp.others";
     private static final String GUI = "uxmessentials.world.gui";
     private static final String PREGEN = "uxmessentials.world.pregen";
+    private static final String BACKUP = "uxmessentials.world.backup";
+    private static final String RESTORE = "uxmessentials.world.restore";
+
+    private static final DateTimeFormatter BACKUP_DATE =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC);
 
     public WorldCommand(WorldsServices services, Messages messages) {
         super(services, messages);
@@ -132,12 +142,29 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         .then(nameArg()
                                 .then(Commands.argument("radius", IntegerArgumentType.integer(1))
                                         .executes(this::runPregen))))
+                .then(Commands.literal("backup")
+                        .requires(p(BACKUP))
+                        .then(nameArg().executes(this::runBackup)))
+                .then(Commands.literal("backups")
+                        .requires(p(BACKUP))
+                        .then(nameArg().executes(this::runBackups)))
+                .then(Commands.literal("restore")
+                        .requires(p(RESTORE))
+                        .then(nameArg()
+                                // No backup-id suggestions: enumerating them is a backups-directory read, and
+                                // suggestion callbacks run on the tick thread and must stay off I/O.
+                                .then(Commands.argument("backup", StringArgumentType.word())
+                                        .executes(this::runRestore))))
+                .then(Commands.literal("restoreconfirm")
+                        .requires(p(RESTORE))
+                        .then(nameArg().executes(this::runRestoreConfirm)))
                 .build();
     }
 
     @Override
     public String description() {
-        return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp, gui, pregen.";
+        return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp, gui, pregen,"
+                + " backup, backups, restore, restoreconfirm.";
     }
 
     private static Predicate<CommandSourceStack> p(String node) {
@@ -479,6 +506,105 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         }
         PlayerRef who = ref(sender);
         onGlobal(() -> services.pregen().cancel(who, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runBackup(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.backupWorld().backup(who, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runBackups(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        // The list is a backups-directory read; keep it off the command thread. It runs on the global region
+        // thread (a small directory scan, cheap there) and feedback is rendered in the same hop.
+        onGlobal(() -> renderBackups(sender, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Render a world's stored backups (header + one row each, or the empty notice) to the sender. */
+    private void renderBackups(Player sender, WorldName name) {
+        List<BackupRef> refs = services.listBackups().list(name);
+        if (refs.isEmpty()) {
+            feedback.send(sender, WorldsMessageKey.WORLD_BACKUP_LIST_EMPTY, Map.of("world", name.value()));
+            return;
+        }
+        feedback.send(
+                sender,
+                WorldsMessageKey.WORLD_BACKUP_LIST_HEADER,
+                Map.of("world", name.value(), "count", Integer.toString(refs.size())));
+        for (BackupRef ref : refs) {
+            feedback.send(
+                    sender,
+                    WorldsMessageKey.WORLD_BACKUP_LIST_ENTRY,
+                    Map.of(
+                            "backup", ref.id().value(),
+                            "date", BACKUP_DATE.format(ref.createdAt()),
+                            "size", formatSize(ref.sizeBytes())));
+        }
+    }
+
+    /** A compact kilobyte rendering of a backup archive's byte size, rounded up so a non-empty file never reads 0. */
+    private static String formatSize(long bytes) {
+        long kb = (bytes + 1023L) / 1024L;
+        return kb + " KB";
+    }
+
+    private int runRestore(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        BackupId id = parseBackupId(sender, ctx.getArgument("backup", String.class));
+        if (id == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.restoreWorld().request(who, name, id));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Parse a raw token into a {@link BackupId}, or {@code null} (after sending the not-found reply). */
+    private @Nullable BackupId parseBackupId(Player sender, String raw) {
+        try {
+            return BackupId.of(raw);
+        } catch (IllegalArgumentException invalid) {
+            feedback.send(sender, WorldsMessageKey.WORLD_BACKUP_NOT_FOUND, Map.of("backup", raw));
+            return null;
+        }
+    }
+
+    private int runRestoreConfirm(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.restoreWorld().confirm(who, name));
         return Command.SINGLE_SUCCESS;
     }
 

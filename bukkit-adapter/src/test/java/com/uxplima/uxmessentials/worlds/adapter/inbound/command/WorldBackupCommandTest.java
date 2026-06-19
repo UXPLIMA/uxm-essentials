@@ -3,8 +3,8 @@ package com.uxplima.uxmessentials.worlds.adapter.inbound.command;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
@@ -12,8 +12,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
-import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -45,6 +43,7 @@ import com.uxplima.uxmessentials.worlds.application.WorldInfo;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
+import com.uxplima.uxmessentials.worlds.domain.BackupId;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
@@ -59,16 +58,17 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /worlds gui} verb through its real Brigadier node: the bare form opens the
- * world-picker {@link WorldListView}, while {@code gui <world>} opens the per-world {@link WorldMainView} for a
- * managed world. An unmanaged world name opens neither view.
+ * MockBukkit coverage of the {@code /worlds backup|backups|restore|restoreconfirm} verbs through their real
+ * Brigadier nodes: each routes to the matching backup use case, and {@code restore} parses its trailing token
+ * into the {@link BackupId} handed to {@code request}.
  */
-class WorldGuiCommandTest {
+class WorldBackupCommandTest {
 
     private ServerMock server;
     private PlayerMock alice;
-    private WorldListView listView;
-    private WorldMainView mainView;
+    private BackupWorld backupWorld;
+    private ListBackups listBackups;
+    private RestoreWorld restoreWorld;
     private Messages messages;
     private WorldsServices services;
 
@@ -77,11 +77,17 @@ class WorldGuiCommandTest {
         server = MockBukkit.mock();
         alice = server.addPlayer("Alice");
         alice.setOp(true);
-        listView = mock(WorldListView.class);
-        mainView = mock(WorldMainView.class);
+        rb();
         messages = mock(Messages.class);
-        when(messages.resolve(any(), any(), any())).thenReturn(""); // a render the feedback path can parse
+        when(messages.resolve(any(), any(), any())).thenReturn("");
         services = services(new SingleWorldRepository(WorldName.of("world")));
+    }
+
+    private void rb() {
+        backupWorld = mock(BackupWorld.class);
+        listBackups = mock(ListBackups.class);
+        restoreWorld = mock(RestoreWorld.class);
+        when(listBackups.list(any())).thenReturn(List.of());
     }
 
     @AfterEach
@@ -90,27 +96,33 @@ class WorldGuiCommandTest {
     }
 
     @Test
-    void guiWithoutArgumentOpensTheWorldPicker() {
-        execute("worlds gui");
+    void backupRoutesToTheBackupUseCase() {
+        execute("worlds backup world");
 
-        verify(listView).open(any(Player.class), any(PlayerRef.class), eq(0));
-        verifyNoInteractions(mainView);
+        verify(backupWorld).backup(any(PlayerRef.class), eq(WorldName.of("world")));
     }
 
     @Test
-    void guiWithManagedWorldOpensThatWorldsHub() {
-        execute("worlds gui world");
+    void backupsRoutesToTheListUseCase() {
+        execute("worlds backups world");
 
-        verify(mainView).open(any(Player.class), any(PlayerRef.class), eq(WorldName.of("world")));
-        verifyNoInteractions(listView);
+        verify(listBackups).list(eq(WorldName.of("world")));
     }
 
     @Test
-    void guiWithUnmanagedWorldOpensNeitherView() {
-        execute("worlds gui missing");
+    void restoreRoutesToRequestWithTheParsedBackupId() {
+        execute("worlds restore world 20240101-120000");
 
-        verifyNoInteractions(listView);
-        verifyNoInteractions(mainView);
+        verify(restoreWorld)
+                .request(any(PlayerRef.class), eq(WorldName.of("world")), eq(BackupId.of("20240101-120000")));
+    }
+
+    @Test
+    void restoreConfirmRoutesToConfirm() {
+        execute("worlds restoreconfirm world");
+
+        verify(restoreWorld).confirm(any(PlayerRef.class), eq(WorldName.of("world")));
+        verify(restoreWorld, never()).request(any(), any(), any());
     }
 
     private void execute(String input) {
@@ -143,14 +155,14 @@ class WorldGuiCommandTest {
                 new SyncScheduler(),
                 Set::of,
                 mock(WorldTeleportService.class),
-                mock(BackupWorld.class),
-                mock(ListBackups.class),
-                mock(RestoreWorld.class),
-                listView,
-                mainView);
+                backupWorld,
+                listBackups,
+                restoreWorld,
+                mock(WorldListView.class),
+                mock(WorldMainView.class));
     }
 
-    /** A repository that recognises exactly one managed world (so {@code gui <world>} resolves it). */
+    /** A repository that recognises exactly one managed world, so the name argument suggests and resolves it. */
     private static final class SingleWorldRepository implements WorldRepository {
         private final ManagedWorld world;
 

@@ -24,12 +24,15 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
+import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
+import com.uxplima.uxmessentials.worlds.application.ListBackups;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
 import com.uxplima.uxmessentials.worlds.application.PregenWorld;
+import com.uxplima.uxmessentials.worlds.application.RestoreWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
@@ -131,6 +134,9 @@ class WorldPregenCommandTest {
                 new SyncScheduler(),
                 Set::of,
                 mock(WorldTeleportService.class),
+                mock(BackupWorld.class),
+                mock(ListBackups.class),
+                mock(RestoreWorld.class),
                 mock(WorldListView.class),
                 mock(WorldMainView.class));
     }

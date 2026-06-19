@@ -10,12 +10,15 @@ import java.util.stream.Collectors;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
+import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
+import com.uxplima.uxmessentials.worlds.application.ListBackups;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
 import com.uxplima.uxmessentials.worlds.application.PregenWorld;
+import com.uxplima.uxmessentials.worlds.application.RestoreWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
@@ -52,6 +55,9 @@ public final class WorldsServices {
     private final SetWorldAlias setWorldAlias;
     private final PregenWorld pregen;
     private final WorldTeleportService worldTeleport;
+    private final BackupWorld backupWorld;
+    private final ListBackups listBackups;
+    private final RestoreWorld restoreWorld;
     private final GameRuleCatalog gameRuleCatalog;
     private final WorldRepository repository;
     private final Scheduler scheduler;
@@ -79,6 +85,9 @@ public final class WorldsServices {
             Scheduler scheduler,
             Supplier<Set<WorldName>> onDiskScanner,
             WorldTeleportService worldTeleport,
+            BackupWorld backupWorld,
+            ListBackups listBackups,
+            RestoreWorld restoreWorld,
             WorldListView worldListView,
             WorldMainView worldMainView) {
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
@@ -99,6 +108,9 @@ public final class WorldsServices {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.onDiskScanner = Objects.requireNonNull(onDiskScanner, "onDiskScanner");
         this.worldTeleport = Objects.requireNonNull(worldTeleport, "worldTeleport");
+        this.backupWorld = Objects.requireNonNull(backupWorld, "backupWorld");
+        this.listBackups = Objects.requireNonNull(listBackups, "listBackups");
+        this.restoreWorld = Objects.requireNonNull(restoreWorld, "restoreWorld");
         this.worldListView = Objects.requireNonNull(worldListView, "worldListView");
         this.worldMainView = Objects.requireNonNull(worldMainView, "worldMainView");
     }
@@ -158,6 +170,21 @@ public final class WorldsServices {
 
     public WorldTeleportService worldTeleport() {
         return worldTeleport;
+    }
+
+    /** The {@code /worlds backup} use case, exposed so the command can kick a snapshot. */
+    public BackupWorld backupWorld() {
+        return backupWorld;
+    }
+
+    /** The {@code /worlds backups} use case, exposed so the command can list a world's stored snapshots. */
+    public ListBackups listBackups() {
+        return listBackups;
+    }
+
+    /** The {@code /worlds restore}/{@code restoreconfirm} use case, exposed so the command can stage and confirm. */
+    public RestoreWorld restoreWorld() {
+        return restoreWorld;
     }
 
     /** The world-picker view {@code /worlds editor} opens, exposed so the command can launch it. */

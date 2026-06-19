@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.worlds.adapter;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -37,6 +38,7 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessList
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitChunkGenSource;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitGameRuleCatalog;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldArchive;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldEngine;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldPregen;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldSettingApplier;
@@ -45,16 +47,21 @@ import com.uxplima.uxmessentials.worlds.adapter.outbound.ChunkGenSource;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InFlightScheduler;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingDeletionRegistry;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingRestoreRegistry;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldArchiver;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import com.uxplima.uxmessentials.worlds.application.ApplyWorldSettingsOnLoad;
+import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
+import com.uxplima.uxmessentials.worlds.application.ListBackups;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
 import com.uxplima.uxmessentials.worlds.application.PregenWorld;
 import com.uxplima.uxmessentials.worlds.application.ReconcileWorldsOnEnable;
 import com.uxplima.uxmessentials.worlds.application.ResolvePortalDestination;
+import com.uxplima.uxmessentials.worlds.application.RestoreWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
@@ -99,7 +106,8 @@ public final class WorldsWiring {
             InProcessDomainEventPublisher events,
             TeleportEngine teleportEngine,
             WorldEntryFee entryFee,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(server, "server");
@@ -107,6 +115,7 @@ public final class WorldsWiring {
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(entryFee, "entryFee");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
 
         CachedWorldRepository repository = WorldRepositories.cachedConcrete(persistence);
@@ -162,6 +171,24 @@ public final class WorldsWiring {
                 chunkGen, kernel.scheduler(), engine, kernel.messages(), notifier, settings, kernel.log());
         PregenWorld pregenWorld = new PregenWorld(repository, engine, pregen, settings, notifier, tracked);
 
+        WorldArchiver archiver = new WorldArchiver();
+        InMemoryPendingRestoreRegistry pendingRestore = new InMemoryPendingRestoreRegistry();
+        BukkitWorldArchive archive = new BukkitWorldArchive(
+                server,
+                kernel.scheduler(),
+                engine,
+                repository,
+                archiver,
+                worldTeleport,
+                forcedEntries,
+                settings,
+                notifier,
+                kernel.log(),
+                dataFolder);
+        BackupWorld backupWorld = new BackupWorld(repository, archive, notifier, tracked);
+        ListBackups listBackups = new ListBackups(repository, archive);
+        RestoreWorld restoreWorld = new RestoreWorld(repository, engine, archive, pendingRestore, notifier, tracked);
+
         Editor editor = buildEditor(kernel, guiLayouts, repository, engine, tracked);
         WorldsServices services = assemble(
                 kernel,
@@ -175,6 +202,9 @@ public final class WorldsWiring {
                 ruleCatalog,
                 worldTeleport,
                 pregenWorld,
+                backupWorld,
+                listBackups,
+                restoreWorld,
                 editor.listView(),
                 editor.mainView());
         WorldEditorListener editorListener = new WorldEditorListener(
@@ -243,6 +273,9 @@ public final class WorldsWiring {
             GameRuleCatalog ruleCatalog,
             WorldTeleportService worldTeleport,
             PregenWorld pregenWorld,
+            BackupWorld backupWorld,
+            ListBackups listBackups,
+            RestoreWorld restoreWorld,
             WorldListView worldListView,
             WorldMainView worldMainView) {
         CreateWorld createWorld = new CreateWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
@@ -284,6 +317,9 @@ public final class WorldsWiring {
                 kernel.scheduler(),
                 engine::onDiskWorldNames,
                 worldTeleport,
+                backupWorld,
+                listBackups,
+                restoreWorld,
                 worldListView,
                 worldMainView);
     }

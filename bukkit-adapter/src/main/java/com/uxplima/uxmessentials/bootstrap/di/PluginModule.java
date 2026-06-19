@@ -432,8 +432,15 @@ public final class PluginModule {
         WorldEntryFee entryFee = new LinkedWorldEntryFee(() -> links.economyProvider, () -> links.economyCurrency);
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        WorldsWiring.Wired wired =
-                WorldsWiring.wire(ctx, persistence, plugin.getServer(), events, engine, entryFee, guiLayouts);
+        WorldsWiring.Wired wired = WorldsWiring.wire(
+                ctx,
+                persistence,
+                plugin.getServer(),
+                events,
+                engine,
+                entryFee,
+                guiLayouts,
+                plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Capture the generator resolver for the plugin's getDefaultWorldGenerator hook before kicking the
