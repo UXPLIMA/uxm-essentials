@@ -40,6 +40,24 @@ class SetWorldPropertyTest {
     }
 
     @Test
+    void clearsAPortalLinkBackToVanillaWithBlankValue() {
+        register("w");
+        ManagedWorld linked = repo.find(WorldName.of("w"))
+                .orElseThrow()
+                .withSettings(repo.find(WorldName.of("w"))
+                        .orElseThrow()
+                        .settings()
+                        .with(WorldProperties.PORTAL_NETHER_LINK, "thenether"));
+        repo.save(linked);
+
+        var result = setProperty.set(who, WorldName.of("w"), "portal-nether-link", "");
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(repo.find(WorldName.of("w")).orElseThrow().settings().get(WorldProperties.PORTAL_NETHER_LINK))
+                .isEqualTo("");
+    }
+
+    @Test
     void rejectsUnknownProperty() {
         register("w");
         assertThat(setProperty

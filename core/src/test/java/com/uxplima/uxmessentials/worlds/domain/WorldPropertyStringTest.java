@@ -12,9 +12,9 @@ class WorldPropertyStringTest {
     }
 
     @Test
-    void ofStringRejectsBlankOrWhitespace() {
-        assertThat(WorldProperties.PORTAL_NETHER_LINK.decode("")).isEmpty();
-        assertThat(WorldProperties.PORTAL_NETHER_LINK.decode("   ")).isEmpty();
+    void ofStringDecodesBlankAsTheUnsetVanillaValue() {
+        assertThat(WorldProperties.PORTAL_NETHER_LINK.decode("")).contains("");
+        assertThat(WorldProperties.PORTAL_NETHER_LINK.decode("   ")).contains("");
     }
 
     @Test

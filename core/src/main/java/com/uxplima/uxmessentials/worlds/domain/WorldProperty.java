@@ -10,7 +10,9 @@ import java.util.function.Function;
 
 /**
  * A single typed per-world property: its catalog key, default, string codec (the {@code decode}
- * doubles as the validator — empty means "invalid"), and tab-completion suggestions. One descriptor
+ * doubles as the validator — empty means "invalid" for the typed properties; the string properties
+ * accept any value, treating {@code ""} as the explicit "unset / vanilla" link), and tab-completion
+ * suggestions. One descriptor
  * is the single source of truth driving the {@code /worlds set} argument, the {@code world_setting}
  * (de)serialization, and the live-apply binding.
  */
@@ -119,8 +121,10 @@ public final class WorldProperty<T> {
     }
 
     static WorldProperty<String> ofString(String key, String def) {
-        return new WorldProperty<>(
-                key, def, raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw), Function.identity(), List.of());
+        // String properties (the portal-nether/end links) accept any value, including the empty
+        // string. After the outer decode strips whitespace, "" is the explicit "unset / vanilla"
+        // value: it clears a world-name link so portals fall back to vanilla routing.
+        return new WorldProperty<>(key, def, Optional::of, Function.identity(), List.of());
     }
 
     static WorldProperty<BigDecimal> ofDecimal(String key) {

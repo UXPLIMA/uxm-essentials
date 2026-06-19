@@ -147,6 +147,20 @@ class WorldEditorListenerTest {
     }
 
     @Test
+    void shiftClickingASetPortalLinkOnAccessClearsItBackToVanilla() {
+        repository.add(world(WORLD, WorldSettings.defaults().with(WorldProperties.PORTAL_NETHER_LINK, "thenether")));
+        gridView.open(viewer, ref(viewer), WORLD, WorldEditorScreen.ACCESS, WorldPropertyGridView.ACCESS_PROPERTIES);
+        int portalNetherSlot =
+                contentSlot(WorldPropertyGridView.ACCESS_PROPERTIES.indexOf(WorldProperties.PORTAL_NETHER_LINK));
+
+        fireClick(portalNetherSlot, ClickType.SHIFT_LEFT);
+
+        verify(setWorldProperty).set(ref(viewer), WORLD, "portal-nether-link", "");
+        ItemStack portalButton = viewer.getOpenInventory().getTopInventory().getItem(portalNetherSlot);
+        assertThat(loreOf(portalButton)).doesNotContain("thenether");
+    }
+
+    @Test
     void clickingTheRulesNavButtonOnMainOpensTheRulesGrid() {
         mainView.open(viewer, ref(viewer), WORLD);
 
@@ -199,10 +213,14 @@ class WorldEditorListenerTest {
     }
 
     private int firstContentSlot() {
+        return contentSlot(0);
+    }
+
+    private int contentSlot(int index) {
         return GuiLayout.paginatedDefault(Material.PAPER)
                 .explicitContentSlots()
-                .map(slots -> slots.get(0))
-                .orElse(0);
+                .map(slots -> slots.get(index))
+                .orElse(index);
     }
 
     private static String loreOf(ItemStack item) {
