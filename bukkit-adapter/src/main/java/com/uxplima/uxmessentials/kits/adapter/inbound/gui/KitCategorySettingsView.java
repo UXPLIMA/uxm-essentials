@@ -11,10 +11,10 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -27,12 +27,10 @@ public final class KitCategorySettingsView {
 
     private final Messages messages;
     private final Scheduler scheduler;
-    private final MiniMessage miniMessage;
 
     public KitCategorySettingsView(Messages messages, Scheduler scheduler) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     public void open(Player player, PlayerRef viewer, KitCategory category) {
@@ -152,15 +150,15 @@ public final class KitCategorySettingsView {
     }
 
     private Component title(KitCategory category, PlayerRef viewer) {
-        return miniMessage.deserialize(messages.resolve(
+        return StyledText.render(messages.resolve(
                 viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_TITLE, Map.of("kit", category.id())));
     }
 
     private Component text(PlayerRef viewer, MessageKey key) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, Map.of()));
+        return StyledText.render(messages.resolve(viewer, key, Map.of()));
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 }

@@ -18,7 +18,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.listener.ChatPromptListener;
@@ -79,7 +78,7 @@ public final class KitEditorListener implements Listener {
         this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
         this.settingsView = Objects.requireNonNull(settingsView, "settingsView");
         this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
-        this.text = new KitEditorText(Objects.requireNonNull(messages, "messages"), MiniMessage.miniMessage());
+        this.text = new KitEditorText(Objects.requireNonNull(messages, "messages"));
         this.categoryEditing = new KitCategoryEditing(services, categoryRepository, promptListener, this.text);
     }
 

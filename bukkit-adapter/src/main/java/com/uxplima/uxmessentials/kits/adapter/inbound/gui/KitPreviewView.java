@@ -8,11 +8,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -37,13 +37,11 @@ public final class KitPreviewView {
     private final Messages messages;
     private final Scheduler scheduler;
     private final GuiLayout layout;
-    private final MiniMessage miniMessage;
 
     public KitPreviewView(Messages messages, Scheduler scheduler, GuiLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Open the read-only preview of {@code kit} for {@code player}, scheduled on the viewer's entity thread. */
@@ -74,6 +72,6 @@ public final class KitPreviewView {
                 viewer,
                 KitsMessageKey.KIT_PREVIEW_GUI_TITLE,
                 Map.of("kit", kit.id().value()));
-        return miniMessage.deserialize(rendered);
+        return StyledText.render(rendered);
     }
 }

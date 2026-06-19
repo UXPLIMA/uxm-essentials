@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -175,15 +176,20 @@ final class KitIconRenderer {
                     case UNAVAILABLE, OUT_OF_STOCK -> Optional.empty();
                 };
 
+        // An operator-supplied per-state name is free text and stays on the bare parser; the catalog
+        // fallback carries the project tokens and goes through the styled parser.
+        if (nameOpt.isPresent()) {
+            return miniMessage.deserialize(processPlaceholders(viewer, kit, nameOpt.get()));
+        }
         KitsMessageKey defaultKey =
                 switch (state) {
                     case UNAVAILABLE -> KitsMessageKey.KIT_MENU_UNAVAILABLE_NAME;
                     case OUT_OF_STOCK -> KitsMessageKey.KIT_MENU_OUT_OF_STOCK_NAME;
                     default -> KitsMessageKey.KIT_MENU_ENTRY_NAME;
                 };
-        String rawName = nameOpt.orElseGet(() ->
-                messages.resolve(viewer, defaultKey, Map.of("kit", kit.id().value())));
-        return miniMessage.deserialize(processPlaceholders(viewer, kit, rawName));
+        String rawName =
+                messages.resolve(viewer, defaultKey, Map.of("kit", kit.id().value()));
+        return StyledText.render(processPlaceholders(viewer, kit, rawName));
     }
 
     private Material resolveMaterial(PlayerRef viewer, KitDefinition kit) {
@@ -321,6 +327,6 @@ final class KitIconRenderer {
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 }

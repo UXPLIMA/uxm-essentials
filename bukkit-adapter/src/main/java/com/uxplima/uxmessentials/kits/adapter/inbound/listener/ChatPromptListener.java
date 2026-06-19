@@ -14,44 +14,38 @@ import org.bukkit.event.Listener;
 import io.papermc.paper.event.player.AsyncChatEvent;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Temporary listener that prompts a player for text input via chat, intercepting
- * their next message. Used by the in-game Kit Settings/Manager GUI.
+ * their next message. Used by the in-game Kit Settings/Manager GUI. The prompt {@link Component} is already
+ * resolved and styled by the caller (it carries its own {@code <tag:'KIT'>} prefix), so it is sent verbatim.
  */
 @NullMarked
 public final class ChatPromptListener implements Listener {
 
     private final Messages messages;
-    private final MiniMessage miniMessage;
     private final Map<UUID, Consumer<String>> activePrompts = new ConcurrentHashMap<>();
 
     public ChatPromptListener(Messages messages) {
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /**
      * Request input from a player.
      *
      * @param player the player to prompt
-     * @param message the message explaining what to enter
+     * @param message the message explaining what to enter, already resolved and styled by the caller
      * @param callback the action to run once input is received
      */
     public void prompt(Player player, Component message, Consumer<String> callback) {
-        PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
-        String prefixStr = messages.resolve(viewer, () -> "prefix", Map.of());
-        Component prefix = miniMessage.deserialize(prefixStr);
-        player.sendMessage(prefix.append(message));
+        player.sendMessage(message);
         activePrompts.put(player.getUniqueId(), callback);
     }
 
@@ -71,10 +65,8 @@ public final class ChatPromptListener implements Listener {
                     .trim();
             if (text.equalsIgnoreCase("cancel")) {
                 PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
-                String prefixStr = messages.resolve(viewer, () -> "prefix", Map.of());
-                TagResolver prefix = Placeholder.component("prefix", miniMessage.deserialize(prefixStr));
                 String resolved = messages.resolve(viewer, KitsMessageKey.KIT_EDITOR_PROMPT_CANCELLED, Map.of());
-                player.sendMessage(miniMessage.deserialize(resolved, prefix));
+                player.sendMessage(StyledText.render(resolved));
                 return;
             }
             callback.accept(text);

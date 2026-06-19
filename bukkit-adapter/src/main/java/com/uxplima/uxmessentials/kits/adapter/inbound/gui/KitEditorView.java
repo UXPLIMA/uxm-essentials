@@ -11,12 +11,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -46,14 +46,12 @@ public final class KitEditorView {
     private final Messages messages;
     private final KitEditor kitEditor;
     private final Scheduler scheduler;
-    private final MiniMessage miniMessage;
     private final Set<KitEditorHolder> open = ConcurrentHashMap.newKeySet();
 
     public KitEditorView(Messages messages, KitEditor kitEditor, Scheduler scheduler) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.kitEditor = Objects.requireNonNull(kitEditor, "kitEditor");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Open the editable window for {@code kit} for {@code editor}, scheduled on the editor's entity thread. */
@@ -111,6 +109,6 @@ public final class KitEditorView {
                 editor,
                 KitsMessageKey.KIT_EDITOR_GUI_TITLE,
                 Map.of("kit", kit.id().value()));
-        return miniMessage.deserialize(rendered);
+        return StyledText.render(rendered);
     }
 }
