@@ -20,6 +20,8 @@ public final class WorldProperties {
     public static final WorldProperty<Boolean> ACCESS_RESTRICTED = WorldProperty.ofBoolean("access-restricted", false);
     public static final WorldProperty<Integer> PLAYER_LIMIT = WorldProperty.ofInteger("player-limit", 0);
     public static final WorldProperty<BigDecimal> ENTRY_FEE = WorldProperty.ofDecimal("entry-fee");
+    public static final WorldProperty<String> PORTAL_NETHER_LINK = WorldProperty.ofString("portal-nether-link", "");
+    public static final WorldProperty<String> PORTAL_END_LINK = WorldProperty.ofString("portal-end-link", "");
 
     public static final List<WorldProperty<?>> ALL = List.of(
             PVP,
@@ -31,7 +33,9 @@ public final class WorldProperties {
             WEATHER,
             ACCESS_RESTRICTED,
             PLAYER_LIMIT,
-            ENTRY_FEE);
+            ENTRY_FEE,
+            PORTAL_NETHER_LINK,
+            PORTAL_END_LINK);
 
     private WorldProperties() {}
 

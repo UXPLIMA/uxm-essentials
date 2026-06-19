@@ -118,6 +118,11 @@ public final class WorldProperty<T> {
                 List.of("0", "1", "10", "50"));
     }
 
+    static WorldProperty<String> ofString(String key, String def) {
+        return new WorldProperty<>(
+                key, def, raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw), Function.identity(), List.of());
+    }
+
     static WorldProperty<BigDecimal> ofDecimal(String key) {
         return new WorldProperty<>(
                 key,
