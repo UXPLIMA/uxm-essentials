@@ -151,14 +151,29 @@ public final class BukkitWorldPregen implements WorldPregen {
         while (job.inFlight().get() < settings.pregenMaxConcurrent()
                 && job.iterator().hasNext()) {
             ChunkPos p = job.iterator().next();
-            job.inFlight().incrementAndGet();
-            // The completion callback may run off the region thread: it must touch ONLY these atomics —
-            // never Bukkit, the boss bar, or the notifier (those are confined to tick/finish/cancel). The
-            // future itself is fire-and-forget; the callback both decrements in-flight and counts the chunk.
+            request(job, world, p);
+        }
+    }
+
+    /**
+     * Request one chunk and arm the completion callback that closes its in-flight slot. The increment is
+     * paired with the future's completion; a synchronous throw from {@link ChunkGenSource#generate} is
+     * caught here so the slot is still released and the chunk counted as done — otherwise the job would
+     * never drain to {@code inFlight == 0} and the loop would wedge. The callback may run off the region
+     * thread, so it touches ONLY these two atomics — never Bukkit, the boss bar, or the notifier (those
+     * are confined to tick/finish/cancel).
+     */
+    private void request(PregenJob job, WorldName world, ChunkPos p) {
+        job.inFlight().incrementAndGet();
+        try {
             var ignored = gen.generate(world, p.x(), p.z()).whenComplete((c, ex) -> {
                 job.inFlight().decrementAndGet();
                 job.done().incrementAndGet();
             });
+        } catch (RuntimeException synchronousFailure) {
+            job.inFlight().decrementAndGet();
+            job.done().incrementAndGet();
+            log.error("pregen chunk request failed for " + world.value(), synchronousFailure);
         }
     }
 

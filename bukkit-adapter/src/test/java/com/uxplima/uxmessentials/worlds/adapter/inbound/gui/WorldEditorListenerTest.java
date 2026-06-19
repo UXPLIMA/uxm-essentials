@@ -43,6 +43,7 @@ import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
+import com.uxplima.uxmessentials.worlds.application.PregenWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
@@ -246,6 +247,7 @@ class WorldEditorListenerTest {
                 mock(SetGamerule.class),
                 mock(SetWorldSpawn.class),
                 mock(SetWorldAlias.class),
+                mock(PregenWorld.class),
                 mock(GameRuleCatalog.class),
                 repository,
                 new SyncScheduler(),

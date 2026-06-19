@@ -15,6 +15,7 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -57,6 +58,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     private static final String TP = "uxmessentials.world.tp";
     private static final String TP_OTHERS = "uxmessentials.world.tp.others";
     private static final String GUI = "uxmessentials.world.gui";
+    private static final String PREGEN = "uxmessentials.world.pregen";
 
     public WorldCommand(WorldsServices services, Messages messages) {
         super(services, messages);
@@ -124,12 +126,18 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         .requires(p(GUI))
                         .executes(this::runGuiList)
                         .then(nameArg().executes(this::runGuiWorld)))
+                .then(Commands.literal("pregen")
+                        .requires(p(PREGEN))
+                        .then(Commands.literal("cancel").then(nameArg().executes(this::runPregenCancel)))
+                        .then(nameArg()
+                                .then(Commands.argument("radius", IntegerArgumentType.integer(1))
+                                        .executes(this::runPregen))))
                 .build();
     }
 
     @Override
     public String description() {
-        return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp, gui.";
+        return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp, gui, pregen.";
     }
 
     private static Predicate<CommandSourceStack> p(String node) {
@@ -442,6 +450,35 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
             return 0;
         }
         services.worldMainView().open(sender, ref(sender), name); // the view self-schedules onEntity
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runPregen(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        int radius = ctx.getArgument("radius", Integer.class);
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.pregen().start(who, name, radius));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runPregenCancel(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.pregen().cancel(who, name));
         return Command.SINGLE_SUCCESS;
     }
 

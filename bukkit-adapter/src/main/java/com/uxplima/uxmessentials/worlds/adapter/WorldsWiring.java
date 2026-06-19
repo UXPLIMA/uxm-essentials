@@ -35,10 +35,13 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldPropertyGridVie
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitChunkGenSource;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitGameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldEngine;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldPregen;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldSettingApplier;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldTeleporter;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.ChunkGenSource;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InFlightScheduler;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingDeletionRegistry;
@@ -49,6 +52,7 @@ import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
+import com.uxplima.uxmessentials.worlds.application.PregenWorld;
 import com.uxplima.uxmessentials.worlds.application.ReconcileWorldsOnEnable;
 import com.uxplima.uxmessentials.worlds.application.ResolvePortalDestination;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
@@ -64,6 +68,7 @@ import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
 import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
+import com.uxplima.uxmessentials.worlds.application.port.WorldPregen;
 import com.uxplima.uxmessentials.worlds.application.port.WorldSettingApplier;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldLoaded;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldSettingChanged;
@@ -150,6 +155,13 @@ public final class WorldsWiring {
         ResolvePortalDestination resolvePortal = new ResolvePortalDestination(repository);
         WorldPortalListener portalListener = new WorldPortalListener(resolvePortal, server, server.getLogger());
 
+        // The pregen engine drives a tick-paced repeating loop, so it takes the raw kernel scheduler rather
+        // than the in-flight-counting decorator (which only wraps async); its last arg is the project logger.
+        ChunkGenSource chunkGen = new BukkitChunkGenSource(server);
+        WorldPregen pregen = new BukkitWorldPregen(
+                chunkGen, kernel.scheduler(), engine, kernel.messages(), notifier, settings, kernel.log());
+        PregenWorld pregenWorld = new PregenWorld(repository, engine, pregen, settings, notifier, tracked);
+
         Editor editor = buildEditor(kernel, guiLayouts, repository, engine, tracked);
         WorldsServices services = assemble(
                 kernel,
@@ -162,6 +174,7 @@ public final class WorldsWiring {
                 clock,
                 ruleCatalog,
                 worldTeleport,
+                pregenWorld,
                 editor.listView(),
                 editor.mainView());
         WorldEditorListener editorListener = new WorldEditorListener(
@@ -204,6 +217,7 @@ public final class WorldsWiring {
                 startReconcile,
                 () -> {
                     events.unsubscribe(applySubscriber);
+                    pregen.stopAll(); // cancel every running pre-generation loop before the module tears down
                     awaitDrain(inFlight);
                 },
                 resolver);
@@ -228,6 +242,7 @@ public final class WorldsWiring {
             Clock clock,
             GameRuleCatalog ruleCatalog,
             WorldTeleportService worldTeleport,
+            PregenWorld pregenWorld,
             WorldListView worldListView,
             WorldMainView worldMainView) {
         CreateWorld createWorld = new CreateWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
@@ -263,6 +278,7 @@ public final class WorldsWiring {
                 setGamerule,
                 setSpawn,
                 setAlias,
+                pregenWorld,
                 ruleCatalog,
                 repository,
                 kernel.scheduler(),

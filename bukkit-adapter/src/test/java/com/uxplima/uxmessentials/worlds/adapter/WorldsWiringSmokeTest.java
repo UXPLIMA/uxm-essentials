@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.worlds.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
@@ -39,6 +40,7 @@ import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
+import com.uxplima.uxmessentials.worlds.application.PregenWorld;
 import com.uxplima.uxmessentials.worlds.application.ResolvePortalDestination;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
@@ -142,6 +144,20 @@ class WorldsWiringSmokeTest {
         assertThat(services.worldMainView()).isNotNull();
     }
 
+    @Test
+    void servicesExposeThePregenUseCase() {
+        WorldsServices services = services(mock(WorldTeleportService.class));
+
+        assertThat(services.pregen()).isNotNull();
+    }
+
+    @Test
+    void runningTheStopHookDoesNotThrow() {
+        WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver());
+
+        assertThatNoException().isThrownBy(() -> wired.stop().run());
+    }
+
     private static WorldAccessListener accessListener() {
         return new WorldAccessListener(
                 new NoOpRepository(),
@@ -176,6 +192,7 @@ class WorldsWiringSmokeTest {
                 mock(SetGamerule.class),
                 mock(SetWorldSpawn.class),
                 mock(SetWorldAlias.class),
+                mock(PregenWorld.class),
                 mock(GameRuleCatalog.class),
                 new NoOpRepository(),
                 new NoOpScheduler(),

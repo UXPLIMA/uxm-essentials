@@ -3,8 +3,8 @@ package com.uxplima.uxmessentials.worlds.adapter.inbound.command;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
@@ -12,8 +12,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
-import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -56,16 +54,16 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /worlds gui} verb through its real Brigadier node: the bare form opens the
- * world-picker {@link WorldListView}, while {@code gui <world>} opens the per-world {@link WorldMainView} for a
- * managed world. An unmanaged world name opens neither view.
+ * MockBukkit coverage of the {@code /worlds pregen} verb through its real Brigadier node: {@code pregen
+ * <world> <radius>} starts a pre-generation with the parsed radius, while {@code pregen cancel <world>}
+ * cancels one. The {@code cancel} literal must win over the {@code <world>} argument, so the cancel form
+ * never routes to {@code start} and the world name it cancels is the trailing token, not {@code cancel}.
  */
-class WorldGuiCommandTest {
+class WorldPregenCommandTest {
 
     private ServerMock server;
     private PlayerMock alice;
-    private WorldListView listView;
-    private WorldMainView mainView;
+    private PregenWorld pregen;
     private Messages messages;
     private WorldsServices services;
 
@@ -74,10 +72,9 @@ class WorldGuiCommandTest {
         server = MockBukkit.mock();
         alice = server.addPlayer("Alice");
         alice.setOp(true);
-        listView = mock(WorldListView.class);
-        mainView = mock(WorldMainView.class);
+        pregen = mock(PregenWorld.class);
         messages = mock(Messages.class);
-        when(messages.resolve(any(), any(), any())).thenReturn(""); // a render the feedback path can parse
+        when(messages.resolve(any(), any(), any())).thenReturn("");
         services = services(new SingleWorldRepository(WorldName.of("world")));
     }
 
@@ -87,27 +84,21 @@ class WorldGuiCommandTest {
     }
 
     @Test
-    void guiWithoutArgumentOpensTheWorldPicker() {
-        execute("worlds gui");
+    void pregenWithRadiusStartsTheGeneration() {
+        execute("worlds pregen world 5");
 
-        verify(listView).open(any(Player.class), any(PlayerRef.class), eq(0));
-        verifyNoInteractions(mainView);
+        verify(pregen).start(any(PlayerRef.class), eq(WorldName.of("world")), eq(5));
+        verify(pregen, never()).cancel(any(), any());
     }
 
     @Test
-    void guiWithManagedWorldOpensThatWorldsHub() {
-        execute("worlds gui world");
+    void pregenCancelCancelsTheNamedWorldWithoutStarting() {
+        execute("worlds pregen cancel world");
 
-        verify(mainView).open(any(Player.class), any(PlayerRef.class), eq(WorldName.of("world")));
-        verifyNoInteractions(listView);
-    }
-
-    @Test
-    void guiWithUnmanagedWorldOpensNeitherView() {
-        execute("worlds gui missing");
-
-        verifyNoInteractions(listView);
-        verifyNoInteractions(mainView);
+        verify(pregen).cancel(any(PlayerRef.class), eq(WorldName.of("world")));
+        verify(pregen, never()).start(any(), any(), org.mockito.ArgumentMatchers.anyInt());
+        // The literal must not be mis-parsed as a world name to cancel.
+        verify(pregen, never()).cancel(any(PlayerRef.class), eq(WorldName.of("cancel")));
     }
 
     private void execute(String input) {
@@ -134,17 +125,17 @@ class WorldGuiCommandTest {
                 mock(SetGamerule.class),
                 mock(SetWorldSpawn.class),
                 mock(SetWorldAlias.class),
-                mock(PregenWorld.class),
+                pregen,
                 mock(GameRuleCatalog.class),
                 repository,
                 new SyncScheduler(),
                 Set::of,
                 mock(WorldTeleportService.class),
-                listView,
-                mainView);
+                mock(WorldListView.class),
+                mock(WorldMainView.class));
     }
 
-    /** A repository that recognises exactly one managed world (so {@code gui <world>} resolves it). */
+    /** A repository that recognises exactly one managed world, so the name argument suggests and resolves it. */
     private static final class SingleWorldRepository implements WorldRepository {
         private final ManagedWorld world;
 

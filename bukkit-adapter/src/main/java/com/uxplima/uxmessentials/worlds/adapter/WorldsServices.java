@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
+import com.uxplima.uxmessentials.worlds.application.PregenWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
@@ -49,6 +50,7 @@ public final class WorldsServices {
     private final SetGamerule setGamerule;
     private final SetWorldSpawn setWorldSpawn;
     private final SetWorldAlias setWorldAlias;
+    private final PregenWorld pregen;
     private final WorldTeleportService worldTeleport;
     private final GameRuleCatalog gameRuleCatalog;
     private final WorldRepository repository;
@@ -71,6 +73,7 @@ public final class WorldsServices {
             SetGamerule setGamerule,
             SetWorldSpawn setWorldSpawn,
             SetWorldAlias setWorldAlias,
+            PregenWorld pregen,
             GameRuleCatalog gameRuleCatalog,
             WorldRepository repository,
             Scheduler scheduler,
@@ -90,6 +93,7 @@ public final class WorldsServices {
         this.setGamerule = Objects.requireNonNull(setGamerule, "setGamerule");
         this.setWorldSpawn = Objects.requireNonNull(setWorldSpawn, "setWorldSpawn");
         this.setWorldAlias = Objects.requireNonNull(setWorldAlias, "setWorldAlias");
+        this.pregen = Objects.requireNonNull(pregen, "pregen");
         this.gameRuleCatalog = Objects.requireNonNull(gameRuleCatalog, "gameRuleCatalog");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -145,6 +149,11 @@ public final class WorldsServices {
 
     public SetWorldAlias setWorldAlias() {
         return setWorldAlias;
+    }
+
+    /** The {@code /worlds pregen} use case, exposed so the command can start and cancel pre-generation. */
+    public PregenWorld pregen() {
+        return pregen;
     }
 
     public WorldTeleportService worldTeleport() {
