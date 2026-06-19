@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.worlds.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -76,6 +77,27 @@ class WorldsSettingsTest {
                 new WorldsSettings(new FixedConfig(Map.of("access.redirect-on-restricted-join", false)));
 
         assertThat(settings.redirectOnRestrictedJoin()).isFalse();
+    }
+
+    @Test
+    void pregenAccessorsFallBackToTheirDefaultsWhenAbsent() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of()));
+
+        assertThat(settings.pregenMaxRadius()).isEqualTo(200);
+        assertThat(settings.pregenMaxConcurrent()).isEqualTo(10);
+        assertThat(settings.pregenTickPeriod()).isEqualTo(Duration.ofMillis(50));
+    }
+
+    @Test
+    void pregenAccessorsAreReadFromConfig() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of(
+                "pregen.max-radius", 64,
+                "pregen.max-concurrent-chunks", 4,
+                "pregen.tick-period-ticks", 4)));
+
+        assertThat(settings.pregenMaxRadius()).isEqualTo(64);
+        assertThat(settings.pregenMaxConcurrent()).isEqualTo(4);
+        assertThat(settings.pregenTickPeriod()).isEqualTo(Duration.ofMillis(200));
     }
 
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */

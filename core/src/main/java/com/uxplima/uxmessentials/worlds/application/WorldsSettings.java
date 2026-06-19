@@ -61,4 +61,19 @@ public final class WorldsSettings {
     public boolean redirectOnRestrictedJoin() {
         return config.getBoolean("access.redirect-on-restricted-join", true);
     }
+
+    /** The largest square radius {@code /worlds pregen} will generate, {@code pregen.max-radius}; default 200, floor 1. */
+    public int pregenMaxRadius() {
+        return Math.max(1, config.getInt("pregen.max-radius", 200));
+    }
+
+    /** The cap on concurrent in-flight async chunk generations, {@code pregen.max-concurrent-chunks}; default 10, floor 1. */
+    public int pregenMaxConcurrent() {
+        return Math.max(1, config.getInt("pregen.max-concurrent-chunks", 10));
+    }
+
+    /** The pre-gen loop's tick period from {@code pregen.tick-period-ticks} (1 tick = 50ms); default one tick, floor one tick. */
+    public java.time.Duration pregenTickPeriod() {
+        return java.time.Duration.ofMillis(50L * Math.max(1, config.getInt("pregen.tick-period-ticks", 1)));
+    }
 }

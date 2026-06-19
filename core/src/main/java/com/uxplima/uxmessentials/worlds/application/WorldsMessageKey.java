@@ -53,7 +53,14 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_ENTER_FEE_INSUFFICIENT("world.enter.fee-insufficient"),
     WORLD_ENTER_FEE_CHARGED("world.enter.fee-charged"),
     WORLD_TP_DESTINATION_UNRESOLVED("world.tp.destination-unresolved"),
-    WORLD_TP_OTHER("world.tp.other");
+    WORLD_TP_OTHER("world.tp.other"),
+
+    WORLD_PREGEN_STARTED("world.pregen.started"),
+    WORLD_PREGEN_DONE("world.pregen.done"),
+    WORLD_PREGEN_CANCELLED("world.pregen.cancelled"),
+    WORLD_PREGEN_ALREADY_RUNNING("world.pregen.already-running"),
+    WORLD_PREGEN_NOT_RUNNING("world.pregen.not-running"),
+    WORLD_PREGEN_BAR("world.pregen.bar");
 
     private final String key;
 
