@@ -12,7 +12,8 @@ public sealed interface WorldEvent extends DomainEvent
                 WorldUnloaded,
                 WorldUnregistered,
                 WorldDeleted,
-                WorldSettingChanged {
+                WorldSettingChanged,
+                WorldEntryDenied {
 
     WorldName name();
 }
