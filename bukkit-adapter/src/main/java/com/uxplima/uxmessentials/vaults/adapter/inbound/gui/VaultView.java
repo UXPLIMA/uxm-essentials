@@ -12,8 +12,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -78,7 +78,6 @@ public final class VaultView {
     private final Permissions permissions;
     private final VaultItemPolicy itemPolicy;
     private final @Nullable Sound openSound;
-    private final MiniMessage miniMessage;
     private final Set<OpenWindow> open = ConcurrentHashMap.newKeySet();
 
     public VaultView(
@@ -96,7 +95,6 @@ public final class VaultView {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.itemPolicy = Objects.requireNonNull(itemPolicy, "itemPolicy");
         this.openSound = openSound;
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /**
@@ -246,7 +244,7 @@ public final class VaultView {
         Map<String, String> placeholders = adminView
                 ? Map.of("player", owner.name(), "index", Integer.toString(index))
                 : Map.of("index", Integer.toString(index));
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
     private record OpenWindow(PlayerRef owner, Vault vault, StorageGui gui) {
