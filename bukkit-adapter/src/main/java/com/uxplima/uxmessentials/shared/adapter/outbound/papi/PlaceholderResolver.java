@@ -60,6 +60,7 @@ public final class PlaceholderResolver {
     private static final String HOLOGRAMS_PREFIX = "holograms_";
     private static final String COMMUNICATION_PREFIX = "communication_";
     private static final String SCOREBOARD_PREFIX = "scoreboard_";
+    private static final String WORLDS_PREFIX = "worlds_";
     private static final String SERVER_PREFIX = "server_";
     private static final String SERVER_WORLD_PLAYERS_PREFIX = "world_players_";
     private static final String VOTES_PREFIX = "votes_";
@@ -144,6 +145,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(SCOREBOARD_PREFIX)) {
             return Optional.of(scoreboard(who, online, normalized.substring(SCOREBOARD_PREFIX.length())));
+        }
+        if (normalized.startsWith(WORLDS_PREFIX)) {
+            return Optional.of(worldsFamily(normalized.substring(WORLDS_PREFIX.length())));
         }
         if (normalized.startsWith(SERVER_PREFIX)) {
             return Optional.of(serverMetric(normalized.substring(SERVER_PREFIX.length())));
@@ -523,6 +527,27 @@ public final class PlaceholderResolver {
                 yield max < 0 ? unlimited() : Integer.toString(Math.max(0, max - vaults.count(who)));
             }
             case "size" -> Integer.toString(vaults.size(who));
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code worlds_*} tail against the worlds seam. Every key is a server-wide global, so the
+     * requesting player is ignored: {@code managed_count} reads the registry size, {@code loaded_count} the
+     * number of loaded worlds, {@code default} the default world's name (the dash when no world is loaded),
+     * and {@code default_players} how many players are in it. A disabled module degrades every key to the dash.
+     */
+    private String worldsFamily(String tail) {
+        Optional<WorldsPlaceholders> seam = contexts.worlds();
+        if (seam.isEmpty()) {
+            return EMPTY;
+        }
+        WorldsPlaceholders worlds = seam.get();
+        return switch (tail) {
+            case "managed_count" -> Integer.toString(worlds.managedCount());
+            case "loaded_count" -> Integer.toString(worlds.loadedCount());
+            case "default" -> worlds.defaultWorld().orElse(EMPTY);
+            case "default_players" -> Integer.toString(worlds.defaultWorldPlayers());
             default -> EMPTY;
         };
     }

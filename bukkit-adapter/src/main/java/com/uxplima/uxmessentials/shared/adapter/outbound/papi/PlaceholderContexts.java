@@ -34,6 +34,7 @@ public final class PlaceholderContexts {
     private final @Nullable CommunicationPlaceholders communication;
     private final @Nullable ScoreboardPlaceholders scoreboard;
     private final @Nullable ServerMetricsPlaceholders serverMetrics;
+    private final @Nullable WorldsPlaceholders worldsPlaceholders;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -54,6 +55,7 @@ public final class PlaceholderContexts {
         this.communication = builder.communication;
         this.scoreboard = builder.scoreboard;
         this.serverMetrics = builder.serverMetrics;
+        this.worldsPlaceholders = builder.worldsPlaceholders;
     }
 
     /** A fresh, empty builder — every seam starts absent until a wired context registers it. */
@@ -133,6 +135,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(serverMetrics);
     }
 
+    public Optional<WorldsPlaceholders> worlds() {
+        return Optional.ofNullable(worldsPlaceholders);
+    }
+
     /** True when no context registered a seam — registering the expansion would surface nothing. */
     public boolean isEmpty() {
         return homes == null
@@ -152,7 +158,8 @@ public final class PlaceholderContexts {
                 && holograms == null
                 && communication == null
                 && scoreboard == null
-                && serverMetrics == null;
+                && serverMetrics == null
+                && worldsPlaceholders == null;
     }
 
     /** Mutable collector for the seams, filled as each context's adapters are wired in bootstrap. */
@@ -176,6 +183,7 @@ public final class PlaceholderContexts {
         private @Nullable CommunicationPlaceholders communication;
         private @Nullable ScoreboardPlaceholders scoreboard;
         private @Nullable ServerMetricsPlaceholders serverMetrics;
+        private @Nullable WorldsPlaceholders worldsPlaceholders;
 
         private Builder() {}
 
@@ -266,6 +274,11 @@ public final class PlaceholderContexts {
 
         public Builder serverMetrics(ServerMetricsPlaceholders seam) {
             this.serverMetrics = seam;
+            return this;
+        }
+
+        public Builder worlds(WorldsPlaceholders seam) {
+            this.worldsPlaceholders = java.util.Objects.requireNonNull(seam, "seam");
             return this;
         }
 

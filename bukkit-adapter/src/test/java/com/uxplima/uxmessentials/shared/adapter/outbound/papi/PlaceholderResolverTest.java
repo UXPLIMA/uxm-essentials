@@ -470,6 +470,50 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void worldsPlaceholdersReadServerWideCountsAndDefaultWorld() {
+        WorldsPlaceholders worlds = fakeWorlds(5, 3, Optional.of("world"), 8);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().worlds(worlds).build());
+
+        // Every worlds_ key is server-wide, so it reads identically for any requester, online or offline.
+        assertThat(resolver.resolve(ALICE, true, "worlds_managed_count")).contains("5");
+        assertThat(resolver.resolve(ALICE, true, "worlds_loaded_count")).contains("3");
+        assertThat(resolver.resolve(ALICE, true, "worlds_default")).contains("world");
+        assertThat(resolver.resolve(ALICE, true, "worlds_default_players")).contains("8");
+        assertThat(resolver.resolve(BOB, false, "worlds_managed_count")).contains("5");
+    }
+
+    @Test
+    void worldsDefaultDashesWhenNoDefaultWorld() {
+        WorldsPlaceholders worlds = fakeWorlds(0, 0, Optional.empty(), 0);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().worlds(worlds).build());
+
+        assertThat(resolver.resolve(ALICE, true, "worlds_default")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "worlds_default_players")).contains("0");
+    }
+
+    @Test
+    void unknownWorldsTailDegradesToDash() {
+        WorldsPlaceholders worlds = fakeWorlds(1, 1, Optional.of("world"), 0);
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().worlds(worlds).build());
+
+        assertThat(resolver.resolve(ALICE, true, "worlds_zzz")).contains("-");
+    }
+
+    @Test
+    void worldsDegradeWhenModuleIsDisabled() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "worlds_managed_count")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "worlds_default")).contains("-");
+        // An unknown worlds_ tail still resolves through the branch to the dash, never the raw token.
+        assertThat(resolver.resolve(ALICE, true, "worlds_unknown")).contains("-");
+    }
+
+    @Test
     void playerwarpsCountLimitLeftAndListReadThroughTheSeam() {
         FakePlayerwarps warps = new FakePlayerwarps(2, 5)
                 .owned("base", playerWarpView("base", "Alice", "world", 10, 64, -20, 7))
@@ -1779,6 +1823,31 @@ class PlaceholderResolverTest {
         public boolean receivesBroadcasts(PlayerRef who) {
             return receiving.contains(who);
         }
+    }
+
+    private static WorldsPlaceholders fakeWorlds(
+            int managed, int loaded, Optional<String> defaultWorld, int defaultWorldPlayers) {
+        return new WorldsPlaceholders() {
+            @Override
+            public int managedCount() {
+                return managed;
+            }
+
+            @Override
+            public int loadedCount() {
+                return loaded;
+            }
+
+            @Override
+            public Optional<String> defaultWorld() {
+                return defaultWorld;
+            }
+
+            @Override
+            public int defaultWorldPlayers() {
+                return defaultWorldPlayers;
+            }
+        };
     }
 
     private static VaultsPlaceholders fakeVaults(int count, int max, int size) {

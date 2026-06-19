@@ -57,6 +57,7 @@ class PlaceholderInventoryDriftTest {
             "holograms_",
             "communication_",
             "scoreboard_",
+            "worlds_",
             "server_");
 
     /** The bare (un-prefixed) keys the resolver dispatches in its terminal switch. */
@@ -177,6 +178,7 @@ class PlaceholderInventoryDriftTest {
                 .holograms(() -> 0)
                 .communication(communication())
                 .scoreboard(who -> true)
+                .worlds(worlds())
                 .serverMetrics(serverMetrics())
                 .build();
     }
@@ -302,6 +304,30 @@ class PlaceholderInventoryDriftTest {
 
             @Override
             public int size(PlayerRef who) {
+                return 0;
+            }
+        };
+    }
+
+    private static WorldsPlaceholders worlds() {
+        return new WorldsPlaceholders() {
+            @Override
+            public int managedCount() {
+                return 0;
+            }
+
+            @Override
+            public int loadedCount() {
+                return 0;
+            }
+
+            @Override
+            public Optional<String> defaultWorld() {
+                return Optional.empty();
+            }
+
+            @Override
+            public int defaultWorldPlayers() {
                 return 0;
             }
         };
