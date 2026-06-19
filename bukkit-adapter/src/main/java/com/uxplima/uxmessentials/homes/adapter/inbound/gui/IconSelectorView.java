@@ -10,12 +10,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeIcon;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -41,7 +41,6 @@ public final class IconSelectorView {
     private final Scheduler scheduler;
     private final SetHomeIcon setHomeIcon;
     private final IconSelectorLayout layout;
-    private final MiniMessage miniMessage;
 
     public IconSelectorView(
             Messages messages, Scheduler scheduler, SetHomeIcon setHomeIcon, IconSelectorLayout layout) {
@@ -49,7 +48,6 @@ public final class IconSelectorView {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.setHomeIcon = Objects.requireNonNull(setHomeIcon, "setHomeIcon");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Open the picker for {@code home}; {@code onDone} reopens the action menu after a pick or reset. */
@@ -114,6 +112,6 @@ public final class IconSelectorView {
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 }

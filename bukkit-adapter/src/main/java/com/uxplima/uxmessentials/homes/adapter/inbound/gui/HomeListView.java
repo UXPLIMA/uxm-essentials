@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
@@ -23,6 +22,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeLimit;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -65,7 +65,6 @@ public final class HomeListView {
     private final HomeListLayout layout;
     private final int unlimitedMax;
     private final DateTimeFormatter dateFormat;
-    private final MiniMessage miniMessage;
 
     public HomeListView(
             Messages messages,
@@ -97,7 +96,6 @@ public final class HomeListView {
         }
         this.unlimitedMax = unlimitedMax;
         this.dateFormat = Objects.requireNonNull(dateFormat, "dateFormat");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Open the slot grid for {@code viewer} on its first page; loads off-thread, then builds on the entity thread. */
@@ -244,29 +242,17 @@ public final class HomeListView {
         org.bukkit.Material material = HomeIconResolver.resolve(home.icon(), layout.fallbackIcon());
         return ItemBuilder.of(material)
                 .name(text(viewer, HomesMessageKey.HOME_MENU_DEFAULT_NAME, nameOf(home)))
-                .lore(List.of(
-                        text(
-                                viewer,
-                                HomesMessageKey.HOME_MENU_FILLED_LORE_WORLD,
-                                Map.of("world", home.location().world().name())),
-                        text(viewer, HomesMessageKey.HOME_MENU_FILLED_LORE_COORDS, coords(home)),
-                        text(
-                                viewer,
-                                HomesMessageKey.HOME_MENU_FILLED_LORE_CREATED,
-                                Map.of("created", dateFormat.format(home.createdAt()))),
-                        text(viewer, HomesMessageKey.HOME_MENU_FILLED_LORE_HINT, Map.of())))
+                .lore(text(viewer, HomesMessageKey.HOME_MENU_FILLED_LORE, filledLore(home)))
                 .build();
     }
 
     private ItemStack emptyIcon(PlayerRef viewer, int used, int maxSlots) {
         return ItemBuilder.of(layout.emptyIcon())
                 .name(text(viewer, HomesMessageKey.HOME_MENU_EMPTY_NAME, Map.of()))
-                .lore(List.of(
-                        text(
-                                viewer,
-                                HomesMessageKey.HOME_MENU_EMPTY_LORE_REMAINING,
-                                Map.of("used", Integer.toString(used), "limit", Integer.toString(maxSlots))),
-                        text(viewer, HomesMessageKey.HOME_MENU_EMPTY_LORE_HINT, Map.of())))
+                .lore(text(
+                        viewer,
+                        HomesMessageKey.HOME_MENU_EMPTY_LORE,
+                        Map.of("used", Integer.toString(used), "limit", Integer.toString(maxSlots))))
                 .build();
     }
 
@@ -292,14 +278,16 @@ public final class HomeListView {
         return Map.of("home", label, "slot", Integer.toString(home.slot().displayNumber()));
     }
 
-    private Map<String, String> coords(Home home) {
+    private Map<String, String> filledLore(Home home) {
         return Map.of(
+                "world", home.location().world().name(),
                 "x", Integer.toString(home.location().blockX()),
                 "y", Integer.toString(home.location().blockY()),
-                "z", Integer.toString(home.location().blockZ()));
+                "z", Integer.toString(home.location().blockZ()),
+                "created", dateFormat.format(home.createdAt()));
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 }

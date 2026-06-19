@@ -11,7 +11,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -90,7 +90,6 @@ public final class HomeActionView {
     private final AnvilInput anvil;
     private final HomeActionsLayout layout;
     private final DateTimeFormatter dateFormat;
-    private final MiniMessage miniMessage;
     private final boolean confirmDelete;
     private final boolean confirmRelocate;
     private final boolean confirmUnsafeTeleport;
@@ -135,7 +134,6 @@ public final class HomeActionView {
         this.anvil = Objects.requireNonNull(anvil, "anvil");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.dateFormat = Objects.requireNonNull(dateFormat, "dateFormat");
-        this.miniMessage = MiniMessage.miniMessage();
         this.confirmDelete = confirmDelete;
         this.confirmRelocate = confirmRelocate;
         this.confirmUnsafeTeleport = confirmUnsafeTeleport;
@@ -376,13 +374,7 @@ public final class HomeActionView {
     private ItemStack infoIcon(PlayerRef viewer, Home home) {
         return ItemBuilder.of(layout.infoMaterial())
                 .name(text(viewer, HomesMessageKey.HOME_ACTION_INFO_NAME, slotName(home)))
-                .lore(List.of(
-                        text(
-                                viewer,
-                                HomesMessageKey.HOME_ACTION_INFO_LORE_WORLD,
-                                Map.of("world", home.location().world().name())),
-                        text(viewer, HomesMessageKey.HOME_ACTION_INFO_LORE_COORDS, coords(home)),
-                        text(viewer, HomesMessageKey.HOME_ACTION_INFO_LORE_CREATED, Map.of("created", created(home)))))
+                .lore(text(viewer, HomesMessageKey.HOME_ACTION_INFO_LORE, infoLore(home)))
                 .build();
     }
 
@@ -468,19 +460,17 @@ public final class HomeActionView {
         return Map.of("home", label, "slot", Integer.toString(home.slot().displayNumber()));
     }
 
-    private Map<String, String> coords(Home home) {
+    private Map<String, String> infoLore(Home home) {
         return Map.of(
+                "world", home.location().world().name(),
                 "x", Integer.toString(home.location().blockX()),
                 "y", Integer.toString(home.location().blockY()),
-                "z", Integer.toString(home.location().blockZ()));
-    }
-
-    private String created(Home home) {
-        return dateFormat.format(home.createdAt());
+                "z", Integer.toString(home.location().blockZ()),
+                "created", dateFormat.format(home.createdAt()));
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
     private static HomesMessageKey claimMessageKey(ClaimDecision decision) {

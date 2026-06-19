@@ -12,7 +12,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
@@ -20,6 +19,7 @@ import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -57,7 +57,6 @@ public final class InvitedPlayersMenu {
     private final HomeNotifier notifier;
     private final AnvilInput anvil;
     private final InvitesMenuLayout layout;
-    private final MiniMessage miniMessage;
 
     public InvitedPlayersMenu(
             Messages messages,
@@ -78,7 +77,6 @@ public final class InvitedPlayersMenu {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.anvil = Objects.requireNonNull(anvil, "anvil");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Open the menu for {@code home}; {@code onBack} reopens the action menu from the back button. */
@@ -231,7 +229,7 @@ public final class InvitedPlayersMenu {
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
     /** One invited player resolved to a display name for the menu. */
