@@ -21,9 +21,11 @@ import org.jspecify.annotations.NullMarked;
 public final class BukkitWorldTeleporter implements WorldTeleporter {
 
     private final TeleportEngine engine;
+    private final ForcedWorldEntryMarker marker;
 
-    public BukkitWorldTeleporter(TeleportEngine engine) {
+    public BukkitWorldTeleporter(TeleportEngine engine, ForcedWorldEntryMarker marker) {
         this.engine = Objects.requireNonNull(engine, "engine");
+        this.marker = Objects.requireNonNull(marker, "marker");
     }
 
     @Override
@@ -36,6 +38,12 @@ public final class BukkitWorldTeleporter implements WorldTeleporter {
                     case SPAWN -> TeleportKind.SPAWN;
                     case ADMIN -> TeleportKind.ADMIN;
                 };
+        if (cause == WorldTeleportCause.ADMIN) {
+            // A staff /worlds tp (or login redirect) bypasses the access policy in WorldTeleportService;
+            // mark the player so the cross-world access listener exempts the event this launch raises. Only
+            // ADMIN is instant, so the mark-to-event window is negligible; SPAWN can be cancelled mid-warmup.
+            marker.mark(who.uuid());
+        }
         return engine.launch(who, Destination.at(to), kind).isOk();
     }
 }

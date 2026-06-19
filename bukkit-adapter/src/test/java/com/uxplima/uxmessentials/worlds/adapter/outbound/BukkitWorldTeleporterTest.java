@@ -24,7 +24,8 @@ import org.mockito.ArgumentCaptor;
 class BukkitWorldTeleporterTest {
 
     private final TeleportEngine engine = mock(TeleportEngine.class);
-    private final BukkitWorldTeleporter teleporter = new BukkitWorldTeleporter(engine);
+    private final ForcedWorldEntryMarker marker = new ForcedWorldEntryMarker();
+    private final BukkitWorldTeleporter teleporter = new BukkitWorldTeleporter(engine, marker);
     private final PlayerRef who = new PlayerRef(UUID.randomUUID(), "Steve");
     private final Position to = new Position(new WorldRef(UUID.randomUUID(), "creative"), 10.5, 64, -3.5, 90f, 0f);
 
@@ -51,6 +52,24 @@ class BukkitWorldTeleporterTest {
         ArgumentCaptor<TeleportKind> kind = ArgumentCaptor.forClass(TeleportKind.class);
         verify(engine).launch(any(), any(), kind.capture());
         assertThat(kind.getValue()).isEqualTo(TeleportKind.ADMIN);
+    }
+
+    @Test
+    void adminCauseMarksThePlayerAsAForcedWorldEntry() {
+        when(engine.launch(any(), any(), any())).thenReturn(Result.ok());
+
+        teleporter.teleport(who, to, WorldTeleportCause.ADMIN);
+
+        assertThat(marker.consume(who.uuid())).isTrue();
+    }
+
+    @Test
+    void spawnCauseDoesNotMarkThePlayerAsAForcedWorldEntry() {
+        when(engine.launch(any(), any(), any())).thenReturn(Result.ok());
+
+        teleporter.teleport(who, to, WorldTeleportCause.SPAWN);
+
+        assertThat(marker.consume(who.uuid())).isFalse();
     }
 
     @Test

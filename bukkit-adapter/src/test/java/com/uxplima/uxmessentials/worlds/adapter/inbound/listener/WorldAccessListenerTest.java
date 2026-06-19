@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
 import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
@@ -70,6 +71,7 @@ class WorldAccessListenerTest {
     private FakePermissions permissions;
     private CountingEngine engine;
     private RecordingPublisher events;
+    private ForcedWorldEntryMarker forcedEntries;
 
     @BeforeEach
     void setUp() {
@@ -80,6 +82,7 @@ class WorldAccessListenerTest {
         permissions = new FakePermissions();
         engine = new CountingEngine();
         events = new RecordingPublisher();
+        forcedEntries = new ForcedWorldEntryMarker();
     }
 
     @AfterEach
@@ -96,6 +99,26 @@ class WorldAccessListenerTest {
         listener().onTeleport(event);
 
         assertThat(event.isCancelled()).isTrue();
+        assertThat(events.published).hasSize(1).first().isInstanceOf(WorldEntryDenied.class);
+    }
+
+    @Test
+    void doesNotCancelMarkedForcedEntryIntoRestrictedWorldAndConsumesTheMark() {
+        repository.put(restricted("locked"));
+        PlayerMock alice = server.addPlayer("Alice");
+        forcedEntries.mark(alice.getUniqueId()); // a staff /worlds tp or login redirect raised this teleport
+
+        PlayerTeleportEvent forced = crossWorld(alice, open, locked);
+        listener().onTeleport(forced);
+
+        assertThat(forced.isCancelled()).isFalse();
+        assertThat(events.published).isEmpty();
+
+        // The mark is one-shot: a second, un-marked cross-world teleport into the same restricted world is gated.
+        PlayerTeleportEvent next = crossWorld(alice, open, locked);
+        listener().onTeleport(next);
+
+        assertThat(next.isCancelled()).isTrue();
         assertThat(events.published).hasSize(1).first().isInstanceOf(WorldEntryDenied.class);
     }
 
@@ -201,7 +224,15 @@ class WorldAccessListenerTest {
         WorldNotifier notifier = mock(WorldNotifier.class);
         WorldTeleportService teleportService = mock(WorldTeleportService.class);
         return new WorldAccessListener(
-                repository, policy, teleportService, engine, events, new InlineScheduler(), notifier, true);
+                repository,
+                policy,
+                teleportService,
+                engine,
+                events,
+                new InlineScheduler(),
+                notifier,
+                forcedEntries,
+                true);
     }
 
     private PlayerTeleportEvent crossWorld(PlayerMock player, World from, World to) {
@@ -220,6 +251,7 @@ class WorldAccessListenerTest {
                 events,
                 new InlineScheduler(),
                 notifier,
+                forcedEntries,
                 redirectOnRestrictedJoin);
     }
 

@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
 import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
@@ -45,6 +46,7 @@ public final class WorldAccessListener implements Listener {
     private final DomainEventPublisher events;
     private final Scheduler scheduler;
     private final WorldNotifier notifier;
+    private final ForcedWorldEntryMarker forcedEntries;
     private final boolean redirectOnRestrictedJoin;
 
     public WorldAccessListener(
@@ -55,6 +57,7 @@ public final class WorldAccessListener implements Listener {
             DomainEventPublisher events,
             Scheduler scheduler,
             WorldNotifier notifier,
+            ForcedWorldEntryMarker forcedEntries,
             boolean redirectOnRestrictedJoin) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.policy = Objects.requireNonNull(policy, "policy");
@@ -63,11 +66,15 @@ public final class WorldAccessListener implements Listener {
         this.events = Objects.requireNonNull(events, "events");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.forcedEntries = Objects.requireNonNull(forcedEntries, "forcedEntries");
         this.redirectOnRestrictedJoin = redirectOnRestrictedJoin;
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {
+        if (forcedEntries.consume(event.getPlayer().getUniqueId())) {
+            return; // a worlds-initiated (staff /worlds tp or login redirect) hand-off — already adjudicated
+        }
         Location to = event.getTo();
         if (to == null || event.getFrom().getWorld().equals(to.getWorld())) {
             return;

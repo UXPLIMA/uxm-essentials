@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitGameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldEngine;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldSettingApplier;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldTeleporter;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InFlightScheduler;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingDeletionRegistry;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
@@ -107,7 +108,10 @@ public final class WorldsWiring {
         ApplyWorldSettingsOnLoad onLoad = new ApplyWorldSettingsOnLoad(repository, applier);
 
         WorldAccessPolicy policy = new WorldAccessPolicy(kernel.permissions(), engine);
-        BukkitWorldTeleporter teleporter = new BukkitWorldTeleporter(teleportEngine);
+        // One marker shared between the teleporter (which marks staff /worlds tp and login-redirect hand-offs)
+        // and the access listener (which consumes the mark to exempt those worlds-initiated teleports).
+        ForcedWorldEntryMarker forcedEntries = new ForcedWorldEntryMarker();
+        BukkitWorldTeleporter teleporter = new BukkitWorldTeleporter(teleportEngine, forcedEntries);
         WorldTeleportService worldTeleport = new WorldTeleportService(
                 repository,
                 engine,
@@ -126,6 +130,7 @@ public final class WorldsWiring {
                 kernel.events(),
                 kernel.scheduler(),
                 notifier,
+                forcedEntries,
                 settings.redirectOnRestrictedJoin());
 
         WorldsServices services = assemble(
