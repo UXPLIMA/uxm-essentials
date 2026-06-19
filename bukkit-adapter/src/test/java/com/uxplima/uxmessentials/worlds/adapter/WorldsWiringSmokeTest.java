@@ -11,8 +11,6 @@ import java.util.Optional;
 import org.bukkit.Material;
 import org.bukkit.event.Listener;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
@@ -240,7 +238,7 @@ class WorldsWiringSmokeTest {
     }
 
     private static WorldEditorText editorText() {
-        return new WorldEditorText(mock(Messages.class), MiniMessage.miniMessage());
+        return new WorldEditorText(mock(Messages.class));
     }
 
     private static GuiLayout listLayout() {

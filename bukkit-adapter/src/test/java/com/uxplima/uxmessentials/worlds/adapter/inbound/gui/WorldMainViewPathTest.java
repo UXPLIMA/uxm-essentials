@@ -17,8 +17,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -81,7 +79,7 @@ class WorldMainViewPathTest {
         repository.add(world("world", WorldEnvironment.NORMAL));
         repository.add(world("hell", WorldEnvironment.NETHER));
         engine.loaded.add("world");
-        text = new WorldEditorText(new KeyMessages(), MiniMessage.miniMessage());
+        text = new WorldEditorText(new KeyMessages());
     }
 
     @AfterEach

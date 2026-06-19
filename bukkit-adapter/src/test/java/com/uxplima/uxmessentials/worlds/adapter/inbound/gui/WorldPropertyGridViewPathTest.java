@@ -14,7 +14,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
@@ -59,7 +58,7 @@ class WorldPropertyGridViewPathTest {
         repository = new FakeWorldRepository();
         WorldSettings settings = WorldSettings.defaults().with(WorldProperties.PVP, false);
         repository.add(world("world", settings));
-        WorldEditorText text = new WorldEditorText(new KeyMessages(), MiniMessage.miniMessage());
+        WorldEditorText text = new WorldEditorText(new KeyMessages());
         view = new WorldPropertyGridView(
                 text, repository, new SyncScheduler(), GuiLayout.paginatedDefault(org.bukkit.Material.PAPER));
     }

@@ -27,7 +27,6 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
@@ -111,7 +110,7 @@ class WorldEditorListenerTest {
         repository.add(world(WORLD, WorldSettings.defaults().with(WorldProperties.PVP, true)));
         engine = new FakeWorldEngine();
 
-        WorldEditorText text = new WorldEditorText(new KeyMessages(), MiniMessage.miniMessage());
+        WorldEditorText text = new WorldEditorText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
         GuiLayout layout = GuiLayout.paginatedDefault(Material.PAPER);
         listView = new WorldListView(text, repository, engine, scheduler, layout);

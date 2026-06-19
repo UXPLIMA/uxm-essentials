@@ -12,8 +12,6 @@ import org.bukkit.Material;
 import org.bukkit.Server;
 import org.bukkit.event.Listener;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.worlds.CachedWorldRepository;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
@@ -364,7 +362,7 @@ public final class WorldsWiring {
         GuiLayout gridLayout = guiLayouts.load("worlds", "editor-grid", GuiLayout.paginatedDefault(Material.PAPER));
         GuiLayout mainLayout = guiLayouts.load("worlds", "editor-main", threeRow());
         GuiLayout genLayout = guiLayouts.load("worlds", "editor-generation", threeRow());
-        WorldEditorText editorText = new WorldEditorText(kernel.messages(), MiniMessage.miniMessage());
+        WorldEditorText editorText = new WorldEditorText(kernel.messages());
         WorldListView listView = new WorldListView(editorText, repository, engine, tracked, listLayout);
         WorldMainView mainView = new WorldMainView(editorText, repository, engine, tracked, mainLayout);
         WorldGenerationView generationView = new WorldGenerationView(editorText, repository, tracked, genLayout);

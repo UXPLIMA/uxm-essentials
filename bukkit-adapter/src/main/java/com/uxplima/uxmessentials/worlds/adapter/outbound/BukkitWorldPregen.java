@@ -13,8 +13,8 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -60,7 +60,6 @@ public final class BukkitWorldPregen implements WorldPregen {
     private final WorldNotifier notifier;
     private final WorldsSettings settings;
     private final Logger log;
-    private final MiniMessage miniMessage;
 
     private final ConcurrentHashMap<WorldName, PregenJob> jobs = new ConcurrentHashMap<>();
 
@@ -79,7 +78,6 @@ public final class BukkitWorldPregen implements WorldPregen {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.log = Objects.requireNonNull(log, "log");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     @Override
@@ -202,7 +200,7 @@ public final class BukkitWorldPregen implements WorldPregen {
                 initiator,
                 WorldsMessageKey.WORLD_PREGEN_BAR,
                 Map.of("world", world.value(), "percent", String.valueOf(percent), "eta", eta));
-        return miniMessage.deserialize(resolved);
+        return StyledText.render(resolved);
     }
 
     private static int percent(PregenProgress pr) {

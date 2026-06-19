@@ -16,8 +16,6 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -65,7 +63,7 @@ class WorldListViewPathTest {
         repository.add(world("hell", WorldEnvironment.NETHER));
         repository.add(world("void", WorldEnvironment.THE_END));
         engine.loaded.add("world");
-        WorldEditorText text = new WorldEditorText(new KeyMessages(), MiniMessage.miniMessage());
+        WorldEditorText text = new WorldEditorText(new KeyMessages());
         view = new WorldListView(
                 text, repository, engine, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRASS_BLOCK));
     }
