@@ -86,4 +86,24 @@ public final class WorldsSettings {
     public int backupRetentionCount() {
         return Math.max(1, config.getInt("backup.retention-count", 10));
     }
+
+    /** Whether the idle world auto-unload sweep runs, {@code auto-unload.enabled}; opt-in, default false. */
+    public boolean autoUnloadEnabled() {
+        return config.getBoolean("auto-unload.enabled", false);
+    }
+
+    /** How long a world stays empty before it is eligible to unload, {@code auto-unload.idle-minutes}; default 30m, floor 0. */
+    public java.time.Duration autoUnloadIdle() {
+        return java.time.Duration.ofMinutes(Math.max(0, config.getInt("auto-unload.idle-minutes", 30)));
+    }
+
+    /** How often the auto-unload sweep runs, {@code auto-unload.sweep-interval-seconds}; default 60s, floor 1s. */
+    public java.time.Duration autoUnloadSweepInterval() {
+        return java.time.Duration.ofSeconds(Math.max(1, config.getInt("auto-unload.sweep-interval-seconds", 60)));
+    }
+
+    /** The worlds never auto-unloaded beyond the default world, {@code auto-unload.excluded-worlds}; default empty. */
+    public java.util.Set<String> autoUnloadExcluded() {
+        return java.util.Set.copyOf(config.getStringList("auto-unload.excluded-worlds", java.util.List.of()));
+    }
 }

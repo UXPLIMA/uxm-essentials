@@ -124,6 +124,48 @@ class WorldsSettingsTest {
         assertThat(settings.backupRetentionCount()).isEqualTo(1);
     }
 
+    @Test
+    void autoUnloadAccessorsFallBackToTheirDefaultsWhenAbsent() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of()));
+
+        assertThat(settings.autoUnloadEnabled()).isFalse();
+        assertThat(settings.autoUnloadIdle()).isEqualTo(Duration.ofMinutes(30));
+        assertThat(settings.autoUnloadSweepInterval()).isEqualTo(Duration.ofSeconds(60));
+        assertThat(settings.autoUnloadExcluded()).isEmpty();
+    }
+
+    @Test
+    void autoUnloadAccessorsAreReadFromConfig() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of(
+                "auto-unload.enabled",
+                true,
+                "auto-unload.idle-minutes",
+                5,
+                "auto-unload.sweep-interval-seconds",
+                10,
+                "auto-unload.excluded-worlds",
+                List.of("a", "b"))));
+
+        assertThat(settings.autoUnloadEnabled()).isTrue();
+        assertThat(settings.autoUnloadIdle()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(settings.autoUnloadSweepInterval()).isEqualTo(Duration.ofSeconds(10));
+        assertThat(settings.autoUnloadExcluded()).containsExactlyInAnyOrder("a", "b");
+    }
+
+    @Test
+    void autoUnloadIdleIsFlooredAtZeroMinutes() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of("auto-unload.idle-minutes", -5)));
+
+        assertThat(settings.autoUnloadIdle()).isEqualTo(Duration.ofMinutes(0));
+    }
+
+    @Test
+    void autoUnloadSweepIntervalIsFlooredAtOneSecond() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of("auto-unload.sweep-interval-seconds", 0)));
+
+        assertThat(settings.autoUnloadSweepInterval()).isEqualTo(Duration.ofSeconds(1));
+    }
+
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */
     private record FixedConfig(Map<String, Object> values) implements ConfigStore {
         @Override
