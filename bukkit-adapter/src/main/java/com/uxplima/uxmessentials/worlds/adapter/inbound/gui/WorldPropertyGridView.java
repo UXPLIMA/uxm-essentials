@@ -140,7 +140,8 @@ public final class WorldPropertyGridView {
                 repository.find(world).map(ManagedWorld::settings).orElse(WorldSettings.defaults());
         List<Integer> slots = contentSlots();
         for (int i = 0; i < properties.size() && i < slots.size(); i++) {
-            place(inventory, slots.get(i), size, button(viewer, settings, properties.get(i)));
+            WorldProperty<?> property = properties.get(i);
+            place(inventory, slots.get(i), size, button(viewer, property, renderValue(settings, property)));
         }
         place(
                 inventory,
@@ -151,10 +152,17 @@ public final class WorldPropertyGridView {
                         .build());
     }
 
-    private ItemStack button(PlayerRef viewer, WorldSettings settings, WorldProperty<?> property) {
+    /**
+     * The button drawn for {@code property} showing {@code rawValue} as its current setting. Shared by {@link #open}'s
+     * render loop and the editor listener's optimistic single-slot update, so both build the identical item: the same
+     * label, value-lore, cycle hint, and material.
+     */
+    public ItemStack button(PlayerRef viewer, WorldProperty<?> property, String rawValue) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(property, "property");
+        Objects.requireNonNull(rawValue, "rawValue");
         Component label = text.text(viewer, labelKey(property));
-        Component value = text.text(
-                viewer, WorldEditorMessageKey.PROPERTY_VALUE_LORE, Map.of("value", renderValue(settings, property)));
+        Component value = text.text(viewer, WorldEditorMessageKey.PROPERTY_VALUE_LORE, Map.of("value", rawValue));
         Component hint = text.text(viewer, WorldEditorMessageKey.PROPERTY_CYCLE_HINT);
         return ItemBuilder.of(materialFor(property))
                 .name(label)
