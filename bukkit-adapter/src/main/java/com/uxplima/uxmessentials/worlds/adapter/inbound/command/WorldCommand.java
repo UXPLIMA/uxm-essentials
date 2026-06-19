@@ -11,11 +11,14 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
@@ -50,6 +53,9 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     private static final String SET = "uxmessentials.world.set";
     private static final String GAMERULE = "uxmessentials.world.gamerule";
     private static final String SETSPAWN = "uxmessentials.world.setspawn";
+    private static final String SPAWN = "uxmessentials.world.spawn";
+    private static final String TP = "uxmessentials.world.tp";
+    private static final String TP_OTHERS = "uxmessentials.world.tp.others";
 
     public WorldCommand(WorldsServices services, Messages messages) {
         super(services, messages);
@@ -102,12 +108,23 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .then(Commands.literal("setspawn")
                         .requires(p(SETSPAWN))
                         .then(nameArg().executes(this::runSetSpawn)))
+                .then(Commands.literal("spawn")
+                        .requires(p(SPAWN))
+                        .executes(this::runSpawnCurrent)
+                        .then(nameArg().executes(this::runSpawnNamed)))
+                .then(Commands.literal("tp")
+                        .requires(p(TP))
+                        .then(nameArg()
+                                .executes(this::runTpSelf)
+                                .then(Commands.argument("player", ArgumentTypes.player())
+                                        .requires(p(TP_OTHERS))
+                                        .executes(this::runTpOther))))
                 .build();
     }
 
     @Override
     public String description() {
-        return "Manage worlds: create, import, load, unload, unregister, delete, list, info.";
+        return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp.";
     }
 
     private static Predicate<CommandSourceStack> p(String node) {
@@ -336,6 +353,72 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         Position spawn = position(sender);
         onGlobal(() -> services.setWorldSpawn().set(who, name, spawn));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSpawnCurrent(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        return spawnTo(sender, sender.getWorld().getName());
+    }
+
+    private int runSpawnNamed(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        return spawnTo(sender, ctx.getArgument("name", String.class));
+    }
+
+    private int spawnTo(Player sender, String raw) {
+        WorldName name = parseName(sender, raw);
+        if (name == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.worldTeleport().spawn(who, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runTpSelf(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.worldTeleport().forced(who, who, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runTpOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        Optional<Player> target = resolveTarget(ctx);
+        if (target.isEmpty()) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        PlayerRef actor = ref(sender);
+        PlayerRef subject = ref(target.get());
+        onGlobal(() -> services.worldTeleport().forced(actor, subject, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Resolve the {@code player} selector to a single target, or empty (no online match) for the actor. */
+    private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+        List<Player> resolved = resolver.resolve(ctx.getSource());
+        return resolved.isEmpty() ? Optional.empty() : Optional.of(resolved.get(0));
     }
 
     private int mutate(CommandContext<CommandSourceStack> ctx, Mutation mutation) {
