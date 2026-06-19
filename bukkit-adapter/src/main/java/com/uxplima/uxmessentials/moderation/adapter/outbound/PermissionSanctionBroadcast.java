@@ -11,6 +11,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -78,6 +79,6 @@ public final class PermissionSanctionBroadcast implements SanctionBroadcast {
     private void sendToConsole(MessageKey key, Map<String, String> placeholders) {
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
         String rendered = messages.resolve(CONSOLE, key, placeholders);
-        server.getConsoleSender().sendMessage(miniMessage.deserialize(rendered, prefix));
+        server.getConsoleSender().sendMessage(miniMessage.deserialize(rendered, prefix, StyleTags.resolver()));
     }
 }

@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerLoginEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -53,7 +54,7 @@ public final class ModerationLoginListener implements Listener {
         if (!decision.allowed()) {
             event.disallow(
                     PlayerLoginEvent.Result.KICK_BANNED,
-                    MiniMessage.miniMessage().deserialize(decision.kickReason().orElse("")));
+                    MiniMessage.miniMessage().deserialize(decision.kickReason().orElse(""), StyleTags.resolver()));
         }
     }
 }

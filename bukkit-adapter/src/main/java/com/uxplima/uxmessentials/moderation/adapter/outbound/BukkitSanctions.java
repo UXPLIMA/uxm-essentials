@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -59,7 +60,7 @@ public final class BukkitSanctions implements Sanctions {
     public void kick(PlayerRef target, MessageKey reasonKey, String reasonText) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(reasonText, "reasonText");
-        Component reason = MiniMessage.miniMessage().deserialize(reasonText);
+        Component reason = MiniMessage.miniMessage().deserialize(reasonText, StyleTags.resolver());
         scheduler.onEntity(target, () -> withPlayer(target, player -> player.kick(reason)));
     }
 
