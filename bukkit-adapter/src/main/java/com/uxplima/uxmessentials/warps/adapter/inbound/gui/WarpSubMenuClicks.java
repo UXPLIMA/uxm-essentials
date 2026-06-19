@@ -11,8 +11,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -36,7 +36,6 @@ final class WarpSubMenuClicks {
     private final WarpEditorView editorView;
     private final WarpChatPromptListener promptListener;
     private final Messages messages;
-    private final MiniMessage miniMessage;
     private final EditableWarpLoader loader;
     private final WarpSoundSelectorView soundSelectorView;
     private final WarpParticleSelectorView particleSelectorView;
@@ -53,7 +52,6 @@ final class WarpSubMenuClicks {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.miniMessage = MiniMessage.miniMessage();
         this.loader = Objects.requireNonNull(loader, "loader");
         this.soundSelectorView = Objects.requireNonNull(soundSelectorView, "soundSelectorView");
         this.particleSelectorView = Objects.requireNonNull(particleSelectorView, "particleSelectorView");
@@ -242,6 +240,6 @@ final class WarpSubMenuClicks {
     }
 
     private Component text(PlayerRef viewer, MessageKey key) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, Map.of()));
+        return StyledText.render(messages.resolve(viewer, key, Map.of()));
     }
 }

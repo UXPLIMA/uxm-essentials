@@ -19,6 +19,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
@@ -39,7 +40,7 @@ public final class WarpChatPromptListener implements Listener {
     public void prompt(Player player, Component message, Consumer<String> callback) {
         PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
         String prefixStr = messages.resolve(viewer, () -> "prefix", Map.of());
-        Component prefix = miniMessage.deserialize(prefixStr);
+        Component prefix = miniMessage.deserialize(prefixStr, StyleTags.resolver());
         player.sendMessage(prefix.append(message));
         activePrompts.put(player.getUniqueId(), callback);
     }
@@ -61,9 +62,10 @@ public final class WarpChatPromptListener implements Listener {
             if (text.equalsIgnoreCase("cancel")) {
                 PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
                 String prefixStr = messages.resolve(viewer, () -> "prefix", Map.of());
-                TagResolver prefix = Placeholder.component("prefix", miniMessage.deserialize(prefixStr));
+                TagResolver prefix =
+                        Placeholder.component("prefix", miniMessage.deserialize(prefixStr, StyleTags.resolver()));
                 String resolved = messages.resolve(viewer, WarpsMessageKey.WARP_EDITOR_PROMPT_CANCELLED, Map.of());
-                player.sendMessage(miniMessage.deserialize(resolved, prefix));
+                player.sendMessage(miniMessage.deserialize(resolved, StyleTags.resolver(), prefix));
                 return;
             }
             callback.accept(text);

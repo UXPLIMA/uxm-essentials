@@ -12,11 +12,11 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -35,7 +35,6 @@ public final class WarpEditorView {
     private final Messages messages;
     private final Scheduler scheduler;
     private final WarpRepository warpRepository;
-    private final MiniMessage miniMessage;
     private final WarpEditorLayout layout;
     private final PlayerWarpRepositoryHandle playerWarpRepositoryHandle;
 
@@ -51,7 +50,6 @@ public final class WarpEditorView {
         this.layout = Objects.requireNonNull(layout, "layout");
         this.playerWarpRepositoryHandle =
                 Objects.requireNonNull(playerWarpRepositoryHandle, "playerWarpRepositoryHandle");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     public WarpEditorLayout layout() {
@@ -286,16 +284,15 @@ public final class WarpEditorView {
     }
 
     private Component title(String warpName, PlayerRef viewer) {
-        return miniMessage.deserialize(
-                messages.resolve(viewer, WarpsMessageKey.WARP_EDITOR_TITLE, Map.of("warp", warpName)));
+        return StyledText.render(messages.resolve(viewer, WarpsMessageKey.WARP_EDITOR_TITLE, Map.of("warp", warpName)));
     }
 
     private Component text(PlayerRef viewer, MessageKey key) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, Map.of()));
+        return StyledText.render(messages.resolve(viewer, key, Map.of()));
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
     private List<Component> textPrompt(PlayerRef viewer, MessageKey key) {
@@ -308,7 +305,7 @@ public final class WarpEditorView {
                 .split(resolved);
         java.util.ArrayList<Component> list = new java.util.ArrayList<>();
         for (String part : parts) {
-            list.add(miniMessage.deserialize(part));
+            list.add(StyledText.render(part));
         }
         return list;
     }

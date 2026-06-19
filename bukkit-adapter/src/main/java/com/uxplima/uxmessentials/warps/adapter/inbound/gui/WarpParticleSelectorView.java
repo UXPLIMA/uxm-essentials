@@ -11,9 +11,9 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -29,13 +29,11 @@ public final class WarpParticleSelectorView {
     private final Messages messages;
     private final Scheduler scheduler;
     private final FixedMenuLayout layout;
-    private final MiniMessage miniMessage;
 
     public WarpParticleSelectorView(Messages messages, Scheduler scheduler, FixedMenuLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** The shipped geometry: the option grid limit plus the custom/back/remove buttons, externalised to conf. */
@@ -131,11 +129,11 @@ public final class WarpParticleSelectorView {
     }
 
     private Component text(PlayerRef viewer, MessageKey key) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, Map.of()));
+        return StyledText.render(messages.resolve(viewer, key, Map.of()));
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
     public List<ParticleOption> getOptions() {

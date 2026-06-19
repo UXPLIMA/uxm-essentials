@@ -9,9 +9,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -49,14 +49,12 @@ public final class WarpMenuView {
     private final Scheduler scheduler;
     private final UseWarp useWarp;
     private final GuiLayout layout;
-    private final MiniMessage miniMessage;
 
     public WarpMenuView(Messages messages, Scheduler scheduler, UseWarp useWarp, GuiLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.useWarp = Objects.requireNonNull(useWarp, "useWarp");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Open the browse menu listing {@code warps} for {@code player}, scheduled on the viewer's entity thread. */
@@ -142,6 +140,6 @@ public final class WarpMenuView {
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 }

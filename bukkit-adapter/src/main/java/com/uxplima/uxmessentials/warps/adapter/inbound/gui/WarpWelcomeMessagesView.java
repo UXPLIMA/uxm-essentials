@@ -13,12 +13,12 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -40,7 +40,6 @@ public final class WarpWelcomeMessagesView {
     private final WarpRepository warpRepository;
     private final WarpEditorView editorView;
     private final FixedMenuLayout layout;
-    private final MiniMessage miniMessage;
 
     public WarpWelcomeMessagesView(
             Messages messages,
@@ -53,7 +52,6 @@ public final class WarpWelcomeMessagesView {
         this.warpRepository = Objects.requireNonNull(warpRepository, "warpRepository");
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** The shipped geometry: the message grid limit plus the add/back/clear buttons, externalised to conf. */
@@ -180,10 +178,10 @@ public final class WarpWelcomeMessagesView {
     }
 
     private Component text(PlayerRef viewer, MessageKey key) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, Map.of()));
+        return StyledText.render(messages.resolve(viewer, key, Map.of()));
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 }
