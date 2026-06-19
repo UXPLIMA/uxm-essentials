@@ -63,6 +63,21 @@ class WorldsSettingsTest {
         assertThat(settings.flatBiome()).isEqualTo(BiomeId.of("plains"));
     }
 
+    @Test
+    void redirectOnRestrictedJoinDefaultsToTrueWhenAbsent() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of()));
+
+        assertThat(settings.redirectOnRestrictedJoin()).isTrue();
+    }
+
+    @Test
+    void redirectOnRestrictedJoinIsReadFromConfig() {
+        WorldsSettings settings =
+                new WorldsSettings(new FixedConfig(Map.of("access.redirect-on-restricted-join", false)));
+
+        assertThat(settings.redirectOnRestrictedJoin()).isFalse();
+    }
+
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */
     private record FixedConfig(Map<String, Object> values) implements ConfigStore {
         @Override

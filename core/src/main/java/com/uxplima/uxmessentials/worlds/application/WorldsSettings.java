@@ -56,4 +56,9 @@ public final class WorldsSettings {
     public BiomeId flatBiome() {
         return BiomeId.of(config.getString("generators.flat.biome", "plains"));
     }
+
+    /** Whether a player who logs into a managed world they may no longer enter is redirected to the default world's spawn; default true. */
+    public boolean redirectOnRestrictedJoin() {
+        return config.getBoolean("access.redirect-on-restricted-join", true);
+    }
 }
