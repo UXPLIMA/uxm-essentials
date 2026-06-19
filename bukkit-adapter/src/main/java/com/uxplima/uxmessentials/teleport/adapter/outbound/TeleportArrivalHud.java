@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -80,11 +81,13 @@ public final class TeleportArrivalHud {
 
             Component component;
             if (msg.message().equals(TeleportMessageKey.ARRIVED_TITLE.key())) {
-                component = miniMessage.deserialize(messages.resolve(who, TeleportMessageKey.ARRIVED_TITLE, Map.of()));
+                component = miniMessage.deserialize(
+                        messages.resolve(who, TeleportMessageKey.ARRIVED_TITLE, Map.of()), StyleTags.resolver());
             } else if (msg.message().contains(".")
                     && !msg.message().contains(" ")
                     && !msg.message().contains("<")) {
-                component = miniMessage.deserialize(messages.resolve(who, msg::message, Map.of()));
+                component =
+                        miniMessage.deserialize(messages.resolve(who, msg::message, Map.of()), StyleTags.resolver());
             } else {
                 component = miniMessage.deserialize(msg.message());
             }
