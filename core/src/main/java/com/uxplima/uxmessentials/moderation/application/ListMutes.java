@@ -46,8 +46,9 @@ public final class ListMutes {
     }
 
     private Map<String, String> entry(MuteEntry mute) {
-        String name = players.findByUuid(mute.target()).map(PlayerRef::name).orElseGet(() -> mute.target()
-                .toString());
+        String name = players.findByUuid(mute.target())
+                .map(PlayerRef::name)
+                .orElseGet(() -> mute.target().toString());
         String expires = mute.until().map(java.time.Instant::toString).orElse("permanent");
         return Map.of(
                 "player",

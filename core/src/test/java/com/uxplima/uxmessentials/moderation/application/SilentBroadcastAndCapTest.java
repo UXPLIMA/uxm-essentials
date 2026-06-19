@@ -106,8 +106,9 @@ class SilentBroadcastAndCapTest {
     void nonSilentMuteBroadcastsAndTellsTheTarget() {
         mute(ModerationFakes.exempt()).mute(ACTOR, TARGET, "1h", Optional.of("spam"), false);
 
-        assertThat(broadcast.announced).singleElement().satisfies(row -> assertThat(row.key())
-                .isEqualTo(ModerationMessageKey.MOD_BROADCAST_MUTE));
+        assertThat(broadcast.announced)
+                .singleElement()
+                .satisfies(row -> assertThat(row.key()).isEqualTo(ModerationMessageKey.MOD_BROADCAST_MUTE));
         assertThat(sink.sent(TARGET, ModerationMessageKey.MUTE_NOTIFY_TARGET)).isTrue();
     }
 
@@ -125,8 +126,9 @@ class SilentBroadcastAndCapTest {
         IssueWarn warn = issueWarn(WarnEscalation.NONE);
 
         warn.warn(ACTOR, TARGET, Optional.of("first"), false);
-        assertThat(broadcast.announced).singleElement().satisfies(row -> assertThat(row.key())
-                .isEqualTo(ModerationMessageKey.MOD_BROADCAST_WARN));
+        assertThat(broadcast.announced)
+                .singleElement()
+                .satisfies(row -> assertThat(row.key()).isEqualTo(ModerationMessageKey.MOD_BROADCAST_WARN));
         assertThat(sink.sent(TARGET, ModerationMessageKey.WARN_NOTIFY_TARGET)).isTrue();
 
         broadcast.announced.clear();
@@ -158,8 +160,9 @@ class SilentBroadcastAndCapTest {
         assertThat(stored.isActiveAt(NOW.plus(Duration.ofMinutes(59)))).isTrue();
         assertThat(stored.isActiveAt(NOW.plus(Duration.ofMinutes(61)))).isFalse();
         assertThat(sink.sent(ACTOR, ModerationMessageKey.MOD_DURATION_CAPPED)).isTrue();
-        assertThat(broadcast.announced).singleElement().satisfies(row -> assertThat(row.placeholders())
-                .containsEntry("duration", "1h"));
+        assertThat(broadcast.announced)
+                .singleElement()
+                .satisfies(row -> assertThat(row.placeholders()).containsEntry("duration", "1h"));
     }
 
     @Test
@@ -207,8 +210,9 @@ class SilentBroadcastAndCapTest {
         assertThat(stored.isActiveAt(NOW.plus(Duration.ofDays(100)))).isFalse();
         assertThat(sink.sent(ACTOR, ModerationMessageKey.MOD_DURATION_CAPPED)).isTrue();
         // A reduced "permanent" ban announces as a tempban, not the permanent line.
-        assertThat(broadcast.announced).singleElement().satisfies(row -> assertThat(row.key())
-                .isEqualTo(ModerationMessageKey.MOD_BROADCAST_TEMPBAN));
+        assertThat(broadcast.announced)
+                .singleElement()
+                .satisfies(row -> assertThat(row.key()).isEqualTo(ModerationMessageKey.MOD_BROADCAST_TEMPBAN));
     }
 
     // --- warn escalation --------------------------------------------------------------------------------

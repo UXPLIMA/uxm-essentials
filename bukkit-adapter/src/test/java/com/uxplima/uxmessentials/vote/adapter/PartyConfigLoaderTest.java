@@ -30,8 +30,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
  */
 class PartyConfigLoaderTest {
 
-    private static final String FULL_CONFIG =
-            """
+    private static final String FULL_CONFIG = """
             voteparty {
               threshold = 50
               only-voters = true
@@ -44,8 +43,7 @@ class PartyConfigLoaderTest {
             }
             """;
 
-    private static final String MINIMAL_CONFIG =
-            """
+    private static final String MINIMAL_CONFIG = """
             voteparty {
               threshold = 10
             }

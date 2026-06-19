@@ -13,7 +13,8 @@ import org.jspecify.annotations.Nullable;
  * @param displayName the player-chosen display name, or {@code null} when none has been set
  * @param iconMaterial the player-chosen icon material name, or {@code null} when none has been set
  */
-public record VaultSummary(int index, @Nullable String displayName, @Nullable String iconMaterial) {
+public record VaultSummary(
+        int index, @Nullable String displayName, @Nullable String iconMaterial) {
 
     public VaultSummary {
         if (index < 1) {

@@ -37,9 +37,7 @@ class ScoreboardContentCodecTest {
     @Test
     void backCompatWrapsTheTopLevelScoreboardBlockAsOneDefaultBoard(@TempDir Path dir) throws Exception {
         // The historical single-board shape: no boards{} block, just a top-level scoreboard{} block.
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 enabled = true
                 scoreboard {
                   title = "<gold>My Server"
@@ -70,9 +68,7 @@ class ScoreboardContentCodecTest {
 
     @Test
     void parsesNamedBoardsWithConditionsAndPriorities(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 enabled = true
                 refresh-ticks = 10
                 boards {
@@ -150,9 +146,7 @@ class ScoreboardContentCodecTest {
     @Test
     void parsesFramesAndScrollAnimationsAndSkipsAnUnknownType(@TempDir Path dir) throws Exception {
         RecordingLogger log = new RecordingLogger();
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 enabled = true
                 animations {
                   blink { type = "FRAMES", frames = [ "ON", "OFF" ], interval-ticks = 10 }

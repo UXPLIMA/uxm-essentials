@@ -8,7 +8,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * Immutable value object representing a physical coin denomination of a currency.
  */
-public record Denomination(BigDecimal value, String material, String displayName, @Nullable Integer customModelData) {
+public record Denomination(
+        BigDecimal value,
+        String material,
+        String displayName,
+        @Nullable Integer customModelData) {
     public Denomination {
         Objects.requireNonNull(value, "value");
         Objects.requireNonNull(material, "material");

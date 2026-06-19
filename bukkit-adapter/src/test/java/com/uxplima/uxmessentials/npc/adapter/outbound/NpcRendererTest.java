@@ -2110,7 +2110,8 @@ class NpcRendererTest {
 
         private record Sent(UUID viewer, Object packet) {}
 
-        private record TabAdd(UUID profileId, String name, @Nullable TabSkin skin) {}
+        private record TabAdd(
+                UUID profileId, String name, @Nullable TabSkin skin) {}
 
         private record TabRemove(UUID profileId) {}
 
@@ -2130,7 +2131,11 @@ class NpcRendererTest {
 
         private record Silent(int entityId, boolean silent) {}
 
-        private record Collidable(String teamName, String memberName, @Nullable NamedColor color, boolean collidable) {}
+        private record Collidable(
+                String teamName,
+                String memberName,
+                @Nullable NamedColor color,
+                boolean collidable) {}
 
         private record PoseSet(int entityId, com.uxplima.uxmlib.packet.npc.NpcPose pose) {}
 
@@ -2228,7 +2233,10 @@ class NpcRendererTest {
 
         private record VillagerData(int entityId, String type, String profession, int level) {}
 
-        private record GlowColor(String teamName, String memberName, @Nullable NamedColor color) {}
+        private record GlowColor(
+                String teamName,
+                String memberName,
+                @Nullable NamedColor color) {}
 
         private record GlowColorRemove(String teamName) {}
 

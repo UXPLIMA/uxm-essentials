@@ -90,10 +90,11 @@ class UserdataGoldenFileTest {
 
     private static WorldNameResolver fakeWorlds() {
         return name -> switch (name) {
-            case "world" -> Optional.of(
-                    new WorldRef(UUID.nameUUIDFromBytes("world".getBytes(StandardCharsets.UTF_8)), "world"));
-            case "world_nether" -> Optional.of(new WorldRef(
-                    UUID.nameUUIDFromBytes("world_nether".getBytes(StandardCharsets.UTF_8)), "world_nether"));
+            case "world" ->
+                Optional.of(new WorldRef(UUID.nameUUIDFromBytes("world".getBytes(StandardCharsets.UTF_8)), "world"));
+            case "world_nether" ->
+                Optional.of(new WorldRef(
+                        UUID.nameUUIDFromBytes("world_nether".getBytes(StandardCharsets.UTF_8)), "world_nether"));
             default -> Optional.empty();
         };
     }

@@ -203,9 +203,11 @@ tasks.assemble { dependsOn(tasks.shadowJar) }
 
 tasks.runServer {
     minecraftVersion(
+        // Paper's version string is "<mc>.build.<n>-<channel>" (e.g. 26.1.2.build.71-stable); run-paper
+        // wants just the Minecraft version, so strip the ".build.*" build suffix.
         libs.versions.paper
             .get()
-            .substringBefore("-"),
+            .substringBefore(".build"),
     )
     jvmArgs(
         "-Xmx4G",

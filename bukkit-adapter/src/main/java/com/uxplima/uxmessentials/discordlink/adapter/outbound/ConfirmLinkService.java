@@ -52,8 +52,9 @@ public final class ConfirmLinkService implements DiscordLinkConfirmation {
     }
 
     private Outcome linked(ConfirmedLink link) {
-        String name = players.findByUuid(link.player()).map(PlayerRef::name).orElseGet(() -> link.player()
-                .toString());
+        String name = players.findByUuid(link.player())
+                .map(PlayerRef::name)
+                .orElseGet(() -> link.player().toString());
         return Outcome.linked(name);
     }
 

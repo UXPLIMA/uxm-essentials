@@ -165,12 +165,8 @@ public final class NpcTypeData {
     /** Whether {@code key} is one this adapter knows how to apply — the set the command validates against. */
     public static boolean isKnownKey(String key) {
         return switch (key.toLowerCase(Locale.ROOT)) {
-            case KEY_BABY,
-                    KEY_SIZE,
-                    KEY_CHARGED,
-                    KEY_VILLAGER_TYPE,
-                    KEY_VILLAGER_PROFESSION,
-                    KEY_VILLAGER_LEVEL -> true;
+            case KEY_BABY, KEY_SIZE, KEY_CHARGED, KEY_VILLAGER_TYPE, KEY_VILLAGER_PROFESSION, KEY_VILLAGER_LEVEL ->
+                true;
             default -> NpcVariantData.isKnownKey(key);
         };
     }

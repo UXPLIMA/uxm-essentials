@@ -40,11 +40,7 @@ class GuiLayoutsLoaderTest {
 
     @Test
     void anOnDiskConfWinsOverTheBundledDefault(@TempDir Path dir) throws Exception {
-        writeGui(
-                dir,
-                "kits",
-                "kits-menu",
-                """
+        writeGui(dir, "kits", "kits-menu", """
                 rows = 3
                 fallback-icon = "DIAMOND"
                 nav-icon = "ARROW"

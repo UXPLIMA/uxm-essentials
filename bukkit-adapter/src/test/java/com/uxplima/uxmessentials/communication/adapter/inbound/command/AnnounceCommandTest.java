@@ -89,9 +89,7 @@ class AnnounceCommandTest {
     void reloadReReadsTheConfigAndConfirmsTheCount() throws Exception {
         CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
         // Rewrite the file with two announcements, then reload.
-        Files.writeString(
-                moduleDir.resolve("announcer.conf"),
-                """
+        Files.writeString(moduleDir.resolve("announcer.conf"), """
                 announcer {
                   default-interval-seconds = 100
                   announcements = [
@@ -113,9 +111,7 @@ class AnnounceCommandTest {
         CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
         // A reload that newly gives an announcement an interval-seconds override: it leaves the shared rotation, so
         // a fresh override loop must be armed or it would never broadcast again.
-        Files.writeString(
-                moduleDir.resolve("announcer.conf"),
-                """
+        Files.writeString(moduleDir.resolve("announcer.conf"), """
                 announcer {
                   announcements = [
                     { id = "timed", channels = [ "CHAT" ], lines = [ "tick" ], interval-seconds = 30 }

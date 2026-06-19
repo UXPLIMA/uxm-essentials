@@ -320,8 +320,9 @@ class BukkitWorldArchiveTest {
 
     private Server newServer() {
         Server s = mock(Server.class);
-        lenient().when(s.getWorldContainer()).thenAnswer(inv -> Objects.requireNonNull(worldContainer)
-                .toFile());
+        lenient()
+                .when(s.getWorldContainer())
+                .thenAnswer(inv -> Objects.requireNonNull(worldContainer).toFile());
         lenient().when(s.getWorld("arena")).thenReturn(null);
         return s;
     }

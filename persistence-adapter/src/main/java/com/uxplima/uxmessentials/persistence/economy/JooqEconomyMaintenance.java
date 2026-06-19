@@ -57,8 +57,8 @@ public final class JooqEconomyMaintenance implements EconomyMaintenance {
 
     @Override
     public List<PlayerRef> allOwners() {
-        return dsl.transactionResult(
-                cfg -> cfg.dsl().select(ECONOMY_OWNERS.OWNER, ECONOMY_OWNERS.NAME).from(ECONOMY_OWNERS).fetch().stream()
+        return dsl.transactionResult(cfg ->
+                cfg.dsl().select(ECONOMY_OWNERS.OWNER, ECONOMY_OWNERS.NAME).from(ECONOMY_OWNERS).fetch().stream()
                         .map(row -> {
                             String owner = row.get(ECONOMY_OWNERS.OWNER);
                             String name = row.get(ECONOMY_OWNERS.NAME);

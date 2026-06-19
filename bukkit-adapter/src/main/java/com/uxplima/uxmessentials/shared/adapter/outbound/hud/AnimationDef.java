@@ -104,15 +104,17 @@ public record AnimationDef(AnimationSpec spec, Optional<Scroll> scroll, Optional
     private static AnimationDef fromConfig(AnimationSpec spec, ConfigurationNode node) {
         return switch (spec.type()) {
             case FRAMES -> frames(spec);
-            case SCROLL -> scroll(
-                    spec,
-                    new Scroll(
-                            node.node("window").getInt(16),
-                            node.node("separator").getString(" ")));
-            case GRADIENT -> gradient(
-                    spec,
-                    new Gradient(
-                            strings(node.node("colors")), node.node("steps").getInt(20)));
+            case SCROLL ->
+                scroll(
+                        spec,
+                        new Scroll(
+                                node.node("window").getInt(16),
+                                node.node("separator").getString(" ")));
+            case GRADIENT ->
+                gradient(
+                        spec,
+                        new Gradient(
+                                strings(node.node("colors")), node.node("steps").getInt(20)));
         };
     }
 

@@ -80,8 +80,9 @@ class ModerationRulesTest {
         assertThat(result.isErr()).isTrue();
         assertThat(result.errorOrThrow()).isEqualTo(ModerationError.TARGET_EXEMPT);
         assertThat(repository.loadMute(EXEMPT)).isInstanceOf(MuteState.None.class);
-        assertThat(audit.lines).singleElement().satisfies(line -> assertThat(line.ok())
-                .isFalse());
+        assertThat(audit.lines)
+                .singleElement()
+                .satisfies(line -> assertThat(line.ok()).isFalse());
     }
 
     @Test
@@ -101,8 +102,9 @@ class ModerationRulesTest {
         var result = unmute.unmute(ADMIN, TARGET);
 
         assertThat(result.errorOrThrow()).isEqualTo(ModerationError.NOT_MUTED);
-        assertThat(audit.lines).singleElement().satisfies(line -> assertThat(line.ok())
-                .isFalse());
+        assertThat(audit.lines)
+                .singleElement()
+                .satisfies(line -> assertThat(line.ok()).isFalse());
     }
 
     @Test

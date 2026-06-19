@@ -35,9 +35,7 @@ class FancyHologramsConvertTest {
 
     @Test
     void parsesAndMapsATextHologram(@TempDir Path dir) throws IOException {
-        Path file = write(
-                dir,
-                """
+        Path file = write(dir, """
                 version: 2
                 holograms:
                   spawn:
@@ -66,9 +64,7 @@ class FancyHologramsConvertTest {
 
     @Test
     void skipsItemAndBlockHologramsThatCarryNoText(@TempDir Path dir) throws IOException {
-        Path file = write(
-                dir,
-                """
+        Path file = write(dir, """
                 version: 2
                 holograms:
                   shop:
@@ -97,9 +93,7 @@ class FancyHologramsConvertTest {
 
     @Test
     void skipsAHologramWhoseWorldTheServerDoesNotKnow(@TempDir Path dir) throws IOException {
-        Path file = write(
-                dir,
-                """
+        Path file = write(dir, """
                 version: 2
                 holograms:
                   ghost:
@@ -118,9 +112,7 @@ class FancyHologramsConvertTest {
 
     @Test
     void refusesAPreVersionTwoFileWholesale(@TempDir Path dir) throws IOException {
-        Path file = write(
-                dir,
-                """
+        Path file = write(dir, """
                 version: 1
                 holograms:
                   legacy:

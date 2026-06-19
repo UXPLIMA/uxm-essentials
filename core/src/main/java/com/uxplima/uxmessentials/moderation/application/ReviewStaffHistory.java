@@ -50,8 +50,9 @@ public final class ReviewStaffHistory {
     }
 
     private Map<String, String> entry(PlayerRef staff, SanctionHistoryEntry row) {
-        String target = players.findByUuid(row.target()).map(PlayerRef::name).orElseGet(() -> row.target()
-                .toString());
+        String target = players.findByUuid(row.target())
+                .map(PlayerRef::name)
+                .orElseGet(() -> row.target().toString());
         return Map.of(
                 "staff", staff.name(),
                 "action", SanctionHistoryLine.label(row.action()),

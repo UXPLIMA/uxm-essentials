@@ -124,8 +124,10 @@ class BanTest {
         assertThat(repository.loadTempban(TARGET)).isInstanceOf(TempbanState.None.class);
         assertThat(audit.lines).singleElement().isEqualTo(new RecordingModerationAudit.Line("player_unban", true));
         // A successful unban records exactly one UNBAN history row.
-        assertThat(history.appended).singleElement().satisfies(row -> assertThat(row.action())
-                .isEqualTo(com.uxplima.uxmessentials.moderation.domain.SanctionAction.UNBAN));
+        assertThat(history.appended)
+                .singleElement()
+                .satisfies(row -> assertThat(row.action())
+                        .isEqualTo(com.uxplima.uxmessentials.moderation.domain.SanctionAction.UNBAN));
     }
 
     @Test

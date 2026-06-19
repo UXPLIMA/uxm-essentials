@@ -92,8 +92,9 @@ public final class TpaRequestCommand extends TeleportCommandSupport implements C
      * accept still drives the mover's warmup, so the move-cancels-warmup invariant is unaffected.
      */
     private void autoAccept(PlayerRef target, Player targetPlayer) {
-        services.scheduler().onEntity(target, () -> services.acceptTeleport()
-                .accept(target, TeleportRefs.positionOf(targetPlayer)));
+        services.scheduler()
+                .onEntity(
+                        target, () -> services.acceptTeleport().accept(target, TeleportRefs.positionOf(targetPlayer)));
     }
 
     private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {

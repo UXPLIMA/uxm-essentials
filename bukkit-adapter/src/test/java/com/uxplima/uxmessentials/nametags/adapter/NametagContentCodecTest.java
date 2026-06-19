@@ -31,9 +31,7 @@ class NametagContentCodecTest {
 
     @Test
     void parsesTheFormatsBlockWithAppearanceAndVisibility(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 refresh-ticks = 40
                 formats {
                   staff {
@@ -98,9 +96,7 @@ class NametagContentCodecTest {
 
     @Test
     void keepsAZeroViewerDistanceButTreatsANegativeOneAsAbsent(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   show-all {
                     condition = ""
@@ -130,9 +126,7 @@ class NametagContentCodecTest {
 
     @Test
     void aFormatWithNoLinesIsDropped(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   empty { condition = "", priority = 0, lines = [] }
                   real { condition = "", priority = 0, lines = [ "<white>{player}" ] }
@@ -147,9 +141,7 @@ class NametagContentCodecTest {
 
     @Test
     void backCompatWrapsTheTopLevelNametagAsOneDefaultFormat(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 enabled = true
                 refresh-ticks = 40
                 nametag {
@@ -188,16 +180,12 @@ class NametagContentCodecTest {
 
     @Test
     void hideVanillaNameDefaultsOnAndIsOverridableToOff(@TempDir Path dir) throws Exception {
-        ConfigurationNode unset = load(
-                dir,
-                """
+        ConfigurationNode unset = load(dir, """
                 formats { default { condition = "", lines = [ "<white>{player}" ] } }
                 """);
         assertThat(NametagContentCodec.read(unset, LOG).hideVanillaName()).isTrue();
 
-        ConfigurationNode off = load(
-                dir,
-                """
+        ConfigurationNode off = load(dir, """
                 hide-vanilla-name = false
                 formats { default { condition = "", lines = [ "<white>{player}" ] } }
                 """);
@@ -206,9 +194,7 @@ class NametagContentCodecTest {
 
     @Test
     void aBlankNametagBlockYieldsNoFormats(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 refresh-ticks = 0
                 nametag {
                   lines = []
@@ -227,9 +213,7 @@ class NametagContentCodecTest {
         // A non-positive scale violates the domain invariant; the codec must catch it and fall back to the default
         // appearance rather than failing the whole format (a single bad value never blanks the nametag).
         RecordingLogger log = new RecordingLogger();
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   broken { condition = "", priority = 0, lines = [ "<white>{player}" ], appearance { scale = -2.0 } }
                 }
@@ -245,9 +229,7 @@ class NametagContentCodecTest {
 
     @Test
     void parsesTheTopLevelAnimationsBlockSharedWithTheOtherHudModules(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 enabled = true
                 animations {
                   blink { type = "FRAMES", frames = [ "ON", "OFF" ], interval-ticks = 10 }

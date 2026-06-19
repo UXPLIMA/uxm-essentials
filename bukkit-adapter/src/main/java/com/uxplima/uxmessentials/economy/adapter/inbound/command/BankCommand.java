@@ -126,8 +126,9 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
         offTick(() -> {
             Optional<SharedBank> bankOpt = services.bankService().getBank(bankId);
             if (bankOpt.isEmpty()) {
-                services.scheduler().onEntity(senderRef, () -> services.notifier()
-                        .send(senderRef, EconomyMessageKey.BANK_NOT_FOUND));
+                services.scheduler()
+                        .onEntity(
+                                senderRef, () -> services.notifier().send(senderRef, EconomyMessageKey.BANK_NOT_FOUND));
                 return;
             }
             SharedBank bank = bankOpt.get();
@@ -163,8 +164,9 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
         offTick(() -> {
             Optional<SharedBank> bankOpt = services.bankService().getBank(bankId);
             if (bankOpt.isEmpty()) {
-                services.scheduler().onEntity(senderRef, () -> services.notifier()
-                        .send(senderRef, EconomyMessageKey.BANK_NOT_FOUND));
+                services.scheduler()
+                        .onEntity(
+                                senderRef, () -> services.notifier().send(senderRef, EconomyMessageKey.BANK_NOT_FOUND));
                 return;
             }
             SharedBank bank = bankOpt.get();
@@ -200,8 +202,10 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
         offTick(() -> {
             Optional<PlayerRef> target = services.players().findByName(targetName);
             if (target.isEmpty()) {
-                services.scheduler().onEntity(senderRef, () -> services.notifier()
-                        .send(senderRef, EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN));
+                services.scheduler()
+                        .onEntity(
+                                senderRef,
+                                () -> services.notifier().send(senderRef, EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN));
                 return;
             }
 
@@ -233,8 +237,10 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
         offTick(() -> {
             Optional<PlayerRef> target = services.players().findByName(targetName);
             if (target.isEmpty()) {
-                services.scheduler().onEntity(senderRef, () -> services.notifier()
-                        .send(senderRef, EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN));
+                services.scheduler()
+                        .onEntity(
+                                senderRef,
+                                () -> services.notifier().send(senderRef, EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN));
                 return;
             }
 

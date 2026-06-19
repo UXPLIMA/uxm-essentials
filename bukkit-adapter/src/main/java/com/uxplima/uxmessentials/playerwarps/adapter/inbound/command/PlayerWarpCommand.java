@@ -165,8 +165,9 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
             unknownPlayer(ctx.getSource().getSender(), ownerName);
             return 0;
         }
-        services.scheduler().async(() -> services.usePlayerWarp()
-                .useFor(who, owner.get(), PlayerWarpName.of(warpName), Optional.of(password)));
+        services.scheduler()
+                .async(() -> services.usePlayerWarp()
+                        .useFor(who, owner.get(), PlayerWarpName.of(warpName), Optional.of(password)));
         return Command.SINGLE_SUCCESS;
     }
 

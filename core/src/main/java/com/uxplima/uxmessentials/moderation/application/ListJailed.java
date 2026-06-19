@@ -51,8 +51,9 @@ public final class ListJailed {
     }
 
     private Map<String, String> entry(JailEntry jail) {
-        String name = players.findByUuid(jail.target()).map(PlayerRef::name).orElseGet(() -> jail.target()
-                .toString());
+        String name = players.findByUuid(jail.target())
+                .map(PlayerRef::name)
+                .orElseGet(() -> jail.target().toString());
         return Map.of(
                 "player", name,
                 "jail", jail.jail(),

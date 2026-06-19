@@ -61,10 +61,8 @@ public final class BukkitEntityPurger {
         }
         return switch (selection.category()) {
             case MONSTERS -> entity instanceof Monster;
-            case NAMED_TYPE -> selection
-                    .typeId()
-                    .map(id -> typeMatches(entity.getType(), id))
-                    .orElse(false);
+            case NAMED_TYPE ->
+                selection.typeId().map(id -> typeMatches(entity.getType(), id)).orElse(false);
             case ALL_ENTITIES -> true;
         };
     }

@@ -29,9 +29,10 @@ public enum CooldownStartPhase {
      */
     public boolean burnsOn(RequestState.Phase phase) {
         return switch (this) {
-            case REQUEST -> phase == RequestState.Phase.PENDING
-                    || phase == RequestState.Phase.ACCEPTED
-                    || phase == RequestState.Phase.COMPLETED;
+            case REQUEST ->
+                phase == RequestState.Phase.PENDING
+                        || phase == RequestState.Phase.ACCEPTED
+                        || phase == RequestState.Phase.COMPLETED;
             case ACCEPT -> phase == RequestState.Phase.ACCEPTED || phase == RequestState.Phase.COMPLETED;
             case TELEPORT -> phase == RequestState.Phase.COMPLETED;
         };

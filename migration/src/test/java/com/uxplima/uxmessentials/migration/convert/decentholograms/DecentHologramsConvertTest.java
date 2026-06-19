@@ -34,10 +34,7 @@ class DecentHologramsConvertTest {
 
     @Test
     void parsesAndMapsAModernPagedHologram(@TempDir Path dir) throws IOException {
-        write(
-                dir,
-                "spawn.yml",
-                """
+        write(dir, "spawn.yml", """
                 location: "world:10.5:64.0:-20.25"
                 enabled: true
                 display-range: 48
@@ -63,10 +60,7 @@ class DecentHologramsConvertTest {
 
     @Test
     void readsTheLegacyTopLevelLinesSection(@TempDir Path dir) throws IOException {
-        write(
-                dir,
-                "old.yml",
-                """
+        write(dir, "old.yml", """
                 location: "world:1:2:3"
                 lines:
                   '1':
@@ -75,17 +69,15 @@ class DecentHologramsConvertTest {
                     content: "two"
                 """);
 
-        assertThat(holograms(dir)).singleElement().satisfies(hologram -> assertThat(
-                        hologram.lines().stream().map(HologramLine::value))
-                .containsExactly("one", "two"));
+        assertThat(holograms(dir))
+                .singleElement()
+                .satisfies(hologram -> assertThat(hologram.lines().stream().map(HologramLine::value))
+                        .containsExactly("one", "two"));
     }
 
     @Test
     void dropsBlankSpacerLinesButKeepsTheHologram(@TempDir Path dir) throws IOException {
-        write(
-                dir,
-                "spaced.yml",
-                """
+        write(dir, "spaced.yml", """
                 location: "world:0:0:0"
                 pages:
                   - lines:
@@ -94,17 +86,15 @@ class DecentHologramsConvertTest {
                       - content: "footer"
                 """);
 
-        assertThat(holograms(dir)).singleElement().satisfies(hologram -> assertThat(
-                        hologram.lines().stream().map(HologramLine::value))
-                .containsExactly("header", "footer"));
+        assertThat(holograms(dir))
+                .singleElement()
+                .satisfies(hologram -> assertThat(hologram.lines().stream().map(HologramLine::value))
+                        .containsExactly("header", "footer"));
     }
 
     @Test
     void skipsAHologramWhoseWorldTheServerDoesNotKnow(@TempDir Path dir) throws IOException {
-        write(
-                dir,
-                "ghost.yml",
-                """
+        write(dir, "ghost.yml", """
                 location: "nether:0:0:0"
                 pages:
                   - lines:

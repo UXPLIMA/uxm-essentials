@@ -54,9 +54,10 @@ public final class BroadcastDecision {
             case EVERY_VOTE -> true;
             case ONLINE_ONLY -> voterOnline;
             case FIRST_VOTE_OF_DAY -> dailyAfter == 1;
-            case COOLDOWN_PER_PLAYER -> voterOnline
-                    && (lastBroadcast.isEmpty()
-                            || !now.isBefore(lastBroadcast.get().plus(cooldown)));
+            case COOLDOWN_PER_PLAYER ->
+                voterOnline
+                        && (lastBroadcast.isEmpty()
+                                || !now.isBefore(lastBroadcast.get().plus(cooldown)));
         };
     }
 }

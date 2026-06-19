@@ -47,9 +47,10 @@ class SetHologramAppearanceTest {
     void appliesTheTransitionSavesAndReRenders() {
         repository.save(hologram("spawn"));
 
-        Result<Unit, HologramError> result =
-                appearance.apply(actor, HologramName.of("spawn"), current -> current.withBillboard(Billboard.FIXED)
-                        .withScale(2.0f));
+        Result<Unit, HologramError> result = appearance.apply(
+                actor,
+                HologramName.of("spawn"),
+                current -> current.withBillboard(Billboard.FIXED).withScale(2.0f));
 
         assertThat(result.isOk()).isTrue();
         Hologram updated = repository.find(HologramName.of("spawn")).orElseThrow();

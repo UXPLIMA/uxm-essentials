@@ -9,7 +9,10 @@ import org.jspecify.annotations.Nullable;
  * Result of a currency exchange request.
  */
 public record ExchangeOutcome(
-        Status status, BigDecimal sourceAmount, BigDecimal targetAmount, @Nullable TransferError error) {
+        Status status,
+        BigDecimal sourceAmount,
+        BigDecimal targetAmount,
+        @Nullable TransferError error) {
     public enum Status {
         SUCCESS,
         RATE_NOT_FOUND,

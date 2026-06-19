@@ -80,8 +80,10 @@ public final class TablistWiring {
         // with the nametag/npc packet stacks, and listener faults are logged off the I/O thread through the kernel log.
         PacketListenerRegistry suppressRegistry = new PacketListenerRegistry();
         PacketPipeline suppressPipeline = new PacketPipeline(
-                new ChannelResolver(), suppressRegistry, "uxmessentials:tablist-suppress", fault -> kernel.log()
-                        .error("tablist suppress listener fault", fault));
+                new ChannelResolver(),
+                suppressRegistry,
+                "uxmessentials:tablist-suppress",
+                fault -> kernel.log().error("tablist suppress listener fault", fault));
         TablistSuppression suppression = new TablistSuppression(
                 new ConnectionGate(suppressPipeline),
                 suppressRegistry,

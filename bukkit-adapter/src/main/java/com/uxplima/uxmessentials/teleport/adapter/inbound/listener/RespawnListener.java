@@ -80,8 +80,8 @@ public final class RespawnListener implements Listener {
             case SPAWN -> spawns.defaultSpawn(respawnWorld);
             case HOME -> homeLocator.respawnHome(BukkitRefs.toRef(player));
             case BED -> bedSpawn(player);
-                // ANCHOR/WARP/RANDOM are not wired into the respawn listener yet (see the class Javadoc); the
-                // chain falls through to the next step rather than blocking on a missing port.
+            // ANCHOR/WARP/RANDOM are not wired into the respawn listener yet (see the class Javadoc); the
+            // chain falls through to the next step rather than blocking on a missing port.
             case ANCHOR, WARP, RANDOM -> Optional.empty();
         };
     }

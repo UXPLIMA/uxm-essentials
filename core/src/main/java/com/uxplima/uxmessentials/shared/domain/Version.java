@@ -45,8 +45,9 @@ public record Version(int major, int minor, int patch) implements Comparable<Ver
             return Optional.empty();
         }
         String[] parts = core.split("\\.", -1);
-        return component(parts, 0).flatMap(maj -> component(parts, 1)
-                .flatMap(min -> component(parts, 2).map(pat -> new Version(maj, min, pat))));
+        return component(parts, 0)
+                .flatMap(maj ->
+                        component(parts, 1).flatMap(min -> component(parts, 2).map(pat -> new Version(maj, min, pat))));
     }
 
     private static String stripSuffix(String value) {

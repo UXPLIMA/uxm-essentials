@@ -315,9 +315,7 @@ class CommunicationAdapterTest {
     private Path writeContent(Path dataDir) throws Exception {
         Path dir = dataDir.resolve("modules").resolve("communication");
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("join-quit.conf"),
-                """
+        Files.writeString(dir.resolve("join-quit.conf"), """
                 join { mode = CUSTOM, ordering = SEQUENTIAL, templates = [ "welcome {player}" ] }
                 quit { mode = DEFAULT }
                 death { mode = DEFAULT }
@@ -325,9 +323,7 @@ class CommunicationAdapterTest {
         Files.writeString(
                 dir.resolve("announcer.conf"),
                 "announcer { interval-seconds = 60, min-players = 0, ordering = SEQUENTIAL, lines = [] }\n");
-        Files.writeString(
-                dir.resolve("info-pages.conf"),
-                """
+        Files.writeString(dir.resolve("info-pages.conf"), """
                 info-pages {
                   rules = [ "Rule one", "Rule two" ]
                   motd = [ "Welcome {player}" ]

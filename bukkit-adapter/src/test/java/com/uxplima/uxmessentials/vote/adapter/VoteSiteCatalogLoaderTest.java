@@ -36,8 +36,7 @@ class VoteSiteCatalogLoaderTest {
 
     @Test
     void parsesStructuredSitesBlock(@TempDir Path dir) throws IOException {
-        String hocon =
-                """
+        String hocon = """
                 default-cooldown-minutes = 1440
                 sites = [
                   { name = "PlanetMinecraft", url = "https://planetminecraft.com", cooldown-minutes = 720 }
@@ -62,8 +61,7 @@ class VoteSiteCatalogLoaderTest {
 
     @Test
     void parsesServiceFieldAndDefaultsToNameWhenAbsent(@TempDir Path dir) throws IOException {
-        String hocon =
-                """
+        String hocon = """
                 sites = [
                   { name = "PlanetMinecraft", service = "PMC", url = "https://planetminecraft.com" }
                   { name = "minecraft-mp" }
@@ -86,8 +84,7 @@ class VoteSiteCatalogLoaderTest {
 
     @Test
     void appliesDefaultCooldownWhenSiteCooldownAbsent(@TempDir Path dir) throws IOException {
-        String hocon =
-                """
+        String hocon = """
                 default-cooldown-minutes = 60
                 sites = [
                   { name = "TestSite" }
@@ -101,8 +98,7 @@ class VoteSiteCatalogLoaderTest {
 
     @Test
     void legacyVoteLinksBackCompatSeedsTheCatalog(@TempDir Path dir) throws IOException {
-        String hocon =
-                """
+        String hocon = """
                 default-cooldown-minutes = 1440
                 sites = []
                 vote-links = [
@@ -139,8 +135,7 @@ class VoteSiteCatalogLoaderTest {
 
     @Test
     void structuredSitesTakePrecedenceOverLegacyLinks(@TempDir Path dir) throws IOException {
-        String hocon =
-                """
+        String hocon = """
                 sites = [
                   { name = "PMC", url = "https://pmc.example", cooldown-minutes = 1440 }
                 ]
@@ -155,8 +150,7 @@ class VoteSiteCatalogLoaderTest {
 
     @Test
     void siteWithoutNameIsSkipped(@TempDir Path dir) throws IOException {
-        String hocon =
-                """
+        String hocon = """
                 sites = [
                   { url = "https://pmc.example", cooldown-minutes = 1440 }
                   { name = "ValidSite" }

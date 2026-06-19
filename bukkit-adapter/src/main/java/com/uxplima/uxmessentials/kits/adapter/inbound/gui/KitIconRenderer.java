@@ -171,7 +171,7 @@ final class KitIconRenderer {
                     case REQUIREMENTS -> kit.requirementsName();
                     case UNAFFORDABLE -> kit.unaffordableName();
                     case NORMAL -> kit.displayName();
-                        // The two locked states force their own name so the icon always reads as closed/sold out.
+                    // The two locked states force their own name so the icon always reads as closed/sold out.
                     case UNAVAILABLE, OUT_OF_STOCK -> Optional.empty();
                 };
 

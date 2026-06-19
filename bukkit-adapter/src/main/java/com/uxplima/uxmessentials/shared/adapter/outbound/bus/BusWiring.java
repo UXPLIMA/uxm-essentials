@@ -50,7 +50,8 @@ public final class BusWiring {
      * @param bus the publish + register seam handed to each context
      * @param client the live bus client, or {@code null} when the bus is disabled
      */
-    public record Wired(Bus bus, @org.jspecify.annotations.Nullable BusClient client) {
+    public record Wired(
+            Bus bus, @org.jspecify.annotations.Nullable BusClient client) {
 
         public Wired {
             Objects.requireNonNull(bus, "bus");

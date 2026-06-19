@@ -979,15 +979,11 @@ final class NpcVariantData {
             case KEY_ARMADILLO_STATE -> ARMADILLO_STATES.contains(value.toLowerCase(Locale.ROOT));
             case KEY_USE_ITEM -> USE_ITEM_VALUES.contains(value.toLowerCase(Locale.ROOT));
             case KEY_SHAKING -> parseBool(value) != null;
-            case KEY_AS_HEAD,
-                    KEY_AS_BODY,
-                    KEY_AS_LEFT_ARM,
-                    KEY_AS_RIGHT_ARM,
-                    KEY_AS_LEFT_LEG,
-                    KEY_AS_RIGHT_LEG -> parseAngles(value) != null;
+            case KEY_AS_HEAD, KEY_AS_BODY, KEY_AS_LEFT_ARM, KEY_AS_RIGHT_ARM, KEY_AS_LEFT_LEG, KEY_AS_RIGHT_LEG ->
+                parseAngles(value) != null;
             case KEY_INTERACTION_WIDTH, KEY_INTERACTION_HEIGHT -> isDimension(value);
-                // Block/item content is validated leniently (non-blank) so this stays Bukkit-free; the apply path
-                // resolves the BlockData/item and skips fail-soft if it is unparseable.
+            // Block/item content is validated leniently (non-blank) so this stays Bukkit-free; the apply path
+            // resolves the BlockData/item and skips fail-soft if it is unparseable.
             case KEY_BLOCK, KEY_ITEM, KEY_TEXT -> !value.isBlank();
             case KEY_DISPLAY_SCALE -> {
                 if (value.indexOf(',') >= 0) {

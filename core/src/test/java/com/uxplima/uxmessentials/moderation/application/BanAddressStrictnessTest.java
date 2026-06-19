@@ -103,8 +103,10 @@ class BanAddressStrictnessTest {
         ban(AddressStrictness.STRICT, new ModerationGuard(ModerationFakes.exempt()), repository)
                 .ban(ACTOR, TARGET, Optional.of("cheating"), false);
 
-        assertThat(repository.activeIpBan("203.0.113.7", NOW)).isPresent().get().satisfies(b -> assertThat(b.until())
-                .isEmpty());
+        assertThat(repository.activeIpBan("203.0.113.7", NOW))
+                .isPresent()
+                .get()
+                .satisfies(b -> assertThat(b.until()).isEmpty());
     }
 
     @Test

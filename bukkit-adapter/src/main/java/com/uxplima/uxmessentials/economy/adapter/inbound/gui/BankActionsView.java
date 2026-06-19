@@ -168,22 +168,26 @@ public final class BankActionsView {
     private ItemStack actionIcon(PlayerRef viewer, String action) {
         ActionKeys keys =
                 switch (action) {
-                    case "deposit" -> new ActionKeys(
-                            EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_NAME,
-                            EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_LORE,
-                            EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_HINT);
-                    case "withdraw" -> new ActionKeys(
-                            EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_NAME,
-                            EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_LORE,
-                            EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_HINT);
-                    case "members" -> new ActionKeys(
-                            EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_NAME,
-                            EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_LORE,
-                            EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_HINT);
-                    default -> new ActionKeys(
-                            EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_NAME,
-                            EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_LORE,
-                            EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_HINT);
+                    case "deposit" ->
+                        new ActionKeys(
+                                EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_NAME,
+                                EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_LORE,
+                                EconomyMessageKey.BANK_ACTIONS_GUI_DEPOSIT_HINT);
+                    case "withdraw" ->
+                        new ActionKeys(
+                                EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_NAME,
+                                EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_LORE,
+                                EconomyMessageKey.BANK_ACTIONS_GUI_WITHDRAW_HINT);
+                    case "members" ->
+                        new ActionKeys(
+                                EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_NAME,
+                                EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_LORE,
+                                EconomyMessageKey.BANK_ACTIONS_GUI_MEMBERS_HINT);
+                    default ->
+                        new ActionKeys(
+                                EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_NAME,
+                                EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_LORE,
+                                EconomyMessageKey.BANK_ACTIONS_GUI_LOGS_HINT);
                 };
         return ItemBuilder.of(layout.material(action))
                 .name(text(viewer, keys.name(), Map.of()))

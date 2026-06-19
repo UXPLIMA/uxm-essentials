@@ -115,8 +115,9 @@ public final class GiveAllCommand extends ItemworldCommandSupport implements Com
     private void deliverTo(
             PlayerRef actor, Player target, Material material, AmountSpec amount, String itemKey, boolean audit) {
         PlayerRef targetRef = BukkitRefs.toRef(target);
-        services.kernel().scheduler().onEntity(targetRef, () -> target.getInventory()
-                .addItem(new ItemStack(material, amount.amount())));
+        services.kernel()
+                .scheduler()
+                .onEntity(targetRef, () -> target.getInventory().addItem(new ItemStack(material, amount.amount())));
         if (audit) {
             services.audit().gave(actor, targetRef, itemKey, amount.amount());
         }

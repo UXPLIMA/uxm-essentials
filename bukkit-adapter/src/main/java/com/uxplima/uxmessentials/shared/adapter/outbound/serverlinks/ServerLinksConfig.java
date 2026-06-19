@@ -70,5 +70,8 @@ public final class ServerLinksConfig {
     }
 
     /** One raw, un-validated link entry as read from the file. */
-    public record RawLink(@Nullable String type, @Nullable String label, @Nullable String url) {}
+    public record RawLink(
+            @Nullable String type,
+            @Nullable String label,
+            @Nullable String url) {}
 }

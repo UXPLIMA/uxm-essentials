@@ -94,8 +94,8 @@ public final class RepositoryRecordWriter implements RecordWriter {
             case ImportRecord.BanRecord ban -> writeBan(ban, options);
             case ImportRecord.IpBanRecord ban -> writeIpBan(ban.ban(), options);
             case ImportRecord.WarnRecord warn -> writeWarn(warn);
-            case ImportRecord.HologramRecord hologram -> writeHologram(
-                    hologram.hologram().hologram(), options);
+            case ImportRecord.HologramRecord hologram ->
+                writeHologram(hologram.hologram().hologram(), options);
         };
     }
 

@@ -87,23 +87,27 @@ class JooqEconomyMaintenanceTest {
     }
 
     private void insertTransaction(long id, long ts) {
-        persistence.dsl().transaction(cfg -> cfg.dsl()
-                .insertInto(TRANSACTIONS)
-                .set(TRANSACTIONS.ID, id)
-                .set(TRANSACTIONS.TS, ts)
-                .set(TRANSACTIONS.CURRENCY, "coins")
-                .set(TRANSACTIONS.AMOUNT, BigDecimal.ONE)
-                .set(TRANSACTIONS.TYPE, "CREDIT")
-                .set(TRANSACTIONS.REASON, "PAY")
-                .execute());
+        persistence
+                .dsl()
+                .transaction(cfg -> cfg.dsl()
+                        .insertInto(TRANSACTIONS)
+                        .set(TRANSACTIONS.ID, id)
+                        .set(TRANSACTIONS.TS, ts)
+                        .set(TRANSACTIONS.CURRENCY, "coins")
+                        .set(TRANSACTIONS.AMOUNT, BigDecimal.ONE)
+                        .set(TRANSACTIONS.TYPE, "CREDIT")
+                        .set(TRANSACTIONS.REASON, "PAY")
+                        .execute());
     }
 
     private void insertCreditScore(PlayerRef player) {
-        persistence.dsl().transaction(cfg -> cfg.dsl()
-                .insertInto(ECONOMY_CREDIT_SCORES)
-                .set(ECONOMY_CREDIT_SCORES.PLAYER_UUID, player.uuid().toString())
-                .set(ECONOMY_CREDIT_SCORES.SCORE, 500)
-                .set(ECONOMY_CREDIT_SCORES.LAST_UPDATED, 0L)
-                .execute());
+        persistence
+                .dsl()
+                .transaction(cfg -> cfg.dsl()
+                        .insertInto(ECONOMY_CREDIT_SCORES)
+                        .set(ECONOMY_CREDIT_SCORES.PLAYER_UUID, player.uuid().toString())
+                        .set(ECONOMY_CREDIT_SCORES.SCORE, 500)
+                        .set(ECONOMY_CREDIT_SCORES.LAST_UPDATED, 0L)
+                        .execute());
     }
 }

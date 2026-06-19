@@ -238,5 +238,6 @@ final class FillerPainter {
      * being fetched from the same cell once resolved, so the next tick repaints rather than treating the skinless paint
      * as the steady state. {@link Component} has a value-based {@code equals}.
      */
-    private record AppliedFiller(Component text, int order, @Nullable TablistSkinSource skinSource, boolean pending) {}
+    private record AppliedFiller(
+            Component text, int order, @Nullable TablistSkinSource skinSource, boolean pending) {}
 }

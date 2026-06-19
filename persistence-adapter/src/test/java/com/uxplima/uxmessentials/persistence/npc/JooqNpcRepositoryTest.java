@@ -113,25 +113,27 @@ class JooqNpcRepositoryTest {
         // with auto-commit off, so the seed insert is wrapped in a transaction to commit before the read.
         com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
                 com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
-        persistence.dsl().transaction(cfg -> org.jooq
-                .impl
-                .DSL
-                .using(cfg)
-                .insertInto(npc)
-                .set(npc.NAME, "legacy")
-                .set(npc.WORLD, WORLD.uid().toString())
-                .set(npc.WORLD_NAME, WORLD.name())
-                .set(npc.X, 0.0)
-                .set(npc.Y, 64.0)
-                .set(npc.Z, 0.0)
-                .set(npc.YAW, 0.0f)
-                .set(npc.PITCH, 0.0f)
-                .set(npc.LOOK_AT_PLAYER, (short) 1)
-                .set(npc.EQUIP_HEAD, "DIAMOND_HELMET")
-                .set(npc.GLOWING, (short) 0)
-                .set(npc.ENTITY_TYPE, "PLAYER")
-                .set(npc.CREATED_AT, 1_000L)
-                .execute());
+        persistence
+                .dsl()
+                .transaction(cfg -> org.jooq
+                        .impl
+                        .DSL
+                        .using(cfg)
+                        .insertInto(npc)
+                        .set(npc.NAME, "legacy")
+                        .set(npc.WORLD, WORLD.uid().toString())
+                        .set(npc.WORLD_NAME, WORLD.name())
+                        .set(npc.X, 0.0)
+                        .set(npc.Y, 64.0)
+                        .set(npc.Z, 0.0)
+                        .set(npc.YAW, 0.0f)
+                        .set(npc.PITCH, 0.0f)
+                        .set(npc.LOOK_AT_PLAYER, (short) 1)
+                        .set(npc.EQUIP_HEAD, "DIAMOND_HELMET")
+                        .set(npc.GLOWING, (short) 0)
+                        .set(npc.ENTITY_TYPE, "PLAYER")
+                        .set(npc.CREATED_AT, 1_000L)
+                        .execute());
 
         Npc loaded = repository.find(NpcName.of("legacy")).orElseThrow();
 
@@ -146,25 +148,27 @@ class JooqNpcRepositoryTest {
         // must still surface mainhand on the next load, so the unedited slot's gear is never lost on first save.
         com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
                 com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
-        persistence.dsl().transaction(cfg -> org.jooq
-                .impl
-                .DSL
-                .using(cfg)
-                .insertInto(npc)
-                .set(npc.NAME, "veteran")
-                .set(npc.WORLD, WORLD.uid().toString())
-                .set(npc.WORLD_NAME, WORLD.name())
-                .set(npc.X, 0.0)
-                .set(npc.Y, 64.0)
-                .set(npc.Z, 0.0)
-                .set(npc.YAW, 0.0f)
-                .set(npc.PITCH, 0.0f)
-                .set(npc.LOOK_AT_PLAYER, (short) 1)
-                .set(npc.EQUIP_MAINHAND, "DIAMOND_SWORD")
-                .set(npc.GLOWING, (short) 0)
-                .set(npc.ENTITY_TYPE, "PLAYER")
-                .set(npc.CREATED_AT, 1_000L)
-                .execute());
+        persistence
+                .dsl()
+                .transaction(cfg -> org.jooq
+                        .impl
+                        .DSL
+                        .using(cfg)
+                        .insertInto(npc)
+                        .set(npc.NAME, "veteran")
+                        .set(npc.WORLD, WORLD.uid().toString())
+                        .set(npc.WORLD_NAME, WORLD.name())
+                        .set(npc.X, 0.0)
+                        .set(npc.Y, 64.0)
+                        .set(npc.Z, 0.0)
+                        .set(npc.YAW, 0.0f)
+                        .set(npc.PITCH, 0.0f)
+                        .set(npc.LOOK_AT_PLAYER, (short) 1)
+                        .set(npc.EQUIP_MAINHAND, "DIAMOND_SWORD")
+                        .set(npc.GLOWING, (short) 0)
+                        .set(npc.ENTITY_TYPE, "PLAYER")
+                        .set(npc.CREATED_AT, 1_000L)
+                        .execute());
 
         Npc legacy = repository.find(NpcName.of("veteran")).orElseThrow();
         repository.save(legacy.withEquipment(EquipmentSlot.OFFHAND, "SHIELD"));
@@ -183,25 +187,27 @@ class JooqNpcRepositoryTest {
         // resurface through the new-then-legacy read.
         com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
                 com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
-        persistence.dsl().transaction(cfg -> org.jooq
-                .impl
-                .DSL
-                .using(cfg)
-                .insertInto(npc)
-                .set(npc.NAME, "molting")
-                .set(npc.WORLD, WORLD.uid().toString())
-                .set(npc.WORLD_NAME, WORLD.name())
-                .set(npc.X, 0.0)
-                .set(npc.Y, 64.0)
-                .set(npc.Z, 0.0)
-                .set(npc.YAW, 0.0f)
-                .set(npc.PITCH, 0.0f)
-                .set(npc.LOOK_AT_PLAYER, (short) 1)
-                .set(npc.EQUIP_HEAD, "DIAMOND_HELMET")
-                .set(npc.GLOWING, (short) 0)
-                .set(npc.ENTITY_TYPE, "PLAYER")
-                .set(npc.CREATED_AT, 1_000L)
-                .execute());
+        persistence
+                .dsl()
+                .transaction(cfg -> org.jooq
+                        .impl
+                        .DSL
+                        .using(cfg)
+                        .insertInto(npc)
+                        .set(npc.NAME, "molting")
+                        .set(npc.WORLD, WORLD.uid().toString())
+                        .set(npc.WORLD_NAME, WORLD.name())
+                        .set(npc.X, 0.0)
+                        .set(npc.Y, 64.0)
+                        .set(npc.Z, 0.0)
+                        .set(npc.YAW, 0.0f)
+                        .set(npc.PITCH, 0.0f)
+                        .set(npc.LOOK_AT_PLAYER, (short) 1)
+                        .set(npc.EQUIP_HEAD, "DIAMOND_HELMET")
+                        .set(npc.GLOWING, (short) 0)
+                        .set(npc.ENTITY_TYPE, "PLAYER")
+                        .set(npc.CREATED_AT, 1_000L)
+                        .execute());
 
         Npc seeded = repository.find(NpcName.of("molting")).orElseThrow();
         repository.save(seeded.withEquipment(EquipmentSlot.HEAD, null));
@@ -545,24 +551,26 @@ class JooqNpcRepositoryTest {
         // DEFAULTs (0 flags, 0 cooldown) must apply and the nullable display/distance columns read back NULL.
         com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
                 com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
-        persistence.dsl().transaction(cfg -> org.jooq
-                .impl
-                .DSL
-                .using(cfg)
-                .insertInto(npc)
-                .set(npc.NAME, "ancient")
-                .set(npc.WORLD, WORLD.uid().toString())
-                .set(npc.WORLD_NAME, WORLD.name())
-                .set(npc.X, 0.0)
-                .set(npc.Y, 64.0)
-                .set(npc.Z, 0.0)
-                .set(npc.YAW, 0.0f)
-                .set(npc.PITCH, 0.0f)
-                .set(npc.LOOK_AT_PLAYER, (short) 1)
-                .set(npc.GLOWING, (short) 0)
-                .set(npc.ENTITY_TYPE, "PLAYER")
-                .set(npc.CREATED_AT, 1_000L)
-                .execute());
+        persistence
+                .dsl()
+                .transaction(cfg -> org.jooq
+                        .impl
+                        .DSL
+                        .using(cfg)
+                        .insertInto(npc)
+                        .set(npc.NAME, "ancient")
+                        .set(npc.WORLD, WORLD.uid().toString())
+                        .set(npc.WORLD_NAME, WORLD.name())
+                        .set(npc.X, 0.0)
+                        .set(npc.Y, 64.0)
+                        .set(npc.Z, 0.0)
+                        .set(npc.YAW, 0.0f)
+                        .set(npc.PITCH, 0.0f)
+                        .set(npc.LOOK_AT_PLAYER, (short) 1)
+                        .set(npc.GLOWING, (short) 0)
+                        .set(npc.ENTITY_TYPE, "PLAYER")
+                        .set(npc.CREATED_AT, 1_000L)
+                        .execute());
 
         Npc loaded = repository.find(NpcName.of("ancient")).orElseThrow();
 
@@ -586,24 +594,26 @@ class JooqNpcRepositoryTest {
         // source runs with auto-commit off, so the seed insert is wrapped in a transaction to commit before the read.
         com.uxplima.uxmessentials.persistence.jooq.tables.Npc npc =
                 com.uxplima.uxmessentials.persistence.jooq.tables.Npc.NPC;
-        persistence.dsl().transaction(cfg -> org.jooq
-                .impl
-                .DSL
-                .using(cfg)
-                .insertInto(npc)
-                .set(npc.NAME, "ancient")
-                .set(npc.WORLD, WORLD.uid().toString())
-                .set(npc.WORLD_NAME, WORLD.name())
-                .set(npc.X, 0.0)
-                .set(npc.Y, 64.0)
-                .set(npc.Z, 0.0)
-                .set(npc.YAW, 0.0f)
-                .set(npc.PITCH, 0.0f)
-                .set(npc.LOOK_AT_PLAYER, (short) 1)
-                .set(npc.GLOWING, (short) 0)
-                .set(npc.ENTITY_TYPE, "PLAYER")
-                .set(npc.CREATED_AT, 1_000L)
-                .execute());
+        persistence
+                .dsl()
+                .transaction(cfg -> org.jooq
+                        .impl
+                        .DSL
+                        .using(cfg)
+                        .insertInto(npc)
+                        .set(npc.NAME, "ancient")
+                        .set(npc.WORLD, WORLD.uid().toString())
+                        .set(npc.WORLD_NAME, WORLD.name())
+                        .set(npc.X, 0.0)
+                        .set(npc.Y, 64.0)
+                        .set(npc.Z, 0.0)
+                        .set(npc.YAW, 0.0f)
+                        .set(npc.PITCH, 0.0f)
+                        .set(npc.LOOK_AT_PLAYER, (short) 1)
+                        .set(npc.GLOWING, (short) 0)
+                        .set(npc.ENTITY_TYPE, "PLAYER")
+                        .set(npc.CREATED_AT, 1_000L)
+                        .execute());
 
         Npc loaded = repository.find(NpcName.of("ancient")).orElseThrow();
 

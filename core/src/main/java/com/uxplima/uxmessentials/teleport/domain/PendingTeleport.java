@@ -116,7 +116,9 @@ public final class PendingTeleport {
      * @param state the warmup after reconciliation
      * @param cancelReason the reason a cancel fired, or {@code null} when nothing changed
      */
-    public record Outcome(PendingTeleport state, @org.jspecify.annotations.Nullable WarmupCancelReason cancelReason) {
+    public record Outcome(
+            PendingTeleport state,
+            @org.jspecify.annotations.Nullable WarmupCancelReason cancelReason) {
 
         public Outcome {
             Objects.requireNonNull(state, "state");

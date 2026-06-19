@@ -49,11 +49,13 @@ public final class JooqWorldRepository extends JooqRepository implements WorldRe
             dsl.deleteFrom(WORLD_SETTING)
                     .where(WORLD_SETTING.WORLD_NAME.eq(world.name().value()))
                     .execute();
-            world.settings().raw().forEach((key, value) -> dsl.insertInto(WORLD_SETTING)
-                    .set(WORLD_SETTING.WORLD_NAME, world.name().value())
-                    .set(WORLD_SETTING.SETTING_KEY, key)
-                    .set(WORLD_SETTING.SETTING_VALUE, value)
-                    .execute());
+            world.settings()
+                    .raw()
+                    .forEach((key, value) -> dsl.insertInto(WORLD_SETTING)
+                            .set(WORLD_SETTING.WORLD_NAME, world.name().value())
+                            .set(WORLD_SETTING.SETTING_KEY, key)
+                            .set(WORLD_SETTING.SETTING_VALUE, value)
+                            .execute());
             return null;
         });
     }

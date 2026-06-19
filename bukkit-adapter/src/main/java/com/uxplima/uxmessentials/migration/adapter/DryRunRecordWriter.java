@@ -66,8 +66,8 @@ public final class DryRunRecordWriter implements RecordWriter {
             case ImportRecord.BanRecord ban -> banOutcome(ban.target(), options);
             case ImportRecord.IpBanRecord ban -> ipBanOutcome(ban.ban(), options);
             case ImportRecord.WarnRecord warn -> warnOutcome(warn.target(), warn.warn());
-            case ImportRecord.HologramRecord hologram -> hologramOutcome(
-                    hologram.hologram().hologram().name(), options);
+            case ImportRecord.HologramRecord hologram ->
+                hologramOutcome(hologram.hologram().hologram().name(), options);
         };
     }
 

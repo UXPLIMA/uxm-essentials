@@ -25,7 +25,8 @@ import org.jspecify.annotations.Nullable;
  * @param url the validated absolute destination
  */
 @NullMarked
-public record ServerLinkSpec(ServerLinks.@Nullable Type type, @Nullable String label, URI url) {
+public record ServerLinkSpec(
+        ServerLinks.@Nullable Type type, @Nullable String label, URI url) {
 
     public ServerLinkSpec(ServerLinks.@Nullable Type type, @Nullable String label, URI url) {
         this.url = Objects.requireNonNull(url, "url");

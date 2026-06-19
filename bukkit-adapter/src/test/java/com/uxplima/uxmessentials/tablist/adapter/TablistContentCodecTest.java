@@ -33,9 +33,7 @@ class TablistContentCodecTest {
 
     @Test
     void parsesTheFormatsBlock(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 refresh-ticks = 40
                 formats {
                   staff {
@@ -81,9 +79,7 @@ class TablistContentCodecTest {
     void aFormatWithOnlyANameOverrideIsKept(@TempDir Path dir) throws Exception {
         // A format that sets neither header nor footer but does carry a name format still does something, so it must
         // survive the "drop the do-nothing format" filter.
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   vip { condition = "", priority = 0, name-format = "<gold>{player}" }
                 }
@@ -99,9 +95,7 @@ class TablistContentCodecTest {
 
     @Test
     void parsesAPlayerSkinSource(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default { condition = "", priority = 0, name-format = "<gold>{player}", skin = "player:Notch" }
                 }
@@ -114,9 +108,7 @@ class TablistContentCodecTest {
 
     @Test
     void parsesATextureSkinSourceWithASignature(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default { condition = "", priority = 0, header = [ "x" ], skin = "texture:dmFsdWU=:sig" }
                 }
@@ -131,9 +123,7 @@ class TablistContentCodecTest {
     @Test
     void aSkinOnlyFormatIsKept(@TempDir Path dir) throws Exception {
         // A format that sets neither header/footer nor a name/order but does carry a skin still does something.
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   vip { condition = "", priority = 0, skin = "player:Notch" }
                 }
@@ -147,9 +137,7 @@ class TablistContentCodecTest {
 
     @Test
     void anUnrecognisedSkinPrefixIsTreatedAsNoSkin(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default { condition = "", priority = 0, header = [ "x" ], skin = "url:http://example" }
                 }
@@ -162,9 +150,7 @@ class TablistContentCodecTest {
 
     @Test
     void aNonPositiveSortOrderIsTreatedAsAbsent(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default { condition = "", priority = 0, header = [ "x" ], sort-order = 0 }
                 }
@@ -177,9 +163,7 @@ class TablistContentCodecTest {
 
     @Test
     void parsesAFillerLayout(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default {
                     condition = ""
@@ -214,9 +198,7 @@ class TablistContentCodecTest {
     @Test
     void aFormatWithOnlyAFillerLayoutIsKept(@TempDir Path dir) throws Exception {
         // A format that sets no header/footer, name, order, or skin but does paint fillers still does something.
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   grid { condition = "", priority = 0, layout { fillers = [ { slot = 1, text = "<gold>x" } ] } }
                 }
@@ -230,9 +212,7 @@ class TablistContentCodecTest {
 
     @Test
     void aLayoutWithNoFillersIsEmptyAndDefaultDirection(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default { condition = "", priority = 0, header = [ "x" ], layout { fillers = [] } }
                 }
@@ -248,9 +228,7 @@ class TablistContentCodecTest {
     @Test
     void skipsAnInvalidOrDuplicateFillerSlot(@TempDir Path dir) throws Exception {
         RecordingLogger log = new RecordingLogger();
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default {
                     condition = ""
@@ -284,9 +262,7 @@ class TablistContentCodecTest {
         // grid), so two fillers would collide on one client cell. The codec bounds the slot to the grid capacity
         // (4 columns x rows) and rejects + logs the out-of-range one, exactly like the duplicate-slot guard.
         RecordingLogger log = new RecordingLogger();
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default {
                     condition = ""
@@ -319,9 +295,7 @@ class TablistContentCodecTest {
     void acceptsTheLastInGridSlotAndRejectsTheFirstOutOfGridSlot(@TempDir Path dir) throws Exception {
         // The boundary: slot 80 is the last cell of a 4x20 grid (kept), slot 81 is the first past it (rejected).
         RecordingLogger log = new RecordingLogger();
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default {
                     condition = ""
@@ -346,9 +320,7 @@ class TablistContentCodecTest {
 
     @Test
     void aFormatWithNoLayoutCarriesTheEmptyLayout(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default { condition = "", priority = 0, header = [ "<gold>Welcome" ] }
                 }
@@ -362,9 +334,7 @@ class TablistContentCodecTest {
     @Test
     void suppressRealPlayersDefaultsToFalse(@TempDir Path dir) throws Exception {
         // The gate is off unless explicitly set, so a format authored without it leaves the tab unchanged.
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   default { condition = "", priority = 0, header = [ "<gold>Welcome" ] }
                 }
@@ -377,9 +347,7 @@ class TablistContentCodecTest {
 
     @Test
     void suppressRealPlayersIsTrueWhenSet(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   synthetic {
                     condition = ""
@@ -399,9 +367,7 @@ class TablistContentCodecTest {
     void aSuppressOnlyFormatIsKept(@TempDir Path dir) throws Exception {
         // A format that sets no header/footer, name, order, skin, or layout but DOES suppress real players still alters
         // the tab, so it must survive the "drop the do-nothing format" filter.
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 formats {
                   hide { condition = "", priority = 0, suppress-real-players = true }
                 }
@@ -415,9 +381,7 @@ class TablistContentCodecTest {
 
     @Test
     void backCompatWrapsTheTopLevelTablistAsOneDefaultFormat(@TempDir Path dir) throws Exception {
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 enabled = true
                 tablist {
                   header = [ "<gold>Welcome", "<gray>%player_name%" ]
@@ -455,9 +419,7 @@ class TablistContentCodecTest {
     @Test
     void aBlankTablistBlockYieldsNoFormats(@TempDir Path dir) throws Exception {
         // The top-level tablist block exists but carries no header/footer; it must not produce an empty default format.
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 tablist {
                   header = []
                   footer = []
@@ -477,9 +439,7 @@ class TablistContentCodecTest {
         // The animations block is parsed by the shared AnimationDef.parseAll, the same parse the scoreboard codec uses,
         // so the grammar (FRAMES + SCROLL + skip-unknown-with-a-log) is identical across both HUD modules.
         RecordingLogger log = new RecordingLogger();
-        ConfigurationNode root = load(
-                dir,
-                """
+        ConfigurationNode root = load(dir, """
                 enabled = true
                 animations {
                   blink { type = "FRAMES", frames = [ "ON", "OFF" ], interval-ticks = 10 }

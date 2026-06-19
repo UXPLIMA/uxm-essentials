@@ -58,9 +58,7 @@ class CommunicationSettingsSplitTest {
     @Test
     void aPageMayDeclareAnExplicitPageSizeViaTheSectionForm(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("info-pages.conf"),
-                """
+        Files.writeString(dir.resolve("info-pages.conf"), """
                 info-pages {
                   rules = [ "Rule one", "Rule two" ]
                   info { lines = [ "a", "b", "c" ], page-size = 2 }
@@ -113,9 +111,7 @@ class CommunicationSettingsSplitTest {
     @Test
     void parsesTheRichPerAnnouncementForm(@TempDir Path dir) throws Exception {
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("announcer.conf"),
-                """
+        Files.writeString(dir.resolve("announcer.conf"), """
                 announcer {
                   default-interval-seconds = 200
                   min-players = 3
@@ -163,9 +159,7 @@ class CommunicationSettingsSplitTest {
 
     private static void writeSplitFiles(Path dir) throws Exception {
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("join-quit.conf"),
-                """
+        Files.writeString(dir.resolve("join-quit.conf"), """
                 join { mode = CUSTOM, ordering = SEQUENTIAL, templates = [ "welcome {player}" ] }
                 quit { mode = DEFAULT }
                 death { mode = DEFAULT }
@@ -175,9 +169,7 @@ class CommunicationSettingsSplitTest {
         Files.writeString(
                 dir.resolve("announcer.conf"),
                 "announcer { interval-seconds = 60, min-players = 0, ordering = SEQUENTIAL, lines = [ \"tip a\", \"tip b\" ] }\n");
-        Files.writeString(
-                dir.resolve("info-pages.conf"),
-                """
+        Files.writeString(dir.resolve("info-pages.conf"), """
                 info-pages {
                   rules = [ "Rule one", "Rule two" ]
                   motd = [ "Welcome {player}" ]

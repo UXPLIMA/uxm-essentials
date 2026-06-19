@@ -287,7 +287,9 @@ public final class VoteWiring {
     }
 
     /** The Discord wiring outcome: the subscribed notifier and the scheduled top-voter handle (both nullable). */
-    record Discord(@Nullable VoteDiscordNotifier notifier, @Nullable AutoCloseable topVoterTask) {}
+    record Discord(
+            @Nullable VoteDiscordNotifier notifier,
+            @Nullable AutoCloseable topVoterTask) {}
 
     /**
      * Schedule the recurring top-voter Discord embed when the top-voter feature is enabled. The repeating
@@ -315,10 +317,12 @@ public final class VoteWiring {
         kernel.scheduler().async(() -> {
             List<com.uxplima.uxmessentials.vote.application.port.VoteRanking> rankings =
                     repository.topVoters(topVoter.period(), topVoter.limit());
-            notifier.postTopVoter(rankings, uuid -> kernel.playerLookup()
-                    .findByUuid(uuid)
-                    .map(PlayerRef::name)
-                    .orElse(uuid.toString().toLowerCase(java.util.Locale.ROOT)));
+            notifier.postTopVoter(
+                    rankings,
+                    uuid -> kernel.playerLookup()
+                            .findByUuid(uuid)
+                            .map(PlayerRef::name)
+                            .orElse(uuid.toString().toLowerCase(java.util.Locale.ROOT)));
         });
     }
 

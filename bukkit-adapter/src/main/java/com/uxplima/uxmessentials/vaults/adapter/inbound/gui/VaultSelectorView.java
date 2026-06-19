@@ -235,9 +235,9 @@ public final class VaultSelectorView {
         switch (error) {
             case AMOUNT_EXCEEDED -> notifier.amountExceeded(viewer, index);
             case NONE_OWNED -> notifier.noneOwned(viewer);
-                // Only owned vaults are clickable, so a charge failure here is the per-open fee.
-            case CANNOT_AFFORD -> notifier.cannotAfford(
-                    viewer, chargeSettings.costToOpen().toPlainString());
+            // Only owned vaults are clickable, so a charge failure here is the per-open fee.
+            case CANNOT_AFFORD ->
+                notifier.cannotAfford(viewer, chargeSettings.costToOpen().toPlainString());
             case DELETE_UNKNOWN -> notifier.deleteUnknown(viewer, index);
             case VAULT_UNKNOWN -> notifier.renameUnknown(viewer, index);
         }

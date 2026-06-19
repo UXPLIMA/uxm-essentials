@@ -122,10 +122,10 @@ final class CommunicationContentCodec {
         return Map.copyOf(overrides);
     }
 
-    /**
-     * Parse the optional {@code announcer.display} block — the title fade/stay/fade timing and the boss-bar colour,
-     * overlay, and visible-seconds the {@code TITLE}/{@code SUBTITLE}/{@code BOSS_BAR} channels render with. Every
-     * field defaults to the same values the vote broadcaster uses, and colour/overlay names are tolerant of typos.
+    /*
+     * Parse the optional announcer.display block — the title fade/stay/fade timing and the boss-bar colour,
+     * overlay, and visible-seconds the TITLE/SUBTITLE/BOSS_BAR channels render with. Every field defaults to
+     * the same values the vote broadcaster uses, and colour/overlay names are tolerant of typos.
      */
     /** The default announcer display timing, used for inert content and as each field's fallback. */
     static ChannelDisplay defaultDisplay() {

@@ -24,8 +24,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class RewardCatalogLoaderTest {
 
-    private static final String SAMPLE =
-            """
+    private static final String SAMPLE = """
             enabled = true
             rewards {
               per-vote = [
@@ -135,9 +134,7 @@ class RewardCatalogLoaderTest {
     @Test
     void malformedEntriesAreSkippedNotFatal(@TempDir Path dir) throws IOException {
         // A milestone with neither at nor every, and an item with no material, are both dropped.
-        RewardCatalog catalog = load(
-                dir,
-                """
+        RewardCatalog catalog = load(dir, """
                 rewards {
                   per-vote = [ { commands = [ "ok" ], items = [ { amount = 2 }, { material = "STONE" } ] } ]
                   milestones = [ { commands = [ "no-threshold" ] } ]

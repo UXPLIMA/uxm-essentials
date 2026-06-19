@@ -46,8 +46,9 @@ public final class ListBans {
     }
 
     private Map<String, String> entry(BanEntry ban) {
-        String name = players.findByUuid(ban.target()).map(PlayerRef::name).orElseGet(() -> ban.target()
-                .toString());
+        String name = players.findByUuid(ban.target())
+                .map(PlayerRef::name)
+                .orElseGet(() -> ban.target().toString());
         return Map.of(
                 "player", name,
                 "issuer", ban.issuer().name(),

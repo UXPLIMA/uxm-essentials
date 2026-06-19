@@ -49,12 +49,13 @@ public final class MapMarkerService {
         Objects.requireNonNull(event, "event");
         switch (event) {
             case WarpCreated created -> publishWarp(created);
-            case WarpDeleted deleted -> remove(
-                    MapMarkerKind.WARP, deleted.name().value());
+            case WarpDeleted deleted ->
+                remove(MapMarkerKind.WARP, deleted.name().value());
             case HomeCreated created -> publishHome(created);
-            case HomeDeleted deleted -> remove(
-                    MapMarkerKind.HOME,
-                    homeName(deleted.owner().uuid(), deleted.slot().index()));
+            case HomeDeleted deleted ->
+                remove(
+                        MapMarkerKind.HOME,
+                        homeName(deleted.owner().uuid(), deleted.slot().index()));
             default -> {
                 // Not a marker-bearing event; nothing to render.
             }

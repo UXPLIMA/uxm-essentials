@@ -101,8 +101,8 @@ public final class BukkitSanctions implements Sanctions {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(jail, "jail");
         Optional<Location> location = jailLocation(jail);
-        location.ifPresent(
-                loc -> scheduler.onEntity(target, () -> withPlayer(target, player -> teleport(player, loc))));
+        location.ifPresent(loc ->
+                scheduler.onEntity(target, () -> withPlayer(target, player -> teleport(player, loc))));
     }
 
     @Override

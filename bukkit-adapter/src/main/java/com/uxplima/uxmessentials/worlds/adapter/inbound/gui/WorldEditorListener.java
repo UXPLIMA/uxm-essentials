@@ -101,11 +101,13 @@ public final class WorldEditorListener implements Listener {
 
     private void dispatchMain(Player player, WorldEditorHolder h, WorldName world, MainAction action) {
         switch (action) {
-            case RULES -> gridView.open(
-                    player, h.viewer(), world, WorldEditorScreen.RULES, WorldPropertyGridView.RULES_PROPERTIES);
+            case RULES ->
+                gridView.open(
+                        player, h.viewer(), world, WorldEditorScreen.RULES, WorldPropertyGridView.RULES_PROPERTIES);
             case GENERATION -> generationView.open(player, h.viewer(), world);
-            case ACCESS -> gridView.open(
-                    player, h.viewer(), world, WorldEditorScreen.ACCESS, WorldPropertyGridView.ACCESS_PROPERTIES);
+            case ACCESS ->
+                gridView.open(
+                        player, h.viewer(), world, WorldEditorScreen.ACCESS, WorldPropertyGridView.ACCESS_PROPERTIES);
             case BACK -> listView.open(player, h.viewer(), 0);
             case TOGGLE_LOAD -> toggleLoad(player, h, world);
         }

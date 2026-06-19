@@ -980,9 +980,10 @@ public final class PlaceholderResolver {
             case "warmup_remaining" -> online ? remainingSeconds(teleport.warmupRemaining(who)) : EMPTY;
             case "warmup_remaining_formatted" -> online ? remainingFormatted(teleport.warmupRemaining(who)) : EMPTY;
             case "back_available" -> bool(teleport.backLocation(who).isPresent());
-            case "back_world" -> teleport.backLocation(who)
-                    .map(TeleportPlaceholders.BackView::world)
-                    .orElse(EMPTY);
+            case "back_world" ->
+                teleport.backLocation(who)
+                        .map(TeleportPlaceholders.BackView::world)
+                        .orElse(EMPTY);
             case "back_x" -> backCoordinate(teleport.backLocation(who), TeleportPlaceholders.BackView::blockX);
             case "back_y" -> backCoordinate(teleport.backLocation(who), TeleportPlaceholders.BackView::blockY);
             case "back_z" -> backCoordinate(teleport.backLocation(who), TeleportPlaceholders.BackView::blockZ);

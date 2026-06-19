@@ -193,9 +193,8 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
                 delayThenContinue(viewer, actions, continueIndex, action.value());
                 yield Step.PARKED;
             }
-            case CHANCE, PERMISSION, CONDITION, COST -> gate(viewer, action) == Verdict.DENY
-                    ? Step.STOP
-                    : Step.CONTINUE;
+            case CHANCE, PERMISSION, CONDITION, COST ->
+                gate(viewer, action) == Verdict.DENY ? Step.STOP : Step.CONTINUE;
             case RANDOM -> Step.CONTINUE; // a RANDOM marker is sequenced in runFrom, never reached as a single step
             default -> {
                 effect(viewer, action);

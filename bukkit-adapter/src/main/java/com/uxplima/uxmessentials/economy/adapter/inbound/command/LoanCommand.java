@@ -136,10 +136,14 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                     .findFirst();
 
             if (oLoan.isEmpty()) {
-                services.scheduler().onEntity(senderRef, () -> services.notifier()
-                        .send(
+                services.scheduler()
+                        .onEntity(
                                 senderRef,
-                                com.uxplima.uxmessentials.economy.application.EconomyMessageKey.LOAN_NOT_FOUND));
+                                () -> services.notifier()
+                                        .send(
+                                                senderRef,
+                                                com.uxplima.uxmessentials.economy.application.EconomyMessageKey
+                                                        .LOAN_NOT_FOUND));
                 return;
             }
 

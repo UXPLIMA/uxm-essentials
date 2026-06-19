@@ -63,8 +63,8 @@ public final class TablistSkinResolver {
     public Optional<TabSkin> resolve(TablistSkinSource source) {
         Objects.requireNonNull(source, "source");
         return switch (source) {
-            case Texture texture -> Optional.of(
-                    new TabSkin(texture.value(), texture.signature().orElse(null)));
+            case Texture texture ->
+                Optional.of(new TabSkin(texture.value(), texture.signature().orElse(null)));
             case PlayerName playerName -> resolvePlayer(playerName.name());
         };
     }

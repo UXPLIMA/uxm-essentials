@@ -262,21 +262,22 @@ public final class ExchangeGuiView {
     private void handleExchangeResult(Player player, ExchangeOutcome result, Currency source, Currency target) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
         switch (result.status()) {
-            case SUCCESS -> sendPrefixed(
-                    player,
-                    viewerRef,
-                    EconomyMessageKey.EXCHANGE_SUCCESS,
-                    Map.of(
-                            "source-amount", notifier.amount(Money.of(source, result.sourceAmount())),
-                            "target-amount", notifier.amount(Money.of(target, result.targetAmount()))));
+            case SUCCESS ->
+                sendPrefixed(
+                        player,
+                        viewerRef,
+                        EconomyMessageKey.EXCHANGE_SUCCESS,
+                        Map.of(
+                                "source-amount", notifier.amount(Money.of(source, result.sourceAmount())),
+                                "target-amount", notifier.amount(Money.of(target, result.targetAmount()))));
             case RATE_NOT_FOUND -> sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_RATE_NOT_FOUND, Map.of());
-            case INSUFFICIENT_FUNDS -> sendPrefixed(
-                    player, viewerRef, EconomyMessageKey.EXCHANGE_INSUFFICIENT_FUNDS, Map.of());
+            case INSUFFICIENT_FUNDS ->
+                sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_INSUFFICIENT_FUNDS, Map.of());
             case LIMIT_EXCEEDED -> sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_LIMIT_EXCEEDED, Map.of());
-            case PROVIDER_UNSUPPORTED -> sendPrefixed(
-                    player, viewerRef, EconomyMessageKey.EXCHANGE_PROVIDER_UNSUPPORTED, Map.of());
-            case CURRENCY_DISABLED -> sendPrefixed(
-                    player, viewerRef, EconomyMessageKey.EXCHANGE_CURRENCY_DISABLED, Map.of());
+            case PROVIDER_UNSUPPORTED ->
+                sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_PROVIDER_UNSUPPORTED, Map.of());
+            case CURRENCY_DISABLED ->
+                sendPrefixed(player, viewerRef, EconomyMessageKey.EXCHANGE_CURRENCY_DISABLED, Map.of());
             case FAILED -> {
                 com.uxplima.uxmessentials.economy.domain.TransferError err = result.error();
                 sendPrefixed(player, viewerRef, err != null ? err.messageKey() : EconomyMessageKey.PAY_ERROR, Map.of());

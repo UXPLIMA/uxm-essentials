@@ -246,10 +246,15 @@ public final class VoteCommand implements CommandRegistration {
         }
         PlayerRef viewer = BukkitRefs.toRef(sender);
         // Resolve real names from the PlayerLookup; fall back to UUID string when profile is unknown.
-        services.scheduler().async(() -> services.topVoters().top(viewer, period, uuid -> services.playerLookup()
-                .findByUuid(uuid)
-                .map(PlayerRef::name)
-                .orElse(uuid.toString().toLowerCase(Locale.ROOT))));
+        services.scheduler()
+                .async(() -> services.topVoters()
+                        .top(
+                                viewer,
+                                period,
+                                uuid -> services.playerLookup()
+                                        .findByUuid(uuid)
+                                        .map(PlayerRef::name)
+                                        .orElse(uuid.toString().toLowerCase(Locale.ROOT))));
         return Command.SINGLE_SUCCESS;
     }
 

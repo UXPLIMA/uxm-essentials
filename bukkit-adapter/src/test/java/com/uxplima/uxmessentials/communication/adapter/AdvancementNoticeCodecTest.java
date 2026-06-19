@@ -27,8 +27,7 @@ class AdvancementNoticeCodecTest {
 
     @Test
     void anAuthoredBlockMapsEveryField() {
-        AdvancementNoticeConfig cfg = parse(
-                        """
+        AdvancementNoticeConfig cfg = parse("""
                         advancements {
                           enabled = true
                           exclude-recipes = false
@@ -42,8 +41,7 @@ class AdvancementNoticeCodecTest {
                             "minecraft:end/kill_dragon" = "<gold>{player} slew the dragon!"
                           }
                         }
-                        """)
-                .advancements();
+                        """).advancements();
 
         assertThat(cfg.enabled()).isTrue();
         assertThat(cfg.excludeRecipes()).isFalse();
@@ -60,14 +58,12 @@ class AdvancementNoticeCodecTest {
 
     @Test
     void anEnabledBlockWithNoChannelsDefaultsToChat() {
-        AdvancementNoticeConfig cfg = parse(
-                        """
+        AdvancementNoticeConfig cfg = parse("""
                         advancements {
                           enabled = true
                           template = "{player} {title}"
                         }
-                        """)
-                .advancements();
+                        """).advancements();
 
         assertThat(cfg.channels()).containsExactly(BroadcastChannel.CHAT);
         assertThat(cfg.sound()).isEmpty();

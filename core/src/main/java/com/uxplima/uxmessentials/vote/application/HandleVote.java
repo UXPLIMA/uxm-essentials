@@ -159,8 +159,8 @@ public final class HandleVote {
     private static long periodKey(PartyResetSchedule schedule, LocalDate date) {
         return switch (schedule) {
             case DAILY -> date.toEpochDay();
-            case WEEKLY -> (long) date.get(IsoFields.WEEK_BASED_YEAR) * 100
-                    + date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+            case WEEKLY ->
+                (long) date.get(IsoFields.WEEK_BASED_YEAR) * 100 + date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
             case NONE -> 0L;
         };
     }

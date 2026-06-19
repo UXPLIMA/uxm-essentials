@@ -26,9 +26,7 @@ class BroadcastSettingsLoaderTest {
 
     @Test
     void parsesEveryFieldOfASectionBlock(@TempDir Path dir) throws IOException {
-        BroadcastSettingsLoader.Loaded loaded = load(
-                dir,
-                """
+        BroadcastSettingsLoader.Loaded loaded = load(dir, """
                 broadcast {
                   type = "COOLDOWN_PER_PLAYER"
                   cooldown-seconds = 30

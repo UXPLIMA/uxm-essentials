@@ -157,6 +157,9 @@ public final class LockingWalletRepository implements WalletRepository {
      * Take and release both owner stripes in UUID order (deadlock-free) with no I/O between them. As with
      * {@link #markOwner}, the critical section carries no DB or Redis call.
      */
+    // Lock identity is the point: lo and hi can map to the same stripe, and locking that one stripe twice
+    // would deadlock — so the guard is a deliberate reference (==) comparison, not value equality.
+    @SuppressWarnings("ReferenceEquality")
     private void markOwners(UUID first, UUID second) {
         UUID lo = first.compareTo(second) <= 0 ? first : second;
         UUID hi = first.compareTo(second) <= 0 ? second : first;

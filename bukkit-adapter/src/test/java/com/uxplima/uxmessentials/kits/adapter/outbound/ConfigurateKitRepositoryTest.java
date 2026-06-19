@@ -42,17 +42,13 @@ class ConfigurateKitRepositoryTest {
     void loadsMultiplePerKitFiles(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("starter.conf"),
-                """
+        Files.writeString(dir.resolve("starter.conf"), """
                 cooldown = 30
                 one-time = true
                 cost = "0"
                 items = []
                 """);
-        Files.writeString(
-                dir.resolve("vip.conf"),
-                """
+        Files.writeString(dir.resolve("vip.conf"), """
                 cooldown = 0
                 permission = true
                 cost = "100"
@@ -107,9 +103,7 @@ class ConfigurateKitRepositoryTest {
         Path dir = kitsDir(root);
         Path legacy = legacy(root);
         Files.createDirectories(legacy.getParent());
-        Files.writeString(
-                legacy,
-                """
+        Files.writeString(legacy, """
                 kits {
                   old {
                     cooldown = 5
@@ -182,9 +176,7 @@ class ConfigurateKitRepositoryTest {
     void readsVariantsCustomPermissionPreviewAndOffhand(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("daily.conf"),
-                """
+        Files.writeString(dir.resolve("daily.conf"), """
                 cooldown = 3600
                 permission = true
                 permission-node = "myserver.shared.kit"
@@ -243,9 +235,7 @@ class ConfigurateKitRepositoryTest {
     void readsRequirementsAndSkipsMalformedEntries(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("ranked.conf"),
-                """
+        Files.writeString(dir.resolve("ranked.conf"), """
                 cooldown = 0
                 items = []
                 requirements = [
@@ -367,9 +357,7 @@ class ConfigurateKitRepositoryTest {
     void readsTypedClaimAndDenyActionsInOrder(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("vote.conf"),
-                """
+        Files.writeString(dir.resolve("vote.conf"), """
                 cooldown = 0
                 items = []
                 claim-actions = [
@@ -397,17 +385,17 @@ class ConfigurateKitRepositoryTest {
                         com.uxplima.uxmessentials.kits.domain.KitActionType.FIREWORK);
         assertThat(vote.claimActions().get(0).beforeItems()).isTrue();
         assertThat(vote.claimActions().get(3).countAsItem()).isTrue();
-        assertThat(vote.denyActions()).singleElement().satisfies(a -> assertThat(a.type())
-                .isEqualTo(com.uxplima.uxmessentials.kits.domain.KitActionType.SOUND));
+        assertThat(vote.denyActions())
+                .singleElement()
+                .satisfies(
+                        a -> assertThat(a.type()).isEqualTo(com.uxplima.uxmessentials.kits.domain.KitActionType.SOUND));
     }
 
     @Test
     void legacyCommandsSoundParticlesMapIntoClaimActions(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("old.conf"),
-                """
+        Files.writeString(dir.resolve("old.conf"), """
                 cooldown = 0
                 items = []
                 commands = [ "say hi {player}", "give {player} dirt 1" ]
@@ -440,9 +428,7 @@ class ConfigurateKitRepositoryTest {
     void aLegacyKitRoundTripsUnchanged(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("old.conf"),
-                """
+        Files.writeString(dir.resolve("old.conf"), """
                 cooldown = 0
                 items = []
                 commands = [ "say hi {player}" ]
@@ -469,9 +455,7 @@ class ConfigurateKitRepositoryTest {
     void theNewActionBlockWinsOverLegacyKeysWhenBothPresent(@TempDir Path root) throws Exception {
         Path dir = kitsDir(root);
         Files.createDirectories(dir);
-        Files.writeString(
-                dir.resolve("both.conf"),
-                """
+        Files.writeString(dir.resolve("both.conf"), """
                 cooldown = 0
                 items = []
                 commands = [ "legacy command" ]

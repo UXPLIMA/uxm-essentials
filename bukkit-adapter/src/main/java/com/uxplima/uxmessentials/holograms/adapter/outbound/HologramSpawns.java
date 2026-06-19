@@ -45,8 +45,8 @@ final class HologramSpawns {
             MiniMessage miniMessage,
             TagResolver globalTags) {
         return switch (hologram.type()) {
-            case TEXT -> RenderedHologram.ofText(
-                    manager.spawn(builderFor(hologram, placeholders, miniMessage, globalTags), at));
+            case TEXT ->
+                RenderedHologram.ofText(manager.spawn(builderFor(hologram, placeholders, miniMessage, globalTags), at));
             case ITEM -> spawnItem(manager, log, hologram, at);
             case BLOCK -> spawnBlock(manager, log, hologram, at);
             case HEAD -> spawnHead(manager, log, hologram, at);

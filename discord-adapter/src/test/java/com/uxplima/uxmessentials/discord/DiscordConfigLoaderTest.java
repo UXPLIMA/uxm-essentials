@@ -27,9 +27,7 @@ class DiscordConfigLoaderTest {
     void editedConfigParsesTokenAndChannels(@TempDir Path dataFolder) throws Exception {
         Path file = dataFolder.resolve("config").resolve("discord.conf");
         Files.createDirectories(file.getParent());
-        Files.writeString(
-                file,
-                """
+        Files.writeString(file, """
                 enabled = true
                 token = "secret"
                 min-eco-notify = 250
@@ -53,9 +51,7 @@ class DiscordConfigLoaderTest {
     void blankChannelIdIsNotMapped(@TempDir Path dataFolder) throws Exception {
         Path file = dataFolder.resolve("config").resolve("discord.conf");
         Files.createDirectories(file.getParent());
-        Files.writeString(
-                file,
-                """
+        Files.writeString(file, """
                 enabled = true
                 token = "secret"
                 channels {

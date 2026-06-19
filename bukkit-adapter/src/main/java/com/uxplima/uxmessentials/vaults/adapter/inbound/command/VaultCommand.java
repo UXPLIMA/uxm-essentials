@@ -367,8 +367,9 @@ public final class VaultCommand implements CommandRegistration {
         switch (error) {
             case AMOUNT_EXCEEDED -> notifier.amountExceeded(viewer, index);
             case NONE_OWNED -> notifier.noneOwned(viewer);
-            case CANNOT_AFFORD -> notifier.cannotAfford(
-                    viewer, services.chargeSettings().costToCreate().toPlainString());
+            case CANNOT_AFFORD ->
+                notifier.cannotAfford(
+                        viewer, services.chargeSettings().costToCreate().toPlainString());
             case DELETE_UNKNOWN -> notifier.deleteUnknown(viewer, index);
             case VAULT_UNKNOWN -> notifier.renameUnknown(viewer, index);
         }

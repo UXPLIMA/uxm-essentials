@@ -12,7 +12,7 @@ dependencies {
 
     // Plugins the convention plugin applies via id("...") need to be on
     // buildSrc's compile classpath. Versions here must match libs.versions.toml.
-    implementation("com.diffplug.spotless:spotless-plugin-gradle:7.0.2")
-    implementation("net.ltgt.gradle:gradle-errorprone-plugin:4.4.0")
-    implementation("net.ltgt.gradle:gradle-nullaway-plugin:3.0.0")
+    implementation("com.diffplug.spotless:spotless-plugin-gradle:8.7.0")
+    implementation("net.ltgt.gradle:gradle-errorprone-plugin:5.1.0")
+    implementation("net.ltgt.gradle:gradle-nullaway-plugin:3.1.0")
 }

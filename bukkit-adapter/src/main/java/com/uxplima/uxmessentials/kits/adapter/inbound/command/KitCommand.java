@@ -258,8 +258,10 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
             return 0;
         }
         KitId id = KitId.of(ctx.getArgument("name", String.class));
-        services.kitEditor().open(ref(sender), id).asValue().ifPresent(kit -> services.kitEditorView()
-                .open(sender, ref(sender), kit));
+        services.kitEditor()
+                .open(ref(sender), id)
+                .asValue()
+                .ifPresent(kit -> services.kitEditorView().open(sender, ref(sender), kit));
         return Command.SINGLE_SUCCESS;
     }
 
