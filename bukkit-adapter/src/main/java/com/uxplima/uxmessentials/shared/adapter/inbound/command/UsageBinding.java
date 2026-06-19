@@ -19,6 +19,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -92,7 +93,7 @@ public final class UsageBinding {
     private void reply(CommandSender sender, String literal, String usage, String description) {
         Map<String, String> placeholders = Map.of("command", literal, "usage", usage, "description", description);
         String rendered = messages.resolve(refOf(sender), SharedMessageKey.COMMAND_USAGE, placeholders);
-        sender.sendMessage(MiniMessage.miniMessage().deserialize(rendered));
+        sender.sendMessage(MiniMessage.miniMessage().deserialize(rendered, StyleTags.resolver()));
     }
 
     private static PlayerRef refOf(CommandSender sender) {
