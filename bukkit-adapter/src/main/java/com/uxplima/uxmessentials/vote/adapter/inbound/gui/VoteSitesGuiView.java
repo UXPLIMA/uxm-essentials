@@ -14,8 +14,8 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DurationText;
@@ -86,7 +86,6 @@ public final class VoteSitesGuiView {
     private final Scheduler scheduler;
     private final Messages messages;
     private final GuiConfig guiConfig;
-    private final MiniMessage miniMessage;
 
     public VoteSitesGuiView(
             VoteSiteCatalog catalog,
@@ -99,7 +98,6 @@ public final class VoteSitesGuiView {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.guiConfig = Objects.requireNonNull(guiConfig, "guiConfig");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Whether the GUI is enabled in config (i.e. list-display = gui). */
@@ -185,7 +183,7 @@ public final class VoteSitesGuiView {
         Material material = entry.votable() ? guiConfig.votableMaterial() : guiConfig.cooldownMaterial();
 
         List<Component> lore = new ArrayList<>(2);
-        entry.spec().url().ifPresent(url -> lore.add(miniMessage.deserialize("<#7cc7ff>" + url)));
+        entry.spec().url().ifPresent(url -> lore.add(StyledText.render("<cta>" + url + "</cta>")));
         if (entry.votable()) {
             lore.add(text(viewer, VoteMessageKey.VOTE_GUI_SITE_VOTABLE, Map.of()));
         } else {
@@ -196,7 +194,7 @@ public final class VoteSitesGuiView {
         }
 
         return ItemBuilder.of(material)
-                .name(miniMessage.deserialize("<white>" + entry.spec().name()))
+                .name(StyledText.render("<value>" + entry.spec().name() + "</value>"))
                 .lore(lore)
                 .build();
     }
@@ -211,7 +209,7 @@ public final class VoteSitesGuiView {
     }
 
     private Component text(PlayerRef viewer, VoteMessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
     /** Per-site snapshot held while the GUI is being built. */

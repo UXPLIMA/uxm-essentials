@@ -16,6 +16,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -81,7 +82,7 @@ public final class BukkitVoteBroadcaster implements VoteBroadcaster {
         }
         String rendered = messages.resolve(who, key, placeholders);
         TagResolver prefix = Placeholder.parsed("prefix", messages.resolve(who, PREFIX, Map.of()));
-        return miniMessage.deserialize(rendered, prefix);
+        return miniMessage.deserialize(rendered, prefix, StyleTags.resolver());
     }
 
     /**
