@@ -16,7 +16,9 @@ import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
@@ -219,6 +221,12 @@ public final class BukkitWorldEngine implements WorldEngine {
     public int playerCount(WorldName name) {
         World world = server.getWorld(name.value());
         return world == null ? 0 : world.getPlayers().size();
+    }
+
+    @Override
+    public Optional<Position> spawnPoint(WorldName name) {
+        World world = server.getWorld(name.value());
+        return Optional.ofNullable(world).map(w -> BukkitRefs.toPosition(w.getSpawnLocation()));
     }
 
     private Path worldFolder(WorldName name) {

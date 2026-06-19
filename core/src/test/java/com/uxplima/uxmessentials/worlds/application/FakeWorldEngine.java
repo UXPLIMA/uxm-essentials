@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
@@ -19,6 +20,7 @@ final class FakeWorldEngine implements WorldEngine {
     WorldName defaultWorld = WorldName.of("world");
     int playerCount;
     Optional<DetectedWorld> scanResult = Optional.empty();
+    Optional<Position> spawnPoint = Optional.empty();
 
     @Nullable ManagedWorld lastLoaded;
 
@@ -83,5 +85,10 @@ final class FakeWorldEngine implements WorldEngine {
     @Override
     public int playerCount(WorldName name) {
         return playerCount;
+    }
+
+    @Override
+    public Optional<Position> spawnPoint(WorldName name) {
+        return spawnPoint;
     }
 }

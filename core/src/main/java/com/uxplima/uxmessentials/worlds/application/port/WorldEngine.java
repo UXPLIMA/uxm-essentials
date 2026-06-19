@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
@@ -55,6 +56,9 @@ public interface WorldEngine {
     Optional<UUID> uidOf(WorldName name);
 
     int playerCount(WorldName name);
+
+    /** The world's current spawn point, or empty when the world is not loaded/known. */
+    Optional<Position> spawnPoint(WorldName name);
 
     /** What a folder scan can determine about a world without loading it. */
     record DetectedWorld(WorldEnvironment environment, Optional<Long> seed) {}
