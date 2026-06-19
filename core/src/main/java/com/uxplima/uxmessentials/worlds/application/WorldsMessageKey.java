@@ -46,7 +46,14 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_GAMERULE_UNKNOWN("world.gamerule.unknown"),
     WORLD_GAMERULE_INVALID_VALUE("world.gamerule.invalid-value"),
     WORLD_SPAWN_SET("world.spawn-set"),
-    WORLD_ALIAS_SET("world.alias-set");
+    WORLD_ALIAS_SET("world.alias-set"),
+
+    WORLD_ENTER_DENIED_PERMISSION("world.enter.denied-permission"),
+    WORLD_ENTER_DENIED_FULL("world.enter.denied-full"),
+    WORLD_ENTER_FEE_INSUFFICIENT("world.enter.fee-insufficient"),
+    WORLD_ENTER_FEE_CHARGED("world.enter.fee-charged"),
+    WORLD_TP_DESTINATION_UNRESOLVED("world.tp.destination-unresolved"),
+    WORLD_TP_OTHER("world.tp.other");
 
     private final String key;
 
