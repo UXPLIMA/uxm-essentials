@@ -33,7 +33,7 @@ public final class StyleTags {
     public static final TextColor ERR_TO = TextColor.color(0xec6116);
 
     private static final String BRACKET_OPEN = "「 ";
-    private static final String BRACKET_CLOSE = " 」 ";
+    private static final String BRACKET_CLOSE = " 」";
 
     private static final TagResolver RESOLVER = build();
 
