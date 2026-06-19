@@ -19,11 +19,14 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitGameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldEngine;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldSettingApplier;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldTeleporter;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InFlightScheduler;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingDeletionRegistry;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
@@ -40,10 +43,13 @@ import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
 import com.uxplima.uxmessentials.worlds.application.SetWorldSpawn;
 import com.uxplima.uxmessentials.worlds.application.UnloadWorld;
 import com.uxplima.uxmessentials.worlds.application.UnregisterWorld;
+import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
 import com.uxplima.uxmessentials.worlds.application.WorldInfo;
 import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
+import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
 import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
+import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmessentials.worlds.application.port.WorldSettingApplier;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldLoaded;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldSettingChanged;
@@ -68,11 +74,18 @@ public final class WorldsWiring {
     private WorldsWiring() {}
 
     public static Wired wire(
-            ModuleContext ctx, Persistence persistence, Server server, InProcessDomainEventPublisher events) {
+            ModuleContext ctx,
+            Persistence persistence,
+            Server server,
+            InProcessDomainEventPublisher events,
+            TeleportEngine teleportEngine,
+            WorldEntryFee entryFee) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(events, "events");
+        Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(entryFee, "entryFee");
         KernelPorts kernel = ctx.kernel();
 
         CachedWorldRepository repository = WorldRepositories.cachedConcrete(persistence);
@@ -93,8 +106,30 @@ public final class WorldsWiring {
         WorldSettingApplier applier = new BukkitWorldSettingApplier(server, ruleCatalog, kernel.log());
         ApplyWorldSettingsOnLoad onLoad = new ApplyWorldSettingsOnLoad(repository, applier);
 
-        WorldsServices services =
-                assemble(kernel, tracked, repository, notifier, engine, pending, settings, clock, ruleCatalog);
+        WorldAccessPolicy policy = new WorldAccessPolicy(kernel.permissions(), engine);
+        BukkitWorldTeleporter teleporter = new BukkitWorldTeleporter(teleportEngine);
+        WorldTeleportService worldTeleport = new WorldTeleportService(
+                repository,
+                engine,
+                policy,
+                teleporter,
+                entryFee,
+                kernel.permissions(),
+                kernel.events(),
+                notifier,
+                tracked);
+        WorldAccessListener accessListener = new WorldAccessListener(
+                repository,
+                policy,
+                worldTeleport,
+                engine,
+                kernel.events(),
+                kernel.scheduler(),
+                notifier,
+                settings.redirectOnRestrictedJoin());
+
+        WorldsServices services = assemble(
+                kernel, tracked, repository, notifier, engine, pending, settings, clock, ruleCatalog, worldTeleport);
         ReconcileWorldsOnEnable reconcile = new ReconcileWorldsOnEnable(
                 repository, engine, kernel.events(), clock, settings::autoAdoptLoaded, settings::autoLoadRegistered);
 
@@ -110,7 +145,7 @@ public final class WorldsWiring {
         };
         events.subscribe(applySubscriber);
 
-        List<Listener> listeners = List.of(new ForceGamemodeListener(repository, kernel.scheduler()));
+        List<Listener> listeners = List.of(new ForceGamemodeListener(repository, kernel.scheduler()), accessListener);
         List<CommandRegistration> commands = WorldCommands.all(services, kernel.messages());
         Runnable startReconcile = () -> kernel.scheduler().onGlobal(() -> {
             reconcile.run();
@@ -145,7 +180,8 @@ public final class WorldsWiring {
             InMemoryPendingDeletionRegistry pending,
             WorldsSettings settings,
             Clock clock,
-            GameRuleCatalog ruleCatalog) {
+            GameRuleCatalog ruleCatalog,
+            WorldTeleportService worldTeleport) {
         CreateWorld createWorld = new CreateWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
         ImportWorld importWorld = new ImportWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
         LoadWorld loadWorld = new LoadWorld(repository, engine, notifier, kernel.events(), scheduler);
@@ -182,7 +218,8 @@ public final class WorldsWiring {
                 ruleCatalog,
                 repository,
                 kernel.scheduler(),
-                engine::onDiskWorldNames);
+                engine::onDiskWorldNames,
+                worldTeleport);
     }
 
     /**

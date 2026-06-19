@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.worlds.application.SetWorldSpawn;
 import com.uxplima.uxmessentials.worlds.application.UnloadWorld;
 import com.uxplima.uxmessentials.worlds.application.UnregisterWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldInfo;
+import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
@@ -46,6 +47,7 @@ public final class WorldsServices {
     private final SetGamerule setGamerule;
     private final SetWorldSpawn setWorldSpawn;
     private final SetWorldAlias setWorldAlias;
+    private final WorldTeleportService worldTeleport;
     private final GameRuleCatalog gameRuleCatalog;
     private final WorldRepository repository;
     private final Scheduler scheduler;
@@ -68,7 +70,8 @@ public final class WorldsServices {
             GameRuleCatalog gameRuleCatalog,
             WorldRepository repository,
             Scheduler scheduler,
-            Supplier<Set<WorldName>> onDiskScanner) {
+            Supplier<Set<WorldName>> onDiskScanner,
+            WorldTeleportService worldTeleport) {
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
         this.importWorld = Objects.requireNonNull(importWorld, "importWorld");
         this.loadWorld = Objects.requireNonNull(loadWorld, "loadWorld");
@@ -85,6 +88,7 @@ public final class WorldsServices {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.onDiskScanner = Objects.requireNonNull(onDiskScanner, "onDiskScanner");
+        this.worldTeleport = Objects.requireNonNull(worldTeleport, "worldTeleport");
     }
 
     public CreateWorld createWorld() {
@@ -133,6 +137,10 @@ public final class WorldsServices {
 
     public SetWorldAlias setWorldAlias() {
         return setWorldAlias;
+    }
+
+    public WorldTeleportService worldTeleport() {
+        return worldTeleport;
     }
 
     /** The server's gamerule names for {@code /world gamerule} tab-completion. */

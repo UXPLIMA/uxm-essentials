@@ -115,6 +115,8 @@ import com.uxplima.uxmessentials.vote.adapter.VoteWiring;
 import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.LinkedWorldEntryFee;
+import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmlib.gui.Guis;
 import org.jspecify.annotations.NullMarked;
 
@@ -332,7 +334,7 @@ public final class PluginModule {
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
-            wireWorlds(plugin, ctx, persistence, resources);
+            wireWorlds(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("homes"))) {
             wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts);
         } else if (module.id().equals(ModuleId.of("economy"))) {
@@ -407,17 +409,29 @@ public final class PluginModule {
     }
 
     private static void wireWorlds(
-            JavaPlugin plugin, ModuleContext ctx, Persistence persistence, CloseableResources resources) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
         // worlds builds its cached jOOQ WorldRepository over persistence.dsl() and its BukkitWorldEngine over the
-        // plugin's Server. It carries no cross-context bridge — its collaborators are the shared kernel ports and
-        // the engine. The enable-time reconcile (adopt already-loaded worlds, auto-load registered ones) is kicked
-        // on the global region thread the moment wiring completes, then drops the warm snapshot and refreshes the
-        // import-folder candidates off-tick. The in-process bus is the concrete publisher so the live-apply
-        // subscriber (re-apply stored settings on world load / setting change) can be registered here and
-        // unsubscribed on stop; the kernel port exposes only publish.
+        // plugin's Server. It delegates /worlds tp and /worlds spawn execution to the captured teleport engine (wired
+        // earlier) and charges the per-world entry fee through the economy bridge — but economy lands after worlds, so
+        // the fee resolves its provider/currency lazily at charge time (free until economy is up, free for good when
+        // economy is disabled). The enable-time reconcile (adopt already-loaded worlds, auto-load registered ones) is
+        // kicked on the global region thread the moment wiring completes, then drops the warm snapshot and refreshes
+        // the
+        // import-folder candidates off-tick. The in-process bus is the concrete publisher so the live-apply subscriber
+        // (re-apply stored settings on world load / setting change) can be registered here and unsubscribed on stop;
+        // the
+        // kernel port exposes only publish.
+        TeleportEngine engine = Objects.requireNonNull(
+                links.teleportEngine,
+                "worlds /worlds tp and /worlds spawn delegate teleport execution but the teleport engine is unavailable");
+        WorldEntryFee entryFee = new LinkedWorldEntryFee(() -> links.economyProvider, () -> links.economyCurrency);
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        WorldsWiring.Wired wired = WorldsWiring.wire(ctx, persistence, plugin.getServer(), events);
+        WorldsWiring.Wired wired = WorldsWiring.wire(ctx, persistence, plugin.getServer(), events, engine, entryFee);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Capture the generator resolver for the plugin's getDefaultWorldGenerator hook before kicking the
@@ -464,6 +478,8 @@ public final class PluginModule {
             ContextLinks links,
             Bus bus) {
         EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence, bus);
+        links.economyProvider = wired.provider();
+        links.economyCurrency = wired.defaultCurrency();
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.start();
@@ -891,6 +907,11 @@ public final class PluginModule {
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
         private @org.jspecify.annotations.Nullable TeleportEngine teleportEngine;
+        // The live economy provider and default currency, captured during economy wiring (which lands after
+        // worlds). worlds resolves them lazily at fee-charge time, so a null here simply means "free worlds".
+        private com.uxplima.uxmessentials.economy.application.port.@org.jspecify.annotations.Nullable EconomyProvider
+                economyProvider;
+        private com.uxplima.uxmessentials.economy.domain.@org.jspecify.annotations.Nullable Currency economyCurrency;
         private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;

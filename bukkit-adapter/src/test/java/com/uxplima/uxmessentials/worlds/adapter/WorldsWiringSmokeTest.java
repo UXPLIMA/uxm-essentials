@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.worlds.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
 import java.util.List;
@@ -9,14 +10,36 @@ import java.util.Optional;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
+import com.uxplima.uxmessentials.worlds.application.CreateWorld;
+import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
+import com.uxplima.uxmessentials.worlds.application.ImportWorld;
+import com.uxplima.uxmessentials.worlds.application.ListWorlds;
+import com.uxplima.uxmessentials.worlds.application.LoadWorld;
+import com.uxplima.uxmessentials.worlds.application.SetGamerule;
+import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
+import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
+import com.uxplima.uxmessentials.worlds.application.SetWorldSpawn;
+import com.uxplima.uxmessentials.worlds.application.UnloadWorld;
+import com.uxplima.uxmessentials.worlds.application.UnregisterWorld;
+import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
+import com.uxplima.uxmessentials.worlds.application.WorldInfo;
+import com.uxplima.uxmessentials.worlds.application.WorldNotifier;
+import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
+import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
+import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.BiomeId;
 import com.uxplima.uxmessentials.worlds.domain.FlatLayerPlan;
@@ -72,12 +95,58 @@ class WorldsWiringSmokeTest {
     }
 
     @Test
-    void wiredCarriesTheForceGamemodeListener() {
-        List<Listener> listeners = List.of(new ForceGamemodeListener(new NoOpRepository(), new NoOpScheduler()));
+    void wiredCarriesTheForceGamemodeAndAccessListeners() {
+        List<Listener> listeners =
+                List.of(new ForceGamemodeListener(new NoOpRepository(), new NoOpScheduler()), accessListener());
 
         WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), listeners, () -> {}, () -> {}, resolver());
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
+        assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldAccessListener.class);
+    }
+
+    @Test
+    void servicesExposeTheWorldTeleportUseCaseAndStillRegisterCommands() {
+        WorldTeleportService worldTeleport = mock(WorldTeleportService.class);
+        WorldsServices services = services(worldTeleport);
+
+        assertThat(services.worldTeleport()).isSameAs(worldTeleport);
+
+        List<CommandRegistration> commands = WorldCommands.all(services, mock(Messages.class));
+        assertThat(commands).isNotEmpty();
+    }
+
+    private static WorldAccessListener accessListener() {
+        return new WorldAccessListener(
+                new NoOpRepository(),
+                mock(WorldAccessPolicy.class),
+                mock(WorldTeleportService.class),
+                mock(WorldEngine.class),
+                mock(DomainEventPublisher.class),
+                new NoOpScheduler(),
+                mock(WorldNotifier.class),
+                true);
+    }
+
+    private static WorldsServices services(WorldTeleportService worldTeleport) {
+        return new WorldsServices(
+                mock(CreateWorld.class),
+                mock(ImportWorld.class),
+                mock(LoadWorld.class),
+                mock(UnloadWorld.class),
+                mock(UnregisterWorld.class),
+                mock(DeleteWorld.class),
+                mock(ListWorlds.class),
+                mock(WorldInfo.class),
+                mock(SetWorldProperty.class),
+                mock(SetGamerule.class),
+                mock(SetWorldSpawn.class),
+                mock(SetWorldAlias.class),
+                mock(GameRuleCatalog.class),
+                new NoOpRepository(),
+                new NoOpScheduler(),
+                java.util.Set::of,
+                worldTeleport);
     }
 
     @Test
