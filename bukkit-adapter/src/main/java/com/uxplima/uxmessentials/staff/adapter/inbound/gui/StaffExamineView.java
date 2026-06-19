@@ -9,8 +9,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -37,21 +37,19 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class StaffExamineView {
 
-    private static final String PICKER_TITLE = "<dark_gray>Examine — pick a player";
+    private static final String PICKER_TITLE = "<h:'Examine — pick a player'>";
     private static final int PICKER_ROWS = 6;
 
     private final Messages messages;
     private final MessageSink sink;
     private final Scheduler scheduler;
     private final StaffServices services;
-    private final MiniMessage miniMessage;
 
     public StaffExamineView(Messages messages, MessageSink sink, Scheduler scheduler, StaffServices services) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.services = Objects.requireNonNull(services, "services");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Open the examine picker for {@code looker}, on their entity region thread. */
@@ -63,7 +61,7 @@ public final class StaffExamineView {
 
     private void buildAndOpen(Player looker, PlayerRef lookerRef) {
         PaginatedGui gui = Guis.paginated()
-                .title(miniMessage.deserialize(PICKER_TITLE))
+                .title(StyledText.render(PICKER_TITLE))
                 .rows(PICKER_ROWS)
                 .build();
         for (Player online : Bukkit.getOnlinePlayers()) {

@@ -11,8 +11,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -44,7 +44,6 @@ abstract class StaffTeleportPicker {
     private final MessageSink sink;
     private final Scheduler scheduler;
     private final StaffTeleport teleport;
-    private final MiniMessage miniMessage;
 
     StaffTeleportPicker(
             Server server, Messages messages, MessageSink sink, Scheduler scheduler, StaffTeleport teleport) {
@@ -53,7 +52,6 @@ abstract class StaffTeleportPicker {
         this.sink = Objects.requireNonNull(sink, "sink");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.teleport = Objects.requireNonNull(teleport, "teleport");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** The picker's title key, resolved in the looker's locale. */
@@ -92,7 +90,7 @@ abstract class StaffTeleportPicker {
     }
 
     private Component title(PlayerRef lookerRef) {
-        return miniMessage.deserialize(messages.resolve(lookerRef, titleKey(), Map.of()));
+        return StyledText.render(messages.resolve(lookerRef, titleKey(), Map.of()));
     }
 
     private GuiItem headFor(Player looker, PlayerRef lookerRef, PaginatedGui gui, Player target) {
