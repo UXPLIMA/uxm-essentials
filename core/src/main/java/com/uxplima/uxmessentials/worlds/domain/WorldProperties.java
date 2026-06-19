@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.worlds.domain;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,9 +17,21 @@ public final class WorldProperties {
     public static final WorldProperty<Long> TIME = WorldProperty.ofTicks("time");
     public static final WorldProperty<WeatherLock> WEATHER =
             WorldProperty.ofEnum("weather", WeatherLock.NONE, WeatherLock.class);
+    public static final WorldProperty<Boolean> ACCESS_RESTRICTED = WorldProperty.ofBoolean("access-restricted", false);
+    public static final WorldProperty<Integer> PLAYER_LIMIT = WorldProperty.ofInteger("player-limit", 0);
+    public static final WorldProperty<BigDecimal> ENTRY_FEE = WorldProperty.ofDecimal("entry-fee");
 
-    public static final List<WorldProperty<?>> ALL =
-            List.of(PVP, DIFFICULTY, FORCE_GAMEMODE, SPAWN_ANIMALS, SPAWN_MONSTERS, TIME, WEATHER);
+    public static final List<WorldProperty<?>> ALL = List.of(
+            PVP,
+            DIFFICULTY,
+            FORCE_GAMEMODE,
+            SPAWN_ANIMALS,
+            SPAWN_MONSTERS,
+            TIME,
+            WEATHER,
+            ACCESS_RESTRICTED,
+            PLAYER_LIMIT,
+            ENTRY_FEE);
 
     private WorldProperties() {}
 

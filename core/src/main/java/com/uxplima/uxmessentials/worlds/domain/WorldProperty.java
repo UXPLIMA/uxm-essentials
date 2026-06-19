@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.worlds.domain;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -99,5 +100,37 @@ public final class WorldProperty<T> {
                 },
                 String::valueOf,
                 List.of("0", "6000", "12000", "18000"));
+    }
+
+    static WorldProperty<Integer> ofInteger(String key, int def) {
+        return new WorldProperty<>(
+                key,
+                def,
+                raw -> {
+                    try {
+                        int value = Integer.parseInt(raw);
+                        return value < 0 ? Optional.empty() : Optional.of(value);
+                    } catch (NumberFormatException notANumber) {
+                        return Optional.empty();
+                    }
+                },
+                String::valueOf,
+                List.of("0", "1", "10", "50"));
+    }
+
+    static WorldProperty<BigDecimal> ofDecimal(String key) {
+        return new WorldProperty<>(
+                key,
+                BigDecimal.ZERO,
+                raw -> {
+                    try {
+                        BigDecimal value = new BigDecimal(raw);
+                        return value.signum() < 0 ? Optional.empty() : Optional.of(value);
+                    } catch (NumberFormatException notANumber) {
+                        return Optional.empty();
+                    }
+                },
+                BigDecimal::toPlainString,
+                List.of("0", "100", "500", "1000"));
     }
 }
