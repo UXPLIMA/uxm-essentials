@@ -76,4 +76,14 @@ public final class WorldsSettings {
     public java.time.Duration pregenTickPeriod() {
         return java.time.Duration.ofMillis(50L * Math.max(1, config.getInt("pregen.tick-period-ticks", 1)));
     }
+
+    /** The directory (under the plugin data folder) world backups are written to, {@code backup.directory}; default {@code backups/worlds}. */
+    public String backupDirectory() {
+        return config.getString("backup.directory", "backups/worlds");
+    }
+
+    /** How many backups per world are kept before older archives are pruned, {@code backup.retention-count}; default 10, floor 1. */
+    public int backupRetentionCount() {
+        return Math.max(1, config.getInt("backup.retention-count", 10));
+    }
 }

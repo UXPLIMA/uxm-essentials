@@ -100,6 +100,30 @@ class WorldsSettingsTest {
         assertThat(settings.pregenTickPeriod()).isEqualTo(Duration.ofMillis(200));
     }
 
+    @Test
+    void backupAccessorsFallBackToTheirDefaultsWhenAbsent() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of()));
+
+        assertThat(settings.backupDirectory()).isEqualTo("backups/worlds");
+        assertThat(settings.backupRetentionCount()).isEqualTo(10);
+    }
+
+    @Test
+    void backupAccessorsAreReadFromConfig() {
+        WorldsSettings settings = new WorldsSettings(
+                new FixedConfig(Map.of("backup.directory", "archives", "backup.retention-count", 3)));
+
+        assertThat(settings.backupDirectory()).isEqualTo("archives");
+        assertThat(settings.backupRetentionCount()).isEqualTo(3);
+    }
+
+    @Test
+    void backupRetentionCountIsFlooredAtOne() {
+        WorldsSettings settings = new WorldsSettings(new FixedConfig(Map.of("backup.retention-count", 0)));
+
+        assertThat(settings.backupRetentionCount()).isEqualTo(1);
+    }
+
     /** A map-backed {@link ConfigStore} addressing keys by their dotted path relative to the module root. */
     private record FixedConfig(Map<String, Object> values) implements ConfigStore {
         @Override

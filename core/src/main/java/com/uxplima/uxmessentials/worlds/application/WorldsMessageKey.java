@@ -60,7 +60,19 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_PREGEN_CANCELLED("world.pregen.cancelled"),
     WORLD_PREGEN_ALREADY_RUNNING("world.pregen.already-running"),
     WORLD_PREGEN_NOT_RUNNING("world.pregen.not-running"),
-    WORLD_PREGEN_BAR("world.pregen.bar");
+    WORLD_PREGEN_BAR("world.pregen.bar"),
+
+    WORLD_BACKUP_STARTED("world.backup.started"),
+    WORLD_BACKUP_CREATED("world.backup.created"),
+    WORLD_BACKUP_FAILED("world.backup.failed"),
+    WORLD_BACKUP_LIST_HEADER("world.backup.list-header"),
+    WORLD_BACKUP_LIST_ENTRY("world.backup.list-entry"),
+    WORLD_BACKUP_LIST_EMPTY("world.backup.list-empty"),
+    WORLD_BACKUP_NOT_FOUND("world.backup.not-found"),
+    WORLD_RESTORE_CONFIRM("world.restore.confirm"),
+    WORLD_RESTORE_NONE_PENDING("world.restore.none-pending"),
+    WORLD_RESTORED("world.restore.done"),
+    WORLD_RESTORE_FAILED("world.restore.failed");
 
     private final String key;
 
