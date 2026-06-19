@@ -9,12 +9,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -35,14 +35,12 @@ public final class PayConfirmationView {
     private final Scheduler scheduler;
     private final Messages messages;
     private final FixedMenuLayout layout;
-    private final MiniMessage miniMessage;
 
     public PayConfirmationView(Pay pay, Scheduler scheduler, Messages messages, FixedMenuLayout layout) {
         this.pay = Objects.requireNonNull(pay, "pay");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** The shipped geometry: the confirm/recipient/value/cancel strip, externalised to pay-confirm.conf. */
@@ -56,8 +54,7 @@ public final class PayConfirmationView {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage
-                .deserialize(messages.resolve(viewer, key, placeholders))
+        return StyledText.render(messages.resolve(viewer, key, placeholders))
                 .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false);
     }
 

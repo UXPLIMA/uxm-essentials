@@ -11,7 +11,6 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BankChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.BankService;
@@ -22,6 +21,7 @@ import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -50,7 +50,6 @@ public final class BankActionsView {
     private final TransactionsHistoryView historyView;
     private final Supplier<BankNavigation> navigation;
     private final FixedMenuLayout layout;
-    private final MiniMessage miniMessage;
 
     public BankActionsView(
             BankService bankService,
@@ -67,7 +66,6 @@ public final class BankActionsView {
         this.historyView = Objects.requireNonNull(historyView, "historyView");
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** The shipped geometry: deposit, withdraw, members, logs, and back, externalised to bank-actions.conf. */
@@ -82,9 +80,7 @@ public final class BankActionsView {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage
-                .deserialize(messages.resolve(viewer, key, placeholders))
-                .decoration(TextDecoration.ITALIC, false);
+        return StyledText.render(messages.resolve(viewer, key, placeholders)).decoration(TextDecoration.ITALIC, false);
     }
 
     public void open(Player player, SharedBank bank) {

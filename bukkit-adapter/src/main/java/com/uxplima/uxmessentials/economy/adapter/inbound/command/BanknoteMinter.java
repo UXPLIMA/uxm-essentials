@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.BanknoteStore;
 import com.uxplima.uxmessentials.economy.domain.Banknote;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
@@ -102,7 +103,7 @@ final class BanknoteMinter {
     /** Resolve an item name/lore line in the recipient's locale and parse it to a non-italic Component. */
     private Component itemText(PlayerRef recipient, EconomyMessageKey key, Map<String, String> placeholders) {
         return miniMessage
-                .deserialize(messages.resolve(recipient, key, placeholders))
+                .deserialize(messages.resolve(recipient, key, placeholders), StyleTags.resolver())
                 .decoration(TextDecoration.ITALIC, false);
     }
 }

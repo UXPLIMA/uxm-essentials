@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,15 +15,14 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
-import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -48,7 +46,6 @@ public final class WalletGuiView {
     private final TransactionsHistoryView historyView;
     private final FixedMenuLayout layout;
     private final Logger log;
-    private final MiniMessage miniMessage;
     private final NamespacedKey valueKey;
     private final NamespacedKey currencyKey;
 
@@ -69,7 +66,6 @@ public final class WalletGuiView {
         this.historyView = Objects.requireNonNull(historyView, "historyView");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.log = Objects.requireNonNull(log, "log");
-        this.miniMessage = MiniMessage.miniMessage();
         // Created once here, never on the GUI-open hot path (CLAUDE.md NamespacedKey rule).
         this.valueKey = new NamespacedKey(plugin, "banknote_value");
         this.currencyKey = new NamespacedKey(plugin, "banknote_currency");
@@ -201,16 +197,14 @@ public final class WalletGuiView {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
+    /**
+     * Renders a {@code <newline>}-joined lore block as one styled component; {@code ItemBuilder.lore} splits it
+     * into separate lines on the embedded newlines, so the canon lore rhythm renders one line per beat.
+     */
     private List<Component> textLoreLines(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        String rawText = messages.resolve(viewer, key, placeholders);
-        Iterable<String> lines = Splitter.on('\n').split(rawText);
-        List<Component> list = new ArrayList<>();
-        for (String line : lines) {
-            list.add(miniMessage.deserialize(line));
-        }
-        return list;
+        return List.of(StyledText.render(messages.resolve(viewer, key, placeholders)));
     }
 }

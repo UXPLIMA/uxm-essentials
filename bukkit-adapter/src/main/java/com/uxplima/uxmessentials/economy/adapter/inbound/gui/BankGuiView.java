@@ -13,7 +13,6 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BankChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.BankService;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -55,7 +55,6 @@ public final class BankGuiView {
     private final Messages messages;
     private final Supplier<BankNavigation> navigation;
     private final GuiLayout layout;
-    private final MiniMessage miniMessage;
 
     public BankGuiView(
             BankService bankService,
@@ -72,13 +71,10 @@ public final class BankGuiView {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage
-                .deserialize(messages.resolve(viewer, key, placeholders))
-                .decoration(TextDecoration.ITALIC, false);
+        return StyledText.render(messages.resolve(viewer, key, placeholders)).decoration(TextDecoration.ITALIC, false);
     }
 
     public void open(Player player) {

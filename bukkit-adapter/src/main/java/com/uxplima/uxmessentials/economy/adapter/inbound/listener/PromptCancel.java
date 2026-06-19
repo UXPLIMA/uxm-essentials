@@ -6,10 +6,8 @@ import java.util.Objects;
 
 import org.bukkit.entity.Player;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -19,18 +17,16 @@ import org.jspecify.annotations.NullMarked;
  * keywords are not hardcoded — they come from the {@code eco.prompt.cancel-tokens} catalog entry, a
  * comma-separated list resolved in the viewer's locale, so an English client cancels with {@code cancel} and a
  * Turkish client with {@code iptal} (or whatever the operator's translation lists) without either keyword living
- * in code. The cancellation acknowledgement is the {@code eco.prompt.cancelled} entry, rendered with the shared
- * prefix folded in.
+ * in code. The cancellation acknowledgement is the {@code eco.prompt.cancelled} entry, which carries its own
+ * contextual tag.
  */
 @NullMarked
 public final class PromptCancel {
 
     private final Messages messages;
-    private final MiniMessage miniMessage;
 
     public PromptCancel(Messages messages) {
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** True when {@code input} matches one of the viewer's configured cancel tokens (case-insensitive). */
@@ -48,11 +44,8 @@ public final class PromptCancel {
         return false;
     }
 
-    /** Send the localised cancellation acknowledgement, with the shared prefix folded in. */
+    /** Send the localised cancellation acknowledgement; the catalog line carries its own contextual tag. */
     public void sendCancelled(Player player, PlayerRef viewer) {
-        Component prefix = miniMessage.deserialize(messages.resolve(viewer, () -> "prefix", Map.of()));
-        Component body =
-                miniMessage.deserialize(messages.resolve(viewer, EconomyMessageKey.PROMPT_CANCELLED, Map.of()));
-        player.sendMessage(prefix.append(body));
+        player.sendMessage(StyledText.render(messages.resolve(viewer, EconomyMessageKey.PROMPT_CANCELLED, Map.of())));
     }
 }

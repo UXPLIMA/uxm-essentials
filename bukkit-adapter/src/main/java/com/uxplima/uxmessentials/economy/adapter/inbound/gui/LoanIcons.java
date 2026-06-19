@@ -12,13 +12,13 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.LoanService;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
@@ -35,13 +35,11 @@ final class LoanIcons {
     private final LoanService loanService;
     private final Messages messages;
     private final CurrencyRegistry currencies;
-    private final MiniMessage miniMessage;
 
     LoanIcons(LoanService loanService, Messages messages, CurrencyRegistry currencies) {
         this.loanService = Objects.requireNonNull(loanService, "loanService");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     ItemStack profile(PlayerRef viewer, Loan.CreditScore creditScore) {
@@ -151,8 +149,6 @@ final class LoanIcons {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage
-                .deserialize(messages.resolve(viewer, key, placeholders))
-                .decoration(TextDecoration.ITALIC, false);
+        return StyledText.render(messages.resolve(viewer, key, placeholders)).decoration(TextDecoration.ITALIC, false);
     }
 }

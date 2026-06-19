@@ -10,7 +10,6 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.LoanChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
@@ -23,6 +22,7 @@ import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -50,7 +50,6 @@ public final class LoanGuiView {
     private final LoanIcons icons;
     private final LoanRequestFlow requestFlow;
     private final FixedMenuLayout layout;
-    private final MiniMessage miniMessage;
 
     public LoanGuiView(
             LoanService loanService,
@@ -68,7 +67,6 @@ public final class LoanGuiView {
         this.icons = new LoanIcons(loanService, messages, currencies);
         this.requestFlow = new LoanRequestFlow(
                 loanService, currencies, chatPromptListener, scheduler, messages, icons, this::open);
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** The shipped geometry: profile, active-loan strip, request, and close, externalised to loan-dashboard.conf. */
@@ -83,9 +81,7 @@ public final class LoanGuiView {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage
-                .deserialize(messages.resolve(viewer, key, placeholders))
-                .decoration(TextDecoration.ITALIC, false);
+        return StyledText.render(messages.resolve(viewer, key, placeholders)).decoration(TextDecoration.ITALIC, false);
     }
 
     public void open(Player player) {

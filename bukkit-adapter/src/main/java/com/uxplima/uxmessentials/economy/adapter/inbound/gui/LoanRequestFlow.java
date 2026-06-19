@@ -12,7 +12,6 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.LoanChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -49,7 +49,6 @@ final class LoanRequestFlow {
     private final Messages messages;
     private final LoanIcons icons;
     private final Consumer<Player> refresh;
-    private final MiniMessage miniMessage;
 
     LoanRequestFlow(
             LoanService loanService,
@@ -66,7 +65,6 @@ final class LoanRequestFlow {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.icons = Objects.requireNonNull(icons, "icons");
         this.refresh = Objects.requireNonNull(refresh, "refresh");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     void openCurrencySelector(Player player) {
@@ -181,8 +179,6 @@ final class LoanRequestFlow {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage
-                .deserialize(messages.resolve(viewer, key, placeholders))
-                .decoration(TextDecoration.ITALIC, false);
+        return StyledText.render(messages.resolve(viewer, key, placeholders)).decoration(TextDecoration.ITALIC, false);
     }
 }

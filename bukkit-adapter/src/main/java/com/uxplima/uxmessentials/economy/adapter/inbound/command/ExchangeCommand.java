@@ -9,7 +9,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
@@ -25,6 +24,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -132,47 +132,31 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
 
     private void handleExchangeResult(Player player, ExchangeOutcome result, Currency source, Currency target) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        String prefixStr = messages.resolve(viewerRef, () -> "prefix", Map.of());
-        Component prefix = miniMessage.deserialize(prefixStr);
-
         switch (result.status()) {
-            case SUCCESS -> {
-                String successMsg = messages.resolve(
+            case SUCCESS ->
+                send(
+                        player,
                         viewerRef,
                         EconomyMessageKey.EXCHANGE_SUCCESS,
                         Map.of(
                                 "source-amount", services.notifier().amount(Money.of(source, result.sourceAmount())),
                                 "target-amount", services.notifier().amount(Money.of(target, result.targetAmount()))));
-                player.sendMessage(prefix.append(miniMessage.deserialize(successMsg)));
-            }
-            case RATE_NOT_FOUND -> {
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_RATE_NOT_FOUND, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
-            case INSUFFICIENT_FUNDS -> {
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_INSUFFICIENT_FUNDS, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
-            case LIMIT_EXCEEDED -> {
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_LIMIT_EXCEEDED, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
-            case PROVIDER_UNSUPPORTED -> {
-                String errorMsg =
-                        messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_PROVIDER_UNSUPPORTED, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
-            case CURRENCY_DISABLED -> {
-                String errorMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_CURRENCY_DISABLED, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
-            }
+            case RATE_NOT_FOUND -> send(player, viewerRef, EconomyMessageKey.EXCHANGE_RATE_NOT_FOUND, Map.of());
+            case INSUFFICIENT_FUNDS -> send(player, viewerRef, EconomyMessageKey.EXCHANGE_INSUFFICIENT_FUNDS, Map.of());
+            case LIMIT_EXCEEDED -> send(player, viewerRef, EconomyMessageKey.EXCHANGE_LIMIT_EXCEEDED, Map.of());
+            case PROVIDER_UNSUPPORTED ->
+                send(player, viewerRef, EconomyMessageKey.EXCHANGE_PROVIDER_UNSUPPORTED, Map.of());
+            case CURRENCY_DISABLED -> send(player, viewerRef, EconomyMessageKey.EXCHANGE_CURRENCY_DISABLED, Map.of());
             case FAILED -> {
                 com.uxplima.uxmessentials.economy.domain.TransferError err = result.error();
-                com.uxplima.uxmessentials.economy.application.EconomyMessageKey key =
-                        err != null ? err.messageKey() : EconomyMessageKey.PAY_ERROR;
-                String errorMsg = messages.resolve(viewerRef, key, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(errorMsg)));
+                send(player, viewerRef, err != null ? err.messageKey() : EconomyMessageKey.PAY_ERROR, Map.of());
             }
         }
+    }
+
+    /** Resolve {@code key} in the viewer's locale and send it; the catalog line carries its own contextual tag. */
+    private void send(Player player, PlayerRef viewerRef, EconomyMessageKey key, Map<String, String> placeholders) {
+        player.sendMessage(
+                miniMessage.deserialize(messages.resolve(viewerRef, key, placeholders), StyleTags.resolver()));
     }
 }

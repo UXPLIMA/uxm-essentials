@@ -10,13 +10,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -38,14 +38,12 @@ public final class BaltopGuiView {
     private final Scheduler scheduler;
     private final EconomyNotifier notifier;
     private final Messages messages;
-    private final MiniMessage miniMessage;
 
     public BaltopGuiView(BaltopSnapshots snapshots, Scheduler scheduler, EconomyNotifier notifier, Messages messages) {
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /**
@@ -142,6 +140,6 @@ public final class BaltopGuiView {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 }

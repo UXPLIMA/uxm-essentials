@@ -13,7 +13,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
@@ -25,6 +24,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -47,7 +47,6 @@ public final class ExchangeGuiView {
     private final ExchangeChatPromptListener chatPromptListener;
     private final FixedMenuLayout layout;
     private final ExchangeIcons icons;
-    private final MiniMessage miniMessage;
 
     public ExchangeGuiView(
             Plugin plugin,
@@ -66,7 +65,6 @@ public final class ExchangeGuiView {
         this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.icons = new ExchangeIcons(messages, notifier, layout);
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /**
@@ -104,8 +102,8 @@ public final class ExchangeGuiView {
             Money targetBalance = economyProvider.balance(viewerRef, target);
 
             scheduler.onEntity(viewerRef, () -> {
-                Component titleText = miniMessage.deserialize(
-                        messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_GUI_TITLE, Map.of()));
+                Component titleText =
+                        StyledText.render(messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_GUI_TITLE, Map.of()));
                 SimpleGui gui = Guis.gui().title(titleText).rows(layout.rows()).build();
 
                 fillBackground(gui);
@@ -230,23 +228,20 @@ public final class ExchangeGuiView {
 
     private void promptCustomAmount(Player player, Currency source, Currency target) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        String prefixStr = messages.resolve(viewerRef, () -> "prefix", Map.of());
-        Component prefix = miniMessage.deserialize(prefixStr);
-        String resolvedPrompt = messages.resolve(
+        Component promptMessage = StyledText.render(messages.resolve(
                 viewerRef,
                 EconomyMessageKey.EXCHANGE_PROMPT,
                 Map.of(
                         "source", source.plural(),
-                        "target", target.plural()));
-        Component promptMessage = prefix.append(miniMessage.deserialize(resolvedPrompt));
+                        "target", target.plural())));
 
         chatPromptListener.prompt(player, promptMessage, input -> {
             BigDecimal amount;
             try {
                 amount = new BigDecimal(input);
             } catch (NumberFormatException e) {
-                String invalidMsg = messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_INVALID_AMOUNT, Map.of());
-                player.sendMessage(prefix.append(miniMessage.deserialize(invalidMsg)));
+                player.sendMessage(StyledText.render(
+                        messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_INVALID_AMOUNT, Map.of())));
                 return;
             }
 
@@ -285,10 +280,9 @@ public final class ExchangeGuiView {
         }
     }
 
-    /** Send {@code key} prefixed with the catalog's {@code prefix}, the pattern every exchange reply uses. */
+    /** Send {@code key} resolved in the viewer's locale; the catalog line carries its own {@code <tag:'ECONOMY'>}. */
     private void sendPrefixed(
             Player player, PlayerRef viewerRef, EconomyMessageKey key, Map<String, String> placeholders) {
-        Component prefix = miniMessage.deserialize(messages.resolve(viewerRef, () -> "prefix", Map.of()));
-        player.sendMessage(prefix.append(miniMessage.deserialize(messages.resolve(viewerRef, key, placeholders))));
+        player.sendMessage(StyledText.render(messages.resolve(viewerRef, key, placeholders)));
     }
 }

@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -10,15 +9,14 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
-import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
@@ -37,13 +35,11 @@ final class ExchangeIcons {
     private final Messages messages;
     private final EconomyNotifier notifier;
     private final FixedMenuLayout layout;
-    private final MiniMessage miniMessage;
 
     ExchangeIcons(Messages messages, EconomyNotifier notifier, FixedMenuLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     ItemStack currency(PlayerRef viewer, Currency shown, Money balance, boolean isSource) {
@@ -93,15 +89,14 @@ final class ExchangeIcons {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage.deserialize(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
+    /**
+     * Renders a {@code <newline>}-joined lore block as one styled component; {@code ItemBuilder.lore} splits it
+     * into separate lines on the embedded newlines, so the canon lore rhythm renders one line per beat.
+     */
     private List<Component> textLoreLines(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        String rawText = messages.resolve(viewer, key, placeholders);
-        List<Component> list = new ArrayList<>();
-        for (String line : Splitter.on('\n').split(rawText)) {
-            list.add(miniMessage.deserialize(line));
-        }
-        return list;
+        return List.of(StyledText.render(messages.resolve(viewer, key, placeholders)));
     }
 }

@@ -13,12 +13,12 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -48,7 +48,6 @@ public final class TransactionsHistoryView {
     private final Messages messages;
     private final GuiLayout layout;
     private final DateTimeFormatter formatter;
-    private final MiniMessage miniMessage;
 
     public TransactionsHistoryView(
             TransactionHistory history, Scheduler scheduler, Messages messages, GuiLayout layout, ZoneId timeZone) {
@@ -60,7 +59,6 @@ public final class TransactionsHistoryView {
         // every server in a network. The formatter is built once here, never on the GUI-open hot path.
         this.formatter =
                 DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(Objects.requireNonNull(timeZone, "timeZone"));
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Opens the transaction history GUI for the viewer; {@code targetPlayer} null renders the global log. */
@@ -178,8 +176,6 @@ public final class TransactionsHistoryView {
     }
 
     private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage
-                .deserialize(messages.resolve(viewer, key, placeholders))
-                .decoration(TextDecoration.ITALIC, false);
+        return StyledText.render(messages.resolve(viewer, key, placeholders)).decoration(TextDecoration.ITALIC, false);
     }
 }
