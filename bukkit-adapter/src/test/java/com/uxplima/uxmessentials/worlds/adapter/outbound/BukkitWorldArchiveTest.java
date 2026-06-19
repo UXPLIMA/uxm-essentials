@@ -73,7 +73,7 @@ class BukkitWorldArchiveTest {
     private static final PlayerRef INITIATOR = new PlayerRef(UUID.randomUUID(), "Admin");
 
     private final WorldArchiver archiver = new WorldArchiver();
-    private final InlineScheduler scheduler = new InlineScheduler();
+    private final CapturingScheduler scheduler = new CapturingScheduler();
     private final FakeWorldEngine engine = new FakeWorldEngine();
     private final FakeWorldRepository repository = new FakeWorldRepository();
     private final List<Forced> forcedTeleports = new ArrayList<>();
@@ -170,7 +170,8 @@ class BukkitWorldArchiveTest {
     }
 
     @Test
-    void restoreEvacuatesUnloadsSwapsAndReloads(@TempDir Path container, @TempDir Path dataFolder) throws IOException {
+    void restoreDrainsToEmptyThenUnloadsSwapsAndReloads(@TempDir Path container, @TempDir Path dataFolder)
+            throws IOException {
         // A known archive (a single file "from-backup") and a world folder with different live content.
         BackupId id = new BackupId(STAMP.format(Instant.EPOCH));
         Path knownTree = dataFolder.resolve("known");
@@ -182,8 +183,11 @@ class BukkitWorldArchiveTest {
         engine.loaded.add(WORLD.value());
         engine.defaultWorld = WorldName.of("world");
         Player resident = player();
-        World live = world(resident);
-        when(server.getWorld("arena")).thenReturn(live);
+        List<Player> residents = new ArrayList<>(List.of(resident));
+        World live = world(residents);
+        // The world is visible while loaded; once the engine unloads it, the lookup returns null (as Paper does),
+        // so the swap re-guard sees the world gone and proceeds.
+        when(server.getWorld("arena")).thenAnswer(inv -> engine.isLoaded(WORLD) ? live : null);
         BukkitWorldArchive archive = archive(container, dataFolder, settings("backups/worlds", 10));
 
         Result<Unit, WorldError> result = archive.restore(INITIATOR, WORLD, id);
@@ -192,7 +196,18 @@ class BukkitWorldArchiveTest {
         assertThat(marker.consume(resident.getUniqueId())).isTrue(); // the resident was marked as a forced entry
         assertThat(forcedTeleports).hasSize(1);
         assertThat(forcedTeleports.get(0).target()).isEqualTo(WorldName.of("world"));
-        assertThat(engine.unloaded).containsExactly(WORLD); // unload happened
+        CapturedLoop drain = scheduler.last();
+        assertThat(drain.initialDelay).isEqualTo(Duration.ZERO);
+        assertThat(drain.period).isEqualTo(Duration.ofMillis(50));
+        // Nothing touched the folder yet — the players are still present, so the world is still loaded.
+        assertThat(engine.unloaded).isEmpty();
+        assertThat(read(container.resolve("arena/level.dat"))).isEqualTo("live-and-stale");
+
+        residents.clear(); // the async evacuation has completed; the next drain tick sees the world empty
+        drain.task.run();
+
+        assertThat(engine.unloaded).containsExactly(WORLD); // unload-checked happened only once empty
+        assertThat(drain.handle.closed).isTrue(); // the loop stopped itself
         ManagedWorld reloaded = Objects.requireNonNull(engine.lastLoaded, "reload happened");
         assertThat(reloaded.name()).isEqualTo(WORLD);
         assertThat(read(container.resolve("arena/level.dat"))).isEqualTo("from-backup"); // folder swapped
@@ -200,8 +215,67 @@ class BukkitWorldArchiveTest {
     }
 
     @Test
-    void restoreOfMissingArchiveIsRejectedAndLeavesTheFolderUntouched(@TempDir Path container, @TempDir Path dataFolder)
+    void restoreAbortsAndKeepsTheFolderWhenPlayersNeverLeave(@TempDir Path container, @TempDir Path dataFolder)
             throws IOException {
+        // The archive exists, the world is managed, but the residents never evacuate. The drain must give up
+        // after RESTORE_EVACUATE_MAX_TICKS rather than delete a still-loaded world's files.
+        BackupId id = new BackupId(STAMP.format(Instant.EPOCH));
+        Path knownTree = dataFolder.resolve("known");
+        writeFile(knownTree.resolve("level.dat"), "from-backup".getBytes(StandardCharsets.UTF_8));
+        archiver.zip(knownTree, dataFolder.resolve("backups/worlds/arena").resolve(id.value() + ".zip"));
+        seedWorldFolder(container, "level.dat", "live-and-stale");
+        repository.save(ManagedWorld.created(WORLD, WorldSpec.normal(), true, Optional.empty(), Instant.EPOCH));
+        engine.loaded.add(WORLD.value());
+        List<Player> residents = new ArrayList<>(List.of(player())); // never cleared — the world stays occupied
+        World live = world(residents);
+        when(server.getWorld("arena")).thenReturn(live);
+        BukkitWorldArchive archive = archive(container, dataFolder, settings("backups/worlds", 10));
+
+        assertThat(archive.restore(INITIATOR, WORLD, id).isOk()).isTrue();
+        CapturedLoop drain = scheduler.last();
+        for (int i = 0; i < 60; i++) { // RESTORE_EVACUATE_MAX_TICKS drain ticks, world never empties
+            drain.task.run();
+        }
+
+        assertThat(drain.handle.closed).isTrue(); // the loop aborted and stopped itself
+        assertThat(engine.unloaded).isEmpty(); // never unloaded a loaded world
+        assertThat(read(container.resolve("arena/level.dat"))).isEqualTo("live-and-stale"); // folder NOT deleted
+        assertThat(engine.lastLoaded).isNull(); // no reload — the swap never ran
+        assertThat(messages.keysFor(INITIATOR)).contains(WorldsMessageKey.WORLD_RESTORE_FAILED);
+    }
+
+    @Test
+    void restoreAbortsAndKeepsTheFolderWhenUnloadFails(@TempDir Path container, @TempDir Path dataFolder)
+            throws IOException {
+        // The world empties, but the engine refuses to unload it. The folder must survive, untouched.
+        BackupId id = new BackupId(STAMP.format(Instant.EPOCH));
+        Path knownTree = dataFolder.resolve("known");
+        writeFile(knownTree.resolve("level.dat"), "from-backup".getBytes(StandardCharsets.UTF_8));
+        archiver.zip(knownTree, dataFolder.resolve("backups/worlds/arena").resolve(id.value() + ".zip"));
+        seedWorldFolder(container, "level.dat", "live-and-stale");
+        repository.save(ManagedWorld.created(WORLD, WorldSpec.normal(), true, Optional.empty(), Instant.EPOCH));
+        engine.loaded.add(WORLD.value());
+        engine.unloadResult = Result.err(WorldError.IO_ERROR);
+        List<Player> residents = new ArrayList<>(List.of(player()));
+        World live = world(residents);
+        when(server.getWorld("arena")).thenReturn(live);
+        BukkitWorldArchive archive = archive(container, dataFolder, settings("backups/worlds", 10));
+
+        assertThat(archive.restore(INITIATOR, WORLD, id).isOk()).isTrue();
+        CapturedLoop drain = scheduler.last();
+        residents.clear(); // world empties so the drain attempts the unload
+        drain.task.run();
+
+        assertThat(engine.unloaded).containsExactly(WORLD); // the unload was attempted
+        assertThat(drain.handle.closed).isTrue(); // the loop stopped itself
+        assertThat(read(container.resolve("arena/level.dat"))).isEqualTo("live-and-stale"); // folder NOT deleted
+        assertThat(engine.lastLoaded).isNull(); // no reload — the swap never ran
+        assertThat(messages.keysFor(INITIATOR)).contains(WorldsMessageKey.WORLD_RESTORE_FAILED);
+    }
+
+    @Test
+    void restoreOfMissingArchiveIsRejectedNotifiesAndLeavesTheFolderUntouched(
+            @TempDir Path container, @TempDir Path dataFolder) throws IOException {
         seedWorldFolder(container, "level.dat", "untouched");
         repository.save(ManagedWorld.created(WORLD, WorldSpec.normal(), true, Optional.empty(), Instant.EPOCH));
         BukkitWorldArchive archive = archive(container, dataFolder, settings("backups/worlds", 10));
@@ -213,11 +287,13 @@ class BukkitWorldArchiveTest {
         assertThat(read(container.resolve("arena/level.dat"))).isEqualTo("untouched"); // never deleted
         assertThat(engine.unloaded).isEmpty(); // nothing was destroyed before the validation
         assertThat(forcedTeleports).isEmpty();
+        assertThat(scheduler.loops).isEmpty(); // no drain loop was scheduled
+        assertThat(messages.keysFor(INITIATOR)).contains(WorldsMessageKey.WORLD_BACKUP_NOT_FOUND);
     }
 
     @Test
-    void restoreOfUnmanagedWorldIsRejectedAndLeavesTheFolderUntouched(@TempDir Path container, @TempDir Path dataFolder)
-            throws IOException {
+    void restoreOfUnmanagedWorldIsRejectedNotifiesAndLeavesTheFolderUntouched(
+            @TempDir Path container, @TempDir Path dataFolder) throws IOException {
         BackupId id = new BackupId(STAMP.format(Instant.EPOCH));
         Path archiveFile = dataFolder.resolve("backups/worlds/arena").resolve(id.value() + ".zip");
         writeFile(archiveFile, "ignored".getBytes(StandardCharsets.UTF_8));
@@ -231,6 +307,8 @@ class BukkitWorldArchiveTest {
         assertThat(result.errorOrThrow()).isEqualTo(WorldError.NOT_FOUND);
         assertThat(read(container.resolve("arena/level.dat"))).isEqualTo("untouched");
         assertThat(engine.unloaded).isEmpty();
+        assertThat(scheduler.loops).isEmpty(); // no drain loop was scheduled
+        assertThat(messages.keysFor(INITIATOR)).contains(WorldsMessageKey.WORLD_NOT_FOUND);
     }
 
     // ---- fixtures -------------------------------------------------------------------------------
@@ -269,9 +347,10 @@ class BukkitWorldArchiveTest {
                 new FixedConfig(Map.of("backup.directory", dir, "backup.retention-count", retention)));
     }
 
-    private World world(Player... residents) {
+    /** A world whose {@code getPlayers()} reads {@code residents} live, so a test can drain it between calls. */
+    private World world(List<Player> residents) {
         World w = mock(World.class);
-        when(w.getPlayers()).thenReturn(List.of(residents));
+        lenient().when(w.getPlayers()).thenAnswer(inv -> List.copyOf(residents));
         return w;
     }
 
@@ -299,8 +378,27 @@ class BukkitWorldArchiveTest {
 
     // ---- doubles --------------------------------------------------------------------------------
 
-    /** Collapses the tick boundary: every scheduled body runs inline, on the calling thread. */
-    private static final class InlineScheduler implements Scheduler {
+    /**
+     * Collapses the tick boundary for the fire-and-forget contexts — {@code async}/{@code onGlobal}/
+     * {@code onEntity}/{@code onRegion} all run inline — but <em>captures</em> the restore drain loop
+     * registered through {@code repeatGlobal} rather than running it. A test advances the drain by
+     * invoking {@link CapturedLoop#task} and asserts the loop was stopped via {@link RecordingHandle#closed}.
+     */
+    private static final class CapturingScheduler implements Scheduler {
+
+        final List<CapturedLoop> loops = new ArrayList<>();
+
+        @Override
+        public AutoCloseable repeatGlobal(Runnable task, Duration initialDelay, Duration period) {
+            CapturedLoop loop = new CapturedLoop(task, initialDelay, period);
+            loops.add(loop);
+            return loop.handle;
+        }
+
+        CapturedLoop last() {
+            return loops.get(loops.size() - 1);
+        }
+
         @Override
         public void onGlobal(Runnable task) {
             task.run();
@@ -324,6 +422,30 @@ class BukkitWorldArchiveTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
+        }
+    }
+
+    /** The {@code Runnable} + cancel handle + delays captured from one {@code repeatGlobal} call. */
+    private static final class CapturedLoop {
+        final Runnable task;
+        final RecordingHandle handle = new RecordingHandle();
+        final Duration initialDelay;
+        final Duration period;
+
+        CapturedLoop(Runnable task, Duration initialDelay, Duration period) {
+            this.task = task;
+            this.initialDelay = initialDelay;
+            this.period = period;
+        }
+    }
+
+    /** An {@link AutoCloseable} that records whether the drain loop was cancelled. */
+    private static final class RecordingHandle implements AutoCloseable {
+        boolean closed;
+
+        @Override
+        public void close() {
+            closed = true;
         }
     }
 
@@ -355,6 +477,7 @@ class BukkitWorldArchiveTest {
         final Set<String> loaded = new HashSet<>();
         final List<WorldName> unloaded = new ArrayList<>();
         WorldName defaultWorld = WorldName.of("world");
+        Result<Unit, WorldError> unloadResult = Result.ok();
 
         @org.jspecify.annotations.Nullable ManagedWorld lastLoaded;
 
@@ -374,8 +497,11 @@ class BukkitWorldArchiveTest {
         @Override
         public Result<Unit, WorldError> unload(WorldName name, boolean save) {
             unloaded.add(name);
+            if (unloadResult.isErr()) {
+                return unloadResult; // leave the world "loaded" so the swap guard can observe it
+            }
             loaded.remove(name.value());
-            return Result.ok();
+            return unloadResult;
         }
 
         @Override

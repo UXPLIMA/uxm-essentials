@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.worlds.adapter.outbound;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -11,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.Server;
 import org.bukkit.World;
@@ -47,15 +50,22 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>A restore is the dangerous half — it deletes the world folder — so it validates before it destroys:
  * the archive file must exist and the world must be managed (needed to reload it with its spec) <em>before</em>
- * any player is evacuated, the world is unloaded, or the folder is touched. Evacuation and the unload run on
- * the region thread; the delete-tree and unzip run off-tick; the reload returns to the global thread. A
- * missing archive or unmanaged world is rejected with the folder left exactly as it was.
+ * any player is evacuated, the world is unloaded, or the folder is touched. Evacuation is asynchronous, so the
+ * folder is touched only after the world is provably empty <em>and</em> unloaded: after evacuating, a bounded
+ * global-thread drain polls until the world has no players left, then unloads it and checks the result; only a
+ * confirmed unload hands off to the off-tick delete-tree and unzip, and the reload returns to the global thread.
+ * If the drain times out, or the unload fails, or the world is somehow still loaded when the swap begins, the
+ * folder is left untouched and the operator is told the restore failed. A missing archive or unmanaged world is
+ * rejected up front with the folder left exactly as it was.
  */
 @NullMarked
 public final class BukkitWorldArchive implements WorldArchive {
 
     private static final DateTimeFormatter STAMP =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
+
+    /** How many 50ms drain ticks to wait for evacuated players to leave before aborting the restore (~3s). */
+    private static final int RESTORE_EVACUATE_MAX_TICKS = 60;
 
     private final Server server;
     private final Scheduler scheduler;
@@ -180,18 +190,25 @@ public final class BukkitWorldArchive implements WorldArchive {
         Objects.requireNonNull(id, "id");
         Path archive = archiveFile(world, id);
         if (!Files.isRegularFile(archive)) {
+            notify(initiator, WorldsMessageKey.WORLD_BACKUP_NOT_FOUND, Map.of("backup", id.value()));
             return Result.err(WorldError.BACKUP_NOT_FOUND); // validate before we destroy anything
         }
         Optional<ManagedWorld> managed = repository.find(world);
         if (managed.isEmpty()) {
+            notify(initiator, WorldsMessageKey.WORLD_NOT_FOUND, Map.of("world", world.value()));
             return Result.err(WorldError.NOT_FOUND); // need the spec to reload the world afterwards
         }
         World w = server.getWorld(world.value());
         if (w != null) {
             evacuate(initiator, w);
         }
-        engine.unload(world, false); // discard live state — we are replacing the folder
-        scheduler.async(() -> swapAndReload(initiator, world, id, archive, managed.get()));
+        ManagedWorld spec = managed.get();
+        AtomicReference<AutoCloseable> handle = new AtomicReference<>();
+        AtomicInteger attempts = new AtomicInteger();
+        handle.set(scheduler.repeatGlobal(
+                () -> drainTick(initiator, world, id, archive, spec, handle, attempts),
+                Duration.ZERO,
+                Duration.ofMillis(50)));
         return Result.ok();
     }
 
@@ -205,9 +222,66 @@ public final class BukkitWorldArchive implements WorldArchive {
         });
     }
 
+    /**
+     * Global-thread drain tick: wait for the evacuated world to empty, then unload it before any file is touched.
+     *
+     * <p>Evacuation is asynchronous ({@code teleportAsync}), so the players are still present for a few ticks after
+     * {@link #restore} returns. This runs every 50ms and only proceeds once the world reports no players: it unloads,
+     * stops itself, and — only if the unload succeeds — hands the folder swap off-tick. A vanished world short-circuits
+     * to the swap; a world that never empties within {@link #RESTORE_EVACUATE_MAX_TICKS} is aborted with the folder
+     * left intact, because deleting a still-loaded world's files corrupts the live server.
+     */
+    private void drainTick(
+            PlayerRef initiator,
+            WorldName world,
+            BackupId id,
+            Path archive,
+            ManagedWorld managed,
+            AtomicReference<AutoCloseable> handle,
+            AtomicInteger attempts) {
+        World live = server.getWorld(world.value());
+        if (live == null) {
+            closeHandle(handle); // already gone — nothing to evacuate or unload
+            scheduler.async(() -> swapAndReload(initiator, world, id, archive, managed));
+            return;
+        }
+        if (live.getPlayers().isEmpty()) {
+            Result<Unit, WorldError> unloaded = engine.unload(world, false); // checked — replacing the folder
+            closeHandle(handle);
+            if (unloaded.isErr()) {
+                notify(initiator, WorldsMessageKey.WORLD_RESTORE_FAILED, Map.of("world", world.value()));
+                return;
+            }
+            scheduler.async(() -> swapAndReload(initiator, world, id, archive, managed));
+            return;
+        }
+        if (attempts.incrementAndGet() >= RESTORE_EVACUATE_MAX_TICKS) {
+            closeHandle(handle);
+            log.warn("restore of {} aborted: players did not leave in time", world.value());
+            notify(initiator, WorldsMessageKey.WORLD_RESTORE_FAILED, Map.of("world", world.value()));
+        }
+    }
+
+    /** Stop the drain loop, clearing the handle so a later tick cannot double-close it; log a close failure. */
+    private void closeHandle(AtomicReference<AutoCloseable> handle) {
+        AutoCloseable h = handle.getAndSet(null);
+        if (h != null) {
+            try {
+                h.close();
+            } catch (Exception e) {
+                log.error("failed to stop restore drain", e);
+            }
+        }
+    }
+
     /** Off-tick: replace the world folder from the archive, then reload the world back on the global thread. */
     private void swapAndReload(PlayerRef initiator, WorldName world, BackupId id, Path archive, ManagedWorld managed) {
         try {
+            if (server.getWorld(world.value()) != null) {
+                log.warn("restore aborted: world {} still loaded", world.value());
+                notify(initiator, WorldsMessageKey.WORLD_RESTORE_FAILED, Map.of("world", world.value()));
+                return; // never delete a loaded world's files
+            }
             archiver.deleteTree(worldFolder(world));
             archiver.unzip(archive, worldFolder(world));
             scheduler.onGlobal(() -> finishRestore(initiator, world, id, managed));
