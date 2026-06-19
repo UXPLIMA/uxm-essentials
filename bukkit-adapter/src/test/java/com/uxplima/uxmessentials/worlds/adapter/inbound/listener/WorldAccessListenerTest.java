@@ -2,6 +2,9 @@ package com.uxplima.uxmessentials.worlds.adapter.inbound.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -15,7 +18,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+
+import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -143,6 +149,53 @@ class WorldAccessListenerTest {
         assertThat(permissions.checks.get()).isZero();
     }
 
+    @Test
+    void redirectsRestrictedLoginToDefaultWorldSpawnWhenEnabled() {
+        repository.put(restricted("locked"));
+        PlayerMock frank = inWorld("Frank", locked);
+        WorldTeleportService teleportService = mock(WorldTeleportService.class);
+
+        joinListener(teleportService, true).onJoin(joinEvent(frank));
+
+        PlayerRef who = new PlayerRef(frank.getUniqueId(), frank.getName());
+        verify(teleportService, times(1)).forced(who, who, WorldName.of("open"));
+    }
+
+    @Test
+    void doesNotRedirectRestrictedLoginWhenRedirectDisabled() {
+        repository.put(restricted("locked"));
+        PlayerMock grace = inWorld("Grace", locked);
+        WorldTeleportService teleportService = mock(WorldTeleportService.class);
+
+        joinListener(teleportService, false).onJoin(joinEvent(grace));
+
+        verifyNoInteractions(teleportService);
+    }
+
+    @Test
+    void doesNotRedirectLoginWhenPlayerHoldsEnterNode() {
+        repository.put(restricted("locked"));
+        PlayerMock heidi = inWorld("Heidi", locked);
+        permissions.grant(heidi.getUniqueId(), ENTER_NODE);
+        WorldTeleportService teleportService = mock(WorldTeleportService.class);
+
+        joinListener(teleportService, true).onJoin(joinEvent(heidi));
+
+        verifyNoInteractions(teleportService);
+    }
+
+    @Test
+    void doesNotRedirectRestrictedLoginWhenNoDefaultWorldConfigured() {
+        repository.put(restricted("locked"));
+        engine.defaultWorld(null);
+        PlayerMock ivan = inWorld("Ivan", locked);
+        WorldTeleportService teleportService = mock(WorldTeleportService.class);
+
+        joinListener(teleportService, true).onJoin(joinEvent(ivan));
+
+        verifyNoInteractions(teleportService);
+    }
+
     private WorldAccessListener listener() {
         WorldAccessPolicy policy = new WorldAccessPolicy(permissions, engine);
         WorldNotifier notifier = mock(WorldNotifier.class);
@@ -153,6 +206,32 @@ class WorldAccessListenerTest {
 
     private PlayerTeleportEvent crossWorld(PlayerMock player, World from, World to) {
         return new PlayerTeleportEvent(player, new Location(from, 0, 64, 0), new Location(to, 0, 64, 0));
+    }
+
+    /** A listener wired with a caller-supplied teleport mock so the redirect hand-off can be verified. */
+    private WorldAccessListener joinListener(WorldTeleportService teleportService, boolean redirectOnRestrictedJoin) {
+        WorldAccessPolicy policy = new WorldAccessPolicy(permissions, engine);
+        WorldNotifier notifier = mock(WorldNotifier.class);
+        return new WorldAccessListener(
+                repository,
+                policy,
+                teleportService,
+                engine,
+                events,
+                new InlineScheduler(),
+                notifier,
+                redirectOnRestrictedJoin);
+    }
+
+    /** A player added to the server and placed into {@code world}, the world {@code onJoin} reads. */
+    private PlayerMock inWorld(String name, World world) {
+        PlayerMock player = server.addPlayer(name);
+        player.teleport(new Location(world, 0, 64, 0));
+        return player;
+    }
+
+    private PlayerJoinEvent joinEvent(PlayerMock player) {
+        return new PlayerJoinEvent(player, Component.empty());
     }
 
     private ManagedWorld restricted(String name) {
@@ -236,6 +315,11 @@ class WorldAccessListenerTest {
     /** A {@link WorldEngine} that counts {@code playerCount} calls; only the access-gate hooks are exercised. */
     private static final class CountingEngine implements WorldEngine {
         private final AtomicInteger playerCountCalls = new AtomicInteger();
+        private Optional<WorldName> defaultWorld = Optional.of(WorldName.of("open"));
+
+        void defaultWorld(@Nullable WorldName name) {
+            defaultWorld = Optional.ofNullable(name);
+        }
 
         @Override
         public int playerCount(WorldName name) {
@@ -245,7 +329,7 @@ class WorldAccessListenerTest {
 
         @Override
         public Optional<WorldName> defaultWorldName() {
-            return Optional.of(WorldName.of("open"));
+            return defaultWorld;
         }
 
         @Override
