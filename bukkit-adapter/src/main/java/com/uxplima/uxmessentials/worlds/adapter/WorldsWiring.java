@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitGameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldEngine;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldSettingApplier;
@@ -38,6 +39,7 @@ import com.uxplima.uxmessentials.worlds.application.ImportWorld;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
 import com.uxplima.uxmessentials.worlds.application.ReconcileWorldsOnEnable;
+import com.uxplima.uxmessentials.worlds.application.ResolvePortalDestination;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
@@ -132,6 +134,8 @@ public final class WorldsWiring {
                 notifier,
                 forcedEntries,
                 settings.redirectOnRestrictedJoin());
+        ResolvePortalDestination resolvePortal = new ResolvePortalDestination(repository);
+        WorldPortalListener portalListener = new WorldPortalListener(resolvePortal, server, server.getLogger());
 
         WorldsServices services = assemble(
                 kernel, tracked, repository, notifier, engine, pending, settings, clock, ruleCatalog, worldTeleport);
@@ -150,7 +154,8 @@ public final class WorldsWiring {
         };
         events.subscribe(applySubscriber);
 
-        List<Listener> listeners = List.of(new ForceGamemodeListener(repository, kernel.scheduler()), accessListener);
+        List<Listener> listeners =
+                List.of(new ForceGamemodeListener(repository, kernel.scheduler()), accessListener, portalListener);
         List<CommandRegistration> commands = WorldCommands.all(services, kernel.messages());
         Runnable startReconcile = () -> kernel.scheduler().onGlobal(() -> {
             reconcile.run();

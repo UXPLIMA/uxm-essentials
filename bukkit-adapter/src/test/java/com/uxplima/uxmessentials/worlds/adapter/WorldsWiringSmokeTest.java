@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessListener;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
@@ -28,6 +29,7 @@ import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
 import com.uxplima.uxmessentials.worlds.application.LoadWorld;
+import com.uxplima.uxmessentials.worlds.application.ResolvePortalDestination;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
@@ -97,13 +99,16 @@ class WorldsWiringSmokeTest {
 
     @Test
     void wiredCarriesTheForceGamemodeAndAccessListeners() {
-        List<Listener> listeners =
-                List.of(new ForceGamemodeListener(new NoOpRepository(), new NoOpScheduler()), accessListener());
+        List<Listener> listeners = List.of(
+                new ForceGamemodeListener(new NoOpRepository(), new NoOpScheduler()),
+                accessListener(),
+                portalListener());
 
         WorldsWiring.Wired wired = new WorldsWiring.Wired(List.of(), listeners, () -> {}, () -> {}, resolver());
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldAccessListener.class);
+        assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldPortalListener.class);
     }
 
     @Test
@@ -128,6 +133,13 @@ class WorldsWiringSmokeTest {
                 mock(WorldNotifier.class),
                 new ForcedWorldEntryMarker(),
                 true);
+    }
+
+    private static WorldPortalListener portalListener() {
+        return new WorldPortalListener(
+                new ResolvePortalDestination(new NoOpRepository()),
+                MockBukkit.getMock(),
+                java.util.logging.Logger.getLogger("worlds-portal-test"));
     }
 
     private static WorldsServices services(WorldTeleportService worldTeleport) {
