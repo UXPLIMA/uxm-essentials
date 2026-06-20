@@ -11,11 +11,17 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
 import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitInventoryCalculations;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Denomination;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -129,6 +135,55 @@ class BukkitInventoryCalculationsTest {
 
         assertThat(BukkitInventoryCalculations.matches(customItem, customDenom)).isTrue();
         assertThat(BukkitInventoryCalculations.matches(normalItem, customDenom)).isFalse();
+    }
+
+    @Test
+    void restyledDenominationName_resolvesMoneyTokenThroughProductionResolver() {
+        // Mirrors the production parse in BukkitInventoryCalculations#createItemStack: the same MiniMessage
+        // instance and the same StyleTags resolver the wired item-name path now uses.
+        Component name = MiniMessage.miniMessage().deserialize("<money>Emerald</money>", StyleTags.resolver());
+
+        assertThat(name.color()).isEqualTo(StyleTags.MONEY);
+
+        String plain = PlainTextComponentSerializer.plainText().serialize(name);
+        assertThat(plain).isEqualTo("Emerald");
+        // No leftover literal tokens or legacy codes leaking into the rendered text.
+        assertThat(plain).doesNotContain("<money>").doesNotContain("&");
+    }
+
+    @Test
+    void creditedDenomination_carriesGreenUprightName() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.getInventory().clear();
+
+        // A denomination whose configured display name carries a palette token, exactly like currencies.conf.
+        Denomination styled = new Denomination(BigDecimal.ONE, "EMERALD", "<money>Emerald</money>", null);
+        Currency currency = mock(Currency.class);
+        when(currency.id()).thenReturn(CurrencyId.of("gems"));
+        when(currency.denominations()).thenReturn(List.of(styled));
+        when(currency.precision()).thenReturn(0);
+        when(currency.isPhysical()).thenReturn(true);
+        when(currency.normalize(org.mockito.ArgumentMatchers.any(BigDecimal.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        calculations.credit(player, Money.of(currency, BigDecimal.ONE));
+
+        ItemStack minted = null;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() == Material.EMERALD) {
+                minted = item;
+                break;
+            }
+        }
+        assertThat(minted).isNotNull();
+
+        Component displayName = minted.getItemMeta().displayName();
+        assertThat(displayName).isNotNull();
+        assertThat(displayName.color()).isEqualTo(StyleTags.MONEY);
+        // Item names default to italic in Adventure; the path explicitly turns it off so the name reads upright.
+        assertThat(displayName.decoration(TextDecoration.ITALIC)).isEqualTo(TextDecoration.State.FALSE);
+        assertThat(PlainTextComponentSerializer.plainText().serialize(displayName))
+                .isEqualTo("Emerald");
     }
 
     private int getAmount(PlayerMock player, Material material) {

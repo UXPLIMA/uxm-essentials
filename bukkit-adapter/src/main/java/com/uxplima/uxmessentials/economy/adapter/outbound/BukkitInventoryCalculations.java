@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Denomination;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import org.jspecify.annotations.NullMarked;
@@ -258,10 +259,10 @@ public final class BukkitInventoryCalculations {
             if (denom.customModelData() != null) {
                 meta.setCustomModelData(denom.customModelData());
             }
-            // The denomination display name is an operator-configured MiniMessage template, resolved to an
-            // Adventure Component — never legacy section/ampersand colour codes.
+            // The denomination display name is an operator-configured MiniMessage template carrying palette
+            // tokens (resolved through StyleTags), never legacy section/ampersand colour codes.
             meta.displayName(MINI_MESSAGE
-                    .deserialize(denom.displayName())
+                    .deserialize(denom.displayName(), StyleTags.resolver())
                     .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             item.setItemMeta(meta);
         }
