@@ -53,6 +53,14 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
     }
 
     @Override
+    public List<PlayerWarp> all() {
+        return read(dsl -> dsl.selectFrom(PLAYER_WARPS)
+                .orderBy(PLAYER_WARPS.OWNER.asc(), PLAYER_WARPS.CREATED_AT.asc(), PLAYER_WARPS.NAME.asc())
+                .fetch()
+                .map(PlayerWarpRows::toPlayerWarp));
+    }
+
+    @Override
     public List<PlayerWarp> publicOf(PlayerRef owner) {
         Objects.requireNonNull(owner, "owner");
         return read(dsl -> dsl.selectFrom(PLAYER_WARPS)

@@ -59,6 +59,12 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     }
 
     @Override
+    public List<PlayerWarp> all() {
+        // The cross-owner admin scan is not per-owner cacheable; read it straight from the delegate.
+        return delegate.all();
+    }
+
+    @Override
     public List<PlayerWarp> publicOf(PlayerRef owner) {
         Objects.requireNonNull(owner, "owner");
         List<PlayerWarp> shown = new ArrayList<>();

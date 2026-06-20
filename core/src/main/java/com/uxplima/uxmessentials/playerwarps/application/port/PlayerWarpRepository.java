@@ -25,6 +25,17 @@ public interface PlayerWarpRepository {
     /** Every warp {@code owner} owns, in stored creation order, for the {@code /pwarps} list. */
     List<PlayerWarp> ownedBy(PlayerRef owner);
 
+    /**
+     * Every warp across every owner, in stored creation order, for the management GUI's admin view (an operator
+     * holding {@code uxmessentials.pwarp.gui} manages all players' warps, not just their own). A bounded scan run
+     * off the tick thread; an owner-scoped caller uses {@link #ownedBy} instead. The default returns an empty
+     * list so a store that does not implement it simply shows nothing rather than failing — the jOOQ adapter
+     * overrides it with the real query.
+     */
+    default List<PlayerWarp> all() {
+        return List.of();
+    }
+
     /** The public warps {@code owner} owns, in stored creation order, for a cross-owner {@code /pwarps}. */
     List<PlayerWarp> publicOf(PlayerRef owner);
 

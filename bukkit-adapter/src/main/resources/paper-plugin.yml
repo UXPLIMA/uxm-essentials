@@ -920,6 +920,12 @@ permissions:
   uxmessentials.pwarp.public:
     description: '/pwarp visibility public|private <name> to toggle a player warp''s visibility.'
     default: true
+  # Player-warps management GUI — /pwarp with no arguments opens the list-and-editor panel, and the playerwarps
+  # entry on the /uxmess gui hub gates on this node. A player without it still opens the GUI for their own warps;
+  # holding it widens the list to every player's warps so an operator can manage all. Admin/manage tier.
+  uxmessentials.pwarp.gui:
+    description: 'Manage every player''s warps in the /pwarp GUI (a player without it edits only their own).'
+    default: op
   uxmessentials.playerwarp.bypass.lock:
     description: 'Enter a locked player warp owned by someone else (skips the lock check on /pwarp).'
     default: op

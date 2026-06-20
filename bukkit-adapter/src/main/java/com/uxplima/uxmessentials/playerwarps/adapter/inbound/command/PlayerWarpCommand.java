@@ -40,6 +40,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pwarp")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(this::openGui)
                 .then(Commands.literal("visibility")
                         .requires(src -> src.getSender().hasPermission(PUBLIC_PERMISSION))
                         .then(Commands.literal("public")
@@ -92,6 +93,20 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     @Override
     public String description() {
         return "Teleport to your own or a player's public warp, lock it, edit its settings, or set a password.";
+    }
+
+    /**
+     * {@code /pwarp} with no arguments: open the management list. A player sees and edits their own warps; a
+     * holder of {@code uxmessentials.pwarp.gui} sees and manages every player's (the list re-checks the node per
+     * open and scopes the entity set itself). The open is scheduled on the player's entity thread by the view.
+     */
+    private int openGui(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        services.listView().open(sender, ref(sender));
+        return Command.SINGLE_SUCCESS;
     }
 
     private int openPlayerWarpEditor(CommandContext<CommandSourceStack> ctx) {

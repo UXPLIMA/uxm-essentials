@@ -384,7 +384,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("holograms"))) {
             wireHolograms(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
-            wirePlayerwarps(ctx, persistence, resources, links);
+            wirePlayerwarps(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
             wireScoreboard(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
@@ -781,15 +781,36 @@ public final class PluginModule {
     }
 
     private static void wirePlayerwarps(
-            ModuleContext ctx, Persistence persistence, CloseableResources resources, ContextLinks links) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // player-warps delegates teleport execution to the captured teleport engine exactly as warps does; its
         // cached jOOQ repository over persistence.dsl() is keyed per owner, and the player_warps table ships in
         // the persistence V14 baseline, always applied. It carries no cross-context bridge beyond the engine.
+        // The management GUI consumes the SP0 framework (a GuiText over the shared catalog, the data-folder layout
+        // loader, an anvil): /pwarp with no args opens an owner-scoped list (a player sees their own warps, an
+        // operator holding uxmessentials.pwarp.gui sees and manages everyone's) → per-warp editor, and it
+        // registers the /uxmess gui hub entry. The existing /pwarp edit warps-editor reuse is untouched.
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine,
                 "playerwarps delegates teleport execution but the teleport engine is unavailable");
+        GuiText guiText = new GuiText(ctx.kernel().messages());
         PlayerwarpsWiring.Wired wired = PlayerwarpsWiring.wire(
-                ctx, persistence, engine, links.warpEditorView, links.warpPlayerWarpHandle, links.warpTeleportRegistry);
+                plugin,
+                ctx,
+                persistence,
+                engine,
+                links.warpEditorView,
+                links.warpPlayerWarpHandle,
+                links.warpTeleportRegistry,
+                guiText,
+                guiLayouts,
+                new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin),
+                guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands

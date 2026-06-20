@@ -16,6 +16,9 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommand;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListView;
 import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
@@ -27,6 +30,9 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -62,6 +68,7 @@ class PlayerWarpOffThreadReadTest {
     private static final PlayerWarpName HUB = PlayerWarpName.of("hub");
 
     private ServerMock server;
+    private org.bukkit.plugin.Plugin plugin;
     private PlayerMock player;
     private CountingRepository repository;
     private DeferringScheduler scheduler;
@@ -71,6 +78,7 @@ class PlayerWarpOffThreadReadTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
+        plugin = MockBukkit.createMockPlugin();
         server.addSimpleWorld("world");
         player = server.addPlayer("Alice");
         player.setOp(true); // the /pwarp node gates on a permission; op satisfies it without a permission wiring
@@ -125,22 +133,67 @@ class PlayerWarpOffThreadReadTest {
     private PlayerWarpServices services() {
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(new KeyMessages(), sink);
         Permissions permissions = new AllowAllPermissions();
+        Messages messages = new KeyMessages();
+        SetPlayerWarp setPlayerWarp = new SetPlayerWarp(
+                repository,
+                new PlayerWarpQuota(permissions, 3),
+                notifier,
+                event -> {},
+                java.time.Clock.systemUTC(),
+                List.of());
+        DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
+        SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
         return new PlayerWarpServices(
-                new SetPlayerWarp(
-                        repository,
-                        new PlayerWarpQuota(permissions, 3),
-                        notifier,
-                        event -> {},
-                        java.time.Clock.systemUTC(),
-                        List.of()),
-                new DelPlayerWarp(repository, notifier, event -> {}),
+                setPlayerWarp,
+                delPlayerWarp,
                 new UsePlayerWarp(repository, new NoTeleport(), notifier, position -> true, permissions),
                 new ListPlayerWarps(repository, notifier),
-                new SetPlayerWarpVisibility(repository, notifier),
+                visibility,
                 new NamingLookup(),
                 repository,
                 null,
-                scheduler);
+                scheduler,
+                listView(messages, permissions, setPlayerWarp, visibility, delPlayerWarp));
+    }
+
+    /** A minimal real management list (this test does not open it; it only needs a non-null view in services). */
+    private PlayerWarpListView listView(
+            Messages messages,
+            Permissions permissions,
+            SetPlayerWarp setPlayerWarp,
+            SetPlayerWarpVisibility visibility,
+            DelPlayerWarp delPlayerWarp) {
+        GuiText guiText = new GuiText(messages);
+        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
+        EntityEditorLayout editorLayout = new EntityEditorLayout(
+                6,
+                List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24),
+                49,
+                java.util.OptionalInt.of(53),
+                org.bukkit.Material.ARROW,
+                org.bukkit.Material.BARRIER,
+                org.bukkit.Material.BLACK_STAINED_GLASS_PANE);
+        PlayerWarpEditorView editor = new PlayerWarpEditorView(
+                guiText,
+                scheduler,
+                repository,
+                visibility,
+                delPlayerWarp,
+                anvil,
+                messages,
+                editorLayout,
+                PlayerWarpEditorSubLayouts.codeDefault(),
+                (p, v) -> {});
+        return new PlayerWarpListView(
+                guiText,
+                scheduler,
+                permissions,
+                messages,
+                repository,
+                setPlayerWarp,
+                anvil,
+                EntityListLayout.withCreate(org.bukkit.Material.ENDER_PEARL, 49, org.bukkit.Material.LIME_DYE),
+                editor);
     }
 
     /** Counts repository reads and serves a single owner's warps from memory. */
