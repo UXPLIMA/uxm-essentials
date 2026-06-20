@@ -77,20 +77,21 @@ class StyleTagsTest {
     }
 
     @Test
-    void tagRendersLabelThenSeparator() {
+    void tagRendersTheBrandPrefixWithASingleSpace() {
         Component c = parse("<tag:'HOME'> hi");
         String plain = PlainTextComponentSerializer.plainText().serialize(c);
-        assertThat(plain).startsWith("HOME » ");
-        assertThat(colorOfRun(c, "HOME")).isEqualTo(StyleTags.HEADER);
+        // label ('HOME') is ignored — every prefix is the brand — and exactly one space precedes the body
+        assertThat(plain).isEqualTo("uxmEssentials » hi");
+        assertThat(colorOfRun(c, "uxmEssentials")).isEqualTo(StyleTags.HEADER);
         assertThat(anyBold(c)).isFalse();
     }
 
     @Test
-    void etagRendersRedLabelThenSeparator() {
+    void etagRendersTheSameBrandPrefix() {
         Component c = parse("<etag:'ERROR'> oops");
         String plain = PlainTextComponentSerializer.plainText().serialize(c);
-        assertThat(plain).startsWith("ERROR » ");
-        assertThat(colorOfRun(c, "ERROR")).isEqualTo(StyleTags.BAD);
+        assertThat(plain).isEqualTo("uxmEssentials » oops");
+        assertThat(colorOfRun(c, "uxmEssentials")).isEqualTo(StyleTags.HEADER);
         assertThat(anyBold(c)).isFalse();
     }
 

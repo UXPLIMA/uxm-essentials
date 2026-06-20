@@ -12,9 +12,10 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The project palette as MiniMessage tags. Solid-colour tags ({@code <accent>}, {@code <body>}, …) wrap
- * their content; the composite tags build a styled component from an argument: {@code <tag:'HOME'>} renders
- * the {@code HOME »} chat prefix (blue label, dark-gray separator), {@code <etag:'…'>} its red error variant,
- * and {@code <h:'…'>} a solid blue header. The resolver is immutable and cached; callers add it at every
+ * their content; {@code <tag:'…'>} and {@code <etag:'…'>} both render the single {@code uxmEssentials »}
+ * brand chat prefix (blue brand, dark-gray separator) — the label argument is accepted but ignored, so
+ * catalog keys may keep their {@code <tag:'MODULE'>} form while every message shows the one brand prefix.
+ * {@code <h:'…'>} is a solid blue header. The resolver is immutable and cached; callers add it at every
  * MiniMessage parse.
  */
 @NullMarked
@@ -30,7 +31,8 @@ public final class StyleTags {
     public static final TextColor MUTED = TextColor.color(0xa9a9a9);
     public static final TextColor TITLE = TextColor.color(0x555555);
 
-    private static final String SEPARATOR = " » ";
+    private static final String BRAND = "uxmEssentials";
+    private static final String SEPARATOR = " »";
 
     private static final TagResolver RESOLVER = build();
 
@@ -53,16 +55,22 @@ public final class StyleTags {
                         Placeholder.styling("level", LEVEL),
                         Placeholder.styling("muted", MUTED),
                         Placeholder.styling("title", TITLE),
-                        prefixTag("tag", HEADER),
-                        prefixTag("etag", BAD),
+                        prefixTag("tag"),
+                        prefixTag("etag"),
                         header("h"))
                 .build();
     }
 
-    private static TagResolver prefixTag(String name, TextColor labelColor) {
+    /**
+     * Both {@code <tag:'…'>} and {@code <etag:'…'>} render the one {@code uxmEssentials »} brand prefix. The
+     * label argument is popped and ignored so existing catalog keys (e.g. {@code <tag:'HOME'>}) keep working
+     * while every message shows the same prefix. The separator carries a leading space and no trailing space;
+     * the single gap before the message body comes from the catalog key, so the prefix is never double-spaced.
+     */
+    private static TagResolver prefixTag(String name) {
         return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
-            String label = args.popOr(name + " requires a label").value();
-            Component component = Component.text(label, labelColor).append(Component.text(SEPARATOR, TITLE));
+            args.popOr("");
+            Component component = Component.text(BRAND, HEADER).append(Component.text(SEPARATOR, TITLE));
             return Tag.selfClosingInserting(component);
         });
     }
