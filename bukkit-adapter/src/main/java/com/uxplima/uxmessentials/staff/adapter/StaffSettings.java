@@ -33,11 +33,11 @@ public final class StaffSettings {
     private static final Material DEFAULT_FREEZE_MATERIAL = Material.PACKED_ICE;
     private static final Material DEFAULT_COMPASS_MATERIAL = Material.COMPASS;
     private static final Material DEFAULT_FOLLOW_MATERIAL = Material.LEAD;
-    private static final String DEFAULT_VANISH_NAME = "<aqua>Vanish";
-    private static final String DEFAULT_EXAMINE_NAME = "<gold>Examine";
-    private static final String DEFAULT_FREEZE_NAME = "<blue>Freeze";
-    private static final String DEFAULT_COMPASS_NAME = "<yellow>Navigator";
-    private static final String DEFAULT_FOLLOW_NAME = "<green>Follow";
+    private static final String DEFAULT_VANISH_NAME = "<accent>Vanish</accent>";
+    private static final String DEFAULT_EXAMINE_NAME = "<accent>Examine</accent>";
+    private static final String DEFAULT_FREEZE_NAME = "<accent>Freeze</accent>";
+    private static final String DEFAULT_COMPASS_NAME = "<accent>Navigator</accent>";
+    private static final String DEFAULT_FOLLOW_NAME = "<accent>Follow</accent>";
     private static final String DEFAULT_STAFF_CHAT_NODE = "uxmessentials.staff.chat";
 
     private final boolean vanishOnEnter;
