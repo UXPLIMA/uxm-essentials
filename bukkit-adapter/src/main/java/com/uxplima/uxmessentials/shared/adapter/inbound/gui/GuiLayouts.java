@@ -350,6 +350,68 @@ public final class GuiLayouts {
     }
 
     /**
+     * Resolve a shared-framework {@link EntityListLayout} (the paginated management list), falling back to the
+     * code default when no conf parses. Reads the {@link GuiLayout} geometry plus the list's own {@code filler}
+     * and optional {@code create-slot}/{@code create-icon}.
+     */
+    public EntityListLayout loadEntityList(String module, String name, EntityListLayout codeDefault) {
+        ConfigurationNode root = root(module, name);
+        if (root == null) {
+            return codeDefault;
+        }
+        GuiLayout base = parseBase(root, codeDefault.base());
+        Material filler = material(root.node("filler").getString(), codeDefault.filler());
+        java.util.OptionalInt createSlot = optionalSlot(root.node("create-slot"), codeDefault.createSlot());
+        Material createIcon = material(root.node("create-icon").getString(), codeDefault.createIcon());
+        return new EntityListLayout(base, filler, createSlot, createIcon);
+    }
+
+    /**
+     * Resolve a shared-framework {@link EntityEditorLayout} (the property grid), falling back to the code
+     * default when no conf parses. Reads the row count, the {@code property-slots} list, the {@code back-slot},
+     * the optional {@code delete-slot}, and the back/delete/filler materials.
+     */
+    public EntityEditorLayout loadEntityEditor(String module, String name, EntityEditorLayout codeDefault) {
+        ConfigurationNode root = root(module, name);
+        if (root == null) {
+            return codeDefault;
+        }
+        int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
+        List<Integer> propertySlots = intList(root.node("property-slots"), codeDefault.propertySlots());
+        int backSlot = Math.max(0, root.node("back-slot").getInt(codeDefault.backSlot()));
+        java.util.OptionalInt deleteSlot = optionalSlot(root.node("delete-slot"), codeDefault.deleteSlot());
+        Material backIcon = material(root.node("back-icon").getString(), codeDefault.backIcon());
+        Material deleteIcon = material(root.node("delete-icon").getString(), codeDefault.deleteIcon());
+        Material filler = material(root.node("filler").getString(), codeDefault.filler());
+        return new EntityEditorLayout(rows, propertySlots, backSlot, deleteSlot, backIcon, deleteIcon, filler);
+    }
+
+    /** Re-read the {@link GuiLayout} geometry off {@code root}, mirroring {@link #parse}, against a base default. */
+    private GuiLayout parseBase(ConfigurationNode root, GuiLayout base) {
+        int rows = clampRows(root.node("rows").getInt(base.rows()), base.rows());
+        Material fallbackIcon = material(root.node("fallback-icon").getString(), base.fallbackIcon());
+        Material navIcon = material(root.node("nav-icon").getString(), base.navIcon());
+        int prevSlot = Math.max(0, root.node("prev-slot").getInt(base.prevSlot()));
+        int nextSlot = Math.max(0, root.node("next-slot").getInt(base.nextSlot()));
+        List<Integer> contentSlots = contentSlots(root, base.contentSlots());
+        return new GuiLayout(rows, fallbackIcon, navIcon, prevSlot, nextSlot, contentSlots);
+    }
+
+    /**
+     * Read an optional slot: a node value of zero-or-more makes the slot present, a negative value or an absent
+     * node leaves it as {@code fallback}. This lets an operator omit a button (create/delete) by dropping its
+     * slot from the conf, while a code default carrying a button keeps it unless the conf turns it off with a
+     * negative value.
+     */
+    private java.util.OptionalInt optionalSlot(ConfigurationNode node, java.util.OptionalInt fallback) {
+        if (node.virtual() || node.empty()) {
+            return fallback;
+        }
+        int value = node.getInt(-1);
+        return value < 0 ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(value);
+    }
+
+    /**
      * Load the HOCON root for {@code module}/{@code name}, preferring an operator's on-disk edit over the
      * bundled resource. Returns {@code null} when neither exists or the file cannot be parsed, so the caller
      * falls back to its code default — a typo never stops a menu opening.

@@ -113,6 +113,74 @@ class GuiLayoutsLoaderTest {
         assertThat(layout.explicitContentSlots()).isEmpty();
     }
 
+    @Test
+    void anEntityListConfDrivesGeometryFillerAndCreateButton(@TempDir Path dir) throws Exception {
+        writeGui(dir, "demo", "demo-list", """
+                rows = 6
+                fallback-icon = "PAPER"
+                nav-icon = "ARROW"
+                prev-slot = 48
+                next-slot = 50
+                content-slots = [10, 11, 12]
+                filler = "GRAY_STAINED_GLASS_PANE"
+                create-slot = 49
+                create-icon = "EMERALD"
+                """);
+
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout layout = new GuiLayouts(dir, NOOP)
+                .loadEntityList(
+                        "demo",
+                        "demo-list",
+                        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.paginatedDefault(
+                                Material.CHEST));
+
+        assertThat(layout.rows()).isEqualTo(6);
+        assertThat(layout.base().fallbackIcon()).isEqualTo(Material.PAPER);
+        assertThat(layout.base().contentSlots()).containsExactly(10, 11, 12);
+        assertThat(layout.filler()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
+        assertThat(layout.createSlot()).hasValue(49);
+        assertThat(layout.createIcon()).isEqualTo(Material.EMERALD);
+    }
+
+    @Test
+    void anEntityListConfCanTurnOffTheCreateButtonWithANegativeSlot(@TempDir Path dir) throws Exception {
+        writeGui(dir, "demo", "demo-list", "create-slot = -1\n");
+
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout layout = new GuiLayouts(dir, NOOP)
+                .loadEntityList(
+                        "demo",
+                        "demo-list",
+                        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.withCreate(
+                                Material.CHEST, 49, Material.EMERALD));
+
+        assertThat(layout.createSlot()).isEmpty();
+    }
+
+    @Test
+    void anEntityEditorConfDrivesPropertySlotsAndButtons(@TempDir Path dir) throws Exception {
+        writeGui(dir, "demo", "demo-editor", """
+                rows = 3
+                property-slots = [10, 12, 14, 16]
+                back-slot = 22
+                delete-slot = 26
+                back-icon = "ARROW"
+                delete-icon = "BARRIER"
+                filler = "BLACK_STAINED_GLASS_PANE"
+                """);
+
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout layout = new GuiLayouts(dir, NOOP)
+                .loadEntityEditor(
+                        "demo",
+                        "demo-editor",
+                        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout.codeDefault(
+                                List.of(0), 8));
+
+        assertThat(layout.rows()).isEqualTo(3);
+        assertThat(layout.propertySlots()).containsExactly(10, 12, 14, 16);
+        assertThat(layout.backSlot()).isEqualTo(22);
+        assertThat(layout.deleteSlot()).hasValue(26);
+    }
+
     private static void writeGui(Path dir, String module, String name, String body) throws Exception {
         Path file = dir.resolve("modules").resolve(module).resolve("gui").resolve(name + ".conf");
         Files.createDirectories(file.getParent());
