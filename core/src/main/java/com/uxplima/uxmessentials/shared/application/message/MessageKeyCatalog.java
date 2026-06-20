@@ -42,6 +42,7 @@ public final class MessageKeyCatalog {
     /** The per-module key enums, in the registry's dependency-first order; {@code shared} first. */
     private static final List<MessageKey[]> ENUMS = List.of(
             SharedMessageKey.values(),
+            GuiMessageKey.values(),
             TeleportMessageKey.values(),
             WorldsMessageKey.values(),
             WorldEditorMessageKey.values(),

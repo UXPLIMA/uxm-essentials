@@ -83,6 +83,12 @@ permissions:
   uxmessentials.admin.backup:
     description: '/backup to snapshot the plugin data directory on demand.'
     default: op
+  # Management-GUI hub — /uxmess gui opens the central panel listing each module's management GUI. The
+  # per-module entries inside gate further on each module's own uxmessentials.<module>.gui node, added
+  # with that module's GUI; this base node only gates opening the hub.
+  uxmessentials.gui:
+    description: '/uxmess gui to open the module management hub.'
+    default: op
   # i18n self surface — the per-player /lang locale override (docs/13-i18n §7). Cross-cutting,
   # not owned by a feature context.
   uxmessentials.lang.use:

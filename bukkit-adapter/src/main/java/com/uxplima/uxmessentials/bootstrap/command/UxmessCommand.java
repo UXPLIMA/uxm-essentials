@@ -57,6 +57,7 @@ public final class UxmessCommand implements CommandRegistration {
     private static final String HELP_STATUS = "/uxmess status — list modules and their enable state";
     private static final String HELP_DOCTOR = "/uxmess doctor — run runtime health checks";
     private static final String HELP_HELP = "/uxmess help — show this help";
+    private static final String HELP_GUI = "/uxmess gui — open the module management hub";
     private static final String HELP_RELOAD = "/uxmess reload [module] — reload all modules, or one by id";
     private static final String HELP_IMPORT = "/uxmess import <source> [--dry-run] — import legacy data";
 
@@ -83,6 +84,7 @@ public final class UxmessCommand implements CommandRegistration {
     private final ModuleRegistry registry;
     private final ConfigStore config;
     private final MigrationImportNode importNode;
+    private final GuiSubcommand guiNode;
     private final Scheduler scheduler;
     private final List<HealthCheck> healthChecks;
 
@@ -90,11 +92,13 @@ public final class UxmessCommand implements CommandRegistration {
             ModuleRegistry registry,
             ConfigStore config,
             MigrationImportNode importNode,
+            GuiSubcommand guiNode,
             Scheduler scheduler,
             List<HealthCheck> healthChecks) {
         this.registry = Objects.requireNonNull(registry, "registry");
         this.config = Objects.requireNonNull(config, "config");
         this.importNode = Objects.requireNonNull(importNode, "importNode");
+        this.guiNode = Objects.requireNonNull(guiNode, "guiNode");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.healthChecks = List.copyOf(Objects.requireNonNull(healthChecks, "healthChecks"));
     }
@@ -107,6 +111,7 @@ public final class UxmessCommand implements CommandRegistration {
                 .then(Commands.literal("status").executes(this::runStatus))
                 .then(Commands.literal("doctor").executes(this::runDoctor))
                 .then(Commands.literal("help").executes(this::runHelp))
+                .then(guiNode.build())
                 .then(reloadNode())
                 .then(importNode.build())
                 .build();
@@ -193,6 +198,7 @@ public final class UxmessCommand implements CommandRegistration {
         sendBody(sender, HELP_STATUS);
         sendBody(sender, HELP_DOCTOR);
         sendBody(sender, HELP_HELP);
+        sendBody(sender, HELP_GUI);
         sendBody(sender, HELP_RELOAD);
         sendBody(sender, HELP_IMPORT);
         return Command.SINGLE_SUCCESS;

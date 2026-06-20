@@ -12,11 +12,13 @@ import java.util.Optional;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import org.bukkit.Material;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.bootstrap.CommandAliasDefaults;
 import com.uxplima.uxmessentials.bootstrap.command.BackupCommand;
+import com.uxplima.uxmessentials.bootstrap.command.GuiSubcommand;
 import com.uxplima.uxmessentials.bootstrap.command.HelpCommand;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
@@ -63,7 +65,11 @@ import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -142,6 +148,9 @@ public final class PluginModule {
         KernelWiring.Kernel wiredKernel = KernelWiring.wire(plugin, config, kernelLog);
         KernelPorts kernel = wiredKernel.ports();
         ModuleRegistry registry = new DefaultModuleRegistry();
+        // The hand-wired hub registry every module's management GUI plugs into. Built once here and handed to
+        // the hub command below; module wiring (SP1+) registers each module's opener into it. Empty until then.
+        ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
         CloseableResources resources = new CloseableResources();
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
         resources.localeBinding(new LocaleBinding(wiredKernel.localeStore(), wiredKernel.serverDefault()));
@@ -173,7 +182,20 @@ public final class PluginModule {
         resources.onClose(integrations.stop());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
         List<HealthCheck> healthChecks = healthChecks(plugin, registry, config, persistence);
-        resources.addCommand(new UxmessCommand(registry, config, importNode, kernel.scheduler(), healthChecks));
+        // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
+        // ManagementGuiRegistry entries the viewer is permitted, each opening that module's own GUI. The
+        // registry is constructed here and is threaded to module wiring (SP1+ each registers its opener);
+        // an empty registry is the valid first state, so /uxmess gui replies with the empty-hub line until a
+        // module plugs in. Geometry/materials load disk-first then bundled from modules/management/gui/hub.conf.
+        GuiText guiText = new GuiText(kernel.messages());
+        GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
+        EntityListLayout hubLayout =
+                guiLayouts.loadEntityList("management", "hub", EntityListLayout.paginatedDefault(Material.NETHER_STAR));
+        ManagementHubView hub =
+                new ManagementHubView(guiText, kernel.scheduler(), kernel.permissions(), guiRegistry, hubLayout);
+        GuiSubcommand guiNode = new GuiSubcommand(guiRegistry, hub, kernel.permissions(), kernel.messages());
+        resources.addCommand(
+                new UxmessCommand(registry, config, importNode, guiNode, kernel.scheduler(), healthChecks));
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
                 wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));

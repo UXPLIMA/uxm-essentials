@@ -10,11 +10,17 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.tree.CommandNode;
 import com.uxplima.uxmessentials.bootstrap.di.DefaultModuleRegistry;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthResult;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -76,7 +82,20 @@ class DoctorCommandSurfaceTest {
         ConfigStore config = Mockito.mock(ConfigStore.class);
         Mockito.when(config.scoped(Mockito.anyString())).thenReturn(config);
         MigrationImportService service = Mockito.mock(MigrationImportService.class);
-        return new UxmessCommand(registry, config, new MigrationImportNode(service), new InlineScheduler(), checks);
+        return new UxmessCommand(
+                registry, config, new MigrationImportNode(service), guiNode(), new InlineScheduler(), checks);
+    }
+
+    /** A minimal /uxmess gui node — this surface guard only inspects the doctor child, never opens the hub. */
+    private static GuiSubcommand guiNode() {
+        Scheduler scheduler = new InlineScheduler();
+        Permissions permissions = Mockito.mock(Permissions.class);
+        Messages messages = Mockito.mock(Messages.class);
+        ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
+        GuiText guiText = new GuiText(messages);
+        EntityListLayout layout = EntityListLayout.paginatedDefault(org.bukkit.Material.NETHER_STAR);
+        ManagementHubView hub = new ManagementHubView(guiText, scheduler, permissions, guiRegistry, layout);
+        return new GuiSubcommand(guiRegistry, hub, permissions, messages);
     }
 
     private static HealthCheck okCheck() {
