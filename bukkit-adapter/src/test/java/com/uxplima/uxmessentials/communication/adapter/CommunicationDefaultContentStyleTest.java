@@ -55,7 +55,7 @@ class CommunicationDefaultContentStyleTest {
         // The HudText path: PlaceholderAPI pre-parse is the identity for this template (no %papi%), then this parse.
         Component rendered = MINI.deserialize(ADVANCEMENT, StyleTags.resolver());
         String plain = PLAIN.serialize(rendered);
-        assertThat(plain).startsWith("「 NEWS 」"); // <tag:'NEWS'> rendered as the bracketed prefix
+        assertThat(plain).startsWith("NEWS » "); // <tag:'NEWS'> rendered as the label-and-separator prefix
         assertThat(plain).contains("🏆"); // the achievement glyph survived
         assertThat(colours(rendered)).contains(StyleTags.ACCENT, StyleTags.BODY, StyleTags.MONEY);
         assertNoLiteralTokens(rendered);

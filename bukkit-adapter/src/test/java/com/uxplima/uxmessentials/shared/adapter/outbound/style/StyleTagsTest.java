@@ -35,6 +35,20 @@ class StyleTagsTest {
         throw new AssertionError("no coloured node found in " + root);
     }
 
+    private TextColor colorOfRun(Component root, String text) {
+        Deque<Component> queue = new ArrayDeque<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            Component node = queue.removeFirst();
+            if (node instanceof net.kyori.adventure.text.TextComponent textNode
+                    && textNode.content().equals(text)) {
+                return node.color();
+            }
+            queue.addAll(node.children());
+        }
+        throw new AssertionError("no run with text '" + text + "' found in " + root);
+    }
+
     private boolean anyBold(Component root) {
         if (root.decoration(TextDecoration.BOLD) == TextDecoration.State.TRUE) {
             return true;
@@ -48,27 +62,43 @@ class StyleTagsTest {
     }
 
     @Test
+    void valueIsAccentAlias() {
+        assertThat(firstColor(parse("<value>x</value>"))).isEqualTo(StyleTags.ACCENT);
+    }
+
+    @Test
     void badAppliesRed() {
         assertThat(firstColor(parse("<bad>nope</bad>"))).isEqualTo(StyleTags.BAD);
     }
 
     @Test
-    void tagRendersBracketedBoldGradientLabel() {
+    void titleAppliesDarkGray() {
+        assertThat(firstColor(parse("<title>Your Homes</title>"))).isEqualTo(StyleTags.TITLE);
+    }
+
+    @Test
+    void tagRendersLabelThenSeparator() {
         Component c = parse("<tag:'HOME'> hi");
         String plain = PlainTextComponentSerializer.plainText().serialize(c);
-        assertThat(plain).startsWith("「 HOME 」");
-        // the gradient label is rendered bold
-        assertThat(anyBold(c)).isTrue();
+        assertThat(plain).startsWith("HOME » ");
+        assertThat(colorOfRun(c, "HOME")).isEqualTo(StyleTags.HEADER);
+        assertThat(anyBold(c)).isFalse();
     }
 
     @Test
-    void headerRendersGradientText() {
+    void etagRendersRedLabelThenSeparator() {
+        Component c = parse("<etag:'ERROR'> oops");
+        String plain = PlainTextComponentSerializer.plainText().serialize(c);
+        assertThat(plain).startsWith("ERROR » ");
+        assertThat(colorOfRun(c, "ERROR")).isEqualTo(StyleTags.BAD);
+        assertThat(anyBold(c)).isFalse();
+    }
+
+    @Test
+    void headerRendersSolidBlueText() {
         Component c = parse("<h:'HOME PANEL'>");
         assertThat(PlainTextComponentSerializer.plainText().serialize(c)).isEqualTo("HOME PANEL");
-    }
-
-    @Test
-    void valueIsAccentAlias() {
-        assertThat(firstColor(parse("<value>x</value>"))).isEqualTo(StyleTags.ACCENT);
+        assertThat(firstColor(c)).isEqualTo(StyleTags.HEADER);
+        assertThat(anyBold(c)).isFalse();
     }
 }
