@@ -16,6 +16,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcListView;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
@@ -39,30 +40,35 @@ import org.jspecify.annotations.NullMarked;
 public final class NpcCommand extends NpcCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.npc.admin";
+    private static final String GUI_PERMISSION = "uxmessentials.npc.gui";
 
     private final NpcSkinCommands skinCommands;
     private final NpcAppearanceCommands appearanceCommands;
     private final NpcDataCommands dataCommands;
     private final NpcActionCommands actionCommands;
     private final NpcStateCommands stateCommands;
+    private final NpcListView listView;
 
     public NpcCommand(
             NpcServices services,
             Supplier<? extends Collection<String>> npcNames,
             NpcSkinByName skinByName,
-            Messages messages) {
+            Messages messages,
+            NpcListView listView) {
         super(services, npcNames, messages);
         this.skinCommands = new NpcSkinCommands(services, npcNames, skinByName, messages);
         this.appearanceCommands = new NpcAppearanceCommands(services, npcNames, messages);
         this.dataCommands = new NpcDataCommands(services, npcNames, messages);
         this.actionCommands = new NpcActionCommands(services, npcNames, messages);
         this.stateCommands = new NpcStateCommands(services, npcNames, messages);
+        this.listView = java.util.Objects.requireNonNull(listView, "listView");
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("npc")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(this::openGui)
                 .then(Commands.literal("create")
                         .then(nameArgument()
                                 .executes(this::create)
@@ -104,6 +110,24 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     @Override
     public String description() {
         return "Create and manage fake-player NPCs.";
+    }
+
+    /**
+     * {@code /npc} with no arguments: open the management GUI for a player who holds the GUI node, else print the
+     * {@code /npc help} text so a console or an operator without the GUI node still gets a useful reply. The GUI
+     * node is checked through the live sender's permissions, the same gate the {@code /uxmess gui} hub entry uses.
+     */
+    private int openGui(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        if (sender.hasPermission(GUI_PERMISSION)) {
+            listView.open(sender, ref(sender));
+        } else {
+            feedback.send(sender, NpcMessageKey.NPC_HELP, java.util.Map.of());
+        }
+        return Command.SINGLE_SUCCESS;
     }
 
     private int create(CommandContext<CommandSourceStack> ctx) {

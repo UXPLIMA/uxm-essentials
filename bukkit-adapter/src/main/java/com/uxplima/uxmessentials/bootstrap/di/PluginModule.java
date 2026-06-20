@@ -398,7 +398,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("staff"))) {
             wireStaff(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("npc"))) {
-            wireNpc(plugin, ctx, persistence, resources, links);
+            wireNpc(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         }
     }
 
@@ -852,7 +852,9 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // npc builds its cached jOOQ NpcRepository over persistence.dsl() and its renderer over the uxmLib NPC
         // packet stack; the npc table ships in the persistence V38 baseline, always applied. Its one cross-context
         // edge is soft: a COST click action charges through the economy bridge captured during economy wiring (npc
@@ -860,8 +862,19 @@ public final class PluginModule {
         // has no real entity: each viewer is sent a spawn (then its tab entry is hidden), range-culled and
         // re-evaluated on a per-second global refresh and on join/quit/world-change. On wire every stored NPC is
         // shown to the online viewers in range; on disable the refresh timer is cancelled and every shown fake
-        // player is removed from every viewer so a reload re-spawns cleanly with no ghost.
-        NpcWiring.Wired wired = NpcWiring.wire(plugin, ctx, persistence, Optional.ofNullable(links.npcEconomy));
+        // player is removed from every viewer so a reload re-spawns cleanly with no ghost. The management GUI
+        // consumes the SP0 framework (a GuiText over the shared catalog, the data-folder layout loader, an anvil)
+        // and registers its /uxmess gui hub entry; /npc with no args opens the same list, gated on the GUI node.
+        GuiText guiText = new GuiText(ctx.kernel().messages());
+        NpcWiring.Wired wired = NpcWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                Optional.ofNullable(links.npcEconomy),
+                guiText,
+                guiLayouts,
+                new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin),
+                guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

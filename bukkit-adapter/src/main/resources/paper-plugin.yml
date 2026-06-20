@@ -996,3 +996,8 @@ permissions:
   uxmessentials.npc.use:
     description: 'Interact with (click) an NPC to run its bound command. Reserved for the interaction sub-phase.'
     default: true
+  # NPC management GUI — /npc with no arguments opens the list-and-editor panel, and the npc entry on the
+  # /uxmess gui hub gates on this node. Admin/manage tier, like the rest of the NPC surface.
+  uxmessentials.npc.gui:
+    description: '/npc (no args) opens the NPC management GUI.'
+    default: op

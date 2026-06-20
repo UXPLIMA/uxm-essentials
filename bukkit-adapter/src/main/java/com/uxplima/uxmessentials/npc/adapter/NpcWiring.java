@@ -11,6 +11,9 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcSkinByName;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcEditorSubLayouts;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcEditorView;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcListView;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionListener;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
 import com.uxplima.uxmessentials.npc.adapter.outbound.CompositeSkinService;
@@ -68,6 +71,12 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -78,6 +87,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCom
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
+import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import com.uxplima.uxmlib.npc.ChannelResolver;
 import com.uxplima.uxmlib.npc.PacketSender;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
@@ -113,11 +123,22 @@ public final class NpcWiring {
 
     /** Build the npc adapters and use cases, and spawn the stored NPCs to the online viewers in range. */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, Persistence persistence, Optional<ClickActionEconomy> economy) {
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            Optional<ClickActionEconomy> economy,
+            GuiText guiText,
+            GuiLayouts guiLayouts,
+            AnvilInput anvil,
+            ManagementGuiRegistry guiRegistry) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(economy, "economy");
+        Objects.requireNonNull(guiText, "guiText");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
         KernelPorts kernel = ctx.kernel();
         NpcSettings settings = new NpcSettings(ctx.config());
         NpcRepository repository = NpcRepositories.cached(persistence);
@@ -139,8 +160,17 @@ public final class NpcWiring {
         SkinService skinService = new CompositeSkinService(mojangSkins, mineSkins);
         NpcSkinByName skinByName =
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
+        // The management GUI: an editor exposing every NPC property over the use cases, and a list that opens it.
+        // The list backs both /npc (no args) and the /uxmess gui hub entry; the editor's back button returns to it.
+        NpcListView listView = buildGui(plugin, kernel, repository, services, skinByName, guiText, guiLayouts, anvil);
+        guiRegistry.register(new ManagementGuiEntry(
+                "npc",
+                NpcMessageKey.NPC_GUI_LIST_TITLE,
+                org.bukkit.Material.PLAYER_HEAD,
+                "uxmessentials.npc.gui",
+                listView::open));
         List<CommandRegistration> commands =
-                List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages()));
+                List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages(), listView));
         ClickCommandRunner commandRunner = new FilteredClickCommandRunner(
                 new BukkitClickCommandRunner(), BlockedCommands.of(settings.blockedCommands()), kernel.log());
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
@@ -161,6 +191,65 @@ public final class NpcWiring {
         Duration lookPeriod = settings.lookPeriod();
         AutoCloseable lookTask = kernel.scheduler().repeatGlobal(renderer::lookTick, lookPeriod, lookPeriod);
         return new Wired(commands, listeners, renderer, connector, refreshTask, lookTask);
+    }
+
+    /** The editor's property-button slots, the code default matching the bundled npc-editor.conf. */
+    private static final List<Integer> EDITOR_PROPERTY_SLOTS =
+            List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31);
+
+    /**
+     * Build the NPC management list and editor over the shared GUI framework. The editor's back button reopens
+     * the list, so a one-slot holder breaks the list↔editor construction cycle (the editor is built first, the
+     * list second, and the holder is filled before either is shown).
+     */
+    private static NpcListView buildGui(
+            Plugin plugin,
+            KernelPorts kernel,
+            NpcRepository repository,
+            NpcServices services,
+            NpcSkinByName skinByName,
+            GuiText guiText,
+            GuiLayouts guiLayouts,
+            AnvilInput anvil) {
+        NpcEditorSubLayouts subLayouts =
+                NpcEditorSubLayouts.load(plugin.getDataFolder().toPath(), "npc", "npc-editor", kernel.log());
+        EntityListLayout listLayout = guiLayouts.loadEntityList(
+                "npc",
+                "npc-list",
+                EntityListLayout.withCreate(org.bukkit.Material.PLAYER_HEAD, 49, org.bukkit.Material.LIME_DYE));
+        EntityEditorLayout editorLayout = guiLayouts.loadEntityEditor("npc", "npc-editor", editorCodeDefault());
+        NpcListView[] listHolder = new NpcListView[1];
+        NpcEditorView editor = new NpcEditorView(
+                guiText,
+                kernel.scheduler(),
+                repository,
+                services,
+                skinByName,
+                anvil,
+                kernel.messages(),
+                editorLayout,
+                subLayouts,
+                (player, viewer) -> listHolder[0].open(player, viewer));
+        NpcListView listView =
+                new NpcListView(guiText, kernel.scheduler(), repository, services, anvil, listLayout, editor);
+        listHolder[0] = listView;
+        return listView;
+    }
+
+    /**
+     * The 6-row editor code default used when no {@code npc-editor.conf} is present. The shared
+     * {@link EntityEditorLayout#withDelete} factory is a 3-row default that cannot hold the property slots, so
+     * this builds the layout directly with the bundled geometry.
+     */
+    private static EntityEditorLayout editorCodeDefault() {
+        return new EntityEditorLayout(
+                6,
+                EDITOR_PROPERTY_SLOTS,
+                49,
+                java.util.OptionalInt.of(53),
+                org.bukkit.Material.ARROW,
+                org.bukkit.Material.BARRIER,
+                org.bukkit.Material.BLACK_STAINED_GLASS_PANE);
     }
 
     private static NpcServices assemble(

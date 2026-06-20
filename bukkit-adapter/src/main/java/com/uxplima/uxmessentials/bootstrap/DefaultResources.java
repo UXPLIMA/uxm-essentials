@@ -79,6 +79,8 @@ final class DefaultResources {
             "modules/itemworld/gui/disposal.conf",
             "modules/holograms/gui/hologram-list.conf",
             "modules/holograms/gui/hologram-editor.conf",
+            "modules/npc/gui/npc-list.conf",
+            "modules/npc/gui/npc-editor.conf",
             "modules/management/gui/hub.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");
