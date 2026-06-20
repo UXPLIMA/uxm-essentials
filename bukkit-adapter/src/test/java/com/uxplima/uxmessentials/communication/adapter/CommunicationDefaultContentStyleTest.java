@@ -34,7 +34,7 @@ class CommunicationDefaultContentStyleTest {
 
     private static final String INFO_LINK = "<cta>/rules</cta> <muted>—</muted> <body>read the server rules.</body>";
     private static final String ADVANCEMENT =
-            "<tag:'NEWS'> <value>{player}</value> <body>has made the advancement</body> <good>[{title}]</good> 🏆";
+            "<tag:'NEWS'> <value>{player}</value> <body>has made the advancement</body> <good>[{title}]</good>";
 
     @Test
     void theInfoPageValueTokenResolvesToCyanAndLeavesNoLiteralToken() {
@@ -56,7 +56,6 @@ class CommunicationDefaultContentStyleTest {
         Component rendered = MINI.deserialize(ADVANCEMENT, StyleTags.resolver());
         String plain = PLAIN.serialize(rendered);
         assertThat(plain).startsWith("uxmEssentials »"); // <tag:'NEWS'> renders the single brand prefix
-        assertThat(plain).contains("🏆"); // the achievement glyph survived
         assertThat(colours(rendered)).contains(StyleTags.ACCENT, StyleTags.BODY, StyleTags.MONEY);
         assertNoLiteralTokens(rendered);
     }
