@@ -170,7 +170,7 @@ public final class PluginModule {
         resources.onClose(bus::stop);
 
         PlaceholderContexts placeholders =
-                wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus());
+                wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus(), guiRegistry);
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
@@ -314,7 +314,8 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             Logger log,
-            Bus bus) {
+            Bus bus,
+            ManagementGuiRegistry guiRegistry) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
@@ -332,7 +333,7 @@ public final class PluginModule {
                 continue;
             }
             startModule(module, ctx, resources, log);
-            wireAdapters(plugin, module, ctx, persistence, resources, links, bus, guiLayouts);
+            wireAdapters(plugin, module, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
         }
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
@@ -349,7 +350,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
@@ -380,7 +382,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("communication"))) {
             wireCommunication(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
-            wireHolograms(plugin, ctx, persistence, resources, links);
+            wireHolograms(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
             wirePlayerwarps(ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
@@ -735,7 +737,9 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // holograms builds its cached jOOQ HologramRepository over persistence.dsl() and its renderer over the
         // uxmLib native-Display API; the holograms / hologram_lines tables ship in the persistence V13 baseline,
         // always applied. Its one cross-context bridge is the leaderboard data-source registry: the economy module
@@ -747,12 +751,32 @@ public final class PluginModule {
         // The same shared economy bridge npc charges its COST click actions through (captured during economy
         // wiring, which lands long before holograms); absent on a server without economy, so a hologram COST gate
         // is simply skipped there. It is a generic ClickActionEconomy, not an npc handle — holograms reaches no npc.
-        HologramsWiring.Wired wired =
-                HologramsWiring.wire(plugin, ctx, persistence, leaderboards, Optional.ofNullable(links.npcEconomy));
+        // The management GUI consumes the SP0 framework: a GuiText over the shared catalog and the data-folder
+        // layout loader (disk-first, then bundled). The list view (built inside HologramsWiring with the
+        // repository + use cases) opens for /hologram with no args and from the /uxmess gui hub.
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(
+                        ctx.kernel().messages());
+        HologramsWiring.Wired wired = HologramsWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                leaderboards,
+                Optional.ofNullable(links.npcEconomy),
+                guiText,
+                guiLayouts,
+                new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin));
         wired.commands().forEach(resources::addCommand);
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
         links.placeholders.holograms(new RepositoryHologramsPlaceholders(wired.repository()));
+        // Register the holograms management GUI on the /uxmess gui hub, gated by the holograms GUI node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "holograms",
+                com.uxplima.uxmessentials.holograms.application.HologramsMessageKey.HOLOGRAM_GUI_LIST_TITLE,
+                org.bukkit.Material.ARMOR_STAND,
+                "uxmessentials.holograms.gui",
+                (player, viewer) -> wired.listView().open(player, viewer)));
         resources.onClose(wired::stop);
     }
 

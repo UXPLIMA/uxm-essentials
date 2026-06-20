@@ -134,6 +134,80 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_LIST_ENTRY("hologram.list.entry"),
     HOLOGRAM_LIST_EMPTY("hologram.list.empty"),
 
+    // management GUI — the /hologram list menu
+    HOLOGRAM_GUI_LIST_TITLE("hologram.gui.list.title"),
+    HOLOGRAM_GUI_LIST_ENTRY_NAME("hologram.gui.list.entry-name"),
+    HOLOGRAM_GUI_LIST_ENTRY_LORE("hologram.gui.list.entry-lore"),
+    HOLOGRAM_GUI_LIST_PREV("hologram.gui.list.prev"),
+    HOLOGRAM_GUI_LIST_NEXT("hologram.gui.list.next"),
+    HOLOGRAM_GUI_LIST_CREATE("hologram.gui.list.create"),
+    HOLOGRAM_GUI_LIST_CREATE_PROMPT("hologram.gui.list.create-prompt"),
+
+    // management GUI — the per-hologram editor frame
+    HOLOGRAM_GUI_EDITOR_TITLE("hologram.gui.editor.title"),
+    HOLOGRAM_GUI_EDITOR_VALUE_LORE("hologram.gui.editor.value-lore"),
+    HOLOGRAM_GUI_EDITOR_BACK("hologram.gui.editor.back"),
+    HOLOGRAM_GUI_EDITOR_DELETE("hologram.gui.editor.delete"),
+    HOLOGRAM_GUI_EDITOR_DELETE_CONFIRM("hologram.gui.editor.delete-confirm"),
+
+    // management GUI — per-property labels
+    HOLOGRAM_GUI_PROP_NAME("hologram.gui.prop.name"),
+    HOLOGRAM_GUI_PROP_NAME_PROMPT("hologram.gui.prop.name-prompt"),
+    HOLOGRAM_GUI_PROP_MOVE("hologram.gui.prop.move"),
+    HOLOGRAM_GUI_PROP_LINES("hologram.gui.prop.lines"),
+    HOLOGRAM_GUI_PROP_SCALE("hologram.gui.prop.scale"),
+    HOLOGRAM_GUI_PROP_BILLBOARD("hologram.gui.prop.billboard"),
+    HOLOGRAM_GUI_PROP_ALIGNMENT("hologram.gui.prop.alignment"),
+    HOLOGRAM_GUI_PROP_VISIBILITY("hologram.gui.prop.visibility"),
+    HOLOGRAM_GUI_PROP_VISIBILITY_DISTANCE("hologram.gui.prop.visibility-distance"),
+    HOLOGRAM_GUI_PROP_VIEW_RANGE("hologram.gui.prop.view-range"),
+    HOLOGRAM_GUI_PROP_LINE_WIDTH("hologram.gui.prop.line-width"),
+    HOLOGRAM_GUI_PROP_BRIGHTNESS_BLOCK("hologram.gui.prop.brightness-block"),
+    HOLOGRAM_GUI_PROP_BRIGHTNESS_SKY("hologram.gui.prop.brightness-sky"),
+    HOLOGRAM_GUI_PROP_TEXT_SHADOW("hologram.gui.prop.text-shadow"),
+    HOLOGRAM_GUI_PROP_SEE_THROUGH("hologram.gui.prop.see-through"),
+    HOLOGRAM_GUI_PROP_ROTATION_YAW("hologram.gui.prop.rotation-yaw"),
+    HOLOGRAM_GUI_PROP_ROTATION_PITCH("hologram.gui.prop.rotation-pitch"),
+    HOLOGRAM_GUI_PROP_REFRESH("hologram.gui.prop.refresh"),
+    HOLOGRAM_GUI_PROP_GROW_UP("hologram.gui.prop.grow-up"),
+    HOLOGRAM_GUI_PROP_CLICK_COMMAND("hologram.gui.prop.click-command"),
+    HOLOGRAM_GUI_PROP_CLICK_COMMAND_PROMPT("hologram.gui.prop.click-command-prompt"),
+    HOLOGRAM_GUI_PROP_LEADERBOARD("hologram.gui.prop.leaderboard"),
+    HOLOGRAM_GUI_PROP_NPC_LINK("hologram.gui.prop.npc-link"),
+    HOLOGRAM_GUI_PROP_NPC_LINK_PROMPT("hologram.gui.prop.npc-link-prompt"),
+    HOLOGRAM_GUI_PROP_BLACKLIST("hologram.gui.prop.blacklist"),
+
+    // management GUI — value display words (booleans, modes, the "none/unset" placeholder)
+    HOLOGRAM_GUI_VALUE_ON("hologram.gui.value.on"),
+    HOLOGRAM_GUI_VALUE_OFF("hologram.gui.value.off"),
+    HOLOGRAM_GUI_VALUE_NONE("hologram.gui.value.none"),
+    HOLOGRAM_GUI_VALUE_DEFAULT("hologram.gui.value.default"),
+
+    // management GUI — the lines sub-menu (a ListProperty of text lines)
+    HOLOGRAM_GUI_LINES_TITLE("hologram.gui.lines.title"),
+    HOLOGRAM_GUI_LINES_ENTRY_NAME("hologram.gui.lines.entry-name"),
+    HOLOGRAM_GUI_LINES_ENTRY_HINTS("hologram.gui.lines.entry-hints"),
+    HOLOGRAM_GUI_LINES_ADD("hologram.gui.lines.add"),
+    HOLOGRAM_GUI_LINES_ADD_PROMPT("hologram.gui.lines.add-prompt"),
+    HOLOGRAM_GUI_LINES_EDIT_PROMPT("hologram.gui.lines.edit-prompt"),
+    HOLOGRAM_GUI_LINES_REMOVE_CONFIRM("hologram.gui.lines.remove-confirm"),
+    HOLOGRAM_GUI_LINES_BACK("hologram.gui.lines.back"),
+
+    // management GUI — the blacklist sub-menu (a ListProperty of player names)
+    HOLOGRAM_GUI_BLACKLIST_TITLE("hologram.gui.blacklist.title"),
+    HOLOGRAM_GUI_BLACKLIST_ENTRY_NAME("hologram.gui.blacklist.entry-name"),
+    HOLOGRAM_GUI_BLACKLIST_ENTRY_HINTS("hologram.gui.blacklist.entry-hints"),
+    HOLOGRAM_GUI_BLACKLIST_ADD("hologram.gui.blacklist.add"),
+    HOLOGRAM_GUI_BLACKLIST_ADD_PROMPT("hologram.gui.blacklist.add-prompt"),
+    HOLOGRAM_GUI_BLACKLIST_EDIT_PROMPT("hologram.gui.blacklist.edit-prompt"),
+    HOLOGRAM_GUI_BLACKLIST_REMOVE_CONFIRM("hologram.gui.blacklist.remove-confirm"),
+    HOLOGRAM_GUI_BLACKLIST_BACK("hologram.gui.blacklist.back"),
+
+    // management GUI — enum selector sub-menu titles
+    HOLOGRAM_GUI_SELECT_BILLBOARD("hologram.gui.select.billboard"),
+    HOLOGRAM_GUI_SELECT_ALIGNMENT("hologram.gui.select.alignment"),
+    HOLOGRAM_GUI_SELECT_VISIBILITY("hologram.gui.select.visibility"),
+
     // failures
     HOLOGRAM_NOT_FOUND("hologram.not-found"),
     HOLOGRAM_NAME_TAKEN("hologram.name-taken"),

@@ -17,6 +17,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListView;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -37,24 +38,29 @@ import org.jspecify.annotations.Nullable;
 public final class HologramCommand extends HologramCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.hologram.use";
+    private static final String GUI_PERMISSION = "uxmessentials.holograms.gui";
 
     private final Supplier<? extends Collection<String>> hologramNames;
     private final Supplier<? extends Collection<String>> npcNames;
+    private final HologramListView listView;
 
     public HologramCommand(
             HologramServices services,
             Messages messages,
             Supplier<? extends Collection<String>> hologramNames,
-            Supplier<? extends Collection<String>> npcNames) {
+            Supplier<? extends Collection<String>> npcNames,
+            HologramListView listView) {
         super(services, messages, hologramNames);
         this.hologramNames = hologramNames;
         this.npcNames = Objects.requireNonNull(npcNames, "npcNames");
+        this.listView = Objects.requireNonNull(listView, "listView");
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("hologram")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .executes(this::openGui)
                 .then(createNode())
                 .then(name("delete", this::delete))
                 .then(Commands.literal("list").executes(this::list))
@@ -131,6 +137,25 @@ public final class HologramCommand extends HologramCommandSupport implements Com
 
     private LiteralArgumentBuilder<CommandSourceStack> name(String literal, Command<CommandSourceStack> action) {
         return Commands.literal(literal).then(nameArgument("name").executes(action));
+    }
+
+    /**
+     * {@code /hologram} with no arguments: open the management GUI for a player who holds the GUI node, else
+     * print the {@code /hologram list} text so a console or an operator without the GUI node still gets a useful
+     * reply. The GUI node is checked through the live sender's permissions, the same gate the {@code /uxmess gui}
+     * hub entry uses.
+     */
+    private int openGui(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        if (sender.hasPermission(GUI_PERMISSION)) {
+            listView.open(sender, ref(sender));
+        } else {
+            services.list().list(ref(sender));
+        }
+        return Command.SINGLE_SUCCESS;
     }
 
     private int create(CommandContext<CommandSourceStack> ctx) {

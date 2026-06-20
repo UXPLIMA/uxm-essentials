@@ -15,6 +15,9 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramCommands;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramEditorSubLayouts;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramEditorView;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListView;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.DamageIndicatorListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramClickListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
@@ -73,6 +76,10 @@ import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -89,6 +96,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import com.uxplima.uxmlib.hologram.HologramManager;
 import com.uxplima.uxmlib.npc.ChannelResolver;
 import com.uxplima.uxmlib.npc.PacketSender;
@@ -125,12 +133,18 @@ public final class HologramsWiring {
             ModuleContext ctx,
             Persistence persistence,
             com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards,
-            Optional<ClickActionEconomy> economy) {
+            Optional<ClickActionEconomy> economy,
+            GuiText guiText,
+            GuiLayouts guiLayouts,
+            AnvilInput anvil) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(leaderboards, "leaderboards");
         Objects.requireNonNull(economy, "economy");
+        Objects.requireNonNull(guiText, "guiText");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(anvil, "anvil");
         KernelPorts kernel = ctx.kernel();
         HologramRepository repository = HologramRepositories.cached(persistence);
         HologramManager manager = new HologramManager();
@@ -225,14 +239,60 @@ public final class HologramsWiring {
         // The same warm-set read for NPC names, so /hologram linknpc tab-completes against the current NPCs.
         java.util.function.Supplier<java.util.List<String>> npcNames = () ->
                 npcRepository.all().stream().map(npc -> npc.name().value()).toList();
+        // The management GUI: an editor that exposes every property over the use cases, and a list that opens it.
+        // The list backs both /hologram (no args) and the /uxmess gui hub entry; the back button returns to it.
+        HologramEditorSubLayouts subLayouts = HologramEditorSubLayouts.load(
+                plugin.getDataFolder().toPath(), "holograms", "hologram-editor", kernel.log());
+        EntityListLayout listLayout = guiLayouts.loadEntityList(
+                "holograms",
+                "hologram-list",
+                EntityListLayout.withCreate(org.bukkit.Material.ARMOR_STAND, 49, org.bukkit.Material.LIME_DYE));
+        EntityEditorLayout editorLayout =
+                guiLayouts.loadEntityEditor("holograms", "hologram-editor", editorCodeDefault());
+        HologramListView[] listHolder = new HologramListView[1];
+        HologramEditorView editorView = new HologramEditorView(
+                guiText,
+                kernel.scheduler(),
+                repository,
+                services,
+                anvil,
+                kernel.playerLookup(),
+                kernel.messages(),
+                editorLayout,
+                subLayouts,
+                (player, viewer) -> listHolder[0].open(player, viewer));
+        HologramListView listView =
+                new HologramListView(guiText, kernel.scheduler(), repository, services, anvil, listLayout, editorView);
+        listHolder[0] = listView;
         return new Wired(
-                HologramCommands.all(services, kernel.messages(), hologramNames, npcNames),
+                HologramCommands.all(services, kernel.messages(), hologramNames, npcNames, listView),
                 renderer,
                 repository,
                 refreshTask,
                 events,
                 npcSubscriber,
-                connector);
+                connector,
+                listView);
+    }
+
+    /** The editor's property-button slots, the code default matching the bundled hologram-editor.conf. */
+    private static final List<Integer> EDITOR_PROPERTY_SLOTS =
+            List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37);
+
+    /**
+     * The 6-row editor code default used when no {@code hologram-editor.conf} is present. The shared
+     * {@link EntityEditorLayout#withDelete} factory is a 3-row default that cannot hold the 22 property slots,
+     * so this builds the layout directly with the bundled geometry.
+     */
+    private static EntityEditorLayout editorCodeDefault() {
+        return new EntityEditorLayout(
+                6,
+                EDITOR_PROPERTY_SLOTS,
+                49,
+                java.util.OptionalInt.of(53),
+                org.bukkit.Material.ARROW,
+                org.bukkit.Material.BARRIER,
+                org.bukkit.Material.BLACK_STAINED_GLASS_PANE);
     }
 
     /**
@@ -339,6 +399,7 @@ public final class HologramsWiring {
      * @param events the domain-event bus the npc-link locator subscribed to, dropped on stop
      * @param npcSubscriber the npc-link locator subscription, unsubscribed on stop so it does not outlive a reload
      * @param connector the proxy connect channel the click-action engine uses, unregistered on stop so nothing outlives a disable
+     * @param listView the management-GUI list view, opened by /hologram (no args) and the /uxmess gui hub entry
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -347,7 +408,8 @@ public final class HologramsWiring {
             AutoCloseable refreshTask,
             InProcessDomainEventPublisher events,
             Consumer<DomainEvent> npcSubscriber,
-            BukkitServerConnector connector) {
+            BukkitServerConnector connector,
+            HologramListView listView) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -357,6 +419,7 @@ public final class HologramsWiring {
             Objects.requireNonNull(events, "events");
             Objects.requireNonNull(npcSubscriber, "npcSubscriber");
             Objects.requireNonNull(connector, "connector");
+            Objects.requireNonNull(listView, "listView");
         }
 
         /**

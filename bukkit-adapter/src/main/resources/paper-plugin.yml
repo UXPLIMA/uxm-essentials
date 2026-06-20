@@ -892,6 +892,11 @@ permissions:
   uxmessentials.hologram.use:
     description: '/hologram to create, edit, move, list and delete native-Display holograms.'
     default: op
+  # Holograms management GUI — /hologram with no arguments opens the list-and-editor panel, and the holograms
+  # entry on the /uxmess gui hub gates on this node. Admin/manage tier, like the rest of the hologram surface.
+  uxmessentials.holograms.gui:
+    description: '/hologram (no args) opens the holograms management GUI.'
+    default: op
   # player-warps context (docs/permissions.md "Player Warps"). Player-owned warps keyed (owner, name): the
   # base nodes default true (self-service), the visibility toggle gates /pwarp visibility public|private, and
   # the numbered quota node uxmessentials.pwarp.limit.<n> (optional <world> segment, highest <n> wins) is an

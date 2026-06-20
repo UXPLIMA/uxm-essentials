@@ -77,6 +77,8 @@ final class DefaultResources {
             "modules/homes/gui/icon-selector.conf",
             "modules/homes/gui/invites-menu.conf",
             "modules/itemworld/gui/disposal.conf",
+            "modules/holograms/gui/hologram-list.conf",
+            "modules/holograms/gui/hologram-editor.conf",
             "modules/management/gui/hub.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");
