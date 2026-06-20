@@ -1,4 +1,4 @@
--- Adds FancyHolograms-style ITEM and BLOCK hologram types to the hologram store. As with V35 and V36, every
+-- Adds ITEM and BLOCK hologram types to the hologram store. As with V35 and V36, every
 -- column is nullable with no DEFAULT clause so the ALTER stays portable across SQLite, MySQL/MariaDB and
 -- PostgreSQL; an absent value reads back as NULL and the mapper resolves a NULL type to TEXT, so existing rows
 -- keep rendering their text lines with no data migration. A TEXT hologram leaves item_material / block_data

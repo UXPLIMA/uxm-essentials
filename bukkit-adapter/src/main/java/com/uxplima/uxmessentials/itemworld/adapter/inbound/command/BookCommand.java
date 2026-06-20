@@ -18,8 +18,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /book}: unlock the written book in the player's main hand back into an editable writable book
- * (EssentialsX parity). A signed {@link Material#WRITTEN_BOOK} becomes a {@link Material#WRITABLE_BOOK} that
+ * {@code /book}: unlock the written book in the player's main hand back into an editable writable book.
+ * A signed {@link Material#WRITTEN_BOOK} becomes a {@link Material#WRITABLE_BOOK} that
  * keeps the original pages, so the text can be edited again; any other item — a writable book that is already
  * editable, a non-book item, or an empty hand — replies {@link ItemworldMessageKey#NOT_A_WRITTEN_BOOK} and
  * mutates nothing. The new item is set back on the player's region thread through the {@code Scheduler} port.

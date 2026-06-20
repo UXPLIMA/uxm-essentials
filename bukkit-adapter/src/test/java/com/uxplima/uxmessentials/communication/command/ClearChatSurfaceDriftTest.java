@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins {@code /clearchat} into the communication context's command surface. The chat-family staff verb flushes
- * the visible chat by sending a screenful of blank lines to online players; zEssentials ships
- * {@code CommandChatClear}. This guard fails if the literal drops out of the surface or wires under a node
+ * the visible chat by sending a screenful of blank lines to online players. This guard fails if the literal
+ * drops out of the surface or wires under a node
  * other than {@code uxmessentials.communication.clearchat}.
  */
 class ClearChatSurfaceDriftTest {

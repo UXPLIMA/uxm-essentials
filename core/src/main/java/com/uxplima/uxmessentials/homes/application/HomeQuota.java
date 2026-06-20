@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
  * Resolves an owner's home limit through the shared {@code Permissions} quota reducer. How multiple
  * {@code uxmessentials.home.limit.<n>} tiers combine is governed by {@code limitMode}: {@code MAX} keeps
  * the highest tier the player holds (the default "highest wins" behavior), {@code STACK} sums all tiers
- * the player holds (zEssentials-style additive slots). The world-scoped form
+ * the player holds (additive slots). The world-scoped form
  * ({@code uxmessentials.home.limit.<world>.<n>}) is folded in alongside the unscoped form, LuckPerms meta
  * is treated identically to a node, and the {@code -1} unlimited sentinel short-circuits to "no limit".
  * The result is handed to the aggregate as a {@link HomeLimit} value object, so the reduction semantics

@@ -34,8 +34,8 @@ import org.jspecify.annotations.NullMarked;
  * and nothing in reach answers {@link ItemworldMessageKey#TREE_NO_TARGET}; both leave the world untouched.
  *
  * <p>Type matching is forgiving: the argument is lower-cased and stripped of underscores before comparison with
- * the enum names, and the bare word {@code jungle} resolves to {@link TreeType#SMALL_JUNGLE} (matching
- * EssentialsX, whose {@code /tree jungle} grows the smaller sapling rather than the 2x2 variant).
+ * the enum names, and the bare word {@code jungle} resolves to {@link TreeType#SMALL_JUNGLE} (so
+ * {@code /tree jungle} grows the smaller sapling rather than the 2x2 variant).
  *
  * <p>Growing mutates the world, so it runs on the caller's region thread through the kernel {@code Scheduler};
  * the target location and type name are captured before scheduling for the reply and the audit line.
@@ -106,7 +106,7 @@ public final class TreeCommand extends ItemworldCommandSupport implements Comman
         });
     }
 
-    /** Resolve the friendly argument to a {@link TreeType}, with the EssentialsX {@code jungle} convenience. */
+    /** Resolve the friendly argument to a {@link TreeType}, with the {@code jungle} convenience. */
     private static Optional<TreeType> resolve(String arg) {
         Objects.requireNonNull(arg, "arg");
         String normalised = arg.toLowerCase(Locale.ROOT).replace("_", "");

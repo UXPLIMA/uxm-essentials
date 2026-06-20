@@ -1,4 +1,4 @@
--- Adds FancyHolograms-style per-player visibility and a visibility distance to the hologram store.
+-- Adds per-player visibility and a visibility distance to the hologram store.
 -- As with V35, every column is nullable with no DEFAULT clause so the ALTER stays portable across SQLite,
 -- MySQL/MariaDB and PostgreSQL; an absent value reads back as NULL and the mapper resolves that to
 -- Visibility.everyone() (mode ALL, no node, distance 0 = the vanilla view range), so existing rows stay

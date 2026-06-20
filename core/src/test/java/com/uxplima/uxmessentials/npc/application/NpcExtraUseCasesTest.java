@@ -20,7 +20,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Covers the FancyNpcs-parity use cases: each new field round-trips through its use case, saves and re-renders. */
+/** Covers the extra appearance use cases: each new field round-trips through its use case, saves and re-renders. */
 class NpcExtraUseCasesTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");

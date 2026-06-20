@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.shared.network;
 /**
  * A cross-server sync frame carried over the proxy bus. Pure Java — no Bukkit, no Velocity — so the same
  * type hierarchy is shared by the backend bus client (the bukkit adapter) and the proxy broker (the velocity
- * adapter), mirroring uxmChat's pure-Java codec pattern. The hierarchy is {@code sealed}; the
+ * adapter), using a pure-Java codec pattern. The hierarchy is {@code sealed}; the
  * {@link NetworkMessageCodec} is the only encoder/decoder and every variant has a stable
  * {@link MessageType wire tag}.
  *

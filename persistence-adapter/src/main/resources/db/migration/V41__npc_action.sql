@@ -1,5 +1,5 @@
 -- Adds the ordered click-action chain to an NPC (V38-V40 are the name row, look toggle, equipment and glow),
--- matching the FancyNpcs "actions" surface. The existing single click_command column (V38) is kept and still
+-- the common "actions" surface. The existing single click_command column (V38) is kept and still
 -- runs first on a click; this is the richer, additive mechanism — a list of typed actions, each with a click
 -- trigger (LEFT/RIGHT/ANY) and a type (run-console, run-player, message, action-bar, title, sound, connect).
 --

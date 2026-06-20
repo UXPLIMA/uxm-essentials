@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * <p>The model variant is a property of the texture itself — a slim texture wears wrong on a classic model — and
  * the texture's own metadata carries it for a fetched skin, so {@code slim} defaults to {@code false} (classic)
  * and is only set explicitly when the operator overrides it. It is carried here so the adapter can apply it to
- * the displayed-model byte at render time, mirroring how FancyNpcs sets the skin profile's variant.
+ * the displayed-model byte at render time, the way the skin profile's variant is normally set.
  *
  * @param texture the base64-encoded skin-property value
  * @param signature the Yggdrasil signature for {@code texture}, or {@code null} for an unsigned skin

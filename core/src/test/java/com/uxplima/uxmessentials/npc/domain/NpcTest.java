@@ -484,7 +484,7 @@ class NpcTest {
     }
 
     @Test
-    void createsWithTheFancyNpcsParityDefaults() {
+    void createsWithTheExpectedAppearanceDefaults() {
         Npc npc = Npc.create(NpcName.of("guide"), AT, null, CREATED);
 
         assertThat(npc.displayName()).isNull();
@@ -607,7 +607,7 @@ class NpcTest {
                 .withSilent(true)
                 .withInteractionCooldownMillis(2_000);
 
-        // A move, a re-skin, and a click rebind each carry the full set of FancyNpcs-parity fields forward.
+        // A move, a re-skin, and a click rebind each carry the full set of appearance fields forward.
         assertThat(npc.movedTo(ELSEWHERE).displayName()).isEqualTo("Guide");
         assertThat(npc.movedTo(ELSEWHERE).interactionCooldownMillis()).isEqualTo(2_000);
         assertThat(npc.withSkin(NpcSkin.unsigned("tex")).mirrorSkin()).isTrue();

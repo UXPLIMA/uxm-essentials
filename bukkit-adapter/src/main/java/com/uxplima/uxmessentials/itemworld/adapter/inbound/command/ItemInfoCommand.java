@@ -27,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /iteminfo}: inspect the item in your main hand — its material id, display name, enchantments, custom
  * model data and durability. Read-only (no audit, no region hop, never mutates the item), the held-item
- * inspector zEssentials/EssentialsX users expect alongside {@code /itemdb}. The report is two
+ * inspector players expect alongside {@code /itemdb}. The report is two
  * {@link ItemworldMessageKey} lines, a header and a body line carrying every field; an empty hand replies
  * {@link ItemworldMessageKey#NO_ITEM_IN_HAND}.
  */

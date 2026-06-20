@@ -29,7 +29,7 @@ import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /potion}: add a custom potion effect to the potion in the player's main hand (EssentialsX parity).
+ * {@code /potion}: add a custom potion effect to the potion in the player's main hand.
  * {@code /potion <effect> [duration] [amplifier]} resolves {@code effect} against the {@link Registry#EFFECT}
  * registry by its lowercase name, defaulting to a 30-second amplifier-0 effect when the optional arguments are
  * omitted. The hand must hold a {@link Material#POTION}, {@link Material#SPLASH_POTION} or

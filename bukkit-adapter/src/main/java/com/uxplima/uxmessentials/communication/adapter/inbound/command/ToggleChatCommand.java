@@ -22,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /togglechat} (alias {@code /mutechat}): flip the global chat lock. While locked, public chat from
  * players without {@code uxmessentials.communication.chat.bypass} is cancelled by the {@code ChatLockListener}
  * so staff can freeze chat during a raid or an announcement. The single {@link ChatLock} flag is owned by the
- * communication context and flipped only here; EternalCore/zEssentials ship the same staff verb.
+ * communication context and flipped only here; this is the standard staff chat-freeze verb.
  *
  * <p>The lock is in-memory only: a server restart clears it (a chat freeze is a transient incident control,
  * never durable state), so there is nothing to persist and nothing to restore on enable.

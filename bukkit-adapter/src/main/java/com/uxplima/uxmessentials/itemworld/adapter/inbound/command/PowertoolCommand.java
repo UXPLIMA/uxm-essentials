@@ -26,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /powertool <command...>} (alias {@code /pt}): bind a command to the held item so a later interact runs
- * it. With no command on a bound item the binding is cleared (EssentialsX powertool semantics). The held item
+ * it. With no command on a bound item the binding is cleared (the standard powertool semantics). The held item
  * is identified by its normalised {@code namespace:path} id; the validated {@link PowertoolBinding} is shaped by
  * the domain {@link PowertoolPolicy} and stamped onto the item PDC by {@link PdcPowertoolStore}, so the binding
  * travels with the item and the module keeps no persistence.

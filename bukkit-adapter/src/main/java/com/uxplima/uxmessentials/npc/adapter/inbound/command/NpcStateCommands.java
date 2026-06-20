@@ -25,7 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The FancyNpcs-parity subcommands under {@code /npc} that the appearance/skin/data/action handlers do not own:
+ * The remaining subcommands under {@code /npc} that the appearance/skin/data/action handlers do not own:
  * {@code moveto} (explicit coordinates), {@code displayname}, {@code cooldown}, {@code mirror}, {@code collidable},
  * {@code showintab}, {@code viewdistance}, {@code turndistance}, {@code state} ({@code on_fire|invisible|silent}),
  * and {@code skinslim}. Every {@code name} word completes against the current NPC names and every choice/boolean

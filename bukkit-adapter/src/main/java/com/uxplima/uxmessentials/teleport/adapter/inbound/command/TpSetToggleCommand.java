@@ -19,8 +19,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /tpon} and {@code /tpoff}: the explicit, idempotent on/off counterparts to the flip-style
- * {@code /tptoggle}. Running {@code /tpon} twice keeps requests on rather than flipping back off, which is
- * what players coming from AdvancedTeleport and EssentialsX expect. The state is owned by the
+ * {@code /tptoggle}. Running {@code /tpon} twice keeps requests on rather than flipping back off, the
+ * idempotent on/off behaviour players expect. The state is owned by the
  * {@code TeleportFlags} port; this command sets it and renders the matching on/off confirmation.
  */
 @NullMarked

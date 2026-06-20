@@ -1,5 +1,5 @@
--- Adds equipment and a glowing outline to the npc table (V38, look toggle V39), matching the FancyNpcs
--- surface. Equipment is six nullable material-name columns, one per wearable slot, rather than a serialized
+-- Adds equipment and a glowing outline to the npc table (V38, look toggle V39).
+-- Equipment is six nullable material-name columns, one per wearable slot, rather than a serialized
 -- map: each holds a Bukkit material NAME (e.g. DIAMOND_HELMET), the simplest portable shape and one an
 -- operator can inspect or edit directly. A NULL column is an empty slot. The adapter resolves each name to a
 -- real item at render time and skips a name the live server does not know, so a name that ages out of the

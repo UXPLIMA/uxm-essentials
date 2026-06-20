@@ -52,7 +52,7 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /enchant}'s EssentialsX-parity per-type sub-gate through its real Brigadier node. A
+ * MockBukkit coverage of {@code /enchant}'s per-type sub-gate through its real Brigadier node. A
  * sender holding the {@code uxmessentials.itemworld.enchant.<enchant>} node enchants the held item
  * ({@code ENCHANT_APPLIED}); a sender for whom that node is negated is rejected with the shared no-permission feedback
  * and the held item is left unenchanted, while a different enchantment stays unaffected. The base {@code enchant.use}

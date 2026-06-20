@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins {@code /sellall} into the economy context's command surface. {@code /sell} sells only the held stack;
- * EssentialsX's {@code /sell all} sells every sellable item in the inventory, so {@code /sellall} reuses the
+ * {@code /sellall} sells every sellable item in the inventory, so it reuses the
  * existing {@code SellItem} use case and the {@code uxmessentials.economy.sell} node (same capability). This
  * guard fails if the literal drops out of the surface or wires under a different node.
  */

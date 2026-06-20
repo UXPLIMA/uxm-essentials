@@ -26,7 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The FancyHolograms-style per-player visibility subcommands under {@code /hologram}: {@code visibility} (who
+ * The per-player visibility subcommands under {@code /hologram}: {@code visibility} (who
  * may see the hologram — {@code ALL} for everyone, {@code PERMISSION} gated by an operator-chosen node, or
  * {@code MANUAL} hidden until shown to a named player), {@code visibilitydistance} (the visibility radius in
  * blocks, 0 = unlimited), and the manual viewer-set commands {@code show <name> <player>} and {@code hide <name>

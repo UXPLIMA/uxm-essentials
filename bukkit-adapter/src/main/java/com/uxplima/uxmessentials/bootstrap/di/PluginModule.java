@@ -613,7 +613,7 @@ public final class PluginModule {
 
     private static void wireItemworld(
             JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, GuiLayouts guiLayouts) {
-        // itemworld persists nothing: it is the full EssentialsX item/world surface as stateless ACL-thin
+        // itemworld persists nothing: it is the full item/world command surface as stateless ACL-thin
         // mutations validated at the adapter boundary and applied through the kernel Scheduler. The only runtime
         // state is the powertool/unlimited per-player toggles and the item-PDC powertool bindings, all transient
         // and dropped with the wiring on module stop. /repair /repairall /hat /more are owned here (playerstate

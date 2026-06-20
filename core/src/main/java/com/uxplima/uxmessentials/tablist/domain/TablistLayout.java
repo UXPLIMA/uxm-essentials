@@ -87,7 +87,7 @@ public record TablistLayout(List<TablistFiller> fillers, Direction direction, in
      * Translate a 1-based {@code slot} to the 1-based cell index the client renders it in. {@link Direction#COLUMNS} is
      * the identity (the vanilla list already fills column by column), while {@link Direction#ROWS} maps a slot authored
      * row by row onto the column-major cell the client expects: {@code (slot-1) % COLUMNS * gridRows + (slot-1) / COLUMNS
-     * + 1}. Mirrors the layout arithmetic in the reference TAB plugin so a row-fill places entries identically.
+     * + 1}. Mirrors the standard tab-list layout arithmetic so a row-fill places entries identically.
      */
     private static int translateSlot(int slot, Direction direction, int gridRows) {
         return switch (direction) {

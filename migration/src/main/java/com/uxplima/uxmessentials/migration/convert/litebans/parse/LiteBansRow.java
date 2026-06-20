@@ -10,7 +10,7 @@ import java.util.Optional;
  * share their column set; {@code warned} is meaningful only for warnings (empty elsewhere). Mapping these
  * columns to {@code :core} sanction types is the {@code map/} layer's job.
  *
- * <p>Column semantics, from the LiteBans schema (see {@code rakipler/litebans/config.yml}):
+ * <p>Column semantics, from the imported ban table's schema:
  * {@code uuid} is the target's UUID as text (sentinels {@code #offline#}/{@code #undefined#} possible),
  * {@code time} the creation epoch in milliseconds, {@code until} the expiry epoch in milliseconds where a
  * value {@code <= 0} means permanent, {@code ipban}/{@code ipbanWildcard}/{@code active}/{@code silent} the

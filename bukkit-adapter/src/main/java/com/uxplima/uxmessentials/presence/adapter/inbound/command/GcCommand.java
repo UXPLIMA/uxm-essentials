@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /gc} (aliases {@code /lag}, {@code /tps}, {@code /mem}, {@code uxmessentials.gc.use}): a one-line
  * server-health read-out — the one-minute TPS, process uptime, heap memory (used/free/max) and the loaded chunk
- * and entity totals across every world. The staff diagnostic EssentialsX surfaces under the same name; it sits
+ * and entity totals across every world. The staff diagnostic commonly surfaced under this name; it sits
  * with the presence context's other server/player info reads ({@code /list}, {@code /whois}, {@code /realname}).
  * A pure read: no use case, no state mutation, just a snapshot of the live runtime and one resolved reply, so
  * the console may run it too.

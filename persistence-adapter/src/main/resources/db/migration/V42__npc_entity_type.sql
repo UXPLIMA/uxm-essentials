@@ -1,7 +1,7 @@
 -- Adds the entity type an NPC renders as (V38-V41 are the name row, look toggle, equipment/glow and the action
 -- chain). An NPC is no longer always a fake player: entity_type names the Bukkit EntityType it spawns as —
 -- PLAYER (the default, the fake-player path with a tab entry and a skin) or any living mob (VILLAGER, ZOMBIE, …),
--- matching the FancyNpcs "type" surface.
+-- the "type" surface.
 --
 -- The column is the uppercase EntityType name, the same string the domain carries, so the render adapter resolves
 -- it to a real type and decides PLAYER-vs-mob without the domain ever touching Bukkit. NOT NULL with a PLAYER

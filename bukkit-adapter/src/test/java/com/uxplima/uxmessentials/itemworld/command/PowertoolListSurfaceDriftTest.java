@@ -9,8 +9,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@code /powertoollist} into the itemworld context's command surface. EssentialsX and zEssentials both
- * ship {@code /powertoollist} to print the commands bound to the held item by {@code /powertool}; it is a pure
+ * Pins {@code /powertoollist} into the itemworld context's command surface. {@code /powertoollist} prints the
+ * commands bound to the held item by {@code /powertool}; it is a pure
  * read, so it reuses the existing {@code uxmessentials.powertool.use} node. This guard fails if the literal
  * drops out of the surface or wires under a different node.
  */

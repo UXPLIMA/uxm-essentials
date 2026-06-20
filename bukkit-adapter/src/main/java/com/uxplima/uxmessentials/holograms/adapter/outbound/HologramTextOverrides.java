@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Resolves a text hologram's lines <em>per viewer</em> and sends each viewer a text-override packet, so a
  * hologram whose lines embed a PlaceholderAPI token renders that viewer's own placeholder values while staying a
- * single shared {@code TextDisplay}. This is the FancyHolograms approach — one real shared entity, plus a
+ * single shared {@code TextDisplay}. The approach: one real shared entity, plus a
  * per-viewer metadata override — and it lives here, off {@link HologramRenderer}, so the renderer keeps the
  * shared-entity lifecycle and this collaborator owns the per-viewer placeholder work.
  *

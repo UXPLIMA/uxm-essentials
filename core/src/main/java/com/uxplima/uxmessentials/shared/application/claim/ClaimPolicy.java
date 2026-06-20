@@ -31,7 +31,7 @@ public final class ClaimPolicy {
 
     /**
      * Determines whether {@code player} may place a home at ({@code blockX}, {@code blockZ}) in
-     * {@code world}. Mirrors the uxmHome UxmClaimsHook canCreateHomeAt logic.
+     * {@code world}. Applies the claim hook's canCreateHomeAt logic.
      *
      * <ul>
      *   <li>Provider inactive → {@code ALLOWED}.

@@ -26,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code /list} ({@code uxmessentials.list.use}): print the online roster, vanish-aware. When a player runs it the
  * roster is filtered through that player's {@code canSee} graph — the same seam the presence
  * {@code VisibilityApplier} drives and that messaging {@code /msg} and teleport {@code /tpa} already read — so a
- * vanished player they may not see is absent from both the line and the count, exactly as in EssentialsX. The
+ * vanished player they may not see is absent from both the line and the count. The
  * console has no {@code canSee} graph and sees everyone. This is a pure read: no use case, no state mutation, just
  * the online set, a name-sorted join, and one resolved line.
  */

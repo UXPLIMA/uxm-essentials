@@ -24,7 +24,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The FancyHolograms-style convenience subcommands under {@code /hologram}: {@code copy <src> <dest>} duplicates
+ * The hologram convenience subcommands under {@code /hologram}: {@code copy <src> <dest>} duplicates
  * a hologram, {@code info <name>} prints its properties, {@code nearby [radius]} lists holograms around the
  * operator, {@code center <name>} snaps a hologram to its block centre, {@code teleport <name>} sends the
  * operator to a hologram, {@code rotate <name> <yaw> [pitch]} sets a stored display rotation, and {@code

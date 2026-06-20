@@ -478,7 +478,7 @@ class JooqNpcRepositoryTest {
     }
 
     @Test
-    void defaultsTheFancyNpcsParityFieldsForACreatedNpc() {
+    void defaultsTheExtraAppearanceFieldsForACreatedNpc() {
         repository.save(
                 Npc.create(NpcName.of("plain"), Position.of(WORLD, 0, 64, 0), null, Instant.ofEpochMilli(1_000)));
 
@@ -511,7 +511,7 @@ class JooqNpcRepositoryTest {
     }
 
     @Test
-    void roundTripsTheFancyNpcsParityFields() {
+    void roundTripsTheExtraAppearanceFields() {
         repository.save(Npc.create(NpcName.of("rich"), Position.of(WORLD, 1, 64, 1), null, Instant.ofEpochMilli(1_000))
                 .withDisplayName("<aqua>Greeter")
                 .withMirrorSkin(true)

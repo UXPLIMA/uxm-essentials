@@ -48,7 +48,7 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /spawnmob}'s EssentialsX-parity per-type sub-gate through its real Brigadier node. A
+ * MockBukkit coverage of {@code /spawnmob}'s per-type sub-gate through its real Brigadier node. A
  * sender holding the {@code uxmessentials.itemworld.spawnmob.<mob>} node spawns the mob ({@code SPAWNMOB_SPAWNED}); a
  * sender for whom that node is negated is rejected with the shared no-permission feedback and the spawn never runs,
  * while a different mob type stays unaffected. The base {@code spawnmob.use} node is enforced by the Brigadier

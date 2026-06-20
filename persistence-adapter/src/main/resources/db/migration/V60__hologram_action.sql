@@ -1,7 +1,7 @@
 -- Adds the ordered click-action chain to a hologram, the same richer mechanism the NPC action chain (V41) added:
 -- a clickable hologram (the V54 single click_command kept and still runs first) may now carry a list of typed
 -- actions, each with a click trigger (LEFT/RIGHT/ANY) and a type (run-console, run-player, message, action-bar,
--- title, sound, connect). It mirrors the FancyHolograms / DecentHolograms "actions" surface.
+-- title, sound, connect). It mirrors the common hologram "actions" surface.
 --
 -- The actions live in a SEPARATE child table keyed (hologram_name, ordinal), NOT an opaque JSON blob: an action
 -- is a first-class row that can be selected, ordered and edited in place, exactly like a V13 line or a V57 page

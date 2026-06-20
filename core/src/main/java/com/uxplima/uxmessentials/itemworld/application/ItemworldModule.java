@@ -16,8 +16,8 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The itemworld bounded context as a first-class {@link FeatureModule}: the largest module, mirroring the full
- * EssentialsX item/world surface (~40 verbs) split into independently disableable sub-feature groups
+ * The itemworld bounded context as a first-class {@link FeatureModule}: the largest module, covering the full
+ * item/world command surface (~40 verbs) split into independently disableable sub-feature groups
  * (docs/10-feature-modules.md §15.10). It owns the {@code /give /i /item /itemname /itemlore /itemflag /skull
  * /more /repair /repairall /enchant /hat /itemdb} item utils, the virtual workstations, the {@code
  * /disposal /condense} cleanup, the {@code /powertool /powertooltoggle} powertool, the {@code /spawnmob

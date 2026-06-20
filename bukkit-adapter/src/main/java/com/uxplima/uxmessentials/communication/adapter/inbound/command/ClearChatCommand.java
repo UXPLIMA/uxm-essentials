@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /clearchat} (alias {@code /chatclear}): flush the visible chat for online players by pushing a
- * screenful of blank lines, the staff verb zEssentials ships as {@code CommandChatClear}. A staff member with
+ * screenful of blank lines, the staff chat-clear verb. A staff member with
  * {@code uxmessentials.communication.clearchat.exempt} keeps their scrollback (the blank lines skip them), so
  * an admin can audit what was on screen. Stateless — no DB and no persistence.
  *

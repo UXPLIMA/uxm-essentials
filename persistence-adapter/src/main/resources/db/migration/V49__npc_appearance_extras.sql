@@ -1,9 +1,9 @@
--- Adds the FancyNpcs-parity appearance and behaviour fields of an NPC (V38-V47 are the name row, look toggle,
+-- Adds the remaining appearance and behaviour fields of an NPC (V38-V47 are the name row, look toggle,
 -- equipment/glow, the action chain, the entity type, the widened equipment payload, the pose/scale columns and the
 -- per-type metadata child table). An NPC can now carry a shown display name distinct from its id, a slim/classic
 -- skin-model variant, a mirror-skin toggle, collision and tab-visibility toggles, per-NPC view/turn distance
--- overrides, the on-fire/invisible/silent state flags, and a per-NPC interaction-cooldown override — matching the
--- FancyNpcs per-NPC surface.
+-- overrides, the on-fire/invisible/silent state flags, and a per-NPC interaction-cooldown override — the full
+-- per-NPC surface.
 --
 -- display_name is the shown label (a MiniMessage string), nullable so a NULL or empty value hides the name and
 -- leaves only the id (the tab/profile name is unchanged). skin_slim is a SMALLINT 0/1 flag for the body model

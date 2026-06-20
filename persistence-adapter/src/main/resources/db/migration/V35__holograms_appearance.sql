@@ -1,4 +1,4 @@
--- Adds FancyHolograms-style appearance and a per-hologram refresh interval to the V13 hologram store.
+-- Adds text-display appearance and a per-hologram refresh interval to the V13 hologram store.
 -- Every column is nullable with no DEFAULT clause so the ALTER stays portable across SQLite, MySQL/MariaDB
 -- and PostgreSQL (SQLite gates a few DEFAULT forms behind pragmas); an absent value reads back as NULL and
 -- the mapper resolves that to Appearance.defaults() / a static (0-tick) hologram, so existing rows keep their

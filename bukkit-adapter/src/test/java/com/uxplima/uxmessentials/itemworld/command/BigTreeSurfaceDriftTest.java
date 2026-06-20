@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Pins {@code /bigtree} into the itemworld context's command surface, the way
  * {@code VerticalSurfaceDriftTest} pins the vertical teleport family. {@code /bigtree} grows the
- * large variant of a tree and is the admin-fun sibling of {@code /tree}; EssentialsX ships both under
+ * large variant of a tree and is the admin-fun sibling of {@code /tree}; both share
  * one {@code tree} permission, so this guard fails if {@code /bigtree} ever drops out of the surface
  * or wires under a permission node other than the {@code uxmessentials.tree.use} node {@code /tree}
  * already uses, which would otherwise drift the permissions reference and paper-plugin.yml.

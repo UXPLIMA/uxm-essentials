@@ -87,7 +87,7 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
 
     /**
      * How far above the linked NPC's feet a linked hologram floats, so it sits over the NPC's head rather than
-     * inside it — roughly a player's standing height plus a little clearance, matching FancyHolograms' default
+     * inside it — roughly a player's standing height plus a little clearance, the conventional default
      * NPC-link offset.
      */
     static final double LINKED_NPC_Y_OFFSET = 2.2;

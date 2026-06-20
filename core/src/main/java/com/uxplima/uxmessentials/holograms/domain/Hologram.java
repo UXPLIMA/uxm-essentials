@@ -28,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  * (rendered once, never re-rendered); a positive value means the live entity re-renders on that cadence so its
  * lines pick up fresh placeholder values. {@code createdAt} is preserved across every move or edit.
  *
- * <p>{@link #linkedNpcName()} is the optional name of an NPC the hologram follows (the FancyHolograms
+ * <p>{@link #linkedNpcName()} is the optional name of an NPC the hologram follows (the
  * link-with-NPC feature): when set, the renderer anchors the hologram above that NPC's head and re-anchors as it
  * moves, falling back to {@link #location()} when no such NPC exists; when null the hologram stays anchored to its
  * own stored location. It is a positioning concern only, so it lives on the aggregate as a plain name and is

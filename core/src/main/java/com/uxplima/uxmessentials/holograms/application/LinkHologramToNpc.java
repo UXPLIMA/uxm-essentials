@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
  * {@code /hologram linknpc <name> <npc>}: link an existing hologram to an NPC so it floats above that NPC and
- * follows it as the NPC moves (the FancyHolograms link-with-NPC feature). The link is stored on the aggregate and
+ * follows it as the NPC moves (the link-with-NPC feature). The link is stored on the aggregate and
  * the live entity is re-rendered at once, so the hologram jumps to the NPC immediately rather than waiting for the
  * NPC's next move. A name no hologram exists at is rejected with {@link HologramError#NOT_FOUND}; a name no NPC
  * exists at is rejected with a friendly "no such NPC" reply (no link is written), checked through the

@@ -114,7 +114,7 @@ abstract class ItemworldCommandSupport {
     }
 
     /**
-     * Whether {@code player} may act on the given {@code type} for this command, mirroring EssentialsX's per-type
+     * Whether {@code player} may act on the given {@code type} for this command, using the common per-type
      * gating: after the base {@code uxmessentials.<cmd>.use} node passes, the resolved registry type ({@code zombie},
      * {@code diamond_sword}, {@code sharpness}) must also be permitted under
      * {@code uxmessentials.itemworld.<cmd>.<type>}. The wildcard parent ({@code …spawnmob.*} / {@code …give.*} /

@@ -64,7 +64,7 @@ class CommandAliasDefaultsTest {
     }
 
     @Test
-    void augment_addsEssentialsXMuscleMemoryAliases() {
+    void augment_addsCommonMuscleMemoryAliases() {
         List<CommandDefinition> out = CommandAliasDefaults.augment(List.of(
                 def("feed", "feed"), def("back", "back"), def("afk", "afk"), def("god", "god"), def("near", "near")));
 

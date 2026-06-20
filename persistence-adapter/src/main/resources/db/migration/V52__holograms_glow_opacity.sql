@@ -1,4 +1,4 @@
--- Adds two more FancyHolograms/DecentHolograms-style text-display properties to the V13 hologram store: a
+-- Adds two more text-display properties to the V13 hologram store: a
 -- glowing-outline colour and a text opacity. Both columns are nullable with no DEFAULT clause so the ALTER
 -- stays portable across SQLite, MySQL/MariaDB and PostgreSQL (SQLite gates a few DEFAULT forms behind
 -- pragmas); an absent value reads back as NULL and the mapper resolves it to the matching Appearance sentinel

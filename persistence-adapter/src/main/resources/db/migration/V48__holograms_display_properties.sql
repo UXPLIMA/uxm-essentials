@@ -1,4 +1,4 @@
--- Adds the remaining FancyHolograms-style display properties to the V13 hologram store: text alignment,
+-- Adds the remaining text-display properties to the V13 hologram store: text alignment,
 -- see-through, a per-axis scale and translation offset (extending the V35 uniform `scale` column), and the
 -- display drop-shadow radius/strength (distinct from the V35 text_shadow flag, which is the per-glyph text
 -- shadow). Every column is nullable with no DEFAULT clause so the ALTER stays portable across SQLite,

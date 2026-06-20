@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  * {@link ClaimProvider} backed by the in-house uxmClaims plugin, reached <b>entirely by reflection</b> — there
  * is no compile dependency on uxmClaims, so this class loads and runs whether or not uxmClaims is present.
  *
- * <p>The API chain mirrors uxmHome's {@code UxmClaimsHook}: {@code UxmClaimBukkitAPI.getInstance()} →
+ * <p>The API chain runs through the {@code UxmClaimsHook}: {@code UxmClaimBukkitAPI.getInstance()} →
  * {@code claimFacade()} → {@code findByLocation(new com.uxplima.claim.domain.model.vo.Location(world, x, y, z))}
  * → a {@code Claim} exposing {@code isOwner(UUID)}, {@code findMemberByUid(UUID)} (an {@link Optional}) and
  * {@code hasBanByUid(UUID)}. Trust is owner-or-member; ban is {@code hasBanByUid}.

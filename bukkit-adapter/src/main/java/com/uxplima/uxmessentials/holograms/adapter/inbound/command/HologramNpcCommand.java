@@ -21,7 +21,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The FancyHolograms-style NPC-link subcommands under {@code /hologram}: {@code linknpc <name> <npc>} links a
+ * The NPC-link subcommands under {@code /hologram}: {@code linknpc <name> <npc>} links a
  * hologram to an NPC so it floats above and follows the NPC, and {@code unlinknpc <name>} clears the link so the
  * hologram anchors to its own stored location again. The hologram argument completes against the current hologram
  * names and the npc argument against the current NPC names, both read off warm in-memory sets per keystroke.

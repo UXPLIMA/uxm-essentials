@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@code /worth} into the economy context's command surface. EssentialsX ships {@code /worth} to report
+ * Pins {@code /worth} into the economy context's command surface. {@code /worth} reports
  * the configured sell value of the held item before a player commits to {@code /sell}; this guard fails if the
  * literal drops out of the surface or wires under a node other than {@code uxmessentials.economy.worth}, which
  * would otherwise drift the permissions reference and paper-plugin.yml.

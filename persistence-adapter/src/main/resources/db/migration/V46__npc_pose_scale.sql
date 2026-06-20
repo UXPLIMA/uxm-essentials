@@ -1,7 +1,7 @@
 -- Adds the body pose and the size multiplier an NPC renders with (V38-V45 are the name row, look toggle,
 -- equipment/glow, the action chain, the entity type and the widened equipment payload columns). An NPC can now
 -- be frozen in a pose (STANDING by default, or SITTING/SLEEPING/…) and resized (1.0 is the natural size),
--- matching the FancyNpcs pose + scale surface.
+-- the pose + scale surface.
 --
 -- pose is the uppercase pose NAME, the same string the domain carries, so the render adapter resolves it to the
 -- packet layer's pose without the domain ever touching Bukkit; NOT NULL with a STANDING default means every

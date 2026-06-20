@@ -1,4 +1,4 @@
--- Adds multi-page holograms (the FancyHolograms / DecentHolograms "pages" feature): a hologram may carry an
+-- Adds multi-page holograms (the "pages" feature): a hologram may carry an
 -- ordered set of pages, and a viewer sees one page at a time and clicks to cycle to the next. Page 0 stays the
 -- hologram's existing line set in hologram_lines (V13) — untouched, so every existing hologram is simply a
 -- one-page hologram with no data migration; the extra pages 1..n live here, one row per (hologram, page_index,

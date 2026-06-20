@@ -11,7 +11,7 @@ import java.util.Optional;
  *
  * <p>The domain does not know Bukkit {@code EntityType}; it normalises the id to lowercase and the adapter
  * resolves it, mapping an unresolved id to {@link ItemWorldError#UNKNOWN_MOB}. The mount/ridden chaining and
- * baby/variant modifiers EssentialsX supports live in the adapter's request building; the domain owns the
+ * baby/variant modifiers live in the adapter's request building; the domain owns the
  * id-shape and the count cap that protect the server.
  *
  * @param typeId the normalised entity-type id

@@ -1,7 +1,7 @@
 -- Adds the per-entity-type appearance metadata of an NPC (V38-V46 are the name row, look toggle, equipment/glow,
 -- the action chain, the entity type, the widened equipment payload and the pose/scale columns). A mob NPC can now
 -- carry type-specific appearance data — a baby flag, a slime size, a creeper's charged state, a villager's
--- profession/type/level — matching the FancyNpcs per-type metadata surface.
+-- profession/type/level — the per-type metadata surface.
 --
 -- The metadata lives in a SEPARATE child table keyed (npc_name, data_key), NOT an opaque JSON blob: the
 -- architecture persistence invariant is that every queryable fact is a first-class column, so a datum is a row

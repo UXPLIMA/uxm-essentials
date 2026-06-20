@@ -87,7 +87,7 @@ Vaults.
 
 Itemworld.
 
-- Itemworld context: the full EssentialsX item/world surface (~40 verbs) as the largest feature module, split into independently disableable sub-feature groups (item-utils, workstations, cleanup, powertool, mob-entity, time-weather, admin-fun) on top of the module-level enable switch, with a per-command disable on each verb.
+- Itemworld context: the full item/world command surface (~40 verbs) as the largest feature module, split into independently disableable sub-feature groups (item-utils, workstations, cleanup, powertool, mob-entity, time-weather, admin-fun) on top of the module-level enable switch, with a per-command disable on each verb.
 - Overwhelmingly stateless, ACL-thin mutations with no persistence: every verb is input-validated at the adapter boundary before it touches the live item, entity or world, and the abusable verbs (give, spawnmob, kill/butcher/killall, lightning/fireball/kittycannon, time/weather) are audit-logged.
 - `/repair`, `/repairall`, `/hat` and `/more` are now owned here — playerstate deferred them by name — so the two modules register them once and never double-register.
 

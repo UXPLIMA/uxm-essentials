@@ -26,7 +26,7 @@ import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /firework}: style or power the firework rocket in the player's main hand (EssentialsX parity).
+ * {@code /firework}: style or power the firework rocket in the player's main hand.
  * {@code /firework <color>} adds a ball-shaped effect of that {@link DyeColor} with a trail, {@code /firework
  * power <0-4>} sets the rocket's base flight power, and {@code /firework clear} strips every effect. The hand
  * must hold a {@link Material#FIREWORK_ROCKET}; any other item (or an empty hand) replies

@@ -15,7 +15,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Coalesces rapid balance settles into the fewest {@code UPSERT}s ({@code docs/11-economy-integration.md}
- * §10.1, the zEssentials {@code PendingEconomyUpdate} pattern scoped to the settle path). Each
+ * §10.1, a pending-update pattern scoped to the settle path). Each
  * {@code (owner, currency)} keeps an {@link AtomicReference} of the latest intended balance; a burst of
  * settles overwrites that reference (last write wins) and the row is flushed once per debounce window by a
  * self-rescheduling {@link Scheduler#asyncAfter} task gated on {@link #running}.

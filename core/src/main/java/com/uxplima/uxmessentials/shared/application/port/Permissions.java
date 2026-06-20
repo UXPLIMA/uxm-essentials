@@ -82,7 +82,7 @@ public interface Permissions {
             return new QuotaFamily(node, QuotaReduction.MIN);
         }
 
-        /** A stacking quota family: the reducer sums all matching tier nodes (zEssentials-style). */
+        /** A stacking quota family: the reducer sums all matching tier nodes. */
         public static QuotaFamily stack(String node) {
             return new QuotaFamily(node, QuotaReduction.STACK);
         }

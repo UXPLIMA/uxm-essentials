@@ -18,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The backend side of the cross-server bus. Registers the plugin-messaging channel with Bukkit's
  * {@code Messenger}, sends {@link NetworkMessage} frames out through the proxy, and receives + dispatches
- * frames from peers. Mirrors uxmChat's bus pattern: pure codec ({@link NetworkMessageCodec}) shared with the
+ * frames from peers. Built on a pure-codec bus pattern: the codec ({@link NetworkMessageCodec}) is shared with the
  * proxy broker, and the Bukkit-touching parts (the carrier-player send, the channel registration) confined
  * to this adapter.
  *

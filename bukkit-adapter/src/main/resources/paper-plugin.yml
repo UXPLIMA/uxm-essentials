@@ -582,7 +582,7 @@ permissions:
   uxmessentials.moderation.broadcast.receive:
     description: 'Receive the staff sanction broadcast — the one-line announcement a non-silent /ban /mute /kick /warn emits. The -s flag (or broadcast.silent-by-default) suppresses it. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited).'
     default: op
-  # itemworld context (docs/permissions.md "Itemworld"). The largest module — the full EssentialsX item/world
+  # itemworld context (docs/permissions.md "Itemworld"). The largest module — the full item/world command
   # surface (~40 verbs) split into sub-feature groups, each independently disableable from itemworld.conf and
   # each command additionally disableable per-command (modules.itemworld.groups.<group>.enabled and
   # modules.itemworld.commands.<literal>.disabled). Every verb is permission-gated here; the abusable verbs
@@ -600,7 +600,7 @@ permissions:
   # Per-type sub-gate for /give: after give.use passes, the resolved material must also be permitted under
   # uxmessentials.itemworld.give.<material> (e.g. uxmessentials.itemworld.give.diamond_sword). The wildcard parent and
   # every per-type node default true, so a give.use holder may give every item until an operator negates a specific
-  # one — EssentialsX's per-type model (essentials.give.item-<item>), opt-out rather than opt-in, so it is non-breaking.
+  # one — the per-item give model, opt-out rather than opt-in, so it is non-breaking.
   uxmessentials.itemworld.give.*:
     description: 'Give every item type with /give. Negate uxmessentials.itemworld.give.<material> to restrict one.'
     default: true
@@ -646,7 +646,7 @@ permissions:
   # Per-type sub-gate for /enchant: after enchant.use passes, the resolved enchantment must also be permitted under
   # uxmessentials.itemworld.enchant.<enchant> (e.g. uxmessentials.itemworld.enchant.sharpness). The wildcard parent and
   # every per-type node default true, so an enchant.use holder may apply every enchantment until an operator negates a
-  # specific one — EssentialsX's per-type model (essentials.enchantments.<ench>), opt-out, so it is non-breaking.
+  # specific one — the per-enchantment model, opt-out, so it is non-breaking.
   uxmessentials.itemworld.enchant.*:
     description: 'Apply every enchantment with /enchant. Negate uxmessentials.itemworld.enchant.<enchant> to restrict one.'
     default: true
@@ -741,7 +741,7 @@ permissions:
   # Per-type sub-gate for /spawnmob: after spawnmob.use passes, the resolved mob must also be permitted under
   # uxmessentials.itemworld.spawnmob.<mob> (e.g. uxmessentials.itemworld.spawnmob.zombie). The wildcard parent and
   # every per-type node default true, so a spawnmob.use holder may spawn every mob until an operator negates a specific
-  # one — EssentialsX's per-type model (essentials.spawnmob.<mob>), opt-out rather than opt-in, so it is non-breaking.
+  # one — the per-mob model, opt-out rather than opt-in, so it is non-breaking.
   uxmessentials.itemworld.spawnmob.*:
     description: 'Spawn every mob type with /spawnmob. Negate uxmessentials.itemworld.spawnmob.<mob> to restrict one.'
     default: true

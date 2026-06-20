@@ -103,8 +103,8 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
     }
 
     /**
-     * Per-type gate on the resolved item. EssentialsX gates {@code /give} by {@code essentials.give.item-<item>};
-     * the parity node here is {@code uxmessentials.itemworld.give.<material>}. The check binds to the sender, so a
+     * Per-type gate on the resolved item, modelled on the common per-item {@code give} permission scheme;
+     * the node here is {@code uxmessentials.itemworld.give.<material>}. The check binds to the sender, so a
      * console source (which has already passed the base node and carries no per-player nodes) is allowed every type.
      */
     private boolean allowsItem(CommandContext<CommandSourceStack> ctx, Material material) {

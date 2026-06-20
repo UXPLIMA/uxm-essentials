@@ -5,8 +5,8 @@ package com.uxplima.uxmessentials.teleport.domain;
  * in order and the first step that resolves to a valid location wins, so an operator composes respawn
  * behaviour declaratively (e.g. {@code tpr;spawn;home;bed;warp:hub;anchor}).
  *
- * <p>This maps the EssentialsX-era "death management" vocabulary into the project's ubiquitous language:
- * the chain noun is {@code RespawnChain}, never "death management"; the upstream term is only the thing
+ * <p>This maps the older "death management" vocabulary into the project's ubiquitous language:
+ * the chain noun is {@code RespawnChain}, never "death management"; the legacy term is only the thing
  * we map <em>from</em>.
  */
 public enum RespawnStepKind {

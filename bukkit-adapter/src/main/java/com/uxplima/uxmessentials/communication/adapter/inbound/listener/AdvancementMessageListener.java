@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  * {@link ChannelBroadcaster}.
  *
  * <p><b>Vanilla-message suppression.</b> The vanilla advancement chat line is cleared ({@code event.message(null)})
- * in exactly two cases: (1) the earner is vanished — we hide the achievement entirely, matching EssentialsX; and
+ * in exactly two cases: (1) the earner is vanished — we hide the achievement entirely; and
  * (2) we are announcing our own notice — so the player does not see a duplicate (vanilla line plus our broadcast).
  * When the filter says do-not-announce for any other reason (feature disabled, a recipe, not announce-to-chat,
  * deny-listed, outside a non-empty allow-list) the vanilla line is left untouched, so turning the feature off is

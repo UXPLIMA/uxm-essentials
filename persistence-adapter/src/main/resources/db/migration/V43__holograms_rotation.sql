@@ -1,5 +1,5 @@
 -- Adds a stored display rotation (yaw + pitch in degrees) to the V13 hologram store. This is the
--- explicit spin of the display itself — the FancyHolograms-style /hologram rotate — kept separate from
+-- explicit spin of the display itself — the /hologram rotate transition — kept separate from
 -- the row's existing yaw/pitch (V13), which orient the hologram's anchor location, not the display
 -- transform. A stored rotation is only visually meaningful with a FIXED billboard; the operator sets the
 -- billboard separately, and the renderer applies this rotation regardless.

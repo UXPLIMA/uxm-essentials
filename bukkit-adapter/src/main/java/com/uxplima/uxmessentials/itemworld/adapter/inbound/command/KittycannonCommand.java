@@ -21,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /kittycannon}: launch a cat from the caller's eye that detonates in a harmless cosmetic explosion. An
  * admin-fun verb (audit-logged) — the cat is propelled forward and a non-block-breaking, non-fire explosion is
- * created at the launch point, so the effect is the EssentialsX gag without the griefing.
+ * created at the launch point, so the effect is the gag without the griefing.
  *
  * <p>Spawning and launching the cat is region-bound, so it runs on the caller's region thread through the kernel
  * {@code Scheduler}; the launch is reported through {@link ItemworldMessageKey#KITTYCANNON_FIRED} and audited.

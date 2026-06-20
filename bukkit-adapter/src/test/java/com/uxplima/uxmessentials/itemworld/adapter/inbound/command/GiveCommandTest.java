@@ -50,7 +50,7 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /give}'s EssentialsX-parity per-type sub-gate through its real Brigadier node. A
+ * MockBukkit coverage of {@code /give}'s per-type sub-gate through its real Brigadier node. A
  * sender holding the {@code uxmessentials.itemworld.give.<material>} node receives the stack ({@code GIVE_GIVEN}); a
  * sender for whom that node is negated is rejected with the shared no-permission feedback and the item is never added,
  * while a different item type stays unaffected. The base {@code give.use} node is enforced by the Brigadier

@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the EssentialsX staff teleport verbs — {@code /goto} (move you to the target, mirrors {@code /tp})
+ * Pins the staff teleport verbs — {@code /goto} (move you to the target, mirrors {@code /tp})
  * and {@code /bring} (pull the target to you, mirrors {@code /tphere}) — into the teleport context's command
  * surface. Both ride the shared {@code uxmessentials.tp.use} node that {@code /tp} and {@code /tphere}
  * already use; this guard fails if either drops out of the surface or ever wires under a different

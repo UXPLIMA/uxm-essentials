@@ -18,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
  * The transient powertool binding store: a held item's command lines stamped into the item's
  * {@link PersistentDataContainer} (PDC) rather than a table. This keeps the otherwise-stateless itemworld
  * surface free of persistence — the binding travels with the item the player holds and is gone when the item
- * is, exactly the EssentialsX powertool semantics (docs/10-feature-modules.md §15.10, the powertool group).
+ * is, exactly the standard powertool semantics (docs/10-feature-modules.md §15.10, the powertool group).
  *
  * <p>One {@link NamespacedKey} is created once in the constructor and reused — never on the interact hot path
  * ([CLAUDE.md] §NamespacedKey). Command lines are stored newline-joined under that key; reading splits them

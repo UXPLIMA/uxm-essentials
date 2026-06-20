@@ -81,7 +81,7 @@ public record NpcAppearance(
 
     /**
      * The legacy eight-field constructor, retained so the {@link Npc} compat constructor and any caller that builds
-     * the visual half field-by-field default the FancyNpcs-parity additions (display name, mirror, collidable,
+     * the visual half field-by-field default the later appearance additions (display name, mirror, collidable,
      * show-in-tab, view/turn distance, state flags) to their natural values.
      */
     public NpcAppearance(

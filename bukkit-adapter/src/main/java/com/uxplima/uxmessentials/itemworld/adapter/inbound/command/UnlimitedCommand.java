@@ -18,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /unlimited}: toggle unlimited block placement for yourself — when on, the block-place refill listener
- * tops the placed stack back up so it never empties (EssentialsX {@code /unlimited}). The state is a transient
+ * tops the placed stack back up so it never empties (the standard {@code /unlimited} behaviour). The state is a transient
  * per-player flag; the new value is reported through {@link ItemworldMessageKey#UNLIMITED_ENABLED} /
  * {@link ItemworldMessageKey#UNLIMITED_DISABLED}.
  */

@@ -5,7 +5,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Who may see a hologram, and how far away it stays visible — the FancyHolograms-style per-player visibility
+ * Who may see a hologram, and how far away it stays visible — the per-player visibility
  * controls, kept separate from the visual {@link Appearance} so a visibility change is one transition rather
  * than a restyle. Pure value object (no Bukkit): a {@link Mode}, an optional permission node, and a distance in
  * blocks; the adapter maps each onto Paper's native per-viewer {@code show/hideEntity} and the display view

@@ -29,7 +29,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The FancyHolograms-style styling subcommands under {@code /hologram}: {@code billboard}, {@code background},
+ * The hologram styling subcommands under {@code /hologram}: {@code billboard}, {@code background},
  * {@code shadow}, {@code brightness}, {@code scale}, {@code linewidth}, {@code viewrange}, {@code alignment},
  * {@code seethrough}, {@code translation}, {@code shadowradius}, {@code shadowstrength} and
  * {@code refreshinterval}. Each maps its parsed argument to one {@link Appearance} (or refresh) transition on

@@ -13,8 +13,8 @@ import java.util.UUID;
  * The pure-Java binary codec for every {@link NetworkMessage}. Encodes a frame to a {@code byte[]} and
  * decodes one back, with no dependency on Bukkit, Velocity, or any serialization framework — just
  * {@link DataOutputStream}/{@link DataInputStream} over a byte array. Both the backend bus client and the
- * proxy broker share this one class so the wire format cannot drift between the two sides (uxmChat's
- * pure-codec pattern).
+ * proxy broker share this one class so the wire format cannot drift between the two sides (a single
+ * pure-codec shared by both ends).
  *
  * <p>Wire layout: a one-byte protocol {@link #VERSION}, then a one-byte {@link NetworkMessage.MessageType}
  * wire tag, then the variant's fields. The version byte lets a future format change be detected rather than
