@@ -44,12 +44,12 @@ public final class BusWiring {
         NetworkConfig network = NetworkConfig.from(config);
         if (!network.enabled()) {
             log.info("network sync disabled (network.conf > enabled=false); bus runs local-only");
-            return new Wired(Bus.disabled(network.serverId()), null);
+            return new Wired(Bus.disabled(network.serverId()), null, network);
         }
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
         BusTransport transport = selectTransport(plugin, network, scheduler, log);
         BusCore core = new BusCore(transport, network.serverId(), registry, log);
-        return new Wired(new Bus(core, registry), new Lifecycle(core, log, network));
+        return new Wired(new Bus(core, registry), new Lifecycle(core, log, network), network);
     }
 
     /**
@@ -86,21 +86,34 @@ public final class BusWiring {
     /**
      * The wired bus: the {@link Bus} handle contexts opt into sync through, plus the lifecycle of the live core
      * (absent for a disabled backend, in which case start/stop are no-ops). It deliberately exposes only the
-     * {@link Bus} and the two lifecycle hooks, never the {@link BusCore} or the transport behind them.
+     * {@link Bus}, the two lifecycle hooks, and the read-only {@link BusHealth} diagnostic view — never the
+     * {@link BusCore} or the transport behind them.
      */
     public static final class Wired {
 
         private final Bus bus;
         private final @org.jspecify.annotations.Nullable Lifecycle lifecycle;
+        private final NetworkConfig network;
 
-        private Wired(Bus bus, @org.jspecify.annotations.Nullable Lifecycle lifecycle) {
+        private Wired(Bus bus, @org.jspecify.annotations.Nullable Lifecycle lifecycle, NetworkConfig network) {
             this.bus = Objects.requireNonNull(bus, "bus");
             this.lifecycle = lifecycle;
+            this.network = Objects.requireNonNull(network, "network");
         }
 
         /** The publish + register seam handed to each context. */
         public Bus bus() {
             return bus;
+        }
+
+        /**
+         * A read-only health view for {@code /uxmess doctor}: the bus's enabled flag, the configured transport
+         * name, and a live read of the running transport's {@code healthy()} flag. For a disabled backend the
+         * view reports {@code enabled() == false} and never touches a transport.
+         */
+        public BusHealth health() {
+            BusCore core = lifecycle == null ? null : lifecycle.core();
+            return new WiredHealth(network, core);
         }
 
         /** Register the plugin-messaging channel after every context has registered its listener. */
@@ -137,6 +150,36 @@ public final class BusWiring {
 
         void stop() {
             core.stop();
+        }
+    }
+
+    /**
+     * The {@link BusHealth} the doctor reads. {@code enabled} and {@code transport} come from the immutable
+     * {@link NetworkConfig} snapshot; {@code healthy()} is a live delegate to the running core's transport flag,
+     * so the doctor sees the real connection state at the moment it runs. A disabled backend has no core, so
+     * {@code healthy()} is reported false and never read by the check.
+     */
+    private record WiredHealth(
+            NetworkConfig network,
+            @org.jspecify.annotations.Nullable BusCore core) implements BusHealth {
+
+        private WiredHealth {
+            Objects.requireNonNull(network, "network");
+        }
+
+        @Override
+        public boolean enabled() {
+            return network.enabled();
+        }
+
+        @Override
+        public String transport() {
+            return network.transport().name().toLowerCase(java.util.Locale.ROOT);
+        }
+
+        @Override
+        public boolean healthy() {
+            return core != null && core.healthy();
         }
     }
 }

@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.bootstrap.command.HelpCommand;
 import com.uxplima.uxmessentials.bootstrap.command.LangCommand;
 import com.uxplima.uxmessentials.bootstrap.command.MigrationImportNode;
 import com.uxplima.uxmessentials.bootstrap.command.UxmessCommand;
+import com.uxplima.uxmessentials.bootstrap.health.BusTransportHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.DatabaseHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.EconomyProviderHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.ModuleCountHealthCheck;
@@ -71,6 +72,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusHealth;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
@@ -181,7 +183,7 @@ public final class PluginModule {
         IntegrationsWiring.Wired integrations = IntegrationsWiring.wire(plugin, config, kernel, persistence);
         resources.onClose(integrations.stop());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
-        List<HealthCheck> healthChecks = healthChecks(plugin, registry, config, persistence);
+        List<HealthCheck> healthChecks = healthChecks(plugin, registry, config, persistence, bus.health());
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
         // ManagementGuiRegistry entries the viewer is permitted, each opening that module's own GUI. The
         // registry is constructed here and is threaded to module wiring (SP1+ each registers its opener);
@@ -282,7 +284,11 @@ public final class PluginModule {
     }
 
     private static List<HealthCheck> healthChecks(
-            JavaPlugin plugin, ModuleRegistry registry, ConfigStore config, Persistence persistence) {
+            JavaPlugin plugin,
+            ModuleRegistry registry,
+            ConfigStore config,
+            Persistence persistence,
+            BusHealth busHealth) {
         // Assembled after the modules are wired so the set reflects what is actually present: the database and
         // soft-depend probes always apply, the economy-provider ownership check only when economy is enabled.
         // The /uxmess doctor command runs each one off-tick (each is wrapped in HealthCheck.safe so a probe that
@@ -294,6 +300,9 @@ public final class PluginModule {
         }
         // The Redis probe reads the unified network.redis block from the plugin-wide config, not a per-module one.
         checks.add(new SoftDependencyHealthCheck(plugin.getServer().getPluginManager(), config));
+        // The bus line reads the running transport's live healthy() flag (a cheap volatile read) so the operator
+        // sees whether cross-server delivery is actually working, not just configured.
+        checks.add(new BusTransportHealthCheck(busHealth));
         checks.add(new SchedulerHealthCheck());
         checks.add(new UpdateHealthCheck(UpdateCheckSettings.from(config).enabled()));
         checks.add(new ModuleCountHealthCheck(registry, config));

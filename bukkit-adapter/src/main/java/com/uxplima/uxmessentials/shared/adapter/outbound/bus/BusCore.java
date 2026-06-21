@@ -50,6 +50,11 @@ final class BusCore implements BusPublisher {
         transport.stop();
     }
 
+    /** A live read of whether the underlying transport can currently deliver frames. Cheap; never blocks. */
+    boolean healthy() {
+        return transport.healthy();
+    }
+
     /** This backend's {@code server-id} — the origin stamped into outbound frames and the loop sentinel. */
     @Override
     public String serverId() {
