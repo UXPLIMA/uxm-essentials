@@ -58,6 +58,15 @@ dependencies {
     compileOnly(libs.gson)
     implementation(libs.bstats.bukkit)
 
+    // Jedis (relocated below) so the Redis bus transport and the cross-server wallet/warp sync work straight
+    // out of the shipped jar — no operator-dropped Jedis jar, no boot-time Maven download. gson and slf4j-api
+    // are already on the runtime classpath (gson from the plugin loader, slf4j from Paper), so they are excluded
+    // here to avoid shading a second copy; only Jedis itself and its pool/json transitives are bundled.
+    implementation(libs.jedis) {
+        exclude(group = "com.google.code.gson")
+        exclude(group = "org.slf4j")
+    }
+
     // uxmLib GUI toolkit (dogfood) — consumed from mavenLocal; pulls uxmlib-item + uxmlib-common
     // transitively. Configurate is loaded at runtime via Paper library loader.
     implementation("com.uxplima.uxmlib:uxmlib-gui:0.1.0-SNAPSHOT") {
@@ -185,10 +194,24 @@ tasks.shadowJar {
     relocate("org.bstats", "com.uxplima.uxmessentials.libs.bstats")
     // uxmLib (dogfood) — relocate into our per-plugin namespace so two plugins shading it cannot clash.
     relocate("com.uxplima.uxmlib", "com.uxplima.uxmessentials.libs.uxmlib")
+    // Jedis + its pool/json transitives — relocate into our per-plugin namespace so a server running a second
+    // plugin that also bundles Jedis at a different version cannot clash on the classpath. The Redis bus/wallet/warp
+    // classes are written against `redis.clients.jedis.*`; Shadow rewrites those references (and the classpath-guard
+    // type reference) to the relocated package at shade time, so no source import changes. gson/slf4j are not
+    // bundled (see the dependency exclude above), so they are deliberately not relocated here.
+    relocate("redis.clients.jedis", "com.uxplima.uxmessentials.libs.jedis")
+    relocate("org.apache.commons.pool2", "com.uxplima.uxmessentials.libs.commons.pool2")
+    relocate("org.json", "com.uxplima.uxmessentials.libs.json")
     mergeServiceFiles()
     minimize {
         // bStats uses reflection / service loading the minimizer can't see.
         exclude(dependency("org.bstats:.*:.*"))
+        // Jedis (and its commons-pool2 / org.json transitives) resolve many internal classes by reflection and
+        // service loading; the minimizer cannot trace them from the few Jedis types the transport names directly,
+        // so keep these modules whole or the runtime client loses classes it loads dynamically.
+        exclude(dependency("redis.clients:jedis:.*"))
+        exclude(dependency("org.apache.commons:commons-pool2:.*"))
+        exclude(dependency("org.json:json:.*"))
         // uxmLib uses reflection (Brigadier/registry/MiniMessage) + a GuiListener the minimizer can't
         // trace from the few entry points the adapter touches; keep its modules whole.
         exclude(dependency("com.uxplima.uxmlib:.*:.*"))

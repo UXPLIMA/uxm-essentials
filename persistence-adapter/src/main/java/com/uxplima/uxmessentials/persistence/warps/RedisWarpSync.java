@@ -185,10 +185,14 @@ public final class RedisWarpSync {
     }
 
     private static boolean jedisOnClasspath() {
+        // Probe Jedis through a real type reference rather than a string class name: the shipped jar relocates
+        // Jedis under com.uxplima.uxmessentials.libs.jedis, and Shadow rewrites the JedisPool type reference here
+        // to the relocated class at shade time the same way it rewrites the field/method references above — a
+        // string literal in Class.forName would not be rewritten reliably and the guard would wrongly report Jedis
+        // absent. If Jedis really is off the runtime classpath, loading the class throws NoClassDefFoundError.
         try {
-            Class.forName("redis.clients.jedis.Jedis");
-            return true;
-        } catch (ClassNotFoundException absent) {
+            return JedisPool.class != null;
+        } catch (NoClassDefFoundError absent) {
             return false;
         }
     }
