@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -28,10 +29,23 @@ import org.junit.jupiter.api.Test;
  * allowlist below — so a regression that re-introduces an unmarshalled roster scan cannot land silently.
  *
  * <p><strong>How it works.</strong> The scan finds every source line that calls {@code getOnlinePlayers()} (any
- * receiver), ignoring comment lines (a leading {@code //}, {@code *}, or {@code /*} — so the many javadoc mentions
- * of the method do not count). Every such line's declaring class must appear in {@link #ALLOWLIST}. The allowlist
- * is the expected current set; it passes today and fails the moment an enumeration appears in a class that is not
- * listed. Each entry is grouped by <em>why</em> the read is safe.
+ * receiver) <em>or</em> references it as a method handle ({@code ::getOnlinePlayers} — so the
+ * {@code Bukkit::getOnlinePlayers} / {@code getServer()::getOnlinePlayers} / {@code server::getOnlinePlayers} forms
+ * that hand the roster to a {@code Supplier} are caught too), ignoring comment lines (a leading {@code //},
+ * {@code *}, or {@code /*} — so the many javadoc mentions of the method do not count). Every such line's declaring
+ * class must appear in {@link #ALLOWLIST}. The allowlist is the expected current set; it passes today and fails the
+ * moment an enumeration appears in a class that is not listed. Each entry is grouped by <em>why</em> the read is
+ * safe.
+ *
+ * <p><strong>Known limitation — the roster can travel through a {@code Supplier} the scan cannot follow.</strong>
+ * A class can hand {@code Bukkit::getOnlinePlayers} to another object as a {@code Supplier<Collection<Player>>}; the
+ * <em>creating</em> class is caught by the method-ref match above, but the <em>consuming</em> class enumerates by
+ * calling {@code supplier.get()}, which carries no {@code getOnlinePlayers} text for the scan to see. The two known
+ * consumers (the tablist {@code RealPlayerRowPainter} and {@code TablistSuppression}, fed from {@code TablistWiring}
+ * / {@code TablistRenderer}) are listed in {@link #ALLOWLIST} and tracked in {@link #SUPPLIER_CONSUMERS}, but a
+ * reviewer adding a foreign-live read inside one of them — or wiring a <em>new</em> supplier consumer — gets no
+ * automatic signal. When a new {@code Supplier} of the roster is injected, the reviewer must hand-check the
+ * consuming class for the enumerate-then-hop shape and list it here.
  *
  * <p><strong>The four safe shapes (and the rule for adding an entry).</strong>
  *
@@ -60,6 +74,7 @@ import org.junit.jupiter.api.Test;
 class FoliaThreadingDriftTest {
 
     private static final String CALL = "getOnlinePlayers()";
+    private static final String METHOD_REF = "::getOnlinePlayers";
 
     /**
      * The known-safe online-roster enumeration sites, keyed by fully-qualified class name. Grouped by why each is
@@ -67,6 +82,16 @@ class FoliaThreadingDriftTest {
      * that reads the roster is here, and nothing else may.
      */
     private static final Map<String, String> ALLOWLIST = buildAllowlist();
+
+    /**
+     * Allowlisted classes that receive the online roster through an injected {@code Supplier} rather than naming
+     * {@code getOnlinePlayers} themselves — they call {@code viewers.get()}, which carries no literal or method-ref
+     * text the scan can see. They are listed (their consumption is hand-verified, see the supplier note in the class
+     * javadoc) but exempt from the staleness check, because the scan can never observe them enumerating.
+     */
+    private static final Set<String> SUPPLIER_CONSUMERS = Set.of(
+            "com.uxplima.uxmessentials.tablist.adapter.outbound.RealPlayerRowPainter",
+            "com.uxplima.uxmessentials.tablist.adapter.outbound.TablistSuppression");
 
     private static Map<String, String> buildAllowlist() {
         Map<String, String> allow = new LinkedHashMap<>();
@@ -208,6 +233,19 @@ class FoliaThreadingDriftTest {
         allow.put(
                 pkg + "tablist.adapter.outbound.TablistRenderTask",
                 "RENDER_SCAN: asyncAfter loop enumerates, then hops per-entity to render");
+        // Supplies Bukkit::getOnlinePlayers (a method reference, caught via METHOD_REF) to the tablist renderer and
+        // suppression as the injected roster supplier; consumed on the global/region thread, reads uuid/name only.
+        allow.put(
+                pkg + "tablist.adapter.outbound.TablistRenderer",
+                "RENDER_SCAN: passes Bukkit::getOnlinePlayers as the viewers supplier into the skin-row painter");
+        // Consumes the injected roster supplier (no literal/method-ref the scanner can see — it calls viewers.get()).
+        // Verified enumerate-then-hop: reads uuid/name only, hops onEntity before touching a target.
+        allow.put(
+                pkg + "tablist.adapter.outbound.RealPlayerRowPainter",
+                "RENDER_SCAN: consumes the injected viewers supplier; broadcasts a prebuilt packet per viewer, no foreign mutation");
+        allow.put(
+                pkg + "tablist.adapter.outbound.TablistSuppression",
+                "RENDER_SCAN: consumes the injected viewers supplier; reads only the online uuids for suppress/restore");
         allow.put(
                 pkg + "nametags.adapter.outbound.NametagRenderTask",
                 "RENDER_SCAN: asyncAfter reconcile loop enumerates, then hops per-entity to update");
@@ -258,6 +296,7 @@ class FoliaThreadingDriftTest {
                 scan().stream().map(Enumeration::fqcn).distinct().toList();
         List<String> stale = ALLOWLIST.keySet().stream()
                 .filter(fqcn -> !enumerating.contains(fqcn))
+                .filter(fqcn -> !SUPPLIER_CONSUMERS.contains(fqcn))
                 .toList();
         assertThat(stale)
                 .as(
@@ -281,7 +320,7 @@ class FoliaThreadingDriftTest {
     }
 
     private static boolean isCode(String line) {
-        if (!line.contains(CALL)) {
+        if (!line.contains(CALL) && !line.contains(METHOD_REF)) {
             return false;
         }
         String stripped = line.stripLeading();
