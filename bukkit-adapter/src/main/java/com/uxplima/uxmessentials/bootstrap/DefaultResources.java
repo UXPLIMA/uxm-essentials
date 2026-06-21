@@ -97,6 +97,7 @@ final class DefaultResources {
             "modules/discordlink/gui/discord-status.conf",
             "modules/scoreboard/gui/scoreboard-settings.conf",
             "modules/management/gui/hub.conf",
+            "modules/management/gui/colour-picker.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");
 

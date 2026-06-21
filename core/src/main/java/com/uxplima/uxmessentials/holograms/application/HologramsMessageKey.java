@@ -177,6 +177,16 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_GUI_PROP_NPC_LINK_PROMPT("hologram.gui.prop.npc-link-prompt"),
     HOLOGRAM_GUI_PROP_BLACKLIST("hologram.gui.prop.blacklist"),
 
+    // management GUI — appearance properties wired through the colour picker / number steppers
+    HOLOGRAM_GUI_PROP_BACKGROUND("hologram.gui.prop.background"),
+    HOLOGRAM_GUI_PROP_GLOW("hologram.gui.prop.glow"),
+    HOLOGRAM_GUI_PROP_TEXT_OPACITY("hologram.gui.prop.text-opacity"),
+    HOLOGRAM_GUI_PROP_SHADOW_RADIUS("hologram.gui.prop.shadow-radius"),
+    HOLOGRAM_GUI_PROP_SHADOW_STRENGTH("hologram.gui.prop.shadow-strength"),
+    HOLOGRAM_GUI_PROP_TRANSLATION_X("hologram.gui.prop.translation-x"),
+    HOLOGRAM_GUI_PROP_TRANSLATION_Y("hologram.gui.prop.translation-y"),
+    HOLOGRAM_GUI_PROP_TRANSLATION_Z("hologram.gui.prop.translation-z"),
+
     // management GUI — value display words (booleans, modes, the "none/unset" placeholder)
     HOLOGRAM_GUI_VALUE_ON("hologram.gui.value.on"),
     HOLOGRAM_GUI_VALUE_OFF("hologram.gui.value.off"),

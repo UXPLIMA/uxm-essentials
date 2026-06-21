@@ -35,6 +35,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropert
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -63,6 +66,8 @@ public final class HologramEditorView {
     private final PlayerLookup players;
     private final Messages messages;
     private final HologramEditorSubLayouts sub;
+    private final ColourPickerLayout colourPicker;
+    private final ColourPickerText colourPickerText;
     private final EntityEditorView<Hologram> view;
 
     public HologramEditorView(
@@ -75,6 +80,7 @@ public final class HologramEditorView {
             Messages messages,
             EntityEditorLayout layout,
             HologramEditorSubLayouts sub,
+            ColourPickerLayout colourPicker,
             BiConsumer<Player, PlayerRef> onBack) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -84,6 +90,8 @@ public final class HologramEditorView {
         this.players = Objects.requireNonNull(players, "players");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sub = Objects.requireNonNull(sub, "sub");
+        this.colourPicker = Objects.requireNonNull(colourPicker, "colourPicker");
+        this.colourPickerText = ColourPickerText.shared();
         Objects.requireNonNull(layout, "layout");
         Objects.requireNonNull(onBack, "onBack");
         this.view = EntityEditorView.<Hologram>builder()
@@ -144,7 +152,22 @@ public final class HologramEditorView {
         props.add(leaderboardProperty(name));
         props.add(npcLinkProperty(name));
         props.add(blacklistProperty(name));
+        props.add(backgroundColourProperty(name));
+        props.add(glowColourProperty(name));
+        props.add(textOpacityProperty(name));
+        props.add(shadowRadiusProperty(name));
+        props.add(shadowStrengthProperty(name));
+        props.add(translationProperty(name, Axis.X));
+        props.add(translationProperty(name, Axis.Y));
+        props.add(translationProperty(name, Axis.Z));
         return props;
+    }
+
+    /** The translation axis a {@link #translationProperty} edits, mapping onto the {@link Appearance} transform. */
+    private enum Axis {
+        X,
+        Y,
+        Z
     }
 
     // --- identity / position ---
@@ -483,6 +506,100 @@ public final class HologramEditorView {
                 scheduler);
     }
 
+    // --- appearance colours (the shared colour picker) + opacity / shadow / translation numbers ---
+
+    private EditableProperty backgroundColourProperty(HologramName name) {
+        return new ColourProperty(
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_BACKGROUND,
+                Material.PAINTING,
+                () -> currentAppearance(name).backgroundArgb(),
+                argb -> applyAppearance(name, a -> a.withBackgroundArgb(argb)),
+                () -> applyAppearance(name, a -> a.withBackgroundArgb(Appearance.DEFAULT_BACKGROUND)),
+                Appearance.DEFAULT_BACKGROUND,
+                this::defaultWord,
+                guiText,
+                colourPickerText,
+                colourPicker,
+                anvil,
+                scheduler);
+    }
+
+    private EditableProperty glowColourProperty(HologramName name) {
+        return new ColourProperty(
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_GLOW,
+                Material.GLOWSTONE,
+                () -> currentAppearance(name).glowArgb(),
+                argb -> applyAppearance(name, a -> a.withGlowArgb(argb)),
+                () -> applyAppearance(name, a -> a.withGlowArgb(Appearance.DEFAULT_GLOW)),
+                Appearance.DEFAULT_GLOW,
+                this::defaultWord,
+                guiText,
+                colourPickerText,
+                colourPicker,
+                anvil,
+                scheduler);
+    }
+
+    private EditableProperty textOpacityProperty(HologramName name) {
+        return new NumberProperty(
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_TEXT_OPACITY,
+                Material.GLASS_BOTTLE,
+                () -> opacityValue(name),
+                15,
+                4,
+                0,
+                255,
+                value -> applyAppearance(name, a -> a.withTextOpacity(Appearance.clampOpacity((int) (long) value))),
+                scheduler);
+    }
+
+    private EditableProperty shadowRadiusProperty(HologramName name) {
+        return new NumberProperty(
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_SHADOW_RADIUS,
+                Material.BLACK_DYE,
+                () -> Math.round(Math.max(0f, currentAppearance(name).shadowRadius()) * SCALE_FACTOR),
+                10,
+                10,
+                0,
+                Math.round(100.0f * SCALE_FACTOR),
+                value -> applyAppearance(
+                        name, a -> a.withShadowRadius(Appearance.clampShadow(value / (float) SCALE_FACTOR))),
+                scheduler);
+    }
+
+    private EditableProperty shadowStrengthProperty(HologramName name) {
+        return new NumberProperty(
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_SHADOW_STRENGTH,
+                Material.GRAY_DYE,
+                () -> Math.round(Math.max(0f, currentAppearance(name).shadowStrength()) * SCALE_FACTOR),
+                10,
+                10,
+                0,
+                Math.round(100.0f * SCALE_FACTOR),
+                value -> applyAppearance(
+                        name, a -> a.withShadowStrength(Appearance.clampShadow(value / (float) SCALE_FACTOR))),
+                scheduler);
+    }
+
+    private EditableProperty translationProperty(HologramName name, Axis axis) {
+        MessageKey label =
+                switch (axis) {
+                    case X -> HologramsMessageKey.HOLOGRAM_GUI_PROP_TRANSLATION_X;
+                    case Y -> HologramsMessageKey.HOLOGRAM_GUI_PROP_TRANSLATION_Y;
+                    case Z -> HologramsMessageKey.HOLOGRAM_GUI_PROP_TRANSLATION_Z;
+                };
+        return new NumberProperty(
+                label,
+                Material.LEAD,
+                () -> Math.round(translationValue(name, axis) * SCALE_FACTOR),
+                5,
+                10,
+                Math.round(-256.0f * SCALE_FACTOR),
+                Math.round(256.0f * SCALE_FACTOR),
+                value -> applyTranslation(name, axis, value / (float) SCALE_FACTOR),
+                scheduler);
+    }
+
     // --- write helpers (each is the existing use case) ---
 
     private void applyAppearance(HologramName name, Function<Appearance, Appearance> mutation) {
@@ -493,6 +610,18 @@ public final class HologramEditorView {
         applyAppearance(
                 name,
                 a -> block ? a.withBrightness(value, a.brightnessSky()) : a.withBrightness(a.brightnessBlock(), value));
+    }
+
+    private void applyTranslation(HologramName name, Axis axis, float value) {
+        applyAppearance(name, a -> {
+            float clamped = Appearance.clampTranslation(value);
+            com.uxplima.uxmessentials.holograms.domain.Transform t = a.transform();
+            return switch (axis) {
+                case X -> a.withTranslation(clamped, t.translationY(), t.translationZ());
+                case Y -> a.withTranslation(t.translationX(), clamped, t.translationZ());
+                case Z -> a.withTranslation(t.translationX(), t.translationY(), clamped);
+            };
+        });
     }
 
     private void applyRotation(HologramName name, boolean yaw, long value) {
@@ -589,6 +718,27 @@ public final class HologramEditorView {
         return block ? a.brightnessBlock() : a.brightnessSky();
     }
 
+    /** The current per-axis translation offset, defaulting to zero when no transform override is stored. */
+    private float translationValue(HologramName name, Axis axis) {
+        com.uxplima.uxmessentials.holograms.domain.Transform t =
+                currentAppearance(name).transform();
+        return switch (axis) {
+            case X -> t.translationX();
+            case Y -> t.translationY();
+            case Z -> t.translationZ();
+        };
+    }
+
+    /**
+     * The opacity value the stepper shows and steps from: an explicit 0–255 override when one is set, otherwise
+     * the vanilla fully-opaque 255 (the sentinel reads as opaque so a first step lands at a real value rather
+     * than the magic literal).
+     */
+    private long opacityValue(HologramName name) {
+        Appearance a = currentAppearance(name);
+        return a.hasTextOpacity() ? a.textOpacity() : 255;
+    }
+
     private long leaderboardLimit(HologramName name) {
         return currentHologram(name)
                 .map(Hologram::leaderboard)
@@ -606,6 +756,11 @@ public final class HologramEditorView {
     /** The catalog "none" word, shown in a text property's value lore when the underlying value is unset. */
     private String none() {
         return messages.resolve(GUI_ACTOR, HologramsMessageKey.HOLOGRAM_GUI_VALUE_NONE, Map.of());
+    }
+
+    /** The catalog "default" word, shown in a colour property's value lore when no override is set. */
+    private String defaultWord(PlayerRef viewer) {
+        return messages.resolve(viewer, HologramsMessageKey.HOLOGRAM_GUI_VALUE_DEFAULT, Map.of());
     }
 
     private static PlayerRef ref(Player player) {

@@ -22,7 +22,32 @@ public enum GuiMessageKey implements MessageKey {
     HUB_ENTRY_LORE("gui.hub.entry.lore"),
     HUB_EMPTY("gui.hub.empty"),
     HUB_PREV("gui.hub.prev"),
-    HUB_NEXT("gui.hub.next");
+    HUB_NEXT("gui.hub.next"),
+
+    // the shared colour-picker widget — its chrome buttons
+    COLOUR_PICKER_TITLE("gui.colour-picker.title"),
+    COLOUR_PICKER_CUSTOM("gui.colour-picker.custom"),
+    COLOUR_PICKER_CUSTOM_PROMPT("gui.colour-picker.custom-prompt"),
+    COLOUR_PICKER_CLEAR("gui.colour-picker.clear"),
+    COLOUR_PICKER_BACK("gui.colour-picker.back"),
+
+    // the shared colour-picker widget — the 16 standard named-colour swatches
+    COLOUR_WHITE("gui.colour.white"),
+    COLOUR_ORANGE("gui.colour.orange"),
+    COLOUR_MAGENTA("gui.colour.magenta"),
+    COLOUR_LIGHT_BLUE("gui.colour.light-blue"),
+    COLOUR_YELLOW("gui.colour.yellow"),
+    COLOUR_LIME("gui.colour.lime"),
+    COLOUR_PINK("gui.colour.pink"),
+    COLOUR_GRAY("gui.colour.gray"),
+    COLOUR_LIGHT_GRAY("gui.colour.light-gray"),
+    COLOUR_CYAN("gui.colour.cyan"),
+    COLOUR_PURPLE("gui.colour.purple"),
+    COLOUR_BLUE("gui.colour.blue"),
+    COLOUR_BROWN("gui.colour.brown"),
+    COLOUR_GREEN("gui.colour.green"),
+    COLOUR_RED("gui.colour.red"),
+    COLOUR_BLACK("gui.colour.black");
 
     private final String key;
 

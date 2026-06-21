@@ -243,6 +243,9 @@ public final class HologramsWiring {
         // The list backs both /hologram (no args) and the /uxmess gui hub entry; the back button returns to it.
         HologramEditorSubLayouts subLayouts = HologramEditorSubLayouts.load(
                 plugin.getDataFolder().toPath(), "holograms", "hologram-editor", kernel.log());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout colourPicker =
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.load(
+                        plugin.getDataFolder().toPath(), kernel.log());
         EntityListLayout listLayout = guiLayouts.loadEntityList(
                 "holograms",
                 "hologram-list",
@@ -260,6 +263,7 @@ public final class HologramsWiring {
                 kernel.messages(),
                 editorLayout,
                 subLayouts,
+                colourPicker,
                 (player, viewer) -> listHolder[0].open(player, viewer));
         HologramListView listView =
                 new HologramListView(guiText, kernel.scheduler(), repository, services, anvil, listLayout, editorView);
@@ -276,8 +280,9 @@ public final class HologramsWiring {
     }
 
     /** The editor's property-button slots, the code default matching the bundled hologram-editor.conf. */
-    private static final List<Integer> EDITOR_PROPERTY_SLOTS =
-            List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37);
+    private static final List<Integer> EDITOR_PROPERTY_SLOTS = List.of(
+            10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42,
+            43, 46, 47);
 
     /**
      * The 6-row editor code default used when no {@code hologram-editor.conf} is present. The shared

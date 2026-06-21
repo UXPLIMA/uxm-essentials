@@ -72,6 +72,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -107,12 +108,15 @@ class HologramGuiTest {
     private static final Position AT = Position.of(WORLD, 1, 64, 1);
 
     // Editor property slots, in the order HologramEditorView builds its properties.
-    private static final List<Integer> EDITOR_SLOTS =
-            List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37);
+    private static final List<Integer> EDITOR_SLOTS = List.of(
+            10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42,
+            43, 46, 47);
     private static final int NAME_SLOT = EDITOR_SLOTS.get(0);
     private static final int LINES_SLOT = EDITOR_SLOTS.get(2);
     private static final int SCALE_SLOT = EDITOR_SLOTS.get(3);
     private static final int TEXT_SHADOW_SLOT = EDITOR_SLOTS.get(12);
+    private static final int BACKGROUND_SLOT = EDITOR_SLOTS.get(22);
+    private static final int GLOW_SLOT = EDITOR_SLOTS.get(23);
     private static final int DELETE_SLOT = 53;
     private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
 
@@ -152,6 +156,7 @@ class HologramGuiTest {
                 new KeyMessages(),
                 editorLayout,
                 HologramEditorSubLayouts.codeDefault(),
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.codeDefault(),
                 (p, v) -> listView.open(p, v));
         listView = new HologramListView(guiText, scheduler, repository, services, anvil, listLayout, editorView);
     }
@@ -245,6 +250,79 @@ class HologramGuiTest {
                 repository.find(HologramName.of("alpha")).orElseThrow().lines();
         assertThat(stored).hasSize(2);
         assertThat(stored.get(1).value()).isEqualTo("second line");
+    }
+
+    @Test
+    void backgroundColourButtonOpensThePickerWithThePalette() {
+        create("alpha");
+        editorView.open(
+                player, viewer, repository.find(HologramName.of("alpha")).orElseThrow());
+
+        fireClick(BACKGROUND_SLOT, ClickType.LEFT);
+
+        // The picker's first palette slot (code-default slot 10) carries the white swatch's stained-glass pane.
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(inv.getItem(10).getType()).isEqualTo(Material.WHITE_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(11).getType()).isEqualTo(Material.ORANGE_STAINED_GLASS_PANE);
+    }
+
+    @Test
+    void pickingAPaletteColourPersistsThroughTheAppearanceUseCase() {
+        create("alpha");
+        editorView.open(
+                player, viewer, repository.find(HologramName.of("alpha")).orElseThrow());
+        assertThat(appearance("alpha").hasBackground()).isFalse();
+
+        fireClick(BACKGROUND_SLOT, ClickType.LEFT); // open the picker
+        fireClick(10, ClickType.LEFT); // the white swatch
+
+        // White is opaque (0xFFFFFFFF), the packed ARGB the white swatch selects.
+        assertThat(appearance("alpha").backgroundArgb()).isEqualTo(0xFFFFFFFF);
+    }
+
+    @Test
+    void glowColourButtonPicksAndPersists() {
+        create("alpha");
+        editorView.open(
+                player, viewer, repository.find(HologramName.of("alpha")).orElseThrow());
+        assertThat(appearance("alpha").hasGlow()).isFalse();
+
+        fireClick(GLOW_SLOT, ClickType.LEFT); // open the glow picker
+        fireClick(11, ClickType.LEFT); // the orange swatch (0xFFD87F33)
+
+        assertThat(appearance("alpha").glowArgb()).isEqualTo(0xFFD87F33);
+    }
+
+    @Test
+    void customHexParsesAValidColourAndRejectsAnInvalidOne() {
+        create("alpha");
+        Hologram holo = repository.find(HologramName.of("alpha")).orElseThrow();
+        ColourProperty background = (ColourProperty)
+                editorView.grid().propertyAt(BACKGROUND_SLOT, holo).orElseThrow();
+        ClickContext ctx = new ClickContext(player, viewer, false, false, () -> {});
+
+        background.applyCustom(ctx, "#112233");
+        assertThat(appearance("alpha").backgroundArgb()).isEqualTo(0xFF112233);
+
+        // An invalid line leaves the previously-set colour untouched.
+        background.applyCustom(ctx, "not-a-colour");
+        assertThat(appearance("alpha").backgroundArgb()).isEqualTo(0xFF112233);
+    }
+
+    @Test
+    void clearButtonResetsTheColourToItsSentinel() {
+        create("alpha");
+        // Seed an explicit background, then clear it back to the no-override sentinel.
+        services.appearance().apply(viewer, HologramName.of("alpha"), a -> a.withBackgroundArgb(0xFF112233));
+        editorView.open(
+                player, viewer, repository.find(HologramName.of("alpha")).orElseThrow());
+        assertThat(appearance("alpha").hasBackground()).isTrue();
+
+        fireClick(BACKGROUND_SLOT, ClickType.LEFT); // open the picker
+        fireClick(42, ClickType.LEFT); // the clear button (code-default slot 42)
+
+        assertThat(appearance("alpha").backgroundArgb()).isEqualTo(Appearance.DEFAULT_BACKGROUND);
+        assertThat(appearance("alpha").hasBackground()).isFalse();
     }
 
     @Test
