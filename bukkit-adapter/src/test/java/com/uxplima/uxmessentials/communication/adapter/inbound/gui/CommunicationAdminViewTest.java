@@ -96,7 +96,7 @@ class CommunicationAdminViewTest {
         sink = new RecordingSink();
         notifier = new CommunicationNotifier(new KeyMessages(), sink);
         broadcaster = new BukkitAnnouncerBroadcaster(
-                sink, new AlwaysReceives(), new ChannelBroadcaster(scheduler, display()), p -> null);
+                sink, new AlwaysReceives(), new ChannelBroadcaster(scheduler, display()), p -> null, scheduler);
         anvil = new AnvilInput(plugin);
         anvil.install();
         Guis.install(plugin);

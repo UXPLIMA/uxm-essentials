@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -33,10 +34,26 @@ abstract class PresenceCommandSupport {
 
     final PresenceServices services;
     final CommandFeedback feedback;
+    final Scheduler scheduler;
 
-    PresenceCommandSupport(PresenceServices services, Messages messages) {
+    PresenceCommandSupport(PresenceServices services, Messages messages, Scheduler scheduler) {
         this.services = Objects.requireNonNull(services, "services");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+    }
+
+    /**
+     * Run {@code reply} on the thread that owns {@code sender}: a player sender's own entity region thread (where
+     * {@code sendMessage} is valid under Folia), or inline for the console, which has no region. The roster
+     * commands ({@code /list}, {@code /staff}, {@code /realname}, {@code /whois}) enumerate the online set on the
+     * global region thread and then route their one reply back through here.
+     */
+    final void replyOnSenderThread(CommandSender sender, Runnable reply) {
+        if (sender instanceof Player player) {
+            scheduler.onEntity(BukkitRefs.toRef(player), reply);
+        } else {
+            reply.run();
+        }
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */

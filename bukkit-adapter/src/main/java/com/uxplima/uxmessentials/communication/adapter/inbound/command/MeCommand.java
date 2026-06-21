@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.communication.application.CommunicationMessageK
 import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -27,8 +28,9 @@ import org.jspecify.annotations.NullMarked;
  * <p>Unlike {@code /broadcast}, the typed action is <em>untrusted player input</em>, not operator MiniMessage. It
  * therefore rides as a {@code {action}} placeholder of the parity-checked {@link CommunicationMessageKey#ME} string
  * rather than as a raw source line, so a player can never inject MiniMessage tags into the broadcast. The fan-out
- * mirrors {@code BukkitAnnouncerBroadcaster}: scan the live online set once and let the notifier resolve in each
- * viewer's locale and hop to their region thread.
+ * mirrors {@code BukkitAnnouncerBroadcaster}: the online roster is enumerated on the global region thread (Folia
+ * forbids iterating {@code Bukkit.getOnlinePlayers()} off it), then the notifier resolves in each viewer's locale
+ * and hops to their region thread.
  */
 @NullMarked
 public final class MeCommand extends CommunicationCommandSupport implements CommandRegistration {
@@ -37,10 +39,12 @@ public final class MeCommand extends CommunicationCommandSupport implements Comm
     private static final String ACTION_ARG = "action";
 
     private final CommunicationNotifier notifier;
+    private final Scheduler scheduler;
 
-    public MeCommand(Messages messages, CommunicationNotifier notifier) {
+    public MeCommand(Messages messages, CommunicationNotifier notifier, Scheduler scheduler) {
         super(messages);
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
@@ -64,9 +68,11 @@ public final class MeCommand extends CommunicationCommandSupport implements Comm
         }
         Map<String, String> placeholders =
                 Map.of("player", actor.getName(), ACTION_ARG, StringArgumentType.getString(ctx, ACTION_ARG));
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            notifier.send(ref(viewer), CommunicationMessageKey.ME, placeholders);
-        }
+        scheduler.onGlobal(() -> {
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                notifier.send(ref(viewer), CommunicationMessageKey.ME, placeholders);
+            }
+        });
         return Command.SINGLE_SUCCESS;
     }
 }

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.presence.command;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import java.time.Duration;
 import java.util.Map;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -22,7 +23,9 @@ import com.uxplima.uxmessentials.presence.application.SetNick;
 import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +60,7 @@ class WhoisCommandPathTest {
                 mock(ResolveVisibility.class),
                 mock(SetNick.class),
                 mock(ClearNick.class));
-        command = new WhoisCommand(services, new EchoMessages());
+        command = new WhoisCommand(services, new EchoMessages(), new InlineScheduler());
     }
 
     @AfterEach
@@ -131,6 +134,34 @@ class WhoisCommandPathTest {
             placeholders.forEach(
                     (name, value) -> out.append(' ').append(name).append('=').append(value));
             return out.toString();
+        }
+    }
+
+    /** Runs the global-thread roster scan, the target-thread status read, and the reply inline for assertion. */
+    private static final class InlineScheduler implements Scheduler {
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
         }
     }
 }

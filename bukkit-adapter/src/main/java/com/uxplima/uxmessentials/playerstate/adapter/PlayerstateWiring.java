@@ -97,7 +97,7 @@ public final class PlayerstateWiring {
         OfflineContainerView offlineView =
                 new OfflineContainerView(kernel.messages(), kernel.scheduler(), offlineStorage);
         InventoryViewer inventoryViewer = new BukkitInventoryViewer(invseeView, enderseeView, offlineView);
-        NearbyPlayers nearby = new BukkitNearbyPlayers();
+        NearbyPlayers nearby = new BukkitNearbyPlayers(kernel.scheduler(), kernel.log());
         PlayerInfo info = new BukkitPlayerInfo();
         PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
         ClearInventoryPreferences clearPrefs = new PdcClearInventoryPreferences();

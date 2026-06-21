@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -39,8 +40,8 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
     private static final String PERMISSION = "uxmessentials.realname.use";
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
-    public RealnameCommand(PresenceServices services, Messages messages) {
-        super(services, messages);
+    public RealnameCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+        super(services, messages, scheduler);
     }
 
     @Override
@@ -64,13 +65,23 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
     private int run(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String query = StringArgumentType.getString(ctx, "player");
-        Player match = findVisibleMatch(sender, query);
-        if (match == null) {
-            feedback.send(sender, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query));
-            return Command.SINGLE_SUCCESS;
-        }
-        String display = PLAIN.serialize(match.displayName());
-        feedback.send(sender, PresenceMessageKey.REALNAME_RESULT, Map.of("display", display, "name", match.getName()));
+        // The roster (names + display names + per-viewer canSee) is read on the global region thread (Folia forbids
+        // iterating Bukkit.getOnlinePlayers() off it); the one reply then lands on the sender's own thread.
+        scheduler.onGlobal(() -> {
+            Player match = findVisibleMatch(sender, query);
+            if (match == null) {
+                replyOnSenderThread(
+                        sender,
+                        () -> feedback.send(sender, PresenceMessageKey.REALNAME_NOT_FOUND, Map.of("query", query)));
+                return;
+            }
+            String display = PLAIN.serialize(match.displayName());
+            String name = match.getName();
+            replyOnSenderThread(
+                    sender,
+                    () -> feedback.send(
+                            sender, PresenceMessageKey.REALNAME_RESULT, Map.of("display", display, "name", name)));
+        });
         return Command.SINGLE_SUCCESS;
     }
 

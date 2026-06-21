@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.adapter.inbound.gui.PresenceSettingsView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -30,8 +31,9 @@ public final class PresenceSettingsCommand extends PresenceCommandSupport implem
 
     private final PresenceSettingsView view;
 
-    public PresenceSettingsCommand(PresenceServices services, Messages messages, PresenceSettingsView view) {
-        super(services, messages);
+    public PresenceSettingsCommand(
+            PresenceServices services, Messages messages, Scheduler scheduler, PresenceSettingsView view) {
+        super(services, messages, scheduler);
         this.view = Objects.requireNonNull(view, "view");
     }
 

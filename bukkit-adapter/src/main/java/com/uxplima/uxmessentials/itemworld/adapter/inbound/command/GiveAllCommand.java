@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -104,20 +105,26 @@ public final class GiveAllCommand extends ItemworldCommandSupport implements Com
         PlayerRef actor = actorOf(ctx);
         String itemKey = material.getKey().toString();
         boolean audit = amount.amount() >= services.config().giveAuditThreshold();
-        int recipients = 0;
-        for (Player target : ctx.getSource().getSender().getServer().getOnlinePlayers()) {
-            deliverTo(actor, target, material, amount, itemKey, audit);
-            recipients++;
-        }
-        reply(ctx, ItemworldMessageKey.GIVEALL_DONE, placeholders(itemKey, amount.amount(), recipients));
+        // The online roster is enumerated on the global region thread (Folia forbids iterating
+        // Bukkit.getOnlinePlayers() off it); each recipient's stack is then added on that player's own region thread.
+        services.kernel().scheduler().onGlobal(() -> {
+            int recipients = 0;
+            for (Player target : ctx.getSource().getSender().getServer().getOnlinePlayers()) {
+                deliverTo(actor, BukkitRefs.toRef(target), material, amount, itemKey, audit);
+                recipients++;
+            }
+            reply(ctx, ItemworldMessageKey.GIVEALL_DONE, placeholders(itemKey, amount.amount(), recipients));
+        });
     }
 
     private void deliverTo(
-            PlayerRef actor, Player target, Material material, AmountSpec amount, String itemKey, boolean audit) {
-        PlayerRef targetRef = BukkitRefs.toRef(target);
-        services.kernel()
-                .scheduler()
-                .onEntity(targetRef, () -> target.getInventory().addItem(new ItemStack(material, amount.amount())));
+            PlayerRef actor, PlayerRef targetRef, Material material, AmountSpec amount, String itemKey, boolean audit) {
+        services.kernel().scheduler().onEntity(targetRef, () -> {
+            Player live = Bukkit.getPlayer(targetRef.uuid());
+            if (live != null && live.isOnline()) {
+                live.getInventory().addItem(new ItemStack(material, amount.amount()));
+            }
+        });
         if (audit) {
             services.audit().gave(actor, targetRef, itemKey, amount.amount());
         }

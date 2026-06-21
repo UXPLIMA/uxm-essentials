@@ -207,8 +207,8 @@ class AnnouncerTaskTest {
 
     private AnnouncerTask task(java.util.function.Supplier<AnnouncerConfig> live) {
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
-        BukkitAnnouncerBroadcaster broadcaster =
-                new BukkitAnnouncerBroadcaster(new ThrowingSink(), optOut, channels, this::context);
+        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
+                new ThrowingSink(), optOut, channels, this::context, new SyncScheduler());
         NextAnnouncement next = new NextAnnouncement(() -> live.get().rotating(), new ZeroRandom());
         return new AnnouncerTask(scheduler, next, broadcaster, live, () -> true);
     }

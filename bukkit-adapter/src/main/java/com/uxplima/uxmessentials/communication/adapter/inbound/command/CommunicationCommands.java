@@ -72,8 +72,8 @@ public final class CommunicationCommands {
         commands.add(new BroadcastWorldCommand(messages, broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastToggleCommand(optOut, messages));
         commands.add(new AnnounceCommand(settings, broadcaster, optOut, announcer, scheduler, messages));
-        commands.add(new MeCommand(messages, notifier));
-        commands.add(new ClearChatCommand(messages, notifier, sink));
+        commands.add(new MeCommand(messages, notifier, scheduler));
+        commands.add(new ClearChatCommand(messages, notifier, sink, scheduler));
         commands.add(new ToggleChatCommand(chatLock, notifier, messages));
         for (InfoPage page : registry.all()) {
             commands.add(new InfoPageCommand(page.command(), registry, infoSender, notifier, messages));

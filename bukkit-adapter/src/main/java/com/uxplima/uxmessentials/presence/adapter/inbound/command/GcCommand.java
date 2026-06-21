@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -35,8 +36,8 @@ public final class GcCommand extends PresenceCommandSupport implements CommandRe
     private static final long BYTES_PER_MIB = 1024L * 1024L;
     private static final double MAX_TPS = 20.0;
 
-    public GcCommand(PresenceServices services, Messages messages) {
-        super(services, messages);
+    public GcCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+        super(services, messages, scheduler);
     }
 
     @Override

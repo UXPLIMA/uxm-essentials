@@ -76,7 +76,7 @@ class AnnounceCommandTest {
         optOutStore = new PdcBroadcastOptOutStore(MockBukkit.createMockPlugin());
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
         broadcaster = new BukkitAnnouncerBroadcaster(
-                new EchoMessagesSink(), optOutStore, channels, AnnounceCommandTest::context);
+                new EchoMessagesSink(), optOutStore, channels, AnnounceCommandTest::context, new SyncScheduler());
         scheduler = new RecordingScheduler();
     }
 

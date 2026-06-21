@@ -91,7 +91,11 @@ public final class CommunicationWiring {
         CommunicationServices services = assemble(kernel, settings, optOutStore, random, notifier);
         ChannelBroadcaster channelBroadcaster = new ChannelBroadcaster(kernel.scheduler(), settings.announcerDisplay());
         BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
-                kernel.messageSink(), optOutStore, channelBroadcaster, CommunicationWiring::conditionContext);
+                kernel.messageSink(),
+                optOutStore,
+                channelBroadcaster,
+                CommunicationWiring::conditionContext,
+                kernel.scheduler());
         AnnouncerTask announcer = new AnnouncerTask(
                 kernel.scheduler(), services.nextAnnouncement(), broadcaster, settings::announcerConfig, running::get);
         // The admin panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader. It
