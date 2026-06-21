@@ -14,6 +14,8 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcSkinByName;
@@ -33,6 +35,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropert
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -66,6 +71,8 @@ public final class NpcEditorView {
     private final AnvilInput anvil;
     private final Messages messages;
     private final NpcEditorSubLayouts sub;
+    private final ColourPickerLayout colourPicker;
+    private final ColourPickerText colourPickerText;
     private final EntityEditorView<Npc> view;
 
     public NpcEditorView(
@@ -78,6 +85,7 @@ public final class NpcEditorView {
             Messages messages,
             EntityEditorLayout layout,
             NpcEditorSubLayouts sub,
+            ColourPickerLayout colourPicker,
             BiConsumer<Player, PlayerRef> onBack) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -87,6 +95,8 @@ public final class NpcEditorView {
         this.anvil = Objects.requireNonNull(anvil, "anvil");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sub = Objects.requireNonNull(sub, "sub");
+        this.colourPicker = Objects.requireNonNull(colourPicker, "colourPicker");
+        this.colourPickerText = ColourPickerText.shared();
         Objects.requireNonNull(layout, "layout");
         Objects.requireNonNull(onBack, "onBack");
         this.view = EntityEditorView.<Npc>builder()
@@ -247,20 +257,34 @@ public final class NpcEditorView {
     }
 
     private EditableProperty glowColorProperty(NpcName name) {
-        return new EnumProperty<>(
+        // The same glass colour-picker the hologram editor uses. An NPC's glow is a scoreboard-team colour, so a
+        // chosen ARGB is snapped to the nearest of the sixteen named colours; the clear button drops the override.
+        return new ColourProperty(
                 NpcMessageKey.NPC_GUI_PROP_GLOW_COLOR,
-                NpcMessageKey.NPC_GUI_SELECT_GLOW_COLOR,
-                Material.WHITE_DYE,
+                Material.GLOWSTONE,
+                () -> glowArgb(name),
+                argb -> setGlowColor(
+                        name,
+                        NamedTextColor.nearestTo(TextColor.color(argb & RGB_MASK))
+                                .toString()),
+                () -> setGlowColor(name, ""),
+                NO_GLOW_OVERRIDE,
+                this::defaultWord,
                 guiText,
-                GLOW_COLORS,
-                () -> currentGlowColor(name),
-                (viewer, value) -> value,
-                value -> applyGlowColor(name, value),
-                sub.selectorOptionIcon(),
-                sub.selectorFiller(),
-                sub.selectorSlots(),
-                sub.selectorRows(),
+                colourPickerText,
+                colourPicker,
+                anvil,
                 scheduler);
+    }
+
+    /** The current glow colour as an opaque ARGB int, or {@link #NO_GLOW_OVERRIDE} when no override is set. */
+    private int glowArgb(NpcName name) {
+        String raw = currentGlowColorRaw(name);
+        if (raw.isBlank()) {
+            return NO_GLOW_OVERRIDE;
+        }
+        NamedTextColor colour = NamedTextColor.NAMES.value(raw.toLowerCase(Locale.ROOT));
+        return colour == null ? NO_GLOW_OVERRIDE : (OPAQUE_ALPHA | colour.value());
     }
 
     // --- toggles ---
@@ -425,9 +449,9 @@ public final class NpcEditorView {
         services.displayName().setDisplayName(GUI_ACTOR, name, value);
     }
 
-    private void applyGlowColor(NpcName name, String word) {
+    /** Set (or, with a blank {@code color}, clear) the glow-colour override, keeping the glowing flag as-is. */
+    private void setGlowColor(NpcName name, String color) {
         boolean glowing = current(name).map(Npc::glowing).orElse(false);
-        String color = word.equalsIgnoreCase(defaultWord()) ? "" : word;
         services.glow().setGlowing(GUI_ACTOR, name, glowing, color);
     }
 
@@ -448,11 +472,6 @@ public final class NpcEditorView {
 
     private String currentPose(NpcName name) {
         return current(name).map(Npc::pose).orElse(Npc.DEFAULT_POSE);
-    }
-
-    private String currentGlowColor(NpcName name) {
-        String raw = currentGlowColorRaw(name);
-        return raw.isBlank() ? defaultWord() : raw.toLowerCase(Locale.ROOT);
     }
 
     private String currentGlowColorRaw(NpcName name) {
@@ -492,8 +511,8 @@ public final class NpcEditorView {
         return messages.resolve(GUI_ACTOR, NpcMessageKey.NPC_GUI_VALUE_NONE, Map.of());
     }
 
-    private String defaultWord() {
-        return messages.resolve(GUI_ACTOR, NpcMessageKey.NPC_GUI_VALUE_DEFAULT, Map.of());
+    private String defaultWord(PlayerRef viewer) {
+        return messages.resolve(viewer, NpcMessageKey.NPC_GUI_VALUE_DEFAULT, Map.of());
     }
 
     private static PlayerRef ref(Player player) {
@@ -530,25 +549,12 @@ public final class NpcEditorView {
     private static final List<String> POSES =
             List.of("STANDING", "SLEEPING", "SWIMMING", "GLIDING", "CROUCHING", "SPIN_ATTACK", "SITTING");
 
-    /** The sixteen chat-colour names {@code /npc glow [color]} accepts, plus the leading "default" reset. */
-    private static final List<String> GLOW_COLORS = List.of(
-            "default",
-            "black",
-            "dark_blue",
-            "dark_green",
-            "dark_aqua",
-            "dark_red",
-            "dark_purple",
-            "gold",
-            "gray",
-            "dark_gray",
-            "blue",
-            "green",
-            "aqua",
-            "red",
-            "light_purple",
-            "yellow",
-            "white");
+    /** Sentinel ARGB meaning "no glow-colour override"; never collides with an opaque colour (alpha 0xFF). */
+    private static final int NO_GLOW_OVERRIDE = 0;
+    /** Opaque alpha bits OR'd onto a named colour's RGB to form the ARGB the colour picker reads. */
+    private static final int OPAQUE_ALPHA = 0xFF000000;
+    /** Strips the alpha byte from a picked ARGB before snapping it to the nearest named colour. */
+    private static final int RGB_MASK = 0xFFFFFF;
 
     /**
      * The stable synthetic actor every GUI-originated npc write is attributed to. A GUI edit has no command

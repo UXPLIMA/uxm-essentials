@@ -218,6 +218,9 @@ public final class NpcWiring {
                 "npc-list",
                 EntityListLayout.withCreate(org.bukkit.Material.PLAYER_HEAD, 49, org.bukkit.Material.LIME_DYE));
         EntityEditorLayout editorLayout = guiLayouts.loadEntityEditor("npc", "npc-editor", editorCodeDefault());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout colourPicker =
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.load(
+                        plugin.getDataFolder().toPath(), kernel.log());
         NpcListView[] listHolder = new NpcListView[1];
         NpcEditorView editor = new NpcEditorView(
                 guiText,
@@ -229,6 +232,7 @@ public final class NpcWiring {
                 kernel.messages(),
                 editorLayout,
                 subLayouts,
+                colourPicker,
                 (player, viewer) -> listHolder[0].open(player, viewer));
         NpcListView listView =
                 new NpcListView(guiText, kernel.scheduler(), repository, services, anvil, listLayout, editor);
