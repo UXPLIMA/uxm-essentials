@@ -27,8 +27,16 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
 
     private static final int PUBLIC = 1;
 
+    private final java.util.function.Function<java.util.UUID, String> names;
+
+    /** Backward-compatible: no profile resolver, so the owner name stays the uuid string (non-display callers). */
     public JooqPlayerWarpRepository(DSLContext dsl) {
+        this(dsl, java.util.UUID::toString);
+    }
+
+    public JooqPlayerWarpRepository(DSLContext dsl, java.util.function.Function<java.util.UUID, String> names) {
         super(dsl);
+        this.names = Objects.requireNonNull(names, "names");
     }
 
     @Override
@@ -39,7 +47,7 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
                 .where(PLAYER_WARPS.OWNER.eq(owner.uuid().toString()))
                 .and(PLAYER_WARPS.NAME.eq(name.value()))
                 .fetchOptional()
-                .map(PlayerWarpRows::toPlayerWarp));
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
     }
 
     @Override
@@ -49,7 +57,7 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
                 .where(PLAYER_WARPS.OWNER.eq(owner.uuid().toString()))
                 .orderBy(PLAYER_WARPS.CREATED_AT.asc(), PLAYER_WARPS.NAME.asc())
                 .fetch()
-                .map(PlayerWarpRows::toPlayerWarp));
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
     }
 
     @Override
@@ -57,7 +65,7 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
         return read(dsl -> dsl.selectFrom(PLAYER_WARPS)
                 .orderBy(PLAYER_WARPS.OWNER.asc(), PLAYER_WARPS.CREATED_AT.asc(), PLAYER_WARPS.NAME.asc())
                 .fetch()
-                .map(PlayerWarpRows::toPlayerWarp));
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
     }
 
     @Override
@@ -68,7 +76,7 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
                 .and(PLAYER_WARPS.IS_PUBLIC.eq(PUBLIC))
                 .orderBy(PLAYER_WARPS.CREATED_AT.asc(), PLAYER_WARPS.NAME.asc())
                 .fetch()
-                .map(PlayerWarpRows::toPlayerWarp));
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
     }
 
     @Override
