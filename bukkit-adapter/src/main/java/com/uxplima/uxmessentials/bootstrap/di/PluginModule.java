@@ -401,7 +401,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("holograms"))) {
             wireHolograms(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
-            wirePlayerwarps(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
+            wirePlayerwarps(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
             wireScoreboard(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
@@ -926,6 +926,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
@@ -945,6 +946,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 engine,
+                bus,
                 links.warpEditorView,
                 links.warpPlayerWarpHandle,
                 links.warpTeleportRegistry,
