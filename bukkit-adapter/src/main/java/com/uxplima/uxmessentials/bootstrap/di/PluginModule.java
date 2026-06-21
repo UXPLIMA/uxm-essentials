@@ -399,7 +399,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("communication"))) {
             wireCommunication(plugin, ctx, resources, links, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
-            wireHolograms(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
+            wireHolograms(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
             wirePlayerwarps(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
@@ -877,6 +877,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
@@ -901,6 +902,7 @@ public final class PluginModule {
                 plugin,
                 ctx,
                 persistence,
+                bus,
                 leaderboards,
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
