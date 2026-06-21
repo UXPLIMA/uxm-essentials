@@ -179,7 +179,8 @@ class KitMenuClickTest {
                                 services,
                                 new KeyMessages(),
                                 () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI,
-                                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI)
+                                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI,
+                                new SyncScheduler())
                         .build());
         return dispatcher;
     }

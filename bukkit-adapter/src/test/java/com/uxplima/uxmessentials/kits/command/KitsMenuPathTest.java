@@ -178,7 +178,8 @@ class KitsMenuPathTest {
                 services,
                 new KeyMessages(),
                 () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI,
-                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
+                () -> com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI,
+                new SyncScheduler());
     }
 
     /** A command source for a fresh player holding exactly {@code node} (and no op). */
@@ -203,7 +204,10 @@ class KitsMenuPathTest {
     private CommandDispatcher<CommandSourceStack> registerCommand(
             com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new KitCommand(services, new KeyMessages(), () -> mode, () -> mode).build());
+        dispatcher
+                .getRoot()
+                .addChild(new KitCommand(services, new KeyMessages(), () -> mode, () -> mode, new SyncScheduler())
+                        .build());
         return dispatcher;
     }
 

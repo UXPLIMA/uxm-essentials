@@ -120,7 +120,7 @@ public final class PresenceWiring {
             listeners.add(new AfkPickupListener(store, notifier));
         }
         if (settings.sleepIgnoresAfk()) {
-            listeners.add(new SleepExclusionListener(store));
+            listeners.add(new SleepExclusionListener(store, kernel.scheduler()));
         }
         return List.copyOf(listeners);
     }

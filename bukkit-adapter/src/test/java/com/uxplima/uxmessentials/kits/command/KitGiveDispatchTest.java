@@ -11,14 +11,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
-import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.InventoryAction;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryView;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -27,9 +19,7 @@ import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommand;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
-import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
 import com.uxplima.uxmessentials.kits.application.DelKit;
@@ -37,7 +27,6 @@ import com.uxplima.uxmessentials.kits.application.KitAccess;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitReset;
-import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.ListKits;
 import com.uxplima.uxmessentials.kits.application.ShowKit;
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
@@ -46,9 +35,11 @@ import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -58,6 +49,8 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -69,30 +62,30 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the {@code /kit show} GUI preview path through the real Brigadier {@code /kit} node.
- * In {@code gui} mode the subcommand opens a read-only managed menu sized to fit the kit, with the kit's stacks
- * laid out at their definition-order slots and every interaction cancelled by {@link KitPreviewListener}, so a
- * player can inspect a kit's contents without taking anything. In {@code chat} mode the subcommand opens no
- * inventory and sends the chat preview lines instead. The scheduler is a synchronous double so the entity-bound
- * open runs inline, mirroring the {@code /kit list} menu path test.
+ * Folia threading coverage of {@code /kit <name> <player>} (the staff give). The grant mutates the
+ * <em>recipient's</em> inventory through the {@link KitGranter}, so it must run on the recipient's region thread,
+ * never the giving sender's. This drives the real Brigadier give node and asserts, via a scheduler that records
+ * every {@code onEntity} hop, that the grant is dispatched onto the recipient and not the sender.
+ *
+ * <p>The self-claim path ({@code /kit <name>}) stays on the player's own thread and is unaffected; the give path
+ * is the one that crosses regions when sender and recipient differ.
  */
-class ShowKitGuiPathTest {
+class KitGiveDispatchTest {
 
     private ServerMock server;
-    private Plugin plugin;
-    private PlayerMock player;
-    private KitServices services;
-    private RecordingSink sink;
+    private PlayerMock sender;
+    private PlayerMock recipient;
+    private RecordingScheduler scheduler;
+    private GrantRecorder granter;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        plugin = MockBukkit.createMockPlugin();
-        player = server.addPlayer("Alice");
-        player.setOp(true);
-        sink = new RecordingSink();
-        services = services();
-        server.getPluginManager().registerEvents(new KitPreviewListener(), plugin);
+        sender = server.addPlayer("Alice");
+        sender.setOp(true);
+        recipient = server.addPlayer("Bob");
+        scheduler = new RecordingScheduler();
+        granter = new GrantRecorder();
     }
 
     @AfterEach
@@ -101,57 +94,29 @@ class ShowKitGuiPathTest {
     }
 
     @Test
-    void guiModeOpensAReadOnlyMenuHoldingTheKitItems() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.GUI);
+    void givingAKitToAnotherPlayerDispatchesTheGrantOntoTheRecipientsThread() {
+        execute("kit starter Bob");
 
-        execute(dispatcher, "kit show starter");
-
-        Inventory menu = player.getOpenInventory().getTopInventory();
-        assertThat(menu).isNotNull();
-        assertThat(menu.getItem(0)).isNotNull();
-        assertThat(menu.getItem(0).getType()).isEqualTo(Material.DIAMOND_SWORD);
-        assertThat(menu.getItem(1)).isNotNull();
-        assertThat(menu.getItem(1).getType()).isEqualTo(Material.GOLDEN_APPLE);
+        PlayerRef recipientRef = new PlayerRef(recipient.getUniqueId(), "Bob");
+        PlayerRef senderRef = new PlayerRef(sender.getUniqueId(), "Alice");
+        assertThat(scheduler.entityHops).contains(recipientRef);
+        assertThat(scheduler.entityHops).doesNotContain(senderRef);
+        assertThat(granter.grantedTo).containsExactly(recipientRef);
     }
 
-    @Test
-    void everyClickInTheGuiPreviewIsCancelled() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.GUI);
-        execute(dispatcher, "kit show starter");
-        InventoryView view = player.getOpenInventory();
-
-        InventoryClickEvent click = new InventoryClickEvent(
-                view, InventoryType.SlotType.CONTAINER, 0, ClickType.LEFT, InventoryAction.PICKUP_ALL);
-        server.getPluginManager().callEvent(click);
-
-        assertThat(click.isCancelled()).isTrue();
-    }
-
-    @Test
-    void chatModeSendsTheChatLinesAndOpensNothing() {
-        CommandDispatcher<CommandSourceStack> dispatcher = registerCommand(ListDisplayMode.CHAT);
-
-        execute(dispatcher, "kit show starter");
-
-        assertThat(sink.keys).contains(KitsMessageKey.KIT_PREVIEW_HEADER);
-        assertThat(sink.keys).contains(KitsMessageKey.KIT_PREVIEW_ENTRY);
-        assertThat(player.getOpenInventory().getTopInventory()).isNull();
-    }
-
-    private CommandDispatcher<CommandSourceStack> registerCommand(ListDisplayMode mode) {
+    private void execute(String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        // The mode under test drives /kit show's preview presentation; the list presentation is irrelevant here.
         dispatcher
                 .getRoot()
                 .addChild(new KitCommand(
-                                services, new KeyMessages(), () -> ListDisplayMode.GUI, () -> mode, new SyncScheduler())
+                                services(),
+                                new KeyMessages(),
+                                () -> ListDisplayMode.GUI,
+                                () -> ListDisplayMode.GUI,
+                                scheduler)
                         .build());
-        return dispatcher;
-    }
-
-    private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {
         try {
-            dispatcher.execute(input, CommandSourceStackMock.from(player));
+            dispatcher.execute(input, CommandSourceStackMock.from(sender));
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
             throw new AssertionError("command did not parse: " + input, e);
         }
@@ -161,9 +126,8 @@ class ShowKitGuiPathTest {
         Messages messages = new KeyMessages();
         Permissions permissions = new AllowAllPermissions();
         KitClaimStore claims = new NoClaims();
-        KitNotifier notifier = new KitNotifier(messages, sink);
+        KitNotifier notifier = new KitNotifier(messages, new RecordingSink());
         KitRepository repository = new FakeRepository();
-        KitGranter granter = (who, kit) -> KitGranter.Grant.complete();
         KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
         Clock clock = Clock.systemUTC();
         ClaimKit claimKit =
@@ -194,7 +158,7 @@ class ShowKitGuiPathTest {
                 kitPreview,
                 kitEditorView,
                 null,
-                new NoPlayerLookup(),
+                new ServerPlayerLookup(),
                 null,
                 null,
                 null,
@@ -202,23 +166,19 @@ class ShowKitGuiPathTest {
                 null);
     }
 
-    /** A single kit named {@code starter} holding two real, codec-encoded stacks at slots 0 and 1. */
+    /** A free, repeatable, ungated kit named {@code starter} with no items (so the grant is a pure recorded hop). */
     private static final class FakeRepository implements KitRepository {
-        private final KitDefinition starter = KitDefinition.repeatable(
-                KitId.of("starter"),
-                List.of(
-                        KitItemCodec.encode(new ItemStack(Material.DIAMOND_SWORD)),
-                        KitItemCodec.encode(new ItemStack(Material.GOLDEN_APPLE, 3))),
-                Duration.ofSeconds(60));
+        private final List<KitDefinition> kits =
+                List.of(KitDefinition.repeatable(KitId.of("starter"), List.<KitItem>of(), Duration.ZERO));
 
         @Override
         public Optional<KitDefinition> find(KitId id) {
-            return id.equals(starter.id()) ? Optional.of(starter) : Optional.empty();
+            return kits.stream().filter(kit -> kit.id().equals(id)).findFirst();
         }
 
         @Override
         public List<KitDefinition> all() {
-            return List.of(starter);
+            return kits;
         }
 
         @Override
@@ -233,37 +193,45 @@ class ShowKitGuiPathTest {
         public void delete(KitId id) {}
     }
 
-    private static final class NoClaims implements KitClaimStore {
-        @Override
-        public boolean hasClaimed(PlayerRef who, KitId kit) {
-            return false;
-        }
+    /** Records the recipient of every grant so the test can assert who the kit was handed to. */
+    private static final class GrantRecorder implements KitGranter {
+        private final List<PlayerRef> grantedTo = new ArrayList<>();
 
         @Override
-        public void markClaimed(PlayerRef who, KitId kit) {}
-
-        @Override
-        public void reset(PlayerRef who, KitId kit) {}
-
-        @Override
-        public void resetAll(PlayerRef who) {}
-    }
-
-    /** Records each delivered key so a path's outcome is asserted by the message it produced. */
-    private static final class RecordingSink implements MessageSink {
-        private final List<MessageKey> keys = new ArrayList<>();
-
-        @Override
-        public void deliver(PlayerRef viewer, String renderedText) {
-            // renderedText is the key() string (see KeyMessages); the key list is what tests assert on
+        public KitGranter.Grant grant(PlayerRef recipient, KitDefinition kit) {
+            grantedTo.add(recipient);
+            return KitGranter.Grant.complete();
         }
     }
 
-    private final class KeyMessages implements Messages {
+    /** Runs every task inline (so the path completes synchronously) but records each {@code onEntity} target. */
+    private static final class RecordingScheduler implements Scheduler {
+        private final List<PlayerRef> entityHops = new ArrayList<>();
+
         @Override
-        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            sink.keys.add(key);
-            return key.key();
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            entityHops.add(player);
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
         }
     }
 
@@ -294,6 +262,34 @@ class ShowKitGuiPathTest {
         }
     }
 
+    private static final class NoClaims implements KitClaimStore {
+        @Override
+        public boolean hasClaimed(PlayerRef who, KitId kit) {
+            return false;
+        }
+
+        @Override
+        public void markClaimed(PlayerRef who, KitId kit) {}
+
+        @Override
+        public void reset(PlayerRef who, KitId kit) {}
+
+        @Override
+        public void resetAll(PlayerRef who) {}
+    }
+
+    private static final class RecordingSink implements MessageSink {
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    private static final class KeyMessages implements Messages {
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            return key.key();
+        }
+    }
+
     private static final class AllowAllPermissions implements Permissions {
         @Override
         public boolean has(PlayerRef who, String node) {
@@ -307,30 +303,34 @@ class ShowKitGuiPathTest {
         }
     }
 
-    private static final class NoCooldowns implements com.uxplima.uxmessentials.shared.application.port.Cooldowns {
+    private static final class NoCooldowns implements Cooldowns {
         @Override
-        public com.uxplima.uxmessentials.shared.domain.Result<com.uxplima.uxmessentials.shared.domain.Unit, Duration>
-                check(PlayerRef who, CooldownKind kind) {
-            return com.uxplima.uxmessentials.shared.domain.Result.ok();
+        public Result<Unit, Duration> check(PlayerRef who, CooldownKind kind) {
+            return Result.ok();
         }
 
         @Override
         public void stamp(PlayerRef who, CooldownKind kind) {}
 
         @Override
-        public com.uxplima.uxmessentials.shared.domain.Result<com.uxplima.uxmessentials.shared.domain.Unit, Duration>
-                checkLabel(PlayerRef who, String label) {
-            return com.uxplima.uxmessentials.shared.domain.Result.ok();
+        public Result<Unit, Duration> checkLabel(PlayerRef who, String label) {
+            return Result.ok();
         }
 
         @Override
         public void stampLabel(PlayerRef who, String label) {}
     }
 
-    private static final class NoPlayerLookup implements PlayerLookup {
+    private static final class NoEvents implements DomainEventPublisher {
+        @Override
+        public void publish(DomainEvent event) {}
+    }
+
+    private final class ServerPlayerLookup implements PlayerLookup {
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.empty();
+            var bukkit = server.getPlayerExact(name);
+            return bukkit == null ? Optional.empty() : Optional.of(new PlayerRef(bukkit.getUniqueId(), name));
         }
 
         @Override
@@ -340,12 +340,8 @@ class ShowKitGuiPathTest {
 
         @Override
         public boolean isOnline(UUID uuid) {
-            return false;
+            var bukkit = server.getPlayer(uuid);
+            return bukkit != null && bukkit.isOnline();
         }
-    }
-
-    private static final class NoEvents implements DomainEventPublisher {
-        @Override
-        public void publish(DomainEvent event) {}
     }
 }

@@ -145,12 +145,18 @@ public final class WorldEditorListener implements Listener {
     }
 
     private void toggleLoad(Player player, WorldEditorHolder h, WorldName world) {
-        if (engine.isLoaded(world)) {
-            services.unloadWorld().unload(h.viewer(), world, true);
-        } else {
-            services.loadWorld().load(h.viewer(), world);
-        }
-        mainView.open(player, h.viewer(), world);
+        // The world load/unload reaches WorldCreator.createWorld()/server.unloadWorld(), which Folia permits only
+        // on the global region thread — the inventory click fires on the clicking player's region thread, so hop
+        // to global before touching world state, then re-open the hub (which self-schedules back onto the viewer's
+        // entity thread) so the toggled load state is reflected.
+        services.scheduler().onGlobal(() -> {
+            if (engine.isLoaded(world)) {
+                services.unloadWorld().unload(h.viewer(), world, true);
+            } else {
+                services.loadWorld().load(h.viewer(), world);
+            }
+            mainView.open(player, h.viewer(), world);
+        });
     }
 
     private String currentRaw(WorldName world, WorldProperty<?> prop) {
