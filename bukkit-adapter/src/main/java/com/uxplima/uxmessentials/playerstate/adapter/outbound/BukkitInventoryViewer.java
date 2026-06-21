@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView;
@@ -57,12 +58,22 @@ public final class BukkitInventoryViewer implements InventoryViewer {
             offlineView.openEnderChest(viewer, subject);
             return;
         }
-        scheduler.onEntity(viewer, () -> {
-            Player looker = Bukkit.getPlayer(viewer.uuid());
+        // The target's ender chest is a foreign-entity container: on Folia it is owned by the target's region
+        // thread, so resolve the live inventory there, then open it for the viewer on the viewer's own entity
+        // thread (where opening the screen is region-local). The ender chest stays the live shared container so
+        // edits reconcile as before — only the read that hands it over now runs on the owning thread.
+        scheduler.onEntity(subject, () -> {
             Player target = Bukkit.getPlayer(subject.uuid());
-            if (looker != null && looker.isOnline() && target != null && target.isOnline()) {
-                looker.openInventory(target.getEnderChest());
+            if (target == null || !target.isOnline()) {
+                return;
             }
+            Inventory enderChest = target.getEnderChest();
+            scheduler.onEntity(viewer, () -> {
+                Player looker = Bukkit.getPlayer(viewer.uuid());
+                if (looker != null && looker.isOnline()) {
+                    looker.openInventory(enderChest);
+                }
+            });
         });
     }
 

@@ -14,6 +14,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
@@ -67,9 +68,20 @@ public final class TpRandomPlayerCommand extends TeleportCommandSupport implemen
             return Command.SINGLE_SUCCESS;
         }
         Player target = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
-        Position to = TeleportRefs.positionOf(target);
-        services.executor().teleport(ref(sender), Destination.at(to), TeleportKind.ADMIN);
-        services.notifier().send(ref(sender), TeleportMessageKey.TP_DONE);
+        // Reading the chosen target's live location is a foreign-entity read: on Folia that position is owned by
+        // the target's region thread, not the sender's. Resolve it on the target's entity thread, snapshot it to an
+        // immutable Position, then hand it to the executor (which teleports the sender Folia-safely).
+        PlayerRef actor = ref(sender);
+        PlayerRef subject = ref(target);
+        services.scheduler().onEntity(subject, () -> {
+            Player live = sender.getServer().getPlayer(subject.uuid());
+            if (live == null || !live.isOnline()) {
+                return;
+            }
+            Position to = TeleportRefs.positionOf(live);
+            services.executor().teleport(actor, Destination.at(to), TeleportKind.ADMIN);
+            services.notifier().send(actor, TeleportMessageKey.TP_DONE);
+        });
         return Command.SINGLE_SUCCESS;
     }
 

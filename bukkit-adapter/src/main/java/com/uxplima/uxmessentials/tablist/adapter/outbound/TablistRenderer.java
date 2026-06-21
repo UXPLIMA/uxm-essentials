@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.tablist.domain.TablistContent;
 import com.uxplima.uxmessentials.tablist.domain.TablistFiller;
@@ -101,8 +102,9 @@ public final class TablistRenderer {
             AnimationRegistry animations,
             TabListPackets packets,
             TablistSkinResolver skinResolver,
-            Supplier<? extends Collection<? extends Player>> viewers) {
-        this(formats, animations, packets, skinResolver, viewers, null);
+            Supplier<? extends Collection<? extends Player>> viewers,
+            Scheduler scheduler) {
+        this(formats, animations, packets, skinResolver, viewers, scheduler, null);
     }
 
     /** Build a renderer with the full packet path plus the {@code suppression} collaborator driving TAB-C. */
@@ -112,14 +114,17 @@ public final class TablistRenderer {
             TabListPackets packets,
             TablistSkinResolver skinResolver,
             Supplier<? extends Collection<? extends Player>> viewers,
+            Scheduler scheduler,
             @Nullable TablistSuppression suppression) {
         this.formats = Objects.requireNonNull(formats, "formats");
         this.animations = Objects.requireNonNull(animations, "animations");
         Objects.requireNonNull(packets, "packets");
         Objects.requireNonNull(skinResolver, "skinResolver");
         Objects.requireNonNull(viewers, "viewers");
+        Objects.requireNonNull(scheduler, "scheduler");
         this.tablist = new Tablist();
-        this.rowPainter = new RealPlayerRowPainter(packets, skinResolver, this::render, animations::tick, viewers);
+        this.rowPainter =
+                new RealPlayerRowPainter(packets, skinResolver, this::render, animations::tick, viewers, scheduler);
         this.fillerPainter = new FillerPainter(packets, skinResolver, this::render);
         this.suppression = suppression;
     }
@@ -129,8 +134,9 @@ public final class TablistRenderer {
             Supplier<TablistFormatConfig> formats,
             AnimationRegistry animations,
             TabListPackets packets,
-            TablistSkinResolver skinResolver) {
-        this(formats, animations, packets, skinResolver, Bukkit::getOnlinePlayers, null);
+            TablistSkinResolver skinResolver,
+            Scheduler scheduler) {
+        this(formats, animations, packets, skinResolver, Bukkit::getOnlinePlayers, scheduler, null);
     }
 
     /** Render (or clear) {@code player}'s tablist from the selected format. Must run on the player's region thread. */

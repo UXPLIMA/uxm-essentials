@@ -91,7 +91,13 @@ public final class TablistWiring {
                 Bukkit::getOnlinePlayers,
                 kernel.log());
         TablistRenderer renderer = new TablistRenderer(
-                settings::formats, animations, packets, skinResolver, Bukkit::getOnlinePlayers, suppression);
+                settings::formats,
+                animations,
+                packets,
+                skinResolver,
+                Bukkit::getOnlinePlayers,
+                kernel.scheduler(),
+                suppression);
         TablistRenderTask renderTask = new TablistRenderTask(
                 kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
 

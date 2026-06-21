@@ -57,12 +57,6 @@ final class InvseeLayout {
                 .build();
     }
 
-    /** Copy {@code target}'s live items into {@code menu}, cloning each so the menu never aliases a live stack. */
-    static void seed(Inventory menu, Player target) {
-        Objects.requireNonNull(target, "target");
-        seedSlots(menu, fromPlayer(target));
-    }
-
     /** Reconcile {@code menu}'s editable region back onto {@code target}; filler slots are ignored. */
     static void writeBack(Inventory menu, Player target) {
         Objects.requireNonNull(target, "target");

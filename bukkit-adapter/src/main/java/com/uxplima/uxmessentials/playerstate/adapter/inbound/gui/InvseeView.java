@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
@@ -17,6 +18,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Opens {@code /invsee} as a managed 54-slot menu that mirrors a target's full inventory — main slots, armour,
@@ -46,20 +48,28 @@ public final class InvseeView {
     }
 
     /**
-     * Open {@code subject}'s inventory for {@code viewer}. Both refs are resolved to live players on the
-     * viewer's entity thread; the open is skipped when either has gone offline. The viewer's edit right is the
-     * {@code uxmessentials.invsee.modify} node read off the live viewer there — without it the menu opens
-     * view-only (every click cancelled).
+     * Open {@code subject}'s inventory for {@code viewer}. The target's items are snapshotted on the target's own
+     * entity thread — on Folia the target's live inventory is owned by that region thread, so reading it from the
+     * viewer's thread is the asymmetric unsafe half this fix removes — and the menu is then built and opened on the
+     * viewer's entity thread from that snapshot. The open is skipped when either player has gone offline. The
+     * viewer's edit right is the {@code uxmessentials.invsee.modify} node read off the live viewer there — without
+     * it the menu opens view-only (every click cancelled).
      */
     public void open(PlayerRef viewer, PlayerRef subject) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(subject, "subject");
-        scheduler.onEntity(viewer, () -> {
-            Player looker = Bukkit.getPlayer(viewer.uuid());
+        scheduler.onEntity(subject, () -> {
             Player target = Bukkit.getPlayer(subject.uuid());
-            if (looker != null && looker.isOnline() && target != null && target.isOnline()) {
-                openResolved(looker, subject, target, looker.hasPermission(MODIFY_PERMISSION));
+            if (target == null || !target.isOnline()) {
+                return;
             }
+            @Nullable ItemStack[] snapshot = InvseeLayout.fromPlayer(target);
+            scheduler.onEntity(viewer, () -> {
+                Player looker = Bukkit.getPlayer(viewer.uuid());
+                if (looker != null && looker.isOnline()) {
+                    openResolved(looker, subject, snapshot, looker.hasPermission(MODIFY_PERMISSION));
+                }
+            });
         });
     }
 
@@ -85,11 +95,11 @@ public final class InvseeView {
         }
     }
 
-    private void openResolved(Player looker, PlayerRef subject, Player target, boolean editable) {
+    private void openResolved(Player looker, PlayerRef subject, @Nullable ItemStack[] snapshot, boolean editable) {
         InvseeHolder holder = new InvseeHolder(subject, editable);
         Inventory menu = Bukkit.createInventory(holder, InvseeLayout.SIZE, title(looker, subject));
         holder.attach(menu);
-        InvseeLayout.seed(menu, target);
+        InvseeLayout.seedSlots(menu, snapshot);
         open.add(holder);
         looker.openInventory(menu);
     }

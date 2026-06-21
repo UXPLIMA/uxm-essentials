@@ -3,7 +3,9 @@ package com.uxplima.uxmessentials.playerstate.command;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import org.bukkit.Material;
@@ -116,6 +118,27 @@ class InvseeViewPathTest {
     }
 
     @Test
+    void readsTheTargetsInventoryOnTheTargetsEntityThreadBeforeOpeningForTheViewer() {
+        PlayerMock target = server.addPlayer("Target");
+        target.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 5));
+        PlayerMock viewer = grantModify(server.addPlayer("Staff"));
+        RecordingScheduler recording = new RecordingScheduler();
+        InvseeView recordingView = new InvseeView(new KeyMessages(), recording);
+
+        recordingView.open(ref(viewer), ref(target));
+
+        // The target's live inventory is read on the TARGET's entity thread first (Folia ownership), then the menu is
+        // built and opened on the VIEWER's thread: the first hop is the target, and the viewer is hopped to as well.
+        assertThat(recording.entityHops).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(recording.entityHops.get(0).uuid()).isEqualTo(target.getUniqueId());
+        assertThat(recording.entityHops).extracting(PlayerRef::uuid).contains(viewer.getUniqueId());
+        // And the read still produced the right snapshot — the menu mirrors the target's diamond.
+        Inventory menu = viewer.getOpenInventory().getTopInventory();
+        assertThat(menu.getItem(0)).isNotNull();
+        assertThat(menu.getItem(0).getType()).isEqualTo(Material.DIAMOND);
+    }
+
+    @Test
     void withoutModifyTheMenuStillOpensAndNeverDuplicatesOnClose() {
         PlayerMock target = server.addPlayer("Target");
         target.getInventory().setItem(0, new ItemStack(Material.GOLD_INGOT, 4));
@@ -171,6 +194,37 @@ class InvseeViewPathTest {
 
         @Override
         public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** Runs every task inline (so the open completes in-test) but records each {@code onEntity} hop in order. */
+    private static final class RecordingScheduler implements Scheduler {
+        private final List<PlayerRef> entityHops = new ArrayList<>();
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            entityHops.add(player);
             task.run();
         }
 

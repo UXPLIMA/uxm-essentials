@@ -344,7 +344,8 @@ class TablistRendererTest {
                 new AnimationRegistry(List.of()),
                 packets,
                 resolver,
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
 
         renderer.renderFor(player);
 
@@ -367,7 +368,8 @@ class TablistRendererTest {
                 new AnimationRegistry(List.of()),
                 packets,
                 resolver,
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
 
         // First paint: the offline name is not cached yet, so the row falls back to the native path (no packet) and an
         // async fetch is scheduled but not yet run.
@@ -399,7 +401,8 @@ class TablistRendererTest {
                 new AnimationRegistry(List.of()),
                 packets,
                 resolver,
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
 
         renderer.renderFor(player);
         scheduler.runAll();
@@ -542,7 +545,8 @@ class TablistRendererTest {
                 new AnimationRegistry(List.of()),
                 packets,
                 new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
 
         renderer.renderFor(viewer);
         // Change the filler text at the same slot: the entry id must be identical, so it is an update, not a new row.
@@ -587,7 +591,8 @@ class TablistRendererTest {
                 new AnimationRegistry(List.of()),
                 packets,
                 new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
 
         renderer.renderFor(viewer);
         // Switch to a format with no fillers: the previously-painted filler entry must be removed by its id.
@@ -612,7 +617,8 @@ class TablistRendererTest {
                 new AnimationRegistry(List.of()),
                 packets,
                 new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
 
         renderer.renderFor(viewer);
         ref.set(new TablistFormatConfig(
@@ -676,7 +682,8 @@ class TablistRendererTest {
                 new AnimationRegistry(List.of()),
                 packets,
                 resolver,
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
 
         // First paint: the offline name is not cached yet, so the filler is painted skinless and an async fetch queued.
         renderer.renderFor(viewer);
@@ -722,6 +729,7 @@ class TablistRendererTest {
                 packets,
                 new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
                 server::getOnlinePlayers,
+                new InlineScheduler(),
                 suppression);
 
         renderer.renderFor(viewer);
@@ -751,6 +759,7 @@ class TablistRendererTest {
                 packets,
                 new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
                 server::getOnlinePlayers,
+                new InlineScheduler(),
                 suppression);
 
         renderer.renderFor(viewer);
@@ -784,6 +793,7 @@ class TablistRendererTest {
                 packets,
                 new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
                 server::getOnlinePlayers,
+                new InlineScheduler(),
                 suppression);
 
         // Enter suppress mode with no fillers, then grow the layout to add a filler while still suppressed.
@@ -1027,7 +1037,8 @@ class TablistRendererTest {
                 new AnimationRegistry(List.of()),
                 packets,
                 new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
     }
 
     private TablistRenderer rendererOf(
@@ -1039,7 +1050,8 @@ class TablistRendererTest {
                 animations,
                 packets,
                 new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
-                server::getOnlinePlayers);
+                server::getOnlinePlayers,
+                new InlineScheduler());
     }
 
     private static TablistFormat format(
