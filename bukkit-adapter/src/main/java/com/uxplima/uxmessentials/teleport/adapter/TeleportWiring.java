@@ -11,11 +11,17 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.teleport.SpawnDirectories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TpSettingsCommand;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.TeleportSettingsView;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RequestExpirySweep;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.TeleportListeners;
@@ -40,6 +46,7 @@ import com.uxplima.uxmessentials.teleport.application.ResolveRespawn;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveSpawn;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
@@ -61,10 +68,17 @@ public final class TeleportWiring {
     private TeleportWiring() {}
 
     /** Build the teleport adapters and use cases from {@code ctx}, ready to register with the plugin. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence) {
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
         ConfigStore config = ctx.config();
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
@@ -85,9 +99,25 @@ public final class TeleportWiring {
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), running::get);
         RespawnListener respawnListener =
                 new RespawnListener(new ResolveRespawn(settings), spawns, homeRespawnLocator, plugin.getServer());
+        // The per-player settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder
+        // layout loader. It reads and writes the same TeleportFlags the /tptoggle and /tpauto commands do, so
+        // /tpsettings, the panel, and the commands all see one switch. The teleport entry on the /uxmess gui hub
+        // opens the same panel for an admin (gated on uxmessentials.teleport.gui).
+        GuiText guiText = new GuiText(kernel.messages());
+        TeleportSettingsView settingsView =
+                new TeleportSettingsView(guiText, kernel.scheduler(), guiLayouts, kernel.messages(), services.flags());
+        guiRegistry.register(new ManagementGuiEntry(
+                "teleport",
+                TeleportMessageKey.GUI_SETTINGS_TITLE,
+                org.bukkit.Material.ENDER_PEARL,
+                "uxmessentials.teleport.gui",
+                settingsView::open));
+        List<CommandRegistration> commands =
+                new java.util.ArrayList<>(TeleportCommands.all(services, kernel.messages()));
+        commands.add(new TpSettingsCommand(services, kernel.messages(), settingsView));
         return new Wired(
                 services,
-                TeleportCommands.all(services, kernel.messages()),
+                commands,
                 listeners(services, config, respawnListener),
                 sweep,
                 jailGate,

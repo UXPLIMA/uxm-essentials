@@ -86,6 +86,8 @@ final class DefaultResources {
             "modules/npc/gui/npc-editor.conf",
             "modules/playerwarps/gui/pwarp-list.conf",
             "modules/playerwarps/gui/pwarp-editor.conf",
+            "modules/teleport/gui/teleport-settings.conf",
+            "modules/presence/gui/presence-settings.conf",
             "modules/management/gui/hub.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");

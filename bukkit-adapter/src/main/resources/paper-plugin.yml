@@ -117,6 +117,16 @@ permissions:
   uxmessentials.tpa.auto:
     description: '/tpauto to auto-accept incoming teleport requests.'
     default: true
+  # Teleport settings panel — /tpsettings opens a per-player panel toggling the same accept-requests
+  # (/tptoggle) and auto-accept (/tpauto) flags. Self-service for every player, like the commands it mirrors.
+  uxmessentials.tpsettings.use:
+    description: '/tpsettings opens your personal teleport settings panel.'
+    default: true
+  # The teleport entry on the /uxmess gui hub gates on this node so an admin can reach a settings panel for
+  # inspection. Admin/manage tier; the player''s own panel is /tpsettings (uxmessentials.tpsettings.use).
+  uxmessentials.teleport.gui:
+    description: 'Show the teleport settings panel on the /uxmess gui hub.'
+    default: op
   uxmessentials.tpa.block:
     description: '/tpblock / /tpunblock to block a player''s requests.'
     default: true
@@ -506,6 +516,16 @@ permissions:
     default: op
   uxmessentials.vanish.see:
     description: 'See other vanished players (staff-among-staff visibility) and target them with /tp.'
+    default: op
+  # Presence settings panel — /presencesettings opens a per-player panel toggling AFK (/afk) and vanish
+  # (/vanish). Self-service for every player; the underlying vanish toggle still honours uxmessentials.vanish.use.
+  uxmessentials.presencesettings.use:
+    description: '/presencesettings opens your personal presence settings panel.'
+    default: true
+  # The presence entry on the /uxmess gui hub gates on this node so an admin can reach a settings panel for
+  # inspection. Admin/manage tier; the player''s own panel is /presencesettings (uxmessentials.presencesettings.use).
+  uxmessentials.presence.gui:
+    description: 'Show the presence settings panel on the /uxmess gui hub.'
     default: op
   uxmessentials.vanish.persist:
     description: 'Remain vanished across a relog instead of reappearing on join.'

@@ -51,7 +51,16 @@ public enum PresenceMessageKey implements MessageKey {
 
     // /staff — the vanish-aware online staff roster (holders of uxmessentials.staff.member)
     STAFF_LIST("presence.staff-list"),
-    STAFF_EMPTY("presence.staff-empty");
+    STAFF_EMPTY("presence.staff-empty"),
+
+    // /presencesettings — the per-player presence settings panel
+    GUI_SETTINGS_TITLE("presence.gui.settings.title"),
+    GUI_SETTINGS_VALUE_LORE("presence.gui.settings.value-lore"),
+    GUI_SETTINGS_BACK("presence.gui.settings.back"),
+    GUI_SETTINGS_AFK("presence.gui.settings.afk"),
+    GUI_SETTINGS_VANISH("presence.gui.settings.vanish"),
+    GUI_SETTINGS_VALUE_ON("presence.gui.settings.value-on"),
+    GUI_SETTINGS_VALUE_OFF("presence.gui.settings.value-off");
 
     private final String key;
 

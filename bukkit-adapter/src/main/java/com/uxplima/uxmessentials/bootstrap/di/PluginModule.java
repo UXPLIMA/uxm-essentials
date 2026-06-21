@@ -356,7 +356,7 @@ public final class PluginModule {
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
         if (module.id().equals(ModuleId.of("teleport"))) {
-            wireTeleport(plugin, ctx, persistence, resources, links);
+            wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
             wireWorlds(plugin, ctx, persistence, resources, links, guiLayouts);
         } else if (module.id().equals(ModuleId.of("homes"))) {
@@ -372,7 +372,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("messaging"))) {
             wireMessaging(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("presence"))) {
-            wirePresence(plugin, ctx, resources, links);
+            wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
@@ -407,8 +407,10 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
-        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx, persistence);
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
+        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx, persistence, guiLayouts, guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -709,14 +711,19 @@ public final class PluginModule {
     }
 
     private static void wirePresence(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Its
         // BukkitVisibilityApplier drives the canSee graph that messaging's /msg resolution and teleport's /tpa
         // listing already read, so the vanish soft-couple needs no extra cross-context handle wired here. The
         // AFK soft-couple does need one: presence rebinds messaging's MutableAfkStatus (captured during the
         // earlier messaging wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy
         // notice. When messaging is disabled the holder is absent and the bind is a no-op.
-        PresenceWiring.Wired wired = PresenceWiring.wire(plugin, ctx);
+        PresenceWiring.Wired wired = PresenceWiring.wire(plugin, ctx, guiLayouts, guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

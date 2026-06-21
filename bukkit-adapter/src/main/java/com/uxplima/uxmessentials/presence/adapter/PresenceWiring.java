@@ -10,6 +10,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.presence.adapter.inbound.command.PresenceCommands;
+import com.uxplima.uxmessentials.presence.adapter.inbound.command.PresenceSettingsCommand;
+import com.uxplima.uxmessentials.presence.adapter.inbound.gui.PresenceSettingsView;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.AfkPickupListener;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceActivityListener;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceLifecycleListener;
@@ -31,6 +33,10 @@ import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.presence.application.port.VisibilityApplier;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -54,9 +60,12 @@ public final class PresenceWiring {
     private PresenceWiring() {}
 
     /** Build the presence adapters and use cases from {@code plugin} and {@code ctx}, ready to register. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx) {
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, ManagementGuiRegistry guiRegistry) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(guiRegistry, "guiRegistry");
         KernelPorts kernel = ctx.kernel();
         PresenceSettings settings = new PresenceSettings(ctx.config());
         Clock clock = Clock.systemUTC();
@@ -77,7 +86,21 @@ public final class PresenceWiring {
                 settings.idleThreshold(),
                 running::get,
                 clock);
-        List<CommandRegistration> commands = PresenceCommands.all(services, kernel.messages());
+        // The per-player settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder
+        // layout loader. It reads the live presence store and flips AFK / vanish through the same use cases the
+        // /afk and /vanish commands do, so /presencesettings, the panel, and the commands all see one state. The
+        // presence entry on the /uxmess gui hub opens the same panel for an admin (gated uxmessentials.presence.gui).
+        GuiText guiText = new GuiText(kernel.messages());
+        PresenceSettingsView settingsView =
+                new PresenceSettingsView(guiText, kernel.scheduler(), guiLayouts, kernel.messages(), services, store);
+        guiRegistry.register(new ManagementGuiEntry(
+                "presence",
+                com.uxplima.uxmessentials.presence.application.PresenceMessageKey.GUI_SETTINGS_TITLE,
+                org.bukkit.Material.CLOCK,
+                "uxmessentials.presence.gui",
+                settingsView::open));
+        List<CommandRegistration> commands = new ArrayList<>(PresenceCommands.all(services, kernel.messages()));
+        commands.add(new PresenceSettingsCommand(services, kernel.messages(), settingsView));
         List<Listener> listeners = listeners(kernel, settings, services, store, visibility, notifier);
         return new Wired(commands, listeners, sweep, store, services, running, clock);
     }

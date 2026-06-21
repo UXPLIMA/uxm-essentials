@@ -77,7 +77,16 @@ public enum TeleportMessageKey implements MessageKey {
     // shared cooldown / warmup feedback owned by the teleport tiers
     COOLDOWN_ACTIVE("teleport.cooldown.active"),
     WARMUP_STARTED("teleport.warmup.started"),
-    WARMUP_CANCELLED("teleport.warmup.cancelled");
+    WARMUP_CANCELLED("teleport.warmup.cancelled"),
+
+    // /tpsettings — the per-player teleport settings panel
+    GUI_SETTINGS_TITLE("teleport.gui.settings.title"),
+    GUI_SETTINGS_VALUE_LORE("teleport.gui.settings.value-lore"),
+    GUI_SETTINGS_BACK("teleport.gui.settings.back"),
+    GUI_SETTINGS_ACCEPT("teleport.gui.settings.accept"),
+    GUI_SETTINGS_AUTO_ACCEPT("teleport.gui.settings.auto-accept"),
+    GUI_SETTINGS_VALUE_ON("teleport.gui.settings.value-on"),
+    GUI_SETTINGS_VALUE_OFF("teleport.gui.settings.value-off");
 
     private final String key;
 
