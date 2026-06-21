@@ -15,10 +15,12 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The runner is given the migration classpath locations the enabled modules own (the V1 baseline at
  * {@code db/migration}, plus each context's own location as it lands) and the live {@link DataSource}.
- * It validates the applied history against the resolved scripts and then migrates: an already-migrated
- * database is a no-op, a fresh one gets the baseline. The same scripts run on every backend — the
- * portable DDL means SQLite, MySQL and PostgreSQL converge on the same schema (the backend-parity
- * invariant). A migration failure is fatal and surfaced, never swallowed.
+ * It repairs then migrates: an already-migrated database is a no-op, a fresh one gets the baseline. The
+ * repair realigns the schema-history checksums with the resolved scripts before applying anything, so a
+ * cosmetic edit to an already-applied script (e.g. a reworded comment) self-heals on the next start
+ * instead of failing validation and blocking enable on a server that ran the old script. The same scripts
+ * run on every backend — the portable DDL means SQLite, MySQL and PostgreSQL converge on the same schema
+ * (the backend-parity invariant). A migration failure is fatal and surfaced, never swallowed.
  */
 @NullMarked
 public final class FlywayMigrationRunner {
@@ -42,7 +44,12 @@ public final class FlywayMigrationRunner {
                 .baselineOnMigrate(true)
                 .baselineVersion("0");
         try {
-            configuration.load().migrate();
+            Flyway flyway = configuration.load();
+            // Realign recorded checksums with the resolved scripts before validating, so a cosmetic edit to
+            // an already-applied migration (e.g. a reworded comment) does not brick a server that ran the
+            // old script. Then apply forward; an up-to-date database is a no-op.
+            flyway.repair();
+            flyway.migrate();
         } catch (FlywayException cause) {
             throw new PersistenceException("database migration failed for locations " + locations, cause);
         }
