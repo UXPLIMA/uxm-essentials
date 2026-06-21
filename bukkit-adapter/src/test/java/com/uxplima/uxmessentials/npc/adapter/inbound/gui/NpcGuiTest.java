@@ -117,6 +117,7 @@ class NpcGuiTest {
     private static final int TYPE_SLOT = EDITOR_SLOTS.get(2);
     private static final int EQUIPMENT_SLOT = EDITOR_SLOTS.get(3);
     private static final int GLOW_SLOT = EDITOR_SLOTS.get(7);
+    private static final int GLOW_COLOR_SLOT = EDITOR_SLOTS.get(8);
     private static final int DELETE_SLOT = 53;
     private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
     private static final int EQUIP_HEAD_SLOT = 11; // first armour slot in the equipment sub-menu (code default)
@@ -159,6 +160,7 @@ class NpcGuiTest {
                 new KeyMessages(),
                 editorLayout,
                 NpcEditorSubLayouts.codeDefault(),
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.codeDefault(),
                 (p, v) -> listView.open(p, v));
         listView = new NpcListView(guiText, scheduler, repository, services, anvil, listLayout, editorView);
     }
@@ -222,6 +224,16 @@ class NpcGuiTest {
         String chosen = clickFirstSelectorOptionOtherThan("PLAYER");
 
         assertThat(npc("alpha").entityType()).isEqualTo(chosen);
+    }
+
+    @Test
+    void glowColourUsesTheSharedGlassColourPickerNotAPaperEnum() {
+        create("alpha");
+        EditableProperty glowColour =
+                editorView.grid().propertyAt(GLOW_COLOR_SLOT, npc("alpha")).orElseThrow();
+        assertThat(glowColour)
+                .isInstanceOf(
+                        com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty.class);
     }
 
     @Test
