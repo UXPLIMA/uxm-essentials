@@ -987,6 +987,9 @@ permissions:
   uxmessentials.scoreboard.use:
     description: '/scoreboard (alias /sb) to toggle whether you see the scoreboard display.'
     default: true
+  uxmessentials.scoreboard.gui:
+    description: '/scoreboard gui (and the scoreboard entry on the /uxmess gui hub) to open the per-player scoreboard settings panel — the show/hide toggle.'
+    default: true
   # vote context (docs/permissions.md "Vote"). A Votifier-bridged vote-rewards and vote-party feature: an
   # incoming vote runs the configured per-vote rewards and advances a server-wide party counter that fires
   # party rewards for everyone once a threshold is reached (an offline voter's reward is queued and paid on
@@ -1018,6 +1021,9 @@ permissions:
   # inside the optional Discord bridge jar. uxmessentials.module.discordlink is the reload/inspect tier.
   uxmessentials.discord.link:
     description: '/discordlink (issue a code), /discordlink status (show your binding), and /discordunlink (remove it) — all act only on your own account.'
+    default: true
+  uxmessentials.discord.gui:
+    description: '/discordlink gui (and the discordlink entry on the /uxmess gui hub) to open the link-status panel — your binding, a generate-code button, and a confirm-gated unlink.'
     default: true
   # staff context (docs/permissions.md "Staff"). STAFF-MODE ONLY: the /staffmode toggle (item-loss-safe DB-backed
   # loadout swap + the VANISH/EXAMINE gadget hotbar) and staff chat. No sanctions here. The .chat node both gates

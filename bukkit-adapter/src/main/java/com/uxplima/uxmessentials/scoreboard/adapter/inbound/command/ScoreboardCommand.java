@@ -13,6 +13,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.scoreboard.adapter.inbound.gui.ScoreboardSettingsView;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderer;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
@@ -29,7 +30,8 @@ import org.jspecify.annotations.Nullable;
  * sees the scoreboard display. The {@link ToggleScoreboard} use case owns the PDC-backed bit flip, the confirmation
  * (one of the plugin's own {@link ScoreboardMessageKey} strings through the {@code MessageSink}), and the toggled
  * domain event; this handler maps the invoking player and then immediately renders or clears their board based on the
- * returned hidden flag, so the player sees the change at once rather than after a refresh tick.
+ * returned hidden flag, so the player sees the change at once rather than after a refresh tick. The {@code gui}
+ * subcommand opens the settings panel that carries the same toggle, gated on {@code uxmessentials.scoreboard.gui}.
  *
  * <p>A console source gets the players-only rejection — a board belongs to a live player. The render/clear hop runs
  * on the player's entity thread because it touches the live scoreboard.
@@ -39,26 +41,45 @@ public final class ScoreboardCommand
         implements com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.scoreboard.use";
+    private static final String GUI_PERMISSION = "uxmessentials.scoreboard.gui";
 
     private final ToggleScoreboard toggle;
     private final ScoreboardRenderer renderer;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
+    private final ScoreboardSettingsView view;
 
     public ScoreboardCommand(
-            ToggleScoreboard toggle, ScoreboardRenderer renderer, Scheduler scheduler, Messages messages) {
+            ToggleScoreboard toggle,
+            ScoreboardRenderer renderer,
+            Scheduler scheduler,
+            Messages messages,
+            ScoreboardSettingsView view) {
         this.toggle = Objects.requireNonNull(toggle, "toggle");
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.view = Objects.requireNonNull(view, "view");
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("scoreboard")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .then(Commands.literal("gui")
+                        .requires(src -> src.getSender().hasPermission(GUI_PERMISSION))
+                        .executes(this::openGui))
                 .executes(this::run)
                 .build();
+    }
+
+    private int openGui(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        view.open(sender, BukkitRefs.toRef(sender));
+        return Command.SINGLE_SUCCESS;
     }
 
     @Override

@@ -9,6 +9,7 @@ import java.util.random.RandomGeneratorFactory;
 
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import com.uxplima.uxmessentials.discordlink.adapter.inbound.command.DiscordLinkCommands;
+import com.uxplima.uxmessentials.discordlink.adapter.inbound.gui.DiscordStatusView;
 import com.uxplima.uxmessentials.discordlink.adapter.outbound.ConfirmLinkService;
 import com.uxplima.uxmessentials.discordlink.application.BeginLink;
 import com.uxplima.uxmessentials.discordlink.application.ConfirmLink;
@@ -19,6 +20,8 @@ import com.uxplima.uxmessentials.discordlink.application.port.DiscordLinkStore;
 import com.uxplima.uxmessentials.persistence.discordlink.DiscordLinkStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -42,19 +45,28 @@ public final class DiscordlinkWiring {
     private DiscordlinkWiring() {}
 
     /** Build the discord-link adapters and use cases over the kernel ports and the persistence DSL. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence) {
+    public static Wired wire(ModuleContext ctx, Persistence persistence, GuiLayouts guiLayouts) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         DiscordLinkStore store = DiscordLinkStores.jooq(persistence);
         Clock clock = Clock.systemUTC();
         BeginLink beginLink = new BeginLink(store, clock, rng(), ttl(ctx));
         ConfirmLink confirmLink = new ConfirmLink(store, clock);
+        Unlink unlink = new Unlink(store);
+        LinkStatus linkStatus = new LinkStatus(store);
         DiscordLinkNotifier notifier = new DiscordLinkNotifier(kernel.messages(), kernel.messageSink());
-        DiscordLinkServices services =
-                new DiscordLinkServices(beginLink, confirmLink, new Unlink(store), new LinkStatus(store), notifier);
+        DiscordLinkServices services = new DiscordLinkServices(beginLink, confirmLink, unlink, linkStatus, notifier);
+        // The link-status panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout
+        // loader. It surfaces only what the use cases support: a read-only status line, a generate-code button
+        // (BeginLink, told via the same chat messages /discordlink sends), and a confirm-gated unlink (Unlink).
+        // /discordlink gui and the /uxmess gui hub entry both open it.
+        GuiText guiText = new GuiText(kernel.messages());
+        DiscordStatusView view = new DiscordStatusView(
+                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), beginLink, unlink, linkStatus, notifier);
         DiscordLinkConfirmation confirmation = new ConfirmLinkService(confirmLink, kernel.playerLookup());
-        return new Wired(DiscordLinkCommands.all(services), confirmation, store);
+        return new Wired(DiscordLinkCommands.all(services, view), confirmation, store, view);
     }
 
     private static Duration ttl(ModuleContext ctx) {
@@ -67,21 +79,27 @@ public final class DiscordlinkWiring {
     }
 
     /**
-     * Everything the discord-link module contributes once wired: the Brigadier commands and the seam
-     * implementation the plugin registers into the {@code ServicesManager}. The context holds no repeating
-     * scheduled work and no in-memory store, so there is nothing to drain on stop.
+     * Everything the discord-link module contributes once wired: the Brigadier commands, the seam implementation
+     * the plugin registers into the {@code ServicesManager}, and the link-status panel the {@code /uxmess gui}
+     * hub entry opens. The context holds no repeating scheduled work and no in-memory store, so there is nothing
+     * to drain on stop.
      *
      * @param commands the Brigadier command registrations to publish
      * @param confirmation the {@code /link} confirmation seam the Discord bridge consumes
      * @param store the DB-backed link store the PAPI seam reads the player's binding from
+     * @param view the per-player link-status panel registered on the {@code /uxmess gui} hub
      */
     public record Wired(
-            List<CommandRegistration> commands, DiscordLinkConfirmation confirmation, DiscordLinkStore store) {
+            List<CommandRegistration> commands,
+            DiscordLinkConfirmation confirmation,
+            DiscordLinkStore store,
+            DiscordStatusView view) {
 
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(confirmation, "confirmation");
             Objects.requireNonNull(store, "store");
+            Objects.requireNonNull(view, "view");
         }
     }
 }

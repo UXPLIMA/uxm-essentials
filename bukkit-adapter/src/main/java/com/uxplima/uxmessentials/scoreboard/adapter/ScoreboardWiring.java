@@ -12,6 +12,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scoreboard.ScoreboardManager;
 
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.command.ScoreboardCommand;
+import com.uxplima.uxmessentials.scoreboard.adapter.inbound.gui.ScoreboardSettingsView;
 import com.uxplima.uxmessentials.scoreboard.adapter.inbound.listener.ScoreboardConnectionListener;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.PdcScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.ScoreboardRenderTask;
@@ -20,6 +21,8 @@ import com.uxplima.uxmessentials.scoreboard.application.ScoreboardNotifier;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -55,10 +58,12 @@ public final class ScoreboardWiring {
      * wearer whose vanilla name is hidden keeps the hide-team after the {@code setScoreboard} that resets the client
      * team registry.
      */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, NameVisibilityCoordinator nameVisibility) {
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, NameVisibilityCoordinator nameVisibility, GuiLayouts guiLayouts) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(nameVisibility, "nameVisibility");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
         ScoreboardSettings settings = new ScoreboardSettings(dir, kernel.log());
@@ -75,10 +80,18 @@ public final class ScoreboardWiring {
         ScoreboardRenderTask renderTask = new ScoreboardRenderTask(
                 kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
 
+        // The settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader.
+        // It carries the single show/hide toggle the /scoreboard command flips (the board a viewer sees is resolved
+        // automatically by condition + priority, so there is no board-picker to expose). The render loop reconciles
+        // the live board on its next tick from the same PDC bit. /scoreboard gui and the /uxmess gui hub both open it.
+        GuiText guiText = new GuiText(kernel.messages());
+        ScoreboardSettingsView settingsView = new ScoreboardSettingsView(
+                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), visibility, toggle);
+
         List<CommandRegistration> commands =
-                List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages()));
+                List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages(), settingsView));
         List<Listener> listeners = List.of(new ScoreboardConnectionListener(renderer, kernel.scheduler()));
-        return new Wired(commands, listeners, renderer, renderTask, running, visibility);
+        return new Wired(commands, listeners, renderer, renderTask, running, visibility, settingsView);
     }
 
     private static SidebarManager sidebarManager(NameVisibilityCoordinator nameVisibility) {
@@ -103,6 +116,7 @@ public final class ScoreboardWiring {
      * @param renderTask the self-rescheduling render timer, armed by the caller
      * @param running the flag flipped false on stop so the render timer exits
      * @param visibility the per-player "hidden" preference store, exposed for the {@code scoreboard_*} PAPI seam
+     * @param settingsView the per-player settings panel registered on the {@code /uxmess gui} hub
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -110,7 +124,8 @@ public final class ScoreboardWiring {
             ScoreboardRenderer renderer,
             ScoreboardRenderTask renderTask,
             AtomicBoolean running,
-            ScoreboardVisibilityStore visibility) {
+            ScoreboardVisibilityStore visibility,
+            ScoreboardSettingsView settingsView) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -119,6 +134,7 @@ public final class ScoreboardWiring {
             Objects.requireNonNull(renderTask, "renderTask");
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(visibility, "visibility");
+            Objects.requireNonNull(settingsView, "settingsView");
         }
 
         /** Arm the render timer. */

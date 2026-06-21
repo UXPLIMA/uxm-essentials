@@ -386,13 +386,13 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
             wirePlayerwarps(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
-            wireScoreboard(plugin, ctx, resources, links);
+            wireScoreboard(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
             wireTablist(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
-            wireDiscordlink(plugin, ctx, persistence, resources, links);
+            wireDiscordlink(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
             wireNametags(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("staff"))) {
@@ -893,14 +893,21 @@ public final class PluginModule {
     }
 
     private static void wireScoreboard(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // scoreboard persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the sidebar /
         // tablist content is config-authored under modules/scoreboard/config.conf. Its one cross-context handle is the
         // shared NameVisibilityCoordinator: the SidebarManager re-applies the vanilla-name-hide team after every board
         // switch through it (the setScoreboard team-registry reset would otherwise drop it), so a nametag wearer keeps
         // their name hidden across board switches. The renderer dogfoods uxmlib-hud's SidebarManager; the render timer
-        // on the Scheduler port is stopped and every active board torn down on disable.
-        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.nameVisibility);
+        // on the Scheduler port is stopped and every active board torn down on disable. The settings panel consumes
+        // the SP0 GUI framework (a GuiText over the shared catalog, the data-folder layout loader) and registers its
+        // /uxmess gui hub entry; /scoreboard gui opens the same single-toggle panel, gated on the GUI node.
+        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.nameVisibility, guiLayouts);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The scoreboard PAPI seam reads the same PDC-backed "hidden" bit the /scoreboard toggle flips, so the
@@ -908,6 +915,13 @@ public final class PluginModule {
         links.placeholders.scoreboard(new StoreScoreboardPlaceholders(wired.visibility()));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
+        // Register the scoreboard settings panel on the /uxmess gui hub, gated by the player-facing GUI node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "scoreboard",
+                com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey.GUI_TITLE,
+                Material.PAINTING,
+                "uxmessentials.scoreboard.gui",
+                (player, viewer) -> wired.settingsView().open(player, viewer)));
     }
 
     private static void wireTablist(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
@@ -1046,14 +1060,18 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // discordlink builds its un-cached jOOQ store over persistence.dsl() (the discord_link_pending and
         // discord_links tables ship in the persistence V16 baseline, always applied) and the /discordlink and
         // /discordunlink commands. It registers its ConfirmLink seam into the ServicesManager so the optional
         // Discord bridge — a separate jar with no compile-time link to this one — can redeem a /link code through
         // the same use case; the registration is dropped on disable so a reload re-exposes it cleanly. The bridge
-        // looks the service up once its gateway is ready and forwards nothing while it is absent.
-        DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence);
+        // looks the service up once its gateway is ready and forwards nothing while it is absent. The link-status
+        // panel consumes the SP0 GUI framework (a GuiText over the shared catalog, the data-folder layout loader)
+        // and registers its /uxmess gui hub entry; /discordlink gui opens the same panel, gated on the GUI node.
+        DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence, guiLayouts);
         wired.commands().forEach(resources::addCommand);
         // The discordlink PAPI seam reads the same DB-backed link store the /discordlink commands hold, so a
         // placeholder matches the binding the player redeemed (and answers for an offline player too).
@@ -1066,6 +1084,13 @@ public final class PluginModule {
                         plugin,
                         org.bukkit.plugin.ServicePriority.Normal);
         resources.onClose(() -> plugin.getServer().getServicesManager().unregister(wired.confirmation()));
+        // Register the discordlink link-status panel on the /uxmess gui hub, gated by the player-facing GUI node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "discordlink",
+                com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey.GUI_TITLE,
+                Material.PLAYER_HEAD,
+                "uxmessentials.discord.gui",
+                (player, viewer) -> wired.view().open(player, viewer)));
     }
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */

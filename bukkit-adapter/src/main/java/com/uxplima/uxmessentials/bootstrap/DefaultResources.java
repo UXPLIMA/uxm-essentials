@@ -94,6 +94,8 @@ final class DefaultResources {
             "modules/messaging/gui/mailbox.conf",
             "modules/communication/gui/communication-admin.conf",
             "modules/communication/gui/announcer-list.conf",
+            "modules/discordlink/gui/discord-status.conf",
+            "modules/scoreboard/gui/scoreboard-settings.conf",
             "modules/management/gui/hub.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");

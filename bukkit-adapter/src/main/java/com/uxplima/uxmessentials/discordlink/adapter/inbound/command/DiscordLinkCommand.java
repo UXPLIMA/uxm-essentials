@@ -12,6 +12,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordLinkServices;
+import com.uxplima.uxmessentials.discordlink.adapter.inbound.gui.DiscordStatusView;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.discordlink.domain.ConfirmedLink;
 import com.uxplima.uxmessentials.discordlink.domain.LinkCode;
@@ -21,17 +22,23 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /discordlink}: issue a one-time link code and tell the player how to redeem it in Discord; the
- * {@code status} subcommand reports the player's current binding instead. Issuing runs the {@code BeginLink} use
- * case and the status path the {@code LinkStatus} use case; the actual redemption happens in Discord via the
- * bridge's {@code /link} slash command, not here. The {@code uxmessentials.discord.link} node guards both paths.
+ * {@code status} subcommand reports the player's current binding instead, and the {@code gui} subcommand opens
+ * the link-status panel. Issuing runs the {@code BeginLink} use case, the status path the {@code LinkStatus} use
+ * case, and the panel surfaces the same use cases; the actual redemption happens in Discord via the bridge's
+ * {@code /link} slash command, not here. The {@code uxmessentials.discord.link} node guards every path, and the
+ * GUI subcommand additionally requires {@code uxmessentials.discord.gui}.
  */
 @NullMarked
 public final class DiscordLinkCommand extends DiscordLinkCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.discord.link";
+    private static final String GUI_PERMISSION = "uxmessentials.discord.gui";
 
-    public DiscordLinkCommand(DiscordLinkServices services) {
+    private final DiscordStatusView view;
+
+    public DiscordLinkCommand(DiscordLinkServices services, DiscordStatusView view) {
         super(services);
+        this.view = java.util.Objects.requireNonNull(view, "view");
     }
 
     @Override
@@ -39,6 +46,9 @@ public final class DiscordLinkCommand extends DiscordLinkCommandSupport implemen
         return Commands.literal("discordlink")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.literal("status").executes(this::status))
+                .then(Commands.literal("gui")
+                        .requires(src -> src.getSender().hasPermission(GUI_PERMISSION))
+                        .executes(this::openGui))
                 .executes(this::begin)
                 .build();
     }
@@ -46,6 +56,15 @@ public final class DiscordLinkCommand extends DiscordLinkCommandSupport implemen
     @Override
     public String description() {
         return "Generate a code to link your account to Discord.";
+    }
+
+    private int openGui(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        view.open(sender, ref(sender));
+        return Command.SINGLE_SUCCESS;
     }
 
     private int begin(CommandContext<CommandSourceStack> ctx) {

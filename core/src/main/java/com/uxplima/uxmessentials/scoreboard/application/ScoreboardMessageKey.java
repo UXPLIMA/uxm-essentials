@@ -16,7 +16,15 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 public enum ScoreboardMessageKey implements MessageKey {
     SCOREBOARD_SHOWN("scoreboard.shown"),
     SCOREBOARD_HIDDEN("scoreboard.hidden"),
-    SCOREBOARD_PLAYERS_ONLY("scoreboard.players-only");
+    SCOREBOARD_PLAYERS_ONLY("scoreboard.players-only"),
+
+    // /scoreboard gui — the per-player display settings panel
+    GUI_TITLE("scoreboard.gui.title"),
+    GUI_VALUE_LORE("scoreboard.gui.value-lore"),
+    GUI_BACK("scoreboard.gui.back"),
+    GUI_VISIBILITY("scoreboard.gui.visibility"),
+    GUI_VALUE_SHOWN("scoreboard.gui.value-shown"),
+    GUI_VALUE_HIDDEN("scoreboard.gui.value-hidden");
 
     private final String key;
 
