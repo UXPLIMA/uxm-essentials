@@ -4,9 +4,11 @@ import java.util.Objects;
 
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.persistence.network.NetworkTransports;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.network.BusTransport;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -45,10 +47,39 @@ public final class BusWiring {
             return new Wired(Bus.disabled(network.serverId()), null);
         }
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
-        PluginMessagingTransport transport =
-                new PluginMessagingTransport(plugin, scheduler, network.channel(), network.outboundQueueSize());
+        BusTransport transport = selectTransport(plugin, network, scheduler, log);
         BusCore core = new BusCore(transport, network.serverId(), registry, log);
         return new Wired(new Bus(core, registry), new Lifecycle(core, log, network));
+    }
+
+    /**
+     * Build the transport(s) named by {@code network.transport}: the proxy plugin-messaging carrier, the Redis
+     * pub/sub carrier (built through the persistence-adapter factory so the bukkit-adapter never names a Jedis
+     * type), or a {@link CompositeBusTransport} fanning over both. An unrecognised value already fell back to
+     * {@code velocity} in {@link NetworkConfig}; this logs the WARN so the operator sees their typo without the
+     * enable crashing.
+     */
+    private static BusTransport selectTransport(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
+        if (!network.transportRecognized()) {
+            log.warn(
+                    "unknown network.transport value; falling back to {}. valid: velocity | redis | both",
+                    network.transport().name().toLowerCase(java.util.Locale.ROOT));
+        }
+        return switch (network.transport()) {
+            case VELOCITY -> pluginMessaging(plugin, network, scheduler);
+            case REDIS -> redis(network, scheduler, log);
+            case BOTH ->
+                new CompositeBusTransport(pluginMessaging(plugin, network, scheduler), redis(network, scheduler, log));
+        };
+    }
+
+    private static BusTransport pluginMessaging(Plugin plugin, NetworkConfig network, Scheduler scheduler) {
+        return new PluginMessagingTransport(plugin, scheduler, network.channel(), network.outboundQueueSize());
+    }
+
+    private static BusTransport redis(NetworkConfig network, Scheduler scheduler, Logger log) {
+        NetworkConfig.Redis redis = network.redis();
+        return NetworkTransports.redis(redis.host(), redis.port(), redis.password(), redis.channel(), scheduler, log);
     }
 
     /**
