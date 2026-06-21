@@ -25,9 +25,10 @@ import org.jspecify.annotations.Nullable;
  *   slots 41..53  -> a non-interactive filler pane (a labelled gray glass pane)
  * </pre>
  *
- * <p>{@link #seed} copies the live player's items <em>into</em> the menu (clones, so the menu never aliases the
- * live stacks); {@link #writeBack} copies the menu's editable region back <em>onto</em> the live player. The two
- * are mirror images, which keeps the layout in exactly one place and lets a test reason about conservation. The
+ * <p>{@link #fromPlayer} snapshots the live player's items into a flat array and {@link #seedSlots} copies that
+ * array <em>into</em> the menu (both clone, so the menu never aliases the live stacks); {@link #writeBack} copies
+ * the menu's editable region back <em>onto</em> the live player. These are mirror images, which keeps the layout in
+ * exactly one place and lets a test reason about conservation. The
  * armour order matches Bukkit's {@link PlayerInventory#getArmorContents()} (index 0 boots … 3 helmet).
  */
 @NullMarked

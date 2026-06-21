@@ -7,6 +7,8 @@ import java.util.Objects;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerListener;
@@ -90,10 +92,11 @@ public final class PlayerstateWiring {
         StateReconciler reconciler = new BukkitStateReconciler(kernel.scheduler());
         PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler());
         InvseeView invseeView = new InvseeView(kernel.messages(), kernel.scheduler());
+        EnderseeView enderseeView = new EnderseeView(kernel.messages(), kernel.scheduler());
         OfflinePlayerStorage offlineStorage = new NmsOfflinePlayerStorage(kernel.log());
         OfflineContainerView offlineView =
                 new OfflineContainerView(kernel.messages(), kernel.scheduler(), offlineStorage);
-        InventoryViewer inventoryViewer = new BukkitInventoryViewer(kernel.scheduler(), invseeView, offlineView);
+        InventoryViewer inventoryViewer = new BukkitInventoryViewer(invseeView, enderseeView, offlineView);
         NearbyPlayers nearby = new BukkitNearbyPlayers();
         PlayerInfo info = new BukkitPlayerInfo();
         PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
@@ -107,10 +110,11 @@ public final class PlayerstateWiring {
         List<Listener> listeners = List.of(
                 new PlayerStateListener(store, reconciler),
                 new InvseeListener(invseeView),
+                new EnderseeListener(enderseeView),
                 new OfflineContainerListener(offlineView),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
                 new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
-        return new Wired(commands, listeners, invseeView, offlineView, services, store, info);
+        return new Wired(commands, listeners, invseeView, enderseeView, offlineView, services, store, info);
     }
 
     private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {
@@ -172,6 +176,7 @@ public final class PlayerstateWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
      * @param invseeView the online invsee menu, held so {@code stop()} flushes every still-open view
+     * @param enderseeView the online endersee menu, held so {@code stop()} flushes every still-open view
      * @param offlineView the offline invsee/endersee menus, held so {@code stop()} flushes every still-open view
      * @param services the constructed use cases, exposing {@code openContainer} cross-context for the staff EXAMINE gadget
      * @param store the in-memory snapshot map, read by the placeholder seam for the god flag
@@ -181,6 +186,7 @@ public final class PlayerstateWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             InvseeView invseeView,
+            EnderseeView enderseeView,
             OfflineContainerView offlineView,
             PlayerStateServices services,
             PlayerStateStore store,
@@ -190,6 +196,7 @@ public final class PlayerstateWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(invseeView, "invseeView");
+            Objects.requireNonNull(enderseeView, "enderseeView");
             Objects.requireNonNull(offlineView, "offlineView");
             Objects.requireNonNull(services, "services");
             Objects.requireNonNull(store, "store");
@@ -199,6 +206,7 @@ public final class PlayerstateWiring {
         /** Reconcile every still-open invsee/endersee menu back onto its target. Called on module stop. */
         public void stop() {
             invseeView.flushAll();
+            enderseeView.flushAll();
             offlineView.flushAll();
         }
     }
