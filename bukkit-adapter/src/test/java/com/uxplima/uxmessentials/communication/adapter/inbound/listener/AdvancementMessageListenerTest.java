@@ -221,6 +221,29 @@ class AdvancementMessageListenerTest {
     }
 
     @Test
+    void vanishCheckAndBroadcastResolveOnTheGlobalRegionThreadWithoutAMarshal() {
+        // The event fires on the earner's region thread; the vanish read (a cross-region canSee scan) and the
+        // broadcast decision must hop once onto the global thread, where the predicate then runs inline — no nested
+        // CompletableFuture.get marshal of its own. The predicate records the thread-ownership it observed.
+        RecordingScheduler scheduler = new RecordingScheduler();
+        boolean[] testedOnGlobal = {false};
+        Predicate<Player> vanished = p -> {
+            testedOnGlobal[0] = scheduler.onGlobalThread();
+            return false;
+        };
+        AdvancementNoticeConfig cfg = enabled("{player} {title}");
+
+        PlayerAdvancementDoneEvent event =
+                fire(cfg, vanished, advancement("minecraft:end/kill_dragon", true, "The End?", ""), scheduler);
+
+        assertThat(scheduler.globalHops).isOne(); // exactly one hop carried both the vanish test and the broadcast
+        assertThat(testedOnGlobal[0]).isTrue(); // the vanish read ran on the global thread, not the firing thread
+        // The vanilla line is cleared on the firing thread, and the broadcast fired from the single global hop.
+        assertThat(event.message()).isNull();
+        assertThat(PLAIN.serialize(received(viewer))).isEqualTo("Earner The End?");
+    }
+
+    @Test
     void optedOutViewerDoesNotReceiveTheNotice() {
         optOut.optOut(viewer.getUniqueId());
         AdvancementNoticeConfig cfg = enabled("{player} {title}");
@@ -290,9 +313,17 @@ class AdvancementMessageListenerTest {
 
     private PlayerAdvancementDoneEvent fire(
             AdvancementNoticeConfig cfg, Predicate<Player> vanished, Advancement advancement) {
+        return fire(cfg, vanished, advancement, new RecordingScheduler());
+    }
+
+    private PlayerAdvancementDoneEvent fire(
+            AdvancementNoticeConfig cfg,
+            Predicate<Player> vanished,
+            Advancement advancement,
+            RecordingScheduler scheduler) {
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
         AdvancementMessageListener listener =
-                new AdvancementMessageListener(() -> cfg, channels, optOut, vanished, Locale.ENGLISH);
+                new AdvancementMessageListener(() -> cfg, channels, optOut, vanished, scheduler, Locale.ENGLISH);
         PlayerAdvancementDoneEvent event = new PlayerAdvancementDoneEvent(earner, advancement, Component.text(VANILLA));
         listener.onAdvancement(event);
         return event;
@@ -374,6 +405,53 @@ class AdvancementMessageListenerTest {
         @Override
         public void forget(PlayerRef who) {
             out.remove(who.uuid());
+        }
+    }
+
+    /**
+     * Runs {@code onGlobal} inline while counting the hops and reporting that the task body is on the global thread,
+     * so a test can assert the vanish read was marshalled there rather than run on the firing thread. The other hops
+     * (none exercised on the listener's own scheduler) simply run inline.
+     */
+    private static final class RecordingScheduler implements Scheduler {
+        private int globalHops;
+        private boolean onGlobal;
+
+        @Override
+        public boolean onGlobalThread() {
+            return onGlobal;
+        }
+
+        @Override
+        public void onGlobal(Runnable task) {
+            globalHops++;
+            boolean previous = onGlobal;
+            onGlobal = true;
+            try {
+                task.run();
+            } finally {
+                onGlobal = previous;
+            }
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
         }
     }
 
