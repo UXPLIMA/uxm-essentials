@@ -31,7 +31,18 @@ public final class WarpRepositories {
      * the invalidation seam can reach it.
      */
     public static CachedWarpRepository cachedConcrete(Persistence persistence) {
+        return cachedConcrete(persistence, java.util.UUID::toString);
+    }
+
+    /**
+     * As {@link #cachedConcrete(Persistence)} but resolving each warp owner's display name through {@code names}
+     * (an adapter-supplied uuid-to-name profile lookup), so the warp carries the live owner name instead of the
+     * uuid string. The display wiring passes a real resolver; non-display callers keep the uuid default above.
+     */
+    public static CachedWarpRepository cachedConcrete(
+            Persistence persistence, java.util.function.Function<java.util.UUID, String> names) {
         Objects.requireNonNull(persistence, "persistence");
-        return new CachedWarpRepository(new JooqWarpRepository(persistence.dsl()));
+        Objects.requireNonNull(names, "names");
+        return new CachedWarpRepository(new JooqWarpRepository(persistence.dsl(), names));
     }
 }

@@ -20,7 +20,18 @@ public final class PlayerWarpRepositories {
 
     /** A cached jOOQ {@link PlayerWarpRepository} over the shared persistence DSL. */
     public static PlayerWarpRepository cached(Persistence persistence) {
+        return cached(persistence, java.util.UUID::toString);
+    }
+
+    /**
+     * As {@link #cached(Persistence)} but resolving each warp owner's display name through {@code names} (an
+     * adapter-supplied uuid-to-name profile lookup), so the player-warp carries the live owner name instead of
+     * the uuid string. The display wiring passes a real resolver; non-display callers keep the uuid default.
+     */
+    public static PlayerWarpRepository cached(
+            Persistence persistence, java.util.function.Function<java.util.UUID, String> names) {
         Objects.requireNonNull(persistence, "persistence");
-        return new CachedPlayerWarpRepository(new JooqPlayerWarpRepository(persistence.dsl()));
+        Objects.requireNonNull(names, "names");
+        return new CachedPlayerWarpRepository(new JooqPlayerWarpRepository(persistence.dsl(), names));
     }
 }

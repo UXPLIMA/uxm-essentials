@@ -52,6 +52,32 @@ class JooqWarpRepositoryTest {
     }
 
     @Test
+    void resolvesTheOwnerDisplayNameThroughTheProvidedResolver() {
+        UUID ownerId = UUID.randomUUID();
+        JooqWarpRepository resolving =
+                new JooqWarpRepository(persistence.dsl(), uuid -> uuid.equals(ownerId) ? "Alice" : uuid.toString());
+        resolving.save(Warp.create(
+                WarpName.of("shop"),
+                Position.of(WORLD, 1, 2, 3),
+                new PlayerRef(ownerId, "ignored-at-write"),
+                Instant.ofEpochMilli(1_000)));
+
+        Warp loaded = resolving.find(WarpName.of("shop")).orElseThrow();
+
+        assertThat(loaded.owner().uuid()).isEqualTo(ownerId);
+        assertThat(loaded.owner().name()).isEqualTo("Alice");
+    }
+
+    @Test
+    void defaultRepositoryLeavesTheOwnerNameAsTheUuid() {
+        repository.save(warp("shop", 1, 2, 3));
+
+        Warp loaded = repository.find(WarpName.of("shop")).orElseThrow();
+
+        assertThat(loaded.owner().name()).isEqualTo(owner.uuid().toString());
+    }
+
+    @Test
     void savesAndFindsAWarpRoundTrip() {
         repository.save(warp("shop", 10, 64, 20));
 

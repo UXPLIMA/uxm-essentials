@@ -86,7 +86,9 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(anvil, "anvil");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         KernelPorts kernel = ctx.kernel();
-        PlayerWarpRepository repository = PlayerWarpRepositories.cached(persistence);
+        PlayerWarpRepository repository = PlayerWarpRepositories.cached(
+                persistence,
+                com.uxplima.uxmessentials.shared.adapter.outbound.lookup.PlayerNames.resolver(kernel.playerLookup()));
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(kernel.messages(), kernel.messageSink());
         com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry registry = teleportRegistry != null
                 ? teleportRegistry

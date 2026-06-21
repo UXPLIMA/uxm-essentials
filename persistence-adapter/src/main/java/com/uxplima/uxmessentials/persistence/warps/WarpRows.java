@@ -23,9 +23,9 @@ import org.jooq.Record;
  * {@link WarpCost#free()} cost and an empty {@link Optional} respectively. This class is the single place
  * that translation lives.
  *
- * <p>The owner's display name is not persisted (only the uuid is), so a {@link Warp} rebuilt from a row
- * carries the owner uuid with the uuid string as a placeholder name — {@code /warpinfo} renders the owner
- * from this attribution, and a live name is resolved by the adapter when one is available.
+ * <p>The owner's display name is not persisted (only the uuid is), so the repository hands in a uuid-to-name
+ * resolver (an adapter-supplied profile lookup); the rebuilt {@link Warp} then carries the live owner name so
+ * {@code /warpinfo}, the GUI, and the placeholders render the name rather than a raw uuid.
  */
 final class WarpRows {
 
@@ -36,13 +36,13 @@ final class WarpRows {
 
     private WarpRows() {}
 
-    /** Rebuild a {@link Warp} from a queried row. */
-    static Warp toWarp(Record row) {
+    /** Rebuild a {@link Warp} from a queried row, resolving the owner's display name through {@code names}. */
+    static Warp toWarp(Record row, java.util.function.Function<UUID, String> names) {
         WorldRef world = new WorldRef(UUID.fromString(row.get(WARPS.WORLD)), row.get(WARPS.WORLD_NAME));
         Position position = new Position(
                 world, row.get(WARPS.X), row.get(WARPS.Y), row.get(WARPS.Z), row.get(WARPS.YAW), row.get(WARPS.PITCH));
         UUID ownerUuid = UUID.fromString(row.get(WARPS.OWNER));
-        PlayerRef owner = new PlayerRef(ownerUuid, ownerUuid.toString());
+        PlayerRef owner = new PlayerRef(ownerUuid, names.apply(ownerUuid));
         return new Warp(
                 WarpName.of(row.get(WARPS.NAME)),
                 position,

@@ -22,8 +22,16 @@ import org.jooq.DSLContext;
  */
 public final class JooqWarpRepository extends JooqRepository implements WarpRepository {
 
+    private final java.util.function.Function<java.util.UUID, String> names;
+
+    /** Backward-compatible: no profile resolver, so the owner name stays the uuid string (non-display callers). */
     public JooqWarpRepository(DSLContext dsl) {
+        this(dsl, java.util.UUID::toString);
+    }
+
+    public JooqWarpRepository(DSLContext dsl, java.util.function.Function<java.util.UUID, String> names) {
         super(dsl);
+        this.names = Objects.requireNonNull(names, "names");
     }
 
     @Override
@@ -32,7 +40,7 @@ public final class JooqWarpRepository extends JooqRepository implements WarpRepo
         return read(dsl -> dsl.selectFrom(WARPS)
                 .where(WARPS.NAME.eq(name.value()))
                 .fetchOptional()
-                .map(WarpRows::toWarp));
+                .map(row -> WarpRows.toWarp(row, names)));
     }
 
     @Override
@@ -40,7 +48,7 @@ public final class JooqWarpRepository extends JooqRepository implements WarpRepo
         return read(dsl -> dsl.selectFrom(WARPS)
                 .orderBy(WARPS.CREATED_AT.asc(), WARPS.NAME.asc())
                 .fetch()
-                .map(WarpRows::toWarp));
+                .map(row -> WarpRows.toWarp(row, names)));
     }
 
     @Override

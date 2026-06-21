@@ -89,7 +89,9 @@ public final class WarpsWiring {
         KernelPorts kernel = ctx.kernel();
         // The cached repository is the read accelerator; the bus listener drops the cached set when a peer
         // reports a change, and the broadcasting decorator announces this backend's own writes to peers.
-        CachedWarpRepository cached = WarpRepositories.cachedConcrete(persistence);
+        CachedWarpRepository cached = WarpRepositories.cachedConcrete(
+                persistence,
+                com.uxplima.uxmessentials.shared.adapter.outbound.lookup.PlayerNames.resolver(kernel.playerLookup()));
         bus.registry().register(WarpSync.listener(cached));
         // Warm the in-memory warp set once on enable so every later /warp resolve, gate, and tab-complete is
         // served from memory — never a synchronous SQLite read on the command thread. This is the only load on
