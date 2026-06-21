@@ -48,6 +48,11 @@ public final class BuiltinTokens {
         String out = source;
         out = replace(out, "{player}", player::getName);
         out = replace(out, "{displayname}", () -> displayName(player));
+        // The {online} token reads only the roster size, never a player's mutable entity state. This pass runs in
+        // the scoreboard/tablist renderers, which already hold the live viewer on its own region thread, and on the
+        // PlaceholderAPI bridge thread for the metric tokens — neither is the global thread, but a global marshal is
+        // both unnecessary (a torn count during a join/quit self-corrects on the next HUD refresh) and unsafe off a
+        // region tick. So read the count inline rather than hop.
         out = replace(
                 out,
                 "{online}",

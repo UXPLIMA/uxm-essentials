@@ -57,13 +57,13 @@ import org.junit.jupiter.api.io.TempDir;
  * filesystem, with the tick boundary collapsed: a synchronous {@link Scheduler} double runs every
  * {@code async}/{@code onGlobal}/{@code onEntity} body inline, so a single call drives the whole flow.
  *
- * <p>MockBukkit's {@code ServerMock} cannot back these tests: {@code getWorldContainer()} and
- * {@code WorldMock#save()} both throw {@code UnimplementedOperationException}. The world container has
- * to be a {@link TempDir} we control, and {@code backup} calls {@code World#save()} on the region
- * thread — so {@link Server}, {@link World} and {@link Player} are Mockito doubles here. The
- * load-bearing coverage is the {@code WorldArchiver} (zip/unzip/delete) and the orchestration order,
- * both of which run live; {@code World#save()} is a verified no-op and {@code getPlayers()} returns
- * the doubles we seed.
+ * <p>MockBukkit's {@code ServerMock} cannot back these tests: {@code getWorldContainer()} throws
+ * {@code UnimplementedOperationException}, so the world container has to be a {@link TempDir} we control
+ * and {@link Server}, {@link World} and {@link Player} are Mockito doubles here. Backup deliberately does
+ * NOT call {@code World#save()} (a full-world flush has no single owning thread on Folia) — it copies the
+ * on-disk, auto-saved world folder — so the backup test below loads no world at all and still produces a
+ * complete archive. The load-bearing coverage is the {@code WorldArchiver} (zip/unzip/delete) and the
+ * orchestration order, both of which run live; {@code getPlayers()} returns the doubles we seed.
  */
 class BukkitWorldArchiveTest {
 
@@ -100,11 +100,16 @@ class BukkitWorldArchiveTest {
             throws IOException {
         seedWorldFolder(container, "level.dat", "level-bytes");
         seedWorldFolder(container, "region/r.0.0.mca", "region-bytes");
+        // The world is loaded, but backup must NOT flush it with World#save() — a full-world save has no single
+        // owning thread on Folia. It copies the on-disk, auto-saved folder instead, so save() is never called.
+        World live = world(new ArrayList<>());
+        when(server.getWorld("arena")).thenReturn(live);
         BukkitWorldArchive archive = archive(container, dataFolder, settings("backups/worlds", 10));
 
         Result<BackupId, WorldError> result = archive.backup(INITIATOR, WORLD);
 
         assertThat(result.isOk()).isTrue();
+        org.mockito.Mockito.verify(live, org.mockito.Mockito.never()).save();
         BackupId id = result.orElseThrow();
         Path zip = dataFolder.resolve("backups/worlds/arena").resolve(id.value() + ".zip");
         assertThat(Files.isRegularFile(zip)).isTrue();

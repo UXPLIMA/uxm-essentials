@@ -43,10 +43,12 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The {@link WorldArchive} adapter: orchestrates a world's backup and restore across the tick boundary.
  *
- * <p>A backup runs save → zip → prune: the live {@code World#save()} happens on the region thread (the
- * use case calls {@link #backup} via the command's {@code onGlobal}), then the long-running zip and the
- * prune of older archives run off-tick through the {@code Scheduler}'s async context, and the completion
- * notification bounces back onto the operator's entity thread.
+ * <p>A backup runs zip → prune: it copies the on-disk world folder (kept current by Paper/Folia's periodic
+ * auto-save) rather than forcing a synchronous {@code World#save()}, because a full-world save has no single
+ * owning thread on Folia — each region of a world is owned by a different region thread, so flushing it from
+ * the command's {@code onGlobal} hop is unsafe. The long-running zip and the prune of older archives run
+ * off-tick through the {@code Scheduler}'s async context, and the completion notification bounces back onto
+ * the operator's entity thread.
  *
  * <p>A restore is the dangerous half — it deletes the world folder — so it validates before it destroys:
  * the archive file must exist and the world must be managed (needed to reload it with its spec) <em>before</em>
@@ -109,10 +111,11 @@ public final class BukkitWorldArchive implements WorldArchive {
         Objects.requireNonNull(initiator, "initiator");
         Objects.requireNonNull(world, "world");
         BackupId id = new BackupId(STAMP.format(Instant.now()));
-        World w = server.getWorld(world.value());
-        if (w != null) {
-            w.save(); // region thread — flush the live world to disk before we zip it
-        }
+        // The backup copies the on-disk world folder, which Paper/Folia keeps current through its periodic
+        // auto-save. We deliberately do NOT call World#save() here: a full-world save has no single owning thread
+        // on Folia (each of a world's regions is owned by a different region thread), so flushing it from this
+        // onGlobal hop is unsafe. Relying on the auto-saved folder keeps the backup Folia-safe; the small window
+        // of unsaved chunks is the same staleness any on-disk copy of a live world carries.
         scheduler.async(() -> doBackup(initiator, world, id));
         return Result.ok(id);
     }

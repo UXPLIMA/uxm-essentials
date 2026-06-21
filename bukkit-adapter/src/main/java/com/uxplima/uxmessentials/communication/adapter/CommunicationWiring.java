@@ -2,10 +2,14 @@ package com.uxplima.uxmessentials.communication.adapter;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bukkit.entity.Player;
@@ -42,6 +46,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
@@ -129,7 +135,16 @@ public final class CommunicationWiring {
                 settings));
         commands.add(new CommunicationGuiCommand(adminView, kernel.messages()));
         List<Listener> listeners = listeners(
-                services, registry, infoSender, settings, chatLock, notifier, channelBroadcaster, optOutStore);
+                services,
+                registry,
+                infoSender,
+                settings,
+                chatLock,
+                notifier,
+                channelBroadcaster,
+                optOutStore,
+                kernel.scheduler(),
+                kernel.log());
         return new Wired(List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminView);
     }
 
@@ -171,7 +186,9 @@ public final class CommunicationWiring {
             ChatLock chatLock,
             CommunicationNotifier notifier,
             ChannelBroadcaster channelBroadcaster,
-            BroadcastOptOutStore optOutStore) {
+            BroadcastOptOutStore optOutStore,
+            Scheduler scheduler,
+            Logger log) {
         return List.of(
                 new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings),
                 new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
@@ -181,10 +198,13 @@ public final class CommunicationWiring {
                         settings::advancementNotices,
                         channelBroadcaster,
                         optOutStore,
-                        CommunicationWiring::isVanished,
+                        earner -> isVanished(earner, scheduler, log),
                         Locale.ENGLISH),
                 new ChatLockListener(chatLock, notifier));
     }
+
+    /** A vanish probe that times out to {@code false} (not vanished) rather than hanging the advancement listener. */
+    private static final Duration VANISH_PROBE_TIMEOUT = Duration.ofSeconds(2);
 
     /**
      * Whether {@code earner} is currently vanished, derived from Bukkit's own {@code Player#canSee} visibility graph —
@@ -194,8 +214,44 @@ public final class CommunicationWiring {
      * presence is disabled nobody is hidden, {@code canSee} is always true, and the earner is never resolved as
      * vanished, so the feature degrades to "broadcast everyone's advancement" without depending on presence directly.
      * A solo earner (no other online player) is never vanished here — there is no one to be hidden from.
+     *
+     * <p>{@code PlayerAdvancementDoneEvent} fires on the earner's own region thread, but the probe enumerates the
+     * whole roster and reads every other player's {@code canSee} visibility — a cross-region read that tears on Folia
+     * when run off the global region. So the probe marshals onto the global thread (where the roster and the
+     * visibility graph are consistently readable) and waits for the boolean, running inline when the caller already
+     * owns the global thread to avoid a self-deadlock. A marshal that times out resolves to "not vanished", so a
+     * stalled global thread degrades to broadcasting the advancement rather than dropping it.
      */
-    private static boolean isVanished(Player earner) {
+    private static boolean isVanished(Player earner, Scheduler scheduler, Logger log) {
+        if (scheduler.onGlobalThread()) {
+            return probeVanished(earner);
+        }
+        CompletableFuture<Boolean> probe = new CompletableFuture<>();
+        scheduler.onGlobal(() -> {
+            try {
+                probe.complete(probeVanished(earner));
+            } catch (RuntimeException failure) {
+                probe.completeExceptionally(failure);
+            }
+        });
+        try {
+            return probe.get(VANISH_PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (TimeoutException timeout) {
+            log.warn(
+                    "advancement vanish probe timed out after {}ms; treating earner as visible",
+                    VANISH_PROBE_TIMEOUT.toMillis());
+            return false;
+        } catch (java.util.concurrent.ExecutionException failure) {
+            log.error("advancement vanish probe failed; treating earner as visible", failure);
+            return false;
+        }
+    }
+
+    /** The roster scan itself — only legal on the global region thread, where {@code canSee} reads do not tear. */
+    private static boolean probeVanished(Player earner) {
         for (Player other : earner.getServer().getOnlinePlayers()) {
             if (!other.equals(earner) && !other.canSee(earner)) {
                 return true;

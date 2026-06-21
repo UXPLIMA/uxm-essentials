@@ -133,7 +133,7 @@ public final class VoteWiring {
         VoteRepository repository = VoteSync.repository(cachedRepository, bus.publisher());
         VoteNotifier notifier = new VoteNotifier(kernel.messages(), kernel.messageSink());
         BukkitRewardDispatcher dispatcher = new BukkitRewardDispatcher(kernel.scheduler());
-        VoteAudience audience = new BukkitVoteAudience();
+        VoteAudience audience = new BukkitVoteAudience(kernel.scheduler());
         int offlineLimit = Math.max(0, ctx.config().getInt("offline-vote-limit", 0));
         RewardApplier applier =
                 new BukkitRewardApplier(repository, dispatcher, kernel.scheduler(), offlineLimit, kernel.log());

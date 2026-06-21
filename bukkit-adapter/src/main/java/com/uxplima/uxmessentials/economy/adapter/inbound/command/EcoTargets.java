@@ -30,7 +30,13 @@ final class EcoTargets {
 
     private EcoTargets() {}
 
-    /** A snapshot of the online players as {@link PlayerRef}s; read on the tick thread by the command. */
+    /**
+     * A snapshot of the online players as {@link PlayerRef}s. Called only from the {@code /eco} and {@code /payall}
+     * Brigadier handlers, which Paper dispatches on the global region thread — the one thread where
+     * {@code Bukkit.getOnlinePlayers()} is consistently readable on Folia — so the enumeration is already on the
+     * correct thread and needs no {@code onGlobal} hop. The refs are handed to the off-tick worker as an immutable
+     * list so the DB writes never touch the roster off-thread.
+     */
     static List<PlayerRef> online() {
         List<PlayerRef> refs = new ArrayList<>();
         for (Player player : Bukkit.getOnlinePlayers()) {

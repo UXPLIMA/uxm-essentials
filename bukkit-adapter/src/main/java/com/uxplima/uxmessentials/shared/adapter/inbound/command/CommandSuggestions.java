@@ -41,6 +41,10 @@ public final class CommandSuggestions {
      * offline names — the suggestion only surfaces online matches, but the argument still parses anything typed.
      */
     public static SuggestionProvider<CommandSourceStack> onlinePlayers() {
+        // Brigadier resolves suggestions while the player types, off any region tick thread, so an onGlobal hop is
+        // wrong here — there is no tick to marshal back to and a synchronous wait would stall the type-ahead. The
+        // enumeration reads only player names (never mutable entity state); a roster that shifts mid-keystroke at
+        // worst offers or omits one stale name for that keystroke, harmless for a completion list.
         return (ctx, builder) -> {
             String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
             for (Player online : Bukkit.getOnlinePlayers()) {
