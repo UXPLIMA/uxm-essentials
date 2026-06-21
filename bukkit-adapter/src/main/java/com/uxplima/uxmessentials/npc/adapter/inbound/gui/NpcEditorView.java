@@ -416,10 +416,11 @@ public final class NpcEditorView {
     }
 
     private EditableProperty moveProperty(NpcName name) {
+        String hint = current(name).map(npc -> locationHint(npc.location())).orElse("");
         return new NpcActionButton(
                 NpcMessageKey.NPC_GUI_PROP_MOVE,
                 Material.COMPASS,
-                "",
+                hint,
                 (player, reopen) -> {
                     Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
                     scheduler.async(() -> {
@@ -428,6 +429,11 @@ public final class NpcEditorView {
                     });
                 },
                 scheduler);
+    }
+
+    /** The NPC's current anchor as a short "world x, y, z" line for the move button's Current value. */
+    private static String locationHint(Position at) {
+        return at.world().name() + " " + at.blockX() + ", " + at.blockY() + ", " + at.blockZ();
     }
 
     // --- write helpers (each is the existing use case) ---
