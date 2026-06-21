@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.network.BalanceChanged;
+import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.HomeChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
@@ -27,9 +28,13 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 
 /**
- * Dispatch coverage of the backend bus client against the real (mock) Bukkit messenger as the transport. The
- * proxy is faked by feeding decoded-frame bytes straight into {@link BusClient#onPluginMessageReceived}, so the
- * test exercises exactly the two decisions the loop sentinel turns on:
+ * End-to-end dispatch coverage of the bus stack — the real {@link PluginMessagingTransport} over the mock
+ * Bukkit messenger, wrapped by the live {@link BusCore} — so the loop sentinel and listener dispatch are
+ * exercised through exactly the path a frame travels in production: inbound plugin message → transport →
+ * {@code onFrame} → core decode → registry. {@link BusCoreTest} asserts the same decisions against a fake
+ * transport (no Bukkit); this keeps the integrated round-trip covered after the transport was split out of the
+ * old monolithic client. The proxy is faked by feeding decoded-frame bytes straight into the transport's
+ * inbound listener.
  *
  * <ul>
  *   <li>a frame whose origin equals this backend's own {@code server-id} is dropped — never delivered to a
@@ -38,12 +43,11 @@ import org.mockbukkit.mockbukkit.ServerMock;
  *       invalidates the Caffeine cache so the next read sees the peer's change.
  * </ul>
  *
- * <p>The {@link Scheduler} is a synchronous inline fake so the off-tick dispatch the client routes through
- * runs in the test thread; a malformed frame is dropped without reaching a listener. The disabled-bus shape is
- * covered too: a client that was never started, and the {@link Bus#disabled} no-op publisher, both swallow a
- * publish so the single-server path stays a no-op.
+ * <p>The {@link Scheduler} is a synchronous inline fake so the off-tick dispatch runs in the test thread. The
+ * disabled-bus shape is covered too: the {@link Bus#disabled} no-op publisher swallows a publish so the
+ * single-server path stays a no-op.
  */
-class BusClientDispatchTest {
+class BusRoundTripTest {
 
     private static final String SELF = "survival-1";
     private static final String PEER = "lobby-2";
@@ -54,6 +58,8 @@ class BusClientDispatchTest {
     private InlineScheduler scheduler;
     private RecordingListener listener;
     private RemoteSyncRegistry registry;
+    private PluginMessagingTransport transport;
+    private BusCore core;
 
     @BeforeEach
     void setUp() {
@@ -63,6 +69,9 @@ class BusClientDispatchTest {
         listener = new RecordingListener();
         registry = new RemoteSyncRegistry();
         registry.register(listener);
+        transport = new PluginMessagingTransport(plugin, scheduler, channel(), 256);
+        core = new BusCore(transport, SELF, registry, new SilentLogger());
+        core.start();
     }
 
     @AfterEach
@@ -72,29 +81,23 @@ class BusClientDispatchTest {
 
     @Test
     void appliesAFrameFromAPeer() {
-        BusClient client = started();
-
-        deliver(client, new HomeChanged(PEER, OWNER));
+        deliver(new HomeChanged(PEER, OWNER));
 
         assertThat(listener.applied).containsExactly(new HomeChanged(PEER, OWNER));
     }
 
     @Test
     void dropsAFrameThisBackendOriginated() {
-        BusClient client = started();
-
-        deliver(client, new HomeChanged(SELF, OWNER));
+        deliver(new HomeChanged(SELF, OWNER));
 
         assertThat(listener.applied).isEmpty();
     }
 
     @Test
     void deliversEveryMessageTypeFromAPeer() {
-        BusClient client = started();
-
-        deliver(client, new BalanceChanged(PEER, OWNER, "coins"));
-        deliver(client, new WarpChanged(PEER, "spawn"));
-        deliver(client, new VaultChanged(PEER, OWNER, 2));
+        deliver(new BalanceChanged(PEER, OWNER, "coins"));
+        deliver(new WarpChanged(PEER, "spawn"));
+        deliver(new VaultChanged(PEER, OWNER, 2));
 
         assertThat(listener.applied)
                 .containsExactly(
@@ -105,32 +108,17 @@ class BusClientDispatchTest {
 
     @Test
     void dropsAMalformedFrameWithoutReachingAListener() {
-        BusClient client = started();
-
-        client.onPluginMessageReceived(channel(), carrier(), new byte[] {9, 9, 9});
+        transport.onPluginMessageReceived(channel(), carrier(), new byte[] {9, 9, 9});
 
         assertThat(listener.applied).isEmpty();
     }
 
     @Test
     void ignoresAFrameOnAnotherChannel() {
-        BusClient client = started();
-
-        client.onPluginMessageReceived(
+        transport.onPluginMessageReceived(
                 "other:channel", carrier(), NetworkMessageCodec.encode(new HomeChanged(PEER, OWNER)));
 
         assertThat(listener.applied).isEmpty();
-    }
-
-    @Test
-    void aDisabledClientSwallowsAPublish() {
-        BusClient client = new BusClient(plugin, scheduler, new SilentLogger(), disabledConfig(), registry);
-        // start() is a no-op when disabled, so the client never runs and a publish is dropped silently.
-        client.start();
-
-        client.publish(new HomeChanged(SELF, OWNER));
-
-        assertThat(scheduler.ran).isZero();
     }
 
     @Test
@@ -142,26 +130,12 @@ class BusClientDispatchTest {
         assertThat(bus.publisher().serverId()).isEqualTo(SELF);
     }
 
-    private BusClient started() {
-        BusClient client = new BusClient(plugin, scheduler, new SilentLogger(), enabledConfig(), registry);
-        client.start();
-        return client;
-    }
-
-    private void deliver(BusClient client, NetworkMessage message) {
-        client.onPluginMessageReceived(channel(), carrier(), NetworkMessageCodec.encode(message));
-    }
-
-    private static NetworkConfig enabledConfig() {
-        return new NetworkConfig(true, SELF, channel(), 256);
-    }
-
-    private static NetworkConfig disabledConfig() {
-        return new NetworkConfig(false, SELF, channel(), 256);
+    private void deliver(NetworkMessage message) {
+        transport.onPluginMessageReceived(channel(), carrier(), NetworkMessageCodec.encode(message));
     }
 
     private static String channel() {
-        return com.uxplima.uxmessentials.shared.network.BusChannel.FULL;
+        return BusChannel.FULL;
     }
 
     private Player carrier() {
@@ -182,35 +156,28 @@ class BusClientDispatchTest {
     /** Runs every scheduled task inline so the off-tick dispatch fires in the test thread. */
     private static final class InlineScheduler implements Scheduler {
 
-        private int ran;
-
         @Override
         public void onGlobal(Runnable task) {
-            ran++;
             task.run();
         }
 
         @Override
         public void onRegion(Position position, Runnable task) {
-            ran++;
             task.run();
         }
 
         @Override
         public void onEntity(PlayerRef player, Runnable task) {
-            ran++;
             task.run();
         }
 
         @Override
         public void async(Runnable task) {
-            ran++;
             task.run();
         }
 
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
-            ran++;
             task.run();
         }
     }
