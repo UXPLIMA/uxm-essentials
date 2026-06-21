@@ -69,7 +69,6 @@ import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
 import com.uxplima.uxmessentials.persistence.economy.LockingWalletRepository;
-import com.uxplima.uxmessentials.persistence.economy.RedisWalletSync;
 import com.uxplima.uxmessentials.persistence.economy.StripedLock;
 import com.uxplima.uxmessentials.persistence.economy.WalletLedger;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
@@ -120,28 +119,12 @@ public final class EconomyWiring {
         CachedWalletRepository cached = WalletRepositories.cachedConcrete(persistence, currencies, clock);
         bus.registry().register(WalletSync.listener(cached));
 
-        // Cross-server invalidation: the optional Redis sync drops a peer's cached owner; the in-house bus
-        // (WalletSync, below) does the same over its own transport. Both are pure cache-invalidation paths —
-        // money safety is the jOOQ guarded UPDATE, never a JVM or Redis lock.
+        // Decorator chain: JooqWalletRepository -> CachedWalletRepository -> locking (in-JVM per-owner ordering)
+        // -> general-bus WalletSync broadcaster. Cross-server invalidation rides the general bus's WalletSync
+        // frame (network.transport selects the carrier); money safety is the jOOQ guarded UPDATE, never a JVM
+        // lock, so the striped layer holds no lock across any I/O.
         StripedLock stripedLock = new StripedLock(256);
-        boolean redisEnabled = ctx.config().getBoolean("redis.enabled", false);
-        final @org.jspecify.annotations.Nullable RedisWalletSync redisSync;
-        if (redisEnabled) {
-            String redisHost = ctx.config().getString("redis.host", "localhost");
-            int redisPort = ctx.config().getInt("redis.port", 6379);
-            String redisPassword = ctx.config().getString("redis.password", "");
-            String redisChannel = ctx.config().getString("redis.channel", "uxmessentials:economy");
-            redisSync = new RedisWalletSync(
-                    cached, redisHost, redisPort, redisPassword, redisChannel, kernel.scheduler(), kernel.log());
-            redisSync.start();
-        } else {
-            redisSync = null;
-        }
-
-        // Decorator chain: JooqWalletRepository -> CachedWalletRepository -> locking (Redis-invalidation
-        // broadcaster) -> in-house bus WalletSync broadcaster. The locking layer broadcasts the Redis
-        // invalidate; the bus layer broadcasts the in-house frame. Neither holds a lock across any I/O.
-        WalletRepository locking = new LockingWalletRepository(cached, stripedLock, redisSync);
+        WalletRepository locking = new LockingWalletRepository(cached, stripedLock);
         WalletRepository repository = WalletSync.repository(locking, bus.publisher());
 
         WalletLedger ledger = WalletRepositories.ledgerOver(
@@ -165,16 +148,7 @@ public final class EconomyWiring {
 
         EconomyProvider resolved = resolveProvider(plugin, kernel, settings, currencies, decoratedRepository, clock);
         return assemble(
-                plugin,
-                ctx,
-                persistence,
-                settings,
-                currencies,
-                ledger,
-                resolved,
-                redisSync,
-                decoratedRepository,
-                pendingRepo);
+                plugin, ctx, persistence, settings, currencies, ledger, resolved, decoratedRepository, pendingRepo);
     }
 
     private static EconomyProvider resolveProvider(
@@ -207,7 +181,6 @@ public final class EconomyWiring {
             CurrencyRegistry currencies,
             WalletLedger ledger,
             EconomyProvider resolved,
-            @org.jspecify.annotations.Nullable RedisWalletSync redisSync,
             WalletRepository repository,
             PendingTransactionRepository pendingRepo) {
         KernelPorts kernel = ctx.kernel();
@@ -351,7 +324,6 @@ public final class EconomyWiring {
                 settings.registerProvider(),
                 currencies.defaultCurrency(),
                 settings.amountFormat(),
-                redisSync,
                 salaryTask,
                 loanRepaymentTask,
                 maintenanceTask,
@@ -598,7 +570,6 @@ public final class EconomyWiring {
             boolean registered,
             Currency defaultCurrency,
             AmountFormat amountFormat,
-            @org.jspecify.annotations.Nullable RedisWalletSync redisSync,
             @org.jspecify.annotations.Nullable SalaryTask salaryTask,
             @org.jspecify.annotations.Nullable LoanRepaymentTask loanRepaymentTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask,
@@ -650,9 +621,6 @@ public final class EconomyWiring {
             }
             if (salaryTask != null) {
                 salaryTask.stop();
-            }
-            if (redisSync != null) {
-                redisSync.stop();
             }
             snapshots.stop();
             ledger.stop();

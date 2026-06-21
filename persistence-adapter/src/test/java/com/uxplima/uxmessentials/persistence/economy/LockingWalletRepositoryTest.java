@@ -6,10 +6,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -125,90 +123,49 @@ class LockingWalletRepositoryTest {
     }
 
     @Test
-    void debitDelegatesAndBroadcastsOnSuccess() {
+    void debitDelegatesOnSuccess() {
         WalletRepository delegate = mock(WalletRepository.class);
-        RedisWalletSync redisSync = mock(RedisWalletSync.class);
         StripedLock stripedLock = new StripedLock(16);
 
         PlayerRef owner = randomPlayer();
         when(delegate.debit(owner, coins(10))).thenReturn(Result.ok());
 
-        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock, redisSync);
+        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock);
         Result<Unit, TransferError> result = repository.debit(owner, coins(10));
 
         assertThat(result.isOk()).isTrue();
         verify(delegate).debit(owner, coins(10));
-        verify(redisSync).publish(owner.uuid());
     }
 
     @Test
-    void doesNotBroadcastWhenMutationFails() {
+    void transferDelegatesBothOwnersOnSuccess() {
         WalletRepository delegate = mock(WalletRepository.class);
-        RedisWalletSync redisSync = mock(RedisWalletSync.class);
-        StripedLock stripedLock = new StripedLock(16);
-
-        PlayerRef owner = randomPlayer();
-        when(delegate.debit(owner, coins(10))).thenReturn(Result.err(TransferError.INSUFFICIENT_FUNDS));
-
-        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock, redisSync);
-        Result<Unit, TransferError> result = repository.debit(owner, coins(10));
-
-        assertThat(result.isErr()).isTrue();
-        verify(delegate).debit(owner, coins(10));
-        verify(redisSync, never()).publish(any(UUID.class));
-    }
-
-    @Test
-    void transferBroadcastsBothOwnersOnSuccess() {
-        WalletRepository delegate = mock(WalletRepository.class);
-        RedisWalletSync redisSync = mock(RedisWalletSync.class);
         StripedLock stripedLock = new StripedLock(16);
 
         PlayerRef from = randomPlayer();
         PlayerRef to = randomPlayer();
         when(delegate.transfer(from, to, coins(50))).thenReturn(Result.ok());
 
-        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock, redisSync);
+        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock);
         Result<Unit, TransferError> result = repository.transfer(from, to, coins(50));
 
         assertThat(result.isOk()).isTrue();
         verify(delegate).transfer(from, to, coins(50));
-        verify(redisSync, times(1)).publish(from.uuid());
-        verify(redisSync, times(1)).publish(to.uuid());
     }
 
     @Test
-    void worksWithoutRedisSync() {
+    void creditDelegates() {
         WalletRepository delegate = mock(WalletRepository.class);
         StripedLock stripedLock = new StripedLock(16);
 
         PlayerRef owner = randomPlayer();
         when(delegate.credit(owner, coins(5))).thenReturn(Result.ok());
 
-        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock, null);
+        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock);
         Result<Unit, TransferError> result = repository.credit(owner, coins(5));
 
         assertThat(result.isOk()).isTrue();
         verify(delegate).credit(owner, coins(5));
-    }
-
-    @Test
-    void infraFailureThrowsPersistenceExceptionNotInsufficientFunds() {
-        WalletRepository delegate = mock(WalletRepository.class);
-        RedisWalletSync redisSync = mock(RedisWalletSync.class);
-        StripedLock stripedLock = new StripedLock(16);
-
-        PlayerRef owner = randomPlayer();
-        when(delegate.debit(owner, coins(10))).thenReturn(Result.ok());
-        // A Redis outage on the post-commit broadcast is infrastructure, not an over-draw: it must surface as
-        // a PersistenceException, never a lie that the solvent player had INSUFFICIENT_FUNDS.
-        doThrow(new RuntimeException("redis down")).when(redisSync).publish(owner.uuid());
-
-        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock, redisSync);
-
-        assertThatThrownBy(() -> repository.debit(owner, coins(10)))
-                .isInstanceOf(PersistenceException.class)
-                .hasMessageContaining(owner.uuid().toString());
     }
 
     @Test
@@ -231,7 +188,7 @@ class LockingWalletRepositoryTest {
                 .when(delegate)
                 .debit(owner, coins(7));
 
-        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock, null);
+        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock);
         repository.debit(owner, coins(7));
 
         assertThat(stripeFreeDuringDelegate.get()).isTrue();
@@ -244,7 +201,7 @@ class LockingWalletRepositoryTest {
         PlayerRef owner = randomPlayer();
         when(stripedLock.get(owner.uuid())).thenThrow(new IllegalStateException("stripe blew up"));
 
-        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock, null);
+        LockingWalletRepository repository = new LockingWalletRepository(delegate, stripedLock);
 
         assertThatThrownBy(() -> repository.debit(owner, coins(1))).isInstanceOf(PersistenceException.class);
         verify(delegate, never()).debit(any(), any());

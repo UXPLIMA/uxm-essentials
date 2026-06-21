@@ -33,7 +33,7 @@ import redis.clients.jedis.JedisPool;
  * frame whose origin equals this backend's {@code server-id}, which is the correct guard when two backends
  * share Redis state. This transport adds no second de-duplication mechanism.
  *
- * <p>Connection lifecycle mirrors {@code RedisWalletSync}: publishes borrow a connection from a pooled
+ * <p>Connection lifecycle: publishes borrow a connection from a pooled
  * {@link JedisPool} ({@code try (Jedis j = pool.getResource())}); the blocking subscribe loop owns one
  * dedicated connection and runs on the injected {@link Scheduler#async} executor, never a hand-rolled
  * {@code Thread}, reconnecting after a 5s backoff when the connection drops. If the Jedis library is absent
@@ -55,6 +55,7 @@ public final class RedisBusTransport implements BusTransport {
     private final String host;
     private final int port;
     private final String password;
+    private final int db;
     private final byte[] channel;
     private final Scheduler scheduler;
     private final Logger log;
@@ -67,8 +68,9 @@ public final class RedisBusTransport implements BusTransport {
     private volatile @Nullable Consumer<byte[]> onFrame;
     private final AtomicLong lastPublishWarnAt = new AtomicLong(0L);
 
-    public RedisBusTransport(String host, int port, String password, String channel, Scheduler scheduler, Logger log) {
-        this(host, port, password, channel, scheduler, log, null);
+    public RedisBusTransport(
+            String host, int port, String password, int db, String channel, Scheduler scheduler, Logger log) {
+        this(host, port, password, db, channel, scheduler, log, null);
     }
 
     /**
@@ -82,6 +84,7 @@ public final class RedisBusTransport implements BusTransport {
             String host,
             int port,
             String password,
+            int db,
             String channel,
             Scheduler scheduler,
             Logger log,
@@ -89,6 +92,7 @@ public final class RedisBusTransport implements BusTransport {
         this.host = Objects.requireNonNull(host, "host");
         this.port = port;
         this.password = Objects.requireNonNull(password, "password");
+        this.db = db;
         this.channel = Objects.requireNonNull(channel, "channel").getBytes(StandardCharsets.UTF_8);
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
@@ -173,7 +177,7 @@ public final class RedisBusTransport implements BusTransport {
             return;
         }
         try (Jedis jedis = current.getResource()) {
-            authenticate(jedis);
+            prepare(jedis);
             jedis.publish(channel, frame);
         } catch (RuntimeException cause) {
             warnRateLimited("redis bus transport failed to publish a frame", cause);
@@ -187,7 +191,7 @@ public final class RedisBusTransport implements BusTransport {
                 return;
             }
             try (Jedis jedis = current.getResource()) {
-                authenticate(jedis);
+                prepare(jedis);
                 BinaryJedisPubSub sub = frameSubscriber();
                 subscription = sub;
                 connected = true;
@@ -218,9 +222,13 @@ public final class RedisBusTransport implements BusTransport {
         };
     }
 
-    private void authenticate(Jedis jedis) {
+    /** Authenticate (when a password is set) and select the configured logical database on a borrowed connection. */
+    private void prepare(Jedis jedis) {
         if (!password.isEmpty()) {
             jedis.auth(password);
+        }
+        if (db != 0) {
+            jedis.select(db);
         }
     }
 

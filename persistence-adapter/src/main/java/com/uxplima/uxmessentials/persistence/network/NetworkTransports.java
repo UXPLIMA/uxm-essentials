@@ -21,17 +21,18 @@ public final class NetworkTransports {
 
     /**
      * Build the Redis pub/sub transport that carries the full bus frame bytes over a Redis channel with no
-     * proxy. {@code password} is empty to skip auth; {@code channel} is the Redis pub/sub channel both sides
-     * publish to and subscribe on. The subscribe loop runs on {@code scheduler}'s async executor; if Jedis is
-     * absent at runtime the transport disables itself with a single WARN and becomes a no-op.
+     * proxy. {@code password} is empty to skip auth; {@code db} is the logical database index every borrowed
+     * connection selects (0 leaves the default database untouched); {@code channel} is the Redis pub/sub channel
+     * both sides publish to and subscribe on. The subscribe loop runs on {@code scheduler}'s async executor; if
+     * Jedis is absent at runtime the transport disables itself with a single WARN and becomes a no-op.
      */
     public static BusTransport redis(
-            String host, int port, String password, String channel, Scheduler scheduler, Logger log) {
+            String host, int port, String password, int db, String channel, Scheduler scheduler, Logger log) {
         Objects.requireNonNull(host, "host");
         Objects.requireNonNull(password, "password");
         Objects.requireNonNull(channel, "channel");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
-        return new RedisBusTransport(host, port, password, channel, scheduler, log);
+        return new RedisBusTransport(host, port, password, db, channel, scheduler, log);
     }
 }

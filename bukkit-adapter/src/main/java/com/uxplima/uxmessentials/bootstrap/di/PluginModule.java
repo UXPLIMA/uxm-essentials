@@ -287,13 +287,13 @@ public final class PluginModule {
         // soft-depend probes always apply, the economy-provider ownership check only when economy is enabled.
         // The /uxmess doctor command runs each one off-tick (each is wrapped in HealthCheck.safe so a probe that
         // throws becomes a FAIL line rather than aborting the run).
-        ConfigStore economyConfig = config.scoped(ModuleId.of("economy").configRoot());
         List<HealthCheck> checks = new ArrayList<>();
         checks.add(new DatabaseHealthCheck(persistence));
         if (economyEnabled(registry, config)) {
             checks.add(new EconomyProviderHealthCheck(plugin.getServer().getServicesManager(), plugin));
         }
-        checks.add(new SoftDependencyHealthCheck(plugin.getServer().getPluginManager(), economyConfig));
+        // The Redis probe reads the unified network.redis block from the plugin-wide config, not a per-module one.
+        checks.add(new SoftDependencyHealthCheck(plugin.getServer().getPluginManager(), config));
         checks.add(new SchedulerHealthCheck());
         checks.add(new UpdateHealthCheck(UpdateCheckSettings.from(config).enabled()));
         checks.add(new ModuleCountHealthCheck(registry, config));

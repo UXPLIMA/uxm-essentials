@@ -79,7 +79,8 @@ public final class BusWiring {
 
     private static BusTransport redis(NetworkConfig network, Scheduler scheduler, Logger log) {
         NetworkConfig.Redis redis = network.redis();
-        return NetworkTransports.redis(redis.host(), redis.port(), redis.password(), redis.channel(), scheduler, log);
+        return NetworkTransports.redis(
+                redis.host(), redis.port(), redis.password(), redis.db(), redis.channel(), scheduler, log);
     }
 
     /**

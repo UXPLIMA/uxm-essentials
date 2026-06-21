@@ -127,6 +127,25 @@ class RedisBusTransportTest {
     }
 
     @Test
+    void selectsTheConfiguredLogicalDatabaseOnPublish() {
+        FakeRedis redis = new FakeRedis();
+        RedisBusTransport transport = new RedisBusTransport(
+                "localhost", 6379, "", 3, CHANNEL, new InlineAsyncScheduler(async), new NoopLogger(), redis::pool);
+        transport.start(frame -> {});
+
+        byte[] frame = NetworkMessageCodec.encode(new BalanceChanged("self-1", UUID.randomUUID(), "coins"));
+        transport.send(frame);
+
+        waitUntil(() -> !redis.published().isEmpty());
+        // The fake pool hands the same jedis mock to both the subscribe loop and the publish, so select fires on
+        // each borrowed connection; the contract is only that every borrowed connection targets the configured db.
+        verify(redis.jedis(), atLeastOnce()).select(3);
+
+        transport.stop();
+        redis.releaseSubscribe();
+    }
+
+    @Test
     void stopIsIdempotentAndClosesThePool() {
         FakeRedis redis = new FakeRedis();
         RedisBusTransport transport = transportOver(redis);
@@ -143,7 +162,7 @@ class RedisBusTransportTest {
 
     private RedisBusTransport transportOver(FakeRedis redis) {
         return new RedisBusTransport(
-                "localhost", 6379, "", CHANNEL, new InlineAsyncScheduler(async), new NoopLogger(), redis::pool);
+                "localhost", 6379, "", 0, CHANNEL, new InlineAsyncScheduler(async), new NoopLogger(), redis::pool);
     }
 
     /**
@@ -181,6 +200,10 @@ class RedisBusTransportTest {
 
         JedisPool pool() {
             return pool;
+        }
+
+        Jedis jedis() {
+            return jedis;
         }
 
         @Nullable BinaryJedisPubSub subscriber() {
