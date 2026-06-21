@@ -15,6 +15,8 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.FillerPainter.TextRenderer;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
@@ -54,6 +56,7 @@ final class RealPlayerRowPainter {
     private final TextRenderer textRenderer;
     private final LongSupplier tickSource;
     private final Supplier<? extends Collection<? extends Player>> viewers;
+    private final Scheduler scheduler;
 
     /**
      * The last name-format source string applied to each player's list name, keyed by player UUID. An absent key means
@@ -78,12 +81,14 @@ final class RealPlayerRowPainter {
             TablistSkinResolver skinResolver,
             TextRenderer textRenderer,
             LongSupplier tickSource,
-            Supplier<? extends Collection<? extends Player>> viewers) {
+            Supplier<? extends Collection<? extends Player>> viewers,
+            Scheduler scheduler) {
         this.packets = Objects.requireNonNull(packets, "packets");
         this.skinResolver = Objects.requireNonNull(skinResolver, "skinResolver");
         this.textRenderer = Objects.requireNonNull(textRenderer, "textRenderer");
         this.tickSource = Objects.requireNonNull(tickSource, "tickSource");
         this.viewers = Objects.requireNonNull(viewers, "viewers");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     /**
@@ -113,13 +118,19 @@ final class RealPlayerRowPainter {
      * recorded, so it is skipped; the next steady tick repaints it to all viewers once the texture lands.
      */
     void repaintSkinsFor(Player viewer) {
+        UUID viewerId = viewer.getUniqueId();
         for (Map.Entry<UUID, AppliedSkin> painted : appliedSkin.entrySet()) {
-            Player target = Bukkit.getPlayer(painted.getKey());
-            if (target == null) {
-                // The skinned target logged off between paint and this join; their entry no longer exists to repaint.
-                continue;
-            }
-            repaintSkinFor(viewer, target, painted.getValue());
+            UUID targetId = painted.getKey();
+            AppliedSkin skin = painted.getValue();
+            // Rebuilding the entry reads the TARGET's live name and world (through the name renderer); on Folia those
+            // belong to the target's region thread, not the joiner's. Hop to the target's entity thread to build the
+            // TabEntry, then send the finished packet to the joiner from there — the channel send is thread-agnostic.
+            scheduler.onEntity(new PlayerRef(targetId, skin.nameSource()), () -> {
+                Player target = Bukkit.getPlayer(targetId);
+                if (target != null && target.isOnline()) {
+                    repaintSkinFor(viewerId, target, skin);
+                }
+            });
         }
     }
 
@@ -139,11 +150,20 @@ final class RealPlayerRowPainter {
         resetNameAndOrder(player);
     }
 
-    /** Rebuild {@code target}'s skin row from the tuple the steady state holds and send it to the one {@code viewer}. */
-    private void repaintSkinFor(Player viewer, Player target, AppliedSkin painted) {
+    /**
+     * Rebuild {@code target}'s skin row from the tuple the steady state holds and send it to the one joining viewer.
+     * Runs on the target's entity thread (the live name and world reads belong there); the viewer is re-resolved from
+     * {@code viewerId} only to address the outbound channel, and the packet send itself is thread-agnostic.
+     */
+    private void repaintSkinFor(UUID viewerId, Player target, AppliedSkin painted) {
         Optional<TabSkin> skin = skinResolver.resolve(painted.skinSource());
         if (skin.isEmpty()) {
             // The texture has fallen out of cache since the paint; the next steady tick will repaint it to all viewers.
+            return;
+        }
+        Player viewer = Bukkit.getPlayer(viewerId);
+        if (viewer == null || !viewer.isOnline()) {
+            // The joiner dropped between their join and this hop; nothing to repaint to a closed channel.
             return;
         }
         long tick = tickSource.getAsLong();

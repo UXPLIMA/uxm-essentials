@@ -170,8 +170,9 @@ class PlayerStateReconciliationTest {
         bob.teleport(alice.getLocation().clone().add(5, 0, 0));
         carol.teleport(alice.getLocation().clone().add(50, 0, 0));
 
-        NearbyPlayers nearby = new BukkitNearbyPlayers();
-        var found = nearby.within(BukkitRefs.toRef(alice), 100);
+        NearbyPlayers nearby = new BukkitNearbyPlayers(scheduler);
+        java.util.List<NearbyPlayers.Nearby> found = new java.util.ArrayList<>();
+        nearby.within(BukkitRefs.toRef(alice), 100, found::addAll);
 
         assertThat(found).extracting(n -> n.who().name()).containsExactly("Bob", "Carol");
         assertThat(found).noneMatch(n -> n.who().uuid().equals(alice.getUniqueId())); // self excluded

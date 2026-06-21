@@ -12,6 +12,7 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -30,9 +31,13 @@ import org.jspecify.annotations.NullMarked;
  * Shared base for the two staff teleport pickers — the COMPASS navigator and {@code /stafflist}. Both show a
  * paginated grid of player heads and, on a head click, teleport the looking staff member onto that player
  * through the soft-coupled {@link StaffTeleport} (a no-op feedback when teleport is off), sending
- * {@link StaffMessageKey#STAFF_TELEPORTED} or {@link StaffMessageKey#STAFF_TELEPORT_FAILED}. Building and
- * clicking a live window touch the entity, so both run on the looking staff member's entity region thread
- * through the {@link Scheduler} port. Subclasses supply only the title key and the set of players to list.
+ * {@link StaffMessageKey#STAFF_TELEPORTED} or {@link StaffMessageKey#STAFF_TELEPORT_FAILED}.
+ *
+ * <p>The candidate roster is enumerated on the global region thread (iterating {@code Server.getOnlinePlayers()}
+ * off it is illegal on Folia) and snapshotted to plain {@link PlayerRef}s; the GUI is then built and opened on
+ * the looking staff member's own entity region thread, and a head click teleports from there too — both touch the
+ * looker's entity, so both run on the looker's thread through the {@link Scheduler} port. Subclasses supply only
+ * the title key and the set of players to list.
  */
 @NullMarked
 abstract class StaffTeleportPicker {
@@ -57,31 +62,39 @@ abstract class StaffTeleportPicker {
     /** The picker's title key, resolved in the looker's locale. */
     abstract MessageKey titleKey();
 
-    /** The players to list for {@code looker}; each becomes a clickable head. */
+    /** The players to list for {@code looker}, read on the global region thread; each becomes a clickable head. */
     abstract List<Player> candidates(Player looker);
 
-    /** Open the picker for {@code looker}, on their entity region thread. */
+    /** Open the picker for {@code looker}: enumerate the roster on the global thread, build the GUI on theirs. */
     public final void open(Player looker, PlayerRef lookerRef) {
         Objects.requireNonNull(looker, "looker");
         Objects.requireNonNull(lookerRef, "lookerRef");
-        scheduler.onEntity(lookerRef, () -> onOpen(looker, lookerRef));
+        scheduler.onGlobal(() -> {
+            List<PlayerRef> roster = snapshot(candidates(looker));
+            scheduler.onEntity(lookerRef, () -> onOpen(looker, lookerRef, roster));
+        });
     }
 
     /**
-     * What to do once on the looker's entity thread. The default builds and opens the picker; a subclass with an
-     * empty-roster case (the staff list) overrides this to send a line instead of opening an empty window.
+     * What to do once on the looker's entity thread with the global-thread roster snapshot. The default builds and
+     * opens the picker; a subclass with an empty-roster case (the staff list) overrides this to send a line
+     * instead of opening an empty window.
      */
-    void onOpen(Player looker, PlayerRef lookerRef) {
-        buildAndOpen(looker, lookerRef, candidates(looker));
+    void onOpen(Player looker, PlayerRef lookerRef, List<PlayerRef> roster) {
+        buildAndOpen(looker, lookerRef, roster);
     }
 
-    final void buildAndOpen(Player looker, PlayerRef lookerRef, List<Player> roster) {
+    final void buildAndOpen(Player looker, PlayerRef lookerRef, List<PlayerRef> roster) {
         PaginatedGui gui =
                 Guis.paginated().title(title(lookerRef)).rows(PICKER_ROWS).build();
-        for (Player candidate : roster) {
+        for (PlayerRef candidate : roster) {
             gui.addPageItem(headFor(looker, lookerRef, gui, candidate));
         }
         gui.open(looker);
+    }
+
+    private static List<PlayerRef> snapshot(List<Player> roster) {
+        return roster.stream().map(BukkitRefs::toRef).toList();
     }
 
     /** Resolve {@code key} in {@code lookerRef}'s locale and send it to them as a chat line. */
@@ -93,11 +106,11 @@ abstract class StaffTeleportPicker {
         return StyledText.render(messages.resolve(lookerRef, titleKey(), Map.of()));
     }
 
-    private GuiItem headFor(Player looker, PlayerRef lookerRef, PaginatedGui gui, Player target) {
+    private GuiItem headFor(Player looker, PlayerRef lookerRef, PaginatedGui gui, PlayerRef target) {
         ItemStack head = ItemBuilder.of(Material.PLAYER_HEAD)
-                .name(Component.text(target.getName()))
+                .name(Component.text(target.name()))
                 .build();
-        UUID targetId = target.getUniqueId();
+        UUID targetId = target.uuid();
         return GuiItem.button(head, event -> teleport(looker, lookerRef, gui, targetId));
     }
 

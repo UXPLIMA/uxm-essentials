@@ -39,6 +39,11 @@ public final class StaffStaffPlaceholders implements StaffPlaceholders {
 
     @Override
     public int onlineStaffCount() {
+        // Resolved on the PlaceholderAPI expansion thread, not a region tick thread, so an onGlobal hop would be
+        // wrong here (it cannot marshal back to a caller that is not on any region) and pointless: this reads only
+        // a count of permission-marker holders, never any player's mutable entity state. A torn read across a
+        // concurrent join/quit at worst reports a count off by one for a single refresh, which self-corrects on
+        // the next HUD tick — acceptable for a cosmetic placeholder, and far cheaper than a blocking marshal.
         int count = 0;
         for (Player player : server.getOnlinePlayers()) {
             if (player.hasPermission(STAFF_MEMBER_NODE)) {

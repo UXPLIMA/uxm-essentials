@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -51,16 +52,19 @@ public final class BukkitAnnouncerBroadcaster {
     private final BroadcastOptOutStore optOut;
     private final ChannelBroadcaster channels;
     private final Function<Player, ConditionContext> conditionContext;
+    private final Scheduler scheduler;
 
     public BukkitAnnouncerBroadcaster(
             MessageSink sink,
             BroadcastOptOutStore optOut,
             ChannelBroadcaster channels,
-            Function<Player, ConditionContext> conditionContext) {
+            Function<Player, ConditionContext> conditionContext,
+            Scheduler scheduler) {
         this.sink = Objects.requireNonNull(sink, "sink");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
         this.channels = Objects.requireNonNull(channels, "channels");
         this.conditionContext = Objects.requireNonNull(conditionContext, "conditionContext");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     /**
@@ -111,12 +115,14 @@ public final class BukkitAnnouncerBroadcaster {
     /** Send {@code line} to every online, opted-in player. */
     public void broadcast(String line) {
         Objects.requireNonNull(line, "line");
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            PlayerRef who = BukkitRefs.toRef(player);
-            if (optOut.receivesBroadcasts(who)) {
-                sink.deliver(who, line);
+        scheduler.onGlobal(() -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                PlayerRef who = BukkitRefs.toRef(player);
+                if (optOut.receivesBroadcasts(who)) {
+                    sink.deliver(who, line);
+                }
             }
-        }
+        });
     }
 
     /**
@@ -128,19 +134,27 @@ public final class BukkitAnnouncerBroadcaster {
     public void broadcastToWorld(String line, UUID worldId) {
         Objects.requireNonNull(line, "line");
         Objects.requireNonNull(worldId, "worldId");
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!player.getWorld().getUID().equals(worldId)) {
-                continue;
+        scheduler.onGlobal(() -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (!player.getWorld().getUID().equals(worldId)) {
+                    continue;
+                }
+                PlayerRef who = BukkitRefs.toRef(player);
+                if (optOut.receivesBroadcasts(who)) {
+                    sink.deliver(who, line);
+                }
             }
-            PlayerRef who = BukkitRefs.toRef(player);
-            if (optOut.receivesBroadcasts(who)) {
-                sink.deliver(who, line);
-            }
-        }
+        });
     }
 
-    /** The current online player count the announcer's min-players gate is checked against. */
-    public int onlineCount() {
-        return Bukkit.getOnlinePlayers().size();
+    /**
+     * Resolve the current online player count on the global region thread (Folia forbids reading the roster off it)
+     * and hand it to {@code consumer} there. The announcer rotation drives this from its async tick to gate the
+     * min-players check, then picks and broadcasts from the same global hop so the count and the fan-out see one
+     * consistent roster.
+     */
+    public void withOnlineCount(java.util.function.IntConsumer consumer) {
+        Objects.requireNonNull(consumer, "consumer");
+        scheduler.onGlobal(() -> consumer.accept(Bukkit.getOnlinePlayers().size()));
     }
 }

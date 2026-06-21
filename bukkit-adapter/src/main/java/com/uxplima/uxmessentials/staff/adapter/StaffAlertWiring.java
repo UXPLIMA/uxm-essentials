@@ -36,7 +36,11 @@ final class StaffAlertWiring {
             return null;
         }
         MessagingStaffAlerts alerts = new MessagingStaffAlerts(
-                seams.staffAudience().get(), kernel.messageSink(), kernel.messages(), settings.staffChatNode());
+                seams.staffAudience().get(),
+                kernel.messageSink(),
+                kernel.messages(),
+                kernel.scheduler(),
+                settings.staffChatNode());
         Consumer<DomainEvent> subscriber = event -> dispatch(alerts, event);
         events.subscribe(subscriber);
         return subscriber;

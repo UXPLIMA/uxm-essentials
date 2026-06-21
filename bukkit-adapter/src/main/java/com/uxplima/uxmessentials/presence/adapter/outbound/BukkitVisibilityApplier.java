@@ -7,9 +7,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.presence.application.port.VisibilityApplier;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The {@link VisibilityApplier} implementation: it drives Bukkit's {@code hidePlayer} / {@code showPlayer}
@@ -20,8 +22,10 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Every mutation hops to the affected player's owning region/entity thread through the injected
  * {@link Scheduler} port — {@code hidePlayer}/{@code showPlayer} are per-viewer entity operations valid only on
- * the owning thread on Folia. An offline player on either side is a silent no-op. The vanish-see node is checked
- * per viewer so staff keep seeing one another.
+ * the <em>viewer's</em> owning thread on Folia. The online roster is enumerated on the global region thread
+ * (iterating {@code Bukkit.getOnlinePlayers()} off it is illegal on Folia), and each {@code hidePlayer}/
+ * {@code showPlayer} then runs on that viewer's own entity thread. An offline player on either side is a silent
+ * no-op. The vanish-see node is checked per viewer so staff keep seeing one another.
  *
  * <p>{@link #reconcileOnJoin} re-hides a vanished player from everyone the moment they relog (persisted
  * vanish); re-hiding already-vanished <em>others</em> from a fresh joiner is the join listener's job, which
@@ -43,44 +47,71 @@ public final class BukkitVisibilityApplier implements VisibilityApplier {
     @Override
     public void hide(PlayerRef who) {
         Objects.requireNonNull(who, "who");
-        scheduler.onEntity(who, () -> applyHide(who));
+        applyHide(who);
     }
 
     @Override
     public void reveal(PlayerRef who) {
         Objects.requireNonNull(who, "who");
-        scheduler.onEntity(who, () -> applyReveal(who));
+        applyReveal(who);
     }
 
     @Override
     public void reconcileOnJoin(PlayerRef who, boolean vanished) {
         Objects.requireNonNull(who, "who");
         if (vanished) {
-            scheduler.onEntity(who, () -> applyHide(who));
+            applyHide(who);
         }
     }
 
     private void applyHide(PlayerRef who) {
-        Player target = Bukkit.getPlayer(who.uuid());
-        if (target == null || !target.isOnline()) {
-            return;
-        }
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (!viewer.equals(target) && !viewer.hasPermission(SEE_NODE)) {
-                viewer.hidePlayer(plugin, target);
+        forEachViewer((viewer, viewerRef) -> {
+            if (!viewerRef.equals(who) && !viewer.hasPermission(SEE_NODE)) {
+                @Nullable Player target = liveTarget(who);
+                if (target != null) {
+                    viewer.hidePlayer(plugin, target);
+                }
             }
-        }
+        });
     }
 
     private void applyReveal(PlayerRef who) {
-        Player target = Bukkit.getPlayer(who.uuid());
-        if (target == null || !target.isOnline()) {
-            return;
-        }
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (!viewer.equals(target)) {
-                viewer.showPlayer(plugin, target);
+        forEachViewer((viewer, viewerRef) -> {
+            if (!viewerRef.equals(who)) {
+                @Nullable Player target = liveTarget(who);
+                if (target != null) {
+                    viewer.showPlayer(plugin, target);
+                }
             }
-        }
+        });
+    }
+
+    /**
+     * Enumerate the online roster on the global region thread, then run {@code action} for each viewer on that
+     * viewer's own entity thread, where its {@code hidePlayer}/{@code showPlayer} is valid under Folia. The live
+     * viewer is re-resolved inside the hop so an offline viewer is a silent no-op.
+     */
+    private void forEachViewer(ViewerAction action) {
+        scheduler.onGlobal(() -> {
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                PlayerRef viewerRef = BukkitRefs.toRef(online);
+                scheduler.onEntity(viewerRef, () -> {
+                    @Nullable Player viewer = Bukkit.getPlayer(viewerRef.uuid());
+                    if (viewer != null && viewer.isOnline()) {
+                        action.run(viewer, viewerRef);
+                    }
+                });
+            }
+        });
+    }
+
+    private @Nullable Player liveTarget(PlayerRef who) {
+        Player target = Bukkit.getPlayer(who.uuid());
+        return target != null && target.isOnline() ? target : null;
+    }
+
+    @FunctionalInterface
+    private interface ViewerAction {
+        void run(Player viewer, PlayerRef viewerRef);
     }
 }

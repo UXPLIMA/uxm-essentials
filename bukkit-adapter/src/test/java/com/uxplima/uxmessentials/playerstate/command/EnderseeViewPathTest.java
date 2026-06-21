@@ -14,8 +14,8 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -29,29 +29,31 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the managed {@code /invsee} view: the menu mirrors the target's full inventory — main
- * slots, armour, and offhand — into a private 54-slot copy; the viewer's edit to that copy is reconciled back
- * onto the target on close, and nothing is duplicated because the viewer never touches the target's live
- * {@code PlayerInventory} while the menu is open.
+ * MockBukkit coverage of the managed online {@code /endersee} view: the menu mirrors the target's 27-slot ender
+ * chest into a private copy; the viewer's edit to that copy is reconciled back onto the target on close, and
+ * nothing is duplicated because the viewer never touches the target's live ender-chest container while the menu is
+ * open. This is the ender-chest counterpart of {@link InvseeViewPathTest}, and the dispatch assertion proves the
+ * Folia ownership fix: the target's contents are snapshotted on the target's own entity thread, the viewer is
+ * hopped to for the GUI, and the close write-back lands on the subject's thread.
  *
  * <p>The scheduler is a synchronous double so the entity-bound open and the close write-back run inline, and the
- * close is dispatched as a real {@link InventoryCloseEvent} through the same {@link InvseeListener} a live close
+ * close is dispatched as a real {@link InventoryCloseEvent} through the same {@link EnderseeListener} a live close
  * routes through. The conservation assertion is the dupe guard: the total item count across the target plus the
  * menu copy is the same before and after the edit, so an item moved inside the menu is moved, not cloned.
  */
-class InvseeViewPathTest {
+class EnderseeViewPathTest {
 
     private ServerMock server;
     private Plugin plugin;
-    private InvseeView view;
-    private InvseeListener listener;
+    private EnderseeView view;
+    private EnderseeListener listener;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        view = new InvseeView(new KeyMessages(), new SyncScheduler());
-        listener = new InvseeListener(view);
+        view = new EnderseeView(new KeyMessages(), new SyncScheduler());
+        listener = new EnderseeListener(view);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -61,29 +63,26 @@ class InvseeViewPathTest {
     }
 
     @Test
-    void mirrorsMainArmourAndOffhandIntoTheManagedMenu() {
+    void mirrorsTheTargetsEnderChestIntoTheManagedMenu() {
         PlayerMock target = server.addPlayer("Target");
-        target.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 5));
-        target.getInventory().setHelmet(new ItemStack(Material.DIAMOND_HELMET));
-        target.getInventory().setItemInOffHand(new ItemStack(Material.SHIELD));
-        PlayerMock viewer = grantModify(server.addPlayer("Staff"));
+        target.getEnderChest().setItem(0, new ItemStack(Material.DIAMOND, 5));
+        target.getEnderChest().setItem(26, new ItemStack(Material.EMERALD, 2));
+        PlayerMock viewer = server.addPlayer("Staff");
 
         view.open(ref(viewer), ref(target));
 
         Inventory menu = viewer.getOpenInventory().getTopInventory();
-        assertThat(menu.getSize()).isEqualTo(54);
+        assertThat(menu.getSize()).isEqualTo(27);
         assertThat(menu.getItem(0)).isNotNull();
         assertThat(menu.getItem(0).getType()).isEqualTo(Material.DIAMOND);
-        assertThat(menu.getItem(39).getType()).isEqualTo(Material.DIAMOND_HELMET); // helmet slot
-        assertThat(menu.getItem(40).getType()).isEqualTo(Material.SHIELD); // offhand slot
-        assertThat(menu.getItem(53).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE); // filler
+        assertThat(menu.getItem(26).getType()).isEqualTo(Material.EMERALD);
     }
 
     @Test
     void editInTheMenuIsWrittenBackOnCloseWithoutDuplicating() {
         PlayerMock target = server.addPlayer("Target");
-        target.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 5));
-        PlayerMock viewer = grantModify(server.addPlayer("Staff"));
+        target.getEnderChest().setItem(0, new ItemStack(Material.DIAMOND, 5));
+        PlayerMock viewer = server.addPlayer("Staff");
         int before = totalDiamonds(target);
         view.open(ref(viewer), ref(target));
         Inventory menu = viewer.getOpenInventory().getTopInventory();
@@ -94,41 +93,30 @@ class InvseeViewPathTest {
         menu.setItem(7, moved);
         server.getPluginManager().callEvent(new InventoryCloseEvent(viewer.getOpenInventory()));
 
-        // The move landed on the target (slot 0 emptied, slot 7 holds the stack) and nothing was duplicated:
-        // the close write-back overwrites the target's slots from the menu copy, it never adds to them.
-        assertThat(target.getInventory().getItem(0)).isNull();
-        assertThat(target.getInventory().getItem(7)).isNotNull();
-        assertThat(target.getInventory().getItem(7).getType()).isEqualTo(Material.DIAMOND);
+        // The move landed on the target's ender chest (slot 0 emptied, slot 7 holds the stack) and nothing was
+        // duplicated: the close write-back overwrites the target's slots from the menu copy, it never adds to them.
+        assertThat(target.getEnderChest().getItem(0)).isNull();
+        assertThat(target.getEnderChest().getItem(7)).isNotNull();
+        assertThat(target.getEnderChest().getItem(7).getType()).isEqualTo(Material.DIAMOND);
         assertThat(before).isEqualTo(5);
         assertThat(totalDiamonds(target)).isEqualTo(before); // conserved: 5 in, 5 out — no 2x
     }
 
     @Test
-    void selfInvseeOpensAndWritesBackToYourself() {
-        PlayerMock self = grantModify(server.addPlayer("Solo"));
-        self.getInventory().setItem(2, new ItemStack(Material.EMERALD, 3));
-
-        view.open(ref(self), ref(self));
-        Inventory menu = self.getOpenInventory().getTopInventory();
-        menu.setItem(2, new ItemStack(Material.EMERALD, 9)); // grow the stack inside the menu
-        server.getPluginManager().callEvent(new InventoryCloseEvent(self.getOpenInventory()));
-
-        assertThat(self.getInventory().getItem(2)).isNotNull();
-        assertThat(self.getInventory().getItem(2).getAmount()).isEqualTo(9);
-    }
-
-    @Test
-    void readsTheTargetsInventoryOnTheTargetsEntityThreadBeforeOpeningForTheViewer() {
+    void snapshotsOnTheTargetThreadOpensOnTheViewerThreadAndWritesBackOnTheSubjectThread() {
         PlayerMock target = server.addPlayer("Target");
-        target.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 5));
-        PlayerMock viewer = grantModify(server.addPlayer("Staff"));
+        target.getEnderChest().setItem(0, new ItemStack(Material.DIAMOND, 5));
+        PlayerMock viewer = server.addPlayer("Staff");
         RecordingScheduler recording = new RecordingScheduler();
-        InvseeView recordingView = new InvseeView(new KeyMessages(), recording);
+        EnderseeView recordingView = new EnderseeView(new KeyMessages(), recording);
+        // The close write-back must route through the same view the menu was opened against, so register a listener
+        // bound to the recording view for this case (the @BeforeEach listener wraps the synchronous field view).
+        server.getPluginManager().registerEvents(new EnderseeListener(recordingView), plugin);
 
         recordingView.open(ref(viewer), ref(target));
 
-        // The target's live inventory is read on the TARGET's entity thread first (Folia ownership), then the menu is
-        // built and opened on the VIEWER's thread: the first hop is the target, and the viewer is hopped to as well.
+        // The target's live ender chest is read on the TARGET's entity thread first (Folia ownership), then the menu
+        // is built and opened on the VIEWER's thread: the first hop is the target, and the viewer is hopped to too.
         assertThat(recording.entityHops).hasSizeGreaterThanOrEqualTo(2);
         assertThat(recording.entityHops.get(0).uuid()).isEqualTo(target.getUniqueId());
         assertThat(recording.entityHops).extracting(PlayerRef::uuid).contains(viewer.getUniqueId());
@@ -136,29 +124,20 @@ class InvseeViewPathTest {
         Inventory menu = viewer.getOpenInventory().getTopInventory();
         assertThat(menu.getItem(0)).isNotNull();
         assertThat(menu.getItem(0).getType()).isEqualTo(Material.DIAMOND);
-    }
 
-    @Test
-    void withoutModifyTheMenuStillOpensAndNeverDuplicatesOnClose() {
-        PlayerMock target = server.addPlayer("Target");
-        target.getInventory().setItem(0, new ItemStack(Material.GOLD_INGOT, 4));
-        PlayerMock viewer = server.addPlayer("Watcher"); // no modify node
-
-        view.open(ref(viewer), ref(target));
-        Inventory menu = viewer.getOpenInventory().getTopInventory();
-        assertThat(menu.getSize()).isEqualTo(54);
+        // The close write-back hops to the SUBJECT's entity thread before mutating their ender chest.
+        recording.entityHops.clear();
+        ItemStack moved = menu.getItem(0);
+        menu.setItem(0, null);
+        menu.setItem(7, moved);
         server.getPluginManager().callEvent(new InventoryCloseEvent(viewer.getOpenInventory()));
-
-        assertThat(target.getInventory().getItem(0).getAmount()).isEqualTo(4);
-    }
-
-    private PlayerMock grantModify(PlayerMock player) {
-        player.addAttachment(plugin, "uxmessentials.invsee.modify", true);
-        return player;
+        assertThat(recording.entityHops).extracting(PlayerRef::uuid).containsExactly(target.getUniqueId());
+        assertThat(target.getEnderChest().getItem(7)).isNotNull();
+        assertThat(target.getEnderChest().getItem(7).getType()).isEqualTo(Material.DIAMOND);
     }
 
     private static int totalDiamonds(PlayerMock player) {
-        return countDiamonds(player.getInventory().getContents());
+        return countDiamonds(player.getEnderChest().getContents());
     }
 
     private static int countDiamonds(ItemStack[] contents) {

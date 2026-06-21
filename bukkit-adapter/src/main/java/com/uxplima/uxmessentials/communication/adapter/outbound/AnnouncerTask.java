@@ -129,8 +129,10 @@ public final class AnnouncerTask {
         if (!running.getAsBoolean()) {
             return;
         }
-        Optional<Announcement> picked = nextAnnouncement.pick(broadcaster.onlineCount());
-        picked.ifPresent(broadcaster::broadcast);
+        // The roster size feeding the min-players gate is read on the global region thread (Folia forbids reading
+        // Bukkit.getOnlinePlayers() off it); the pick and the broadcast run from that same global hop so the gate and
+        // the fan-out see one consistent roster.
+        broadcaster.withOnlineCount(count -> nextAnnouncement.pick(count).ifPresent(broadcaster::broadcast));
         scheduleDefaultRotation();
     }
 
@@ -151,9 +153,13 @@ public final class AnnouncerTask {
             return; // the announcement was dropped or lost its override on reload; let this loop die
         }
         Announcement announcement = current.get();
-        if (live.shouldFire(broadcaster.onlineCount())) {
-            broadcaster.broadcast(announcement);
-        }
+        // The min-players gate reads the roster size on the global region thread; the broadcast fans out from that
+        // same global hop so the gate and the fan-out agree on the live roster.
+        broadcaster.withOnlineCount(count -> {
+            if (live.shouldFire(count)) {
+                broadcaster.broadcast(announcement);
+            }
+        });
         scheduleOverride(loop, announcement.intervalOverride().orElseThrow());
     }
 

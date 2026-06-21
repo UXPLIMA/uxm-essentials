@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.nametag.Appearance;
 import com.uxplima.uxmlib.nametag.NametagHandle;
 import com.uxplima.uxmlib.nametag.NametagRenderer;
@@ -78,6 +79,17 @@ public final class PacketNametagPresenter {
     private final BooleanSupplier hideVanillaName;
     private final Map<UUID, Tracked> live = new ConcurrentHashMap<>();
 
+    /**
+     * Each online player's last-known {@link Position}, refreshed on that player's <em>own</em> region thread by
+     * {@link #snapshotSelf}. The viewer-distance cull needs every candidate viewer's position, but a viewer's live
+     * location is owned by the viewer's region thread, not the wearer's whose cull runs it — reading it cross-region
+     * is a torn read on Folia. So each player publishes their own position here on their own thread (the reconcile
+     * task already hops to every player's entity thread each tick), and the cull reads the viewer's snapshot instead
+     * of the live location. A one-tick staleness at the reconcile cadence is immaterial to a distance cull; a viewer
+     * not yet snapshotted (joined this tick, before their first reconcile) is simply excluded until their next tick.
+     */
+    private final Map<UUID, Position> positionSnapshots = new ConcurrentHashMap<>();
+
     public PacketNametagPresenter(
             Supplier<NametagConfig> config,
             NametagRenderer libRenderer,
@@ -98,6 +110,9 @@ public final class PacketNametagPresenter {
     /** Show {@code wearer}'s nametag from the selected format. Must run on the wearer's region thread. */
     public void show(Player wearer) {
         Objects.requireNonNull(wearer, "wearer");
+        // Seed this player's position snapshot on their own region thread on first show, so they are an eligible
+        // viewer candidate for others' culls immediately rather than only after their first reconcile tick.
+        snapshotSelf(wearer);
         // A wearer already shown (the reconcile tick showed for them, then a queued onJoin show arrives) must not be
         // shown a second time — that would orphan the first handle and leak its refresh task. Reconcile instead.
         if (live.containsKey(wearer.getUniqueId())) {
@@ -136,6 +151,10 @@ public final class PacketNametagPresenter {
     /** Reconcile {@code wearer}'s nametag with the selected format. Must run on the wearer's region thread. */
     public void update(Player wearer) {
         Objects.requireNonNull(wearer, "wearer");
+        // We are on this player's own region thread (the reconcile task hops here each tick), so publish their live
+        // position for every other wearer's distance cull to read off-thread. Done for every online player, formatted
+        // or not, so a wearer can be culled against a viewer who themselves matches no format.
+        snapshotSelf(wearer);
         Tracked tracked = live.get(wearer.getUniqueId());
         if (tracked == null) {
             show(wearer);
@@ -190,6 +209,10 @@ public final class PacketNametagPresenter {
         if (tracked != null) {
             tracked.handle().remove();
         }
+        // The quit path: the player is leaving, so drop their published position so the snapshot map does not grow
+        // over uptime. A world change goes through remove(uuid), which keeps the snapshot — the player is still online
+        // and re-publishes on their next reconcile.
+        positionSnapshots.remove(player.getUniqueId());
         nameVisibility.clear(player);
     }
 
@@ -205,6 +228,8 @@ public final class PacketNametagPresenter {
             }
             remove(uuid);
         }
+        // Module stop: drop every published position so a disable/reload leaves no snapshot behind.
+        positionSnapshots.clear();
     }
 
     /** Whether {@code uuid} currently has a tracked nametag (test/observability seam). */
@@ -224,6 +249,15 @@ public final class PacketNametagPresenter {
      */
     void trackForTest(Player wearer, NametagHandle handle, NametagFormat format) {
         live.put(wearer.getUniqueId(), new Tracked(handle, format));
+    }
+
+    /**
+     * Publish {@code player}'s position to the cull snapshot, the same act {@link #update} performs on the player's
+     * own region thread each reconcile. Test-only seam so the eligible-viewer cull can be exercised directly without
+     * standing up the full reconcile loop, mirroring production where every online player publishes before a cull runs.
+     */
+    void snapshotForTest(Player player) {
+        snapshotSelf(player);
     }
 
     /**
@@ -285,7 +319,7 @@ public final class PacketNametagPresenter {
         if (visibility.hideWhileSneaking() && wearer.isSneaking()) {
             return List.of();
         }
-        double maxSq = cullRadiusSquared(visibility.viewerDistance());
+        double maxBlocks = cullRadiusBlocks(visibility.viewerDistance());
         List<Player> eligible = new ArrayList<>();
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             if (viewer.getUniqueId().equals(wearer.getUniqueId())) {
@@ -294,7 +328,7 @@ public final class PacketNametagPresenter {
             if (visibility.respectVanish() && !canSee(viewer, wearer)) {
                 continue;
             }
-            if (maxSq != Double.MAX_VALUE && !withinRange(viewer, wearer, maxSq)) {
+            if (maxBlocks != Double.MAX_VALUE && !withinRange(viewer, wearer, maxBlocks)) {
                 continue;
             }
             eligible.add(viewer);
@@ -306,27 +340,39 @@ public final class PacketNametagPresenter {
         return vanish.canSee(BukkitRefs.toRef(viewer), BukkitRefs.toRef(wearer));
     }
 
-    private static boolean withinRange(Player viewer, Player wearer, double maxSq) {
-        if (!viewer.getWorld().equals(wearer.getWorld())) {
-            return false;
-        }
-        Location viewerLocation = viewer.getLocation();
+    /**
+     * Whether {@code viewer} is within {@code maxBlocks} of {@code wearer}. The wearer's position is read live — this
+     * cull runs on the wearer's own region thread, so that read is region-local — while the viewer's position comes
+     * from the off-thread {@link #positionSnapshots} the viewer published on their own thread, never the viewer's live
+     * location (a cross-region read on Folia). A viewer with no snapshot yet, or in another world, is out of range.
+     */
+    private boolean withinRange(Player viewer, Player wearer, double maxBlocks) {
+        Position viewerPosition = positionSnapshots.get(viewer.getUniqueId());
         Location wearerLocation = wearer.getLocation();
-        if (viewerLocation == null || wearerLocation == null) {
+        if (viewerPosition == null || wearerLocation == null) {
             return false;
         }
-        return viewerLocation.distanceSquared(wearerLocation) <= maxSq;
+        Position wearerPosition = BukkitRefs.toPosition(wearerLocation);
+        return wearerPosition.distanceTo(viewerPosition) <= maxBlocks;
     }
 
-    // The squared cull radius for the eligible-viewer pass: an absent viewer-distance uses the renderer default radius,
-    // an authored 0 disables the cull (Double.MAX_VALUE → every online viewer is a candidate, falling back to the
-    // packet appearance view-range for distance fading), and a positive value is that flat block radius.
-    private static double cullRadiusSquared(OptionalDouble viewerDistance) {
+    /** Publish {@code player}'s live position to the shared snapshot. Must run on the player's own region thread. */
+    private void snapshotSelf(Player player) {
+        Location location = player.getLocation();
+        if (location != null) {
+            positionSnapshots.put(player.getUniqueId(), BukkitRefs.toPosition(location));
+        }
+    }
+
+    // The cull radius in blocks for the eligible-viewer pass: an absent viewer-distance uses the renderer default
+    // radius, an authored 0 disables the cull (Double.MAX_VALUE → every online viewer is a candidate, falling back to
+    // the packet appearance view-range for distance fading), and a positive value is that flat block radius.
+    private static double cullRadiusBlocks(OptionalDouble viewerDistance) {
         double blocks = viewerDistance.orElse(DEFAULT_VIEWER_DISTANCE_BLOCKS);
         if (blocks <= 0) {
             return Double.MAX_VALUE;
         }
-        return blocks * blocks;
+        return blocks;
     }
 
     private ConditionContext conditionContext(Player player) {

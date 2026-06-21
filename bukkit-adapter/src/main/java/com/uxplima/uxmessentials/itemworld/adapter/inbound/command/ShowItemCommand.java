@@ -74,16 +74,20 @@ public final class ShowItemCommand extends ItemworldCommandSupport implements Co
                 hand.getType().getKey().toString(),
                 "amount",
                 String.valueOf(hand.getAmount()));
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            PlayerRef who = BukkitRefs.toRef(viewer);
-            services.kernel()
-                    .messageSink()
-                    .deliver(
-                            who,
-                            services.kernel()
-                                    .messages()
-                                    .resolve(who, ItemworldMessageKey.SHOWITEM_BROADCAST, placeholders));
-        }
+        // The online roster is enumerated on the global region thread (Folia forbids iterating
+        // Bukkit.getOnlinePlayers() off it); the sink then resolves per viewer and hops to their region thread.
+        services.kernel().scheduler().onGlobal(() -> {
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                PlayerRef who = BukkitRefs.toRef(viewer);
+                services.kernel()
+                        .messageSink()
+                        .deliver(
+                                who,
+                                services.kernel()
+                                        .messages()
+                                        .resolve(who, ItemworldMessageKey.SHOWITEM_BROADCAST, placeholders));
+            }
+        });
         reply(ctx, ItemworldMessageKey.SHOWITEM_SHOWN);
     }
 }

@@ -99,8 +99,9 @@ public final class PresenceWiring {
                 org.bukkit.Material.CLOCK,
                 "uxmessentials.presence.gui",
                 settingsView::open));
-        List<CommandRegistration> commands = new ArrayList<>(PresenceCommands.all(services, kernel.messages()));
-        commands.add(new PresenceSettingsCommand(services, kernel.messages(), settingsView));
+        List<CommandRegistration> commands =
+                new ArrayList<>(PresenceCommands.all(services, kernel.messages(), kernel.scheduler()));
+        commands.add(new PresenceSettingsCommand(services, kernel.messages(), kernel.scheduler(), settingsView));
         List<Listener> listeners = listeners(kernel, settings, services, store, visibility, notifier);
         return new Wired(commands, listeners, sweep, store, services, running, clock);
     }
@@ -120,7 +121,7 @@ public final class PresenceWiring {
             listeners.add(new AfkPickupListener(store, notifier));
         }
         if (settings.sleepIgnoresAfk()) {
-            listeners.add(new SleepExclusionListener(store));
+            listeners.add(new SleepExclusionListener(store, kernel.scheduler()));
         }
         return List.copyOf(listeners);
     }

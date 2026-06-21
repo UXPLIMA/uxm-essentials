@@ -100,6 +100,10 @@ class PacketNametagPresenterTest {
         NametagVanish vanish = (viewer, target) -> !viewer.uuid().equals(blind.getUniqueId());
         PacketNametagPresenter presenter = presenter(singleFormat("default", DisplayCondition.always()), vanish);
         NametagFormat format = presenter.selectFor(wearer).orElseThrow();
+        // Each player publishes their own position on their own thread before any cull runs in production; mirror that.
+        presenter.snapshotForTest(wearer);
+        presenter.snapshotForTest(seer);
+        presenter.snapshotForTest(blind);
 
         List<Player> eligible = presenter.eligibleViewers(wearer, format);
 
@@ -129,6 +133,8 @@ class PacketNametagPresenterTest {
         NametagVanish vanish = (viewer, target) -> !viewer.uuid().equals(blind.getUniqueId());
         PacketNametagPresenter presenter = presenter(singleFormat("default", DisplayCondition.always()), vanish);
         NametagFormat selected = presenter.selectFor(wearer).orElseThrow();
+        presenter.snapshotForTest(wearer);
+        presenter.snapshotForTest(blind);
 
         assertThat(presenter.eligibleViewers(wearer, selected)).doesNotContain(blind);
     }
@@ -145,6 +151,10 @@ class PacketNametagPresenterTest {
                 new NametagVisibility(DisplayCondition.always(), false, true, OptionalDouble.of(10.0)))));
         PacketNametagPresenter presenter = presenter(config, alwaysVisible());
         NametagFormat selected = presenter.selectFor(wearer).orElseThrow();
+        // Publish each viewer's post-teleport position the way each player's own reconcile would before a cull.
+        presenter.snapshotForTest(wearer);
+        presenter.snapshotForTest(near);
+        presenter.snapshotForTest(far);
 
         List<Player> eligible = presenter.eligibleViewers(wearer, selected);
 
@@ -158,6 +168,8 @@ class PacketNametagPresenterTest {
         PlayerMock viewer = server.addPlayer();
         PacketNametagPresenter presenter =
                 presenter(singleFormat("default", DisplayCondition.always()), alwaysVisible());
+        // The viewer was already online and reconciled, so they have published their position for the wearer's cull.
+        presenter.snapshotForTest(viewer);
 
         presenter.show(wearer);
 

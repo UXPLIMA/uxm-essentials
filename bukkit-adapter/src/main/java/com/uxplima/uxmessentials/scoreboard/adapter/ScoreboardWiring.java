@@ -23,10 +23,13 @@ import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilit
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.hud.scoreboard.SidebarManager;
 import org.jspecify.annotations.NullMarked;
 
@@ -91,7 +94,8 @@ public final class ScoreboardWiring {
         List<CommandRegistration> commands =
                 List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages(), settingsView));
         List<Listener> listeners = List.of(new ScoreboardConnectionListener(renderer, kernel.scheduler()));
-        return new Wired(commands, listeners, renderer, renderTask, running, visibility, settingsView);
+        return new Wired(
+                commands, listeners, renderer, renderTask, running, visibility, settingsView, kernel.scheduler());
     }
 
     private static SidebarManager sidebarManager(NameVisibilityCoordinator nameVisibility) {
@@ -117,6 +121,8 @@ public final class ScoreboardWiring {
      * @param running the flag flipped false on stop so the render timer exits
      * @param visibility the per-player "hidden" preference store, exposed for the {@code scoreboard_*} PAPI seam
      * @param settingsView the per-player settings panel registered on the {@code /uxmess gui} hub
+     * @param scheduler the kernel scheduler, used to enumerate the roster on the global thread and clear each board
+     *     on its owner's region thread when the module stops
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -125,7 +131,8 @@ public final class ScoreboardWiring {
             ScoreboardRenderTask renderTask,
             AtomicBoolean running,
             ScoreboardVisibilityStore visibility,
-            ScoreboardSettingsView settingsView) {
+            ScoreboardSettingsView settingsView,
+            Scheduler scheduler) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -135,6 +142,7 @@ public final class ScoreboardWiring {
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(visibility, "visibility");
             Objects.requireNonNull(settingsView, "settingsView");
+            Objects.requireNonNull(scheduler, "scheduler");
         }
 
         /** Arm the render timer. */
@@ -142,12 +150,24 @@ public final class ScoreboardWiring {
             renderTask.start();
         }
 
-        /** Stop the render timer and tear down every active board so a disable/reload leaves no stale display. */
+        /**
+         * Stop the render timer and tear down every active board so a disable/reload leaves no stale display. The
+         * roster is enumerated on the global region thread (Folia forbids iterating {@code Bukkit.getOnlinePlayers()}
+         * off it) and each board is cleared on its owner's entity thread, where {@code setScoreboard} is valid.
+         */
         public void stop() {
             running.set(false);
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                renderer.clear(player);
-            }
+            scheduler.onGlobal(() -> {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    PlayerRef ref = BukkitRefs.toRef(player);
+                    scheduler.onEntity(ref, () -> {
+                        Player live = Bukkit.getPlayer(ref.uuid());
+                        if (live != null && live.isOnline()) {
+                            renderer.clear(live);
+                        }
+                    });
+                }
+            });
         }
     }
 }

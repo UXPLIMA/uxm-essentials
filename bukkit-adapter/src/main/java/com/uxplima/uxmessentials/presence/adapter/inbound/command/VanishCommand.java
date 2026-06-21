@@ -11,6 +11,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -24,8 +25,8 @@ public final class VanishCommand extends PresenceCommandSupport implements Comma
 
     private static final String PERMISSION = "uxmessentials.vanish.use";
 
-    public VanishCommand(PresenceServices services, Messages messages) {
-        super(services, messages);
+    public VanishCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+        super(services, messages, scheduler);
     }
 
     @Override

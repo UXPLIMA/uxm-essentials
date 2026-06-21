@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -80,15 +81,18 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
 
     private final Supplier<ListDisplayMode> listDisplay;
     private final Supplier<ListDisplayMode> previewDisplay;
+    private final Scheduler scheduler;
 
     public KitCommand(
             KitServices services,
             Messages messages,
             Supplier<ListDisplayMode> listDisplay,
-            Supplier<ListDisplayMode> previewDisplay) {
+            Supplier<ListDisplayMode> previewDisplay,
+            Scheduler scheduler) {
         super(services, messages);
         this.listDisplay = Objects.requireNonNull(listDisplay, "listDisplay");
         this.previewDisplay = Objects.requireNonNull(previewDisplay, "previewDisplay");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
@@ -148,7 +152,13 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         if (target.isEmpty()) {
             return 0;
         }
-        services.claimKit().claimFor(ref(sender), target.get(), KitId.of(ctx.getArgument("name", String.class)));
+        PlayerRef actor = ref(sender);
+        PlayerRef recipient = target.get();
+        KitId kit = KitId.of(ctx.getArgument("name", String.class));
+        // The grant mutates the RECIPIENT's inventory/world (BukkitKitGranter) and spawns effects in their world,
+        // so it must run on the recipient's region thread, not the giving sender's — hop onto the recipient's
+        // entity thread. A self-claim goes through claimSelf and stays on the player's own thread.
+        scheduler.onEntity(recipient, () -> services.claimKit().claimFor(actor, recipient, kit));
         return Command.SINGLE_SUCCESS;
     }
 

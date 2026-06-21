@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -36,8 +37,8 @@ public final class NickCommand extends PresenceCommandSupport implements Command
     private static final String OTHERS_PERMISSION = "uxmessentials.nick.others";
     private static final String OFF = "off";
 
-    public NickCommand(PresenceServices services, Messages messages) {
-        super(services, messages);
+    public NickCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+        super(services, messages, scheduler);
     }
 
     @Override

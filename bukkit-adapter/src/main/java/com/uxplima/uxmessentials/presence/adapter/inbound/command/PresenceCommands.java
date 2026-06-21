@@ -5,6 +5,7 @@ import java.util.List;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -22,15 +23,15 @@ public final class PresenceCommands {
     private PresenceCommands() {}
 
     /** Every presence command, in surface order. */
-    public static List<CommandRegistration> all(PresenceServices services, Messages messages) {
+    public static List<CommandRegistration> all(PresenceServices services, Messages messages, Scheduler scheduler) {
         return List.of(
-                new AfkCommand(services, messages),
-                new VanishCommand(services, messages),
-                new ListCommand(services, messages),
-                new RealnameCommand(services, messages),
-                new NickCommand(services, messages),
-                new WhoisCommand(services, messages),
-                new GcCommand(services, messages),
-                new StaffCommand(services, messages));
+                new AfkCommand(services, messages, scheduler),
+                new VanishCommand(services, messages, scheduler),
+                new ListCommand(services, messages, scheduler),
+                new RealnameCommand(services, messages, scheduler),
+                new NickCommand(services, messages, scheduler),
+                new WhoisCommand(services, messages, scheduler),
+                new GcCommand(services, messages, scheduler),
+                new StaffCommand(services, messages, scheduler));
     }
 }

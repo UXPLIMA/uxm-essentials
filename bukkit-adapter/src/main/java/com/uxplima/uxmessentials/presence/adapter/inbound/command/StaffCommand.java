@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -38,8 +39,8 @@ public final class StaffCommand extends PresenceCommandSupport implements Comman
     private static final MessageKey STAFF_LIST = PresenceMessageKey.STAFF_LIST;
     private static final MessageKey STAFF_EMPTY = PresenceMessageKey.STAFF_EMPTY;
 
-    public StaffCommand(PresenceServices services, Messages messages) {
-        super(services, messages);
+    public StaffCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+        super(services, messages, scheduler);
     }
 
     @Override
@@ -57,14 +58,18 @@ public final class StaffCommand extends PresenceCommandSupport implements Comman
 
     private int run(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        List<String> names = collectStaffNames(sender);
-        if (names.isEmpty()) {
-            feedback.send(sender, STAFF_EMPTY, Map.of());
-            return Command.SINGLE_SUCCESS;
-        }
-        Map<String, String> placeholders =
-                Map.of("count", String.valueOf(names.size()), "players", String.join(", ", names));
-        feedback.send(sender, STAFF_LIST, placeholders);
+        // The roster (staff membership + per-viewer canSee) is read on the global region thread (Folia forbids
+        // iterating Bukkit.getOnlinePlayers() off it); the one reply then lands on the sender's own thread.
+        scheduler.onGlobal(() -> {
+            List<String> names = collectStaffNames(sender);
+            if (names.isEmpty()) {
+                replyOnSenderThread(sender, () -> feedback.send(sender, STAFF_EMPTY, Map.of()));
+                return;
+            }
+            Map<String, String> placeholders =
+                    Map.of("count", String.valueOf(names.size()), "players", String.join(", ", names));
+            replyOnSenderThread(sender, () -> feedback.send(sender, STAFF_LIST, placeholders));
+        });
         return Command.SINGLE_SUCCESS;
     }
 

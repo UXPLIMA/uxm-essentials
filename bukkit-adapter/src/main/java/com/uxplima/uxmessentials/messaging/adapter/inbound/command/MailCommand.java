@@ -135,7 +135,8 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
             return 0;
         }
         PlayerRef from = ref(sender);
-        // Snapshot the online roster on the tick thread (the only safe place to read it), then fan the durable
+        // Snapshot the online roster here, on the global region thread Paper dispatches this Brigadier handler on —
+        // the one thread where Bukkit.getOnlinePlayers() is consistently readable on Folia — then fan the durable
         // per-recipient mail writes off-tick so the broadcast never blocks the tick.
         List<PlayerRef> recipients = onlineRecipients();
         services.scheduler().async(() -> {

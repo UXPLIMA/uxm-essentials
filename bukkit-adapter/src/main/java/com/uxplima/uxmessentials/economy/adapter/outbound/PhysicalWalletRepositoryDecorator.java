@@ -32,8 +32,10 @@ import org.jspecify.annotations.NullMarked;
  * in the player's live inventory, so every read or mutation here touches the Bukkit inventory/world API and must
  * run on that player's region (entity) thread — Folia forbids the off-thread inventory access the previous
  * version performed. The repository contract is synchronous, so each physical branch marshals its inventory work
- * onto the holder's entity thread (or the global region thread for a baltop scan) through the injected
- * {@link Scheduler} and waits for the result. When the caller already owns the target thread the work runs
+ * onto the holder's entity thread through the injected {@link Scheduler} and waits for the result; the baltop scan
+ * enumerates the roster on the global region thread and then reads each holder's inventory on that holder's own
+ * entity thread, joining the per-player results off the tick thread. When the caller already owns the target thread
+ * the work runs
  * inline rather than scheduling onto itself and blocking — that self-schedule-and-wait is a deadlock, and was
  * the cause of the {@code /baltop} marshalling timeouts. Off the owning thread the bounded wait is the standard
  * anti-corruption bridge; the entity branch passes a retired callback so a player who logs off mid-flight
@@ -213,23 +215,79 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
         if (!currency.isPhysical()) {
             return delegate.top(currency, limit);
         }
-        // The physical baltop scans every online inventory; do it on the global region thread where the roster
-        // is consistent, then sort and trim off-thread.
-        List<BaltopRow> rows = onGlobal(
-                () -> {
-                    List<BaltopRow> collected = new ArrayList<>();
-                    for (Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
-                        BigDecimal bal = calculations.getBalance(player, currency);
-                        if (bal.signum() > 0) {
-                            collected.add(new BaltopRow(
-                                    new PlayerRef(player.getUniqueId(), player.getName()), Money.of(currency, bal)));
-                        }
-                    }
-                    return collected;
-                },
-                new ArrayList<>());
+        // The physical baltop reads every online inventory, but on Folia each inventory is owned by that player's
+        // region thread, not the global thread — reading them all from a single global block is torn. So enumerate
+        // the roster on the global thread (where Bukkit.getOnlinePlayers() is consistent), then read each player's
+        // balance on their own entity thread into a per-player future, and join + aggregate off the tick thread.
+        List<PlayerRef> online = onGlobal(this::onlinePlayerRefs, List.of());
+        List<BaltopRow> rows = new ArrayList<>();
+        for (Map.Entry<PlayerRef, CompletableFuture<Optional<BaltopRow>>> entry : readEach(currency, online)) {
+            await(entry.getValue(), Optional.<BaltopRow>empty()).ifPresent(rows::add);
+        }
         rows.sort((r1, r2) -> r2.balance().amount().compareTo(r1.balance().amount()));
         return rows.size() > limit ? new ArrayList<>(rows.subList(0, limit)) : rows;
+    }
+
+    /** Snapshot the online players to refs — only legal on the global region thread. */
+    private List<PlayerRef> onlinePlayerRefs() {
+        List<PlayerRef> refs = new ArrayList<>();
+        for (Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
+            refs.add(new PlayerRef(player.getUniqueId(), player.getName()));
+        }
+        return refs;
+    }
+
+    /**
+     * Dispatch a per-player physical-balance read onto each player's entity thread, returning a future per ref.
+     * A non-positive balance maps to empty so only holders rank; a player who logs off mid-flight completes empty
+     * through the retired callback. The reads are dispatched first and awaited afterwards (in {@link #top}) so the
+     * inventory scans run concurrently across regions rather than serialising one global block.
+     */
+    private List<Map.Entry<PlayerRef, CompletableFuture<Optional<BaltopRow>>>> readEach(
+            Currency currency, List<PlayerRef> online) {
+        List<Map.Entry<PlayerRef, CompletableFuture<Optional<BaltopRow>>>> futures = new ArrayList<>(online.size());
+        for (PlayerRef ref : online) {
+            futures.add(Map.entry(ref, onEntityAsync(ref, player -> baltopRow(currency, ref, player))));
+        }
+        return futures;
+    }
+
+    /** The player's physical balance as a ranked row, or empty when they hold none of {@code currency}. */
+    private Optional<BaltopRow> baltopRow(Currency currency, PlayerRef ref, Player player) {
+        BigDecimal bal = calculations.getBalance(player, currency);
+        return bal.signum() > 0 ? Optional.of(new BaltopRow(ref, Money.of(currency, bal))) : Optional.empty();
+    }
+
+    /**
+     * Schedule {@code work} on {@code owner}'s entity thread, completing the returned future with its result.
+     * When this thread already owns the entity's region the work runs inline and the future is pre-completed,
+     * for the same deadlock reason as {@link #onEntity}; otherwise a retired callback completes the future empty
+     * if the entity is gone before the task runs.
+     */
+    private CompletableFuture<Optional<BaltopRow>> onEntityAsync(
+            PlayerRef owner, java.util.function.Function<Player, Optional<BaltopRow>> work) {
+        CompletableFuture<Optional<BaltopRow>> future = new CompletableFuture<>();
+        if (scheduler.ownsEntity(owner)) {
+            Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+            future.complete(player == null || !player.isOnline() ? Optional.empty() : work.apply(player));
+            return future;
+        }
+        scheduler.onEntity(
+                owner,
+                () -> {
+                    Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+                    if (player == null || !player.isOnline()) {
+                        future.complete(Optional.empty());
+                        return;
+                    }
+                    try {
+                        future.complete(work.apply(player));
+                    } catch (RuntimeException failure) {
+                        future.completeExceptionally(failure);
+                    }
+                },
+                () -> future.complete(Optional.empty()));
+        return future;
     }
 
     /**

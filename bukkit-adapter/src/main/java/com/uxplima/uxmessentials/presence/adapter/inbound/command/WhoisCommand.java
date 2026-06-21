@@ -20,7 +20,10 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -39,8 +42,8 @@ public final class WhoisCommand extends PresenceCommandSupport implements Comman
     private static final String PERMISSION = "uxmessentials.whois.use";
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
-    public WhoisCommand(PresenceServices services, Messages messages) {
-        super(services, messages);
+    public WhoisCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+        super(services, messages, scheduler);
     }
 
     @Override
@@ -64,16 +67,34 @@ public final class WhoisCommand extends PresenceCommandSupport implements Comman
     private int run(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String query = StringArgumentType.getString(ctx, "player");
-        Player match = findVisibleMatch(sender, query);
-        if (match == null) {
-            feedback.send(sender, PresenceMessageKey.WHOIS_NOT_FOUND, Map.of("query", query));
-            return Command.SINGLE_SUCCESS;
-        }
-        feedback.send(sender, PresenceMessageKey.WHOIS_RESULT, summary(match));
+        // The roster (names + display names + per-viewer canSee) is read on the global region thread (Folia forbids
+        // iterating Bukkit.getOnlinePlayers() off it); the matched player's live status fields are then read on that
+        // player's own entity thread, and the one reply lands on the sender's own thread.
+        scheduler.onGlobal(() -> {
+            Player match = findVisibleMatch(sender, query);
+            if (match == null) {
+                replyOnSenderThread(
+                        sender,
+                        () -> feedback.send(sender, PresenceMessageKey.WHOIS_NOT_FOUND, Map.of("query", query)));
+                return;
+            }
+            PlayerRef matchRef = BukkitRefs.toRef(match);
+            scheduler.onEntity(matchRef, () -> {
+                Player live = Bukkit.getPlayer(matchRef.uuid());
+                if (live == null || !live.isOnline()) {
+                    replyOnSenderThread(
+                            sender,
+                            () -> feedback.send(sender, PresenceMessageKey.WHOIS_NOT_FOUND, Map.of("query", query)));
+                    return;
+                }
+                Map<String, String> summary = summary(live);
+                replyOnSenderThread(sender, () -> feedback.send(sender, PresenceMessageKey.WHOIS_RESULT, summary));
+            });
+        });
         return Command.SINGLE_SUCCESS;
     }
 
-    /** The placeholder bundle the result line renders: identity plus live status fields. */
+    /** The placeholder bundle the result line renders: identity plus live status fields, read on the target's thread. */
     private static Map<String, String> summary(Player match) {
         return Map.of(
                 "name", match.getName(),

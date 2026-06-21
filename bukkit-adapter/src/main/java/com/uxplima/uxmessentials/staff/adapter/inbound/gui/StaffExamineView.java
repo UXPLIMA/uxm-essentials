@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.staff.adapter.inbound.gui;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -30,9 +31,11 @@ import org.jspecify.annotations.NullMarked;
  * (ping/gamemode/health/world) regardless — so the gadget always tells the staff member something even when the
  * inventory open degrades.
  *
- * <p>Building and opening a live window touches the entity, so both the open and each click run on the looking
- * staff member's entity region thread through the {@code Scheduler} port. The picker title and the per-head
- * label are styled here; the info line resolves through the {@link Messages} catalog in the looker's locale.
+ * <p>The online roster is enumerated on the global region thread (iterating {@code Bukkit.getOnlinePlayers()} off
+ * it is illegal on Folia) and snapshotted to plain {@link PlayerRef}s; building and opening the live window then
+ * runs on the looking staff member's entity region thread through the {@code Scheduler} port, and each click runs
+ * there too. The picker title and the per-head label are styled here; the info line resolves through the
+ * {@link Messages} catalog in the looker's locale.
  */
 @NullMarked
 public final class StaffExamineView {
@@ -52,29 +55,34 @@ public final class StaffExamineView {
         this.services = Objects.requireNonNull(services, "services");
     }
 
-    /** Open the examine picker for {@code looker}, on their entity region thread. */
+    /** Open the examine picker for {@code looker}: enumerate the roster on the global thread, build it on theirs. */
     public void open(Player looker, PlayerRef lookerRef) {
         Objects.requireNonNull(looker, "looker");
         Objects.requireNonNull(lookerRef, "lookerRef");
-        scheduler.onEntity(lookerRef, () -> buildAndOpen(looker, lookerRef));
+        scheduler.onGlobal(() -> {
+            List<PlayerRef> roster = Bukkit.getOnlinePlayers().stream()
+                    .map(online -> new PlayerRef(online.getUniqueId(), online.getName()))
+                    .toList();
+            scheduler.onEntity(lookerRef, () -> buildAndOpen(looker, lookerRef, roster));
+        });
     }
 
-    private void buildAndOpen(Player looker, PlayerRef lookerRef) {
+    private void buildAndOpen(Player looker, PlayerRef lookerRef, List<PlayerRef> roster) {
         PaginatedGui gui = Guis.paginated()
                 .title(StyledText.render(PICKER_TITLE))
                 .rows(PICKER_ROWS)
                 .build();
-        for (Player online : Bukkit.getOnlinePlayers()) {
+        for (PlayerRef online : roster) {
             gui.addPageItem(headFor(looker, lookerRef, gui, online));
         }
         gui.open(looker);
     }
 
-    private GuiItem headFor(Player looker, PlayerRef lookerRef, PaginatedGui gui, Player target) {
+    private GuiItem headFor(Player looker, PlayerRef lookerRef, PaginatedGui gui, PlayerRef target) {
         ItemStack head = ItemBuilder.of(Material.PLAYER_HEAD)
-                .name(Component.text(target.getName()))
+                .name(Component.text(target.name()))
                 .build();
-        java.util.UUID targetId = target.getUniqueId();
+        java.util.UUID targetId = target.uuid();
         return GuiItem.button(head, event -> examine(looker, lookerRef, gui, targetId));
     }
 

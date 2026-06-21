@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.messaging.application.port.StaffAudience;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import org.jspecify.annotations.NullMarked;
@@ -19,6 +20,13 @@ import org.jspecify.annotations.NullMarked;
  * <p>The toggling player is skipped (they already get their own {@code STAFF_MODE_ON}/{@code OFF} feedback), so
  * the alert is the rest of the roster learning of the change. Bound only when the messaging module is enabled;
  * with messaging off the subscription is never wired, so a toggle simply produces no roster alert.
+ *
+ * <p><b>Threading.</b> Unlike {@code /helpop} and {@code /staffchat} (Brigadier handlers on the global region
+ * thread), this alert is driven by the {@code /staffmode} enter/exit domain events, which fire synchronously on
+ * the <i>target's entity</i> region thread. Enumerating the roster there would be an off-global cross-region read
+ * that tears on Folia, so the audience read and the per-recipient delivery both run inside a single
+ * {@code scheduler.onGlobal} hop. The {@link MessageSink} then re-targets each delivery to the recipient's own
+ * entity thread, so no thread ever blocks waiting on another — the fan-out is push-shaped, never request-reply.
  */
 @NullMarked
 public final class MessagingStaffAlerts {
@@ -26,12 +34,15 @@ public final class MessagingStaffAlerts {
     private final StaffAudience audience;
     private final MessageSink sink;
     private final Messages messages;
+    private final Scheduler scheduler;
     private final String audienceNode;
 
-    public MessagingStaffAlerts(StaffAudience audience, MessageSink sink, Messages messages, String audienceNode) {
+    public MessagingStaffAlerts(
+            StaffAudience audience, MessageSink sink, Messages messages, Scheduler scheduler, String audienceNode) {
         this.audience = Objects.requireNonNull(audience, "audience");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.messages = Objects.requireNonNull(messages, "messages");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.audienceNode = Objects.requireNonNull(audienceNode, "audienceNode");
     }
 
@@ -49,11 +60,13 @@ public final class MessagingStaffAlerts {
 
     private void broadcast(PlayerRef who, StaffMessageKey key) {
         Map<String, String> placeholders = Map.of("player", who.name());
-        for (PlayerRef recipient : audience.onlineWith(audienceNode)) {
-            if (recipient.uuid().equals(who.uuid())) {
-                continue;
+        scheduler.onGlobal(() -> {
+            for (PlayerRef recipient : audience.onlineWith(audienceNode)) {
+                if (recipient.uuid().equals(who.uuid())) {
+                    continue;
+                }
+                sink.deliver(recipient, messages.resolve(recipient, key, placeholders));
             }
-            sink.deliver(recipient, messages.resolve(recipient, key, placeholders));
-        }
+        });
     }
 }

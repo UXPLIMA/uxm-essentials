@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -36,8 +37,8 @@ public final class ListCommand extends PresenceCommandSupport implements Command
     private static final String PERMISSION = "uxmessentials.list.use";
     private static final MessageKey LIST_PLAYERS = PresenceMessageKey.LIST_PLAYERS;
 
-    public ListCommand(PresenceServices services, Messages messages) {
-        super(services, messages);
+    public ListCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
+        super(services, messages, scheduler);
     }
 
     @Override
@@ -60,10 +61,14 @@ public final class ListCommand extends PresenceCommandSupport implements Command
 
     private int run(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        List<String> names = collectVisibleNames(sender);
-        String joined = String.join(", ", names);
-        Map<String, String> placeholders = Map.of("count", String.valueOf(names.size()), "players", joined);
-        feedback.send(sender, LIST_PLAYERS, placeholders);
+        // The roster (names + per-viewer canSee) is read on the global region thread (Folia forbids iterating
+        // Bukkit.getOnlinePlayers() off it); the one reply then lands on the sender's own thread.
+        scheduler.onGlobal(() -> {
+            List<String> names = collectVisibleNames(sender);
+            String joined = String.join(", ", names);
+            Map<String, String> placeholders = Map.of("count", String.valueOf(names.size()), "players", joined);
+            replyOnSenderThread(sender, () -> feedback.send(sender, LIST_PLAYERS, placeholders));
+        });
         return Command.SINGLE_SUCCESS;
     }
 

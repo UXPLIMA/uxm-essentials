@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -28,9 +29,11 @@ import org.jspecify.annotations.NullMarked;
  * {@code uxmessentials.communication.clearchat.exempt} keeps their scrollback (the blank lines skip them), so
  * an admin can audit what was on screen. Stateless — no DB and no persistence.
  *
- * <p>The blank lines and the confirmations both flow through the {@link MessageSink} / {@link CommunicationNotifier},
- * which hop to each viewer's region thread inside the sink, so the fan-out never touches a Bukkit scheduler. The
- * flushed players get a {@link CommunicationMessageKey#CLEARCHAT_CLEARED} notice and the actor a
+ * <p>The online roster is enumerated on the global region thread (Folia forbids iterating
+ * {@code Bukkit.getOnlinePlayers()} off it); the blank lines and the confirmations then flow through the
+ * {@link MessageSink} / {@link CommunicationNotifier}, which hop to each viewer's region thread inside the sink, so
+ * the fan-out never touches a Bukkit scheduler. The flushed players get a
+ * {@link CommunicationMessageKey#CLEARCHAT_CLEARED} notice and the actor a
  * {@link CommunicationMessageKey#CLEARCHAT_BY} confirmation carrying their name.
  */
 @NullMarked
@@ -43,11 +46,13 @@ public final class ClearChatCommand extends CommunicationCommandSupport implemen
 
     private final CommunicationNotifier notifier;
     private final MessageSink sink;
+    private final Scheduler scheduler;
 
-    public ClearChatCommand(Messages messages, CommunicationNotifier notifier, MessageSink sink) {
+    public ClearChatCommand(Messages messages, CommunicationNotifier notifier, MessageSink sink, Scheduler scheduler) {
         super(messages);
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
@@ -70,11 +75,13 @@ public final class ClearChatCommand extends CommunicationCommandSupport implemen
 
     private int run(CommandContext<CommandSourceStack> ctx) {
         String actor = ctx.getSource().getSender().getName();
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (!viewer.hasPermission(EXEMPT_PERMISSION)) {
-                flush(BukkitRefs.toRef(viewer));
+        scheduler.onGlobal(() -> {
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                if (!viewer.hasPermission(EXEMPT_PERMISSION)) {
+                    flush(BukkitRefs.toRef(viewer));
+                }
             }
-        }
+        });
         // Console may run /clearchat as an operator action; only a player actor gets the chat confirmation.
         if (ctx.getSource().getSender() instanceof Player sender) {
             notifier.send(ref(sender), CommunicationMessageKey.CLEARCHAT_BY, Map.of("player", actor));

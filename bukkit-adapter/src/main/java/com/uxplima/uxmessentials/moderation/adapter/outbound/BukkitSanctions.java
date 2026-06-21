@@ -66,6 +66,10 @@ public final class BukkitSanctions implements Sanctions {
 
     @Override
     public Collection<PlayerRef> onlinePlayers() {
+        // The only caller, the KickAll use case, is reached solely from the /kickall Brigadier handler, which
+        // Paper dispatches on the global region thread — the one thread where Bukkit.getOnlinePlayers() is
+        // consistently readable on Folia. The enumeration is therefore already on the correct thread and needs
+        // no onGlobal hop; each per-target kick still hops to that player's own entity thread (see kick()).
         return server.getOnlinePlayers().stream().map(BukkitRefs::toRef).toList();
     }
 

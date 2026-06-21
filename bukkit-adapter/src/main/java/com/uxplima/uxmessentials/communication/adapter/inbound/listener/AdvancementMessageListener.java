@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -46,7 +47,13 @@ import org.jspecify.annotations.Nullable;
  * <p><b>Vanish.</b> Whether the earner is vanished is asked of an injected {@link Predicate} so the listener stays
  * decoupled from the presence context; the wiring supplies the soft-coupled check (Bukkit's {@code Player#canSee}
  * visibility graph, the same seam messaging and nametags use), which degrades to "never vanished" when presence is
- * absent. A vanished earner's advancement is suppressed and never broadcast.
+ * absent. A vanished earner's advancement is suppressed and never broadcast. The predicate enumerates the whole
+ * roster and reads every other player's {@code canSee} visibility — a cross-region read that tears on Folia off the
+ * global region — so the vanish test and the broadcast decision both run inside a single {@code scheduler.onGlobal}
+ * hop, where the roster and the visibility graph are consistently readable. Clearing the vanilla line is the one
+ * piece that stays on the firing thread (a {@code PlayerAdvancementDoneEvent} mutation must be applied synchronously
+ * before the handler returns); it is cleared unconditionally once the filter says announce, so deferring only the
+ * vanish/broadcast decision keeps the exact suppression semantics.
  *
  * <p><b>Template.</b> The operator template (a per-advancement override or the global one) is rendered per viewer:
  * {@code {player}} is the earner's name, {@code {advancement}} the namespaced key, {@code {title}} and
@@ -62,8 +69,10 @@ import org.jspecify.annotations.Nullable;
  * is English-only, so that locale is {@link Locale#ENGLISH}. A title already built from literal text passes through the
  * render unchanged.
  *
- * <p>The event fires on the earner's region thread; the {@link ChannelBroadcaster} performs its own
- * global-enumerate then per-entity hops, so the handler just builds the per-viewer render and hands it over.
+ * <p>The event fires on the earner's region thread. The handler clears the vanilla line there, then hops the vanish
+ * test and the broadcast decision onto {@code scheduler.onGlobal} (the only thread that can read the roster's
+ * {@code canSee} graph consistently on Folia); the {@link ChannelBroadcaster} then performs its own per-entity hops
+ * for delivery, so no region thread ever blocks waiting on a cross-region read.
  */
 @NullMarked
 public final class AdvancementMessageListener implements Listener {
@@ -75,6 +84,7 @@ public final class AdvancementMessageListener implements Listener {
     private final ChannelBroadcaster channels;
     private final BroadcastOptOutStore optOut;
     private final Predicate<Player> vanished;
+    private final Scheduler scheduler;
     private final Locale locale;
 
     public AdvancementMessageListener(
@@ -82,11 +92,13 @@ public final class AdvancementMessageListener implements Listener {
             ChannelBroadcaster channels,
             BroadcastOptOutStore optOut,
             Predicate<Player> vanished,
+            Scheduler scheduler,
             Locale locale) {
         this.config = Objects.requireNonNull(config, "config");
         this.channels = Objects.requireNonNull(channels, "channels");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
         this.vanished = Objects.requireNonNull(vanished, "vanished");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.locale = Objects.requireNonNull(locale, "locale");
     }
 
@@ -100,16 +112,21 @@ public final class AdvancementMessageListener implements Listener {
         if (!AdvancementFilter.shouldAnnounce(cfg, key, isRecipe(key), announceable)) {
             return;
         }
-        // A vanished earner's advancement is hidden entirely: drop the vanilla line and do not broadcast.
-        if (vanished.test(earner)) {
-            event.message(null);
-            return;
-        }
-        // We are announcing our own notice — clear the vanilla line so the player does not see it twice.
+        // The vanilla line is cleared in both surviving outcomes (vanished earner, or our own broadcast), so clear it
+        // here on the firing thread — the event mutation must be applied synchronously before this handler returns.
         event.message(null);
-        String template = substitute(AdvancementFilter.templateFor(cfg, key), earner.getName(), key, display, locale);
-        @Nullable Sound sound = cfg.sound().map(BukkitRegistryKeys::resolveSound).orElse(null);
-        channels.broadcast(viewer -> render(viewer, template), cfg.channels(), sound);
+        // The vanish check enumerates the roster and reads every other player's canSee, which only the global region
+        // can read consistently on Folia; the broadcast decision rides the same hop so a vanished earner is suppressed
+        // there rather than after a cross-region read. Per-recipient delivery hops onEntity inside the broadcaster.
+        scheduler.onGlobal(() -> {
+            if (vanished.test(earner)) {
+                return;
+            }
+            String template =
+                    substitute(AdvancementFilter.templateFor(cfg, key), earner.getName(), key, display, locale);
+            @Nullable Sound sound = cfg.sound().map(BukkitRegistryKeys::resolveSound).orElse(null);
+            channels.broadcast(viewer -> render(viewer, template), cfg.channels(), sound);
+        });
     }
 
     /** The per-viewer notice, or {@code null} to skip a viewer who has opted out of broadcasts. */

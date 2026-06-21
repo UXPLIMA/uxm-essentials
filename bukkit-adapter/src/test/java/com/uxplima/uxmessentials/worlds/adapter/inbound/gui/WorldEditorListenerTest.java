@@ -99,6 +99,7 @@ class WorldEditorListenerTest {
     private WorldMainView mainView;
     private WorldGenerationView generationView;
     private WorldPropertyGridView gridView;
+    private RecordingScheduler servicesScheduler;
 
     @BeforeEach
     void setUp() {
@@ -126,6 +127,7 @@ class WorldEditorListenerTest {
         when(unloadWorld.unload(any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
                 .thenReturn(Result.ok());
 
+        servicesScheduler = new RecordingScheduler();
         WorldsServices services = services();
         WorldEditorListener listener =
                 new WorldEditorListener(listView, mainView, generationView, gridView, services, repository, engine);
@@ -206,6 +208,18 @@ class WorldEditorListenerTest {
         verifyNoInteractions(setWorldProperty, loadWorld, unloadWorld);
     }
 
+    @Test
+    void clickingTheLoadToggleRunsTheWorldLoadOnTheGlobalThread() {
+        mainView.open(viewer, ref(viewer), WORLD);
+
+        fireClick(22, ClickType.LEFT); // the MAIN hub's load-toggle slot
+
+        // The world load/unload reaches WorldCreator/server.unloadWorld, legal under Folia only on the global
+        // region thread, so the listener must hop there rather than run on the click (entity) thread.
+        verify(loadWorld).load(ref(viewer), WORLD);
+        assertThat(servicesScheduler.globalHops).isGreaterThanOrEqualTo(1);
+    }
+
     private void fireClick(int slot, ClickType type) {
         server.getPluginManager().callEvent(clickEvent(slot, type));
     }
@@ -252,7 +266,7 @@ class WorldEditorListenerTest {
                 mock(PregenWorld.class),
                 mock(GameRuleCatalog.class),
                 repository,
-                new SyncScheduler(),
+                servicesScheduler,
                 Set::of,
                 mock(WorldTeleportService.class),
                 mock(BackupWorld.class),
@@ -391,6 +405,37 @@ class WorldEditorListenerTest {
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** Runs every task inline (so views open synchronously) but counts the global hops the load toggle uses. */
+    private static final class RecordingScheduler implements Scheduler {
+        private int globalHops;
+
+        @Override
+        public void onGlobal(Runnable task) {
+            globalHops++;
             task.run();
         }
 

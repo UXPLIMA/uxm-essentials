@@ -116,7 +116,7 @@ public final class OfflineContainerView {
         Inventory menu = Bukkit.createInventory(
                 holder, OfflineInventory.ENDER_SIZE, title(looker, subject, PlayerstateMessageKey.ENDERSEE_TITLE));
         holder.attach(menu);
-        seedEnder(menu, snapshot.ender());
+        EnderLayout.seedSlots(menu, snapshot.ender());
         open.add(holder);
         looker.openInventory(menu);
     }
@@ -129,7 +129,7 @@ public final class OfflineContainerView {
         if (holder.kind() == Kind.INVENTORY) {
             persistInventory(holder.target(), InvseeLayout.readSlots(menu));
         } else {
-            persistEnder(holder.target(), readEnder(menu));
+            persistEnder(holder.target(), EnderLayout.readSlots(menu));
         }
     }
 
@@ -153,37 +153,12 @@ public final class OfflineContainerView {
             scheduler.onEntity(subject, () -> {
                 Player target = Bukkit.getPlayer(subject.uuid());
                 if (target != null && target.isOnline()) {
-                    applyEnderToLive(target, ender);
+                    EnderLayout.applySlots(ender, target);
                 }
             });
         } else {
             scheduler.async(() -> storage.saveEnderChest(subject.uuid(), ender));
         }
-    }
-
-    private static void seedEnder(Inventory menu, @Nullable ItemStack[] ender) {
-        for (int slot = 0; slot < OfflineInventory.ENDER_SIZE; slot++) {
-            menu.setItem(slot, copy(slot < ender.length ? ender[slot] : null));
-        }
-    }
-
-    private static @Nullable ItemStack[] readEnder(Inventory menu) {
-        @Nullable ItemStack[] ender = new ItemStack[OfflineInventory.ENDER_SIZE];
-        for (int slot = 0; slot < OfflineInventory.ENDER_SIZE; slot++) {
-            ender[slot] = copy(menu.getItem(slot));
-        }
-        return ender;
-    }
-
-    private static void applyEnderToLive(Player target, @Nullable ItemStack[] ender) {
-        Inventory chest = target.getEnderChest();
-        for (int slot = 0; slot < OfflineInventory.ENDER_SIZE && slot < chest.getSize(); slot++) {
-            chest.setItem(slot, copy(slot < ender.length ? ender[slot] : null));
-        }
-    }
-
-    private static @Nullable ItemStack copy(@Nullable ItemStack stack) {
-        return stack == null || stack.getType().isAir() ? null : stack.clone();
     }
 
     private Component title(Player viewer, PlayerRef subject, MessageKey key) {

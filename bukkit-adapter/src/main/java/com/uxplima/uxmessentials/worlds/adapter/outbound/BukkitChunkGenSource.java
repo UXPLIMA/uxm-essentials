@@ -29,6 +29,12 @@ public final class BukkitChunkGenSource implements ChunkGenSource {
     @Override
     public CompletableFuture<?> generate(WorldName world, int chunkX, int chunkZ) {
         Objects.requireNonNull(world, "world");
+        // Driven from the pregen job's repeatGlobal tick (the global region thread). getChunkAtAsync is the
+        // Folia-safe async chunk primitive: it does not load/generate inline on the calling thread, it schedules
+        // the work on the chunk's owning region and completes the future when ready, so requesting a far chunk
+        // from the global thread is tolerated. If a future Folia build were to reject far-chunk requests from the
+        // global region, the fallback is to wrap this call in scheduler.onRegion(chunkPosition, ...) so the request
+        // originates on the owning region thread.
         @Nullable World w = server.getWorld(world.value());
         return w == null ? CompletableFuture.completedFuture(null) : w.getChunkAtAsync(chunkX, chunkZ);
     }

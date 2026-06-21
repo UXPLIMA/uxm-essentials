@@ -163,6 +163,59 @@ class PhysicalWalletRepositoryDecoratorTest {
         }
     }
 
+    /**
+     * A scheduler that owns no thread but runs every task inline, recording each entity hop and counting global
+     * hops. Lets the baltop test assert the per-player inventory reads are dispatched onto each player's own entity
+     * thread (Folia ownership) after the roster is enumerated on the global thread, rather than read from one block.
+     */
+    private static final class RecordingEntityScheduler implements Scheduler {
+        private final List<PlayerRef> entityHops = new ArrayList<>();
+        private int globalHops;
+
+        @Override
+        public void onGlobal(Runnable task) {
+            globalHops++;
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            entityHops.add(player);
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+            entityHops.add(player);
+            task.run();
+        }
+
+        @Override
+        public boolean onGlobalThread() {
+            return false;
+        }
+
+        @Override
+        public boolean ownsEntity(PlayerRef player) {
+            return false;
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(java.time.Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
     /** Resolves online state from the MockBukkit server so the decorator's online/offline branches are exercised. */
     private final class ServerPlayerLookup implements PlayerLookup {
         @Override
@@ -326,6 +379,30 @@ class PhysicalWalletRepositoryDecoratorTest {
         assertThat(rows).hasSize(2);
         assertThat(rows.get(0).balance().amount()).isEqualByComparingTo(BigDecimal.valueOf(80));
         assertThat(rows.get(1).balance().amount()).isEqualByComparingTo(BigDecimal.valueOf(20));
+    }
+
+    @Test
+    void testTop_ReadsEachInventoryOnThatPlayersEntityThread() {
+        PlayerMock rich = server.addPlayer("Rich");
+        PlayerMock poor = server.addPlayer("Poor");
+        when(calculations.getBalance(eq(rich), eq(gems))).thenReturn(BigDecimal.valueOf(80));
+        when(calculations.getBalance(eq(poor), eq(gems))).thenReturn(BigDecimal.valueOf(20));
+
+        // A scheduler that owns no thread: the roster is enumerated on the global thread, then each inventory is
+        // read on that player's own entity thread (Folia ownership), not all from the global block.
+        RecordingEntityScheduler recording = new RecordingEntityScheduler();
+        PhysicalWalletRepositoryDecorator perEntity = new PhysicalWalletRepositoryDecorator(
+                delegate, pendingRepo, calculations, registry, recording, new ServerPlayerLookup(), log());
+
+        List<BaltopRow> rows = assertReturnsBefore(Duration.ofSeconds(2), () -> perEntity.top(gems, 10));
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).balance().amount()).isEqualByComparingTo(BigDecimal.valueOf(80));
+        assertThat(rows.get(1).balance().amount()).isEqualByComparingTo(BigDecimal.valueOf(20));
+        assertThat(recording.entityHops)
+                .extracting(PlayerRef::uuid)
+                .containsExactlyInAnyOrder(rich.getUniqueId(), poor.getUniqueId());
+        assertThat(recording.globalHops).isGreaterThanOrEqualTo(1);
     }
 
     @Test

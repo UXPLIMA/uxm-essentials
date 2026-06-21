@@ -293,7 +293,7 @@ class CommunicationAdapterTest {
 
     private BukkitAnnouncerBroadcaster announcerBroadcaster() {
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), settings.announcerDisplay());
-        return new BukkitAnnouncerBroadcaster(sink, optOutStore, channels, this::conditionContext);
+        return new BukkitAnnouncerBroadcaster(sink, optOutStore, channels, this::conditionContext, new SyncScheduler());
     }
 
     private ConditionContext conditionContext(org.bukkit.entity.Player who) {

@@ -112,7 +112,18 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
 
     private void move(Player sender, Player target) {
         if (pull == Pull.GO) {
-            hop(ref(sender), TeleportRefs.positionOf(target));
+            // GO reads the TARGET's live location to send the actor there. On Folia the target's position is
+            // owned by the target's region thread, not the sender's, so resolve it on the target's entity thread,
+            // snapshot it to an immutable Position, and only then hand it to the executor (which teleports the
+            // sender Folia-safely). BRING reads the sender's OWN location, which is region-local here.
+            PlayerRef actor = ref(sender);
+            PlayerRef subject = ref(target);
+            services.scheduler().onEntity(subject, () -> {
+                Player live = org.bukkit.Bukkit.getPlayer(subject.uuid());
+                if (live != null && live.isOnline()) {
+                    hop(actor, TeleportRefs.positionOf(live));
+                }
+            });
         } else {
             hop(ref(target), TeleportRefs.positionOf(sender));
         }

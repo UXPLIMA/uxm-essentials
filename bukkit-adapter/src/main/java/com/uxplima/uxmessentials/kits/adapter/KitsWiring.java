@@ -178,7 +178,8 @@ public final class KitsWiring {
                 services,
                 kernel.messages(),
                 () -> ListDisplayMode.from(ctx.config()),
-                () -> ListDisplayMode.from(ctx.config(), SHOWKIT_DISPLAY_KEY));
+                () -> ListDisplayMode.from(ctx.config(), SHOWKIT_DISPLAY_KEY),
+                kernel.scheduler());
 
         ChatPromptListener promptListener = new ChatPromptListener(kernel.messages());
         KitSettingsView settingsView = new KitSettingsView(kernel.messages(), kernel.scheduler(), settingsLayout);

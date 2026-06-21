@@ -100,9 +100,37 @@ class BukkitAnnouncerBroadcasterTest {
         assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("peek");
     }
 
+    @Test
+    void theStringBroadcastFansOutOnTheGlobalRegionThread() {
+        RecordingScheduler recording = new RecordingScheduler();
+        ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
+        RecordingSink sink = new RecordingSink();
+        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
+                sink, optOut, channels, BukkitAnnouncerBroadcasterTest::alwaysContext, recording);
+
+        broadcaster.broadcast("hello");
+
+        assertThat(recording.globalTasks).isOne();
+        assertThat(sink.deliveredTo(alice.getUniqueId())).isTrue();
+    }
+
+    @Test
+    void onlineCountIsResolvedOnTheGlobalRegionThread() {
+        RecordingScheduler recording = new RecordingScheduler();
+        ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
+        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
+                new ThrowingSink(), optOut, channels, BukkitAnnouncerBroadcasterTest::alwaysContext, recording);
+        java.util.concurrent.atomic.AtomicInteger seen = new java.util.concurrent.atomic.AtomicInteger(-1);
+
+        broadcaster.withOnlineCount(seen::set);
+
+        assertThat(recording.globalTasks).isOne();
+        assertThat(seen).hasValue(1); // exactly Alice is online
+    }
+
     private BukkitAnnouncerBroadcaster broadcaster(Function<Player, ConditionContext> ctx) {
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());
-        return new BukkitAnnouncerBroadcaster(new ThrowingSink(), optOut, channels, ctx);
+        return new BukkitAnnouncerBroadcaster(new ThrowingSink(), optOut, channels, ctx, new SyncScheduler());
     }
 
     private static Announcement chat(DisplayCondition condition, String line) {
@@ -160,6 +188,51 @@ class BukkitAnnouncerBroadcasterTest {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
             throw new AssertionError("the rich announcement path must not use the MessageSink");
+        }
+    }
+
+    /** Like {@link SyncScheduler} but counts the {@code onGlobal} hops so the global-thread fan-out is assertable. */
+    private static final class RecordingScheduler implements Scheduler {
+        private int globalTasks;
+
+        @Override
+        public void onGlobal(Runnable task) {
+            globalTasks++;
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** Records which viewers the legacy {@code /broadcast} string path delivered to, by UUID. */
+    private static final class RecordingSink implements com.uxplima.uxmessentials.shared.application.port.MessageSink {
+        private final Set<java.util.UUID> viewers = ConcurrentHashMap.newKeySet();
+
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {
+            viewers.add(viewer.uuid());
+        }
+
+        boolean deliveredTo(java.util.UUID uuid) {
+            return viewers.contains(uuid);
         }
     }
 

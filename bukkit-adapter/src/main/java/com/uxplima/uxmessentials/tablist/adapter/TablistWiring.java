@@ -11,9 +11,12 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.tablist.adapter.inbound.listener.TablistConnectionListener;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.BukkitMojangProfileSource;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistRenderTask;
@@ -91,13 +94,19 @@ public final class TablistWiring {
                 Bukkit::getOnlinePlayers,
                 kernel.log());
         TablistRenderer renderer = new TablistRenderer(
-                settings::formats, animations, packets, skinResolver, Bukkit::getOnlinePlayers, suppression);
+                settings::formats,
+                animations,
+                packets,
+                skinResolver,
+                Bukkit::getOnlinePlayers,
+                kernel.scheduler(),
+                suppression);
         TablistRenderTask renderTask = new TablistRenderTask(
                 kernel.scheduler(), renderer, animations, settings::refreshInterval, running::get);
 
         List<CommandRegistration> commands = List.of();
         List<Listener> listeners = List.of(new TablistConnectionListener(renderer));
-        return new Wired(commands, listeners, renderer, renderTask, running);
+        return new Wired(commands, listeners, renderer, renderTask, running, kernel.scheduler());
     }
 
     /** Bridges {@link TablistSuppression}'s connection seam onto uxmLib's {@link PacketPipeline} inject/eject. */
@@ -129,13 +138,16 @@ public final class TablistWiring {
      * @param renderer the per-player renderer, used to clear header/footer on stop
      * @param renderTask the self-rescheduling render timer, armed by the caller
      * @param running the flag flipped false on stop so the render timer exits
+     * @param scheduler the kernel scheduler, used to enumerate the roster on the global thread and clear each
+     *     viewer's tablist on its owner's region thread when the module stops
      */
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
             TablistRenderer renderer,
             TablistRenderTask renderTask,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            Scheduler scheduler) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -143,6 +155,7 @@ public final class TablistWiring {
             Objects.requireNonNull(renderer, "renderer");
             Objects.requireNonNull(renderTask, "renderTask");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(scheduler, "scheduler");
         }
 
         /** Arm the render timer. */
@@ -153,13 +166,23 @@ public final class TablistWiring {
         /**
          * Stop the render timer and clear every active header/footer, list name/order/skin, and filler entry so a
          * disable/reload leaves no stale tablist and no orphaned filler row. {@link TablistRenderer#clear} removes the
-         * filler entries it painted for each viewer by their tracked UUIDs.
+         * filler entries it painted for each viewer by their tracked UUIDs. The roster is enumerated on the global
+         * region thread (Folia forbids iterating {@code Bukkit.getOnlinePlayers()} off it) and each viewer's tablist
+         * is cleared on its owner's entity thread.
          */
         public void stop() {
             running.set(false);
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                renderer.clear(player);
-            }
+            scheduler.onGlobal(() -> {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    PlayerRef ref = BukkitRefs.toRef(player);
+                    scheduler.onEntity(ref, () -> {
+                        Player live = Bukkit.getPlayer(ref.uuid());
+                        if (live != null && live.isOnline()) {
+                            renderer.clear(live);
+                        }
+                    });
+                }
+            });
         }
     }
 }

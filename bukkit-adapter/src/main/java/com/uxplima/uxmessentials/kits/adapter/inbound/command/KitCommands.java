@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,7 +34,8 @@ public final class KitCommands {
             KitServices services,
             Messages messages,
             Supplier<ListDisplayMode> listDisplay,
-            Supplier<ListDisplayMode> previewDisplay) {
-        return List.of(new KitCommand(services, messages, listDisplay, previewDisplay));
+            Supplier<ListDisplayMode> previewDisplay,
+            Scheduler scheduler) {
+        return List.of(new KitCommand(services, messages, listDisplay, previewDisplay, scheduler));
     }
 }

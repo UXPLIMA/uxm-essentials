@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
@@ -91,7 +92,11 @@ public final class CommunicationWiring {
         CommunicationServices services = assemble(kernel, settings, optOutStore, random, notifier);
         ChannelBroadcaster channelBroadcaster = new ChannelBroadcaster(kernel.scheduler(), settings.announcerDisplay());
         BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
-                kernel.messageSink(), optOutStore, channelBroadcaster, CommunicationWiring::conditionContext);
+                kernel.messageSink(),
+                optOutStore,
+                channelBroadcaster,
+                CommunicationWiring::conditionContext,
+                kernel.scheduler());
         AnnouncerTask announcer = new AnnouncerTask(
                 kernel.scheduler(), services.nextAnnouncement(), broadcaster, settings::announcerConfig, running::get);
         // The admin panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader. It
@@ -125,7 +130,15 @@ public final class CommunicationWiring {
                 settings));
         commands.add(new CommunicationGuiCommand(adminView, kernel.messages()));
         List<Listener> listeners = listeners(
-                services, registry, infoSender, settings, chatLock, notifier, channelBroadcaster, optOutStore);
+                services,
+                registry,
+                infoSender,
+                settings,
+                chatLock,
+                notifier,
+                channelBroadcaster,
+                optOutStore,
+                kernel.scheduler());
         return new Wired(List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminView);
     }
 
@@ -167,7 +180,8 @@ public final class CommunicationWiring {
             ChatLock chatLock,
             CommunicationNotifier notifier,
             ChannelBroadcaster channelBroadcaster,
-            BroadcastOptOutStore optOutStore) {
+            BroadcastOptOutStore optOutStore,
+            Scheduler scheduler) {
         return List.of(
                 new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings),
                 new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
@@ -177,7 +191,8 @@ public final class CommunicationWiring {
                         settings::advancementNotices,
                         channelBroadcaster,
                         optOutStore,
-                        CommunicationWiring::isVanished,
+                        CommunicationWiring::probeVanished,
+                        scheduler,
                         Locale.ENGLISH),
                 new ChatLockListener(chatLock, notifier));
     }
@@ -190,8 +205,13 @@ public final class CommunicationWiring {
      * presence is disabled nobody is hidden, {@code canSee} is always true, and the earner is never resolved as
      * vanished, so the feature degrades to "broadcast everyone's advancement" without depending on presence directly.
      * A solo earner (no other online player) is never vanished here — there is no one to be hidden from.
+     *
+     * <p>This enumerates the whole roster and reads every other player's {@code canSee} visibility — a cross-region
+     * read that tears on Folia off the global region — so it is only legal on the global region thread. The
+     * advancement listener already runs this predicate inside a {@code scheduler.onGlobal} hop, so the read here is a
+     * plain inline scan with no marshal of its own.
      */
-    private static boolean isVanished(Player earner) {
+    private static boolean probeVanished(Player earner) {
         for (Player other : earner.getServer().getOnlinePlayers()) {
             if (!other.equals(earner) && !other.canSee(earner)) {
                 return true;
