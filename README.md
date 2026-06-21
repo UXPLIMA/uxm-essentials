@@ -2,12 +2,12 @@
 
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Java 25](https://img.shields.io/badge/Java-25-orange.svg)](https://adoptium.net/)
-[![Paper 1.21.11](https://img.shields.io/badge/Paper-1.21.11-brightgreen.svg)](https://papermc.io/)
+[![Paper 26.1.2](https://img.shields.io/badge/Paper-26.1.2-brightgreen.svg)](https://papermc.io/)
 [![Folia](https://img.shields.io/badge/Folia-ready-success.svg)](https://docs.papermc.io/folia)
 [![Modules](https://img.shields.io/badge/modules-22-blueviolet.svg)](#modules)
 [![Version](https://img.shields.io/badge/version-0.2.0-informational.svg)](#)
 
-The all-in-one essentials suite for **Paper 1.21.11** servers, on **Java 25**. Homes, warps, teleports, a
+The all-in-one essentials suite for **Paper 26.1.2** servers, on **Java 25**. Homes, warps, teleports, a
 real economy, kits, vaults, moderation, a staff mode, holograms, NPCs, scoreboards, a vote engine, multi-world
 management — the entire day-to-day toolkit a survival or network server needs — built as **22 independent
 feature modules** behind one clean, fully configurable plugin.
@@ -18,7 +18,7 @@ so it can be re-worded or recoloured without touching code, and **every module s
 management GUI** so you configure holograms, NPCs, warps, vaults, and moderation by clicking, not by editing
 files.
 
-It is built **Paper 1.21.11 only, on purpose** — current API used the way it is meant to be used,
+It is built **Paper 26.1.2 only, on purpose** — current API used the way it is meant to be used,
 **Folia-ready from line one**, balances and vaults **database-backed** so they survive world rollbacks, and
 verified by Error Prone, NullAway null-safety, Spotless formatting, ArchUnit architecture rules, and an
 extensive MockBukkit/JUnit test suite.
@@ -54,7 +54,7 @@ extensive MockBukkit/JUnit test suite.
 
 ## Why uxmEssentials
 
-- **One platform, done well.** Paper 1.21.11 and Java 25 only — no legacy cross-version reflection to drag
+- **One platform, done well.** Paper 26.1.2 and Java 25 only — no legacy cross-version reflection to drag
   around, just the current server API used natively.
 - **Genuinely modular.** Twenty-two feature modules, each toggled on its own. A disabled module instantiates
   zero adapters, registers zero commands and listeners, runs zero migrations, and holds zero state.
@@ -75,10 +75,10 @@ extensive MockBukkit/JUnit test suite.
 
 | | |
 | --- | --- |
-| Server | Paper **1.21.11** (build `26.1.2`), or a Paper fork (Folia / Purpur / Pufferfish) |
+| Server | Paper **26.1.2** (build 71), or a Paper fork (Folia / Purpur / Pufferfish) |
 | Java | **25** |
 | Optional | PlaceholderAPI · Vault / VaultUnlocked / Treasury · a Votifier-compatible vote listener · LuckPerms |
-| Clients | any version a server-side ViaVersion supports can connect — the **server** must be 1.21.11 |
+| Clients | any version a server-side ViaVersion supports can connect — the **server** must be 26.1.2 |
 
 > Spigot and CraftBukkit are **not** supported — uxmEssentials uses `paper-plugin.yml`, Brigadier, and
 > bundled Adventure, which only Paper and its forks provide.
@@ -294,7 +294,7 @@ graph LR
 - **Architecture tests** — ArchUnit fences the domain off from Bukkit, forbids `BukkitScheduler` and legacy
   command handlers, and keeps module boundaries clean. Drift guards keep the docs, permissions, and message
   catalogs in lockstep with the code.
-- **Tests** — JUnit 5, AssertJ, Mockito, MockBukkit (Paper 1.21 line), Testcontainers, and jqwik property
+- **Tests** — JUnit 5, AssertJ, Mockito, MockBukkit (Paper 26.1.2), Testcontainers, and jqwik property
   tests.
 - Built on **[uxmLib](https://github.com/siracozmen01/uxmLib)**, the sibling toolkit that provides the GUI
   framework, item builder, config, storage, and the in-house packet layer.
