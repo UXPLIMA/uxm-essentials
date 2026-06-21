@@ -1,14 +1,12 @@
 package com.uxplima.uxmessentials.playerstate.adapter.outbound;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -17,41 +15,45 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@link NearbyPlayers} implementation for {@code /near}: the players within a radius of the viewer in the
- * same world, ordered nearest-first. It reads the viewer's live location on the viewer's region thread (the
- * thread the synchronous {@code within} call runs on), then reads every candidate's live position.
+ * same world, ordered nearest-first.
  *
  * <p>Scanning every other player's {@link Player#getLocation()} from the viewer's region thread is a torn read on
- * Folia — each player's position is owned by that player's own region. The candidate positions are therefore read
- * on the global region thread (where the whole roster is consistently readable) and snapshotted to plain
- * {@link Location}s before the distance maths runs; {@code /near} is a low-frequency info command, so the brief
- * global hop is acceptable. The {@code within} contract is synchronous, so the read is marshalled with a bounded
- * wait — and runs inline when the caller already owns the global thread, since scheduling onto the owning thread
- * and then blocking on it would deadlock. The radius filter and nearest-first sort are unchanged.
+ * Folia — each player's position is owned by that player's own region. The whole scan therefore runs on the
+ * global region thread (where the entire roster is consistently readable): it reads the viewer's live location,
+ * snapshots every candidate's position, filters by radius, sorts nearest-first, and hands the result to the
+ * supplied callback. The flow is push-shaped, not request-reply: the viewer's region thread schedules the scan
+ * and returns immediately, never blocking on the global read. {@code onResolved} runs on the global thread, so
+ * it must only forward the result to a sink that re-targets each delivery to the recipient's own thread.
  */
 @NullMarked
 public final class BukkitNearbyPlayers implements NearbyPlayers {
 
-    private static final Duration MARSHAL_TIMEOUT = Duration.ofSeconds(5);
-
     private final Scheduler scheduler;
-    private final Logger log;
 
-    public BukkitNearbyPlayers(Scheduler scheduler, Logger log) {
+    public BukkitNearbyPlayers(Scheduler scheduler) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.log = Objects.requireNonNull(log, "log");
     }
 
     @Override
-    public List<Nearby> within(PlayerRef viewer, int radius) {
+    public void within(PlayerRef viewer, int radius, Consumer<List<Nearby>> onResolved) {
         Objects.requireNonNull(viewer, "viewer");
-        Player self = Bukkit.getPlayer(viewer.uuid());
+        Objects.requireNonNull(onResolved, "onResolved");
+        scheduler.onGlobal(() -> onResolved.accept(scan(viewer.uuid(), radius)));
+    }
+
+    /**
+     * Compute the nearby list for {@code viewerId} at {@code radius}. Runs on the global region thread, where the
+     * viewer's location and every candidate's location are all readable without tearing. An offline viewer yields
+     * an empty list.
+     */
+    private static List<Nearby> scan(UUID viewerId, int radius) {
+        Player self = Bukkit.getPlayer(viewerId);
         if (self == null || !self.isOnline()) {
             return List.of();
         }
@@ -60,8 +62,7 @@ public final class BukkitNearbyPlayers implements NearbyPlayers {
         // connected player always has); guard it at the boundary.
         Location origin = Objects.requireNonNull(self.getLocation(), "viewer location");
         double radiusSquared = (double) radius * radius;
-        List<Located> candidates = snapshotPositions(viewer.uuid(), world.getUID());
-        return candidates.stream()
+        return readPositions(viewerId, world.getUID()).stream()
                 .flatMap(candidate -> measure(origin, candidate).stream())
                 .filter(measured -> measured.squared() <= radiusSquared)
                 .sorted(Comparator.comparingDouble(Measured::squared))
@@ -69,33 +70,7 @@ public final class BukkitNearbyPlayers implements NearbyPlayers {
                 .toList();
     }
 
-    /**
-     * Snapshot every candidate's ref and live location on the global region thread, excluding the viewer and any
-     * player outside {@code worldId}. Runs inline when the caller already owns the global thread; otherwise it
-     * marshals the read onto the global thread and waits up to {@link #MARSHAL_TIMEOUT}, returning an empty list on
-     * timeout rather than blocking the viewer's region thread indefinitely.
-     */
-    private List<Located> snapshotPositions(java.util.UUID viewerId, java.util.UUID worldId) {
-        if (scheduler.onGlobalThread()) {
-            return readPositions(viewerId, worldId);
-        }
-        CompletableFuture<List<Located>> result = new CompletableFuture<>();
-        scheduler.onGlobal(() -> result.complete(readPositions(viewerId, worldId)));
-        try {
-            return result.get(MARSHAL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
-            log.warn("nearby-player scan timed out resolving roster positions on the global thread");
-            return List.of();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return List.of();
-        } catch (java.util.concurrent.ExecutionException e) {
-            log.error("nearby-player scan failed resolving roster positions", e);
-            return List.of();
-        }
-    }
-
-    private static List<Located> readPositions(java.util.UUID viewerId, java.util.UUID worldId) {
+    private static List<Located> readPositions(UUID viewerId, UUID worldId) {
         List<Located> located = new ArrayList<>();
         for (Player other : Bukkit.getOnlinePlayers()) {
             if (other.getUniqueId().equals(viewerId)) {

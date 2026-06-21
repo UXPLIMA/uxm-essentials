@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.playerstate.domain.PersonalTime;
 import com.uxplima.uxmessentials.playerstate.domain.PlayerStateSnapshot;
 import com.uxplima.uxmessentials.playerstate.domain.SpeedValue;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -171,8 +170,9 @@ class PlayerStateReconciliationTest {
         bob.teleport(alice.getLocation().clone().add(5, 0, 0));
         carol.teleport(alice.getLocation().clone().add(50, 0, 0));
 
-        NearbyPlayers nearby = new BukkitNearbyPlayers(scheduler, new NoopLogger());
-        var found = nearby.within(BukkitRefs.toRef(alice), 100);
+        NearbyPlayers nearby = new BukkitNearbyPlayers(scheduler);
+        java.util.List<NearbyPlayers.Nearby> found = new java.util.ArrayList<>();
+        nearby.within(BukkitRefs.toRef(alice), 100, found::addAll);
 
         assertThat(found).extracting(n -> n.who().name()).containsExactly("Bob", "Carol");
         assertThat(found).noneMatch(n -> n.who().uuid().equals(alice.getUniqueId())); // self excluded
@@ -281,20 +281,5 @@ class PlayerStateReconciliationTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
-    }
-
-    /** Swallows log output so the nearby scan's marshalling bridge has a logger without printing in tests. */
-    private static final class NoopLogger implements Logger {
-        @Override
-        public void info(String message, Object... args) {}
-
-        @Override
-        public void warn(String message, Object... args) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-
-        @Override
-        public void debug(String message, Object... args) {}
     }
 }

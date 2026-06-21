@@ -30,18 +30,26 @@ public final class ListNearby {
     }
 
     /** List players within the default radius of {@code viewer}. */
-    public List<NearbyPlayers.Nearby> near(PlayerRef viewer) {
-        return near(viewer, DEFAULT_RADIUS);
+    public void near(PlayerRef viewer) {
+        near(viewer, DEFAULT_RADIUS);
     }
 
-    /** List players within {@code radius} (clamped) blocks of {@code viewer}, pushing the rendered list. */
-    public List<NearbyPlayers.Nearby> near(PlayerRef viewer, int radius) {
+    /**
+     * List players within {@code radius} (clamped) blocks of {@code viewer}, pushing the rendered list. The
+     * scan resolves on the port's own thread and the rendered lines are then delivered through the notifier
+     * (which re-targets each line to the viewer's own thread), so the caller's region thread never blocks on
+     * the roster read.
+     */
+    public void near(PlayerRef viewer, int radius) {
         Objects.requireNonNull(viewer, "viewer");
         int clamped = Math.max(1, Math.min(radius, MAX_RADIUS));
-        List<NearbyPlayers.Nearby> found = nearby.within(viewer, clamped);
+        nearby.within(viewer, clamped, found -> render(viewer, clamped, found));
+    }
+
+    private void render(PlayerRef viewer, int clamped, List<NearbyPlayers.Nearby> found) {
         if (found.isEmpty()) {
             notifier.send(viewer, PlayerstateMessageKey.NEAR_EMPTY, Map.of("radius", Integer.toString(clamped)));
-            return found;
+            return;
         }
         notifier.send(
                 viewer,
@@ -53,6 +61,5 @@ public final class ListNearby {
                     PlayerstateMessageKey.NEAR_ENTRY,
                     Map.of("player", hit.who().name(), "distance", Integer.toString(hit.distance())));
         }
-        return found;
     }
 }

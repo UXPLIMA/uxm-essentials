@@ -195,14 +195,31 @@ class PlayerStateUseCasesTest {
     }
 
     @Test
-    void nearClampsTheRadiusAndReturnsTheScan() {
+    void nearClampsTheRadiusAndPushesTheRenderedScan() {
         FakeNearby nearby = new FakeNearby(List.of(new NearbyPlayers.Nearby(bob, 12)));
-        ListNearby near = new ListNearby(nearby, notifier);
+        CapturingSink sink = new CapturingSink();
+        ListNearby near = new ListNearby(nearby, new PlayerStateNotifier(new KeyMessages(), sink));
 
-        List<NearbyPlayers.Nearby> found = near.near(alice, 9_999_999);
+        near.near(alice, 9_999_999); // void: the use case never blocks on a returned list, it pushes
 
-        assertThat(found).extracting(n -> n.who().name()).containsExactly("Bob");
+        assertThat(nearby.invoked).isTrue();
         assertThat(nearby.requestedRadius).isEqualTo(ListNearby.MAX_RADIUS); // clamped to the bound
+        // header line then one entry line, both delivered through the notifier (no .get() in the flow)
+        assertThat(sink.delivered)
+                .containsExactly(PlayerstateMessageKey.NEAR_HEADER.key(), PlayerstateMessageKey.NEAR_ENTRY.key());
+    }
+
+    @Test
+    void nearPushesTheEmptyMessageWhenNobodyIsInRange() {
+        FakeNearby nearby = new FakeNearby(List.of());
+        CapturingSink sink = new CapturingSink();
+        ListNearby near = new ListNearby(nearby, new PlayerStateNotifier(new KeyMessages(), sink));
+
+        near.near(alice);
+
+        assertThat(nearby.invoked).isTrue();
+        assertThat(nearby.requestedRadius).isEqualTo(ListNearby.DEFAULT_RADIUS);
+        assertThat(sink.delivered).containsExactly(PlayerstateMessageKey.NEAR_EMPTY.key());
     }
 
     @Test
@@ -518,19 +535,25 @@ class PlayerStateUseCasesTest {
         }
     }
 
-    /** A nearby scan that returns a fixed list and records the radius it was asked for. */
+    /**
+     * A nearby scan that pushes a fixed list to the supplied callback and records the radius it was asked for.
+     * Invokes the callback inline (synchronously), standing in for the adapter's global-thread resolve — the
+     * use case must not block on or otherwise depend on a returned value, only on the push.
+     */
     private static final class FakeNearby implements NearbyPlayers {
         private final List<Nearby> result;
         private int requestedRadius;
+        private boolean invoked;
 
         FakeNearby(List<Nearby> result) {
             this.result = result;
         }
 
         @Override
-        public List<Nearby> within(PlayerRef viewer, int radius) {
+        public void within(PlayerRef viewer, int radius, java.util.function.Consumer<List<Nearby>> onResolved) {
             requestedRadius = radius;
-            return result;
+            invoked = true;
+            onResolved.accept(result);
         }
     }
 
@@ -551,9 +574,11 @@ class PlayerStateUseCasesTest {
     }
 
     private static final class CapturingSink implements MessageSink {
+        private final List<String> delivered = new ArrayList<>();
+
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
-            // discarded: feedback delivery is not under test here
+            delivered.add(renderedText);
         }
     }
 }
