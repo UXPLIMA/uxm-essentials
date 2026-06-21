@@ -144,7 +144,8 @@ public final class HomesWiring {
                 HomeCommands.all(services, kernel.messages(), kernel.scheduler()),
                 List.of(joinWarmer),
                 repository,
-                quota);
+                quota,
+                services.homeList());
     }
 
     private static HomeServices assemble(
@@ -344,15 +345,21 @@ public final class HomesWiring {
      * @param listeners the join cache-warmer the plugin registers
      * @param repository the home store the {@code homes_count} placeholder reads
      * @param quota the home-limit reducer the {@code homes_limit}/{@code homes_left} placeholders read
+     * @param listView the slot-grid home list the {@code /home} command and the management hub both open
      */
     public record Wired(
-            List<CommandRegistration> commands, List<Listener> listeners, HomeRepository repository, HomeQuota quota) {
+            List<CommandRegistration> commands,
+            List<Listener> listeners,
+            HomeRepository repository,
+            HomeQuota quota,
+            HomeListView listView) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(quota, "quota");
+            Objects.requireNonNull(listView, "listView");
         }
     }
 }

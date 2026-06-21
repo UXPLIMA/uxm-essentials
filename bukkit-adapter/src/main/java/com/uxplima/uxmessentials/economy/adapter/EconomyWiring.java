@@ -356,7 +356,8 @@ public final class EconomyWiring {
                 loanRepaymentTask,
                 maintenanceTask,
                 bankInterestTask,
-                promptCleanup);
+                promptCleanup,
+                services.walletView());
     }
 
     private static EconomyServices useCases(
@@ -580,6 +581,7 @@ public final class EconomyWiring {
      * @param registered whether this plugin registered the native provider (so stop only unregisters then)
      * @param defaultCurrency the default currency the {@code balance}/{@code baltop_position} placeholders read
      * @param amountFormat the operator-selected amount format the {@code balance_formatted} placeholder uses
+     * @param walletView the wallet dashboard the {@code /wallet} command and the management hub both open
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -601,7 +603,8 @@ public final class EconomyWiring {
             @org.jspecify.annotations.Nullable LoanRepaymentTask loanRepaymentTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask bankInterestTask,
-            Runnable promptCleanup) {
+            Runnable promptCleanup,
+            WalletGuiView walletView) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -620,6 +623,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(maintenanceTask, "maintenanceTask");
             Objects.requireNonNull(bankInterestTask, "bankInterestTask");
             Objects.requireNonNull(promptCleanup, "promptCleanup");
+            Objects.requireNonNull(walletView, "walletView");
         }
 
         /** Arm the settle, telemetry, and baltop-refresh loops. Called once after the module starts. */

@@ -261,7 +261,8 @@ public final class WorldsWiring {
                     awaitDrain(inFlight);
                 },
                 resolver,
-                worldsPlaceholders);
+                worldsPlaceholders,
+                editor.listView());
     }
 
     /** Close a stop-time handle, logging any failure rather than stranding the rest of the teardown. */
@@ -393,7 +394,8 @@ public final class WorldsWiring {
      * resolver is non-null whenever worlds wires (it is always built from the config); bootstrap captures it
      * onto the holder the plugin retains so {@code getDefaultWorldGenerator} can serve {@code generator:
      * uxmEssentials:void|flat} worlds loaded from server.properties. The placeholder seam is registered onto
-     * the shared placeholder contexts so the {@code worlds_*} tokens resolve while the module is enabled.
+     * the shared placeholder contexts so the {@code worlds_*} tokens resolve while the module is enabled. The
+     * list view is the {@code /world gui} world picker the management hub also opens.
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -401,7 +403,8 @@ public final class WorldsWiring {
             Runnable startReconcile,
             Runnable stop,
             WorldGeneratorResolver generatorResolver,
-            WorldsPlaceholders worldsPlaceholders) {
+            WorldsPlaceholders worldsPlaceholders,
+            WorldListView listView) {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
@@ -409,6 +412,7 @@ public final class WorldsWiring {
             Objects.requireNonNull(stop, "stop");
             Objects.requireNonNull(generatorResolver, "generatorResolver");
             Objects.requireNonNull(worldsPlaceholders, "worldsPlaceholders");
+            Objects.requireNonNull(listView, "listView");
         }
     }
 }

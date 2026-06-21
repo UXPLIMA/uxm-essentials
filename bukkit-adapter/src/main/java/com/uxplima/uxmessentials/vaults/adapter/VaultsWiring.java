@@ -117,6 +117,7 @@ public final class VaultsWiring {
                 VaultCommands.all(services),
                 List.of(),
                 services.view(),
+                services.selector(),
                 repository,
                 amountQuota,
                 sizeQuota,
@@ -223,6 +224,7 @@ public final class VaultsWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register (none here; the menu listener is uxmLib's)
      * @param view the GUI, held for the stop-time flush
+     * @param selector the vault selector the {@code /vault} command and the management hub both open
      * @param repository the vault store the {@code vaults_count} placeholder reads
      * @param amountQuota the vault-count reducer the {@code vaults_max}/{@code vaults_left} placeholders read
      * @param sizeQuota the per-vault size reducer the {@code vaults_size} placeholder reads
@@ -233,6 +235,7 @@ public final class VaultsWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             VaultView view,
+            VaultSelectorView selector,
             VaultRepository repository,
             VaultAmountQuota amountQuota,
             VaultSizeQuota sizeQuota,
@@ -243,6 +246,7 @@ public final class VaultsWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(view, "view");
+            Objects.requireNonNull(selector, "selector");
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(amountQuota, "amountQuota");
             Objects.requireNonNull(sizeQuota, "sizeQuota");

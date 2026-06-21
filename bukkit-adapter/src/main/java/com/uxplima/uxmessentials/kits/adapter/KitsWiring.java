@@ -205,7 +205,14 @@ public final class KitsWiring {
         Runnable stopAction = promptListener::clear;
 
         return new Wired(
-                commands, listeners, services.kitEditorView(), repository, access, services.listKits(), stopAction);
+                commands,
+                listeners,
+                services.kitEditorView(),
+                repository,
+                access,
+                services.listKits(),
+                services.kitMenu(),
+                stopAction);
     }
 
     private static KitServices assemble(
@@ -279,6 +286,7 @@ public final class KitsWiring {
      * @param repository the kit catalog the cost/cooldown placeholders read
      * @param access the claim gate the availability/permission/claims-left placeholders read
      * @param listKits the {@code /kit list} filter the usable-kit-list placeholder reads
+     * @param kitMenu the browse menu the {@code /kit} command and the management hub both open
      * @param stopAction clears any pending chat prompt on stop
      */
     public record Wired(
@@ -288,6 +296,7 @@ public final class KitsWiring {
             KitRepository repository,
             KitAccess access,
             ListKits listKits,
+            KitMenuView kitMenu,
             Runnable stopAction) {
 
         public Wired {
@@ -297,6 +306,7 @@ public final class KitsWiring {
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(access, "access");
             Objects.requireNonNull(listKits, "listKits");
+            Objects.requireNonNull(kitMenu, "kitMenu");
             Objects.requireNonNull(stopAction, "stopAction");
         }
 

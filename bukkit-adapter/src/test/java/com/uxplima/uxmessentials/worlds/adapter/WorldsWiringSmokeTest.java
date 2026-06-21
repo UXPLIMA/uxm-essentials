@@ -120,8 +120,8 @@ class WorldsWiringSmokeTest {
                 portalListener(),
                 editorListener());
 
-        WorldsWiring.Wired wired =
-                new WorldsWiring.Wired(List.of(), listeners, () -> {}, () -> {}, resolver(), placeholders());
+        WorldsWiring.Wired wired = new WorldsWiring.Wired(
+                List.of(), listeners, () -> {}, () -> {}, resolver(), placeholders(), mock(WorldListView.class));
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldAccessListener.class);
@@ -166,16 +166,16 @@ class WorldsWiringSmokeTest {
 
     @Test
     void runningTheStopHookDoesNotThrow() {
-        WorldsWiring.Wired wired =
-                new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders());
+        WorldsWiring.Wired wired = new WorldsWiring.Wired(
+                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), mock(WorldListView.class));
 
         assertThatNoException().isThrownBy(() -> wired.stop().run());
     }
 
     @Test
     void wiredExposesAWorldsPlaceholderSeam() {
-        WorldsWiring.Wired wired =
-                new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders());
+        WorldsWiring.Wired wired = new WorldsWiring.Wired(
+                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), mock(WorldListView.class));
 
         assertThat(wired.worldsPlaceholders()).isNotNull();
     }
@@ -258,8 +258,8 @@ class WorldsWiringSmokeTest {
 
     @Test
     void wiredExposesAGeneratorResolverThatResolvesTheVoidId() {
-        WorldsWiring.Wired wired =
-                new WorldsWiring.Wired(List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders());
+        WorldsWiring.Wired wired = new WorldsWiring.Wired(
+                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), mock(WorldListView.class));
 
         assertThat(wired.generatorResolver()).isNotNull();
         assertThat(wired.generatorResolver().resolve("void")).isPresent();

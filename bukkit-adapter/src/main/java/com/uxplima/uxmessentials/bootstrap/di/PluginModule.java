@@ -358,15 +358,15 @@ public final class PluginModule {
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
-            wireWorlds(plugin, ctx, persistence, resources, links, guiLayouts);
+            wireWorlds(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("homes"))) {
-            wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts);
+            wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("economy"))) {
-            wireEconomy(plugin, ctx, persistence, resources, links, bus);
+            wireEconomy(plugin, ctx, persistence, resources, links, bus, guiRegistry);
         } else if (module.id().equals(ModuleId.of("warps"))) {
-            wireWarps(ctx, persistence, resources, links, bus, guiLayouts);
+            wireWarps(ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("kits"))) {
-            wireKits(plugin, ctx, resources, links, guiLayouts);
+            wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
@@ -378,7 +378,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
-            wireVaults(plugin, ctx, persistence, resources, bus, links);
+            wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry);
         } else if (module.id().equals(ModuleId.of("communication"))) {
             wireCommunication(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
@@ -440,7 +440,8 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // worlds builds its cached jOOQ WorldRepository over persistence.dsl() and its BukkitWorldEngine over the
         // plugin's Server. It delegates /worlds tp and /worlds spawn execution to the captured teleport engine (wired
         // earlier) and charges the per-world entry fee through the economy bridge — but economy lands after worlds, so
@@ -476,6 +477,13 @@ public final class PluginModule {
         links.placeholders.worlds(wired.worldsPlaceholders());
         wired.startReconcile().run();
         resources.onClose(wired.stop());
+        // Open the same /world gui world picker from the management hub, gated by the existing world-gui node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "worlds",
+                com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey.LIST_TITLE,
+                Material.GRASS_BLOCK,
+                "uxmessentials.world.gui",
+                (player, viewer) -> wired.listView().open(player, viewer, 0)));
     }
 
     private static void wireHomes(
@@ -485,7 +493,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
         HomesWiring.Wired wired = HomesWiring.wire(
@@ -497,6 +506,13 @@ public final class PluginModule {
         // When teleport is disabled its holder is absent and this bind is a no-op.
         bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository()));
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
+        // Open the same /home slot-grid menu from the management hub, gated by the existing home-use node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "homes",
+                com.uxplima.uxmessentials.homes.application.HomesMessageKey.HOME_MENU_TITLE,
+                Material.RED_BED,
+                "uxmessentials.home.use",
+                (player, viewer) -> wired.listView().open(player, viewer)));
     }
 
     private static void bindHomeRespawn(ContextLinks links, HomeRespawnLocator locator) {
@@ -512,7 +528,8 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            Bus bus) {
+            Bus bus,
+            ManagementGuiRegistry guiRegistry) {
         EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence, bus);
         links.economyProvider = wired.provider();
         links.economyCurrency = wired.defaultCurrency();
@@ -520,6 +537,13 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         wired.start();
         resources.onClose(wired::stop);
+        // Open the same /wallet dashboard from the management hub, gated by the existing wallet node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "economy",
+                com.uxplima.uxmessentials.economy.application.EconomyMessageKey.WALLET_GUI_TITLE,
+                Material.GOLD_INGOT,
+                "uxmessentials.economy.wallet",
+                (player, viewer) -> wired.walletView().open(player, wired.defaultCurrency())));
         // Captured for warps, kits, homes, and vaults, which land after economy and charge a recorded cost
         // through it.
         links.warpEconomy = wired.warpEconomy();
@@ -545,7 +569,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "warps delegates teleport execution but the teleport engine is unavailable");
         WarpsWiring.Wired wired =
@@ -557,6 +582,15 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         links.placeholders.warps(new RepositoryWarpsPlaceholders(wired.listWarps()));
+        // Open the same /warp list browse menu from the management hub, resolving the viewer's visible warps
+        // through the identical ListWarps filter the command uses, gated by the existing warp-use node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "warps",
+                com.uxplima.uxmessentials.warps.application.WarpsMessageKey.WARP_MENU_TITLE,
+                Material.ENDER_PEARL,
+                "uxmessentials.warp.use",
+                (player, viewer) ->
+                        wired.warpMenu().open(player, viewer, wired.listWarps().available(viewer))));
     }
 
     private static void wireKits(
@@ -564,7 +598,8 @@ public final class PluginModule {
             ModuleContext ctx,
             CloseableResources resources,
             ContextLinks links,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // kits need no database: definitions live in modules/kits/kits/<id>.conf and claim/cooldown state
         // is transient PDC.
         // The per-kit cost charges through the economy bridge captured during economy wiring when present.
@@ -573,6 +608,15 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         links.placeholders.kits(new KitAccessPlaceholders(wired.repository(), wired.access(), wired.listKits()));
+        // Open the same /kit browse menu from the management hub, resolving the viewer's available kits through
+        // the identical ListKits filter the command uses, gated by the existing kit-use node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "kits",
+                com.uxplima.uxmessentials.kits.application.KitsMessageKey.KIT_MENU_TITLE,
+                Material.CHEST,
+                "uxmessentials.kit.use",
+                (player, viewer) ->
+                        wired.kitMenu().open(player, viewer, wired.listKits().available(viewer))));
     }
 
     private static void wirePlayerstate(ModuleContext ctx, CloseableResources resources, ContextLinks links) {
@@ -704,7 +748,8 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             Bus bus,
-            ContextLinks links) {
+            ContextLinks links,
+            ManagementGuiRegistry guiRegistry) {
         // vaults builds its cached jOOQ VaultRepository over persistence.dsl(), the audit logger on the dedicated
         // audit channel, the inventory-holder GUI and the InventoryClose save listener. It opts into cross-server
         // sync through the bus handle — a remote vault save invalidates exactly that vault here. The economy
@@ -719,6 +764,13 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.placeholders.vaults(
                 new RepositoryVaultsPlaceholders(wired.repository(), wired.amountQuota(), wired.sizeQuota()));
+        // Open the same /vault selector from the management hub, gated by the existing vault-use node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "vaults",
+                com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_SELECTOR_TITLE,
+                Material.ENDER_CHEST,
+                "uxmessentials.vault.use",
+                (player, viewer) -> wired.selector().open(player, viewer)));
     }
 
     private static void bindMute(

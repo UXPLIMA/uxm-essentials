@@ -164,7 +164,14 @@ public final class WarpsWiring {
                 promptListener,
                 editorListener);
         return new Wired(
-                commands, listeners, services.listWarps(), editorView, playerWarpHandle, teleportRegistry, () -> {
+                commands,
+                listeners,
+                services.listWarps(),
+                services.warpMenu(),
+                editorView,
+                playerWarpHandle,
+                teleportRegistry,
+                () -> {
                     teleportRegistry.clear();
                     // Drop any pending editor chat prompt so a leftover callback cannot fire after teardown.
                     promptListener.clear();
@@ -265,6 +272,7 @@ public final class WarpsWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the listeners to register
      * @param listWarps the visibility-filtered listing the {@code warps_*}/{@code warp_*} placeholders read
+     * @param warpMenu the browse menu the {@code /warp list} command and the management hub both open
      * @param editorView the warp editor view player-warps re-uses for its own editor entry, or {@code null}
      * @param playerWarpHandle the late-bound handle player-warps binds its repository into for the editor
      * @param teleportRegistry the warp-arrival notification handoff player-warps shares so its hops also notify
@@ -274,6 +282,7 @@ public final class WarpsWiring {
             List<CommandRegistration> commands,
             List<org.bukkit.event.Listener> listeners,
             ListWarps listWarps,
+            WarpMenuView warpMenu,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle playerWarpHandle,
@@ -284,6 +293,7 @@ public final class WarpsWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(listWarps, "listWarps");
+            Objects.requireNonNull(warpMenu, "warpMenu");
             Objects.requireNonNull(playerWarpHandle, "playerWarpHandle");
             Objects.requireNonNull(teleportRegistry, "teleportRegistry");
             Objects.requireNonNull(stopAction, "stopAction");
