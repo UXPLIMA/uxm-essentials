@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.messaging.adapter.inbound.command.MessagingCommands;
+import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitMessageDelivery;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.CanSeeVanishVisibility;
@@ -40,9 +41,12 @@ import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -65,11 +69,21 @@ public final class MessagingWiring {
     private MessagingWiring() {}
 
     /** Build the messaging adapters and use cases from {@code ctx}, the {@code persistence} DSL, and a mute gate. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Optional<MutePolicy> mute) {
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            Optional<MutePolicy> mute,
+            GuiText guiText,
+            GuiLayouts guiLayouts,
+            AnvilInput anvil) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(mute, "mute");
+        Objects.requireNonNull(guiText, "guiText");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(anvil, "anvil");
         KernelPorts kernel = ctx.kernel();
         MessagingSettings settings = new MessagingSettings(ctx.config());
         AtomicBoolean running = new AtomicBoolean(true);
@@ -90,8 +104,25 @@ public final class MessagingWiring {
                 running::get,
                 kernel.log(),
                 Clock.systemUTC());
-        List<CommandRegistration> commands = MessagingCommands.all(services, kernel.messages(), kernel.messageSink());
-        return new Wired(commands, sweep, stores, mutePolicy, afkStatus, running);
+        // The GUIs read the raw stores (so the rendered state matches in-game state) and write through the same
+        // use cases the commands hold (so notifiers and persistence stay consistent). The four stores are threaded
+        // in individually rather than as the package-private Stores record, keeping the views decoupled from it.
+        MessagingGuiViews views = MessagingGuiViews.create(
+                guiText,
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.permissions(),
+                services,
+                stores.toggles(),
+                stores.socialSpy(),
+                stores.ignores(),
+                stores.mail(),
+                kernel.playerLookup(),
+                anvil,
+                guiLayouts);
+        List<CommandRegistration> commands =
+                MessagingCommands.all(services, kernel.messages(), kernel.messageSink(), views);
+        return new Wired(commands, sweep, stores, mutePolicy, afkStatus, running, views);
     }
 
     private static MessagingServices assemble(
@@ -174,6 +205,7 @@ public final class MessagingWiring {
      * @param mutePolicy the rebindable mute gate the moderation context fills in when it wires
      * @param afkStatus the rebindable AFK status the presence context fills in when it wires
      * @param running the flag flipped false on stop so the sweep exits
+     * @param guiViews the player-facing GUIs (settings, ignore-list, mailbox), for the command and hub openers
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -181,7 +213,8 @@ public final class MessagingWiring {
             Stores stores,
             MutableMutePolicy mutePolicy,
             MutableAfkStatus afkStatus,
-            AtomicBoolean running) {
+            AtomicBoolean running,
+            MessagingGuiViews guiViews) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -190,6 +223,7 @@ public final class MessagingWiring {
             Objects.requireNonNull(mutePolicy, "mutePolicy");
             Objects.requireNonNull(afkStatus, "afkStatus");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(guiViews, "guiViews");
         }
 
         /** Arm the mail-expiry sweep. */

@@ -61,7 +61,38 @@ public enum MessagingMessageKey implements MessageKey {
     // /helpop
     HELPOP_SENT("helpop.sent"),
     HELPOP_RECEIVED("helpop.received"),
-    HELPOP_NO_STAFF("helpop.no-staff");
+    HELPOP_NO_STAFF("helpop.no-staff"),
+
+    // management GUIs — /msgsettings settings panel
+    GUI_SETTINGS_TITLE("messaging.gui.settings.title"),
+    GUI_SETTINGS_VALUE_LORE("messaging.gui.settings.value-lore"),
+    GUI_SETTINGS_BACK("messaging.gui.settings.back"),
+    GUI_SETTINGS_ACCEPT("messaging.gui.settings.accept"),
+    GUI_SETTINGS_SOCIALSPY("messaging.gui.settings.socialspy"),
+    GUI_SETTINGS_VALUE_ON("messaging.gui.settings.value-on"),
+    GUI_SETTINGS_VALUE_OFF("messaging.gui.settings.value-off"),
+
+    // management GUIs — /ignore ignore-list manager
+    GUI_IGNORE_TITLE("messaging.gui.ignore.title"),
+    GUI_IGNORE_PREV("messaging.gui.ignore.prev"),
+    GUI_IGNORE_NEXT("messaging.gui.ignore.next"),
+    GUI_IGNORE_ENTRY_NAME("messaging.gui.ignore.entry-name"),
+    GUI_IGNORE_ENTRY_LORE("messaging.gui.ignore.entry-lore"),
+    GUI_IGNORE_ADD("messaging.gui.ignore.add"),
+    GUI_IGNORE_ADD_PROMPT("messaging.gui.ignore.add-prompt"),
+
+    // management GUIs — /mail mailbox
+    GUI_MAIL_TITLE("messaging.gui.mail.title"),
+    GUI_MAIL_PREV("messaging.gui.mail.prev"),
+    GUI_MAIL_NEXT("messaging.gui.mail.next"),
+    GUI_MAIL_ENTRY_NAME("messaging.gui.mail.entry-name"),
+    GUI_MAIL_ENTRY_LORE("messaging.gui.mail.entry-lore"),
+    GUI_MAIL_CLEAR("messaging.gui.mail.clear"),
+    GUI_MAIL_CLEAR_CONFIRM("messaging.gui.mail.clear-confirm"),
+    GUI_MAIL_DETAIL_TITLE("messaging.gui.mail.detail-title"),
+    GUI_MAIL_DETAIL_NAME("messaging.gui.mail.detail-name"),
+    GUI_MAIL_DETAIL_LORE("messaging.gui.mail.detail-lore"),
+    GUI_MAIL_DETAIL_BACK("messaging.gui.mail.detail-back");
 
     private final String key;
 

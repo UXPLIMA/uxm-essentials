@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.messaging.adapter.inbound.command;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.Bukkit;
@@ -16,6 +17,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
+import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -27,14 +29,14 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /mail <read|send|sendall|clear>}: the persistent-mailbox surface. {@code read} renders the mailbox
- * and marks it read, {@code send <player> <text>} leaves a piece of mail (offline delivery, mute-gated,
+ * {@code /mail <read|send|sendall|clear>}: the persistent-mailbox surface. {@code read} renders the mailbox in
+ * chat and marks it read, {@code send <player> <text>} leaves a piece of mail (offline delivery, mute-gated,
  * ignore-aware), {@code sendall <text>} broadcasts mail to every online player (a staff/operator action
  * behind {@code uxmessentials.mail.sendall}), and {@code clear} empties the box. Each sub-command maps to one
- * use case; the bare {@code /mail} defaults to {@code read}. Mail is text-only — there are no item
- * attachments. The {@code send} target is resolved by name (mail to an offline player is valid and waits for
- * them, so this is a plain online-or-offline lookup, not the vanish-aware online-only resolution {@code /msg}
- * uses).
+ * use case; the bare {@code /mail} opens the mailbox GUI (which marks the box read on open), while
+ * {@code /mail read} keeps the chat rendering. Mail is text-only — there are no item attachments. The
+ * {@code send} target is resolved by name (mail to an offline player is valid and waits for them, so this is a
+ * plain online-or-offline lookup, not the vanish-aware online-only resolution {@code /msg} uses).
  *
  * <p><strong>{@code sendall} recipient scope:</strong> v1 broadcasts to the currently-online roster only. The
  * recipient set is snapshotted on the tick thread (the only safe place to read {@code getOnlinePlayers}) and
@@ -48,15 +50,18 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
     private static final String PERMISSION = "uxmessentials.mail.use";
     private static final String SENDALL_PERMISSION = "uxmessentials.mail.sendall";
 
-    public MailCommand(MessagingServices services, Messages messages, MessageSink sink) {
+    private final MessagingGuiViews views;
+
+    public MailCommand(MessagingServices services, Messages messages, MessageSink sink, MessagingGuiViews views) {
         super(services, messages, sink);
+        this.views = Objects.requireNonNull(views, "views");
     }
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("mail")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .executes(this::read)
+                .executes(this::openGui)
                 .then(Commands.literal("read").executes(this::read))
                 .then(Commands.literal("clear").executes(this::clear))
                 .then(Commands.literal("send")
@@ -72,7 +77,16 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
 
     @Override
     public String description() {
-        return "Read, send or clear your persistent mail.";
+        return "Open your mailbox, or read, send or clear your persistent mail.";
+    }
+
+    private int openGui(CommandContext<CommandSourceStack> ctx) {
+        Player reader = player(ctx);
+        if (reader == null) {
+            return 0;
+        }
+        views.openMailbox(reader, ref(reader));
+        return Command.SINGLE_SUCCESS;
     }
 
     private int read(CommandContext<CommandSourceStack> ctx) {

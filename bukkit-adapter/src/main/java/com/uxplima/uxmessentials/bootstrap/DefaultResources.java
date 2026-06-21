@@ -88,6 +88,9 @@ final class DefaultResources {
             "modules/playerwarps/gui/pwarp-editor.conf",
             "modules/teleport/gui/teleport-settings.conf",
             "modules/presence/gui/presence-settings.conf",
+            "modules/messaging/gui/messaging-settings.conf",
+            "modules/messaging/gui/ignore-list.conf",
+            "modules/messaging/gui/mailbox.conf",
             "modules/management/gui/hub.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");

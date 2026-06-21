@@ -370,7 +370,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
-            wireMessaging(plugin, ctx, persistence, resources, links);
+            wireMessaging(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
@@ -592,12 +592,22 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its transient reply /
         // socialspy / toggle stores in-memory/PDC. The mute gate starts on MutePolicy.NEVER and is captured
         // here so moderation rebinds it when it lands; the vanish gate degrades to "fully visible" without
         // presence.
-        MessagingWiring.Wired wired = MessagingWiring.wire(plugin, ctx, persistence, Optional.empty());
+        // The management GUIs consume the SP0 framework: a GuiText over the shared catalog, the data-folder layout
+        // loader, and a per-module anvil installed here (and torn down on close) for the ignore-list add prompt.
+        // /msgsettings opens the settings panel; /ignore and /mail with no args open the ignore-list and mailbox.
+        GuiText guiText = new GuiText(ctx.kernel().messages());
+        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
+        anvil.install();
+        resources.onClose(anvil::uninstall);
+        MessagingWiring.Wired wired =
+                MessagingWiring.wire(plugin, ctx, persistence, Optional.empty(), guiText, guiLayouts, anvil);
         wired.commands().forEach(resources::addCommand);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
@@ -606,6 +616,20 @@ public final class PluginModule {
         // The messaging PAPI seam reads the same mail/conversation/toggle/socialspy/ignore stores the messaging
         // commands hold, so a placeholder matches the player's in-game mail count and toggle state.
         links.placeholders.messaging(wired.placeholders());
+        // Register two /uxmess gui hub entries — the settings panel and the mailbox — gated by the messaging GUI
+        // node. The ignore-list opens from /ignore with no args; it is not a hub entry of its own.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "messaging-settings",
+                com.uxplima.uxmessentials.messaging.application.MessagingMessageKey.GUI_SETTINGS_TITLE,
+                Material.WRITABLE_BOOK,
+                "uxmessentials.messaging.gui",
+                (player, viewer) -> wired.guiViews().openSettings(player, viewer)));
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "messaging-mailbox",
+                com.uxplima.uxmessentials.messaging.application.MessagingMessageKey.GUI_MAIL_TITLE,
+                Material.PAPER,
+                "uxmessentials.messaging.gui",
+                (player, viewer) -> wired.guiViews().openMailbox(player, viewer)));
         // Captured for staff (wired last), which binds its staff chat to the messaging staff-audience resolver.
         links.staffAudience = new com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience();
     }

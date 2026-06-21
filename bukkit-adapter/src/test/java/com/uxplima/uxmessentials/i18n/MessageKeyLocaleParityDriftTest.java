@@ -110,7 +110,9 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(WarpsMessageKey.values(), List.of("warp")),
                 Map.entry(KitsMessageKey.values(), List.of("kit")),
                 Map.entry(PlayerstateMessageKey.values(), List.of("playerstate")),
-                Map.entry(MessagingMessageKey.values(), List.of("msg", "ignore", "socialspy", "mail", "helpop")),
+                Map.entry(
+                        MessagingMessageKey.values(),
+                        List.of("msg", "ignore", "socialspy", "mail", "helpop", "messaging")),
                 Map.entry(PresenceMessageKey.values(), List.of("afk", "vanish", "presence", "list")),
                 Map.entry(ModerationMessageKey.values(), List.of("moderation", "mute", "jail")),
                 Map.entry(ItemworldMessageKey.values(), List.of("itemworld", "give", "time", "weather")),

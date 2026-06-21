@@ -478,6 +478,12 @@ permissions:
   uxmessentials.msg.bypass.ignore:
     description: 'Reach a player who has ignored you (staff).'
     default: op
+  uxmessentials.msgsettings.use:
+    description: '/msgsettings opens your personal messaging settings panel (accept-messages, social spy).'
+    default: true
+  uxmessentials.messaging.gui:
+    description: 'See and open the messaging settings panel and mailbox on the /uxmess gui management hub.'
+    default: op
   # presence context (docs/permissions.md "Presence"). AFK is auto (idle sweep) + manual (/afk); vanish is
   # staff-only and is honoured by /list, tab, messaging /msg resolution and teleport /tpa visibility through
   # the canSee graph the presence VisibilityApplier drives.

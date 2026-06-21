@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.messaging.adapter.inbound.command;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +22,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.messaging.adapter.MutableAfkStatus;
+import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitMessageDelivery;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemoryConversationStore;
@@ -58,11 +60,14 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,6 +98,9 @@ class MessagingSendPathTest {
     private CountingScheduler scheduler;
     private VanishVisibility vanish;
     private boolean offlineToMail;
+
+    @org.junit.jupiter.api.io.TempDir
+    Path guiDir;
 
     @BeforeEach
     void setUp() {
@@ -245,9 +253,63 @@ class MessagingSendPathTest {
 
     private void executeMailRaw(CommandSourceStack source, String input) throws CommandSyntaxException {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new MailCommand(services(), new KeyMessages(), sink).build());
+        dispatcher.getRoot().addChild(new MailCommand(services(), new KeyMessages(), sink, guiViews()).build());
         dispatcher.execute(input, source);
     }
+
+    /**
+     * The GUIs back the bare {@code /mail} branch, which this command-path test never dispatches (it exercises
+     * the {@code sendall} subcommand only). Built over the same mail store and a deny-all permission seam so the
+     * instance is real but inert here.
+     */
+    private MessagingGuiViews guiViews() {
+        var plugin = MockBukkit.createMockPlugin();
+        var guiText = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyMessages());
+        var anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
+        var layouts = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(guiDir, NO_LOG);
+        return MessagingGuiViews.create(
+                guiText,
+                scheduler,
+                new KeyMessages(),
+                DENY_ALL,
+                services(),
+                new AcceptingToggles(),
+                new InMemorySocialSpyStore(),
+                new NoIgnores(),
+                mail,
+                new CapturingLookup(server),
+                anvil,
+                layouts);
+    }
+
+    /** A deny-all permission seam: the GUIs built here are inert, so nothing depends on a real check. */
+    private static final Permissions DENY_ALL = new Permissions() {
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return false;
+        }
+
+        @Override
+        public QuotaResult resolveQuota(
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+            return QuotaResult.limited(configDefault);
+        }
+    };
+
+    private static final com.uxplima.uxmessentials.shared.application.port.Logger NO_LOG =
+            new com.uxplima.uxmessentials.shared.application.port.Logger() {
+                @Override
+                public void info(String message, Object... args) {}
+
+                @Override
+                public void warn(String message, Object... args) {}
+
+                @Override
+                public void error(String message, Throwable throwable) {}
+
+                @Override
+                public void debug(String message, Object... args) {}
+            };
 
     private MessagingServices services() {
         Messages messages = new KeyMessages();
