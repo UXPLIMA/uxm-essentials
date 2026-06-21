@@ -9,6 +9,7 @@ import java.util.Objects;
 
 import org.bukkit.plugin.PluginManager;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthResult;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -20,10 +21,11 @@ import org.jspecify.annotations.NullMarked;
  * informational; a <em>configured-but-absent</em> dependency is the warning case (the classic silent failure
  * where redis is enabled in config but the server cannot reach it, or the plugin is simply not installed).
  *
- * <p>PlaceholderAPI, Vault, and Treasury are detected by plugin presence. Redis is only probed when the economy
- * module has {@code redis.enabled = true}: a short-timeout TCP connect to the configured host/port decides
- * reachable vs not. Aggregates to {@code WARN} when any configured dependency is unreachable, {@code OK}
- * otherwise.
+ * <p>PlaceholderAPI, Vault, and Treasury are detected by plugin presence. Redis is only probed when the network
+ * bus is enabled with a Redis transport ({@code network.enabled = true} and {@code network.transport} is
+ * {@code redis} or {@code both}): a short-timeout TCP connect to the configured {@code network.redis} host/port
+ * decides reachable vs not. Aggregates to {@code WARN} when any configured dependency is unreachable,
+ * {@code OK} otherwise.
  */
 @NullMarked
 public final class SoftDependencyHealthCheck implements HealthCheck {
@@ -31,11 +33,11 @@ public final class SoftDependencyHealthCheck implements HealthCheck {
     private static final int REDIS_PROBE_TIMEOUT_MILLIS = 750;
 
     private final PluginManager plugins;
-    private final ConfigStore economyConfig;
+    private final ConfigStore config;
 
-    public SoftDependencyHealthCheck(PluginManager plugins, ConfigStore economyConfig) {
+    public SoftDependencyHealthCheck(PluginManager plugins, ConfigStore config) {
         this.plugins = Objects.requireNonNull(plugins, "plugins");
-        this.economyConfig = Objects.requireNonNull(economyConfig, "economyConfig");
+        this.config = Objects.requireNonNull(config, "config");
     }
 
     @Override
@@ -59,17 +61,22 @@ public final class SoftDependencyHealthCheck implements HealthCheck {
     }
 
     private boolean appendRedis(List<String> notes) {
-        if (!economyConfig.getBoolean("redis.enabled", false)) {
+        NetworkConfig network = NetworkConfig.from(config);
+        if (!network.enabled() || !usesRedis(network.transport())) {
             return false;
         }
-        String host = economyConfig.getString("redis.host", "localhost");
-        int port = economyConfig.getInt("redis.port", 6379);
+        String host = network.redis().host();
+        int port = network.redis().port();
         if (redisReachable(host, port)) {
             notes.add("Redis reachable at " + host + ":" + port);
             return false;
         }
         notes.add("Redis configured but unreachable at " + host + ":" + port);
         return true;
+    }
+
+    private static boolean usesRedis(NetworkConfig.Transport transport) {
+        return transport == NetworkConfig.Transport.REDIS || transport == NetworkConfig.Transport.BOTH;
     }
 
     private static boolean redisReachable(String host, int port) {

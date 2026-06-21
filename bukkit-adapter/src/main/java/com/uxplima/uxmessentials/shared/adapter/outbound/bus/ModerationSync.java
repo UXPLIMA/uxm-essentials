@@ -26,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
  *       shared DB on the next chat attempt, so there is no in-memory mute state to refresh.
  * </ul>
  *
- * <p>Self-origin frames never reach the listener — the {@link BusClient} drops any frame whose origin equals
+ * <p>Self-origin frames never reach the listener — the {@link BusCore} drops any frame whose origin equals
  * this backend's id before dispatch — so the player the local {@code /ban} already kicked is never kicked
  * twice. With the bus disabled the publisher is {@link SanctionSync#NONE} and the listener is never invoked, so
  * the single-server path is unchanged.

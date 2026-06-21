@@ -9,7 +9,6 @@ import org.bukkit.Material;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.CachedWarpRepository;
-import com.uxplima.uxmessentials.persistence.warps.RedisWarpSync;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
@@ -35,8 +34,6 @@ import com.uxplima.uxmessentials.warps.application.WarpNotifier;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
-import com.uxplima.uxmessentials.warps.domain.Warp;
-import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -100,22 +97,6 @@ public final class WarpsWiring {
         cached.all();
         WarpRepository repository = WarpSync.repository(cached, bus.publisher());
 
-        // Wire Redis Pub/Sub syncing if enabled
-        boolean redisEnabled = ctx.config().getBoolean("redis.enabled", false);
-        final @org.jspecify.annotations.Nullable RedisWarpSync redisSync;
-        if (redisEnabled) {
-            String redisHost = ctx.config().getString("redis.host", "localhost");
-            int redisPort = ctx.config().getInt("redis.port", 6379);
-            String redisPassword = ctx.config().getString("redis.password", "");
-            String redisChannel = ctx.config().getString("redis.channel", "uxmessentials:warps");
-            redisSync = new RedisWarpSync(
-                    cached, redisHost, redisPort, redisPassword, redisChannel, kernel.scheduler(), kernel.log());
-            redisSync.start();
-            repository = new RedisBroadcastingRepository(repository, redisSync);
-        } else {
-            redisSync = null;
-        }
-
         WarpNotifier notifier = new WarpNotifier(kernel.messages(), kernel.messageSink());
         WarpTeleportRegistry teleportRegistry = new WarpTeleportRegistry();
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry);
@@ -177,57 +158,7 @@ public final class WarpsWiring {
                     teleportRegistry.clear();
                     // Drop any pending editor chat prompt so a leftover callback cannot fire after teardown.
                     promptListener.clear();
-                    if (redisSync != null) {
-                        redisSync.stop();
-                    }
                 });
-    }
-
-    private static final class RedisBroadcastingRepository implements WarpRepository {
-        private final WarpRepository delegate;
-        private final RedisWarpSync redisSync;
-
-        RedisBroadcastingRepository(WarpRepository delegate, RedisWarpSync redisSync) {
-            this.delegate = delegate;
-            this.redisSync = redisSync;
-        }
-
-        @Override
-        public Optional<Warp> find(WarpName name) {
-            return delegate.find(name);
-        }
-
-        @Override
-        public List<Warp> all() {
-            return delegate.all();
-        }
-
-        @Override
-        public boolean exists(WarpName name) {
-            return delegate.exists(name);
-        }
-
-        @Override
-        public void save(Warp warp) {
-            delegate.save(warp);
-            redisSync.publish(warp.name().value());
-        }
-
-        @Override
-        public void delete(WarpName name) {
-            delegate.delete(name);
-            redisSync.publish(name.value());
-        }
-
-        @Override
-        public void rate(WarpName name, java.util.UUID player, double rating) {
-            delegate.rate(name, player, rating);
-        }
-
-        @Override
-        public double averageRating(WarpName name) {
-            return delegate.averageRating(name);
-        }
     }
 
     private static WarpServices assemble(

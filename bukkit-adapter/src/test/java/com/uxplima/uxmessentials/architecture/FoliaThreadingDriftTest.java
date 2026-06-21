@@ -154,7 +154,7 @@ class FoliaThreadingDriftTest {
                 pkg + "tablist.adapter.TablistWiring",
                 "GLOBAL: module stop() tear-down enumerates inside scheduler.onGlobal");
         allow.put(
-                pkg + "shared.adapter.outbound.bus.BusClient",
+                pkg + "shared.adapter.outbound.bus.PluginMessagingTransport",
                 "GLOBAL: cross-server flush is invoked via scheduler.onGlobal");
         allow.put(
                 pkg + "shared.adapter.outbound.hud.ChannelBroadcaster",

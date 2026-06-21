@@ -8,7 +8,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The handle the context wirings receive to opt into cross-server sync. It exposes the two seams a context
  * needs — the {@link BusPublisher} to announce its local mutations and the {@link RemoteSyncRegistry} to
- * register its cache-invalidation listener — without handing out the {@link BusClient} itself. A context
+ * register its cache-invalidation listener — without handing out the {@link BusCore} itself. A context
  * wires its sync identically whether the bus is enabled or not: when disabled, the publisher is a no-op and
  * the registered listeners are never invoked, so the broadcasting decorator and listener are always safe to
  * wire and the single-server path is unchanged.
