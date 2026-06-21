@@ -200,10 +200,12 @@ public final class HologramEditorView {
     }
 
     private EditableProperty moveProperty(HologramName name) {
+        String hint =
+                currentHologram(name).map(holo -> locationHint(holo.location())).orElse("");
         return new ActionProperty(
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_MOVE,
                 Material.COMPASS,
-                "",
+                hint,
                 (player, reopen) -> {
                     Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
                     scheduler.async(() -> {
@@ -212,6 +214,11 @@ public final class HologramEditorView {
                     });
                 },
                 scheduler);
+    }
+
+    /** The hologram's current anchor as a short "world x, y, z" line for the move button's Current value. */
+    private static String locationHint(Position at) {
+        return at.world().name() + " " + at.blockX() + ", " + at.blockY() + ", " + at.blockZ();
     }
 
     // --- content ---

@@ -81,9 +81,14 @@ public final class NpcRenderer implements NpcView {
     public void render(Npc npc) {
         Objects.requireNonNull(npc, "npc");
         RenderedNpc rendered = track(npc);
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            forceRenderForViewer(viewer, rendered);
-        }
+        // The create/edit use cases drive this off an async worker (the DB write runs off the tick thread), so the
+        // online-player snapshot has to be taken on the global region thread — reading it on the async thread misses
+        // every viewer and the fresh NPC never spawns. Each per-viewer step then hops to that viewer's region thread.
+        scheduler.onGlobal(() -> {
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                forceRenderForViewer(viewer, rendered);
+            }
+        });
     }
 
     @Override
@@ -95,9 +100,13 @@ public final class NpcRenderer implements NpcView {
         }
         nameByEntityId.remove(removed.entityId());
         spawner.forget(name.value());
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            removeFromViewer(viewer, removed);
-        }
+        // Delete also runs off an async worker, so take the viewer snapshot on the global region thread for the
+        // same reason as render — an async read would skip every viewer and leave the fake player ghosting.
+        scheduler.onGlobal(() -> {
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                removeFromViewer(viewer, removed);
+            }
+        });
     }
 
     /** Show every in-range NPC to a player who just joined, and start tracking them as a viewer. */

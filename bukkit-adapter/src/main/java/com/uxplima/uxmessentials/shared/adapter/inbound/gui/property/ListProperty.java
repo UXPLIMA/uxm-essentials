@@ -28,8 +28,8 @@ import org.jspecify.annotations.NullMarked;
  * A property whose click opens a sub-menu for editing a list of string entries — add, remove (confirm-gated),
  * reorder, and edit each line — backed by a single {@code List<String>} the caller reads and writes through a
  * use case (e.g. a hologram's text lines). The sub-menu draws one button per entry into the configured entry
- * slots: left-click edits the line through an anvil, right-click moves it down, shift-right-click moves it up,
- * and a separate remove click is confirm-gated. An add button opens an anvil for a new line. Each mutation
+ * slots: left-click moves the line up, right-click moves it down, shift-left-click edits the line through an
+ * anvil, and shift-right-click removes it (confirm-gated). An add button opens an anvil for a new line. Each mutation
  * rewrites the whole list through the setter off the tick thread via the shared {@link Scheduler}, then
  * re-opens the sub-menu so the change shows.
  *
@@ -116,14 +116,14 @@ public final class ListProperty implements EditableProperty {
                 .lore(guiText.text(context.viewer(), keys.entryHints()))
                 .build();
         return com.uxplima.uxmlib.gui.item.GuiItem.button(icon, event -> {
-            if (event.isShiftClick() && event.isRightClick()) {
+            if (event.isShiftClick() && event.isLeftClick()) {
+                edit(context, index, entry);
+            } else if (event.isShiftClick() && event.isRightClick()) {
+                confirmRemove(context, index);
+            } else if (event.isLeftClick()) {
                 move(context, index, -1);
             } else if (event.isRightClick()) {
                 move(context, index, 1);
-            } else if (event.isLeftClick() && event.isShiftClick()) {
-                confirmRemove(context, index);
-            } else {
-                edit(context, index, entry);
             }
         });
     }
