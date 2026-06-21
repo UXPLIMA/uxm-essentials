@@ -585,6 +585,12 @@ permissions:
   uxmessentials.moderation.exempt:
     description: 'Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff.'
     default: op
+  # Moderation management GUI — /mod opens the active-punishments list (ban/mute/jail), each drilling into a
+  # detail view to revoke (confirm-gated, through the existing unban/unmute/unjail use cases) and to inspect the
+  # target's history; the moderation entry on the /uxmess gui hub gates on this node. Admin/manage tier.
+  uxmessentials.moderation.gui:
+    description: '/mod opens the moderation management GUI (active punishments + per-player history).'
+    default: op
   uxmessentials.moderation.broadcast.receive:
     description: 'Receive the staff sanction broadcast — the one-line announcement a non-silent /ban /mute /kick /warn emits. The -s flag (or broadcast.silent-by-default) suppresses it. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited).'
     default: op

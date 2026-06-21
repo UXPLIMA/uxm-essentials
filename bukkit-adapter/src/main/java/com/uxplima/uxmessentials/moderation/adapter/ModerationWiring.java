@@ -8,6 +8,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCommands;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationGuiCommand;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.CommandSpyListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.FreezeMoveListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJoinListener;
@@ -77,6 +79,8 @@ import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
@@ -123,12 +127,21 @@ public final class ModerationWiring {
      * publisher is {@link SanctionSync#NONE} and the listener is never invoked, so the single-server path is
      * unchanged.
      */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, GateSinks gates, Bus bus) {
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            GateSinks gates,
+            Bus bus,
+            GuiText guiText,
+            GuiLayouts guiLayouts) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(gates, "gates");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(guiText, "guiText");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
@@ -164,13 +177,25 @@ public final class ModerationWiring {
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
         gates.bindJail(jailGate);
+        // The management GUI consumes the SP0 framework: a GuiText over the shared catalog and the data-folder
+        // layout loader (disk-first, then bundled). The three views (active-punishments list → per-punishment
+        // detail/revoke → player history) read FRESH from the same repository / history port the list commands
+        // use and revoke through the same audited unban/unmute/unjail use cases the /un* commands take. The
+        // /mod command and the /uxmess gui hub entry both open the active-punishments list.
+        ModerationGuiViews guiViews = ModerationGuiViews.create(
+                guiText,
+                kernel.scheduler(),
+                services,
+                repository,
+                kernel.playerLookup(),
+                sanctionHistory,
+                clock,
+                guiLayouts);
+        java.util.List<CommandRegistration> commands = new java.util.ArrayList<>(ModerationCommands.all(
+                services, kernel.messages(), kernel.messageSink(), kernel.scheduler(), settings.silentByDefault()));
+        commands.add(new ModerationGuiCommand(services, kernel.messages(), kernel.messageSink(), guiViews));
         return new Wired(
-                ModerationCommands.all(
-                        services,
-                        kernel.messages(),
-                        kernel.messageSink(),
-                        kernel.scheduler(),
-                        settings.silentByDefault()),
+                commands,
                 listeners(services, sanctions, repository, kernel, settings, guard, commandSpyStore, clock),
                 sanctions,
                 commandSpyStore,
@@ -178,7 +203,8 @@ public final class ModerationWiring {
                 jailGate,
                 services.freeze(),
                 repository,
-                clock);
+                clock,
+                guiViews);
     }
 
     private static ModerationServices assemble(
@@ -368,6 +394,7 @@ public final class ModerationWiring {
      * @param repository the sanction-state read side the {@code moderation_ban_*}/{@code moderation_mute_*}/
      *     {@code moderation_warns} placeholders query (clock-gated through {@link #clock})
      * @param clock the clock the placeholder seam gates active ban/mute reads against
+     * @param guiViews the management GUI views, whose active-punishments list the {@code /uxmess gui} hub opens
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -378,7 +405,8 @@ public final class ModerationWiring {
             RepositoryJailGate jailGate,
             Freeze freeze,
             ModerationRepository repository,
-            Clock clock) {
+            Clock clock,
+            ModerationGuiViews guiViews) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -390,6 +418,7 @@ public final class ModerationWiring {
             Objects.requireNonNull(freeze, "freeze");
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(clock, "clock");
+            Objects.requireNonNull(guiViews, "guiViews");
         }
 
         /** Drop the session-scoped freeze and commandspy sets. Called on module stop. */

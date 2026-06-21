@@ -174,7 +174,40 @@ public enum ModerationMessageKey implements MessageKey {
     TARGET_EXEMPT("moderation.target-exempt"),
     BAD_DURATION("moderation.bad-duration"),
     UNKNOWN_TARGET("moderation.unknown-target"),
-    MUTED_COMMAND_BLOCKED("moderation.muted-command-blocked");
+    MUTED_COMMAND_BLOCKED("moderation.muted-command-blocked"),
+
+    // management GUI — the active-punishments list, the per-punishment detail/manage view, and a player's history
+    MOD_GUI_LIST_TITLE("moderation.gui.list.title"),
+    MOD_GUI_LIST_PREV("moderation.gui.list.prev"),
+    MOD_GUI_LIST_NEXT("moderation.gui.list.next"),
+    MOD_GUI_LIST_ENTRY_NAME("moderation.gui.list.entry-name"),
+    MOD_GUI_LIST_ENTRY_LORE("moderation.gui.list.entry-lore"),
+    MOD_GUI_LIST_EMPTY_NAME("moderation.gui.list.empty-name"),
+    MOD_GUI_LIST_EMPTY_LORE("moderation.gui.list.empty-lore"),
+    MOD_GUI_KIND_BAN("moderation.gui.kind.ban"),
+    MOD_GUI_KIND_MUTE("moderation.gui.kind.mute"),
+    MOD_GUI_KIND_JAIL("moderation.gui.kind.jail"),
+    MOD_GUI_DETAIL_TITLE("moderation.gui.detail.title"),
+    MOD_GUI_DETAIL_VALUE_LORE("moderation.gui.detail.value-lore"),
+    MOD_GUI_DETAIL_BACK("moderation.gui.detail.back"),
+    MOD_GUI_DETAIL_TARGET("moderation.gui.detail.target"),
+    MOD_GUI_DETAIL_TYPE("moderation.gui.detail.type"),
+    MOD_GUI_DETAIL_ISSUER("moderation.gui.detail.issuer"),
+    MOD_GUI_DETAIL_REASON("moderation.gui.detail.reason"),
+    MOD_GUI_DETAIL_REMAINING("moderation.gui.detail.remaining"),
+    MOD_GUI_DETAIL_HISTORY("moderation.gui.detail.history"),
+    MOD_GUI_DETAIL_HISTORY_HINT("moderation.gui.detail.history-hint"),
+    MOD_GUI_DETAIL_REVOKE("moderation.gui.detail.revoke"),
+    MOD_GUI_DETAIL_REVOKE_CONFIRM("moderation.gui.detail.revoke-confirm"),
+    MOD_GUI_VALUE_PERMANENT("moderation.gui.value.permanent"),
+    MOD_GUI_VALUE_NONE("moderation.gui.value.none"),
+    MOD_GUI_HISTORY_TITLE("moderation.gui.history.title"),
+    MOD_GUI_HISTORY_PREV("moderation.gui.history.prev"),
+    MOD_GUI_HISTORY_NEXT("moderation.gui.history.next"),
+    MOD_GUI_HISTORY_ENTRY_NAME("moderation.gui.history.entry-name"),
+    MOD_GUI_HISTORY_ENTRY_LORE("moderation.gui.history.entry-lore"),
+    MOD_GUI_HISTORY_EMPTY_NAME("moderation.gui.history.empty-name"),
+    MOD_GUI_HISTORY_EMPTY_LORE("moderation.gui.history.empty-lore");
 
     private final String key;
 

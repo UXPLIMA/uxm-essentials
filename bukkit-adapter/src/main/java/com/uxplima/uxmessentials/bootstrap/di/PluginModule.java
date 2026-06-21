@@ -374,7 +374,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
-            wireModeration(plugin, ctx, persistence, resources, links, bus);
+            wireModeration(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources, guiLayouts);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
@@ -614,21 +614,35 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            Bus bus) {
+            Bus bus,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // moderation builds its jOOQ ModerationRepository over persistence.dsl(), the audit logger on the
         // dedicated audit channel, and the login/join/freeze listeners. It rebinds the messaging mute gate and
         // the teleport jail gate captured during their wiring to the real policies — when either context is
         // disabled its holder is absent, so the bind is a no-op and that gate stays NEVER. It opts into
         // cross-server live enforcement through the bus handle: a ban on a peer kicks the player here if they
         // are online (the durable ban is already enforced on every backend's login regardless of the bus).
+        // The management GUI consumes the SP0 framework (a GuiText over the shared catalog, the data-folder
+        // layout loader): /mod with no args and the /uxmess gui hub both open the active-punishments list.
         ModerationWiring.GateSinks gates =
                 new ModerationWiring.GateSinks(policy -> bindMute(links, policy), gate -> bindJail(links, gate));
-        ModerationWiring.Wired wired = ModerationWiring.wire(plugin, ctx, persistence, gates, bus);
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(
+                        ctx.kernel().messages());
+        ModerationWiring.Wired wired = ModerationWiring.wire(plugin, ctx, persistence, gates, bus, guiText, guiLayouts);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         links.placeholders.moderation(new GateModerationPlaceholders(
                 wired.mutePolicy(), wired.jailGate(), wired.repository(), wired.sanctions(), wired.clock()));
+        // Register the moderation management GUI on the /uxmess gui hub, gated by the moderation GUI node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "moderation",
+                com.uxplima.uxmessentials.moderation.application.ModerationMessageKey.MOD_GUI_LIST_TITLE,
+                org.bukkit.Material.IRON_BARS,
+                "uxmessentials.moderation.gui",
+                (player, viewer) -> wired.guiViews().open(player, viewer)));
         // Captured for staff (wired last), which binds its FREEZE gadget to the audited freeze use case and the
         // live freeze-state read (BukkitSanctions is the Sanctions adapter).
         links.staffModerationFreeze = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.ModerationFreezeSeam(
