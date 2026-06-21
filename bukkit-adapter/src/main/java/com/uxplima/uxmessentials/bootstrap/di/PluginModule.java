@@ -323,6 +323,13 @@ public final class PluginModule {
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
         resources.onClose(Guis::uninstall);
+        // One anvil-input listener shared by every GUI-using context's create/rename prompts. Installed once here
+        // (before any module wires) and torn down on disable; sessions are keyed per player and a player has at most
+        // one anvil open, so a single installed instance is safe and avoids per-module listeners that never fire when
+        // a module forgets to install its own.
+        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
+        anvil.install();
+        resources.onClose(anvil::uninstall);
         // The browse-menu layout loader resolves modules/<m>/gui/<name>.conf disk-first then bundled; built once
         // here with the data folder so every GUI-using context loads its layout the same way.
         GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
@@ -333,7 +340,7 @@ public final class PluginModule {
                 continue;
             }
             startModule(module, ctx, resources, log);
-            wireAdapters(plugin, module, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
+            wireAdapters(plugin, module, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         }
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
@@ -351,7 +358,8 @@ public final class PluginModule {
             ContextLinks links,
             Bus bus,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
@@ -370,7 +378,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
-            wireMessaging(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
+            wireMessaging(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
@@ -380,11 +388,11 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry);
         } else if (module.id().equals(ModuleId.of("communication"))) {
-            wireCommunication(plugin, ctx, resources, links, guiLayouts, guiRegistry);
+            wireCommunication(plugin, ctx, resources, links, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
-            wireHolograms(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
+            wireHolograms(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
-            wirePlayerwarps(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
+            wirePlayerwarps(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
             wireScoreboard(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
@@ -398,7 +406,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("staff"))) {
             wireStaff(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("npc"))) {
-            wireNpc(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
+            wireNpc(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
         }
     }
 
@@ -638,18 +646,16 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
         // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its transient reply /
         // socialspy / toggle stores in-memory/PDC. The mute gate starts on MutePolicy.NEVER and is captured
         // here so moderation rebinds it when it lands; the vanish gate degrades to "fully visible" without
         // presence.
         // The management GUIs consume the SP0 framework: a GuiText over the shared catalog, the data-folder layout
-        // loader, and a per-module anvil installed here (and torn down on close) for the ignore-list add prompt.
+        // loader, and the shared anvil (installed once in wireModules) for the ignore-list add prompt.
         // /msgsettings opens the settings panel; /ignore and /mail with no args open the ignore-list and mailbox.
         GuiText guiText = new GuiText(ctx.kernel().messages());
-        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
-        anvil.install();
-        resources.onClose(anvil::uninstall);
         MessagingWiring.Wired wired =
                 MessagingWiring.wire(plugin, ctx, persistence, Optional.empty(), guiText, guiLayouts, anvil);
         wired.commands().forEach(resources::addCommand);
@@ -828,19 +834,17 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
         // communication persists nothing: the per-player broadcast opt-out is PDC-backed (survives relog), the
         // sequence counters are transient, and the connection policies, announcer schedule, and info pages are
         // config-authored content in the modules/communication content files. It carries no cross-context bridge — its
         // only
         // collaborators are the shared Scheduler, messages/messageSink, and event ports — so nothing is captured
         // for a later context. The announcer timer on the Scheduler port is stopped on disable.
-        // The admin panel consumes the SP0 GUI framework: the data-folder layout loader plus a per-module anvil
-        // installed here (torn down on close) for the broadcast prompt. /communication gui and the /uxmess gui hub
+        // The admin panel consumes the SP0 GUI framework: the data-folder layout loader plus the shared anvil
+        // (installed once in wireModules) for the broadcast prompt. /communication gui and the /uxmess gui hub
         // both open it.
-        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
-        anvil.install();
-        resources.onClose(anvil::uninstall);
         CommunicationWiring.Wired wired = CommunicationWiring.wire(plugin, ctx, guiLayouts, anvil);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -865,7 +869,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
         // holograms builds its cached jOOQ HologramRepository over persistence.dsl() and its renderer over the
         // uxmLib native-Display API; the holograms / hologram_lines tables ship in the persistence V13 baseline,
         // always applied. Its one cross-context bridge is the leaderboard data-source registry: the economy module
@@ -891,7 +896,7 @@ public final class PluginModule {
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
                 guiLayouts,
-                new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin));
+                anvil);
         wired.commands().forEach(resources::addCommand);
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
@@ -913,7 +918,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
         // player-warps delegates teleport execution to the captured teleport engine exactly as warps does; its
         // cached jOOQ repository over persistence.dsl() is keyed per owner, and the player_warps table ships in
         // the persistence V14 baseline, always applied. It carries no cross-context bridge beyond the engine.
@@ -935,7 +941,7 @@ public final class PluginModule {
                 links.warpTeleportRegistry,
                 guiText,
                 guiLayouts,
-                new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin),
+                anvil,
                 guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -1015,7 +1021,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
         // npc builds its cached jOOQ NpcRepository over persistence.dsl() and its renderer over the uxmLib NPC
         // packet stack; the npc table ships in the persistence V38 baseline, always applied. Its one cross-context
         // edge is soft: a COST click action charges through the economy bridge captured during economy wiring (npc
@@ -1034,7 +1041,7 @@ public final class PluginModule {
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
                 guiLayouts,
-                new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin),
+                anvil,
                 guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
