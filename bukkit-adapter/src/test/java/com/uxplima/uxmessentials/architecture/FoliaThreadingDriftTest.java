@@ -1,0 +1,345 @@
+package com.uxplima.uxmessentials.architecture;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Test;
+
+/**
+ * The Folia online-roster guard (CLAUDE.md §1 Folia-ready schedulers, docs/02-concurrency.md §2.6/§6.10).
+ *
+ * <p>On Folia there is no single main thread that owns every entity. {@code Bukkit.getOnlinePlayers()} (and the
+ * equivalent {@code server.getOnlinePlayers()} / {@code plugin.getServer().getOnlinePlayers()} forms) is only
+ * coherent when read on the <strong>global region thread</strong>; iterating it on an arbitrary region or async
+ * thread and then mutating each player is the exact assumption Folia breaks (docs/02-concurrency.md §2.6). Phase A
+ * of the 0.3.0 work moved every off-global enumeration onto the global thread (or behind a per-entity hop, or
+ * confined it to an off-tick reader). This guard freezes that result: it walks the production source under
+ * {@code bukkit-adapter/src/main/java} and fails if a new class enumerates the online roster without being on the
+ * allowlist below — so a regression that re-introduces an unmarshalled roster scan cannot land silently.
+ *
+ * <p><strong>How it works.</strong> The scan finds every source line that calls {@code getOnlinePlayers()} (any
+ * receiver), ignoring comment lines (a leading {@code //}, {@code *}, or {@code /*} — so the many javadoc mentions
+ * of the method do not count). Every such line's declaring class must appear in {@link #ALLOWLIST}. The allowlist
+ * is the expected current set; it passes today and fails the moment an enumeration appears in a class that is not
+ * listed. Each entry is grouped by <em>why</em> the read is safe.
+ *
+ * <p><strong>The four safe shapes (and the rule for adding an entry).</strong>
+ *
+ * <ul>
+ *   <li><strong>GLOBAL</strong> — the read runs inside a {@code scheduler.onGlobal(...)} / {@code repeatGlobal(...)}
+ *       lambda, a globally-scheduled task, or a {@code FeatureModule.stop()} (Folia dispatches {@code /uxmess
+ *       reload} and plugin disable on the global region thread). This is the bulk of the Phase A fixes.</li>
+ *   <li><strong>COMMAND</strong> — the read runs directly in a Brigadier command handler, which Paper/Folia
+ *       dispatch on the global region thread, so no extra hop is needed.</li>
+ *   <li><strong>OFFTICK</strong> — a PlaceholderAPI placeholder resolver or a Brigadier suggestion provider. These
+ *       run off any tick/region thread; an {@code onGlobal} hop would be wrong (it would block the resolver), and
+ *       they only read the roster size or build a name list, never touching a foreign player's live state.</li>
+ *   <li><strong>RENDER_SCAN</strong> — the documented self-rescheduling render/visibility pattern
+ *       (docs/02-concurrency.md §2.6 line "hop via entity.getScheduler() per player", §6.10): a loop enumerates the
+ *       roster on its own (async loop or region) thread and then hops to each player's entity/region thread before
+ *       touching that player, or it operates on a region-anchored shared display entity. No foreign {@code Player}
+ *       is mutated inline, which is what §2.6 actually forbids. Adding one here means the new class must follow that
+ *       same enumerate-then-hop shape — not mutate players on the scanning thread.</li>
+ * </ul>
+ *
+ * <p>To add a site: confirm it matches one of the four shapes above, then list its class under the matching group
+ * with a short note. If a new {@code getOnlinePlayers()} fits none of them — it mutates players on a non-global
+ * region/async thread — it is a Folia bug, not an allowlist entry: marshal it through {@code scheduler.onGlobal}
+ * (or a per-entity hop) instead.
+ */
+class FoliaThreadingDriftTest {
+
+    private static final String CALL = "getOnlinePlayers()";
+
+    /**
+     * The known-safe online-roster enumeration sites, keyed by fully-qualified class name. Grouped by why each is
+     * safe (see the class javadoc for the four shapes). This is the expected current set: every production class
+     * that reads the roster is here, and nothing else may.
+     */
+    private static final Map<String, String> ALLOWLIST = buildAllowlist();
+
+    private static Map<String, String> buildAllowlist() {
+        Map<String, String> allow = new LinkedHashMap<>();
+        String pkg = "com.uxplima.uxmessentials.";
+
+        // GLOBAL — resolved on the global region thread (inside scheduler.onGlobal/onRegion/repeatGlobal, a
+        // globally-scheduled task, or a FeatureModule.stop() Folia dispatches on the global region thread).
+        allow.put(
+                pkg + "communication.adapter.CommunicationWiring", "GLOBAL: advancement-vanish probe runs in onGlobal");
+        allow.put(
+                pkg + "communication.adapter.inbound.command.ClearChatCommand",
+                "GLOBAL: clear-chat fan-out wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "communication.adapter.inbound.command.MeCommand",
+                "GLOBAL: /me broadcast wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "communication.adapter.inbound.gui.CommunicationAdminView",
+                "GLOBAL: admin-GUI clear-chat wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "communication.adapter.outbound.BukkitAnnouncerBroadcaster",
+                "GLOBAL: announcer broadcast + count run inside scheduler.onGlobal");
+        allow.put(
+                pkg + "economy.adapter.outbound.PhysicalWalletRepositoryDecorator",
+                "GLOBAL: baltop online-ref snapshot resolved via onGlobal");
+        allow.put(pkg + "economy.adapter.outbound.SalaryTask", "GLOBAL: salary fan-out inside scheduler.onGlobal");
+        allow.put(
+                pkg + "itemworld.adapter.inbound.command.GiveAllCommand",
+                "GLOBAL: /giveall distribution wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "itemworld.adapter.inbound.command.ShowItemCommand",
+                "GLOBAL: /showitem broadcast wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "moderation.adapter.outbound.PermissionSanctionBroadcast",
+                "GLOBAL: sanction broadcast fan-out inside scheduler.onGlobal");
+        allow.put(
+                pkg + "playerstate.adapter.outbound.BukkitNearbyPlayers",
+                "GLOBAL: /near position read resolved via onGlobal before per-entity work");
+        allow.put(
+                pkg + "presence.adapter.inbound.command.ListCommand",
+                "GLOBAL: /list visible-name collection wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "presence.adapter.inbound.command.RealnameCommand",
+                "GLOBAL: /realname match wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "presence.adapter.inbound.command.StaffCommand",
+                "GLOBAL: /staff roster collection wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "presence.adapter.inbound.command.WhoisCommand",
+                "GLOBAL: /whois match wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "presence.adapter.inbound.listener.SleepExclusionListener",
+                "GLOBAL: sleep-exclusion reconcile hops to onGlobal before the roster scan");
+        allow.put(
+                pkg + "presence.adapter.outbound.BukkitVisibilityApplier",
+                "GLOBAL: vanish visibility fan-out enumerates inside scheduler.onGlobal");
+        allow.put(
+                pkg + "scoreboard.adapter.ScoreboardWiring",
+                "GLOBAL: module stop() tear-down enumerates inside scheduler.onGlobal");
+        allow.put(
+                pkg + "tablist.adapter.TablistWiring",
+                "GLOBAL: module stop() tear-down enumerates inside scheduler.onGlobal");
+        allow.put(
+                pkg + "shared.adapter.outbound.bus.BusClient",
+                "GLOBAL: cross-server flush is invoked via scheduler.onGlobal");
+        allow.put(
+                pkg + "shared.adapter.outbound.hud.ChannelBroadcaster",
+                "GLOBAL: channel broadcast fan-out wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "staff.adapter.inbound.gui.StaffExamineView",
+                "GLOBAL: examine roster snapshot taken inside scheduler.onGlobal");
+        allow.put(
+                pkg + "staff.adapter.inbound.gui.StaffListView",
+                "GLOBAL: candidate roster read from the picker's onGlobal open");
+        allow.put(
+                pkg + "staff.adapter.inbound.gui.StaffNavigatorView",
+                "GLOBAL: candidate roster read from the picker's onGlobal open");
+        allow.put(
+                pkg + "vote.adapter.VoteWiring", "GLOBAL: vote reminder + party effects run on repeatGlobal/onGlobal");
+        allow.put(
+                pkg + "vote.adapter.outbound.BukkitRewardApplier",
+                "GLOBAL: vote-party broadcast wrapped in scheduler.onGlobal");
+        allow.put(
+                pkg + "vote.adapter.outbound.BukkitVoteAudience",
+                "GLOBAL: snapshot guarded by onGlobalThread / marshalled via onGlobal");
+        allow.put(
+                pkg + "npc.adapter.outbound.NpcRenderer",
+                "GLOBAL: render/despawn/refresh/look all on onGlobal or repeatGlobal; despawnAll from stop()");
+
+        // COMMAND — runs directly in a Brigadier handler, which Paper/Folia dispatch on the global region thread.
+        allow.put(
+                pkg + "economy.adapter.inbound.command.EcoTargets",
+                "COMMAND: /eco + /payall targets read on the Brigadier (global) thread");
+        allow.put(
+                pkg + "messaging.adapter.inbound.command.MailCommand",
+                "COMMAND: /mail sendall recipients read on the Brigadier (global) thread");
+        allow.put(
+                pkg + "messaging.adapter.outbound.BukkitStaffAudience",
+                "COMMAND: /helpop + /staffchat audience read on the Brigadier (global) thread");
+        allow.put(
+                pkg + "moderation.adapter.outbound.BukkitSanctions",
+                "COMMAND: /kickall + online-players read on the Brigadier (global) thread");
+        allow.put(
+                pkg + "teleport.adapter.inbound.command.TpAllCommand",
+                "COMMAND: /tpall roster copied on the Brigadier (global) thread");
+        allow.put(
+                pkg + "teleport.adapter.inbound.command.TpaAllCommand",
+                "COMMAND: /tpaall roster copied on the Brigadier (global) thread");
+        allow.put(
+                pkg + "teleport.adapter.inbound.command.TpRandomPlayerCommand",
+                "COMMAND: /tpr candidate roster read on the Brigadier (global) thread");
+
+        // OFFTICK — PlaceholderAPI resolvers + Brigadier suggestion providers. These run off any tick/region thread;
+        // an onGlobal hop would be wrong, and they only read the size or build a name list (no live foreign state).
+        allow.put(
+                pkg + "playerstate.adapter.inbound.command.PlayerstateCommandSupport",
+                "OFFTICK: Brigadier suggestion provider (player-name type-ahead)");
+        allow.put(
+                pkg + "shared.adapter.inbound.command.CommandSuggestions",
+                "OFFTICK: Brigadier suggestion provider (player-name type-ahead)");
+        allow.put(
+                pkg + "vaults.adapter.inbound.command.VaultCommand",
+                "OFFTICK: Brigadier suggestion provider (player-name type-ahead)");
+        allow.put(
+                pkg + "shared.adapter.outbound.hud.BuiltinTokens",
+                "OFFTICK: {online} token reads roster size on the placeholder thread");
+        allow.put(
+                pkg + "shared.adapter.outbound.papi.BukkitServerMetrics",
+                "OFFTICK: PAPI server-metrics placeholder reads roster size");
+        allow.put(
+                pkg + "shared.adapter.outbound.papi.StaffStaffPlaceholders",
+                "OFFTICK: PAPI staff-count placeholder reads roster for a permission count");
+
+        // RENDER_SCAN — the documented enumerate-then-hop render/visibility pattern (docs/02-concurrency.md §2.6,
+        // §6.10): the loop enumerates on its own (async-loop or region) thread, then hops per-entity before touching
+        // a player, or operates on a region-anchored shared display entity. No foreign Player is mutated inline.
+        allow.put(
+                pkg + "scoreboard.adapter.outbound.ScoreboardRenderTask",
+                "RENDER_SCAN: asyncAfter loop enumerates, then hops per-entity to render");
+        allow.put(
+                pkg + "tablist.adapter.outbound.TablistRenderTask",
+                "RENDER_SCAN: asyncAfter loop enumerates, then hops per-entity to render");
+        allow.put(
+                pkg + "nametags.adapter.outbound.NametagRenderTask",
+                "RENDER_SCAN: asyncAfter reconcile loop enumerates, then hops per-entity to update");
+        allow.put(
+                pkg + "nametags.adapter.outbound.PacketNametagPresenter",
+                "RENDER_SCAN: eligible-viewer cull read on the wearer's region thread, no foreign mutation");
+        allow.put(
+                pkg + "holograms.adapter.outbound.HologramViewers",
+                "RENDER_SCAN: visibility scan on the hologram's region thread, show/hide on the shared entity");
+        allow.put(
+                pkg + "presence.adapter.outbound.BukkitPresenceAudience",
+                "RENDER_SCAN: AFK audience scanned per-entity (auto-sweep) or on the /afk command thread, no inline mutation");
+        allow.put(
+                pkg + "communication.adapter.inbound.listener.ConnectionMessageListener",
+                "RENDER_SCAN: join/quit handler reads only roster size on the player's region/event thread");
+        allow.put(
+                pkg + "communication.adapter.inbound.listener.DeathMessageListener",
+                "RENDER_SCAN: death handler reads only roster size on the player's region/event thread");
+
+        return Map.copyOf(allow);
+    }
+
+    @Test
+    void everyOnlineRosterEnumerationIsOnTheFoliaAllowlist() {
+        List<Enumeration> found = scan();
+        List<String> violations = new ArrayList<>();
+        for (Enumeration site : found) {
+            if (!ALLOWLIST.containsKey(site.fqcn())) {
+                violations.add(site.path() + ":" + site.line() + "  (" + site.fqcn() + ")  " + site.text());
+            }
+        }
+        assertThat(violations)
+                .as(
+                        "a new Bukkit.getOnlinePlayers() enumeration appeared in a class that is not on the Folia "
+                                + "allowlist. Read it on the global region thread (scheduler.onGlobal / a Brigadier "
+                                + "handler), or — if it is an off-tick PAPI/suggestion reader or the documented "
+                                + "enumerate-then-hop render pattern — add it to FoliaThreadingDriftTest.ALLOWLIST with a "
+                                + "justifying note (see the class javadoc):\n%s",
+                        String.join("\n", violations))
+                .isEmpty();
+    }
+
+    @Test
+    void everyAllowlistedClassStillEnumeratesTheRoster() {
+        // Keep the allowlist honest: an entry whose class no longer reads the roster is stale and should be removed,
+        // so the list never drifts into a graveyard of dead exceptions.
+        List<String> enumerating =
+                scan().stream().map(Enumeration::fqcn).distinct().toList();
+        List<String> stale = ALLOWLIST.keySet().stream()
+                .filter(fqcn -> !enumerating.contains(fqcn))
+                .toList();
+        assertThat(stale)
+                .as(
+                        "these allowlisted classes no longer call getOnlinePlayers(); drop them from the allowlist:\n%s",
+                        String.join("\n", stale))
+                .isEmpty();
+    }
+
+    @Test
+    void scannerSelfTest() {
+        // The scanner must see real code and ignore comment lines (the many javadoc mentions of the method).
+        assertThat(isCode("        for (Player p : Bukkit.getOnlinePlayers()) {"))
+                .isTrue();
+        assertThat(isCode("        return server.getOnlinePlayers().size();")).isTrue();
+        assertThat(isCode(" * iterating {@code Bukkit.getOnlinePlayers()} off it is illegal on Folia"))
+                .isFalse();
+        assertThat(isCode("// Bukkit.getOnlinePlayers() off it); each recipient is delivered on their thread."))
+                .isFalse();
+        assertThat(isCode("/* Bukkit.getOnlinePlayers() */")).isFalse();
+        assertThat(isCode("        homes.get(index);")).isFalse();
+    }
+
+    private static boolean isCode(String line) {
+        if (!line.contains(CALL)) {
+            return false;
+        }
+        String stripped = line.stripLeading();
+        return !stripped.startsWith("//") && !stripped.startsWith("*") && !stripped.startsWith("/*");
+    }
+
+    private List<Enumeration> scan() {
+        Path root = sourceRoot();
+        List<Enumeration> sites = new ArrayList<>();
+        try (Stream<Path> files = Files.walk(root)) {
+            files.filter(path -> path.toString().endsWith(".java")).forEach(path -> scanFile(root, path, sites));
+        } catch (IOException failure) {
+            throw new UncheckedIOException("failed to walk " + root, failure);
+        }
+        return sites;
+    }
+
+    private void scanFile(Path root, Path path, List<Enumeration> sites) {
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        } catch (IOException failure) {
+            throw new UncheckedIOException("failed to read " + path, failure);
+        }
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (isCode(line)) {
+                sites.add(
+                        new Enumeration(fqcn(root, path), root.relativize(path).toString(), i + 1, line.strip()));
+            }
+        }
+    }
+
+    /** The fully-qualified class name for a source file, derived from its path under the source root. */
+    private static String fqcn(Path root, Path file) {
+        String relative = root.relativize(file).toString().replace('\\', '/');
+        return relative.substring(0, relative.length() - ".java".length()).replace('/', '.');
+    }
+
+    private static Path sourceRoot() {
+        Path src = repoRoot().resolve("bukkit-adapter").resolve("src/main/java");
+        assertThat(Files.isDirectory(src))
+                .as("expected the bukkit-adapter production source root at %s", src)
+                .isTrue();
+        return src;
+    }
+
+    private static Path repoRoot() {
+        Path dir = Path.of("").toAbsolutePath();
+        while (dir != null) {
+            if (Files.exists(dir.resolve("settings.gradle.kts"))) {
+                return dir;
+            }
+            dir = dir.getParent();
+        }
+        throw new IllegalStateException("could not locate the repo root (settings.gradle.kts)");
+    }
+
+    /** One online-roster enumeration found in production source. */
+    private record Enumeration(String fqcn, String path, int line, String text) {}
+}
