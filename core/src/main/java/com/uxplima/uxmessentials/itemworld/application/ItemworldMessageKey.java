@@ -173,6 +173,18 @@ public enum ItemworldMessageKey implements MessageKey {
     TREE_NO_TARGET("itemworld.tree.no-target"),
     TREE_UNKNOWN_TYPE("itemworld.tree.unknown-type"),
 
+    // Utilities hub — /itemworld gui. The launcher chrome (title, button lore, back) plus one label per button.
+    GUI_HUB_TITLE("itemworld.gui.hub.title"),
+    GUI_HUB_VALUE_LORE("itemworld.gui.hub.value-lore"),
+    GUI_HUB_BACK("itemworld.gui.hub.back"),
+    GUI_HUB_WORKSTATION("itemworld.gui.hub.workstation"),
+    GUI_HUB_TIME_DAY("itemworld.gui.hub.time-day"),
+    GUI_HUB_TIME_NIGHT("itemworld.gui.hub.time-night"),
+    GUI_HUB_WEATHER_CLEAR("itemworld.gui.hub.weather-clear"),
+    GUI_HUB_WEATHER_RAIN("itemworld.gui.hub.weather-rain"),
+    GUI_HUB_CLEAR_DROPS("itemworld.gui.hub.clear-drops"),
+    GUI_HUB_CLEAR_MOBS("itemworld.gui.hub.clear-mobs"),
+
     // Shared validation failures surfaced at the adapter boundary before a domain call
     UNKNOWN_ITEM("itemworld.unknown-item"),
     AMOUNT_OUT_OF_RANGE("itemworld.amount-out-of-range"),

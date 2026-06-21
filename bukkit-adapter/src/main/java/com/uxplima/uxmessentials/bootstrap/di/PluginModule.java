@@ -376,11 +376,11 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
-            wireItemworld(plugin, ctx, resources, guiLayouts);
+            wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links);
         } else if (module.id().equals(ModuleId.of("communication"))) {
-            wireCommunication(plugin, ctx, resources, links);
+            wireCommunication(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
             wireHolograms(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
@@ -676,7 +676,11 @@ public final class PluginModule {
     }
 
     private static void wireItemworld(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, GuiLayouts guiLayouts) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // itemworld persists nothing: it is the full item/world command surface as stateless ACL-thin
         // mutations validated at the adapter boundary and applied through the kernel Scheduler. The only runtime
         // state is the powertool/unlimited per-player toggles and the item-PDC powertool bindings, all transient
@@ -685,6 +689,13 @@ public final class PluginModule {
         ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx, guiLayouts);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // Register the itemworld utilities hub on the /uxmess gui hub, gated by the itemworld GUI node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "itemworld",
+                com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey.GUI_HUB_TITLE,
+                Material.CRAFTING_TABLE,
+                "uxmessentials.itemworld.gui",
+                (player, viewer) -> wired.hubView().open(player, viewer)));
     }
 
     private static void wireVaults(
@@ -760,14 +771,25 @@ public final class PluginModule {
     }
 
     private static void wireCommunication(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            ContextLinks links,
+            GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry) {
         // communication persists nothing: the per-player broadcast opt-out is PDC-backed (survives relog), the
         // sequence counters are transient, and the connection policies, announcer schedule, and info pages are
         // config-authored content in the modules/communication content files. It carries no cross-context bridge — its
         // only
         // collaborators are the shared Scheduler, messages/messageSink, and event ports — so nothing is captured
         // for a later context. The announcer timer on the Scheduler port is stopped on disable.
-        CommunicationWiring.Wired wired = CommunicationWiring.wire(plugin, ctx);
+        // The admin panel consumes the SP0 GUI framework: the data-folder layout loader plus a per-module anvil
+        // installed here (torn down on close) for the broadcast prompt. /communication gui and the /uxmess gui hub
+        // both open it.
+        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
+        anvil.install();
+        resources.onClose(anvil::uninstall);
+        CommunicationWiring.Wired wired = CommunicationWiring.wire(plugin, ctx, guiLayouts, anvil);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -775,6 +797,13 @@ public final class PluginModule {
         // subscription /broadcasttoggle flips, so a placeholder matches the live chat state and the player's opt-in.
         links.placeholders.communication(new StoreCommunicationPlaceholders(wired.chatLock(), wired.optOutStore()));
         resources.onClose(wired::stop);
+        // Register the communication admin panel on the /uxmess gui hub, gated by the communication GUI node.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "communication",
+                com.uxplima.uxmessentials.communication.application.CommunicationMessageKey.GUI_PANEL_TITLE,
+                Material.WRITABLE_BOOK,
+                "uxmessentials.communication.gui",
+                (player, viewer) -> wired.adminView().open(player, viewer)));
     }
 
     private static void wireHolograms(

@@ -8,6 +8,8 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGroupACommands;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGroupBCommands;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGuiCommand;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubView;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.PowertoolInteractListener;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.UnlimitedPlacementListener;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.LoggingItemworldAudit;
@@ -21,6 +23,7 @@ import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -67,13 +70,22 @@ public final class ItemworldWiring {
         PowertoolToggleStore powertoolToggles = new PowertoolToggleStore();
         UnlimitedPlacementStore unlimited = new UnlimitedPlacementStore();
 
+        // The utilities hub reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader.
+        // Each launcher button runs the same surface a command does (open a workstation, set time/weather, sweep
+        // drops/mobs) and is drawn only when the viewer holds that command's permission. /itemworld gui and the
+        // /uxmess gui hub both open it; no new domain logic — only the surfaces the commands expose.
+        GuiText guiText = new GuiText(kernel.messages());
+        ItemworldHubView hubView = new ItemworldHubView(
+                guiText, kernel.scheduler(), kernel.permissions(), services, purgePolicy, guiLayouts);
+
         List<CommandRegistration> commands = new java.util.ArrayList<>(ItemworldGroupACommands.all(services));
         commands.addAll(ItemworldGroupBCommands.all(
                 services, powertoolPolicy, purgePolicy, powertoolStore, powertoolToggles, unlimited));
+        commands.add(new ItemworldGuiCommand(hubView, kernel.messages(), kernel.messageSink()));
         List<Listener> listeners = List.of(
                 new PowertoolInteractListener(powertoolStore, powertoolToggles, config),
                 new UnlimitedPlacementListener(unlimited, config));
-        return new Wired(List.copyOf(commands), listeners);
+        return new Wired(List.copyOf(commands), listeners, hubView);
     }
 
     private static Logger auditLogger() {
@@ -88,12 +100,14 @@ public final class ItemworldWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the powertool interact + unlimited-placement listeners to register
+     * @param hubView the utilities hub the {@code /uxmess gui} hub entry opens
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners) {
+    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, ItemworldHubView hubView) {
 
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(hubView, "hubView");
         }
     }
 }

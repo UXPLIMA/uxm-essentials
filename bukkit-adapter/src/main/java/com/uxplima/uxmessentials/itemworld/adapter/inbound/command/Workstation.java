@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  * region thread.
  */
 @NullMarked
-enum Workstation {
+public enum Workstation {
     ANVIL("anvil", null, "uxmessentials.workstation.anvil", "anvil"),
     WORKBENCH("workbench", "craft", "uxmessentials.workstation.workbench", "crafting table"),
     ENDERCHEST("enderchest", "echest", "uxmessentials.workstation.enderchest", "ender chest"),
@@ -45,15 +45,18 @@ enum Workstation {
         this.displayName = displayName;
     }
 
-    String literal() {
+    /** This station's command literal — public so the itemworld hub keys its launcher button slot/material by it. */
+    public String literal() {
         return literal;
     }
 
-    String permission() {
+    /** This station's permission node — public so the itemworld hub gates its launcher button by it. */
+    public String permission() {
         return permission;
     }
 
-    String displayName() {
+    /** This station's display name — public so the itemworld hub renders its launcher button by it. */
+    public String displayName() {
         return displayName;
     }
 
@@ -62,7 +65,7 @@ enum Workstation {
     }
 
     /** Open this station's inventory view for {@code player}. Must run on the player's region thread. */
-    void open(Player player) {
+    public void open(Player player) {
         switch (this) {
             case ANVIL -> player.openInventory(MenuType.ANVIL.create(player));
             case WORKBENCH -> player.openInventory(MenuType.CRAFTING.create(player));

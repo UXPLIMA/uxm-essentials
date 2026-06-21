@@ -77,6 +77,7 @@ final class DefaultResources {
             "modules/homes/gui/icon-selector.conf",
             "modules/homes/gui/invites-menu.conf",
             "modules/itemworld/gui/disposal.conf",
+            "modules/itemworld/gui/itemworld-hub.conf",
             "modules/moderation/gui/punishments-list.conf",
             "modules/moderation/gui/punishment-detail.conf",
             "modules/moderation/gui/player-history.conf",
@@ -91,6 +92,8 @@ final class DefaultResources {
             "modules/messaging/gui/messaging-settings.conf",
             "modules/messaging/gui/ignore-list.conf",
             "modules/messaging/gui/mailbox.conf",
+            "modules/communication/gui/communication-admin.conf",
+            "modules/communication/gui/announcer-list.conf",
             "modules/management/gui/hub.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");

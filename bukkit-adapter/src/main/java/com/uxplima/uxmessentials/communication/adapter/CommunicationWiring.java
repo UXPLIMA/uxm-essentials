@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.communication.adapter;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -12,6 +13,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationCommands;
+import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationGuiCommand;
+import com.uxplima.uxmessentials.communication.adapter.inbound.gui.CommunicationAdminView;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.AdvancementMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ChatLockListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ConnectionMessageListener;
@@ -33,11 +36,14 @@ import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.application.port.RandomSource;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
+import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -65,9 +71,11 @@ public final class CommunicationWiring {
     private CommunicationWiring() {}
 
     /** Build the communication adapters and use cases from {@code plugin} and {@code ctx}, ready to register. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx) {
+    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, AnvilInput anvil) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(anvil, "anvil");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
         CommunicationSettings settings = new CommunicationSettings(dir, kernel.log());
@@ -86,7 +94,24 @@ public final class CommunicationWiring {
                 kernel.messageSink(), optOutStore, channelBroadcaster, CommunicationWiring::conditionContext);
         AnnouncerTask announcer = new AnnouncerTask(
                 kernel.scheduler(), services.nextAnnouncement(), broadcaster, settings::announcerConfig, running::get);
-        List<CommandRegistration> commands = CommunicationCommands.all(
+        // The admin panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader. It
+        // flips the live ChatLock, runs the /clearchat fan-out behind a confirm, broadcasts an anvil line through the
+        // same broadcaster as /broadcast, and opens a read-only announcer list — only the surfaces the commands
+        // expose, no new domain logic. /communication gui and the /uxmess gui hub entry both open it.
+        GuiText guiText = new GuiText(kernel.messages());
+        CommunicationAdminView adminView = new CommunicationAdminView(
+                guiText,
+                kernel.scheduler(),
+                guiLayouts,
+                kernel.messages(),
+                chatLock,
+                broadcaster,
+                CommunicationCommands.BROADCAST_PREFIX,
+                settings::announcerConfig,
+                notifier,
+                kernel.messageSink(),
+                anvil);
+        List<CommandRegistration> commands = new ArrayList<>(CommunicationCommands.all(
                 services.broadcastOptOut(),
                 registry,
                 infoSender,
@@ -97,10 +122,11 @@ public final class CommunicationWiring {
                 kernel.scheduler(),
                 kernel.messageSink(),
                 chatLock,
-                settings);
+                settings));
+        commands.add(new CommunicationGuiCommand(adminView, kernel.messages()));
         List<Listener> listeners = listeners(
                 services, registry, infoSender, settings, chatLock, notifier, channelBroadcaster, optOutStore);
-        return new Wired(commands, listeners, announcer, running, chatLock, optOutStore);
+        return new Wired(List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminView);
     }
 
     /**
@@ -185,6 +211,7 @@ public final class CommunicationWiring {
      * @param running the flag flipped false on stop so the announcer exits
      * @param chatLock the global chat lock the PAPI seam reads the chat-enabled state from
      * @param optOutStore the per-player announcer subscription the PAPI seam reads the broadcast state from
+     * @param adminView the admin panel the {@code /uxmess gui} hub entry opens
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -192,7 +219,8 @@ public final class CommunicationWiring {
             AnnouncerTask announcer,
             AtomicBoolean running,
             ChatLock chatLock,
-            BroadcastOptOutStore optOutStore) {
+            BroadcastOptOutStore optOutStore,
+            CommunicationAdminView adminView) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -201,6 +229,7 @@ public final class CommunicationWiring {
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(chatLock, "chatLock");
             Objects.requireNonNull(optOutStore, "optOutStore");
+            Objects.requireNonNull(adminView, "adminView");
         }
 
         /** Arm the announcer timer. */

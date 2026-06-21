@@ -51,7 +51,30 @@ public enum CommunicationMessageKey implements MessageKey {
     ANNOUNCE_LIST_EMPTY("communication.announce.list-empty"),
 
     // /announce preview <id> — the requested announcement id is not configured.
-    ANNOUNCE_PREVIEW_UNKNOWN("communication.announce.preview-unknown");
+    ANNOUNCE_PREVIEW_UNKNOWN("communication.announce.preview-unknown"),
+
+    // /communication gui — the admin panel chrome (title, value lore, back) shared by every panel button.
+    GUI_PANEL_TITLE("communication.gui.panel.title"),
+    GUI_PANEL_VALUE_LORE("communication.gui.panel.value-lore"),
+    GUI_PANEL_BACK("communication.gui.panel.back"),
+    GUI_PANEL_ACTION_HINT("communication.gui.panel.action-hint"),
+    // The chat-lock toggle button and its two value states.
+    GUI_CHAT_LOCK("communication.gui.chat-lock"),
+    GUI_VALUE_LOCKED("communication.gui.value-locked"),
+    GUI_VALUE_UNLOCKED("communication.gui.value-unlocked"),
+    // The clearchat action button (confirm-gated) and its confirm-menu title.
+    GUI_CLEARCHAT("communication.gui.clearchat"),
+    GUI_CLEARCHAT_CONFIRM("communication.gui.clearchat-confirm"),
+    // The broadcast action button and the anvil prompt that captures the message.
+    GUI_BROADCAST("communication.gui.broadcast"),
+    GUI_BROADCAST_PROMPT("communication.gui.broadcast-prompt"),
+    // The announcer-list button on the panel and the read-only list view it opens.
+    GUI_ANNOUNCER("communication.gui.announcer"),
+    GUI_ANNOUNCER_TITLE("communication.gui.announcer.title"),
+    GUI_ANNOUNCER_ENTRY_NAME("communication.gui.announcer.entry-name"),
+    GUI_ANNOUNCER_ENTRY_LORE("communication.gui.announcer.entry-lore"),
+    GUI_ANNOUNCER_PREV("communication.gui.announcer.prev"),
+    GUI_ANNOUNCER_NEXT("communication.gui.announcer.next");
 
     private final String key;
 

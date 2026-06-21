@@ -631,6 +631,12 @@ permissions:
   uxmessentials.module.itemworld:
     description: 'Hot-reload / inspect the itemworld module and its sub-feature groups.'
     default: op
+  # /itemworld gui and the itemworld entry on the /uxmess gui hub gate on this node: the utilities launcher of
+  # virtual workstations, time/weather actions, and cleanup sweeps. Each launcher button is additionally gated by
+  # the permission of the command it stands in for, so a viewer only sees actions they may already run.
+  uxmessentials.itemworld.gui:
+    description: 'Open the itemworld utilities hub (/itemworld gui and on the /uxmess gui hub).'
+    default: op
   # Item utilities sub-feature group.
   uxmessentials.give.use:
     description: '/give <player> <item> [amount] (alias /i) — give an item to a player; bulk gives are audited.'
@@ -914,6 +920,11 @@ permissions:
     default: op
   uxmessentials.communication.chat.bypass:
     description: 'Keep chatting while public chat is locked by /togglechat.'
+    default: op
+  # /communication gui and the communication entry on the /uxmess gui hub gate on this node: the admin panel with
+  # the chat-lock toggle, the clearchat and broadcast actions, and the read-only announcer list.
+  uxmessentials.communication.gui:
+    description: 'Open the communication admin panel (/communication gui and on the /uxmess gui hub).'
     default: op
   # holograms context (docs/permissions.md "Holograms"). The single /hologram command (with its
   # create / delete / list / addline / setline / removeline / movehere subcommands) is an operator surface,
