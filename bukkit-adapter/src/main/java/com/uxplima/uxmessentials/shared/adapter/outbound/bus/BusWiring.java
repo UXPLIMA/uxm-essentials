@@ -67,7 +67,7 @@ public final class BusWiring {
         /** Unregister the channel and drop buffered frames; a no-op for a disabled backend. */
         public void stop() {
             if (client != null) {
-                client.stop();
+                client.shutdown();
             }
         }
     }
