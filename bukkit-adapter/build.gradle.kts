@@ -58,11 +58,12 @@ dependencies {
     compileOnly(libs.gson)
     implementation(libs.bstats.bukkit)
 
-    // The Redis bus transport lives in the standalone uxmEssentials-redis companion jar (built on Lettuce via
-    // uxmlib-redis), not in the main jar. It is referenced compileOnly so BusWiring can name its factory without
-    // bundling Lettuce/Netty here; at runtime the operator drops the companion jar to enable the redis transport,
-    // and BusWiring degrades to local-only when it is absent.
-    compileOnly(project(":redis-adapter"))
+    // The Redis bus transport lives in the standalone uxmEssentials-redis companion *plugin*, not in the main
+    // jar. The main never compiles against it: BusWiring names only the RedisTransportFactory SPI in :core and
+    // resolves the companion's implementation through Bukkit's ServicesManager at runtime. The operator drops
+    // the companion jar in plugins/ to enable the redis transport; BusWiring degrades to local-only when it is
+    // absent. So there is no compile dependency on :redis-adapter here — that would re-introduce the duplicate
+    // BusTransport class the ServicesManager design exists to avoid.
 
     // uxmLib GUI toolkit (dogfood) — consumed from mavenLocal; pulls uxmlib-item + uxmlib-common
     // transitively. Configurate is loaded at runtime via Paper library loader.

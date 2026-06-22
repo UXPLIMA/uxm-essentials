@@ -4,7 +4,6 @@ import java.util.Objects;
 
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.redis.RedisBusTransports;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -46,7 +45,7 @@ public final class BusWiring {
         NetworkConfig network = NetworkConfig.from(config);
         if (!network.enabled()) {
             log.info("network sync disabled (network.conf > enabled=false); bus runs local-only");
-            return new Wired(Bus.disabled(network.serverId()), null, null, network);
+            return new Wired(Bus.disabled(network.serverId()), null, null, network, scheduler);
         }
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
         BusTransport transport = selectTransport(plugin, network, scheduler, log);
@@ -58,15 +57,17 @@ public final class BusWiring {
         ClusterPeers peers = new ClusterPeers(network.peerLivenessWindow());
         registry.register(peers.listener());
         ClusterHeartbeat heartbeat = new ClusterHeartbeat(core, scheduler, network.heartbeatInterval());
-        return new Wired(new Bus(core, registry), new Lifecycle(core, heartbeat, log, network), peers, network);
+        return new Wired(
+                new Bus(core, registry), new Lifecycle(core, heartbeat, log, network), peers, network, scheduler);
     }
 
     /**
      * Build the transport(s) named by {@code network.transport}: the proxy plugin-messaging carrier, the Redis
-     * pub/sub carrier (built through the {@code :redis-adapter} factory so the bukkit-adapter never names a
-     * Lettuce type and the main jar never bundles a Redis client), or a {@link CompositeBusTransport} fanning
-     * over both. An unrecognised value already fell back to {@code velocity} in {@link NetworkConfig}; this logs
-     * the WARN so the operator sees their typo without the enable crashing.
+     * pub/sub carrier (a {@link DeferredRedisTransport} that resolves the companion plugin's factory through the
+     * {@code ServicesManager} at start, so the bukkit-adapter never names a Lettuce type and the main jar never
+     * bundles a Redis client), or a {@link CompositeBusTransport} fanning over both. An unrecognised value
+     * already fell back to {@code velocity} in {@link NetworkConfig}; this logs the WARN so the operator sees
+     * their typo without the enable crashing.
      */
     private static BusTransport selectTransport(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
         if (!network.transportRecognized()) {
@@ -76,9 +77,10 @@ public final class BusWiring {
         }
         return switch (network.transport()) {
             case VELOCITY -> pluginMessaging(plugin, network, scheduler);
-            case REDIS -> redis(network, scheduler, log);
+            case REDIS -> redis(plugin, network, scheduler, log);
             case BOTH ->
-                new CompositeBusTransport(pluginMessaging(plugin, network, scheduler), redis(network, scheduler, log));
+                new CompositeBusTransport(
+                        pluginMessaging(plugin, network, scheduler), redis(plugin, network, scheduler, log));
         };
     }
 
@@ -87,24 +89,15 @@ public final class BusWiring {
     }
 
     /**
-     * Build the Redis transport from the {@code :redis-adapter} factory, which is referenced {@code compileOnly}
-     * so the main jar carries no Lettuce. The class is therefore absent at runtime unless the operator drops the
-     * {@code uxmEssentials-redis} companion jar in {@code plugins/}; if it is missing the factory reference fails
-     * to link, so the call is guarded and the bus degrades to a {@link LocalOnlyBusTransport} (local-only, the
-     * transport degradation contract) with a single WARN telling the operator how to enable it.
+     * The Redis arm of the bus. The Redis transport ships in the optional {@code uxmEssentials-redis} companion
+     * plugin, which publishes a {@code RedisTransportFactory} through the {@code ServicesManager} when it enables.
+     * Because the companion loads after the host, the factory is not yet registered while this wiring runs — so we
+     * hand back a {@link DeferredRedisTransport} that resolves the factory at start time (the host defers starting
+     * the bus to its first global tick, past every plugin's enable). Companion present → the real Redis transport;
+     * companion absent → a {@link LocalOnlyBusTransport} with one WARN, the transport degradation contract.
      */
-    private static BusTransport redis(NetworkConfig network, Scheduler scheduler, Logger log) {
-        NetworkConfig.Redis redis = network.redis();
-        try {
-            return RedisBusTransports.redis(
-                    redis.host(), redis.port(), redis.password(), redis.db(), redis.channel(), scheduler, log);
-        } catch (LinkageError absent) {
-            // LinkageError covers NoClassDefFoundError (its subclass) — thrown the moment the JVM tries to resolve
-            // the absent companion-jar factory class — and any other link-time failure of the redis transport.
-            log.warn("network.transport=redis but the uxmEssentials-redis companion jar is not deployed; "
-                    + "redis bus disabled — drop the jar in plugins/ to enable");
-            return new LocalOnlyBusTransport();
-        }
+    private static BusTransport redis(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
+        return new DeferredRedisTransport(plugin, network.redis(), scheduler, log);
     }
 
     /**
@@ -119,16 +112,33 @@ public final class BusWiring {
         private final @org.jspecify.annotations.Nullable Lifecycle lifecycle;
         private final @org.jspecify.annotations.Nullable ClusterPeers peers;
         private final NetworkConfig network;
+        private final Scheduler scheduler;
+
+        // Lifecycle gate for the deferred start. start() schedules the real start onto the first global tick;
+        // stop() may run (a disable) before that tick fires. The gate makes the pair safe in either order: a
+        // stop before the deferred start cancels it (the task sees STOPPED and never starts the core), and a
+        // start that already ran is stopped normally. Owned here, read/written only on the global thread by the
+        // deferred task and by stop() (itself called on disable, on the main/global thread).
+        private enum Phase {
+            PENDING,
+            STARTED,
+            STOPPED
+        }
+
+        private final java.util.concurrent.atomic.AtomicReference<Phase> phase =
+                new java.util.concurrent.atomic.AtomicReference<>(Phase.PENDING);
 
         private Wired(
                 Bus bus,
                 @org.jspecify.annotations.Nullable Lifecycle lifecycle,
                 @org.jspecify.annotations.Nullable ClusterPeers peers,
-                NetworkConfig network) {
+                NetworkConfig network,
+                Scheduler scheduler) {
             this.bus = Objects.requireNonNull(bus, "bus");
             this.lifecycle = lifecycle;
             this.peers = peers;
             this.network = Objects.requireNonNull(network, "network");
+            this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         }
 
         /** The publish + register seam handed to each context. */
@@ -155,16 +165,34 @@ public final class BusWiring {
             return java.util.Optional.ofNullable(peers);
         }
 
-        /** Register the plugin-messaging channel after every context has registered its listener. */
+        /**
+         * Start the bus, deferred to the first global tick. The Redis transport resolves the companion plugin's
+         * factory through the {@code ServicesManager}, and the companion is declared to load after the host — so
+         * its factory is not registered yet while the host enables. Deferring the start to the first global tick
+         * (past every plugin's enable) lets the redis arm find the factory; the proxy and disabled paths are
+         * unaffected by the one-tick delay. A disabled backend has no lifecycle and schedules nothing.
+         */
         public void start() {
-            if (lifecycle != null) {
-                lifecycle.start();
+            if (lifecycle == null) {
+                return;
             }
+            scheduler.onGlobal(() -> {
+                if (phase.compareAndSet(Phase.PENDING, Phase.STARTED)) {
+                    lifecycle.start();
+                }
+            });
         }
 
-        /** Unregister the channel and drop buffered frames; a no-op for a disabled backend. */
+        /**
+         * Unregister the channel and drop buffered frames; a no-op for a disabled backend. Safe in any order
+         * against the deferred start: if the first tick has not fired, this flips the gate to STOPPED so the
+         * pending start becomes a no-op; if the bus already started, it is stopped normally.
+         */
         public void stop() {
-            if (lifecycle != null) {
+            if (lifecycle == null) {
+                return;
+            }
+            if (phase.getAndSet(Phase.STOPPED) == Phase.STARTED) {
                 lifecycle.stop();
             }
         }
