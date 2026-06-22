@@ -19,7 +19,9 @@ import org.jspecify.annotations.NullMarked;
  * <p>An enabled backend gets a {@link PluginMessagingTransport} (the byte-moving machinery) wrapped by a
  * {@link BusCore} (the codec + origin stamp + self-origin drop + registry dispatch). The core is both the
  * {@link BusPublisher} the contexts' broadcasting decorators publish through and the lifecycle handle the
- * wiring starts and stops.
+ * wiring starts and stops. An enabled backend also gets a {@link ClusterPeers} roster and a
+ * {@link ClusterHeartbeat}: the heartbeat publishes a presence ping on a bounded interval, peers record each
+ * other's pings into their roster, and {@code /uxmess doctor} reads the live peer count from it.
  *
  * <p>The wiring order in {@code PluginModule} is: build the bus (this), wire the feature modules (each
  * registering its remote-sync listener and wrapping its repository with the broadcasting decorator through
@@ -44,12 +46,19 @@ public final class BusWiring {
         NetworkConfig network = NetworkConfig.from(config);
         if (!network.enabled()) {
             log.info("network sync disabled (network.conf > enabled=false); bus runs local-only");
-            return new Wired(Bus.disabled(network.serverId()), null, network);
+            return new Wired(Bus.disabled(network.serverId()), null, null, network);
         }
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
         BusTransport transport = selectTransport(plugin, network, scheduler, log);
         BusCore core = new BusCore(transport, network.serverId(), registry, log);
-        return new Wired(new Bus(core, registry), new Lifecycle(core, log, network), network);
+        // The cluster roster and the presence heartbeat are kernel concerns (one per backend), so they are wired
+        // here next to the core rather than in any feature context. The roster's listener records inbound pings;
+        // the heartbeat publishes this backend's own ping on the bounded interval, both bound to the live
+        // lifecycle below — a disabled backend builds neither.
+        ClusterPeers peers = new ClusterPeers(network.peerLivenessWindow());
+        registry.register(peers.listener());
+        ClusterHeartbeat heartbeat = new ClusterHeartbeat(core, scheduler, network.heartbeatInterval());
+        return new Wired(new Bus(core, registry), new Lifecycle(core, heartbeat, log, network), peers, network);
     }
 
     /**
@@ -108,11 +117,17 @@ public final class BusWiring {
 
         private final Bus bus;
         private final @org.jspecify.annotations.Nullable Lifecycle lifecycle;
+        private final @org.jspecify.annotations.Nullable ClusterPeers peers;
         private final NetworkConfig network;
 
-        private Wired(Bus bus, @org.jspecify.annotations.Nullable Lifecycle lifecycle, NetworkConfig network) {
+        private Wired(
+                Bus bus,
+                @org.jspecify.annotations.Nullable Lifecycle lifecycle,
+                @org.jspecify.annotations.Nullable ClusterPeers peers,
+                NetworkConfig network) {
             this.bus = Objects.requireNonNull(bus, "bus");
             this.lifecycle = lifecycle;
+            this.peers = peers;
             this.network = Objects.requireNonNull(network, "network");
         }
 
@@ -131,6 +146,15 @@ public final class BusWiring {
             return new WiredHealth(network, core);
         }
 
+        /**
+         * The cluster roster the cluster-peer health check reads, present only for an enabled backend. A disabled
+         * backend has no roster (it neither sends nor records heartbeats), so this is empty and the check is not
+         * registered for it.
+         */
+        public java.util.Optional<ClusterPeers> peers() {
+            return java.util.Optional.ofNullable(peers);
+        }
+
         /** Register the plugin-messaging channel after every context has registered its listener. */
         public void start() {
             if (lifecycle != null) {
@@ -147,23 +171,29 @@ public final class BusWiring {
     }
 
     /**
-     * The live core plus the diagnostics logged on start. Starting the core registers the plugin-messaging
-     * channel through the transport it owns; stopping it unregisters the channel and drops the buffer.
+     * The live core and presence heartbeat, plus the diagnostics logged on start. Starting the core registers
+     * the plugin-messaging channel through the transport it owns and starts the heartbeat publishing this
+     * backend's pings; stopping it unregisters the channel, drops the buffer, and stops the heartbeat.
      */
-    private record Lifecycle(BusCore core, Logger log, NetworkConfig network) {
+    private record Lifecycle(BusCore core, ClusterHeartbeat heartbeat, Logger log, NetworkConfig network) {
 
         private Lifecycle {
             Objects.requireNonNull(core, "core");
+            Objects.requireNonNull(heartbeat, "heartbeat");
             Objects.requireNonNull(log, "log");
             Objects.requireNonNull(network, "network");
         }
 
         void start() {
             core.start();
+            // The heartbeat starts after the channel is up so the first ping rides a live transport.
+            heartbeat.start();
             log.info("network sync enabled on channel {} as server-id {}", network.channel(), network.serverId());
         }
 
         void stop() {
+            // Stop the heartbeat before the channel goes away so no ping is published into a closed transport.
+            heartbeat.stop();
             core.stop();
         }
     }

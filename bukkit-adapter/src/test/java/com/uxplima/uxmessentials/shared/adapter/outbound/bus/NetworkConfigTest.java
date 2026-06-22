@@ -101,6 +101,30 @@ class NetworkConfigTest {
         assertThat(config.outboundQueueSize()).isEqualTo(256);
     }
 
+    @Test
+    void heartbeatDefaultsToThirtySecondsAndDerivesAThreeBeatLivenessWindow() {
+        NetworkConfig config = NetworkConfig.from(new FixedConfig(Map.of()));
+
+        assertThat(config.heartbeatSeconds()).isEqualTo(30);
+        assertThat(config.heartbeatInterval()).isEqualTo(java.time.Duration.ofSeconds(30));
+        assertThat(config.peerLivenessWindow()).isEqualTo(java.time.Duration.ofSeconds(90));
+    }
+
+    @Test
+    void heartbeatParsesFromTheNetworkSubtree() {
+        NetworkConfig config = NetworkConfig.from(new FixedConfig(Map.of("network.heartbeat-seconds", 15)));
+
+        assertThat(config.heartbeatSeconds()).isEqualTo(15);
+        assertThat(config.peerLivenessWindow()).isEqualTo(java.time.Duration.ofSeconds(45));
+    }
+
+    @Test
+    void aNonPositiveHeartbeatIsFlooredToOneSecondRatherThanCrashingEnable() {
+        assertThat(NetworkConfig.from(new FixedConfig(Map.of("network.heartbeat-seconds", 0)))
+                        .heartbeatSeconds())
+                .isEqualTo(1);
+    }
+
     /** A map-backed {@link ConfigStore} addressing keys by their absolute dotted path. */
     private record FixedConfig(Map<String, Object> values) implements ConfigStore {
         @Override

@@ -19,6 +19,8 @@ import org.jspecify.annotations.NullMarked;
  * @param serverId this backend's unique id; two backends sharing it corrupt origin routing
  * @param channel the plugin-messaging channel the proxy broker registers
  * @param outboundQueueSize the cap on buffered outbound frames before the oldest are dropped
+ * @param heartbeatSeconds how often this backend announces its presence with a {@code ServerPing}; a peer
+ *     ages out of the {@code /uxmess doctor} count after a few missed beats
  * @param transport which carrier(s) move the bus: the proxy plugin-messaging path, Redis pub/sub, or both
  * @param transportRecognized whether {@code transport} parsed cleanly; {@code false} means it fell back to
  *     {@code velocity} from an unknown value, so the wiring can WARN without crashing enable
@@ -30,11 +32,13 @@ public record NetworkConfig(
         String serverId,
         String channel,
         int outboundQueueSize,
+        int heartbeatSeconds,
         Transport transport,
         boolean transportRecognized,
         Redis redis) {
 
     private static final int DEFAULT_QUEUE = 256;
+    private static final int DEFAULT_HEARTBEAT_SECONDS = 30;
     private static final String DEFAULT_SERVER_ID = "server-1";
 
     public NetworkConfig {
@@ -48,6 +52,22 @@ public record NetworkConfig(
         if (outboundQueueSize < 1) {
             throw new IllegalArgumentException("outbound-queue-size must be positive: " + outboundQueueSize);
         }
+        if (heartbeatSeconds < 1) {
+            throw new IllegalArgumentException("heartbeat-seconds must be positive: " + heartbeatSeconds);
+        }
+    }
+
+    /** The heartbeat publish interval the {@code ClusterHeartbeat} schedules on. */
+    public java.time.Duration heartbeatInterval() {
+        return java.time.Duration.ofSeconds(heartbeatSeconds);
+    }
+
+    /**
+     * How long a peer stays "live" after its last heartbeat: three beats, so a peer that misses one or two
+     * pings does not flap out of the cluster-peer count.
+     */
+    public java.time.Duration peerLivenessWindow() {
+        return heartbeatInterval().multipliedBy(3);
     }
 
     /** The carrier(s) the bus rides. {@link #VELOCITY} is the proxy default — no Redis connection is opened. */
@@ -118,6 +138,8 @@ public record NetworkConfig(
         String serverId = config.getString("network.server-id", DEFAULT_SERVER_ID);
         String channel = config.getString("network.bus-channel", BusChannel.FULL);
         int queue = config.getInt("network.bus.outbound-queue-size", DEFAULT_QUEUE);
+        // Floor at one second so a fat-fingered zero/negative cannot trip the constructor's positivity check.
+        int heartbeat = Math.max(1, config.getInt("network.heartbeat-seconds", DEFAULT_HEARTBEAT_SECONDS));
         String rawTransport = config.getString("network.transport", Transport.VELOCITY.name());
         java.util.Optional<Transport> parsed = Transport.parse(rawTransport);
         return new NetworkConfig(
@@ -125,6 +147,7 @@ public record NetworkConfig(
                 serverId.isBlank() ? DEFAULT_SERVER_ID : serverId,
                 channel,
                 queue,
+                heartbeat,
                 parsed.orElse(Transport.VELOCITY),
                 parsed.isPresent(),
                 Redis.from(config));
