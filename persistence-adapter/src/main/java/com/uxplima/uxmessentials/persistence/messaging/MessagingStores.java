@@ -32,6 +32,16 @@ public final class MessagingStores {
 
     /** A cached jOOQ {@link IgnoreStore} over the shared persistence DSL. */
     public static IgnoreStore ignores(Persistence persistence) {
+        return cachedIgnores(persistence);
+    }
+
+    /**
+     * As {@link #ignores(Persistence)} but returned as its concrete decorator type, so the wiring can hand the
+     * cross-server bus a per-owner invalidation hook on the same cache the {@code /msg} delivery path reads — a
+     * remote {@code /ignore} drops exactly that owner's cached set. Same backing as {@link #ignores}; this
+     * overload exposes the decorator only so the invalidation seam can reach it.
+     */
+    public static CachedIgnoreStore cachedIgnores(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedIgnoreStore(new JooqIgnoreStore(persistence.dsl()));
     }

@@ -38,11 +38,14 @@ import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
+import com.uxplima.uxmessentials.persistence.messaging.CachedIgnoreStore;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.IgnoreSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -74,6 +77,7 @@ public final class MessagingWiring {
             ModuleContext ctx,
             Persistence persistence,
             Optional<MutePolicy> mute,
+            Bus bus,
             GuiText guiText,
             GuiLayouts guiLayouts,
             AnvilInput anvil) {
@@ -81,13 +85,14 @@ public final class MessagingWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(mute, "mute");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(anvil, "anvil");
         KernelPorts kernel = ctx.kernel();
         MessagingSettings settings = new MessagingSettings(ctx.config());
         AtomicBoolean running = new AtomicBoolean(true);
-        Stores stores = stores(plugin, persistence);
+        Stores stores = stores(plugin, persistence, bus);
         // The mute gate forwards to NEVER until the moderation context lands and rebinds it (soft couple). If
         // a real policy is already available it is bound up front; otherwise moderation binds it on wire.
         MutableMutePolicy mutePolicy = new MutableMutePolicy();
@@ -175,10 +180,16 @@ public final class MessagingWiring {
                 kernel.scheduler());
     }
 
-    private static Stores stores(Plugin plugin, Persistence persistence) {
+    private static Stores stores(Plugin plugin, Persistence persistence, Bus bus) {
+        // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
+        // wraps that same cache so a local /ignore or /unignore announces it to peers (the player-warps seam,
+        // copied for the ignore list). The /msg delivery path reads this same cache, so the loop closes.
+        CachedIgnoreStore cachedIgnores = MessagingStores.cachedIgnores(persistence);
+        bus.registry().register(IgnoreSync.listener(cachedIgnores));
+        IgnoreStore ignores = IgnoreSync.store(cachedIgnores, bus.publisher());
         return new Stores(
                 MessagingStores.mail(persistence),
-                MessagingStores.ignores(persistence),
+                ignores,
                 new InMemoryConversationStore(),
                 new PdcMessageToggleStore(plugin),
                 new PdcReplyRoutingStore(plugin),

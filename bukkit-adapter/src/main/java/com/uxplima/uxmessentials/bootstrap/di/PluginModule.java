@@ -387,7 +387,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
-            wireMessaging(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
+            wireMessaging(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
@@ -654,6 +654,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
@@ -666,7 +667,7 @@ public final class PluginModule {
         // /msgsettings opens the settings panel; /ignore and /mail with no args open the ignore-list and mailbox.
         GuiText guiText = new GuiText(ctx.kernel().messages());
         MessagingWiring.Wired wired =
-                MessagingWiring.wire(plugin, ctx, persistence, Optional.empty(), guiText, guiLayouts, anvil);
+                MessagingWiring.wire(plugin, ctx, persistence, Optional.empty(), bus, guiText, guiLayouts, anvil);
         wired.commands().forEach(resources::addCommand);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
