@@ -96,7 +96,7 @@ Two optional companion jars extend the suite onto other platforms — see
 | Jar | Where it goes | What it adds |
 | --- | --- | --- |
 | `uxmEssentials-0.3.0.jar` | Paper `plugins/` | The plugin itself (required). |
-| `uxmEssentials-velocity-0.3.0.jar` | Velocity `plugins/` | Cross-server sync of homes, warps, economy, and vote parties. |
+| `uxmEssentials-velocity-0.3.0.jar` | Velocity `plugins/` | Proxy-side bus broker — relays every synced context (homes, warps, economy, vaults, moderation, votes, and more) across the network. |
 | `uxmEssentials-discord-0.3.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
 
 ## Modules
