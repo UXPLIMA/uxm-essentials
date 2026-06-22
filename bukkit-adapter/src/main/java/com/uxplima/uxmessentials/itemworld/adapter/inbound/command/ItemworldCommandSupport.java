@@ -10,13 +10,17 @@ import java.util.function.Supplier;
 import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.Registry;
+import org.bukkit.TreeType;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
@@ -173,10 +177,60 @@ abstract class ItemworldCommandSupport {
                         type -> type != EntityType.UNKNOWN && type != EntityType.PLAYER && type.isSpawnable()));
     }
 
+    /**
+     * A {@code flag} string argument that completes against the {@link ItemFlag} enum values, lower-cased. The
+     * resolver upper-cases the token before {@code ItemFlag.valueOf}, so the lower-cased suggestion parses; the
+     * value still resolves at execution, so a typed-but-unsuggested token keeps working.
+     */
+    static RequiredArgumentBuilder<CommandSourceStack, String> itemFlagArgument() {
+        return Commands.argument("flag", StringArgumentType.word()).suggests(enumNames(ItemFlag.values()));
+    }
+
+    /**
+     * A {@code type} string argument that completes against the {@link TreeType} enum values, lower-cased. The
+     * tree resolvers lower-case and strip underscores before matching the enum names, so a lower-cased suggestion
+     * parses; the friendly aliases ({@code jungle}, {@code oak}) the resolvers add are not enumerated here because
+     * the canonical names cover the discoverable set, and the value still resolves at execution.
+     */
+    static RequiredArgumentBuilder<CommandSourceStack, String> treeTypeArgument() {
+        return Commands.argument("type", StringArgumentType.word()).suggests(enumNames(TreeType.values()));
+    }
+
+    /**
+     * Build a suggestion provider over an enum's values: each value is offered by its lower-cased name,
+     * prefix-filtered by the partial token. Used for the small Bukkit enums ({@link ItemFlag}, {@link TreeType})
+     * that are not registry {@link Keyed} types — the value set is fixed and read once per keystroke.
+     */
+    private static SuggestionProvider<CommandSourceStack> enumNames(Enum<?>[] values) {
+        return (ctx, builder) -> {
+            String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
+            for (Enum<?> value : values) {
+                String name = value.name().toLowerCase(Locale.ROOT);
+                if (prefix.isEmpty() || name.startsWith(prefix)) {
+                    builder.suggest(name);
+                }
+            }
+            return builder.buildFuture();
+        };
+    }
+
     /** An {@code effect} string argument that completes against the potion effect types in the live registry. */
     static RequiredArgumentBuilder<CommandSourceStack, String> effectArgument() {
         return Commands.argument("effect", StringArgumentType.word())
                 .suggests(keyedSuggestions(() -> Registry.EFFECT, effect -> true));
+    }
+
+    /**
+     * An {@code enchant} string argument that completes against the enchantments in the live registry. The
+     * value still parses through {@link com.uxplima.uxmessentials.itemworld.domain.EnchantSpec} at execution, so
+     * a typed-but-unsuggested id keeps working — the registry only drives the type-ahead.
+     */
+    static RequiredArgumentBuilder<CommandSourceStack, String> enchantArgument() {
+        // Enchantments live in the data-driven RegistryAccess (the legacy Registry.ENCHANTMENT is deprecated), the
+        // same registry BukkitItemResolver#enchantment resolves the typed value against.
+        return Commands.argument("enchant", StringArgumentType.word())
+                .suggests(keyedSuggestions(
+                        () -> RegistryAccess.registryAccess().getRegistry(RegistryKey.ENCHANTMENT), enchant -> true));
     }
 
     /**

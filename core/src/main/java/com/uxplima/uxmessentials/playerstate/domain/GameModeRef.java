@@ -35,6 +35,11 @@ public enum GameModeRef {
         return canonical;
     }
 
+    /** The short alias the command also accepts ({@code c} for creative), mirroring the vanilla shortcuts. */
+    public String shortAlias() {
+        return shortAlias;
+    }
+
     /**
      * Resolve a mode from raw input — the full name, its short alias, or the numeric id — case-insensitively.
      * Returns empty when nothing matches, so the command can reject an unknown mode with a localized message.

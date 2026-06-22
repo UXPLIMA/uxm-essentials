@@ -54,7 +54,7 @@ public final class TreeCommand extends ItemworldCommandSupport implements Comman
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("type", StringArgumentType.word()).executes(this::run))
+                .then(treeTypeArgument().executes(this::run))
                 .build();
     }
 

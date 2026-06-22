@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -12,7 +13,6 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.EnchantSpec;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -37,6 +38,10 @@ public final class EnchantCommand extends ItemworldCommandSupport implements Com
 
     private static final String PERMISSION = "uxmessentials.enchant.use";
 
+    // The level arg parses any integer >= 1 (clamped to max-enchant-level in the domain); the type-ahead offers a
+    // small, sensible ladder rather than every vanilla max, which varies per enchantment.
+    private static final List<String> LEVELS = List.of("1", "2", "3", "4", "5");
+
     public EnchantCommand(ItemworldServices services) {
         super(services, "enchant", SubFeatureGroup.ITEM_UTILS, "Enchant the held item.");
     }
@@ -45,9 +50,10 @@ public final class EnchantCommand extends ItemworldCommandSupport implements Com
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("enchant", StringArgumentType.word())
+                .then(enchantArgument()
                         .executes(ctx -> run(ctx, 1))
                         .then(Commands.argument("level", IntegerArgumentType.integer(1))
+                                .suggests(CommandSuggestions.fromStrings(() -> LEVELS))
                                 .executes(ctx -> run(ctx, IntegerArgumentType.getInteger(ctx, "level")))))
                 .build();
     }

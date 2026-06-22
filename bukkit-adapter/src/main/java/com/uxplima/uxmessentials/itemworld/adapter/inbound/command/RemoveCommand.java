@@ -10,7 +10,6 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
@@ -54,7 +53,7 @@ public final class RemoveCommand extends ItemworldCommandSupport implements Comm
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("type", StringArgumentType.word())
+                .then(mobTypeArgument()
                         .executes(ctx -> run(ctx, DEFAULT_RADIUS))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1))
                                 .executes(ctx -> run(ctx, IntegerArgumentType.getInteger(ctx, "radius")))))

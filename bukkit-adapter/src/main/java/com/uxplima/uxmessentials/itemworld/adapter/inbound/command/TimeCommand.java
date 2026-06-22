@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.itemworld.domain.TimeSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -35,6 +37,13 @@ public final class TimeCommand extends ItemworldCommandSupport implements Comman
 
     private static final String PERMISSION = "uxmessentials.time.use";
 
+    // The two modes the parser accepts (set the absolute time, or add a delta).
+    private static final List<String> MODES = List.of("set", "add");
+
+    // The named keywords TimeSpec.parse resolves; a raw tick number is also accepted, so the type-ahead offers the
+    // memorable keywords and leaves the numeric form to the player.
+    private static final List<String> VALUES = List.of("day", "noon", "sunset", "night", "midnight", "sunrise");
+
     public TimeCommand(ItemworldServices services) {
         super(services, "time", SubFeatureGroup.TIME_WEATHER, "Set or add world time.");
     }
@@ -44,7 +53,9 @@ public final class TimeCommand extends ItemworldCommandSupport implements Comman
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("mode", StringArgumentType.word())
+                        .suggests(CommandSuggestions.fromStrings(() -> MODES))
                         .then(Commands.argument("value", StringArgumentType.word())
+                                .suggests(CommandSuggestions.fromStrings(() -> VALUES))
                                 .executes(this::run)))
                 .build();
     }

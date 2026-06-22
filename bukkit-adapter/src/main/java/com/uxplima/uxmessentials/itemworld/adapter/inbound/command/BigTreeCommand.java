@@ -53,7 +53,7 @@ public final class BigTreeCommand extends ItemworldCommandSupport implements Com
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("type", StringArgumentType.word()).executes(this::run))
+                .then(treeTypeArgument().executes(this::run))
                 .build();
     }
 

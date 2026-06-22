@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,6 +18,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -34,6 +36,10 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
 
     private static final String PERMISSION = "uxmessentials.gamemode.use";
 
+    // Every form GameModeRef.parse accepts — the full name, the short alias, and the numeric id — derived from the
+    // enum so the type-ahead never drifts from what the parser resolves.
+    private static final List<String> MODE_SUGGESTIONS = modeSuggestions();
+
     public GamemodeCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
     }
@@ -43,6 +49,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
         return Commands.literal("gamemode")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("mode", StringArgumentType.word())
+                        .suggests(CommandSuggestions.fromStrings(() -> MODE_SUGGESTIONS))
                         .executes(this::setMode)
                         .then(PlayerTargets.players("player").executes(this::setMode)))
                 .build();
@@ -71,5 +78,15 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
             services.setGamemode().setFor(ref(sender), target, mode.get());
         }
         return Command.SINGLE_SUCCESS;
+    }
+
+    private static List<String> modeSuggestions() {
+        List<String> modes = new ArrayList<>();
+        for (GameModeRef mode : GameModeRef.values()) {
+            modes.add(mode.canonical());
+            modes.add(mode.shortAlias());
+            modes.add(Integer.toString(mode.id()));
+        }
+        return List.copyOf(modes);
     }
 }

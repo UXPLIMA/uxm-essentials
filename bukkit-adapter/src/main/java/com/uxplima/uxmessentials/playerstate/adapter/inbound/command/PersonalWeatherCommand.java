@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -16,6 +17,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.domain.PersonalWeather;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
@@ -30,6 +32,10 @@ public final class PersonalWeatherCommand extends PlayerstateCommandSupport impl
 
     private static final String PERMISSION = "uxmessentials.pweather.use";
 
+    // The canonical value for each outcome PersonalWeather.parse resolves to (clear / rain / reset). The parser also
+    // accepts aliases like sun, storm and off, but the type-ahead offers one discoverable token per outcome.
+    private static final List<String> VALUES = List.of("clear", "rain", "reset");
+
     public PersonalWeatherCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
     }
@@ -38,7 +44,9 @@ public final class PersonalWeatherCommand extends PlayerstateCommandSupport impl
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pweather")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("value", StringArgumentType.word()).executes(this::set))
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .suggests(CommandSuggestions.fromStrings(() -> VALUES))
+                        .executes(this::set))
                 .build();
     }
 
