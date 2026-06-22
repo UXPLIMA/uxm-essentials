@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -51,14 +53,7 @@ class GcCommandPathTest {
     void setUp() {
         server = MockBukkit.mock();
         server.addSimpleWorld("world");
-        PresenceServices services = new PresenceServices(
-                mock(MarkAfk.class),
-                mock(ClearAfkOnActivity.class),
-                mock(ToggleVanish.class),
-                mock(ResolveVisibility.class),
-                mock(SetNick.class),
-                mock(ClearNick.class));
-        command = new GcCommand(services, new EchoMessages(), new InlineScheduler());
+        command = new GcCommand(presenceServices(), new EchoMessages(), new InlineScheduler());
     }
 
     @AfterEach
@@ -96,9 +91,39 @@ class GcCommandPathTest {
                 .contains("seconds=");
     }
 
+    @Test
+    void theWorldTotalsSnapshotRunsOnTheGlobalThreadThenRepliesOnTheSenderThread() {
+        // The world-totals read (every world's entities + loaded chunks) is a cross-region read on Folia, so it
+        // must be taken on the global region thread; the one reply then lands on the player sender's own thread.
+        // A recording scheduler pins those two hops without needing a real Folia server.
+        RecordingScheduler recording = new RecordingScheduler();
+        GcCommand recorded = new GcCommand(presenceServices(), new EchoMessages(), recording);
+        PlayerMock viewer = server.addPlayer("Pinned");
+        viewer.addAttachment(MockBukkit.createMockPlugin(), PERMISSION, true);
+
+        executeWith(recorded, CommandSourceStackMock.from(viewer), "gc");
+
+        assertThat(recording.globalHops).isEqualTo(1);
+        assertThat(recording.entityHops).containsExactly(viewer.getUniqueId());
+    }
+
+    private PresenceServices presenceServices() {
+        return new PresenceServices(
+                mock(MarkAfk.class),
+                mock(ClearAfkOnActivity.class),
+                mock(ToggleVanish.class),
+                mock(ResolveVisibility.class),
+                mock(SetNick.class),
+                mock(ClearNick.class));
+    }
+
     private void execute(CommandSourceStack source, String input) {
+        executeWith(command, source, input);
+    }
+
+    private void executeWith(GcCommand target, CommandSourceStack source, String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(command.build());
+        dispatcher.getRoot().addChild(target.build());
         try {
             dispatcher.execute(input, source);
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
@@ -118,7 +143,7 @@ class GcCommandPathTest {
         }
     }
 
-    /** Satisfies the command's constructor; {@code /gc} reads runtime stats, not the roster, so hops run inline. */
+    /** Runs every hop inline so the rendered reply is observable synchronously through the sender's message queue. */
     private static final class InlineScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
@@ -132,6 +157,39 @@ class GcCommandPathTest {
 
         @Override
         public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** Records the global snapshot hop and the per-entity reply hop, running each inline so the flow still completes. */
+    private static final class RecordingScheduler implements Scheduler {
+        private int globalHops;
+        private final List<java.util.UUID> entityHops = new ArrayList<>();
+
+        @Override
+        public void onGlobal(Runnable task) {
+            globalHops++;
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            entityHops.add(player.uuid());
             task.run();
         }
 

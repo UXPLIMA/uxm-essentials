@@ -17,25 +17,28 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * The Folia online-roster guard (CLAUDE.md §1 Folia-ready schedulers, docs/02-concurrency.md §2.6/§6.10).
+ * The Folia whole-world enumeration guard (CLAUDE.md §1 Folia-ready schedulers, docs/02-concurrency.md §2.6/§6.10).
  *
  * <p>On Folia there is no single main thread that owns every entity. {@code Bukkit.getOnlinePlayers()} (and the
  * equivalent {@code server.getOnlinePlayers()} / {@code plugin.getServer().getOnlinePlayers()} forms) is only
- * coherent when read on the <strong>global region thread</strong>; iterating it on an arbitrary region or async
- * thread and then mutating each player is the exact assumption Folia breaks (docs/02-concurrency.md §2.6). Phase A
- * of the 0.3.0 work moved every off-global enumeration onto the global thread (or behind a per-entity hop, or
- * confined it to an off-tick reader). This guard freezes that result: it walks the production source under
- * {@code bukkit-adapter/src/main/java} and fails if a new class enumerates the online roster without being on the
- * allowlist below — so a regression that re-introduces an unmarshalled roster scan cannot land silently.
+ * coherent when read on the <strong>global region thread</strong>; the same is true of a whole-world entity
+ * enumeration ({@code world.getEntities()}), whose entities are each owned by their own region thread. Iterating
+ * either on an arbitrary region or async thread and then mutating each entity is the exact assumption Folia breaks
+ * (docs/02-concurrency.md §2.6). Phase A of the 0.3.0 work moved every off-global enumeration onto the global
+ * thread (or behind a per-entity / per-region hop, or confined it to an off-tick reader). This guard freezes that
+ * result: it walks the production source under {@code bukkit-adapter/src/main/java} and fails if a new class
+ * enumerates the online roster or a whole world's entities without being on the allowlist below — so a regression
+ * that re-introduces an unmarshalled cross-region scan cannot land silently.
  *
  * <p><strong>How it works.</strong> The scan finds every source line that calls {@code getOnlinePlayers()} (any
  * receiver) <em>or</em> references it as a method handle ({@code ::getOnlinePlayers} — so the
  * {@code Bukkit::getOnlinePlayers} / {@code getServer()::getOnlinePlayers} / {@code server::getOnlinePlayers} forms
- * that hand the roster to a {@code Supplier} are caught too), ignoring comment lines (a leading {@code //},
- * {@code *}, or {@code /*} — so the many javadoc mentions of the method do not count). Every such line's declaring
- * class must appear in {@link #ALLOWLIST}. The allowlist is the expected current set; it passes today and fails the
- * moment an enumeration appears in a class that is not listed. Each entry is grouped by <em>why</em> the read is
- * safe.
+ * that hand the roster to a {@code Supplier} are caught too) <em>or</em> calls {@code getEntities(} on any receiver
+ * (the whole-world entity enumeration — {@code getNearbyEntities} is a bounded single-region read and is
+ * deliberately not matched), ignoring comment lines (a leading {@code //}, {@code *}, or {@code /*} — so the many
+ * javadoc mentions of these methods do not count). Every such line's declaring class must appear in
+ * {@link #ALLOWLIST}. The allowlist is the expected current set; it passes today and fails the moment an
+ * enumeration appears in a class that is not listed. Each entry is grouped by <em>why</em> the read is safe.
  *
  * <p><strong>Known limitation — the roster can travel through a {@code Supplier} the scan cannot follow.</strong>
  * A class can hand {@code Bukkit::getOnlinePlayers} to another object as a {@code Supplier<Collection<Player>>}; the
@@ -75,6 +78,8 @@ class FoliaThreadingDriftTest {
 
     private static final String CALL = "getOnlinePlayers()";
     private static final String METHOD_REF = "::getOnlinePlayers";
+    /** The whole-world entity enumeration. The leading dot excludes {@code getNearbyEntities(}, a bounded read. */
+    private static final String ENTITIES_CALL = ".getEntities(";
 
     /**
      * The known-safe online-roster enumeration sites, keyed by fully-qualified class name. Grouped by why each is
@@ -121,6 +126,9 @@ class FoliaThreadingDriftTest {
                 pkg + "itemworld.adapter.inbound.command.GiveAllCommand",
                 "GLOBAL: /giveall distribution wrapped in scheduler.onGlobal");
         allow.put(
+                pkg + "itemworld.adapter.outbound.BukkitEntityPurger",
+                "GLOBAL: world purge snapshots world.getEntities() inside onGlobal, then hops each removal to onRegion");
+        allow.put(
                 pkg + "itemworld.adapter.inbound.command.ShowItemCommand",
                 "GLOBAL: /showitem broadcast wrapped in scheduler.onGlobal");
         allow.put(
@@ -129,6 +137,9 @@ class FoliaThreadingDriftTest {
         allow.put(
                 pkg + "playerstate.adapter.outbound.BukkitNearbyPlayers",
                 "GLOBAL: /near position read resolved via onGlobal before per-entity work");
+        allow.put(
+                pkg + "presence.adapter.inbound.command.GcCommand",
+                "GLOBAL: /gc world entity + chunk totals read inside scheduler.onGlobal");
         allow.put(
                 pkg + "presence.adapter.inbound.command.ListCommand",
                 "GLOBAL: /list visible-name collection wrapped in scheduler.onGlobal");
@@ -269,7 +280,7 @@ class FoliaThreadingDriftTest {
     }
 
     @Test
-    void everyOnlineRosterEnumerationIsOnTheFoliaAllowlist() {
+    void everyWholeWorldEnumerationIsOnTheFoliaAllowlist() {
         List<Enumeration> found = scan();
         List<String> violations = new ArrayList<>();
         for (Enumeration site : found) {
@@ -279,19 +290,20 @@ class FoliaThreadingDriftTest {
         }
         assertThat(violations)
                 .as(
-                        "a new Bukkit.getOnlinePlayers() enumeration appeared in a class that is not on the Folia "
-                                + "allowlist. Read it on the global region thread (scheduler.onGlobal / a Brigadier "
-                                + "handler), or — if it is an off-tick PAPI/suggestion reader or the documented "
-                                + "enumerate-then-hop render pattern — add it to FoliaThreadingDriftTest.ALLOWLIST with a "
-                                + "justifying note (see the class javadoc):\n%s",
+                        "a new whole-world enumeration (Bukkit.getOnlinePlayers() or world.getEntities()) appeared in a "
+                                + "class that is not on the Folia allowlist. Read it on the global region thread "
+                                + "(scheduler.onGlobal / a Brigadier handler) — and for a world-entity sweep hop each "
+                                + "mutation to the owning region (scheduler.onRegion) — or, if it is an off-tick "
+                                + "PAPI/suggestion reader or the documented enumerate-then-hop render pattern, add it to "
+                                + "FoliaThreadingDriftTest.ALLOWLIST with a justifying note (see the class javadoc):\n%s",
                         String.join("\n", violations))
                 .isEmpty();
     }
 
     @Test
-    void everyAllowlistedClassStillEnumeratesTheRoster() {
-        // Keep the allowlist honest: an entry whose class no longer reads the roster is stale and should be removed,
-        // so the list never drifts into a graveyard of dead exceptions.
+    void everyAllowlistedClassStillEnumerates() {
+        // Keep the allowlist honest: an entry whose class no longer reads the roster or a world's entities is stale
+        // and should be removed, so the list never drifts into a graveyard of dead exceptions.
         List<String> enumerating =
                 scan().stream().map(Enumeration::fqcn).distinct().toList();
         List<String> stale = ALLOWLIST.keySet().stream()
@@ -300,27 +312,36 @@ class FoliaThreadingDriftTest {
                 .toList();
         assertThat(stale)
                 .as(
-                        "these allowlisted classes no longer call getOnlinePlayers(); drop them from the allowlist:\n%s",
+                        "these allowlisted classes no longer call getOnlinePlayers() or .getEntities(); drop them from "
+                                + "the allowlist:\n%s",
                         String.join("\n", stale))
                 .isEmpty();
     }
 
     @Test
     void scannerSelfTest() {
-        // The scanner must see real code and ignore comment lines (the many javadoc mentions of the method).
+        // The scanner must see real code and ignore comment lines (the many javadoc mentions of the methods).
         assertThat(isCode("        for (Player p : Bukkit.getOnlinePlayers()) {"))
                 .isTrue();
         assertThat(isCode("        return server.getOnlinePlayers().size();")).isTrue();
+        assertThat(isCode("        for (Entity entity : world.getEntities()) {"))
+                .isTrue();
+        assertThat(isCode("        entities += world.getEntities().size();")).isTrue();
         assertThat(isCode(" * iterating {@code Bukkit.getOnlinePlayers()} off it is illegal on Folia"))
                 .isFalse();
         assertThat(isCode("// Bukkit.getOnlinePlayers() off it); each recipient is delivered on their thread."))
                 .isFalse();
         assertThat(isCode("/* Bukkit.getOnlinePlayers() */")).isFalse();
+        assertThat(isCode(" * snapshots {@code world.getEntities()} on the global thread"))
+                .isFalse();
+        // getNearbyEntities is a bounded single-region read and must not be matched as a whole-world enumeration.
+        assertThat(isCode("        return actor.getNearbyEntities(radius, radius, radius);"))
+                .isFalse();
         assertThat(isCode("        homes.get(index);")).isFalse();
     }
 
     private static boolean isCode(String line) {
-        if (!line.contains(CALL) && !line.contains(METHOD_REF)) {
+        if (!line.contains(CALL) && !line.contains(METHOD_REF) && !line.contains(ENTITIES_CALL)) {
             return false;
         }
         String stripped = line.stripLeading();

@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
 import com.uxplima.uxmlib.gui.item.GuiItem;
@@ -47,8 +48,9 @@ import org.jspecify.annotations.NullMarked;
  * <p>Geometry, materials and per-button slots come from {@code modules/itemworld/gui/itemworld-hub.conf}; every
  * label and lore is an {@link ItemworldMessageKey}. The menu is a uxmLib {@link SimpleGui} (so click routing flows
  * through the installed menu listener), built and opened on the viewer's entity thread through the kernel
- * {@link Scheduler}; the world-time and weather changes hop to the global region, and the cleanup sweep to the
- * actor's region, exactly as the commands do.
+ * {@link Scheduler}; the world-time and weather changes hop to the global region, the clear-mobs radius sweep to
+ * the actor's region, and the clear-drops world sweep through the purger's global-snapshot-then-per-region fan-out,
+ * exactly as the commands do.
  */
 @NullMarked
 public final class ItemworldHubView {
@@ -219,28 +221,37 @@ public final class ItemworldHubView {
 
     private void sweep(Player player, PurgeSelection selection) {
         PlayerRef actor = BukkitRefs.toRef(player);
-        scheduler.onEntity(actor, () -> {
-            int removed = BukkitEntityPurger.purge(player, selection);
-            MessageKey key = selection.category() == PurgeSelection.Category.MONSTERS
-                    ? ItemworldMessageKey.BUTCHER_DONE
-                    : ItemworldMessageKey.KILLALL_DONE;
-            reply(
-                    actor,
-                    key,
-                    Map.of(
-                            "count", String.valueOf(removed),
-                            "type", selection.typeId().orElse("all"),
-                            "radius", String.valueOf(selection.radius())));
-            if (selection.category() == PurgeSelection.Category.MONSTERS) {
-                services.audit().butchered(actor, selection, removed);
-            } else {
-                services.audit().killedAll(actor, selection, removed);
-            }
-            services.kernel()
-                    .events()
-                    .publish(new EntitiesPurged(
-                            actor, selection, BukkitRefs.toRef(player.getWorld()), removed, Instant.now()));
-        });
+        WorldRef world = BukkitRefs.toRef(player.getWorld());
+        // The two hub sweeps thread differently under Folia: the clear-mobs button is a radius purge the actor's
+        // own region owns (a synchronous read-and-remove on the entity thread), while the clear-drops button is a
+        // world purge that spans every region, so it snapshots on the global thread and removes each drop on the
+        // region that owns it. Both report the same way once the removal count is known.
+        if (selection.scope() == PurgeSelection.Scope.RADIUS) {
+            scheduler.onEntity(
+                    actor, () -> finish(actor, world, selection, BukkitEntityPurger.purge(player, selection)));
+        } else {
+            BukkitEntityPurger.purgeWorld(
+                    scheduler, player, selection, removed -> finish(actor, world, selection, removed));
+        }
+    }
+
+    private void finish(PlayerRef actor, WorldRef world, PurgeSelection selection, int removed) {
+        MessageKey key = selection.category() == PurgeSelection.Category.MONSTERS
+                ? ItemworldMessageKey.BUTCHER_DONE
+                : ItemworldMessageKey.KILLALL_DONE;
+        reply(
+                actor,
+                key,
+                Map.of(
+                        "count", String.valueOf(removed),
+                        "type", selection.typeId().orElse("all"),
+                        "radius", String.valueOf(selection.radius())));
+        if (selection.category() == PurgeSelection.Category.MONSTERS) {
+            services.audit().butchered(actor, selection, removed);
+        } else {
+            services.audit().killedAll(actor, selection, removed);
+        }
+        services.kernel().events().publish(new EntitiesPurged(actor, selection, world, removed, Instant.now()));
     }
 
     private void reply(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {

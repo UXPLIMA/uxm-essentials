@@ -28,6 +28,11 @@ import org.jspecify.annotations.NullMarked;
  * with the presence context's other server/player info reads ({@code /list}, {@code /whois}, {@code /realname}).
  * A pure read: no use case, no state mutation, just a snapshot of the live runtime and one resolved reply, so
  * the console may run it too.
+ *
+ * <p>The world totals span every world's entities and loaded chunks, which on Folia are owned by their own region
+ * threads rather than the command-dispatch thread — so, like {@code /list}, the snapshot is taken on the global
+ * region thread and the one reply is routed back to the sender's own thread. On Paper that global thread is the
+ * main thread, so the read and reply behave exactly as the original inline command did.
  */
 @NullMarked
 public final class GcCommand extends PresenceCommandSupport implements CommandRegistration {
@@ -60,7 +65,15 @@ public final class GcCommand extends PresenceCommandSupport implements CommandRe
 
     private int show(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        feedback.send(sender, PresenceMessageKey.GC_RESULT, health());
+        // The world totals iterate every world's entities and loaded chunks — a cross-region read on Folia, where
+        // each world's entities are owned by their own region threads, not the command-dispatch thread. The whole
+        // snapshot is therefore taken on the global region thread (the one thread that can read every world's
+        // aggregate coherently); the single reply then lands on the sender's own thread. On Paper onGlobal is the
+        // main thread, so the read and reply are identical to running them inline.
+        scheduler.onGlobal(() -> {
+            Map<String, String> health = health();
+            replyOnSenderThread(sender, () -> feedback.send(sender, PresenceMessageKey.GC_RESULT, health));
+        });
         return Command.SINGLE_SUCCESS;
     }
 
