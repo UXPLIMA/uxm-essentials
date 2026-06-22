@@ -25,12 +25,14 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /setworth [item] <price>|clear}: write or clear a per-item sell-value override the
+ * {@code /setworth [item] <price> [currency]|clear}: write or clear a per-item sell-value override the
  * {@link com.uxplima.uxmessentials.economy.application.SetWorth} use case persists. With no item the held
  * item's material is used; with a name that material is resolved at the boundary. A positive price sets the
- * override; the {@code clear} keyword (or a price of {@code 0}) removes it so the item falls back to its
- * configured worth. The write runs off the tick thread, the same off-tick shape {@link WorthCommand} uses, so a
- * price change never blocks the command. Operator-only, gated by {@code uxmessentials.economy.setworth}.
+ * override; an optional {@code [currency]} prices the item in that currency (the default when omitted, an
+ * unknown id falling back to the default as the use case decides). The {@code clear} keyword (or a price of
+ * {@code 0}) removes the override so the item falls back to its configured worth. The write runs off the tick
+ * thread, the same off-tick shape {@link WorthCommand} uses, so a price change never blocks the command.
+ * Operator-only, gated by {@code uxmessentials.economy.setworth}.
  */
 @NullMarked
 public final class SetWorthCommand extends EconomyCommandSupport implements CommandRegistration {
@@ -46,17 +48,33 @@ public final class SetWorthCommand extends EconomyCommandSupport implements Comm
         return Commands.literal("setworth")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("price", DoubleArgumentType.doubleArg(0))
-                        .executes(ctx -> runHeld(ctx, DoubleArgumentType.getDouble(ctx, "price"))))
+                        .executes(ctx -> runHeld(ctx, DoubleArgumentType.getDouble(ctx, "price"), defaultCurrencyId()))
+                        .then(currencyArgument()
+                                .executes(ctx -> runHeld(
+                                        ctx,
+                                        DoubleArgumentType.getDouble(ctx, "price"),
+                                        StringArgumentType.getString(ctx, "currency")))))
                 .then(Commands.literal("clear").executes(this::clearHeld))
                 .then(itemArgument()
                         .then(Commands.argument("price", DoubleArgumentType.doubleArg(0))
                                 .executes(ctx -> runNamed(
                                         ctx,
                                         StringArgumentType.getString(ctx, "item"),
-                                        DoubleArgumentType.getDouble(ctx, "price"))))
+                                        DoubleArgumentType.getDouble(ctx, "price"),
+                                        defaultCurrencyId()))
+                                .then(currencyArgument()
+                                        .executes(ctx -> runNamed(
+                                                ctx,
+                                                StringArgumentType.getString(ctx, "item"),
+                                                DoubleArgumentType.getDouble(ctx, "price"),
+                                                StringArgumentType.getString(ctx, "currency")))))
                         .then(Commands.literal("clear")
                                 .executes(ctx -> clearNamed(ctx, StringArgumentType.getString(ctx, "item")))))
                 .build();
+    }
+
+    private String defaultCurrencyId() {
+        return defaultCurrency().id().value();
     }
 
     @Override
@@ -64,12 +82,13 @@ public final class SetWorthCommand extends EconomyCommandSupport implements Comm
         return "Set an item's sell worth.";
     }
 
-    private int runHeld(CommandContext<CommandSourceStack> ctx, double price) {
+    private int runHeld(CommandContext<CommandSourceStack> ctx, double price, String currencyId) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        heldId(sender).ifPresent(id -> offTick(() -> services.setWorth().set(ref(sender), id, decimal(price))));
+        heldId(sender)
+                .ifPresent(id -> offTick(() -> services.setWorth().set(ref(sender), id, decimal(price), currencyId)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -82,12 +101,13 @@ public final class SetWorthCommand extends EconomyCommandSupport implements Comm
         return Command.SINGLE_SUCCESS;
     }
 
-    private int runNamed(CommandContext<CommandSourceStack> ctx, String raw, double price) {
+    private int runNamed(CommandContext<CommandSourceStack> ctx, String raw, double price, String currencyId) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        namedId(sender, raw).ifPresent(id -> offTick(() -> services.setWorth().set(ref(sender), id, decimal(price))));
+        namedId(sender, raw)
+                .ifPresent(id -> offTick(() -> services.setWorth().set(ref(sender), id, decimal(price), currencyId)));
         return Command.SINGLE_SUCCESS;
     }
 

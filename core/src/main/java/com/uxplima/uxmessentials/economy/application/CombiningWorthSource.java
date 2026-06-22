@@ -19,20 +19,15 @@ public final class CombiningWorthSource implements WorthSource {
 
     private final WorthOverrideStore overrides;
     private final WorthTable config;
-    private final String defaultCurrencyId;
 
-    public CombiningWorthSource(WorthOverrideStore overrides, WorthTable config, String defaultCurrencyId) {
+    public CombiningWorthSource(WorthOverrideStore overrides, WorthTable config) {
         this.overrides = Objects.requireNonNull(overrides, "overrides");
         this.config = Objects.requireNonNull(config, "config");
-        this.defaultCurrencyId = Objects.requireNonNull(defaultCurrencyId, "defaultCurrencyId");
     }
 
     @Override
     public Optional<Worth> unitPrice(String material) {
         Objects.requireNonNull(material, "material");
-        return overrides
-                .find(material)
-                .map(amount -> Worth.of(amount, defaultCurrencyId))
-                .or(() -> config.unitPrice(material));
+        return overrides.find(material).or(() -> config.unitPrice(material));
     }
 }

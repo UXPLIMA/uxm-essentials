@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.economy.application;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 
@@ -20,37 +21,66 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <p>Unlike a balance mutation this is a pricing-policy change, so it publishes no economy domain event (the
  * sealed {@code EconomyEvent} family is for aggregate state) and records only through the {@link EconomyAudit}.
- * The operator-only permission is enforced at the adapter gate. The price is always in the default currency,
- * matching {@code /worth} and {@code /sell}.
+ * The operator-only permission is enforced at the adapter gate. A price may be set in any configured currency;
+ * an omitted or unknown currency falls back to the default, matching how the config {@code worth.items} list
+ * resolves an item's pay-out currency.
  */
 public final class SetWorth {
 
     private final WorthOverrideStore store;
     private final EconomyNotifier notifier;
     private final EconomyAudit audit;
-    private final Currency currency;
+    private final Currency defaultCurrency;
+    private final Collection<Currency> currencies;
 
-    public SetWorth(WorthOverrideStore store, EconomyNotifier notifier, EconomyAudit audit, Currency currency) {
+    public SetWorth(
+            WorthOverrideStore store,
+            EconomyNotifier notifier,
+            EconomyAudit audit,
+            Currency defaultCurrency,
+            Collection<Currency> currencies) {
         this.store = Objects.requireNonNull(store, "store");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
-        this.currency = Objects.requireNonNull(currency, "currency");
+        this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
+        this.currencies = java.util.List.copyOf(currencies);
     }
 
-    /** Set {@code material}'s worth to {@code price} for {@code actor}; a non-positive price clears it. */
+    /**
+     * Set {@code material}'s worth to {@code price} in the default currency for {@code actor}; a non-positive
+     * price clears it.
+     */
     public void set(PlayerRef actor, String material, BigDecimal price) {
+        set(actor, material, price, defaultCurrency.id().value());
+    }
+
+    /**
+     * Set {@code material}'s worth to {@code price} in the currency {@code currencyId} for {@code actor}. An
+     * unknown currency id falls back to the default, so a typo never persists an unsellable override. A
+     * non-positive price clears the override.
+     */
+    public void set(PlayerRef actor, String material, BigDecimal price, String currencyId) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(material, "material");
         Objects.requireNonNull(price, "price");
+        Objects.requireNonNull(currencyId, "currencyId");
         if (price.signum() <= 0) {
             clear(actor, material);
             return;
         }
-        store.set(material, price);
+        Currency currency = resolve(currencyId);
+        store.set(material, price, currency.id().value());
         Money worth = Money.of(currency, price);
         audit.worthSet(actor, material, worth);
         notifier.send(
                 actor, EconomyMessageKey.SETWORTH_SET, Map.of("item", material, "amount", notifier.amount(worth)));
+    }
+
+    private Currency resolve(String currencyId) {
+        return currencies.stream()
+                .filter(c -> c.id().value().equalsIgnoreCase(currencyId))
+                .findFirst()
+                .orElse(defaultCurrency);
     }
 
     /** Remove {@code material}'s worth override for {@code actor}, noting when none was set. */

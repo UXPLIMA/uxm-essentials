@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.economy.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.fakes.CapturingSink;
@@ -33,7 +34,7 @@ class SetWorthTest {
         sink = new CapturingSink();
         audit = new RecordingAudit();
         EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), sink);
-        setWorth = new SetWorth(store, notifier, audit, Currencies.COINS);
+        setWorth = new SetWorth(store, notifier, audit, Currencies.COINS, List.of(Currencies.COINS, Currencies.GEMS));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 
@@ -41,7 +42,7 @@ class SetWorthTest {
     void positivePriceUpsertsAndAuditsAndConfirms() {
         setWorth.set(actor, "diamond", new BigDecimal("25"));
 
-        assertThat(store.find("diamond")).contains(new BigDecimal("25"));
+        assertThat(store.find("diamond")).contains(Worth.of(new BigDecimal("25"), "coins"));
         assertThat(sink.delivered("wallet.setworth-set")).isTrue();
         assertThat(audit.worthLines()).containsExactly(new RecordingAudit.WorthLine("economy_setworth", "diamond"));
     }
@@ -51,7 +52,22 @@ class SetWorthTest {
         setWorth.set(actor, "diamond", new BigDecimal("10"));
         setWorth.set(actor, "diamond", new BigDecimal("30"));
 
-        assertThat(store.find("diamond")).contains(new BigDecimal("30"));
+        assertThat(store.find("diamond")).contains(Worth.of(new BigDecimal("30"), "coins"));
+    }
+
+    @Test
+    void aChosenCurrencyIsPersistedOnTheOverride() {
+        setWorth.set(actor, "diamond", new BigDecimal("25"), "gems");
+
+        assertThat(store.find("diamond")).contains(Worth.of(new BigDecimal("25"), "gems"));
+        assertThat(sink.delivered("wallet.setworth-set")).isTrue();
+    }
+
+    @Test
+    void anUnknownCurrencyFallsBackToTheDefault() {
+        setWorth.set(actor, "diamond", new BigDecimal("25"), "doubloons");
+
+        assertThat(store.find("diamond")).contains(Worth.of(new BigDecimal("25"), "coins"));
     }
 
     @Test

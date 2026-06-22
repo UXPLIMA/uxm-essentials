@@ -124,46 +124,91 @@ public final class EconomyConfig {
 
     /**
      * The per-item sell value table {@code /worth} reads and {@code /sell} credits against, parsed from the
-     * {@code worth.items} string list of {@code material:price} tokens. A blank, malformed, or non-positive
-     * entry is skipped so a typo never poisons the whole table; an empty list yields an empty table where
-     * every material reads as not-sellable.
+     * {@code worth.items} string list. An entry is {@code "MATERIAL:price"} (paid in the default currency) or
+     * {@code "MATERIAL:price:currencyId"} (paid in that currency), so an operator can price an item in any
+     * configured currency from the config file just as {@code /setworth} lets them do in-game. A blank,
+     * malformed, or non-positive entry is skipped so a typo never poisons the whole table; an entry whose
+     * currency is not configured is loaded in the default currency and logged as a warning so the operator
+     * notices the typo. An empty list yields an empty table where every material reads as not-sellable.
      */
-    public WorthTable worthTable() {
-        String defaultCurrency = config.getString("wallet.default-currency", "coins");
+    public WorthTable worthTable(
+            CurrencyRegistry currencies, com.uxplima.uxmessentials.shared.application.port.Logger log) {
+        String defaultCurrency = currencies.defaultCurrency().id().value();
         Map<String, Worth> prices = new HashMap<>();
         for (String token : config.getStringList("worth.items", List.of())) {
-            parseWorth(token, defaultCurrency).ifPresent(entry -> prices.put(entry.material(), entry.worth()));
+            parseWorth(token, defaultCurrency, currencies, log)
+                    .ifPresent(entry -> prices.put(entry.material(), entry.worth()));
         }
         return new WorthTable(prices);
     }
 
-    private static java.util.Optional<WorthEntry> parseWorth(String token, String defaultCurrency) {
-        int split = token.lastIndexOf(':');
-        if (split <= 0 || split == token.length() - 1) {
+    private static java.util.Optional<WorthEntry> parseWorth(
+            String token,
+            String defaultCurrency,
+            CurrencyRegistry currencies,
+            com.uxplima.uxmessentials.shared.application.port.Logger log) {
+        // A material id has no colon, so the first field is the material and the rest is the worth: the second
+        // field is the price and an optional third field is the pay-out currency.
+        int firstSplit = token.indexOf(':');
+        if (firstSplit <= 0 || firstSplit == token.length() - 1) {
             return java.util.Optional.empty();
         }
-        String material = token.substring(0, split).strip();
+        String material = token.substring(0, firstSplit).strip();
         if (material.isEmpty()) {
             return java.util.Optional.empty();
         }
         try {
-            String worthPart = token.substring(split + 1).strip();
-            java.util.List<String> parts = com.google.common.base.Splitter.on(' ')
+            // The remainder is "price" or "price:currency"; the legacy "price currency" space form still parses.
+            java.util.List<String> worthFields =
+                    com.google.common.base.Splitter.on(':').trimResults().splitToList(token.substring(firstSplit + 1));
+            java.util.List<String> priceAndCurrency = com.google.common.base.Splitter.on(' ')
                     .omitEmptyStrings()
                     .trimResults()
-                    .splitToList(worthPart);
-            if (parts.isEmpty()) {
+                    .splitToList(worthFields.get(0));
+            if (priceAndCurrency.isEmpty()) {
                 return java.util.Optional.empty();
             }
-            BigDecimal amount = new BigDecimal(parts.get(0));
+            BigDecimal amount = new BigDecimal(priceAndCurrency.get(0));
             if (amount.signum() <= 0) {
                 return java.util.Optional.empty();
             }
-            String currency = parts.size() > 1 ? parts.get(1).toLowerCase(java.util.Locale.ROOT) : defaultCurrency;
+            String currency = pickCurrency(worthFields, priceAndCurrency, defaultCurrency);
+            currency = resolveCurrency(material, currency, defaultCurrency, currencies, log);
             return java.util.Optional.of(new WorthEntry(material, Worth.of(amount, currency)));
         } catch (Exception notANumber) {
             return java.util.Optional.empty();
         }
+    }
+
+    /** The chosen currency id from the colon-third field or the legacy space form, defaulting when absent. */
+    private static String pickCurrency(
+            java.util.List<String> worthFields, java.util.List<String> priceAndCurrency, String defaultCurrency) {
+        if (worthFields.size() > 1 && !worthFields.get(1).isBlank()) {
+            return worthFields.get(1).toLowerCase(java.util.Locale.ROOT);
+        }
+        if (priceAndCurrency.size() > 1) {
+            return priceAndCurrency.get(1).toLowerCase(java.util.Locale.ROOT);
+        }
+        return defaultCurrency;
+    }
+
+    /** Keep the chosen currency when it is configured; otherwise warn and fall back to the default. */
+    private static String resolveCurrency(
+            String material,
+            String currency,
+            String defaultCurrency,
+            CurrencyRegistry currencies,
+            com.uxplima.uxmessentials.shared.application.port.Logger log) {
+        if (currency.equalsIgnoreCase(defaultCurrency)
+                || currencies.find(CurrencyId.of(currency)).isPresent()) {
+            return currency;
+        }
+        log.warn(
+                "Worth entry for {} names unknown currency '{}'; pricing it in the default currency '{}' instead",
+                material,
+                currency,
+                defaultCurrency);
+        return defaultCurrency;
     }
 
     private record WorthEntry(String material, Worth worth) {}

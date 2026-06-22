@@ -74,14 +74,33 @@ class SellItemTest {
     @Test
     void anOverridePriceChangesTheProceeds() {
         InMemoryWorthOverrideStore overrides = new InMemoryWorthOverrideStore();
-        overrides.set("diamond", new BigDecimal("25"));
+        overrides.set("diamond", new BigDecimal("25"), "coins");
         WorthSource worth = new CombiningWorthSource(
-                overrides, new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins"))), "coins");
+                overrides, new WorthTable(Map.of("diamond", Worth.of(new BigDecimal("10"), "coins"))));
         SellItem sell = sellWith(worth);
 
         SellOutcome outcome = sell.sell(seller, "diamond", 4);
 
         assertThat(outcome.earned()).contains(Money.of(Currencies.COINS, 100));
+    }
+
+    @Test
+    void anItemPricedInANonDefaultCurrencyCreditsThatCurrency() {
+        CurrencyRegistry registry =
+                CurrencyRegistry.of(java.util.List.of(Currencies.COINS, Currencies.GEMS), Currencies.COINS.id());
+        Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
+        NativeEconomyProvider provider = new NativeEconomyProvider(repo, registry, clock);
+        EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), sink);
+        WorthSource worth = new WorthTable(Map.of("emerald", Worth.of(new BigDecimal("3"), "gems")));
+        SellItem sell = new SellItem(provider, worth, notifier, Currencies.COINS, registry.all());
+
+        SellOutcome outcome = sell.sell(seller, "emerald", 5);
+
+        assertThat(outcome.earned()).contains(Money.of(Currencies.GEMS, 15));
+        assertThat(repo.findByOwner(seller).orElseThrow().balanceOf(Currencies.GEMS))
+                .isEqualTo(Money.of(Currencies.GEMS, 15));
+        assertThat(repo.findByOwner(seller).orElseThrow().balanceOf(Currencies.COINS))
+                .isEqualTo(Money.of(Currencies.COINS, 0));
     }
 
     @Test

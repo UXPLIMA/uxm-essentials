@@ -421,10 +421,9 @@ public final class EconomyWiring {
                 new SchedulerPendingPayRegistry(kernel.scheduler(), kernel.log(), settings.confirmTimeout());
         Clock clock = Clock.systemUTC();
         EconomyProvider baltopProvider = new SnapshotBaltopProvider(resolved, snapshots);
-        WorthTable configWorth = settings.worthTable();
+        WorthTable configWorth = settings.worthTable(currencies, kernel.log());
         WorthOverrideStore worthOverrides = WalletRepositories.worthOverrideStore(persistence);
-        WorthSource worth = new CombiningWorthSource(
-                worthOverrides, configWorth, currencies.defaultCurrency().id().value());
+        WorthSource worth = new CombiningWorthSource(worthOverrides, configWorth);
         Currency defaultCurrency = currencies.defaultCurrency();
         PayTaxation taxation = new PayTaxation(
                 settings.taxPolicy(),
@@ -561,7 +560,7 @@ public final class EconomyWiring {
                 new LookupWorth(worth, notifier, defaultCurrency, currencies.all()),
                 new SellItem(resolved, worth, notifier, defaultCurrency, currencies.all()),
                 new SellAll(resolved, worth, notifier, defaultCurrency, currencies.all()),
-                new SetWorth(worthOverrides, notifier, audit, defaultCurrency),
+                new SetWorth(worthOverrides, notifier, audit, defaultCurrency, currencies.all()),
                 new EcoAdmin(resolved, repository, audit, notifier),
                 exchangeService,
                 currencies,

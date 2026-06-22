@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.economy.application.Worth;
 import com.uxplima.uxmessentials.economy.application.port.WorthOverrideStore;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.EconomyWorthOverridesRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -18,8 +19,9 @@ import org.jooq.DSLContext;
  * overwrites the same row — and {@link #remove} deletes by it. Every statement is typed jOOQ DSL; no SQL is
  * ever string-concatenated.
  *
- * <p>The {@code updated_at} metadata column is stamped at save time from the wall clock; the port carries only
- * the material and price, so the column is a write-only audit field the read path does not return.
+ * <p>An override carries its pay-out currency in the {@code currency} column (V63), so {@link #find} returns the
+ * full {@link Worth} the combining source needs without a second lookup. The {@code updated_at} metadata column
+ * is stamped at save time from the wall clock; it is a write-only audit field the read path does not return.
  */
 public final class JooqWorthOverrideStore extends JooqRepository implements WorthOverrideStore {
 
@@ -28,24 +30,25 @@ public final class JooqWorthOverrideStore extends JooqRepository implements Wort
     }
 
     @Override
-    public void set(String material, BigDecimal price) {
+    public void set(String material, BigDecimal price, String currencyId) {
         Objects.requireNonNull(material, "material");
         Objects.requireNonNull(price, "price");
+        Objects.requireNonNull(currencyId, "currencyId");
         long savedAt = System.currentTimeMillis();
         write(dsl -> {
-            upsert(dsl, material, price, savedAt);
+            upsert(dsl, material, price, currencyId, savedAt);
             return null;
         });
     }
 
     @Override
-    public Optional<BigDecimal> find(String material) {
+    public Optional<Worth> find(String material) {
         Objects.requireNonNull(material, "material");
         String key = WorthOverrideRows.normalise(material);
-        return read(dsl -> dsl.select(ECONOMY_WORTH_OVERRIDES.PRICE)
+        return read(dsl -> dsl.select(ECONOMY_WORTH_OVERRIDES.PRICE, ECONOMY_WORTH_OVERRIDES.CURRENCY)
                 .from(ECONOMY_WORTH_OVERRIDES)
                 .where(ECONOMY_WORTH_OVERRIDES.MATERIAL.eq(key))
-                .fetchOptional(ECONOMY_WORTH_OVERRIDES.PRICE));
+                .fetchOptional(WorthOverrideRows::toWorth));
     }
 
     @Override
@@ -65,14 +68,15 @@ public final class JooqWorthOverrideStore extends JooqRepository implements Wort
                 > 0);
     }
 
-    private static void upsert(DSLContext dsl, String material, BigDecimal price, long savedAt) {
+    private static void upsert(DSLContext dsl, String material, BigDecimal price, String currencyId, long savedAt) {
         EconomyWorthOverridesRecord record = dsl.newRecord(ECONOMY_WORTH_OVERRIDES);
-        WorthOverrideRows.apply(record, material, price, savedAt);
+        WorthOverrideRows.apply(record, material, price, currencyId, savedAt);
         dsl.insertInto(ECONOMY_WORTH_OVERRIDES)
                 .set(record)
                 .onConflict(ECONOMY_WORTH_OVERRIDES.MATERIAL)
                 .doUpdate()
                 .set(ECONOMY_WORTH_OVERRIDES.PRICE, record.getPrice())
+                .set(ECONOMY_WORTH_OVERRIDES.CURRENCY, record.getCurrency())
                 .set(ECONOMY_WORTH_OVERRIDES.UPDATED_AT, record.getUpdatedAt())
                 .execute();
     }

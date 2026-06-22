@@ -39,40 +39,54 @@ class JooqWorthOverrideStoreTest {
 
     @Test
     void setsAndFindsAPriceRoundTrip() {
-        store.set("diamond", new BigDecimal("25.0000"));
+        store.set("diamond", new BigDecimal("25.0000"), "coins");
 
-        assertThat(store.find("diamond"))
-                .hasValueSatisfying(price -> assertThat(price).isEqualByComparingTo(new BigDecimal("25")));
+        assertThat(store.find("diamond")).hasValueSatisfying(worth -> {
+            assertThat(worth.amount()).isEqualByComparingTo(new BigDecimal("25"));
+            assertThat(worth.currencyId()).isEqualTo("coins");
+        });
+    }
+
+    @Test
+    void persistsTheChosenPayOutCurrency() {
+        store.set("diamond", new BigDecimal("25.0000"), "gems");
+
+        assertThat(store.find("diamond")).hasValueSatisfying(worth -> {
+            assertThat(worth.amount()).isEqualByComparingTo(new BigDecimal("25"));
+            assertThat(worth.currencyId()).isEqualTo("gems");
+        });
     }
 
     @Test
     void findFoldsTheLookupNameCase() {
-        store.set("diamond", new BigDecimal("25.0000"));
+        store.set("diamond", new BigDecimal("25.0000"), "coins");
 
         assertThat(store.find("DIAMOND")).isPresent();
     }
 
     @Test
     void setUpsertsOnTheMaterialKeyRatherThanInserting() {
-        store.set("diamond", new BigDecimal("10.0000"));
-        store.set("diamond", new BigDecimal("30.0000"));
+        store.set("diamond", new BigDecimal("10.0000"), "coins");
+        store.set("diamond", new BigDecimal("30.0000"), "gems");
 
-        assertThat(store.find("diamond"))
-                .hasValueSatisfying(price -> assertThat(price).isEqualByComparingTo(new BigDecimal("30")));
+        assertThat(store.find("diamond")).hasValueSatisfying(worth -> {
+            assertThat(worth.amount()).isEqualByComparingTo(new BigDecimal("30"));
+            assertThat(worth.currencyId()).isEqualTo("gems");
+        });
     }
 
     @Test
     void existsReflectsWhetherAnOverrideIsStored() {
         assertThat(store.exists("diamond")).isFalse();
 
-        store.set("diamond", new BigDecimal("10.0000"));
+        store.set("diamond", new BigDecimal("10.0000"), "coins");
 
         assertThat(store.exists("diamond")).isTrue();
     }
 
     @Test
     void removeReturnsTrueOnceThenFalse() {
-        store.set("diamond", new BigDecimal("10.0000"));
+        store.set("diamond", new BigDecimal("10.0000"), "coins");
 
         assertThat(store.remove("diamond")).isTrue();
         assertThat(store.remove("diamond")).isFalse();
