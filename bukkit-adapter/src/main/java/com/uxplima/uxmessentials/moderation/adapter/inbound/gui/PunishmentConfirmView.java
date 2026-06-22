@@ -117,9 +117,13 @@ public final class PunishmentConfirmView {
         gui.set(
                 APPLY_SLOT,
                 GuiItem.button(applyIcon(actor, action), e -> confirm(viewer, actor, target, executor, reason, false)));
-        gui.set(
-                SILENT_SLOT,
-                GuiItem.button(silentIcon(actor, action), e -> confirm(viewer, actor, target, executor, reason, true)));
+        // /banip has no silent form, so its confirm screen omits the silent button; every other verb shows both.
+        if (action.silentSupported()) {
+            gui.set(
+                    SILENT_SLOT,
+                    GuiItem.button(
+                            silentIcon(actor, action), e -> confirm(viewer, actor, target, executor, reason, true)));
+        }
         gui.set(
                 REASON_SLOT,
                 GuiItem.button(
@@ -178,7 +182,12 @@ public final class PunishmentConfirmView {
     }
 
     private ItemStack silentIcon(PlayerRef viewer, PunishmentAction action) {
-        return labelled(viewer, SILENT_ICON, action.silentLabel(), action.silentLore());
+        // Only reached when silentSupported() is true, so the two labels are present.
+        return labelled(
+                viewer,
+                SILENT_ICON,
+                action.silentLabel().orElseThrow(),
+                action.silentLore().orElseThrow());
     }
 
     private ItemStack reasonIcon(PlayerRef viewer, Optional<String> reason) {

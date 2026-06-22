@@ -26,9 +26,10 @@ public final class ModerationCommands {
     private ModerationCommands() {}
 
     /**
-     * Every moderation command, in surface order. {@code guiFlow} is the bare {@code /ban}/{@code /mute}
-     * picker→confirm opener those two commands expose through {@code guiRoot()}; it is {@code null} only in a
-     * configuration that built no GUI flow (every other command ignores it).
+     * Every moderation command, in surface order. {@code guiFlow} is the bare-command picker→confirm opener the
+     * six sanction commands ({@code /ban}, {@code /mute}, {@code /tempban}, {@code /tempmute}, {@code /warn},
+     * {@code /banip}) expose through {@code guiRoot()}; it is {@code null} only in a configuration that built no
+     * GUI flow (every other command ignores it).
      */
     public static List<CommandRegistration> all(
             ModerationServices services,
@@ -39,7 +40,7 @@ public final class ModerationCommands {
             @Nullable PunishmentGuiFlow guiFlow) {
         return List.of(
                 new MuteCommand(services, messages, sink, silentByDefault, guiFlow),
-                new TempmuteCommand(services, messages, sink, silentByDefault),
+                new TempmuteCommand(services, messages, sink, silentByDefault, guiFlow),
                 target(
                         "unmute",
                         "uxmessentials.moderation.unmute",
@@ -62,7 +63,7 @@ public final class ModerationCommands {
                 new JailedPlayersCommand(services, messages, sink, scheduler),
                 new SetJailCommand(services, messages, sink),
                 new DelJailCommand(services, messages, sink),
-                new TempbanCommand(services, messages, sink, silentByDefault),
+                new TempbanCommand(services, messages, sink, silentByDefault, guiFlow),
                 new BanCommand(services, messages, sink, silentByDefault, guiFlow),
                 new UnbanCommand(services, messages, sink),
                 new BanListCommand(services, messages, sink, scheduler),
@@ -76,7 +77,7 @@ public final class ModerationCommands {
                 new CheckMuteCommand(services, messages, sink, scheduler),
                 new KickCommand(services, messages, sink, silentByDefault),
                 new KickallCommand(services, messages, sink),
-                new WarnCommand(services, messages, sink, silentByDefault),
+                new WarnCommand(services, messages, sink, silentByDefault, guiFlow),
                 new TempwarnCommand(services, messages, sink, silentByDefault),
                 new UnwarnCommand(services, messages, sink),
                 target(
@@ -88,7 +89,7 @@ public final class ModerationCommands {
                         sink,
                         (a, t) -> services.reviewWarns().review(a, t)),
                 new SanctionCommand(services, messages, sink, scheduler),
-                new BanipCommand(services, messages, sink),
+                new BanipCommand(services, messages, sink, guiFlow),
                 new TempbanipCommand(services, messages, sink),
                 new UnbanipCommand(services, messages, sink),
                 target(

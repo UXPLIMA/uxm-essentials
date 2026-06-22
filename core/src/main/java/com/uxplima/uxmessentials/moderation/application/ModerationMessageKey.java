@@ -233,7 +233,36 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_GUI_CONFIRM_REASON_SET_LORE("moderation.gui.confirm.reason-set-lore"),
     MOD_GUI_CONFIRM_REASON_NONE_LORE("moderation.gui.confirm.reason-none-lore"),
     MOD_GUI_CONFIRM_REASON_PROMPT("moderation.gui.confirm.reason-prompt"),
-    MOD_GUI_CONFIRM_BACK("moderation.gui.confirm.back");
+    MOD_GUI_CONFIRM_BACK("moderation.gui.confirm.back"),
+
+    // bare /tempban, /tempmute, /warn and /banip GUI flow — the picker titles, the per-verb confirm-screen
+    // labels, and the timed verbs' duration step. The picker reuses the shared gui.player-picker.* chrome and
+    // the timed verbs reuse the shared gui.duration-picker.* chrome; these are the moderation-specific labels.
+    MOD_GUI_PICK_TEMPBAN_TITLE("moderation.gui.pick.tempban-title"),
+    MOD_GUI_PICK_TEMPMUTE_TITLE("moderation.gui.pick.tempmute-title"),
+    MOD_GUI_PICK_WARN_TITLE("moderation.gui.pick.warn-title"),
+    MOD_GUI_PICK_BANIP_TITLE("moderation.gui.pick.banip-title"),
+    MOD_GUI_CONFIRM_TEMPBAN_TITLE("moderation.gui.confirm.tempban-title"),
+    MOD_GUI_CONFIRM_TEMPMUTE_TITLE("moderation.gui.confirm.tempmute-title"),
+    MOD_GUI_CONFIRM_WARN_TITLE("moderation.gui.confirm.warn-title"),
+    MOD_GUI_CONFIRM_BANIP_TITLE("moderation.gui.confirm.banip-title"),
+    MOD_GUI_CONFIRM_TEMPBAN("moderation.gui.confirm.tempban"),
+    MOD_GUI_CONFIRM_TEMPBAN_LORE("moderation.gui.confirm.tempban-lore"),
+    MOD_GUI_CONFIRM_TEMPBAN_SILENT("moderation.gui.confirm.tempban-silent"),
+    MOD_GUI_CONFIRM_TEMPBAN_SILENT_LORE("moderation.gui.confirm.tempban-silent-lore"),
+    MOD_GUI_CONFIRM_TEMPMUTE("moderation.gui.confirm.tempmute"),
+    MOD_GUI_CONFIRM_TEMPMUTE_LORE("moderation.gui.confirm.tempmute-lore"),
+    MOD_GUI_CONFIRM_TEMPMUTE_SILENT("moderation.gui.confirm.tempmute-silent"),
+    MOD_GUI_CONFIRM_TEMPMUTE_SILENT_LORE("moderation.gui.confirm.tempmute-silent-lore"),
+    MOD_GUI_CONFIRM_WARN("moderation.gui.confirm.warn"),
+    MOD_GUI_CONFIRM_WARN_LORE("moderation.gui.confirm.warn-lore"),
+    MOD_GUI_CONFIRM_WARN_SILENT("moderation.gui.confirm.warn-silent"),
+    MOD_GUI_CONFIRM_WARN_SILENT_LORE("moderation.gui.confirm.warn-silent-lore"),
+    MOD_GUI_CONFIRM_BANIP("moderation.gui.confirm.banip"),
+    MOD_GUI_CONFIRM_BANIP_LORE("moderation.gui.confirm.banip-lore"),
+    MOD_GUI_DURATION_TEMPBAN_TITLE("moderation.gui.duration.tempban-title"),
+    MOD_GUI_DURATION_TEMPMUTE_TITLE("moderation.gui.duration.tempmute-title"),
+    MOD_GUI_DURATION_REJECT("moderation.gui.duration.reject");
 
     private final String key;
 

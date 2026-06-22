@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.command.MuteCommand;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentConfirmView;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.DurationPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
@@ -57,8 +58,10 @@ class BanMuteGuiRootTest {
         com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
         PlayerPickerView picker =
                 new PlayerPickerView(guiText, scheduler, anvil, server, new KeyMessages(), new NoopSink());
+        DurationPickerView durations =
+                new DurationPickerView(guiText, scheduler, anvil, new KeyMessages(), new NoopSink());
         PunishmentConfirmView confirm = new PunishmentConfirmView(guiText, scheduler, anvil);
-        flow = new PunishmentGuiFlow(services, picker, confirm);
+        flow = new PunishmentGuiFlow(services, picker, durations, confirm, new KeyMessages(), new NoopSink());
     }
 
     @AfterEach

@@ -81,6 +81,7 @@ import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.DurationPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
@@ -196,13 +197,18 @@ public final class ModerationWiring {
                 sanctionHistory,
                 clock,
                 guiLayouts);
-        // The bare /ban and /mute GUI flow: the reusable player picker into the per-target confirm screen,
-        // ending in the same audited Ban/Mute use cases the raw subcommands take. The picker stays generic — the
-        // flow supplies the moderation TargetResolver as its offline-name resolver and the unknown-target reply.
+        // The bare-command GUI flow for the named sanctions (/ban /mute /tempban /tempmute /warn /banip): the
+        // reusable player picker — and, for the timed verbs, the reusable duration picker — into the per-target
+        // confirm screen, ending in the same audited use cases the raw subcommands take. The views stay generic:
+        // the flow supplies the moderation TargetResolver as its offline-name resolver, the unknown-target reply,
+        // and the SanctionDuration-backed validator for the timed verbs.
         PlayerPickerView picker = new PlayerPickerView(
                 guiText, kernel.scheduler(), anvil, plugin.getServer(), kernel.messages(), kernel.messageSink());
+        DurationPickerView durationPicker =
+                new DurationPickerView(guiText, kernel.scheduler(), anvil, kernel.messages(), kernel.messageSink());
         PunishmentConfirmView confirmView = new PunishmentConfirmView(guiText, kernel.scheduler(), anvil);
-        PunishmentGuiFlow guiFlow = new PunishmentGuiFlow(services, picker, confirmView);
+        PunishmentGuiFlow guiFlow = new PunishmentGuiFlow(
+                services, picker, durationPicker, confirmView, kernel.messages(), kernel.messageSink());
         java.util.List<CommandRegistration> commands = new java.util.ArrayList<>(ModerationCommands.all(
                 services,
                 kernel.messages(),

@@ -40,6 +40,14 @@ public enum GuiMessageKey implements MessageKey {
     PLAYER_PICKER_PREV("gui.player-picker.prev"),
     PLAYER_PICKER_NEXT("gui.player-picker.next"),
 
+    // the shared duration-picker widget — preset duration buttons plus the custom-span anvil button and back
+    DURATION_PICKER_PRESET_NAME("gui.duration-picker.preset-name"),
+    DURATION_PICKER_PRESET_LORE("gui.duration-picker.preset-lore"),
+    DURATION_PICKER_CUSTOM("gui.duration-picker.custom"),
+    DURATION_PICKER_CUSTOM_LORE("gui.duration-picker.custom-lore"),
+    DURATION_PICKER_CUSTOM_PROMPT("gui.duration-picker.custom-prompt"),
+    DURATION_PICKER_BACK("gui.duration-picker.back"),
+
     // the shared colour-picker widget — the 16 standard named-colour swatches
     COLOUR_WHITE("gui.colour.white"),
     COLOUR_ORANGE("gui.colour.orange"),
