@@ -226,7 +226,9 @@ exchange, and physical banknotes.
 ## Storage
 
 SQLite is the default — zero setup, a single file under the data folder, WAL-mode and single-writer-safe.
-Point it at a network backend to share homes, warps, economy, vaults, and moderation across a fleet:
+Point it at a network backend to share state across a fleet — homes, warps, player-warps, economy, vaults,
+moderation, holograms, NPCs, the vote party, and the messaging ignore list all replicate between nodes that
+share one database:
 
 ```hocon
 # config.conf
@@ -261,8 +263,37 @@ conflict policy — so you can move an existing server over without starting fro
 
 ## Cross-server & Discord add-ons
 
-- **Velocity** — drop `uxmEssentials-velocity-0.2.0.jar` on the proxy and the uxmEssentials nodes sharing one
-  database fan home / warp / economy changes and the vote party across servers over a proxy-side bus.
+Nodes that share one database stay in sync over a pluggable bus. A write on one server publishes a small
+"this changed" notice that tells every peer to drop its cached copy and re-read the authoritative row — so the
+database stays the single source of truth and a change never round-trips as a full payload. Pick the transport
+in `config.conf`:
+
+```hocon
+# config.conf
+network {
+  enabled   = true
+  server-id = "survival-1"      # unique per node; the origin tag on every change
+  transport = "velocity"        # velocity | redis | both
+  redis {
+    host     = "127.0.0.1"
+    port     = 6379
+    password = ""
+    db       = 0
+    channel  = "uxmessentials:bus"
+  }
+}
+```
+
+- **Velocity** — drop `uxmEssentials-velocity-0.2.0.jar` on the proxy and the bus rides a proxy-side broker
+  over plugin messaging.
+- **Redis** — point `network.redis` at a Redis server and the same bus runs over Redis pub/sub with **no
+  Velocity proxy required** — a plain set of backends sharing a database and a Redis instance sync directly.
+- **both** — run both transports at once (handy mid-migration); a frame goes out on each.
+
+Either way the sync covers homes, warps, player-warps, economy, vaults, moderation, holograms, NPCs, the vote
+party, and the messaging ignore list. With no proxy, no Redis, and no peers the bus degrades cleanly to
+local-only — the single-server path is unchanged. `/uxmess doctor` reports the active transport and its health.
+
 - **Discord** — drop `uxmEssentials-discord-0.2.0.jar` on a Paper node to bridge account linking and push
   audit and economy notifications through JDA.
 
