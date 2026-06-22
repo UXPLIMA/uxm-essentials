@@ -68,8 +68,6 @@ import com.uxplima.uxmessentials.homes.adapter.outbound.ProviderHomeEconomy;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
-import com.uxplima.uxmessentials.persistence.economy.LockingWalletRepository;
-import com.uxplima.uxmessentials.persistence.economy.StripedLock;
 import com.uxplima.uxmessentials.persistence.economy.WalletLedger;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -119,13 +117,12 @@ public final class EconomyWiring {
         CachedWalletRepository cached = WalletRepositories.cachedConcrete(persistence, currencies, clock);
         bus.registry().register(WalletSync.listener(cached));
 
-        // Decorator chain: JooqWalletRepository -> CachedWalletRepository -> locking (in-JVM per-owner ordering)
-        // -> general-bus WalletSync broadcaster. Cross-server invalidation rides the general bus's WalletSync
-        // frame (network.transport selects the carrier); money safety is the jOOQ guarded UPDATE, never a JVM
-        // lock, so the striped layer holds no lock across any I/O.
-        StripedLock stripedLock = new StripedLock(256);
-        WalletRepository locking = new LockingWalletRepository(cached, stripedLock);
-        WalletRepository repository = WalletSync.repository(locking, bus.publisher());
+        // Decorator chain: JooqWalletRepository -> CachedWalletRepository -> general-bus WalletSync broadcaster.
+        // Cross-server invalidation rides the general bus's WalletSync frame (network.transport selects the
+        // carrier). Money safety is the jOOQ guarded UPDATE alone — a single `UPDATE … WHERE amount >= ?` the
+        // database serialises, where an over-draw updates zero rows; correct even across servers sharing one DB,
+        // which a per-JVM lock could never be.
+        WalletRepository repository = WalletSync.repository(cached, bus.publisher());
 
         WalletLedger ledger = WalletRepositories.ledgerOver(
                 repository,
