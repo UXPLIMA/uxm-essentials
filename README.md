@@ -86,8 +86,8 @@ extensive MockBukkit/JUnit test suite.
 ## Installation
 
 1. Download `uxmEssentials-0.3.0.jar` and drop it in your server's `plugins/` folder.
-2. Start the server once. uxmEssentials creates `plugins/uxmEssentials/` with a `modules.conf`, a per-module
-   `config.conf`, the message catalogs, and the GUI layouts.
+2. Start the server once. uxmEssentials creates `plugins/uxmEssentials/` with a shared `config.conf`, a
+   `commands.conf`, a `config.conf` per module under `modules/`, the message catalogs, and the GUI layouts.
 3. Edit what you want, then `/uxmess reload <module>` (or restart). That's it.
 
 Two optional companion jars extend the suite onto other platforms — see
@@ -101,8 +101,9 @@ Two optional companion jars extend the suite onto other platforms — see
 
 ## Modules
 
-Every module is a self-contained bounded context, switched on or off in `modules.conf`. `economy` is the
-worked multi-currency example; `vaults` and `economy` are database-backed so they survive rollbacks.
+Every module is a self-contained bounded context, switched on or off by the `enabled` flag in its own
+`modules/<module>/config.conf`. `economy` is the worked multi-currency example; `vaults` and `economy` are
+database-backed so they survive rollbacks.
 
 | Module | What it gives your server |
 | --- | --- |
