@@ -1,54 +1,79 @@
 package com.uxplima.uxmessentials.playerstate.application;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
+import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
+import com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * {@code /playtime [player]}: show a player's total time played. A read-only query through the
- * {@link PlayerInfo} port — nothing is mutated. The viewer sees their own play time, or another player's with
- * the {@code .others} node; an offline target is a silent no-op the adapter has already rejected before this
- * runs. The duration is split into whole days, hours, and minutes for the message placeholders.
+ * {@code /playtime [player]}: show a player's playtime breakdown — active (non-AFK) and AFK time across today, the
+ * last seven days, the last thirty days, and all time, read from the DB-backed {@link PlaytimeRepository} the
+ * periodic sampler feeds. The viewer sees their own breakdown, or another player's with the {@code .others} node;
+ * the adapter has already resolved the target before this runs. The DB summary survives a world rollback (it is
+ * never PDC), unlike the Bukkit lifetime statistic — which is still surfaced as one continuity line through the
+ * {@link PlayerInfo} port when the target is online, so an operator who watched the old number recognises it.
+ *
+ * <p>Nothing is mutated. A target with no tracked rows renders a clean all-zero breakdown rather than no answer.
  */
 public final class ShowPlaytime {
 
-    private static final long MINUTES_PER_DAY = 1440L;
-    private static final long MINUTES_PER_HOUR = 60L;
-
+    private final PlaytimeRepository repository;
     private final PlayerInfo info;
     private final PlayerStateNotifier notifier;
+    private final Clock clock;
 
-    public ShowPlaytime(PlayerInfo info, PlayerStateNotifier notifier) {
+    public ShowPlaytime(PlaytimeRepository repository, PlayerInfo info, PlayerStateNotifier notifier, Clock clock) {
+        this.repository = Objects.requireNonNull(repository, "repository");
         this.info = Objects.requireNonNull(info, "info");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Show {@code who} their own play time. */
+    /** Show {@code who} their own breakdown. */
     public void show(PlayerRef who) {
         showFor(who, who);
     }
 
-    /** Show {@code actor} the play time of {@code subject}. */
+    /** Show {@code actor} the breakdown of {@code subject}. */
     public void showFor(PlayerRef actor, PlayerRef subject) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(subject, "subject");
-        Optional<Duration> playtime = info.playtimeOf(subject);
-        if (playtime.isEmpty()) {
-            return;
-        }
-        long total = playtime.get().toMinutes();
-        Map<String, String> data = Map.of(
-                "days", Long.toString(total / MINUTES_PER_DAY),
-                "hours", Long.toString((total % MINUTES_PER_DAY) / MINUTES_PER_HOUR),
-                "minutes", Long.toString(total % MINUTES_PER_HOUR),
-                "player", subject.name());
-        notifier.send(
-                actor,
-                actor.equals(subject) ? PlayerstateMessageKey.PLAYTIME_SHOW : PlayerstateMessageKey.PLAYTIME_SHOW_OTHER,
-                data);
+        PlaytimeSummary summary = repository.summaryOf(subject.uuid(), LocalDate.now(clock));
+        notifier.send(actor, headerKey(actor, subject), placeholders(subject, summary));
+    }
+
+    private static PlayerstateMessageKey headerKey(PlayerRef actor, PlayerRef subject) {
+        return actor.equals(subject) ? PlayerstateMessageKey.PLAYTIME_SHOW : PlayerstateMessageKey.PLAYTIME_SHOW_OTHER;
+    }
+
+    private Map<String, String> placeholders(PlayerRef subject, PlaytimeSummary summary) {
+        Map<String, String> data = new HashMap<>();
+        data.put("player", subject.name());
+        data.put("today_active", PlaytimeFormat.compact(summary.todayActive()));
+        data.put("today_afk", PlaytimeFormat.compact(summary.todayAfk()));
+        data.put("week_active", PlaytimeFormat.compact(summary.weekActive()));
+        data.put("week_afk", PlaytimeFormat.compact(summary.weekAfk()));
+        data.put("month_active", PlaytimeFormat.compact(summary.monthActive()));
+        data.put("month_afk", PlaytimeFormat.compact(summary.monthAfk()));
+        data.put("total_active", PlaytimeFormat.compact(summary.totalActive()));
+        data.put("total_afk", PlaytimeFormat.compact(summary.totalAfk()));
+        data.put("total", PlaytimeFormat.compact(summary.totalCombined()));
+        data.put("lifetime", PlaytimeFormat.compact(lifetime(subject)));
+        return data;
+    }
+
+    /** The vanilla play-one-minute statistic for continuity, or the tracked all-time total when offline. */
+    private Duration lifetime(PlayerRef subject) {
+        Optional<Duration> bukkit = info.playtimeOf(subject);
+        return bukkit.orElseGet(
+                () -> repository.summaryOf(subject.uuid(), LocalDate.now(clock)).totalCombined());
     }
 }

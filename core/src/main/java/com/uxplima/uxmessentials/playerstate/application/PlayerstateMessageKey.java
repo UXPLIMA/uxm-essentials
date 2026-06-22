@@ -134,6 +134,10 @@ public enum PlayerstateMessageKey implements MessageKey {
     PLAYTIME_SHOW("playerstate.playtime.show"),
     PLAYTIME_SHOW_OTHER("playerstate.playtime.show-other"),
 
+    // /playtime reset
+    PLAYTIME_RESET("playerstate.playtime.reset"),
+    PLAYTIME_RESET_OTHER("playerstate.playtime.reset-other"),
+
     // /rest
     REST_DONE("playerstate.rest.done"),
     REST_DONE_OTHER("playerstate.rest.done-other"),

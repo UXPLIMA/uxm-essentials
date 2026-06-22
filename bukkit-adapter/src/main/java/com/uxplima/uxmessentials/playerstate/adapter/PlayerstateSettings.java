@@ -26,14 +26,33 @@ public final class PlayerstateSettings {
 
     private static final String COMMAND_BLOCKS = "world-command-blocks";
     private static final String NO_FLY_WORLDS = "no-fly-worlds";
+    private static final String PLAYTIME_TRACKING = "playtime.tracking";
+    private static final String PLAYTIME_SAMPLE_SECONDS = "playtime.sample-seconds";
+
+    /** Default sampling cadence in seconds; floored to one so a mis-set value never schedules a zero-delay loop. */
+    private static final int DEFAULT_SAMPLE_SECONDS = 60;
 
     private final WorldCommandPolicy worldCommandPolicy;
     private final List<String> noFlyWorlds;
+    private final boolean playtimeTracking;
+    private final int playtimeSampleSeconds;
 
     public PlayerstateSettings(ConfigStore config) {
         Objects.requireNonNull(config, "config");
         this.worldCommandPolicy = new WorldCommandPolicy(readCommandBlocks(config));
         this.noFlyWorlds = config.getStringList(NO_FLY_WORLDS, List.of());
+        this.playtimeTracking = config.getBoolean(PLAYTIME_TRACKING, true);
+        this.playtimeSampleSeconds = Math.max(1, config.getInt(PLAYTIME_SAMPLE_SECONDS, DEFAULT_SAMPLE_SECONDS));
+    }
+
+    /** Whether the AFK-aware playtime sampler runs (the {@code /playtime} breakdown is empty when off). */
+    public boolean playtimeTracking() {
+        return playtimeTracking;
+    }
+
+    /** The sampling cadence in seconds — how much playtime each tick credits each online player. */
+    public int playtimeSampleSeconds() {
+        return playtimeSampleSeconds;
     }
 
     /** The per-world command-block rule built from {@code world-command-blocks}. */

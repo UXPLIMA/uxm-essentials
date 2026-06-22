@@ -434,7 +434,10 @@ permissions:
     description: '/ping to show a player''s round-trip latency.'
     default: true
   uxmessentials.playtime.use:
-    description: '/playtime [player] to show a player''s total time played.'
+    description: '/playtime [player] to show a player''s playtime breakdown (active/afk, today/week/month/all-time).'
+    default: op
+  uxmessentials.playtime.reset:
+    description: '/playtime reset [player] to wipe a player''s tracked playtime (resetting others also needs uxmessentials.playerstate.others).'
     default: op
   uxmessentials.rest.use:
     description: '/rest to reset a player''s time-since-rest so phantoms stop.'

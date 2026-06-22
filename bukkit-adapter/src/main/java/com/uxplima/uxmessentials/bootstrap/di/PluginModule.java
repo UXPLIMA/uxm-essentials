@@ -59,8 +59,10 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
+import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
+import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
@@ -390,7 +392,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("kits"))) {
             wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
-            wirePlayerstate(ctx, resources, links);
+            wirePlayerstate(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
             wireMessaging(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("presence"))) {
@@ -642,16 +644,28 @@ public final class PluginModule {
                         wired.kitMenu().open(player, viewer, wired.listKits().available(viewer))));
     }
 
-    private static void wirePlayerstate(ModuleContext ctx, CloseableResources resources, ContextLinks links) {
-        // playerstate persists nothing: the per-player snapshot map is transient in-memory state, and all
-        // live-player reconciliation routes through the kernel Scheduler port onto the owning region thread.
-        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(ctx);
+    private static void wirePlayerstate(
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
+        // playerstate's only durable state is the per-day playtime ledger behind /playtime, built over
+        // persistence.dsl(); the per-player snapshot map stays transient in-memory and all live-player
+        // reconciliation routes through the kernel Scheduler port onto the owning region thread. The AFK-aware
+        // playtime sampler is armed below and stopped on module disable, leaving no orphaned tick.
+        PlaytimeRepository playtimeRepository = PlaytimeRepositories.jooq(persistence);
+        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(plugin, ctx, playtimeRepository);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        wired.startBackgroundWork();
         resources.onClose(wired::stop);
         links.placeholders.playerstate(new StorePlayerstatePlaceholders(wired.store(), wired.info()));
         // Captured for staff (wired last), which binds its EXAMINE gadget to this /invsee open use case.
         links.staffOpenContainer = wired.services().openContainer();
+        // Captured so presence (wired later) rebinds the playtime sampler's AFK seam to its live store, so the
+        // sampler splits active vs AFK seconds. Until then — or when presence is disabled — it counts all active.
+        links.playtimeAfkStatus = wired.afkStatus();
     }
 
     private static void wireMessaging(
@@ -821,6 +835,15 @@ public final class PluginModule {
         }
     }
 
+    private static void bindPlaytimeAfk(
+            ContextLinks links, com.uxplima.uxmessentials.playerstate.application.port.AfkStatus status) {
+        com.uxplima.uxmessentials.playerstate.adapter.outbound.MutablePlaytimeAfkStatus holder =
+                links.playtimeAfkStatus;
+        if (holder != null) {
+            holder.bind(status);
+        }
+    }
+
     private static void wirePresence(
             JavaPlugin plugin,
             ModuleContext ctx,
@@ -841,6 +864,11 @@ public final class PluginModule {
         resources.onClose(wired::stop);
         links.placeholders.presence(new StorePresencePlaceholders(wired.store(), wired.clock()));
         bindAfk(links, new PresenceAfkStatus(wired.store()));
+        // Rebind the playtime sampler's AFK seam (captured during the earlier playerstate wiring) to the live
+        // presence store, so the sampler splits each player's seconds into active vs AFK. When playerstate is
+        // disabled the holder is absent and this is a no-op.
+        bindPlaytimeAfk(
+                links, new com.uxplima.uxmessentials.playerstate.adapter.outbound.PresenceAfkStatus(wired.store()));
         // Captured for staff (wired last), which binds its VANISH gadget and vanish-on-enter to this toggle + store.
         links.staffPresenceVanish = new com.uxplima.uxmessentials.staff.adapter.StaffWiring.PresenceVanishSeam(
                 wired.services().toggleVanish(), wired.store());
@@ -1197,6 +1225,8 @@ public final class PluginModule {
                 balanceLeaderboard;
         private @org.jspecify.annotations.Nullable MutableMutePolicy mutePolicy;
         private @org.jspecify.annotations.Nullable MutableAfkStatus afkStatus;
+        private com.uxplima.uxmessentials.playerstate.adapter.outbound.@org.jspecify.annotations.Nullable MutablePlaytimeAfkStatus
+                playtimeAfkStatus;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
         private @org.jspecify.annotations.Nullable MutableHomeRespawnLocator homeRespawnLocator;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView

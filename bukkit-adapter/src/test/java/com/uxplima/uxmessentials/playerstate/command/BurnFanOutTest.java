@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.playerstate.application.Freeze;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
+import com.uxplima.uxmessentials.playerstate.application.ResetPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
 import com.uxplima.uxmessentials.playerstate.application.SetAir;
 import com.uxplima.uxmessentials.playerstate.application.SetExperience;
@@ -172,6 +173,7 @@ class BurnFanOutTest {
                 mock(ShowPosition.class),
                 mock(ShowPing.class),
                 mock(ShowPlaytime.class),
+                mock(ResetPlaytime.class),
                 mock(ResetRest.class),
                 mock(PlayerLookup.class));
     }

@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.playerstate.application.Freeze;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
+import com.uxplima.uxmessentials.playerstate.application.ResetPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
 import com.uxplima.uxmessentials.playerstate.application.SetAir;
 import com.uxplima.uxmessentials.playerstate.application.SetExperience;
@@ -62,6 +63,7 @@ import org.jspecify.annotations.NullMarked;
  * @param showPosition {@code /getpos} ({@code /coords}, {@code /whereami})
  * @param showPing {@code /ping}
  * @param showPlaytime {@code /playtime}
+ * @param resetPlaytime {@code /playtime reset}
  * @param resetRest {@code /rest}
  * @param players name → ref resolution for the {@code .others} targets
  */
@@ -92,6 +94,7 @@ public record PlayerStateServices(
         ShowPosition showPosition,
         ShowPing showPing,
         ShowPlaytime showPlaytime,
+        ResetPlaytime resetPlaytime,
         ResetRest resetRest,
         PlayerLookup players) {
 
@@ -121,6 +124,7 @@ public record PlayerStateServices(
         Objects.requireNonNull(showPosition, "showPosition");
         Objects.requireNonNull(showPing, "showPing");
         Objects.requireNonNull(showPlaytime, "showPlaytime");
+        Objects.requireNonNull(resetPlaytime, "resetPlaytime");
         Objects.requireNonNull(resetRest, "resetRest");
         Objects.requireNonNull(players, "players");
     }

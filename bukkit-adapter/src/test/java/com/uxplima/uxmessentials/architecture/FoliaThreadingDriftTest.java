@@ -138,6 +138,10 @@ class FoliaThreadingDriftTest {
                 pkg + "playerstate.adapter.outbound.BukkitNearbyPlayers",
                 "GLOBAL: /near position read resolved via onGlobal before per-entity work");
         allow.put(
+                pkg + "playerstate.adapter.outbound.BukkitOnlineRoster",
+                "GLOBAL: playtime sampler roster snapshot — get() is only ever called inside the sampler's "
+                        + "scheduler.onGlobal lambda, copies uuid/name only, then the writes hop off-tick");
+        allow.put(
                 pkg + "presence.adapter.inbound.command.GcCommand",
                 "GLOBAL: /gc world entity + chunk totals read inside scheduler.onGlobal");
         allow.put(

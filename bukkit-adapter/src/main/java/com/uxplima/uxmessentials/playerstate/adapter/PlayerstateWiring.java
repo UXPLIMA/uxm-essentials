@@ -1,10 +1,12 @@
 package com.uxplima.uxmessentials.playerstate.adapter;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
 import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeListener;
@@ -18,12 +20,15 @@ import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStat
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.WorldCommandListener;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitNearbyPlayers;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitOnlineRoster;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerEffects;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitPlayerInfo;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitStateReconciler;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.InMemoryPlayerStateStore;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.MutablePlaytimeAfkStatus;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.PdcClearInventoryPreferences;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.PlaytimeSampler;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.nms.NmsOfflinePlayerStorage;
 import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
@@ -35,6 +40,7 @@ import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.playerstate.application.PlayerStateNotifier;
+import com.uxplima.uxmessentials.playerstate.application.ResetPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ResetRest;
 import com.uxplima.uxmessentials.playerstate.application.SetAir;
 import com.uxplima.uxmessentials.playerstate.application.SetExperience;
@@ -59,6 +65,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.NearbyPlayers;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerInfo;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
+import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -82,8 +89,10 @@ public final class PlayerstateWiring {
     private PlayerstateWiring() {}
 
     /** Build the playerstate adapters and use cases from {@code ctx}, ready to register with the plugin. */
-    public static Wired wire(ModuleContext ctx) {
+    public static Wired wire(Plugin plugin, ModuleContext ctx, PlaytimeRepository playtimeRepository) {
+        Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(playtimeRepository, "playtimeRepository");
         KernelPorts kernel = ctx.kernel();
         ConfigStore config = ctx.config();
         Clock clock = Clock.systemUTC();
@@ -102,10 +111,22 @@ public final class PlayerstateWiring {
         PlayerStateNotifier notifier = new PlayerStateNotifier(kernel.messages(), kernel.messageSink());
         ClearInventoryPreferences clearPrefs = new PdcClearInventoryPreferences();
 
-        Ports ports = new Ports(store, reconciler, effects, inventoryViewer, nearby, info, notifier, clearPrefs);
+        Ports ports = new Ports(
+                store, reconciler, effects, inventoryViewer, nearby, info, notifier, clearPrefs, playtimeRepository);
         PlayerStateServices services = assemble(kernel, config, clock, ports);
         PlayerstateSettings settings = new PlayerstateSettings(config);
         NoFlyWorldPolicy noFlyWorlds = new NoFlyWorldPolicy(settings.noFlyWorlds());
+        // The AFK source is rebound when presence wires (presence lands after playerstate); until then — or when
+        // presence is disabled — the holder reports no one AFK, so every sample counts as active time.
+        MutablePlaytimeAfkStatus afkStatus = new MutablePlaytimeAfkStatus();
+        PlaytimeSampler sampler = new PlaytimeSampler(
+                kernel.scheduler(),
+                playtimeRepository,
+                afkStatus,
+                new BukkitOnlineRoster(plugin),
+                clock,
+                settings.playtimeTracking(),
+                Duration.ofSeconds(settings.playtimeSampleSeconds()));
         List<CommandRegistration> commands = PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds);
         List<Listener> listeners = List.of(
                 new PlayerStateListener(store, reconciler),
@@ -114,7 +135,8 @@ public final class PlayerstateWiring {
                 new OfflineContainerListener(offlineView),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
                 new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
-        return new Wired(commands, listeners, invseeView, enderseeView, offlineView, services, store, info);
+        return new Wired(
+                commands, listeners, invseeView, enderseeView, offlineView, services, store, info, sampler, afkStatus);
     }
 
     private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {
@@ -151,7 +173,8 @@ public final class PlayerstateWiring {
                 new Freeze(effects, notifier),
                 new ShowPosition(ports.info(), notifier),
                 new ShowPing(ports.info(), notifier),
-                new ShowPlaytime(ports.info(), notifier),
+                new ShowPlaytime(ports.playtimeRepository(), ports.info(), notifier, clock),
+                new ResetPlaytime(ports.playtimeRepository(), notifier),
                 new ResetRest(effects, notifier, restEnabled),
                 kernel.playerLookup());
     }
@@ -165,13 +188,15 @@ public final class PlayerstateWiring {
             NearbyPlayers nearby,
             PlayerInfo info,
             PlayerStateNotifier notifier,
-            ClearInventoryPreferences clearPreferences) {}
+            ClearInventoryPreferences clearPreferences,
+            PlaytimeRepository playtimeRepository) {}
 
     /**
      * Everything the playerstate module contributes once wired: the Brigadier commands and the listeners (the
-     * join/quit/respawn re-apply/reset listener and the {@code /invsee} menu's click/close listener). The
-     * context holds no repeating scheduled work; its only durable-while-open state is the set of open invsee
-     * menus, which {@link #stop()} reconciles back onto their targets before disable so no edit is lost.
+     * join/quit/respawn re-apply/reset listener and the {@code /invsee} menu's click/close listener), plus the
+     * self-rescheduling playtime sampler. The only durable-while-open state is the set of open invsee menus, which
+     * {@link #stop()} reconciles back onto their targets, and the sampler loop, which {@code stop()} flips off so
+     * no edit is lost and no orphaned tick survives disable.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
@@ -181,6 +206,8 @@ public final class PlayerstateWiring {
      * @param services the constructed use cases, exposing {@code openContainer} cross-context for the staff EXAMINE gadget
      * @param store the in-memory snapshot map, read by the placeholder seam for the god flag
      * @param info the live-player read port, read by the placeholder seam for total play time
+     * @param sampler the AFK-aware playtime sampler, armed by {@code startBackgroundWork} and stopped by {@code stop}
+     * @param afkStatus the rebindable AFK seam presence rebinds to its store when it wires
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -190,7 +217,9 @@ public final class PlayerstateWiring {
             OfflineContainerView offlineView,
             PlayerStateServices services,
             PlayerStateStore store,
-            PlayerInfo info) {
+            PlayerInfo info,
+            PlaytimeSampler sampler,
+            MutablePlaytimeAfkStatus afkStatus) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -201,10 +230,18 @@ public final class PlayerstateWiring {
             Objects.requireNonNull(services, "services");
             Objects.requireNonNull(store, "store");
             Objects.requireNonNull(info, "info");
+            Objects.requireNonNull(sampler, "sampler");
+            Objects.requireNonNull(afkStatus, "afkStatus");
         }
 
-        /** Reconcile every still-open invsee/endersee menu back onto its target. Called on module stop. */
+        /** Arm the playtime sampler. Called once after registration, like the presence sweep. */
+        public void startBackgroundWork() {
+            sampler.start();
+        }
+
+        /** Stop the sampler and reconcile every still-open invsee/endersee menu back onto its target. */
         public void stop() {
+            sampler.stop();
             invseeView.flushAll();
             enderseeView.flushAll();
             offlineView.flushAll();

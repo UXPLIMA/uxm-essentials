@@ -330,22 +330,42 @@ class PlayerStateUseCasesTest {
     }
 
     @Test
-    void playtimeReadsThroughTheInfoPortAndIsSilentWhenOffline() {
+    void playtimeRendersTheBreakdownAndIsReadOnly() {
         FakeInfo online = new FakeInfo(null, null, java.time.Duration.ofHours(5));
+        FakePlaytimeRepository repo = new FakePlaytimeRepository();
 
-        new ShowPlaytime(online, notifier).show(alice);
+        new ShowPlaytime(repo, online, notifier, Clock.systemUTC()).show(alice);
+
         assertThat(reconciler.reconciled).isEmpty(); // read-only: nothing is reconciled
+    }
 
+    @Test
+    void playtimeAlwaysSendsTheBreakdownEvenWithNoTrackedRows() {
         FakeInfo offline = new FakeInfo(null, null, null);
+        FakePlaytimeRepository repo = new FakePlaytimeRepository();
         var captured = new ArrayList<String>();
         PlayerStateNotifier capturing =
                 new PlayerStateNotifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
 
-        new ShowPlaytime(offline, capturing).show(alice);
-        assertThat(captured).isEmpty(); // offline target sends nothing
+        // An untracked player offline yields an all-zero summary, which the breakdown still renders (unlike the
+        // old behaviour, which sent nothing when the Bukkit lifetime stat was unavailable).
+        new ShowPlaytime(repo, offline, capturing, Clock.systemUTC()).show(alice);
 
-        new ShowPlaytime(online, capturing).show(alice);
         assertThat(captured).containsExactly(PlayerstateMessageKey.PLAYTIME_SHOW.key()); // self uses the self key
+    }
+
+    @Test
+    void resetPlaytimeWipesTheLedgerAndConfirms() {
+        FakePlaytimeRepository repo = new FakePlaytimeRepository();
+        repo.reset.clear();
+        var captured = new ArrayList<String>();
+        PlayerStateNotifier capturing =
+                new PlayerStateNotifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
+
+        new ResetPlaytime(repo, capturing).reset(alice);
+
+        assertThat(repo.reset).containsExactly(alice.uuid());
+        assertThat(captured).containsExactly(PlayerstateMessageKey.PLAYTIME_RESET.key());
     }
 
     /** A map-backed {@link PlayerStateStore} mutated via the same compute contract as the real adapter. */
@@ -532,6 +552,32 @@ class PlayerStateUseCasesTest {
         @Override
         public java.util.Optional<java.time.Duration> playtimeOf(PlayerRef who) {
             return java.util.Optional.ofNullable(playtime);
+        }
+    }
+
+    /** A map-backed playtime ledger recording resets and accumulating per-day deltas for assertions. */
+    private static final class FakePlaytimeRepository
+            implements com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository {
+        private final List<UUID> reset = new ArrayList<>();
+        private final Map<UUID, long[]> totals = new ConcurrentHashMap<>(); // [active, afk]
+
+        @Override
+        public void addSeconds(UUID uuid, java.time.LocalDate day, long activeDelta, long afkDelta) {
+            totals.merge(uuid, new long[] {activeDelta, afkDelta}, (a, b) -> new long[] {a[0] + b[0], a[1] + b[1]});
+        }
+
+        @Override
+        public com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary summaryOf(
+                UUID uuid, java.time.LocalDate today) {
+            long[] t = totals.getOrDefault(uuid, new long[] {0L, 0L});
+            return com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary.ofSeconds(
+                    t[0], t[1], t[0], t[1], t[0], t[1], t[0], t[1]);
+        }
+
+        @Override
+        public void reset(UUID uuid) {
+            reset.add(uuid);
+            totals.remove(uuid);
         }
     }
 
