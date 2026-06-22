@@ -73,6 +73,12 @@ public final class DiscordLinkCommand extends DiscordLinkCommandSupport implemen
             return 0;
         }
         PlayerRef ref = ref(sender);
+        if (!services.bridge().available()) {
+            // No connected bridge means a code has nothing to redeem it, so refuse to mint one rather than
+            // hand the player a dead end. status/gui still work — only the issuing path is gated.
+            services.notifier().send(ref, DiscordlinkMessageKey.DISCORD_NOT_CONFIGURED);
+            return Command.SINGLE_SUCCESS;
+        }
         Optional<ConfirmedLink> existing = services.linkStatus().status(ref);
         if (existing.isPresent()) {
             services.notifier()

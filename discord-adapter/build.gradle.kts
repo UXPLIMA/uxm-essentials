@@ -20,6 +20,7 @@ dependencies {
     compileOnly(libs.bundles.configs)
 
     testImplementation(libs.bundles.testing)
+    testImplementation(libs.paper.api)
     testImplementation(libs.jda)
     testImplementation(libs.bundles.configs)
 }

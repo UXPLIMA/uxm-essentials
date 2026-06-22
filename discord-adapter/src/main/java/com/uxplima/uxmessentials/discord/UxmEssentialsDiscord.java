@@ -36,6 +36,7 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
     private final DiscordGateway gateway;
     private final AtomicReference<NotificationForwarder> forwarder = new AtomicReference<>();
     private final AtomicReference<AuditNoticeSubscriber> subscriber = new AtomicReference<>();
+    private final AtomicReference<BridgePresence> presence = new AtomicReference<>();
 
     /** Production constructor: a real JDA gateway. */
     public UxmEssentialsDiscord() {
@@ -59,6 +60,10 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        BridgePresence advertised = presence.getAndSet(null);
+        if (advertised != null) {
+            advertised.withdraw();
+        }
         AuditNoticeSubscriber open = subscriber.getAndSet(null);
         if (open != null) {
             open.stop();
@@ -120,6 +125,10 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
      * ServicesManager} (no compile-time link to the host jar). When the host exposes no confirmation — it is
      * older than the bridge, or the discordlink module is disabled — linking stays dormant: the bridge runs the
      * outbound notice mirror unchanged and logs why, exactly like the notification-source dormant path.
+     *
+     * <p>Once linking is live, advertise the bridge's presence back to the host so it knows a {@code /discordlink}
+     * code now has somewhere to be redeemed. Presence is published only here, after a real connect and a found
+     * confirmation seam, so the host's "Discord is configured" signal means exactly "connected and redeemable".
      */
     private void enableLinking() {
         DiscordLinkConfirmation confirmation = lookupConfirmation();
@@ -130,6 +139,9 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
             return;
         }
         gateway.enableLinking(confirmation);
+        BridgePresence advertised = new BridgePresence(getServer().getServicesManager(), this);
+        advertised.publish();
+        presence.set(advertised);
     }
 
     private @Nullable DiscordLinkConfirmation lookupConfirmation() {

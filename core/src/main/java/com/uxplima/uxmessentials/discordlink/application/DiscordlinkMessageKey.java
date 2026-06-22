@@ -33,6 +33,9 @@ public enum DiscordlinkMessageKey implements MessageKey {
     // console rejection
     DISCORD_LINK_PLAYERS_ONLY("discordlink.players-only"),
 
+    // the Discord bridge is not installed/connected, so a link code would have nothing to redeem it
+    DISCORD_NOT_CONFIGURED("discordlink.not-configured"),
+
     // /discordlink gui — the per-player link-status panel
     GUI_TITLE("discordlink.gui.title"),
     GUI_VALUE_LORE("discordlink.gui.value-lore"),

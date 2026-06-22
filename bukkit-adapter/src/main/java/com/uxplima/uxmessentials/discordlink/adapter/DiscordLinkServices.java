@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.discordlink.application.ConfirmLink;
 import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
+import com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -20,6 +21,7 @@ import org.jspecify.annotations.NullMarked;
  * @param unlink {@code /discordunlink}
  * @param linkStatus {@code /discordlink status}
  * @param notifier resolves and delivers the player-facing replies
+ * @param bridge whether the Discord bridge is connected to redeem a code, so issuing paths can decline early
  */
 @NullMarked
 public record DiscordLinkServices(
@@ -27,7 +29,8 @@ public record DiscordLinkServices(
         ConfirmLink confirmLink,
         Unlink unlink,
         LinkStatus linkStatus,
-        DiscordLinkNotifier notifier) {
+        DiscordLinkNotifier notifier,
+        DiscordBridge bridge) {
 
     public DiscordLinkServices {
         Objects.requireNonNull(beginLink, "beginLink");
@@ -35,5 +38,6 @@ public record DiscordLinkServices(
         Objects.requireNonNull(unlink, "unlink");
         Objects.requireNonNull(linkStatus, "linkStatus");
         Objects.requireNonNull(notifier, "notifier");
+        Objects.requireNonNull(bridge, "bridge");
     }
 }

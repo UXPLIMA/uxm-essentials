@@ -1154,7 +1154,10 @@ public final class PluginModule {
         // looks the service up once its gateway is ready and forwards nothing while it is absent. The link-status
         // panel consumes the SP0 GUI framework (a GuiText over the shared catalog, the data-folder layout loader)
         // and registers its /uxmess gui hub entry; /discordlink gui opens the same panel, gated on the GUI node.
-        DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence, guiLayouts);
+        com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge bridge =
+                new com.uxplima.uxmessentials.discordlink.adapter.outbound.ServicesManagerDiscordBridge(
+                        plugin.getServer().getServicesManager());
+        DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence, guiLayouts, bridge);
         wired.commands().forEach(resources::addCommand);
         // The discordlink PAPI seam reads the same DB-backed link store the /discordlink commands hold, so a
         // placeholder matches the binding the player redeemed (and answers for an offline player too).

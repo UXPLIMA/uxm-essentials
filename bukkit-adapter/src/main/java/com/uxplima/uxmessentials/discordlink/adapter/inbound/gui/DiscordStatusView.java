@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
+import com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge;
 import com.uxplima.uxmessentials.discordlink.domain.ConfirmedLink;
 import com.uxplima.uxmessentials.discordlink.domain.LinkCode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
@@ -59,6 +60,7 @@ public final class DiscordStatusView {
     private final Messages messages;
     private final GuiText guiText;
     private final Scheduler scheduler;
+    private final DiscordBridge bridge;
 
     public DiscordStatusView(
             GuiText guiText,
@@ -68,7 +70,8 @@ public final class DiscordStatusView {
             BeginLink beginLink,
             Unlink unlink,
             LinkStatus linkStatus,
-            DiscordLinkNotifier notifier) {
+            DiscordLinkNotifier notifier,
+            DiscordBridge bridge) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
@@ -77,6 +80,7 @@ public final class DiscordStatusView {
         this.unlink = Objects.requireNonNull(unlink, "unlink");
         this.linkStatus = Objects.requireNonNull(linkStatus, "linkStatus");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.bridge = Objects.requireNonNull(bridge, "bridge");
 
         EntityEditorLayout layout = guiLayouts.loadEntityEditor(
                 MODULE, PANEL_LAYOUT, EntityEditorLayout.codeDefault(List.of(STATUS_SLOT, ACTION_SLOT), 22));
@@ -153,6 +157,11 @@ public final class DiscordStatusView {
      */
     void generateCode(PlayerRef viewer) {
         Objects.requireNonNull(viewer, "viewer");
+        if (!bridge.available()) {
+            // Mirror the /discordlink gate: with no connected bridge a code redeems nowhere, so decline instead.
+            notifier.send(viewer, DiscordlinkMessageKey.DISCORD_NOT_CONFIGURED);
+            return;
+        }
         LinkCode code = beginLink.begin(viewer);
         notifier.send(viewer, DiscordlinkMessageKey.DISCORD_LINK_CODE, Map.of("code", code.value()));
         notifier.send(viewer, DiscordlinkMessageKey.DISCORD_LINK_HOWTO, Map.of("code", code.value()));

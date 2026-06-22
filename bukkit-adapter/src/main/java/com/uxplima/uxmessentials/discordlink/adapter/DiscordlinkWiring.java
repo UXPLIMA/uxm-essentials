@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.discordlink.application.ConfirmLink;
 import com.uxplima.uxmessentials.discordlink.application.DiscordLinkNotifier;
 import com.uxplima.uxmessentials.discordlink.application.LinkStatus;
 import com.uxplima.uxmessentials.discordlink.application.Unlink;
+import com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge;
 import com.uxplima.uxmessentials.discordlink.application.port.DiscordLinkStore;
 import com.uxplima.uxmessentials.persistence.discordlink.DiscordLinkStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -45,10 +46,11 @@ public final class DiscordlinkWiring {
     private DiscordlinkWiring() {}
 
     /** Build the discord-link adapters and use cases over the kernel ports and the persistence DSL. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence, GuiLayouts guiLayouts) {
+    public static Wired wire(ModuleContext ctx, Persistence persistence, GuiLayouts guiLayouts, DiscordBridge bridge) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(bridge, "bridge");
         KernelPorts kernel = ctx.kernel();
         DiscordLinkStore store = DiscordLinkStores.jooq(persistence);
         Clock clock = Clock.systemUTC();
@@ -57,14 +59,23 @@ public final class DiscordlinkWiring {
         Unlink unlink = new Unlink(store);
         LinkStatus linkStatus = new LinkStatus(store);
         DiscordLinkNotifier notifier = new DiscordLinkNotifier(kernel.messages(), kernel.messageSink());
-        DiscordLinkServices services = new DiscordLinkServices(beginLink, confirmLink, unlink, linkStatus, notifier);
+        DiscordLinkServices services =
+                new DiscordLinkServices(beginLink, confirmLink, unlink, linkStatus, notifier, bridge);
         // The link-status panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout
         // loader. It surfaces only what the use cases support: a read-only status line, a generate-code button
         // (BeginLink, told via the same chat messages /discordlink sends), and a confirm-gated unlink (Unlink).
         // /discordlink gui and the /uxmess gui hub entry both open it.
         GuiText guiText = new GuiText(kernel.messages());
         DiscordStatusView view = new DiscordStatusView(
-                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), beginLink, unlink, linkStatus, notifier);
+                guiText,
+                kernel.scheduler(),
+                guiLayouts,
+                kernel.messages(),
+                beginLink,
+                unlink,
+                linkStatus,
+                notifier,
+                bridge);
         DiscordLinkConfirmation confirmation = new ConfirmLinkService(confirmLink, kernel.playerLookup());
         return new Wired(DiscordLinkCommands.all(services, view), confirmation, store, view);
     }

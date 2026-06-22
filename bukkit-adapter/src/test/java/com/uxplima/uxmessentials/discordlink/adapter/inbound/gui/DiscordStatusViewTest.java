@@ -138,6 +138,17 @@ class DiscordStatusViewTest {
     }
 
     @Test
+    void linkButtonDeclinesAndIssuesNoCodeWhenTheBridgeIsAbsent() throws Exception {
+        view(false).open(player, viewer);
+        assertThat(store.pending).isEmpty();
+
+        fireClick(ACTION_SLOT, ClickType.LEFT); // with no connected bridge a code redeems nowhere
+
+        assertThat(store.pending).isEmpty(); // nothing was persisted
+        assertThat(sink.deliveries).containsExactly("discordlink.not-configured"); // the decline message only
+    }
+
+    @Test
     void unlinkIsConfirmGatedAndOnlyUnlinksOnConfirm() throws Exception {
         store.confirm(new ConfirmedLink(viewer.uuid(), DiscordId.of("123456789012345678"), Instant.now()));
         view().open(player, viewer);
@@ -155,10 +166,22 @@ class DiscordStatusViewTest {
     }
 
     private DiscordStatusView view() throws Exception {
+        return view(true);
+    }
+
+    private DiscordStatusView view(boolean bridgeAvailable) throws Exception {
         writeLayout();
         GuiLayouts layouts = new GuiLayouts(dir, NOOP);
         return new DiscordStatusView(
-                guiText, scheduler, layouts, new KeyMessages(), beginLink, unlink, linkStatus, notifier);
+                guiText,
+                scheduler,
+                layouts,
+                new KeyMessages(),
+                beginLink,
+                unlink,
+                linkStatus,
+                notifier,
+                () -> bridgeAvailable);
     }
 
     private void writeLayout() throws Exception {
