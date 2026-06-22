@@ -92,13 +92,27 @@ class PlayerStateReconciliationTest {
     }
 
     @Test
-    void reconcilingAGameModeSnapshotSetsTheBukkitMode() {
+    void reconcilingACreativeSnapshotSetsTheModeAndLiftsThePlayerIntoFlight() {
         PlayerMock alice = server.addPlayer("Alice");
         PlayerRef ref = BukkitRefs.toRef(alice);
 
         reconciler.reconcile(ref, store.update(ref, s -> s.withGameMode(GameModeRef.CREATIVE)));
 
         assertThat(alice.getGameMode()).isEqualTo(GameMode.CREATIVE);
+        // Creative should be airborne at once, not waiting for a double-jump.
+        assertThat(alice.getAllowFlight()).isTrue();
+        assertThat(alice.isFlying()).isTrue();
+    }
+
+    @Test
+    void reconcilingASurvivalSnapshotSetsTheModeWithoutForcingFlight() {
+        PlayerMock alice = server.addPlayer("Alice");
+        PlayerRef ref = BukkitRefs.toRef(alice);
+
+        reconciler.reconcile(ref, store.update(ref, s -> s.withGameMode(GameModeRef.SURVIVAL)));
+
+        assertThat(alice.getGameMode()).isEqualTo(GameMode.SURVIVAL);
+        assertThat(alice.isFlying()).isFalse(); // a non-flying mode never lifts the player
     }
 
     @Test

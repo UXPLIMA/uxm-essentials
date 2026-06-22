@@ -22,7 +22,9 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The reconciler is the single place domain state crosses to the Bukkit API; the use cases never touch a
  * live {@code Player}. Disabling fly while the player is airborne also clears their in-flight state so they do
- * not hang in the air.
+ * not hang in the air. Switching into a flight-capable mode (creative or spectator) puts the player into the
+ * air at once rather than waiting for a double-jump, which is what operators expect from {@code /gm 1}; leaving
+ * such a mode is left to vanilla's own handling of {@code setGameMode}.
  */
 @NullMarked
 public final class BukkitStateReconciler
@@ -48,7 +50,7 @@ public final class BukkitStateReconciler
         }
         player.setInvulnerable(snapshot.god());
         applyFlight(player, snapshot.fly());
-        snapshot.gameMode().map(BukkitStateReconciler::toBukkit).ifPresent(player::setGameMode);
+        snapshot.gameMode().ifPresent(mode -> applyGameMode(player, mode));
         player.setWalkSpeed(snapshot.walkSpeed().toWalkMultiplier());
         player.setFlySpeed(snapshot.flySpeed().toFlyMultiplier());
     }
@@ -57,6 +59,17 @@ public final class BukkitStateReconciler
         player.setAllowFlight(allowed);
         if (!allowed && player.isFlying()) {
             player.setFlying(false);
+        }
+    }
+
+    private static void applyGameMode(Player player, GameModeRef mode) {
+        player.setGameMode(toBukkit(mode));
+        // A flight-capable mode should lift the player straight away; vanilla only allows flight here, it does
+        // not start it, so the player would otherwise stay grounded until a double-jump. Done after setGameMode
+        // because the mode switch resets flight, and setFlying(true) requires the allowance to already be set.
+        if (mode.flies()) {
+            player.setAllowFlight(true);
+            player.setFlying(true);
         }
     }
 

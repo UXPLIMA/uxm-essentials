@@ -38,10 +38,16 @@ public final class Lockdown {
     public void setLockdown(PlayerRef actor, boolean enabled) {
         Objects.requireNonNull(actor, "actor");
         repository.setLockedDown(enabled);
-        ModerationMessageKey key =
+        ModerationMessageKey publicKey =
                 enabled ? ModerationMessageKey.MOD_LOCKDOWN_ENABLED : ModerationMessageKey.MOD_LOCKDOWN_DISABLED;
-        notifier.send(actor, key);
-        broadcast.announce(key, Map.of("actor", actor.name()));
+        ModerationMessageKey selfKey = enabled
+                ? ModerationMessageKey.MOD_LOCKDOWN_ENABLED_SELF
+                : ModerationMessageKey.MOD_LOCKDOWN_DISABLED_SELF;
+        // The actor gets a distinct personal confirmation; the broadcast carries the public line to the
+        // audience. An actor who also holds the broadcast-receive node would otherwise see the one public line
+        // twice, which is why the two keys differ (the rest of the moderation context already works this way).
+        notifier.send(actor, selfKey);
+        broadcast.announce(publicKey, Map.of("actor", actor.name()));
         audit.lockdown(actor.uuid(), enabled);
     }
 

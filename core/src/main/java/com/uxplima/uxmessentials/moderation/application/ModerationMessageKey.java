@@ -149,9 +149,13 @@ public enum ModerationMessageKey implements MessageKey {
     // /sudo
     SUDO_DONE("moderation.sudo.done"),
 
-    // /lockdown — refuse every login except bypass-perm holders; the kick line is the disconnect screen
+    // /lockdown — refuse every login except bypass-perm holders; the kick line is the disconnect screen.
+    // The *_SELF keys are the short personal confirmation to the actor, mirroring every other moderation
+    // action's distinct self-line so an actor who also receives the broadcast does not see the same line twice.
     MOD_LOCKDOWN_ENABLED("moderation.lockdown.enabled"),
     MOD_LOCKDOWN_DISABLED("moderation.lockdown.disabled"),
+    MOD_LOCKDOWN_ENABLED_SELF("moderation.lockdown.enabled-self"),
+    MOD_LOCKDOWN_DISABLED_SELF("moderation.lockdown.disabled-self"),
     MOD_LOCKDOWN_KICK("moderation.lockdown.kick"),
 
     // /seen, /seenip

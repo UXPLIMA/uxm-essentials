@@ -96,6 +96,20 @@ class StyleTagsTest {
     }
 
     @Test
+    void helpopAndStaffchatCarryDistinctLabelledPrefixes() {
+        Component help = parse("<helpop> hi");
+        Component staff = parse("<staffchat> hi");
+        PlainTextComponentSerializer plain = PlainTextComponentSerializer.plainText();
+        // The two staff channels read apart from each other rather than both showing the brand prefix.
+        assertThat(plain.serialize(help)).isEqualTo("HelpOP » hi");
+        assertThat(plain.serialize(staff)).isEqualTo("StaffChat » hi");
+        assertThat(colorOfRun(help, "HelpOP")).isEqualTo(StyleTags.HEADER);
+        assertThat(colorOfRun(staff, "StaffChat")).isEqualTo(StyleTags.HEADER);
+        assertThat(anyBold(help)).isFalse();
+        assertThat(anyBold(staff)).isFalse();
+    }
+
+    @Test
     void headerRendersSolidBlueText() {
         Component c = parse("<h:'HOME PANEL'>");
         assertThat(PlainTextComponentSerializer.plainText().serialize(c)).isEqualTo("HOME PANEL");

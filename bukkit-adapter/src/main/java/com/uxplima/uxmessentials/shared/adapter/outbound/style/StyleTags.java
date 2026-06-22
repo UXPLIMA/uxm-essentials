@@ -15,8 +15,10 @@ import org.jspecify.annotations.NullMarked;
  * their content; {@code <tag:'…'>} and {@code <etag:'…'>} both render the single {@code uxmEssentials »}
  * brand chat prefix (blue brand, dark-gray separator) — the label argument is accepted but ignored, so
  * catalog keys may keep their {@code <tag:'MODULE'>} form while every message shows the one brand prefix.
- * {@code <h:'…'>} is a solid blue header. The resolver is immutable and cached; callers add it at every
- * MiniMessage parse.
+ * {@code <h:'…'>} is a solid blue header. The two staff-facing message channels carry their own labelled
+ * prefixes instead of the brand one so they read apart from each other in chat: {@code <helpop>} renders
+ * {@code HelpOP »} and {@code <staffchat>} renders {@code StaffChat »}, both in the same brand styling. The
+ * resolver is immutable and cached; callers add it at every MiniMessage parse.
  */
 @NullMarked
 public final class StyleTags {
@@ -57,6 +59,8 @@ public final class StyleTags {
                         Placeholder.styling("title", TITLE),
                         prefixTag("tag"),
                         prefixTag("etag"),
+                        labelledPrefix("helpop", "HelpOP"),
+                        labelledPrefix("staffchat", "StaffChat"),
                         header("h"))
                 .build();
     }
@@ -71,6 +75,21 @@ public final class StyleTags {
         return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
             args.popOr("");
             Component component = Component.text(BRAND, HEADER).append(Component.text(SEPARATOR, TITLE));
+            return Tag.selfClosingInserting(component);
+        });
+    }
+
+    /**
+     * A self-closing prefix that renders a fixed channel {@code label} followed by the brand separator
+     * ({@code HelpOP »}), in the same brand/separator styling as {@code <tag>} but with the channel's own
+     * name. Unlike {@code prefixTag} the label is the visible text, not an ignored argument — the helpop and
+     * staffchat channels need to be told apart in chat, so each carries its own constant label here rather
+     * than the shared brand prefix. The separator has no trailing space; the gap before the body comes from
+     * the catalog key, exactly as for the brand prefix.
+     */
+    private static TagResolver labelledPrefix(String name, String label) {
+        return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
+            Component component = Component.text(label, HEADER).append(Component.text(SEPARATOR, TITLE));
             return Tag.selfClosingInserting(component);
         });
     }

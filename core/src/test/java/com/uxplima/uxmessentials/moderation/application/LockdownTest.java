@@ -40,7 +40,11 @@ class LockdownTest {
         lockdown.setLockdown(actor, true);
 
         assertThat(repository.isLockedDown()).isTrue();
-        assertThat(sink.sent(actor, ModerationMessageKey.MOD_LOCKDOWN_ENABLED)).isTrue();
+        // The actor sees the personal confirmation, not the public line — so a broadcast-receiving actor is
+        // not told twice. The broadcast carries the public line for the audience.
+        assertThat(sink.sent(actor, ModerationMessageKey.MOD_LOCKDOWN_ENABLED_SELF))
+                .isTrue();
+        assertThat(sink.sent(actor, ModerationMessageKey.MOD_LOCKDOWN_ENABLED)).isFalse();
         assertThat(broadcast.announced).hasSize(1);
         assertThat(broadcast.announced.get(0).key()).isEqualTo(ModerationMessageKey.MOD_LOCKDOWN_ENABLED);
         assertThat(audit.lines).hasSize(1);
@@ -60,7 +64,9 @@ class LockdownTest {
         lockdown.setLockdown(actor, false);
 
         assertThat(repository.isLockedDown()).isFalse();
-        assertThat(sink.sent(actor, ModerationMessageKey.MOD_LOCKDOWN_DISABLED)).isTrue();
+        assertThat(sink.sent(actor, ModerationMessageKey.MOD_LOCKDOWN_DISABLED_SELF))
+                .isTrue();
+        assertThat(sink.sent(actor, ModerationMessageKey.MOD_LOCKDOWN_DISABLED)).isFalse();
     }
 
     @Test

@@ -41,6 +41,15 @@ public enum GameModeRef {
     }
 
     /**
+     * Whether this mode lets the player fly: creative and spectator do, survival and adventure do not. The
+     * reconciler uses this to lift a player into the air the moment they enter such a mode rather than leaving
+     * them to double-jump for it.
+     */
+    public boolean flies() {
+        return this == CREATIVE || this == SPECTATOR;
+    }
+
+    /**
      * Resolve a mode from raw input — the full name, its short alias, or the numeric id — case-insensitively.
      * Returns empty when nothing matches, so the command can reject an unknown mode with a localized message.
      */
