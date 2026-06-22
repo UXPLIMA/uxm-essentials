@@ -262,7 +262,14 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_GUI_CONFIRM_BANIP_LORE("moderation.gui.confirm.banip-lore"),
     MOD_GUI_DURATION_TEMPBAN_TITLE("moderation.gui.duration.tempban-title"),
     MOD_GUI_DURATION_TEMPMUTE_TITLE("moderation.gui.duration.tempmute-title"),
-    MOD_GUI_DURATION_REJECT("moderation.gui.duration.reject");
+    MOD_GUI_DURATION_REJECT("moderation.gui.duration.reject"),
+
+    // bare /banhistory picker title, and the bare /checkban and /checkmute anvil-name prompts. The picker
+    // reuses the shared gui.player-picker.* chrome and routes a pick to the read-only history view; the two
+    // anvil prompts capture a name that resolves into the existing chat-output check use cases.
+    MOD_GUI_PICK_HISTORY_TITLE("moderation.gui.pick.history-title"),
+    MOD_GUI_CHECK_BAN_PROMPT("moderation.gui.check.ban-prompt"),
+    MOD_GUI_CHECK_MUTE_PROMPT("moderation.gui.check.mute-prompt");
 
     private final String key;
 

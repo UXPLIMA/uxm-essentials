@@ -36,9 +36,11 @@ public final class ModerationGuiViews {
     private static final String MODULE = "moderation";
 
     private final ActivePunishmentsView list;
+    private final PlayerHistoryView historyView;
 
-    private ModerationGuiViews(ActivePunishmentsView list) {
+    private ModerationGuiViews(ActivePunishmentsView list, PlayerHistoryView historyView) {
         this.list = list;
+        this.historyView = historyView;
     }
 
     /** Build the three views over the existing use cases and the module's GUI layouts. */
@@ -93,12 +95,24 @@ public final class ModerationGuiViews {
         ActivePunishmentsView list =
                 new ActivePunishmentsView(guiText, scheduler, repository, players, clock, listLayout, detail);
         listHolder[0] = list;
-        return new ModerationGuiViews(list);
+        return new ModerationGuiViews(list, historyView);
     }
 
     /** Open the active-punishments list — the management GUI's entry point — for {@code viewer}. */
     public void open(Player player, PlayerRef viewer) {
         list.open(player, viewer);
+    }
+
+    /**
+     * Open {@code target}'s read-only history for {@code viewer}, reusing the same {@link PlayerHistoryView} the
+     * detail screen's history button drills into so the bare {@code /banhistory} picker and the in-GUI navigation
+     * land on one view rather than a divergent second one.
+     */
+    public void openHistory(Player player, PlayerRef viewer, PlayerRef target) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(target, "target");
+        historyView.open(player, viewer, target.uuid());
     }
 
     private static EntityListLayout listCodeDefault() {

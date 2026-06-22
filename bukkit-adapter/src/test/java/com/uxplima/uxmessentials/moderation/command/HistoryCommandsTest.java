@@ -178,7 +178,7 @@ class HistoryCommandsTest {
         repository.tempban =
                 TempbanState.active(NOW.plus(Duration.ofDays(1)), Issuer.console("Mod"), Optional.of("griefing"), NOW);
 
-        dispatch(new CheckBanCommand(services, messages, sink, scheduler), staff(), "checkban Subject");
+        dispatch(new CheckBanCommand(services, messages, sink, scheduler, null, null), staff(), "checkban Subject");
 
         assertThat(messages.keys).containsExactly("moderation.check.banned");
     }
@@ -188,7 +188,7 @@ class HistoryCommandsTest {
         targets.add(new PlayerRef(TARGET, "Subject"));
         repository.tempban = TempbanState.none();
 
-        dispatch(new CheckBanCommand(services, messages, sink, scheduler), staff(), "checkban Subject");
+        dispatch(new CheckBanCommand(services, messages, sink, scheduler, null, null), staff(), "checkban Subject");
 
         assertThat(messages.keys).containsExactly("moderation.check.not-banned");
     }
@@ -198,7 +198,7 @@ class HistoryCommandsTest {
         targets.add(new PlayerRef(TARGET, "Subject"));
         repository.mute = MuteState.permanent(Issuer.console("Mod"), Optional.of("spam"), NOW);
 
-        dispatch(new CheckMuteCommand(services, messages, sink, scheduler), staff(), "checkmute Subject");
+        dispatch(new CheckMuteCommand(services, messages, sink, scheduler, null, null), staff(), "checkmute Subject");
 
         assertThat(messages.keys).containsExactly("moderation.check.muted");
     }
@@ -208,7 +208,7 @@ class HistoryCommandsTest {
         targets.add(new PlayerRef(TARGET, "Subject"));
         repository.mute = MuteState.none();
 
-        dispatch(new CheckMuteCommand(services, messages, sink, scheduler), staff(), "checkmute Subject");
+        dispatch(new CheckMuteCommand(services, messages, sink, scheduler, null, null), staff(), "checkmute Subject");
 
         assertThat(messages.keys).containsExactly("moderation.check.not-muted");
     }

@@ -215,7 +215,11 @@ public final class ModerationWiring {
                 kernel.messageSink(),
                 kernel.scheduler(),
                 settings.silentByDefault(),
-                guiFlow));
+                guiFlow,
+                guiViews,
+                picker,
+                guiText,
+                anvil));
         commands.add(new ModerationGuiCommand(services, kernel.messages(), kernel.messageSink(), guiViews));
         return new Wired(
                 commands,

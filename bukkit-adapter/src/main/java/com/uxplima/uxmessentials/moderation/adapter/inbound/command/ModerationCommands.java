@@ -3,11 +3,15 @@ package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
 import java.util.List;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -30,6 +34,12 @@ public final class ModerationCommands {
      * six sanction commands ({@code /ban}, {@code /mute}, {@code /tempban}, {@code /tempmute}, {@code /warn},
      * {@code /banip}) expose through {@code guiRoot()}; it is {@code null} only in a configuration that built no
      * GUI flow (every other command ignores it).
+     *
+     * <p>The read-only GUI collaborators thread to the matching command's bare-root opener: {@code guiViews}
+     * (the active-punishments list) to {@code /banlist} and (with {@code picker}) the history view to
+     * {@code /banhistory}, and {@code guiText} + {@code anvil} to the {@code /checkban}/{@code /checkmute} name
+     * prompts. Each is {@code null} only when no GUI surface was built, in which case the owning command exposes
+     * no opener and keeps its raw chat behaviour.
      */
     public static List<CommandRegistration> all(
             ModerationServices services,
@@ -37,7 +47,11 @@ public final class ModerationCommands {
             MessageSink sink,
             Scheduler scheduler,
             boolean silentByDefault,
-            @Nullable PunishmentGuiFlow guiFlow) {
+            @Nullable PunishmentGuiFlow guiFlow,
+            @Nullable ModerationGuiViews guiViews,
+            @Nullable PlayerPickerView picker,
+            @Nullable GuiText guiText,
+            @Nullable AnvilInput anvil) {
         return List.of(
                 new MuteCommand(services, messages, sink, silentByDefault, guiFlow),
                 new TempmuteCommand(services, messages, sink, silentByDefault, guiFlow),
@@ -66,15 +80,15 @@ public final class ModerationCommands {
                 new TempbanCommand(services, messages, sink, silentByDefault, guiFlow),
                 new BanCommand(services, messages, sink, silentByDefault, guiFlow),
                 new UnbanCommand(services, messages, sink),
-                new BanListCommand(services, messages, sink, scheduler),
+                new BanListCommand(services, messages, sink, scheduler, guiViews),
                 new MuteListCommand(services, messages, sink, scheduler),
-                new BanHistoryCommand(services, messages, sink, scheduler),
+                new BanHistoryCommand(services, messages, sink, scheduler, picker, guiViews),
                 new MuteHistoryCommand(services, messages, sink, scheduler),
                 new HistoryCommand(services, messages, sink, scheduler),
                 new StaffHistoryCommand(services, messages, sink, scheduler),
                 new StaffRollbackCommand(services, messages, sink, scheduler),
-                new CheckBanCommand(services, messages, sink, scheduler),
-                new CheckMuteCommand(services, messages, sink, scheduler),
+                new CheckBanCommand(services, messages, sink, scheduler, guiText, anvil),
+                new CheckMuteCommand(services, messages, sink, scheduler, guiText, anvil),
                 new KickCommand(services, messages, sink, silentByDefault),
                 new KickallCommand(services, messages, sink),
                 new WarnCommand(services, messages, sink, silentByDefault, guiFlow),

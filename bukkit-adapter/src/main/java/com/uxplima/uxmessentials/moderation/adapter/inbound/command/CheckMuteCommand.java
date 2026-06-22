@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.entity.Player;
+
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
@@ -10,13 +12,17 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
+import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /checkmute <player>}: report whether a player is currently muted, and if so the issuer, reason and
@@ -26,6 +32,12 @@ import org.jspecify.annotations.NullMarked;
  * {@code uxmessentials.moderation.check} node with {@code /checkban}. The lookup is hopped off the tick thread
  * through the {@link Scheduler} port; the target resolves online-first, then from the profile cache, so an
  * offline player's mute state is still checkable.
+ *
+ * <p>Bare {@code /checkmute} (no arguments) opens an anvil that prompts for a player name when the command's
+ * catalog {@code gui} flag is on; a submitted name resolves through the {@code TargetResolver} and runs the same
+ * {@code CheckMute.show} chat output the raw form does — the anvil captures the name only, the result is chat, not
+ * a GUI. The raw {@code /checkmute <player>} child is unchanged either way, and the same {@code .requires}
+ * permission gate covers the bare-root opener.
  */
 @NullMarked
 public final class CheckMuteCommand extends ModerationCommandSupport implements CommandRegistration {
@@ -33,10 +45,28 @@ public final class CheckMuteCommand extends ModerationCommandSupport implements 
     private static final String PERMISSION = "uxmessentials.moderation.check";
 
     private final Scheduler scheduler;
+    private final @Nullable CheckTargetPrompt prompt;
 
-    public CheckMuteCommand(ModerationServices services, Messages messages, MessageSink sink, Scheduler scheduler) {
+    public CheckMuteCommand(
+            ModerationServices services,
+            Messages messages,
+            MessageSink sink,
+            Scheduler scheduler,
+            @Nullable GuiText guiText,
+            @Nullable AnvilInput anvil) {
         super(services, messages, sink);
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.prompt = (guiText == null || anvil == null)
+                ? null
+                : new CheckTargetPrompt(
+                        services,
+                        guiText,
+                        anvil,
+                        scheduler,
+                        messages,
+                        sink,
+                        ModerationMessageKey.MOD_GUI_CHECK_MUTE_PROMPT,
+                        (actor, target) -> services.checkMute().show(actor, target));
     }
 
     @Override
@@ -50,6 +80,19 @@ public final class CheckMuteCommand extends ModerationCommandSupport implements 
     @Override
     public String description() {
         return "Check whether a player is muted.";
+    }
+
+    @Override
+    public Optional<Command<CommandSourceStack>> guiRoot() {
+        if (prompt == null) {
+            return Optional.empty();
+        }
+        return Optional.of(ctx -> {
+            if (ctx.getSource().getSender() instanceof Player sender) {
+                prompt.open(sender);
+            }
+            return Command.SINGLE_SUCCESS;
+        });
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
