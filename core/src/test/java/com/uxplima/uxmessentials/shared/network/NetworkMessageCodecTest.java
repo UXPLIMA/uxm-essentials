@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.network;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -78,5 +79,16 @@ class NetworkMessageCodecTest {
         frame[1] = 120; // the wire-tag byte — frame[0] is the protocol version
 
         assertThatThrownBy(() -> NetworkMessageCodec.decode(frame)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsATruncatedBody() {
+        // A valid version and tag but the body cut short (a network truncation or a short/hostile peer frame):
+        // the read failure must surface as the IllegalArgumentException the bus catches and drops, not escape
+        // as a raw IOException that would kill the listener thread.
+        byte[] full = NetworkMessageCodec.encode(new BalanceChanged("survival-1", OWNER, "coins"));
+        byte[] truncated = Arrays.copyOf(full, 2); // keep [version][tag], drop the entire body
+
+        assertThatThrownBy(() -> NetworkMessageCodec.decode(truncated)).isInstanceOf(IllegalArgumentException.class);
     }
 }
