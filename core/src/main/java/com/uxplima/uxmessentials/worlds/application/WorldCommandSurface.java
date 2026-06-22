@@ -10,8 +10,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 /**
  * The worlds context's command surface as platform-neutral {@link CommandSpec}s. The {@code /worlds}
  * root carries the base {@code uxmessentials.world.use} node; its create/import/load/unload/
- * unregister/delete/list/info subcommands are Brigadier literals gated individually by the inbound
- * adapter. {@code /worldsconfirm} is the delete confirmation companion, gated by the delete node.
+ * unregister/delete/confirm/list/info subcommands are Brigadier literals gated individually by the inbound
+ * adapter, where {@code /worlds confirm} is the delete confirmation step (target of the delete prompt's click).
  * The literal is {@code worlds} (plural) because {@code playerstate} already owns {@code /world}
  * (a read-only "which world am I in" command); literals must be globally unique.
  */
@@ -21,11 +21,7 @@ final class WorldCommandSurface {
 
     static List<CommandSpec> all() {
         return List.of(
-                spec("worlds", "uxmessentials.world.use", WorldsCommandDescriptor.of("worlds", "Manage worlds")),
-                spec(
-                        "worldsconfirm",
-                        "uxmessentials.world.delete",
-                        WorldsCommandDescriptor.of("worldsconfirm", "Confirm a pending world deletion")));
+                spec("worlds", "uxmessentials.world.use", WorldsCommandDescriptor.of("worlds", "Manage worlds")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

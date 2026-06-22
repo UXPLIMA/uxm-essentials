@@ -14,6 +14,6 @@ public final class WorldCommands {
     private WorldCommands() {}
 
     public static List<CommandRegistration> all(WorldsServices services, Messages messages) {
-        return List.of(new WorldCommand(services, messages), new WorldConfirmCommand(services, messages));
+        return List.of(new WorldCommand(services, messages));
     }
 }

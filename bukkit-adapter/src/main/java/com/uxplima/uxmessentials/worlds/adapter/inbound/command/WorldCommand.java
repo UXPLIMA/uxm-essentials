@@ -104,6 +104,9 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .then(Commands.literal("delete")
                         .requires(p(DELETE))
                         .then(nameArg().executes(this::runDelete)))
+                .then(Commands.literal("confirm")
+                        .requires(p(DELETE))
+                        .then(nameArg().executes(this::runConfirm)))
                 .then(Commands.literal("set")
                         .requires(p(SET))
                         .then(nameArg()
@@ -278,6 +281,22 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
             return 0;
         }
         services.deleteWorld().request(ref(sender), name); // inline: validation + staging, no I/O
+        return Command.SINGLE_SUCCESS;
+    }
+
+    // The target of the delete-confirmation prompt's click. Kept under the root as `/worlds confirm <name>`
+    // rather than a separate top-level command so the whole world surface lives behind one literal.
+    private int runConfirm(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        onGlobal(() -> services.deleteWorld().confirm(who, name)); // unload + off-tick file delete
         return Command.SINGLE_SUCCESS;
     }
 

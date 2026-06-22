@@ -535,7 +535,7 @@ class FeatureModuleRegistryDriftTest {
 
         Set<String> literals =
                 worlds.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
-        assertThat(literals).containsExactlyInAnyOrder("worlds", "worldsconfirm");
+        assertThat(literals).containsExactlyInAnyOrder("worlds");
         assertThat(worlds.migrations()).isEmpty();
     }
 

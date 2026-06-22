@@ -21,16 +21,17 @@ class WorldCommandSurfaceDriftTest {
     }
 
     @Test
-    void exposesTheWorldRootAndConfirmCompanion() {
+    void exposesTheWorldRoot() {
         assertThat(worldsSpec("worlds").permission()).isEqualTo("uxmessentials.world.use");
-        assertThat(worldsSpec("worldsconfirm").permission()).isEqualTo("uxmessentials.world.delete");
     }
 
     @Test
     void worldsExposesNoExtraTopLevelLiteral() {
+        // Deletion confirmation is the `/worlds confirm <name>` subcommand, not a separate top-level command,
+        // so the worlds surface is a single literal.
         FeatureModule worlds =
                 new DefaultModuleRegistry().byId(ModuleId.of("worlds")).orElseThrow();
         assertThat(worlds.commands().stream().map(CommandSpec::literal).toList())
-                .containsExactlyInAnyOrder("worlds", "worldsconfirm");
+                .containsExactlyInAnyOrder("worlds");
     }
 }
