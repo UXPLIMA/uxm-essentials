@@ -93,6 +93,19 @@ class PlayerWarpSyncTest {
     }
 
     @Test
+    void recordingAVisitDoesNotAnnounceToPeers() {
+        CapturingBus bus = new CapturingBus("survival-1");
+        PlayerWarpRepository repo =
+                PlayerWarpSync.repository(new CachedPlayerWarpRepository(new RecordingDelegate()), bus);
+
+        // A visit count is high-frequency, eventually-consistent data, so the decorator forwards it without a
+        // frame — peers are not invalidated per teleport.
+        repo.recordVisit(OWNER, PlayerWarpName.of("base"));
+
+        assertThat(bus.published).isEmpty();
+    }
+
+    @Test
     void aRemotePlayerWarpChangedDropsTheOwnerSoTheNextReadReloads() {
         RecordingDelegate delegate = new RecordingDelegate();
         CachedPlayerWarpRepository cached = new CachedPlayerWarpRepository(delegate);
@@ -190,6 +203,9 @@ class PlayerWarpSyncTest {
             stored.getOrDefault(owner.uuid(), new ArrayList<>())
                     .removeIf(warp -> warp.name().equals(name));
         }
+
+        @Override
+        public void recordVisit(PlayerRef owner, PlayerWarpName name) {}
 
         @Override
         public void rate(PlayerRef owner, PlayerWarpName name, UUID player, double rating) {}

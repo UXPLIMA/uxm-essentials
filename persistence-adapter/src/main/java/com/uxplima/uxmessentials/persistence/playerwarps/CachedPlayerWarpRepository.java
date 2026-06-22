@@ -111,6 +111,16 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     }
 
     @Override
+    public void recordVisit(PlayerRef owner, PlayerWarpName name) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(name, "name");
+        delegate.recordVisit(owner, name);
+        // Drop the local entry so a subsequent read on this server reflects the bumped count; this is a local
+        // refresh only, the bus decorator above us decides whether peers hear about it (it chooses not to).
+        cache.invalidate(owner.uuid());
+    }
+
+    @Override
     public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {
         delegate.rate(owner, name, player, rating);
     }

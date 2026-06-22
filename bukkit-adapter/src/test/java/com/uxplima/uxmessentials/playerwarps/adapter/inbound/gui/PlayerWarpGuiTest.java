@@ -375,6 +375,14 @@ class PlayerWarpGuiTest {
         }
 
         @Override
+        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
+            PlayerWarp warp = byKey.get(key(owner, name));
+            if (warp != null) {
+                byKey.put(key(owner, name), warp.incrementedVisitors());
+            }
+        }
+
+        @Override
         public void rate(PlayerRef owner, PlayerWarpName name, UUID player, double rating) {}
 
         @Override

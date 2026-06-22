@@ -114,6 +114,18 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
     }
 
     @Override
+    public void recordVisit(PlayerRef owner, PlayerWarpName name) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(name, "name");
+        // Increment in the database, not in memory, so two concurrent visits both land instead of racing.
+        write(dsl -> dsl.update(PLAYER_WARPS)
+                .set(PLAYER_WARPS.VISITORS, PLAYER_WARPS.VISITORS.add(1))
+                .where(PLAYER_WARPS.OWNER.eq(owner.uuid().toString()))
+                .and(PLAYER_WARPS.NAME.eq(name.value()))
+                .execute());
+    }
+
+    @Override
     public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(name, "name");

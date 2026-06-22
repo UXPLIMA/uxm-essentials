@@ -52,6 +52,16 @@ public interface PlayerWarpRepository {
     void delete(PlayerRef owner, PlayerWarpName name);
 
     /**
+     * Atomically bump the visit counter on {@code owner}'s warp under {@code name} by one. This is a
+     * high-frequency, eventually-consistent write — it runs on every teleport to the warp — so it does the
+     * increment in the database rather than reading, mutating, and saving the whole row (which would lose
+     * concurrent visits to a last-writer-wins race). It deliberately stays off the cross-server sync path:
+     * a visitor count drifting by a few on peers until the next real change is fine, and is not worth a
+     * cluster-wide cache invalidation per visit.
+     */
+    void recordVisit(PlayerRef owner, PlayerWarpName name);
+
+    /**
      * The warps {@code owner} owns if they are already in memory, without touching the database. A cache
      * decorator returns its cached set on a hit and an empty {@link Optional} on a miss; an undecorated store
      * has nothing in memory and so returns empty. This exists for tick-thread callers that must never block

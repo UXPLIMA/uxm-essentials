@@ -264,6 +264,14 @@ class PlayerWarpCommandPathTest {
         }
 
         @Override
+        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
+            PlayerWarp warp = set(owner).get(name.value());
+            if (warp != null) {
+                set(owner).put(name.value(), warp.incrementedVisitors());
+            }
+        }
+
+        @Override
         public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {}
 
         @Override

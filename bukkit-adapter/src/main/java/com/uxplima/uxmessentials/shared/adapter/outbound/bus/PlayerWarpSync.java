@@ -113,6 +113,14 @@ public final class PlayerWarpSync {
         }
 
         @Override
+        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
+            // A visit count is high-frequency, eventually-consistent data; letting peers drift a few visits
+            // behind until the owner's next real change is fine, and not worth a cluster-wide invalidation per
+            // teleport, so this forwards to the delegate without announcing.
+            delegate.recordVisit(owner, name);
+        }
+
+        @Override
         public void rate(PlayerRef owner, PlayerWarpName name, java.util.UUID player, double rating) {
             // A rating is not part of the cached owner set (the cache reads averageRating from the delegate, not
             // the cached map), so the cached repository does not invalidate on rate — there is nothing for a peer

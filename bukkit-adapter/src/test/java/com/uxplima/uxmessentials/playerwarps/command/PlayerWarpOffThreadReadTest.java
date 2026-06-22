@@ -246,6 +246,14 @@ class PlayerWarpOffThreadReadTest {
         }
 
         @Override
+        public void recordVisit(PlayerRef owner, PlayerWarpName name) {
+            PlayerWarp warp = byName.get(name.value());
+            if (warp != null) {
+                byName.put(name.value(), warp.incrementedVisitors());
+            }
+        }
+
+        @Override
         public Optional<List<PlayerWarp>> peekOwned(PlayerRef owner) {
             return Optional.of(List.copyOf(byName.values()));
         }

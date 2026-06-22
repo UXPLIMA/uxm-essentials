@@ -126,11 +126,13 @@ public final class UsePlayerWarp {
                 PlayerwarpsMessageKey.PWARP_TELEPORTING,
                 Map.of("warp", warp.name().value()));
 
-        // Increment visitor counter
-        PlayerWarp updated = warp.incrementedVisitors();
-        repository.save(updated);
+        // Record the visit atomically in storage rather than reading, bumping, and saving the whole row here —
+        // that loses concurrent visits to a last-writer-wins race and would needlessly invalidate the owner's
+        // cross-server cache on every teleport. The warp we hand the teleporter shows the pre-visit count, which
+        // is fine for this request.
+        repository.recordVisit(owner, warp.name());
 
-        teleporter.teleportTo(actor, updated);
+        teleporter.teleportTo(actor, warp);
         return Result.ok();
     }
 }
