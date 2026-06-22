@@ -156,6 +156,29 @@ public final class CachedHologramRepository implements HologramRepository {
     }
 
     /**
+     * Re-read one hologram from the durable delegate and update the in-memory set to match, returning its fresh
+     * state — present when it now exists (created or edited on a peer), empty when it was deleted there. Unlike
+     * {@link #save}/{@link #delete}, the change did not pass through this cache (a peer wrote the shared row), so
+     * the in-memory authoritative set is stale for that name; this hops it back in step against the database. The
+     * viewer and blacklist caches for the name are invalidated too, so a peer's show/hide/blacklist edit is
+     * reflected on the next render. The cross-server listener calls this off the tick thread (the delegate read is
+     * a synchronous SQLite query) and re-renders or despawns the live entity from the returned state.
+     */
+    public Optional<Hologram> reload(HologramName name) {
+        Objects.requireNonNull(name, "name");
+        Optional<Hologram> fresh = delegate.find(name);
+        if (fresh.isPresent()) {
+            Hologram hologram = fresh.get();
+            republish(next -> next.put(name.value(), hologram));
+        } else {
+            republish(next -> next.remove(name.value()));
+        }
+        viewers.invalidate(name.value());
+        blacklists.invalidate(name.value());
+        return fresh;
+    }
+
+    /**
      * The authoritative in-memory set, loaded from the delegate on the first access and reused thereafter. The
      * load is idempotent: a concurrent loser reuses the winner's published set so the next write applies to the
      * live snapshot rather than being lost to a racing reload.

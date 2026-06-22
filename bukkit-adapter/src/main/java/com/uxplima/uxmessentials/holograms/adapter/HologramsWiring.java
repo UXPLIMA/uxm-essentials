@@ -132,6 +132,7 @@ public final class HologramsWiring {
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
+            com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
             com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards,
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
@@ -140,13 +141,20 @@ public final class HologramsWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(leaderboards, "leaderboards");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(anvil, "anvil");
         KernelPorts kernel = ctx.kernel();
-        HologramRepository repository = HologramRepositories.cached(persistence);
+        // The concrete cache is what the cross-server listener reloads per name; the broadcasting decorator wraps
+        // that same cache so a local hologram write announces it to peers, and the listener reloads + re-renders
+        // the named hologram there. The renderer is built below, so the listener is registered after it exists.
+        com.uxplima.uxmessentials.persistence.holograms.CachedHologramRepository cached =
+                HologramRepositories.cachedConcrete(persistence);
+        HologramRepository repository =
+                com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.repository(cached, bus.publisher());
         HologramManager manager = new HologramManager();
         manager.installLifecycleListener(plugin);
         // A hologram is one shared TextDisplay. Its broadcast text resolves placeholders server-globally (online,
@@ -193,6 +201,14 @@ public final class HologramsWiring {
                 leaderboards,
                 pageState);
         rendererHolder.set(renderer);
+        // Close the cross-server loop: a remote hologram change reloads exactly that hologram into the same cache
+        // the commands and renderer read, then re-renders (or despawns) the live display through the renderer —
+        // the same render path the local edit runs, hopped onto the right region thread by the renderer itself.
+        // With the bus disabled the publisher is a no-op and this listener is never invoked, so the single-server
+        // path is unchanged.
+        bus.registry()
+                .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.listener(
+                        cached, renderer, kernel.scheduler()));
         InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
         Consumer<DomainEvent> npcSubscriber = npcLocator;
         events.subscribe(npcSubscriber);

@@ -76,6 +76,26 @@ public final class CachedNpcRepository implements NpcRepository {
     }
 
     /**
+     * Re-read one NPC from the durable delegate and update the in-memory set to match, returning its fresh state
+     * — present when it now exists (created or edited on a peer), empty when it was deleted there. Unlike
+     * {@link #save}/{@link #delete}, the change did not pass through this cache (a peer wrote the shared row), so
+     * the in-memory authoritative set is stale for that name; this hops it back in step against the database. The
+     * cross-server listener calls this off the tick thread (the delegate read is a synchronous SQLite query) and
+     * re-renders or despawns the live fake player from the returned state.
+     */
+    public Optional<Npc> reload(NpcName name) {
+        Objects.requireNonNull(name, "name");
+        Optional<Npc> fresh = delegate.find(name);
+        if (fresh.isPresent()) {
+            Npc npc = fresh.get();
+            republish(next -> next.put(name.value(), npc));
+        } else {
+            republish(next -> next.remove(name.value()));
+        }
+        return fresh;
+    }
+
+    /**
      * The authoritative in-memory set, loaded from the delegate on the first access and reused thereafter. The
      * load is idempotent: a concurrent loser discards its own snapshot and reads the winner's, so the next write
      * is applied to the published set rather than lost to a racing reload.

@@ -22,6 +22,10 @@ class NetworkMessageCodecTest {
                 new VaultChanged("survival-1", OWNER, 3),
                 new BanChanged("survival-1", OWNER),
                 new MuteChanged("survival-1", OWNER),
+                new PlayerWarpChanged("survival-1", OWNER),
+                new HologramChanged("survival-1", "spawn"),
+                new NpcChanged("survival-1", "guide"),
+                new IgnoreChanged("survival-1", OWNER),
                 new ServerPing("lobby-2", 1_717_000_000_000L),
                 new VotePartyFired("survival", 25),
                 new VoteCounterChanged("lobby"));

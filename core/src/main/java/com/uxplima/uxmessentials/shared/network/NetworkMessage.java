@@ -25,6 +25,10 @@ public sealed interface NetworkMessage
                 VaultChanged,
                 BanChanged,
                 MuteChanged,
+                PlayerWarpChanged,
+                HologramChanged,
+                NpcChanged,
+                IgnoreChanged,
                 ServerPing,
                 VotePartyFired,
                 VoteCounterChanged {
@@ -49,7 +53,11 @@ public sealed interface NetworkMessage
         VOTE_PARTY_FIRED(6),
         VOTE_COUNTER_CHANGED(7),
         BAN_CHANGED(8),
-        MUTE_CHANGED(9);
+        MUTE_CHANGED(9),
+        PLAYER_WARP_CHANGED(10),
+        HOLOGRAM_CHANGED(11),
+        NPC_CHANGED(12),
+        IGNORE_CHANGED(13);
 
         private final byte wireTag;
 

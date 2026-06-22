@@ -126,6 +126,7 @@ public final class NpcWiring {
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
+            com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
             GuiLayouts guiLayouts,
@@ -134,6 +135,7 @@ public final class NpcWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
@@ -141,11 +143,25 @@ public final class NpcWiring {
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         KernelPorts kernel = ctx.kernel();
         NpcSettings settings = new NpcSettings(ctx.config());
-        NpcRepository repository = NpcRepositories.cached(persistence);
+        // The concrete cache is what the cross-server listener reloads per name; the broadcasting decorator wraps
+        // that same cache so a local NPC write announces it to peers, and the listener reloads + re-renders the
+        // named NPC there. The renderer is built below, so the listener is registered after it exists.
+        com.uxplima.uxmessentials.persistence.npc.CachedNpcRepository cached =
+                NpcRepositories.cachedConcrete(persistence);
+        NpcRepository repository =
+                com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.repository(cached, bus.publisher());
         NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
         NpcViewSpawner spawner = new NpcViewSpawner(packets, kernel.scheduler(), kernel.log(), TAB_HIDE_DELAY);
         NpcRenderer renderer =
                 new NpcRenderer(packets, spawner, kernel.scheduler(), RENDER_RANGE, settings.lookRange());
+        // Close the cross-server loop: a remote NPC change reloads exactly that NPC into the same cache the
+        // commands and renderer read, then re-renders (or despawns) the live fake player through the renderer —
+        // the same render path the local edit runs, hopped onto the global region thread by the renderer itself.
+        // With the bus disabled the publisher is a no-op and this listener is never invoked, so the single-server
+        // path is unchanged.
+        bus.registry()
+                .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.listener(
+                        cached, renderer, kernel.scheduler()));
         NpcNotifier notifier = new NpcNotifier(kernel.messages(), kernel.messageSink());
         NpcQuota quota = new NpcQuota(kernel.permissions(), settings.defaultLimit());
         NpcServices services = assemble(kernel, repository, renderer, notifier, quota);

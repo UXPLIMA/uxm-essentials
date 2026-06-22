@@ -67,6 +67,7 @@ public final class PlayerwarpsWiring {
             ModuleContext ctx,
             Persistence persistence,
             TeleportEngine teleportEngine,
+            com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
@@ -81,14 +82,23 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(anvil, "anvil");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         KernelPorts kernel = ctx.kernel();
-        PlayerWarpRepository repository = PlayerWarpRepositories.cached(
-                persistence,
-                com.uxplima.uxmessentials.shared.adapter.outbound.lookup.PlayerNames.resolver(kernel.playerLookup()));
+        // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
+        // wraps that same cache so a local write announces it to peers (the homes seam, copied for player-warps).
+        com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository cached =
+                PlayerWarpRepositories.cachedConcrete(
+                        persistence,
+                        com.uxplima.uxmessentials.shared.adapter.outbound.lookup.PlayerNames.resolver(
+                                kernel.playerLookup()));
+        bus.registry().register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerWarpSync.listener(cached));
+        PlayerWarpRepository repository =
+                com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerWarpSync.repository(
+                        cached, bus.publisher());
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(kernel.messages(), kernel.messageSink());
         com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry registry = teleportRegistry != null
                 ? teleportRegistry

@@ -30,6 +30,17 @@ public final class PlayerWarpRepositories {
      */
     public static PlayerWarpRepository cached(
             Persistence persistence, java.util.function.Function<java.util.UUID, String> names) {
+        return cachedConcrete(persistence, names);
+    }
+
+    /**
+     * As {@link #cached(Persistence, java.util.function.Function)} but returned as its concrete decorator type, so
+     * the wiring can hand the cross-server bus a per-owner invalidation hook on the same cache the {@code /pwarp}
+     * commands read — a remote {@code /setpwarp} drops exactly that owner's cached set. Same backing as
+     * {@link #cached}; this overload exposes the decorator only so the invalidation seam can reach it.
+     */
+    public static CachedPlayerWarpRepository cachedConcrete(
+            Persistence persistence, java.util.function.Function<java.util.UUID, String> names) {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(names, "names");
         return new CachedPlayerWarpRepository(new JooqPlayerWarpRepository(persistence.dsl(), names));

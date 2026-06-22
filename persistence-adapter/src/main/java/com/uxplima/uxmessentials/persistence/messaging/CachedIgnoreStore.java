@@ -58,6 +58,14 @@ public final class CachedIgnoreStore implements IgnoreStore {
         cache.invalidateAll();
     }
 
+    /**
+     * Drop one cached owner so the next read reloads it from the database. Called by the cross-server bus
+     * client when a peer reports this owner's ignore list changed on another backend.
+     */
+    public void invalidateOwner(UUID owner) {
+        cache.invalidate(Objects.requireNonNull(owner, "owner"));
+    }
+
     private IgnoreList loadFresh(UUID ownerUuid) {
         // The cache key is the owner uuid; the delegate only reads the uuid (the row carries no owner name),
         // so a name placeholder here never reaches a row.

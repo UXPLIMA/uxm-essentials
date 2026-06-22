@@ -20,6 +20,16 @@ public final class HologramRepositories {
 
     /** A cached jOOQ {@link HologramRepository} over the shared persistence DSL. */
     public static HologramRepository cached(Persistence persistence) {
+        return cachedConcrete(persistence);
+    }
+
+    /**
+     * As {@link #cached(Persistence)} but returned as its concrete decorator type, so the wiring can hand the
+     * cross-server bus a per-name reload hook on the same cache the {@code /hologram} commands and the renderer
+     * read — a remote hologram change reloads exactly that name from the shared DB and the listener re-renders it.
+     * Same backing as {@link #cached}; this overload exposes the decorator only so the sync seam can reach it.
+     */
+    public static CachedHologramRepository cachedConcrete(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedHologramRepository(new JooqHologramRepository(persistence.dsl()));
     }
