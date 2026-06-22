@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -97,7 +98,11 @@ public final class StaffWiring {
 
         StaffGadgetItems gadgetItems = new StaffGadgetItems(plugin);
         StaffModeStoreImpl store = new StaffModeStoreImpl();
-        StaffLoadoutRepository repository = StaffStores.loadouts(persistence, Clock.systemUTC());
+        // The loadout is per-server state, so it is keyed per (player, server_id): the repository scopes every
+        // save/load/delete to THIS backend's network.server-id, so two backends sharing one DB never clobber
+        // each other's captured pre-mode inventory. A single-server install runs on the default id unchanged.
+        String serverId = NetworkConfig.from(ctx.config()).serverId();
+        StaffLoadoutRepository repository = StaffStores.loadouts(persistence, Clock.systemUTC(), serverId);
         StaffNotifier notifier = new StaffNotifier(kernel.messages(), kernel.messageSink());
 
         // vanish is built (and the seams bound) before the capture, because the capture reads the pre-mode
