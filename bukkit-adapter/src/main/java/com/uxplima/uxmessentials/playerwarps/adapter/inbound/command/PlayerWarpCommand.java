@@ -25,12 +25,18 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /pwarp <name> [owner]}: teleport to a player-warp. With no owner the sender warps to their own warp;
  * with an owner they warp to that player's warp, permitted only when it is public.
+ *
+ * <p>{@code /pwarp del <name>} removes one of the sender's own warps, freeing its name for reuse — the
+ * folded-in counterpart of the visibility/lock/edit subcommands, gated by {@code uxmessentials.pwarp.delete}.
+ * The {@link com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp} use case rejects a missing name
+ * through the sink.
  */
 @NullMarked
 public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.pwarp.use";
     private static final String PUBLIC_PERMISSION = "uxmessentials.pwarp.public";
+    private static final String DELETE_PERMISSION = "uxmessentials.pwarp.delete";
 
     public PlayerWarpCommand(PlayerWarpServices services, Messages messages) {
         super(services, messages);
@@ -61,6 +67,11 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                                 .executes(this::setPasswordClear)
                                 .then(Commands.argument("password", StringArgumentType.word())
                                         .executes(this::setPassword))))
+                .then(Commands.literal("del")
+                        .requires(src -> src.getSender().hasPermission(DELETE_PERMISSION))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
+                                .executes(this::runDelete)))
                 .then(Commands.literal("edit")
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .suggests(CommandSuggestions.forPlayer(services::ownWarpNames))
@@ -142,6 +153,18 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
         PlayerWarpName warp = PlayerWarpName.of(ctx.getArgument("name", String.class));
         // The use case reads the warp then delegates the hop to the teleport context; run the read off-thread.
         services.scheduler().async(() -> services.usePlayerWarp().use(who, warp));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runDelete(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        PlayerRef who = ref(sender);
+        PlayerWarpName name = PlayerWarpName.of(ctx.getArgument("name", String.class));
+        // The delete reads then writes the database; run it off the tick thread.
+        services.scheduler().async(() -> services.delPlayerWarp().delete(who, name));
         return Command.SINGLE_SUCCESS;
     }
 

@@ -15,7 +15,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Warms the joining player's owned player-warps into the repository cache so the {@code /pwarp} and
- * {@code /delpwarp} name-argument suggesters have the names in memory to complete by the time the player
+ * {@code /pwarp del} name-argument suggesters have the names in memory to complete by the time the player
  * starts typing. The suggesters run on the tick thread and must never block on the database, so they only
  * peek the cache; this listener does the one load up front, off the join thread via the {@link Scheduler}
  * port's async seam (the read hits SQLite). A player who never types a pwarp command still pays only one

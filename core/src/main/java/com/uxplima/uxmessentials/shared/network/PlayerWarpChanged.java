@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * One player's player-warp set changed on the origin backend (a {@code /setpwarp}, {@code /delpwarp}, a
+ * One player's player-warp set changed on the origin backend (a {@code /setpwarp}, {@code /pwarp del}, a
  * visibility flip, or a move/relocate), so peers must drop their cached copy of {@code owner}'s warps and
  * re-read the authoritative rows on the next {@code /pwarp} / {@code /pwarps}. The frame carries the owner
  * identity only; the warp rows live in the shared database, and a {@code /pwarp} on a peer resolves the

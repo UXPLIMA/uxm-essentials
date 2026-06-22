@@ -16,8 +16,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The player-warps bounded context as a first-class {@link FeatureModule}: it owns the per-owner
  * {@code PlayerWarp} aggregate, its ownership/public-flag access gates, the per-owner count limit, and the
- * {@code /setpwarp} {@code /delpwarp} {@code /pwarp} {@code /pwarps} commands, and it <em>delegates</em>
- * teleport execution to the teleport context (so it is registered after teleport in
+ * {@code /setpwarp} {@code /pwarp} (with its {@code del} subcommand) {@code /pwarps} commands, and it
+ * <em>delegates</em> teleport execution to the teleport context (so it is registered after teleport in
  * {@code DefaultModuleRegistry}). The module declares its command surface and enable gate here; {@code start}
  * arms the lifecycle bookkeeping, and the bukkit-side adapters (the Brigadier handlers and the jOOQ
  * repository over {@code persistence.dsl()}) are constructed in the adapter wiring once the module has

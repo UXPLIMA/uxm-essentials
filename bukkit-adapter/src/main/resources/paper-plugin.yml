@@ -546,7 +546,7 @@ permissions:
     description: '/unmute <player>.'
     default: op
   uxmessentials.moderation.jail:
-    description: '/jail <player> <jail> [duration] [reason]; /jails lists configured jails; /jailedplayers lists who is jailed; /setjail <name> defines a jail at your location; /deljail <name> removes a defined jail.'
+    description: '/jail <player> <jail> [duration] [reason]; /jails lists configured jails; /jailedplayers lists who is jailed; /setjail <name> defines a jail at your location; /jail del <name> removes a defined jail.'
     default: op
   uxmessentials.moderation.unjail:
     description: '/unjail <player>.'
@@ -955,7 +955,7 @@ permissions:
     description: '/setpwarp <name> to create or move a player-owned warp at your location.'
     default: true
   uxmessentials.pwarp.delete:
-    description: '/delpwarp <name> to remove one of your player warps.'
+    description: '/pwarp del <name> to remove one of your player warps.'
     default: true
   uxmessentials.pwarp.list:
     description: '/pwarps [player] to list your warps or a player''s public warps.'

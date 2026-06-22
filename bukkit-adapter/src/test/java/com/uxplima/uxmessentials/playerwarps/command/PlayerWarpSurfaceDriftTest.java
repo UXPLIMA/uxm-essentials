@@ -9,11 +9,13 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins each player-warps command literal to its base permission node. The four self-service commands are the
+ * Pins each player-warps command literal to its base permission node. The three self-service commands are the
  * whole top-level surface; this guard fails if a literal drops out or wires under a node other than its
  * documented one, keeping the kernel surface in lockstep with {@code paper-plugin.yml}. The
- * {@code visibility public|private <name>} toggles are subcommands of {@code /pwarp} (gated by
- * {@code uxmessentials.pwarp.public}) rather than command literals, so they are not part of this table.
+ * {@code visibility public|private <name>} toggles and {@code del <name>} are subcommands of {@code /pwarp}
+ * (gated by {@code uxmessentials.pwarp.public} and {@code uxmessentials.pwarp.delete}) rather than command
+ * literals, so they are not part of this table — {@code del} folded into {@code /pwarp} the way {@code /warp del}
+ * sits under {@code /warp}.
  */
 class PlayerWarpSurfaceDriftTest {
 
@@ -38,8 +40,11 @@ class PlayerWarpSurfaceDriftTest {
     }
 
     @Test
-    void delPwarpWiresUnderItsDeleteNode() {
-        assertThat(spec("delpwarp").permission()).isEqualTo("uxmessentials.pwarp.delete");
+    void pwarpDeletionIsFoldedIntoPwarpNotAStandaloneLiteral() {
+        FeatureModule playerwarps = new DefaultModuleRegistry()
+                .byId(ModuleId.of("playerwarps"))
+                .orElseThrow(() -> new AssertionError("playerwarps module must be registered"));
+        assertThat(playerwarps.commands().stream().map(CommandSpec::literal)).doesNotContain("delpwarp");
     }
 
     @Test

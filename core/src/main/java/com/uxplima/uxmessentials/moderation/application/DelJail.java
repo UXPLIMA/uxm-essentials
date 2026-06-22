@@ -12,11 +12,11 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * {@code /deljail <name>}: remove a DB-backed jail location, freeing its name. A name no stored jail exists at
+ * {@code /jail del <name>}: remove a DB-backed jail location, freeing its name. A name no stored jail exists at
  * is a not-found notice ({@code DELJAIL_NOT_FOUND}) and publishes nothing; a successful delete publishes
  * {@code JailLocationRemoved} attributed to the staff member and confirms with {@code DELJAIL_DELETED}. Only a
  * stored jail can be removed this way — a config-defined jail name lives in {@code moderation.conf}, not the
- * store, so a {@code /deljail} of such a name reports not-found (the operator edits the config to remove it).
+ * store, so a {@code /jail del} of such a name reports not-found (the operator edits the config to remove it).
  * The operator-only permission is enforced at the adapter gate.
  */
 public final class DelJail {

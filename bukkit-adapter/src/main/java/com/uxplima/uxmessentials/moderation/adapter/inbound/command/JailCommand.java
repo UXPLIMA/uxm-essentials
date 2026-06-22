@@ -29,6 +29,12 @@ import org.jspecify.annotations.Nullable;
  * handler maps the name, the jail, the optional duration token and the greedy reason. The target may be
  * offline (offline jail re-applied at the next login).
  *
+ * <p>{@code /jail del <name>} removes a stored jail, freeing its name — the folded-in counterpart to
+ * {@code /jail <player> <jail> ...}, mirroring how {@code /warp del} sits under {@code /warp}. Only a stored
+ * jail can be removed this way; a config-defined jail name lives in {@code moderation.conf}, not the store. The
+ * not-found feedback and the confirmation are the {@link com.uxplima.uxmessentials.moderation.application.DelJail}
+ * use case's job. A console source is allowed since no position is captured.
+ *
  * <p>Bare {@code /jail} (no arguments) opens the jail management hub — the player picker → jail chooser →
  * duration flow, with footer buttons into the jail-list manager and the jailed-players release list — when the
  * command's catalog {@code gui} flag is on: {@link #guiRoot()} returns the opener and the shared
@@ -52,6 +58,12 @@ public final class JailCommand extends ModerationCommandSupport implements Comma
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("jail")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .then(Commands.literal("del")
+                        .requires(src -> src.getSender().hasPermission(PERMISSION))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .suggests(CommandSuggestions.fromStrings(
+                                        () -> services.listJails().suggestionNames()))
+                                .executes(this::runDelete)))
                 .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("jail", StringArgumentType.word())
                                 .suggests(CommandSuggestions.fromStrings(
@@ -91,6 +103,11 @@ public final class JailCommand extends ModerationCommandSupport implements Comma
         String jail = ctx.getArgument("jail", String.class);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
         target.ifPresent(to -> services.jail().jail(actor, to, jail, duration, reason));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runDelete(CommandContext<CommandSourceStack> ctx) {
+        services.delJail().delete(actor(ctx), ctx.getArgument("name", String.class));
         return Command.SINGLE_SUCCESS;
     }
 }

@@ -15,9 +15,9 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@code PlayerwarpsModule} stays small and the command/permission pairing is one greppable table the
  * permissions guard checks against {@code paper-plugin.yml}.
  *
- * <p>The {@code public}/{@code private} visibility toggles are subcommands of {@code /pwarp} gated by
- * {@code uxmessentials.pwarp.public}, not separate command literals, so they are not in this table — only the
- * four top-level command literals are.
+ * <p>The {@code public}/{@code private} visibility toggles and {@code del} (gated by
+ * {@code uxmessentials.pwarp.delete}) are subcommands of {@code /pwarp}, not separate command literals, so they
+ * are not in this table — only the three top-level command literals are.
  */
 final class PlayerWarpCommandSurface {
 
@@ -30,10 +30,6 @@ final class PlayerWarpCommandSurface {
                         "setpwarp",
                         "uxmessentials.pwarp.set",
                         PlayerWarpCommand.of("setpwarp", "Create or move a player warp")),
-                spec(
-                        "delpwarp",
-                        "uxmessentials.pwarp.delete",
-                        PlayerWarpCommand.of("delpwarp", "Remove a player warp")),
                 spec(
                         "pwarps",
                         "uxmessentials.pwarp.list",

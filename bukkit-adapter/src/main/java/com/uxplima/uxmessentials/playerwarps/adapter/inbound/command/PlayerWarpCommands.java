@@ -23,7 +23,6 @@ public final class PlayerWarpCommands {
         return List.of(
                 new PlayerWarpCommand(services, messages),
                 new SetPlayerWarpCommand(services, messages),
-                new DelPlayerWarpCommand(services, messages),
                 new PlayerWarpsCommand(services, messages));
     }
 }

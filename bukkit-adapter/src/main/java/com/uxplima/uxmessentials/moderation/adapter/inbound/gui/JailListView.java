@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * entity thread to render. Re-anchoring and creating both read the viewer's own location <em>on the viewer's
  * thread</em> (a region-local read) before delegating to the audited {@code SetJail} use case; delete delegates
  * to {@code DelJail}. The view holds no domain logic — it threads the existing use cases the {@code /setjail}
- * and {@code /deljail} commands take.
+ * and {@code /jail del} commands take.
  */
 @NullMarked
 public final class JailListView {

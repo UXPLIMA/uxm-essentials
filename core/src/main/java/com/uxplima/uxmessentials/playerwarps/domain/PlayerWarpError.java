@@ -10,7 +10,7 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
  */
 public enum PlayerWarpError {
 
-    /** A name no warp exists under for the owner: {@code /pwarp}, {@code /delpwarp}, the visibility toggles. */
+    /** A name no warp exists under for the owner: {@code /pwarp}, {@code /pwarp del}, the visibility toggles. */
     NOT_FOUND(PlayerwarpsMessageKey.PWARP_NOT_FOUND),
 
     /** {@code /setpwarp} for a name the owner already has, when a re-anchor was not intended. */

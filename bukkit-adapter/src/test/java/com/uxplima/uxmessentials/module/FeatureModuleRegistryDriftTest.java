@@ -287,12 +287,12 @@ class FeatureModuleRegistryDriftTest {
         assertThat(off).doesNotContain("playerwarps");
         assertThat(off).contains("teleport", "warps", "holograms");
 
-        // Enabled, playerwarps contributes exactly /pwarp /setpwarp /delpwarp /pwarps and owns no extra Flyway
-        // location (its player_warps table is in the persistence V14 baseline, always applied), so it declares
-        // no MigrationSet of its own.
+        // Enabled, playerwarps contributes exactly /pwarp /setpwarp /pwarps (warp removal folded into
+        // /pwarp del, the way /warp del sits under /warp) and owns no extra Flyway location (its player_warps
+        // table is in the persistence V14 baseline, always applied), so it declares no MigrationSet of its own.
         Set<String> literals =
                 playerwarps.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
-        assertThat(literals).containsExactlyInAnyOrder("pwarp", "setpwarp", "delpwarp", "pwarps");
+        assertThat(literals).containsExactlyInAnyOrder("pwarp", "setpwarp", "pwarps");
         assertThat(playerwarps.migrations()).isEmpty();
     }
 

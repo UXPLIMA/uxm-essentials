@@ -43,7 +43,7 @@ public enum ModerationMessageKey implements MessageKey {
     SANCTION_BAN_NONE("moderation.sanction.ban-none"),
     SANCTION_WARNS("moderation.sanction.warns"),
 
-    // /setjail, /deljail — define and remove a stored jail location at the staff member's position
+    // /setjail, /jail del — define and remove a stored jail location at the staff member's position
     SETJAIL_SAVED("moderation.setjail.saved"),
     DELJAIL_DELETED("moderation.deljail.deleted"),
     DELJAIL_NOT_FOUND("moderation.deljail.not-found"),

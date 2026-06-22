@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /delpwarp <name>}: remove one of the owner's player-warps, freeing its name for reuse. A name the
+ * {@code /pwarp del <name>}: remove one of the owner's player-warps, freeing its name for reuse. A name the
  * owner has no warp at is rejected with {@link PlayerWarpError#NOT_FOUND}; a successful delete removes the row
  * and publishes {@code PlayerWarpDeleted}. The base {@code uxmessentials.pwarp.delete} node guards the
  * command at the adapter; a player only ever deletes their own warps.

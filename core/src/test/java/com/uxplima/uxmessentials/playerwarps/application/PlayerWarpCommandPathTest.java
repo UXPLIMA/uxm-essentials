@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
  * teleporter — the same wiring the Brigadier handlers drive, minus Bukkit. It proves that {@code /setpwarp}
  * persists a warp keyed per owner and re-anchors in place, that a set past the resolved per-owner limit is
  * refused, that {@code /pwarp} delegates execution to the teleport context, that ownership and the public flag
- * gate cross-owner use, that {@code /delpwarp} removes a warp, that {@code /pwarps} lists own warps and only a
+ * gate cross-owner use, that {@code /pwarp del} removes a warp, that {@code /pwarps} lists own warps and only a
  * player's public warps, and that the visibility toggles flip the public flag.
  */
 class PlayerWarpCommandPathTest {

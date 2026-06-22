@@ -214,7 +214,7 @@ public final class ModerationWiring {
         // allowed) plus the [Jails] manager and [Jailed players] release list reached from the hub's footer.
         // It reuses the same shared player/duration pickers and reads FRESH from the same jail directory and
         // repository the /jails and /jailedplayers commands use, executing through the same audited
-        // jail/unjail/setjail/deljail use cases the raw commands take.
+        // jail/unjail/setjail/del use cases the raw commands take.
         JailGuiViews jailGui = JailGuiViews.create(
                 guiText,
                 kernel.scheduler(),

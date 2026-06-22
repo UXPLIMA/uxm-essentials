@@ -19,7 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@code /deljail}: removes a stored jail. A stored name is deleted, publishes {@link JailLocationRemoved},
+ * {@code /jail del}: removes a stored jail. A stored name is deleted, publishes {@link JailLocationRemoved},
  * audits a {@code jail_location_delete} line and confirms with {@code DELJAIL_DELETED}; an unknown name is a
  * not-found notice that publishes nothing and audits nothing.
  */

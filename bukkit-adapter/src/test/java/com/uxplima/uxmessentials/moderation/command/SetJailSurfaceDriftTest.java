@@ -9,10 +9,11 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins {@code /setjail} and {@code /deljail} into the moderation context's command surface. Jails were
- * config-only and read-only; these define and remove a DB-backed jail at the staff member's location. This
- * guard fails if either literal drops out of the surface or wires under a node other than the shared
- * {@code uxmessentials.moderation.jail}.
+ * Pins {@code /setjail} into the moderation context's command surface under the shared
+ * {@code uxmessentials.moderation.jail} node, and pins that jail removal is no longer a standalone literal:
+ * removing a jail folded into {@code /jail del} (mirroring {@code /warp del}), so the surface must not carry a
+ * {@code deljail} command. This guard fails if {@code setjail} drops out or rewires, or if a {@code deljail}
+ * literal reappears.
  */
 class SetJailSurfaceDriftTest {
 
@@ -27,14 +28,16 @@ class SetJailSurfaceDriftTest {
     }
 
     @Test
-    void moderationSurfaceExposesSetJailAndDelJail() {
+    void moderationSurfaceExposesSetJailUnderTheJailNode() {
         assertThat(moderationSpec("setjail").literal()).isEqualTo("setjail");
-        assertThat(moderationSpec("deljail").literal()).isEqualTo("deljail");
+        assertThat(moderationSpec("setjail").permission()).isEqualTo("uxmessentials.moderation.jail");
     }
 
     @Test
-    void bothShareTheJailNode() {
-        assertThat(moderationSpec("setjail").permission()).isEqualTo("uxmessentials.moderation.jail");
-        assertThat(moderationSpec("deljail").permission()).isEqualTo("uxmessentials.moderation.jail");
+    void jailRemovalIsFoldedIntoJailNotAStandaloneLiteral() {
+        FeatureModule moderation = new DefaultModuleRegistry()
+                .byId(ModuleId.of("moderation"))
+                .orElseThrow(() -> new AssertionError("moderation module must be registered"));
+        assertThat(moderation.commands().stream().map(CommandSpec::literal)).doesNotContain("deljail");
     }
 }

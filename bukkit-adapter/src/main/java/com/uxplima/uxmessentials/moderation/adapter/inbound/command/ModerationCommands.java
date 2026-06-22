@@ -80,7 +80,6 @@ public final class ModerationCommands {
                 new JailsCommand(services, messages, sink, scheduler, jailGui),
                 new JailedPlayersCommand(services, messages, sink, scheduler, jailGui),
                 new SetJailCommand(services, messages, sink),
-                new DelJailCommand(services, messages, sink),
                 new TempbanCommand(services, messages, sink, silentByDefault, guiFlow),
                 new BanCommand(services, messages, sink, silentByDefault, guiFlow),
                 new UnbanCommand(services, messages, sink),

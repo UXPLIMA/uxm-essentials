@@ -17,10 +17,10 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  *
  * <p>Every command is permission-gated and every state-mutating one is audit-logged in its use case;
  * {@code /tempmute} is the explicit-duration alias of {@code /mute}, {@code /kickall} shares the kick node,
- * {@code /warns} and {@code /unwarn} share the warn node, {@code /jails}, {@code /jailedplayers},
- * {@code /setjail} and {@code /deljail} share the jail node, {@code /tempbanip} and {@code /unbanip} share the
- * banip node, {@code /unfreeze} shares the freeze node, and {@code /checkban} and {@code /checkmute} share the
- * check node — matching the node table.
+ * {@code /warns} and {@code /unwarn} share the warn node, {@code /jails}, {@code /jailedplayers} and
+ * {@code /setjail} share the jail node (as does {@code /jail del}, a subcommand of {@code /jail} rather than a
+ * separate literal), {@code /tempbanip} and {@code /unbanip} share the banip node, {@code /unfreeze} shares the
+ * freeze node, and {@code /checkban} and {@code /checkmute} share the check node — matching the node table.
  */
 final class ModerationCommandSurface {
 
@@ -37,7 +37,6 @@ final class ModerationCommandSurface {
                 spec("jails", "uxmessentials.moderation.jail", "List the configured jails"),
                 spec("jailedplayers", "uxmessentials.moderation.jail", "List the players currently jailed"),
                 spec("setjail", "uxmessentials.moderation.jail", "Define a jail at your location"),
-                spec("deljail", "uxmessentials.moderation.jail", "Remove a defined jail"),
                 spec("tempban", "uxmessentials.moderation.tempban", "Ban a player for a duration"),
                 spec("ban", "uxmessentials.moderation.ban", "Permanently ban a player"),
                 spec("unban", "uxmessentials.moderation.ban", "Lift a player's permanent ban"),

@@ -76,7 +76,7 @@ public interface ModerationAudit {
     /** {@code event=jail_location_set} — a {@code /setjail} saved (or re-anchored) a stored jail location. */
     void jailLocationDefined(PlayerRef actor, String jail);
 
-    /** {@code event=jail_location_delete} — a {@code /deljail} removed a stored jail location. */
+    /** {@code event=jail_location_delete} — a {@code /jail del} removed a stored jail location. */
     void jailLocationRemoved(PlayerRef actor, String jail);
 
     /** {@code event=server_lockdown} — a {@code /lockdown} flipped the server-wide login gate ({@code enabled}). */

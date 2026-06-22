@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * adapter-side runtime state, so there is nothing here to drain on stop beyond dropping this holder.
  *
  * @param setPlayerWarp {@code /setpwarp}
- * @param delPlayerWarp {@code /delpwarp}
+ * @param delPlayerWarp {@code /pwarp del}
  * @param usePlayerWarp {@code /pwarp <name> [owner]}
  * @param listPlayerWarps {@code /pwarps [player]}
  * @param visibility {@code /pwarp public|private <name>}
