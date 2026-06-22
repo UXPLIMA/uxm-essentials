@@ -66,8 +66,7 @@ class NpcInteractionListenerTest {
         MockBukkit.createMockPlugin();
         packets = new FixedIdPackets();
         InlineScheduler rendererScheduler = new InlineScheduler();
-        NpcViewSpawner spawner =
-                new NpcViewSpawner(packets, rendererScheduler, new NoopLogger(), Duration.ofSeconds(1));
+        NpcViewSpawner spawner = new NpcViewSpawner(packets, new NoopLogger());
         renderer = new NpcRenderer(packets, spawner, rendererScheduler, 48.0, 16.0);
         repository = new FakeRepository();
         runner = new RecordingRunner();
@@ -288,6 +287,11 @@ class NpcInteractionListenerTest {
 
         @Override
         public Object tabAdd(UUID profileId, String name, @Nullable TabSkin skin) {
+            return new Object();
+        }
+
+        @Override
+        public Object tabAdd(UUID profileId, String name, @Nullable TabSkin skin, boolean listed) {
             return new Object();
         }
 

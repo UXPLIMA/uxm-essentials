@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.npc.adapter.outbound;
 
-import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -17,7 +16,6 @@ import org.bukkit.inventory.ItemStack;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.packet.npc.EquipmentSlot;
 import com.uxplima.uxmlib.packet.npc.NamedColor;
@@ -30,10 +28,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * Builds and sends the spawn packets for one (viewer, NPC) pair, branching on type. A fake player takes the
  * player path — a player-info ADD (carrying the name and skin) bundled with a spawn-player packet so they arrive
- * together, then a deferred tab-remove that hides the entry while the spawned fake player keeps its skin; any
- * other type spawns the mob through {@code spawnEntity} with no tab entry and no skin. Both paths then aim the
- * entity at its fixed facing and dress it (equipment + glow + pose/scale + per-type metadata). The
- * {@link NpcRenderer} owns which NPCs each viewer
+ * together; the entry is added unlisted ({@code listed=false}) so the body renders but the NPC shows no tab-list
+ * row, or listed when the operator opted the NPC into the tab list, and either way the entry is kept (the
+ * {@link NpcRenderer} drops it on despawn). Any other type spawns the mob through {@code spawnEntity} with no tab
+ * entry and no skin. Both paths then aim the entity at its fixed facing and dress it (equipment + glow +
+ * pose/scale + per-type metadata). The {@link NpcRenderer} owns which NPCs each viewer
  * has been shown and only marks a viewer shown when {@link #spawn(Player, RenderedNpc)} reports the spawn went
  * out, so a skipped bad type never leaves a phantom in the tracking map.
  *
@@ -52,25 +51,22 @@ public final class NpcViewSpawner {
     private static final int MAX_PROFILE_NAME = 16;
 
     private final NpcPackets packets;
-    private final Scheduler scheduler;
     private final Logger log;
-    private final Duration tabHideDelay;
     // NPC name -> the unresolvable entity-type value we already warned about, so a bad row is logged once rather
     // than every refresh tick for every viewer.
     private final Map<String, String> warnedBadType = new ConcurrentHashMap<>();
 
-    public NpcViewSpawner(NpcPackets packets, Scheduler scheduler, Logger log, Duration tabHideDelay) {
+    public NpcViewSpawner(NpcPackets packets, Logger log) {
         this.packets = Objects.requireNonNull(packets, "packets");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
-        this.tabHideDelay = Objects.requireNonNull(tabHideDelay, "tabHideDelay");
     }
 
     /**
-     * Spawn the NPC for this viewer, branching on type. A fake player takes the player path (tab-add + spawn,
-     * deferred tab-hide, skin); any other type spawns the mob through {@code spawnEntity} with no tab entry and no
-     * skin. An unknown stored type resolves to nothing and is skipped (logged, never thrown on the render thread),
-     * so a bad row never spawns. Both real paths then aim the entity and dress it (equipment + glow).
+     * Spawn the NPC for this viewer, branching on type. A fake player takes the player path (tab-add + spawn, the
+     * entry kept either unlisted or listed, skin); any other type spawns the mob through {@code spawnEntity} with
+     * no tab entry and no skin. An unknown stored type resolves to nothing and is skipped (logged, never thrown on
+     * the render thread), so a bad row never spawns. Both real paths then aim the entity and dress it (equipment +
+     * glow).
      *
      * @return {@code true} when the spawn went out (so the caller should mark the viewer shown), {@code false}
      *     when the stored type was unresolvable and the spawn was skipped.
@@ -114,17 +110,13 @@ public final class NpcViewSpawner {
         // A mirror-skin NPC wears the viewer's own skin (resolved per viewer); otherwise its stored skin. The
         // rendered name above the head is the display name when set, else the NPC id.
         TabSkin skin = npc.mirrorSkin() ? viewerSkin(viewer) : tabSkin(npc.skin());
-        Object tabAdd = packets.tabAdd(profileId, renderedName(npc), skin);
+        // The entry is added unlisted unless the operator opted the NPC into the tab list. Either way it is kept:
+        // removing the player-info entry de-renders the fake player on modern clients, so the renderer drops it
+        // only on despawn. An unlisted entry renders the body and skin without ever showing a tab-list row.
+        Object tabAdd = packets.tabAdd(profileId, renderedName(npc), skin, npc.showInTab());
         Object spawn =
                 packets.spawnPlayer(rendered.entityId(), profileId, at.x(), at.y(), at.z(), at.yaw(), at.pitch());
         packets.send(viewer, packets.bundle(List.of(tabAdd, spawn)));
-        if (npc.showInTab()) {
-            // The operator wants this NPC to stay a tab-list entry, so do not hide it; the entry persists.
-            return;
-        }
-        // Hide the entry from the tab list a moment later, once the client has parsed it — the spawned fake
-        // player keeps its skin even after the entry is gone.
-        scheduler.asyncAfter(tabHideDelay, () -> packets.send(viewer, packets.tabRemove(profileId)));
     }
 
     private void spawnMobForViewer(Player viewer, RenderedNpc rendered, String typeKey) {

@@ -102,7 +102,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The repository is the jOOQ adapter behind a Caffeine read-cache decorator. The renderer holds the packet
  * stack — a {@link ChannelResolver} → {@link PacketSender} → {@link NmsNpcPackets} — and sends each viewer a
- * fake-player spawn (then hides its tab entry) with no real entity. On wire every stored NPC is spawned to the
+ * fake-player spawn (its tab entry kept unlisted) with no real entity. On wire every stored NPC is spawned to the
  * online viewers in range; a global refresh timer re-evaluates range each second so an NPC appears/disappears as
  * players move, and a faster look timer turns each looking NPC toward its nearby viewers. The interaction
  * listener runs an NPC's bound click command when a player clicks its fake entity. A {@code COST} click action
@@ -116,8 +116,6 @@ public final class NpcWiring {
     private static final Duration REFRESH_PERIOD = Duration.ofSeconds(1);
     /** The radius within which a viewer is shown an NPC — the vanilla player tracking range. */
     private static final double RENDER_RANGE = 48.0;
-    /** How long after the spawn the tab entry is hidden, so the client links the skin before it goes. */
-    private static final Duration TAB_HIDE_DELAY = Duration.ofSeconds(1);
 
     private NpcWiring() {}
 
@@ -151,7 +149,7 @@ public final class NpcWiring {
         NpcRepository repository =
                 com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.repository(cached, bus.publisher());
         NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
-        NpcViewSpawner spawner = new NpcViewSpawner(packets, kernel.scheduler(), kernel.log(), TAB_HIDE_DELAY);
+        NpcViewSpawner spawner = new NpcViewSpawner(packets, kernel.log());
         NpcRenderer renderer =
                 new NpcRenderer(packets, spawner, kernel.scheduler(), RENDER_RANGE, settings.lookRange());
         // Close the cross-server loop: a remote NPC change reloads exactly that NPC into the same cache the

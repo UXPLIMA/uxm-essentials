@@ -33,11 +33,12 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * Covers the {@link NpcRenderer} dispatch under MockBukkit with a fake {@link com.uxplima.uxmlib.packet.npc.NpcPackets}:
- * a render to an in-range viewer sends one spawn bundle (tab-add + spawn) and schedules the tab-remove that hides the
- * entry; the renderer tracks which NPCs each viewer has been shown; a delete and a forget-then-quit both leave no ghost;
- * and an out-of-range viewer is never spawned (and is removed when it falls out of range). A non-player NPC instead
- * spawns through {@code spawnEntity} with no tab entry, still wears its equipment/glow, fails soft on an unknown stored
- * type, and re-renders cleanly (remove + re-add) when its type changes.
+ * a render to an in-range viewer sends one spawn bundle (tab-add + spawn) whose entry is added unlisted and kept (no
+ * tab-remove on spawn); the renderer tracks which NPCs each viewer has been shown; a delete and a forget-then-quit both
+ * leave no ghost, and the delete path sends the tab-remove that drops the kept entry; and an out-of-range viewer is
+ * never spawned (and is removed when it falls out of range). A non-player NPC instead spawns through {@code spawnEntity}
+ * with no tab entry, still wears its equipment/glow, fails soft on an unknown stored type, and re-renders cleanly
+ * (remove + re-add) when its type changes.
  */
 class NpcRendererTest {
 
@@ -57,22 +58,23 @@ class NpcRendererTest {
     }
 
     @Test
-    void rendersOneSpawnBundleAndSchedulesTheTabHideForAnInRangeViewer() {
+    void rendersOneSpawnBundleWithAnUnlistedKeptEntryForAnInRangeViewer() {
         PlayerMock viewer = server.addPlayer();
         InlineScheduler scheduler = new InlineScheduler();
         NpcRenderer renderer = newRenderer(scheduler, new NoopLogger());
 
         renderer.render(npcAt(viewer, 1.0)); // one block away — in range
 
-        // Exactly one bundle (tab-add + spawn) reached the viewer, plus the two look packets and the deferred
-        // tab-remove.
+        // Exactly one bundle (tab-add + spawn) reached the viewer, plus the two look packets.
         assertThat(packets.bundlesSentTo(viewer.getUniqueId())).hasSize(1);
         assertThat(packets.bundles).hasSize(1);
         assertThat(packets.bundles.get(0)).hasSize(2); // tab-add + spawn travel together
         assertThat(packets.tabAdds).hasSize(1);
         assertThat(packets.spawns).hasSize(1);
-        // The tab entry is hidden a moment later so the NPC keeps its skin but never shows in the tab list.
-        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).hasSize(1);
+        // The entry is added unlisted so the body renders without a tab-list row, and it is kept — no tab-remove
+        // is sent on spawn (removing the entry would de-render the fake player; the renderer drops it on despawn).
+        assertThat(packets.tabAdds.get(0).listed()).isFalse();
+        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).isEmpty();
     }
 
     @Test
@@ -138,9 +140,12 @@ class NpcRendererTest {
 
         renderer.despawn(NpcName.of("guide"));
 
-        // The fake player is removed from the viewer (entity-remove + tab-remove); no ghost is left behind.
+        // The fake player is removed from the viewer (entity-remove + tab-remove); no ghost is left behind. Since
+        // the kept entry is no longer auto-removed after spawn, the despawn path must send the tab-remove itself,
+        // or the player-info entry would leak.
         assertThat(packets.removes).hasSize(1);
         assertThat(packets.removesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).hasSize(1);
     }
 
     @Test
@@ -174,9 +179,9 @@ class NpcRendererTest {
         assertThat(packets.bundlesSentTo(viewer.getUniqueId())).hasSize(1);
         assertThat(packets.spawns).hasSize(1);
         assertThat(packets.tabAdds).hasSize(1);
-        // No churn: a stationary refresh sends neither a remove nor an extra tab-remove.
+        // No churn: a stationary refresh sends neither a remove nor a tab-remove — the kept entry is never touched.
         assertThat(packets.removesSentTo(viewer.getUniqueId())).isEmpty();
-        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).hasSize(1); // only the initial deferred hide
+        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).isEmpty();
     }
 
     @Test
@@ -246,20 +251,18 @@ class NpcRendererTest {
     }
 
     @Test
-    void schedulesButDoesNotImmediatelySendTheTabRemoveWhenTheHopIsDeferred() {
+    void spawnSchedulesNoDeferredTabRemove() {
         PlayerMock viewer = server.addPlayer();
-        DeferredScheduler scheduler = new DeferredScheduler();
+        CountingDelayScheduler scheduler = new CountingDelayScheduler();
         NpcRenderer renderer = newRenderer(scheduler, new NoopLogger());
 
         renderer.render(npcAt(viewer, 1.0));
 
-        // The spawn bundle has gone out, but the tab-remove is queued for later, not sent yet.
+        // The spawn bundle goes out, but nothing is deferred: the kept unlisted entry needs no later tab-remove,
+        // so the spawn path schedules zero asyncAfter hops and sends no tab-remove at all.
         assertThat(packets.bundlesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(scheduler.asyncAfterCalls).isZero();
         assertThat(packets.tabRemoves).isEmpty();
-        assertThat(scheduler.pendingAsyncAfter).hasSize(1);
-
-        scheduler.runAllAsyncAfter();
-        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).hasSize(1);
     }
 
     @Test
@@ -374,14 +377,29 @@ class NpcRendererTest {
     }
 
     @Test
-    void keepsTheTabEntryWhenShowInTabIsOn() {
+    void listsTheTabEntryWhenShowInTabIsOn() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
 
         renderer.render(npcAt(viewer, 1.0).withShowInTab(true));
 
-        // The spawn bundle still goes out, but the deferred tab-remove is skipped so the entry stays listed.
+        // The operator opted the NPC into the tab list, so the entry is added listed; it is kept (no tab-remove on
+        // spawn) exactly like the unlisted default.
         assertThat(packets.bundlesSentTo(viewer.getUniqueId())).hasSize(1);
+        assertThat(packets.tabAdds.get(0).listed()).isTrue();
+        assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).isEmpty();
+    }
+
+    @Test
+    void addsTheTabEntryUnlistedByDefault() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+
+        renderer.render(npcAt(viewer, 1.0)); // showInTab defaults off
+
+        // The default fake-player NPC renders its body via an unlisted entry — present to the client but never a
+        // tab-list row — so no phantom row appears and no remove is needed.
+        assertThat(packets.tabAdds.get(0).listed()).isFalse();
         assertThat(packets.tabRemovesSentTo(viewer.getUniqueId())).isEmpty();
     }
 
@@ -1471,10 +1489,10 @@ class NpcRendererTest {
         assertThat(packets.spawnEntities).hasSize(1);
     }
 
-    // Wire the renderer over its spawner from the shared recording packets, the given scheduler, and the given
-    // logger — the same 48/16 ranges and 1s tab-hide delay the renderer was always built with.
+    // Wire the renderer over its spawner from the shared recording packets and the given logger, and the given
+    // scheduler for the renderer's own region hops — the same 48/16 ranges the renderer was always built with.
     private NpcRenderer newRenderer(Scheduler scheduler, com.uxplima.uxmessentials.shared.application.port.Logger log) {
-        NpcViewSpawner spawner = new NpcViewSpawner(packets, scheduler, log, Duration.ofSeconds(1));
+        NpcViewSpawner spawner = new NpcViewSpawner(packets, log);
         return new NpcRenderer(packets, spawner, scheduler, 48.0, 16.0);
     }
 
@@ -1574,7 +1592,12 @@ class NpcRendererTest {
 
         @Override
         public Object tabAdd(UUID profileId, String name, @Nullable TabSkin skin) {
-            TabAdd packet = new TabAdd(profileId, name, skin);
+            return tabAdd(profileId, name, skin, true);
+        }
+
+        @Override
+        public Object tabAdd(UUID profileId, String name, @Nullable TabSkin skin, boolean listed) {
+            TabAdd packet = new TabAdd(profileId, name, skin, listed);
             tabAdds.add(packet);
             return packet;
         }
@@ -2111,7 +2134,7 @@ class NpcRendererTest {
         private record Sent(UUID viewer, Object packet) {}
 
         private record TabAdd(
-                UUID profileId, String name, @Nullable TabSkin skin) {}
+                UUID profileId, String name, @Nullable TabSkin skin, boolean listed) {}
 
         private record TabRemove(UUID profileId) {}
 
@@ -2305,19 +2328,15 @@ class NpcRendererTest {
         }
     }
 
-    /** A scheduler that runs entity hops inline but queues the {@code asyncAfter} tab-hide so a test can run it later. */
-    private static final class DeferredScheduler extends InlineScheduler {
-        private final List<Runnable> pendingAsyncAfter = new ArrayList<>();
+    /** A scheduler that runs every hop inline but counts {@code asyncAfter} calls, so a test can prove the spawn
+     * path defers nothing now that the tab entry is kept rather than removed on a delay. */
+    private static final class CountingDelayScheduler extends InlineScheduler {
+        private int asyncAfterCalls;
 
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
-            pendingAsyncAfter.add(task);
-        }
-
-        void runAllAsyncAfter() {
-            List<Runnable> snapshot = List.copyOf(pendingAsyncAfter);
-            pendingAsyncAfter.clear();
-            snapshot.forEach(Runnable::run);
+            asyncAfterCalls++;
+            task.run();
         }
     }
 }

@@ -23,10 +23,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * The outbound seam that keeps the in-world fake players in step with the stored model, realised over the uxmLib
  * NPC packet stack. An NPC has no real entity: each viewer is sent a player-info ADD (carrying the name and
- * skin), then a spawn-player packet, in one bundle so they arrive together; a moment later a tab-remove hides
- * the entry from the tab list while the spawned fake player keeps its skin. The renderer tracks which NPCs each
- * viewer has been shown ({@link #shownTo}), so it can send a clean remove on quit, delete, or a move out of
- * range and re-send on join — a viewer never keeps a ghost.
+ * skin), then a spawn-player packet, in one bundle so they arrive together. The entry is added unlisted so the
+ * fake player renders without a tab-list row, and it is kept until the NPC despawns — removing the player-info
+ * entry would de-render the body on modern clients, so the tab-remove rides the despawn path, not the spawn. The
+ * renderer tracks which NPCs each viewer has been shown ({@link #shownTo}), so it can send a clean remove on
+ * quit, delete, or a move out of range and re-send on join — a viewer never keeps a ghost.
  *
  * <p>Every NPC has a stable {@link RenderedNpc#profileId() profile uuid} (derived from its name) and an entity
  * id allocated once and reused, so a re-render (move or re-skin) is a remove-then-spawn under the same id and a
@@ -47,7 +48,7 @@ import org.jspecify.annotations.Nullable;
  *       re-spawn flood and tab flicker for a stationary player.</li>
  * </ul>
  *
- * <p>Composing and sending the spawn packets — the player-vs-mob branch, the deferred tab-hide, the skin,
+ * <p>Composing and sending the spawn packets — the player-vs-mob branch, the unlisted tab entry, the skin,
  * equipment, glow, and the warn-once on a bad stored type — is delegated to the injected {@link NpcViewSpawner};
  * this class owns the per-viewer tracking and decides only <em>when</em> to spawn or remove.
  */
