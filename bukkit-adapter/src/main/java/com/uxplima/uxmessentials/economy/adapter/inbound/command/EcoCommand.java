@@ -17,14 +17,17 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /eco give|take|set|reset <player> <amount> [currency]} and the bulk
@@ -38,10 +41,17 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     private static final String BASE = "uxmessentials.economy.admin";
 
     private final BanknoteMinter minter;
+    private final @Nullable EconomyAdminGuiViews adminGui;
 
     public EcoCommand(Plugin plugin, EconomyServices services, Messages messages) {
+        this(plugin, services, messages, null);
+    }
+
+    public EcoCommand(
+            Plugin plugin, EconomyServices services, Messages messages, @Nullable EconomyAdminGuiViews adminGui) {
         super(services, messages);
         this.minter = new BanknoteMinter(plugin, messages, services.banknoteStore());
+        this.adminGui = adminGui;
     }
 
     @Override
@@ -88,6 +98,26 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     @Override
     public String description() {
         return "Eco-admin balance mutations.";
+    }
+
+    /**
+     * Bare {@code /eco} opens the admin economy GUI when GUIs are enabled (the {@code .requires(...)} admin gate
+     * is carried by the rebind, so a non-admin still cannot open it). Absent the GUI stack — when economy GUIs
+     * are off — this returns empty and bare {@code /eco} falls through to its usage text; every raw
+     * {@code /eco give|take|set|reset …} subcommand is unaffected either way.
+     */
+    @Override
+    public java.util.Optional<Command<CommandSourceStack>> guiRoot() {
+        EconomyAdminGuiViews gui = adminGui;
+        if (gui == null) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(ctx -> {
+            if (ctx.getSource().getSender() instanceof Player sender) {
+                gui.hub().open(sender, BukkitRefs.toRef(sender));
+            }
+            return Command.SINGLE_SUCCESS;
+        });
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> targetVerb(String literal, String node) {

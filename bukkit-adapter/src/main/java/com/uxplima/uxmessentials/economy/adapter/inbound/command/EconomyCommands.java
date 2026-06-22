@@ -7,9 +7,11 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.economy.adapter.EconomyConfig;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the economy context's Brigadier command surface (docs/10-feature-modules.md §15.4) as
@@ -27,6 +29,16 @@ public final class EconomyCommands {
     /** Every economy command, in surface order. */
     public static List<CommandRegistration> all(
             Plugin plugin, EconomyConfig config, EconomyServices services, Messages messages) {
+        return all(plugin, config, services, messages, null);
+    }
+
+    /** Every economy command, in surface order, with the bare-{@code /eco} admin GUI when GUIs are enabled. */
+    public static List<CommandRegistration> all(
+            Plugin plugin,
+            EconomyConfig config,
+            EconomyServices services,
+            Messages messages,
+            @Nullable EconomyAdminGuiViews adminGui) {
         List<CommandRegistration> list = new ArrayList<>();
 
         list.add(new BalanceCommand(services, messages));
@@ -35,7 +47,7 @@ public final class EconomyCommands {
         list.add(new PayAllCommand(services, messages));
         list.add(new PayToggleCommand(services, messages));
         list.add(new BaltopCommand(services, messages));
-        list.add(new EcoCommand(plugin, services, messages));
+        list.add(new EcoCommand(plugin, services, messages, adminGui));
 
         if (config.worthEnabled()) {
             list.add(new WorthCommand(services, messages));

@@ -384,7 +384,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("homes"))) {
             wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("economy"))) {
-            wireEconomy(plugin, ctx, persistence, resources, links, bus, guiRegistry);
+            wireEconomy(plugin, ctx, persistence, resources, links, bus, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("warps"))) {
             wireWarps(ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("kits"))) {
@@ -551,8 +551,9 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
-            ManagementGuiRegistry guiRegistry) {
-        EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence, bus);
+            ManagementGuiRegistry guiRegistry,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
+        EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence, bus, anvil);
         links.economyProvider = wired.provider();
         links.economyCurrency = wired.defaultCurrency();
         wired.commands().forEach(resources::addCommand);

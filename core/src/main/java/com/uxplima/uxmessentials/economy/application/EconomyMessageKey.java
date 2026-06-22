@@ -324,7 +324,47 @@ public enum EconomyMessageKey implements MessageKey {
     // Physical Economy
     PHYSICAL_INVENTORY_FULL("eco.physical.inventory-full"),
     PHYSICAL_PENDING_RECEIVED("eco.physical.pending-received"),
-    PHYSICAL_PLAYER_OFFLINE("eco.physical.player-offline");
+    PHYSICAL_PLAYER_OFFLINE("eco.physical.player-offline"),
+
+    // Eco-admin GUI (bare /eco) — hub
+    ECO_ADMIN_GUI_TITLE("eco.admin-gui.title"),
+    ECO_ADMIN_GUI_MANAGE_NAME("eco.admin-gui.manage-name"),
+    ECO_ADMIN_GUI_MANAGE_LORE("eco.admin-gui.manage-lore"),
+    ECO_ADMIN_GUI_BULK_NAME("eco.admin-gui.bulk-name"),
+    ECO_ADMIN_GUI_BULK_LORE("eco.admin-gui.bulk-lore"),
+    ECO_ADMIN_GUI_HISTORY_NAME("eco.admin-gui.history-name"),
+    ECO_ADMIN_GUI_HISTORY_LORE("eco.admin-gui.history-lore"),
+    ECO_ADMIN_GUI_CLOSE("eco.admin-gui.close"),
+    ECO_ADMIN_GUI_PICK_TITLE("eco.admin-gui.pick-title"),
+
+    // Eco-admin GUI — per-player manage screen
+    ECO_ADMIN_GUI_TARGET_TITLE("eco.admin-gui.target-title"),
+    ECO_ADMIN_GUI_TARGET_HEAD_NAME("eco.admin-gui.target-head-name"),
+    ECO_ADMIN_GUI_TARGET_HEAD_LORE("eco.admin-gui.target-head-lore"),
+    ECO_ADMIN_GUI_GIVE_NAME("eco.admin-gui.give-name"),
+    ECO_ADMIN_GUI_GIVE_LORE("eco.admin-gui.give-lore"),
+    ECO_ADMIN_GUI_TAKE_NAME("eco.admin-gui.take-name"),
+    ECO_ADMIN_GUI_TAKE_LORE("eco.admin-gui.take-lore"),
+    ECO_ADMIN_GUI_SET_NAME("eco.admin-gui.set-name"),
+    ECO_ADMIN_GUI_SET_LORE("eco.admin-gui.set-lore"),
+    ECO_ADMIN_GUI_RESET_NAME("eco.admin-gui.reset-name"),
+    ECO_ADMIN_GUI_RESET_LORE("eco.admin-gui.reset-lore"),
+    ECO_ADMIN_GUI_RESET_CONFIRM_TITLE("eco.admin-gui.reset-confirm-title"),
+    ECO_ADMIN_GUI_TARGET_HISTORY_NAME("eco.admin-gui.target-history-name"),
+    ECO_ADMIN_GUI_TARGET_HISTORY_LORE("eco.admin-gui.target-history-lore"),
+    ECO_ADMIN_GUI_CURRENCY_NAME("eco.admin-gui.currency-name"),
+    ECO_ADMIN_GUI_CURRENCY_LORE("eco.admin-gui.currency-lore"),
+    ECO_ADMIN_GUI_CURRENCY_ACTIVE_LORE("eco.admin-gui.currency-active-lore"),
+    ECO_ADMIN_GUI_BACK("eco.admin-gui.back"),
+    ECO_ADMIN_GUI_AMOUNT_PROMPT("eco.admin-gui.amount-prompt"),
+
+    // Eco-admin GUI — server-wide bulk screen
+    ECO_ADMIN_GUI_BULK_TITLE("eco.admin-gui.bulk-title"),
+    ECO_ADMIN_GUI_GIVEALL_NAME("eco.admin-gui.giveall-name"),
+    ECO_ADMIN_GUI_GIVEALL_LORE("eco.admin-gui.giveall-lore"),
+    ECO_ADMIN_GUI_RESETALL_NAME("eco.admin-gui.resetall-name"),
+    ECO_ADMIN_GUI_RESETALL_LORE("eco.admin-gui.resetall-lore"),
+    ECO_ADMIN_GUI_RESETALL_CONFIRM_TITLE("eco.admin-gui.resetall-confirm-title");
 
     private final String key;
 

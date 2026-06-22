@@ -103,6 +103,20 @@ public final class EconomyWiring {
 
     /** Build the economy context from {@code plugin}, {@code ctx}, and the shared {@code persistence} DSL. */
     public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus) {
+        return wire(plugin, ctx, persistence, bus, null);
+    }
+
+    /**
+     * Build the economy context, threading the shared {@code anvil} into the bare-{@code /eco} admin GUI so its
+     * Give / Take / Set amount entry reuses the one installed anvil listener. A {@code null} anvil disables the
+     * admin GUI (bare {@code /eco} then falls through to usage); the raw subcommands are unaffected either way.
+     */
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            Bus bus,
+            com.uxplima.uxmlib.gui.anvil.@org.jspecify.annotations.Nullable AnvilInput anvil) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -145,7 +159,16 @@ public final class EconomyWiring {
 
         EconomyProvider resolved = resolveProvider(plugin, kernel, settings, currencies, decoratedRepository, clock);
         return assemble(
-                plugin, ctx, persistence, settings, currencies, ledger, resolved, decoratedRepository, pendingRepo);
+                plugin,
+                ctx,
+                persistence,
+                settings,
+                currencies,
+                ledger,
+                resolved,
+                decoratedRepository,
+                pendingRepo,
+                anvil);
     }
 
     private static EconomyProvider resolveProvider(
@@ -179,7 +202,8 @@ public final class EconomyWiring {
             WalletLedger ledger,
             EconomyProvider resolved,
             WalletRepository repository,
-            PendingTransactionRepository pendingRepo) {
+            PendingTransactionRepository pendingRepo,
+            com.uxplima.uxmlib.gui.anvil.@org.jspecify.annotations.Nullable AnvilInput anvil) {
         KernelPorts kernel = ctx.kernel();
         BaltopExemption exemption = new PermissionBaltopExemption(kernel.permissions(), settings.baltopExemptNode());
         BaltopSnapshots snapshots = new BaltopSnapshots(
@@ -218,7 +242,37 @@ public final class EconomyWiring {
                 bankChatPromptListener,
                 loanChatPromptListener,
                 guiLayouts);
-        List<CommandRegistration> commands = EconomyCommands.all(plugin, settings, services, kernel.messages());
+        // The bare-/eco admin GUI (item 19): a hub over picker → per-player Give/Take/Set/Reset and a server-wide
+        // bulk screen, reusing the one installed anvil for amount entry. Built only when an anvil is supplied (the
+        // module is wired with GUIs available); GuiRootBinding then opens it on bare /eco when the catalog gui flag
+        // is on, and the .requires(economy.admin) gate is carried by the rebind.
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews adminGui = null;
+        if (anvil != null) {
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
+                    new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView picker =
+                    new com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView(
+                            guiText,
+                            kernel.scheduler(),
+                            anvil,
+                            plugin.getServer(),
+                            kernel.messages(),
+                            kernel.messageSink());
+            adminGui = com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews.create(
+                    guiText,
+                    kernel.scheduler(),
+                    plugin.getServer(),
+                    picker,
+                    anvil,
+                    kernel.playerLookup(),
+                    resolved,
+                    services.ecoAdmin(),
+                    currencies,
+                    services.notifier(),
+                    services.historyView());
+        }
+        List<CommandRegistration> commands =
+                EconomyCommands.all(plugin, settings, services, kernel.messages(), adminGui);
         WarpEconomy warpEconomy = new ProviderWarpEconomy(resolved, currencies.defaultCurrency());
         KitEconomy kitEconomy = new ProviderKitEconomy(resolved, currencies.defaultCurrency());
         HomeEconomy homeEconomy = new ProviderHomeEconomy(resolved, currencies.defaultCurrency());

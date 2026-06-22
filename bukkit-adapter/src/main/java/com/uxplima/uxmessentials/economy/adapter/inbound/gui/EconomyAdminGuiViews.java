@@ -1,0 +1,79 @@
+package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
+
+import java.util.Objects;
+
+import org.bukkit.Server;
+
+import com.uxplima.uxmessentials.economy.application.EcoAdmin;
+import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
+import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
+import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * Assembles the eco-admin GUI stack the bare {@code /eco} opens: the {@link EconomyAdminView hub}, the
+ * per-player {@link EconomyTargetView manage screen}, and the server-wide {@link EconomyBulkView bulk screen}.
+ * The hub holds the other two so its [Manage a player] and [Server-wide] entries open them, and each child
+ * carries a back-callback into the hub. One instance is built per module start by {@code EconomyWiring}; the
+ * command's {@code guiRoot()} delegates here.
+ */
+@NullMarked
+public final class EconomyAdminGuiViews {
+
+    private final EconomyAdminView hub;
+
+    private EconomyAdminGuiViews(EconomyAdminView hub) {
+        this.hub = Objects.requireNonNull(hub, "hub");
+    }
+
+    /** The hub the bare {@code /eco} opens. */
+    public EconomyAdminView hub() {
+        return hub;
+    }
+
+    /** Build the eco-admin GUI stack over the resolved provider, the kernel ports, and the shared picker/anvil. */
+    public static EconomyAdminGuiViews create(
+            GuiText guiText,
+            Scheduler scheduler,
+            Server server,
+            PlayerPickerView picker,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil,
+            PlayerLookup players,
+            EconomyProvider economy,
+            EcoAdmin ecoAdmin,
+            CurrencyRegistry currencies,
+            EconomyNotifier notifier,
+            TransactionsHistoryView historyView) {
+        EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
+        // Both child screens return to the hub; the hub is constructed last, so the back-callbacks read it
+        // through a one-slot holder rather than a setter, keeping every cross-link constructor-injected.
+        EconomyAdminView[] hubHolder = new EconomyAdminView[1];
+        EconomyTargetView targetView = new EconomyTargetView(
+                guiText,
+                scheduler,
+                anvil,
+                economy,
+                ops,
+                currencies,
+                notifier,
+                historyView,
+                (player, viewer) -> hubHolder[0].open(player, viewer));
+        EconomyBulkView bulkView = new EconomyBulkView(
+                guiText,
+                scheduler,
+                anvil,
+                server,
+                ops,
+                currencies,
+                notifier,
+                (player, viewer) -> hubHolder[0].open(player, viewer));
+        EconomyAdminView hub =
+                new EconomyAdminView(guiText, scheduler, picker, players, targetView, bulkView, historyView);
+        hubHolder[0] = hub;
+        return new EconomyAdminGuiViews(hub);
+    }
+}
