@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -7,7 +8,6 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -43,8 +44,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("mode", StringArgumentType.word())
                         .executes(this::setMode)
-                        .then(Commands.argument("player", ArgumentTypes.player())
-                                .executes(this::setMode)))
+                        .then(PlayerTargets.players("player").executes(this::setMode)))
                 .build();
     }
 
@@ -63,11 +63,13 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
             feedback.send(sender, PlayerstateMessageKey.GAMEMODE_INVALID, Map.of());
             return 0;
         }
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
-        if (target.isEmpty()) {
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        if (targets.isEmpty()) {
             return 0;
         }
-        services.setGamemode().setFor(ref(sender), target.get(), mode.get());
+        for (PlayerRef target : targets) {
+            services.setGamemode().setFor(ref(sender), target, mode.get());
+        }
         return Command.SINGLE_SUCCESS;
     }
 }

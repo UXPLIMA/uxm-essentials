@@ -1,7 +1,7 @@
 package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
@@ -9,23 +9,23 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /kill [player]}: kill a target — the named player, or the invoking player when no name is given. An
- * abusable verb (audit-logged): killing another player is a moderation-adjacent action, so it is recorded with
- * actor and target. The named target must resolve online (else {@link ItemworldMessageKey#UNKNOWN_TARGET}).
+ * {@code /kill [player]}: kill a target — the named player, the invoking player when no argument is given, or
+ * every player a selector matches ({@code /kill @a}). An abusable verb (audit-logged): killing another player
+ * is a moderation-adjacent action, so each kill is recorded with actor and target. A name or selector that
+ * matches no online player answers {@link ItemworldMessageKey#UNKNOWN_TARGET}.
  *
- * <p>Setting health is entity-bound, so it runs on the victim's region thread through the kernel
+ * <p>Setting health is entity-bound, so each kill runs on that victim's region thread through the kernel
  * {@code Scheduler}; the kill is reported through {@link ItemworldMessageKey#KILL_DONE} and audited.
  */
 @NullMarked
@@ -41,9 +41,8 @@ public final class KillCommand extends ItemworldCommandSupport implements Comman
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .executes(ctx -> run(ctx, Optional.empty()))
-                .then(CommandSuggestions.playerArgument("player")
-                        .executes(ctx -> run(ctx, Optional.of(StringArgumentType.getString(ctx, "player")))))
+                .executes(this::runSelf)
+                .then(PlayerTargets.players("player").executes(this::runTargets))
                 .build();
     }
 
@@ -52,7 +51,7 @@ public final class KillCommand extends ItemworldCommandSupport implements Comman
         return describe();
     }
 
-    private int run(CommandContext<CommandSourceStack> ctx, Optional<String> name) {
+    private int runSelf(CommandContext<CommandSourceStack> ctx) {
         if (!enabled(ctx)) {
             return Command.SINGLE_SUCCESS;
         }
@@ -60,12 +59,26 @@ public final class KillCommand extends ItemworldCommandSupport implements Comman
         if (self == null) {
             return Command.SINGLE_SUCCESS;
         }
-        Player victim = name.map(n -> self.getServer().getPlayerExact(n)).orElse(self);
-        if (victim == null) {
-            reply(ctx, ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", name.orElse(self.getName())));
+        kill(ctx, self, self);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runTargets(CommandContext<CommandSourceStack> ctx) {
+        if (!enabled(ctx)) {
             return Command.SINGLE_SUCCESS;
         }
-        kill(ctx, self, victim);
+        Player self = player(ctx);
+        if (self == null) {
+            return Command.SINGLE_SUCCESS;
+        }
+        List<Player> victims = PlayerTargets.resolveAll(ctx, "player");
+        if (victims.isEmpty()) {
+            reply(ctx, ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", typedTarget(ctx)));
+            return Command.SINGLE_SUCCESS;
+        }
+        for (Player victim : victims) {
+            kill(ctx, self, victim);
+        }
         return Command.SINGLE_SUCCESS;
     }
 
@@ -77,5 +90,13 @@ public final class KillCommand extends ItemworldCommandSupport implements Comman
             reply(ctx, ItemworldMessageKey.KILL_DONE, Map.of("target", targetName));
             services.audit().killed(actorRef, targetName);
         });
+    }
+
+    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getNodes().stream()
+                .filter(node -> "player".equals(node.getNode().getName()))
+                .findFirst()
+                .map(node -> node.getRange().get(ctx.getInput()))
+                .orElse("");
     }
 }

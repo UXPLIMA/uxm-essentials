@@ -1,12 +1,11 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
-import java.util.Optional;
+import java.util.List;
 
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -15,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -40,8 +40,7 @@ public final class AirCommand extends PlayerstateCommandSupport implements Comma
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("seconds", IntegerArgumentType.integer(0))
                         .executes(this::set)
-                        .then(Commands.argument("player", ArgumentTypes.player())
-                                .executes(this::set)))
+                        .then(PlayerTargets.players("player").executes(this::set)))
                 .build();
     }
 
@@ -55,12 +54,14 @@ public final class AirCommand extends PlayerstateCommandSupport implements Comma
         if (sender == null) {
             return 0;
         }
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
-        if (target.isEmpty()) {
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        if (targets.isEmpty()) {
             return 0;
         }
         AirAmount air = AirAmount.ofSeconds(ctx.getArgument("seconds", Integer.class), Integer.MAX_VALUE);
-        services.air().setFor(ref(sender), target.get(), air);
+        for (PlayerRef target : targets) {
+            services.air().setFor(ref(sender), target, air);
+        }
         return Command.SINGLE_SUCCESS;
     }
 }

@@ -1,12 +1,11 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
-import java.util.Optional;
+import java.util.List;
 
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -15,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -42,8 +42,7 @@ public final class HealthCommand extends PlayerstateCommandSupport implements Co
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("amount", IntegerArgumentType.integer(0, MAX_HEALTH_INPUT))
                         .executes(this::set)
-                        .then(Commands.argument("player", ArgumentTypes.player())
-                                .executes(this::set)))
+                        .then(PlayerTargets.players("player").executes(this::set)))
                 .build();
     }
 
@@ -57,12 +56,14 @@ public final class HealthCommand extends PlayerstateCommandSupport implements Co
         if (sender == null) {
             return 0;
         }
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
-        if (target.isEmpty()) {
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        if (targets.isEmpty()) {
             return 0;
         }
         HealthLevel level = HealthLevel.of(ctx.getArgument("amount", Integer.class));
-        services.health().setFor(ref(sender), target.get(), level);
+        for (PlayerRef target : targets) {
+            services.health().setFor(ref(sender), target, level);
+        }
         return Command.SINGLE_SUCCESS;
     }
 }

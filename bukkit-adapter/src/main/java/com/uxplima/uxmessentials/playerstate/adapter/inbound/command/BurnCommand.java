@@ -1,12 +1,11 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
-import java.util.Optional;
+import java.util.List;
 
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -15,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -40,8 +40,7 @@ public final class BurnCommand extends PlayerstateCommandSupport implements Comm
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("seconds", IntegerArgumentType.integer(0, BurnDuration.MAX_SECONDS))
                         .executes(this::burn)
-                        .then(Commands.argument("player", ArgumentTypes.player())
-                                .executes(this::burn)))
+                        .then(PlayerTargets.players("player").executes(this::burn)))
                 .build();
     }
 
@@ -55,12 +54,14 @@ public final class BurnCommand extends PlayerstateCommandSupport implements Comm
         if (sender == null) {
             return 0;
         }
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
-        if (target.isEmpty()) {
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        if (targets.isEmpty()) {
             return 0;
         }
         BurnDuration duration = BurnDuration.ofSeconds(ctx.getArgument("seconds", Integer.class));
-        services.burn().burnFor(ref(sender), target.get(), duration);
+        for (PlayerRef target : targets) {
+            services.burn().burnFor(ref(sender), target, duration);
+        }
         return Command.SINGLE_SUCCESS;
     }
 }

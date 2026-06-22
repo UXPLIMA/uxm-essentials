@@ -1,13 +1,12 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
@@ -16,6 +15,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.SpeedValue;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -60,8 +60,7 @@ public final class SpeedCommand extends PlayerstateCommandSupport implements Com
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0, SpeedValue.MAX_SCALE))
                         .executes(this::set)
-                        .then(Commands.argument("player", ArgumentTypes.player())
-                                .executes(this::set)))
+                        .then(PlayerTargets.players("player").executes(this::set)))
                 .build();
     }
 
@@ -75,12 +74,14 @@ public final class SpeedCommand extends PlayerstateCommandSupport implements Com
         if (sender == null) {
             return 0;
         }
-        Optional<PlayerRef> resolved = resolveTarget(ctx, sender);
-        if (resolved.isEmpty()) {
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        if (targets.isEmpty()) {
             return 0;
         }
         SpeedValue value = SpeedValue.of(ctx.getArgument("value", Double.class));
-        apply(ref(sender), resolved.get(), value);
+        for (PlayerRef target : targets) {
+            apply(ref(sender), target, value);
+        }
         return Command.SINGLE_SUCCESS;
     }
 

@@ -164,6 +164,11 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
         return world == null ? Optional.empty() : Optional.of(BukkitRefs.toRef(world));
     }
 
+    // These verbs are deliberately single-target: GO moves the sender to one player and BRING moves one player
+    // to the sender, so fanning out over @a is meaningless (you cannot send yourself to many places, and
+    // bringing a whole selector is what /tpall already does). The argument stays ArgumentTypes.player(), which
+    // rejects a multi-match selector at parse time, so a present value resolves to at most one player; a single
+    // resolved element is taken. A selector like @p or a name still resolves the way it always has.
     private Optional<Player> resolveTarget(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
         List<Player> resolved = resolver.resolve(ctx.getSource());

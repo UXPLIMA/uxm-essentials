@@ -71,23 +71,40 @@ abstract class PlayerstateCommandSupport {
     }
 
     /**
-     * Resolve the optional {@code player} argument to a target. When the argument is absent the sender is the
-     * target; when present (a name or an {@code @a}/{@code @p}/{@code @s}/{@code @r} selector), the resolved
-     * player is returned only if the sender holds {@link #OTHERS_PERMISSION} — otherwise the no-permission
-     * rejection is sent. A selector that matches no online player yields the unknown-player rejection. The
-     * argument is a {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#player()} selector, so a
-     * present value is always an online player; the first match is taken for a single-target verb.
+     * Resolve the optional {@code player} argument to one or more targets. When the argument is absent the
+     * sender is the sole target; when present (a name or an {@code @a}/{@code @p}/{@code @s}/{@code @r}
+     * selector) the matched players are returned only if the sender holds {@link #OTHERS_PERMISSION} —
+     * otherwise the no-permission rejection is sent and the list is empty. A selector that matches no online
+     * player yields the unknown-player rejection and an empty list.
+     *
+     * <p>The argument is a {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#players()} selector,
+     * so {@code @a} parses and resolves to every online player. The caller applies its per-player effect once
+     * per returned target; each target carries its own uuid, so the effect adapter hops to the correct region
+     * thread for each. A single name still resolves to a one-element list, leaving the single-target path
+     * unchanged.
      */
-    final Optional<PlayerRef> resolveTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
+    final List<PlayerRef> resolveTargets(CommandContext<CommandSourceStack> ctx, Player sender) {
         Optional<PlayerSelectorArgumentResolver> resolver = selector(ctx);
         if (resolver.isEmpty()) {
-            return Optional.of(BukkitRefs.toRef(sender));
+            return List.of(BukkitRefs.toRef(sender));
         }
         if (!sender.hasPermission(OTHERS_PERMISSION)) {
             reply(sender, NO_PERMISSION, Map.of());
-            return Optional.empty();
+            return List.of();
         }
         return resolveSelector(resolver.get(), ctx, sender);
+    }
+
+    /**
+     * Resolve the optional {@code player} argument to a single target, for the read/report verbs that name one
+     * player ({@code /playtime}, {@code /getpos}, {@code /ping}) where a fan-out would only spam the same answer.
+     * Those verbs keep an {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#player()} argument,
+     * which already rejects a multi-match selector at parse, so the list this returns holds at most one element;
+     * its first is taken. Empty means the rejection (no-permission or unknown-player) was already sent.
+     */
+    final Optional<PlayerRef> resolveTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        return targets.isEmpty() ? Optional.empty() : Optional.of(targets.get(0));
     }
 
     /** A {@link PlayerRef} for the live player. */
@@ -145,20 +162,20 @@ abstract class PlayerstateCommandSupport {
         }
     }
 
-    private Optional<PlayerRef> resolveSelector(
+    private List<PlayerRef> resolveSelector(
             PlayerSelectorArgumentResolver resolver, CommandContext<CommandSourceStack> ctx, Player sender) {
         try {
             List<Player> resolved = resolver.resolve(ctx.getSource());
             if (resolved.isEmpty()) {
                 reply(sender, UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
-                return Optional.empty();
+                return List.of();
             }
-            return Optional.of(BukkitRefs.toRef(resolved.get(0)));
+            return resolved.stream().map(BukkitRefs::toRef).toList();
         } catch (CommandSyntaxException unmatched) {
             // A name with no online player, or a selector that matched nothing — surfaced to the sender as the
             // same unknown-player rejection the name path used, never as a raw Brigadier parse error.
             reply(sender, UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
-            return Optional.empty();
+            return List.of();
         }
     }
 

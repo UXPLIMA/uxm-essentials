@@ -1,13 +1,12 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
@@ -15,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -45,7 +45,7 @@ public final class GamemodeAliasCommand extends PlayerstateCommandSupport implem
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::set)
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::set))
+                .then(PlayerTargets.players("player").executes(this::set))
                 .build();
     }
 
@@ -59,11 +59,13 @@ public final class GamemodeAliasCommand extends PlayerstateCommandSupport implem
         if (sender == null) {
             return 0;
         }
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
-        if (target.isEmpty()) {
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        if (targets.isEmpty()) {
             return 0;
         }
-        services.setGamemode().setFor(ref(sender), target.get(), mode);
+        for (PlayerRef target : targets) {
+            services.setGamemode().setFor(ref(sender), target, mode);
+        }
         return Command.SINGLE_SUCCESS;
     }
 }

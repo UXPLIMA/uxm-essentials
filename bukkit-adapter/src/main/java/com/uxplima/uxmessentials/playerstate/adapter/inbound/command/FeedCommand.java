@@ -1,18 +1,18 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
-import java.util.Optional;
+import java.util.List;
 
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -36,7 +36,7 @@ public final class FeedCommand extends PlayerstateCommandSupport implements Comm
         return Commands.literal("feed")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::feed)
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::feed))
+                .then(PlayerTargets.players("player").executes(this::feed))
                 .build();
     }
 
@@ -50,11 +50,13 @@ public final class FeedCommand extends PlayerstateCommandSupport implements Comm
         if (sender == null) {
             return 0;
         }
-        Optional<PlayerRef> target = resolveTarget(ctx, sender);
-        if (target.isEmpty()) {
+        List<PlayerRef> targets = resolveTargets(ctx, sender);
+        if (targets.isEmpty()) {
             return 0;
         }
-        services.feed().feedFor(ref(sender), target.get());
+        for (PlayerRef target : targets) {
+            services.feed().feedFor(ref(sender), target);
+        }
         return Command.SINGLE_SUCCESS;
     }
 }
