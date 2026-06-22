@@ -269,7 +269,47 @@ public enum ModerationMessageKey implements MessageKey {
     // anvil prompts capture a name that resolves into the existing chat-output check use cases.
     MOD_GUI_PICK_HISTORY_TITLE("moderation.gui.pick.history-title"),
     MOD_GUI_CHECK_BAN_PROMPT("moderation.gui.check.ban-prompt"),
-    MOD_GUI_CHECK_MUTE_PROMPT("moderation.gui.check.mute-prompt");
+    MOD_GUI_CHECK_MUTE_PROMPT("moderation.gui.check.mute-prompt"),
+
+    // The jail management GUI (bare /jail, /jails, /jailedplayers). The hub is the player picker with two extra
+    // footer buttons; choosing a target opens the jail chooser, then the duration step (which offers permanent),
+    // then jails the target. The jail-list view manages the defined jails (re-anchor / delete / create), and the
+    // jailed-players view releases a currently-jailed player on click.
+    MOD_GUI_JAIL_HUB_TITLE("moderation.gui.jail.hub-title"),
+    MOD_GUI_JAIL_FOOTER_JAILS("moderation.gui.jail.footer-jails"),
+    MOD_GUI_JAIL_FOOTER_JAILS_LORE("moderation.gui.jail.footer-jails-lore"),
+    MOD_GUI_JAIL_FOOTER_JAILED("moderation.gui.jail.footer-jailed"),
+    MOD_GUI_JAIL_FOOTER_JAILED_LORE("moderation.gui.jail.footer-jailed-lore"),
+    MOD_GUI_JAIL_CHOOSE_TITLE("moderation.gui.jail.choose-title"),
+    MOD_GUI_JAIL_CHOOSE_PREV("moderation.gui.jail.choose-prev"),
+    MOD_GUI_JAIL_CHOOSE_NEXT("moderation.gui.jail.choose-next"),
+    MOD_GUI_JAIL_CHOOSE_ENTRY_NAME("moderation.gui.jail.choose-entry-name"),
+    MOD_GUI_JAIL_CHOOSE_ENTRY_LORE("moderation.gui.jail.choose-entry-lore"),
+    MOD_GUI_JAIL_CHOOSE_EMPTY("moderation.gui.jail.choose-empty"),
+    MOD_GUI_JAIL_DURATION_TITLE("moderation.gui.jail.duration-title"),
+    MOD_GUI_JAIL_DURATION_REJECT("moderation.gui.jail.duration-reject"),
+    MOD_GUI_JAIL_LIST_TITLE("moderation.gui.jail.list-title"),
+    MOD_GUI_JAIL_LIST_PREV("moderation.gui.jail.list-prev"),
+    MOD_GUI_JAIL_LIST_NEXT("moderation.gui.jail.list-next"),
+    MOD_GUI_JAIL_LIST_CREATE("moderation.gui.jail.list-create"),
+    MOD_GUI_JAIL_LIST_ENTRY_NAME("moderation.gui.jail.list-entry-name"),
+    MOD_GUI_JAIL_LIST_ENTRY_LORE("moderation.gui.jail.list-entry-lore"),
+    MOD_GUI_JAIL_LIST_EMPTY_NAME("moderation.gui.jail.list-empty-name"),
+    MOD_GUI_JAIL_LIST_EMPTY_LORE("moderation.gui.jail.list-empty-lore"),
+    MOD_GUI_JAIL_EDIT_TITLE("moderation.gui.jail.edit-title"),
+    MOD_GUI_JAIL_EDIT_BACK("moderation.gui.jail.edit-back"),
+    MOD_GUI_JAIL_EDIT_ANCHOR("moderation.gui.jail.edit-anchor"),
+    MOD_GUI_JAIL_EDIT_ANCHOR_LORE("moderation.gui.jail.edit-anchor-lore"),
+    MOD_GUI_JAIL_EDIT_DELETE("moderation.gui.jail.edit-delete"),
+    MOD_GUI_JAIL_EDIT_DELETE_LORE("moderation.gui.jail.edit-delete-lore"),
+    MOD_GUI_JAIL_CREATE_PROMPT("moderation.gui.jail.create-prompt"),
+    MOD_GUI_JAILED_TITLE("moderation.gui.jail.jailed-title"),
+    MOD_GUI_JAILED_PREV("moderation.gui.jail.jailed-prev"),
+    MOD_GUI_JAILED_NEXT("moderation.gui.jail.jailed-next"),
+    MOD_GUI_JAILED_ENTRY_NAME("moderation.gui.jail.jailed-entry-name"),
+    MOD_GUI_JAILED_ENTRY_LORE("moderation.gui.jail.jailed-entry-lore"),
+    MOD_GUI_JAILED_EMPTY_NAME("moderation.gui.jail.jailed-empty-name"),
+    MOD_GUI_JAILED_EMPTY_LORE("moderation.gui.jail.jailed-empty-lore");
 
     private final String key;
 

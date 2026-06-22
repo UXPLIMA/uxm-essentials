@@ -44,4 +44,13 @@ public final class ListJails {
     public List<String> suggestionNames() {
         return directory.peekNames();
     }
+
+    /**
+     * The full jail-name union — config jails merged with the DB-backed {@code /setjail} jails, sorted — for the
+     * management GUI's jail list to render as clickable rows. Reads {@link com.uxplima.uxmessentials.moderation.application.port.JailDirectory#names()},
+     * which can touch the database, so the adapter resolves it off the tick thread exactly as {@link #list} is run.
+     */
+    public List<String> names() {
+        return directory.names();
+    }
 }

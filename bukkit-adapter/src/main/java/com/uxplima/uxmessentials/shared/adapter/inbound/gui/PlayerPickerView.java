@@ -44,6 +44,11 @@ import org.jspecify.annotations.NullMarked;
  * a caller passes is its own (moderation backs it with {@code BukkitTargetResolver}), so this class
  * never reaches for a context's lookup itself.
  *
+ * <p>A caller may also supply optional {@link Request#footerButtons() footer buttons} — extra bottom-row
+ * actions that are not a player pick (the jail hub uses two: a "jails" manager and a "jailed players"
+ * list). They default to empty, so the sanction callers that only pick a target are unaffected; a
+ * supplied button renders in a free bottom-row slot and fires its own callback with the live viewer.
+ *
  * <p>Folia: the online roster is enumerated on the global region thread (iterating
  * {@code Server.getOnlinePlayers()} off it is illegal) and snapshotted to plain {@link PlayerRef}s; the
  * menu is then built and opened on the viewer's own entity region thread, where its clicks also run. The
@@ -61,6 +66,9 @@ public final class PlayerPickerView {
     private static final int NEXT_SLOT = 53;
     private static final Material NAV_ICON = Material.ARROW;
     private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
+
+    // The bottom row's free slots, flanking the offline-name button, where optional footer buttons land.
+    private static final int[] FOOTER_SLOTS = {47, 51};
 
     private final GuiText guiText;
     private final Scheduler scheduler;
@@ -116,7 +124,21 @@ public final class PlayerPickerView {
         gui.set(
                 OFFLINE_BUTTON_SLOT,
                 GuiItem.button(offlineButton(viewerRef), e -> promptOffline(viewer, viewerRef, request)));
+        footerButtons(gui, viewer, viewerRef, request);
         gui.open(viewer);
+    }
+
+    /** Render the caller's optional footer buttons into the bottom row's free slots; each fires with the viewer. */
+    private void footerButtons(PaginatedGui gui, Player viewer, PlayerRef viewerRef, Request request) {
+        List<FooterButton> buttons = request.footerButtons();
+        for (int i = 0; i < buttons.size() && i < FOOTER_SLOTS.length; i++) {
+            FooterButton footer = buttons.get(i);
+            ItemStack icon = ItemBuilder.of(footer.icon())
+                    .name(guiText.text(viewerRef, footer.label()))
+                    .lore(List.of(guiText.text(viewerRef, footer.lore())))
+                    .build();
+            gui.set(FOOTER_SLOTS[i], GuiItem.button(icon, e -> footer.onClick().accept(viewer)));
+        }
     }
 
     /** Open the anvil for a typed name; a submission flows through {@link #resolveTyped}. */
@@ -199,24 +221,60 @@ public final class PlayerPickerView {
     /**
      * One picker invocation's caller-supplied parts, keeping {@link PlayerPickerView} generic: the menu title,
      * the callback fired with the chosen target, the resolver that turns a typed offline name into a
-     * {@link PlayerRef}, and the reply key used when a typed name resolves to nothing.
+     * {@link PlayerRef}, the reply key used when a typed name resolves to nothing, and any extra footer buttons.
+     *
+     * <p>The four-argument constructor is the common case (the sanction flows that only pick a target); it
+     * defaults {@link #footerButtons} to empty so those callers are unchanged. The jail hub uses the full
+     * constructor to add its [Jails] and [Jailed players] actions.
      *
      * @param title the menu-title catalog key
      * @param onPick invoked with the chosen target (a clicked head, or a resolved typed name)
      * @param offlineResolver maps a typed name to a target, or empty when the name is unknown
      * @param unknownPlayerKey the reply key for an unresolvable typed name (filled with {@code {player}})
+     * @param footerButtons extra bottom-row buttons that are not a player pick (empty for the sanction callers)
      */
     public record Request(
             MessageKey title,
             Consumer<PlayerRef> onPick,
             Function<String, Optional<PlayerRef>> offlineResolver,
-            MessageKey unknownPlayerKey) {
+            MessageKey unknownPlayerKey,
+            List<FooterButton> footerButtons) {
 
         public Request {
             Objects.requireNonNull(title, "title");
             Objects.requireNonNull(onPick, "onPick");
             Objects.requireNonNull(offlineResolver, "offlineResolver");
             Objects.requireNonNull(unknownPlayerKey, "unknownPlayerKey");
+            footerButtons = List.copyOf(Objects.requireNonNull(footerButtons, "footerButtons"));
+        }
+
+        /** The common case: a picker with no extra footer buttons (just the target heads and the offline anvil). */
+        public Request(
+                MessageKey title,
+                Consumer<PlayerRef> onPick,
+                Function<String, Optional<PlayerRef>> offlineResolver,
+                MessageKey unknownPlayerKey) {
+            this(title, onPick, offlineResolver, unknownPlayerKey, List.of());
+        }
+    }
+
+    /**
+     * An optional bottom-row picker button that performs an action other than picking a player — its name and
+     * lore catalog keys, its icon material, and the callback fired (with the live viewer) when it is clicked.
+     * The jail hub adds two: a jails manager and a jailed-players list.
+     *
+     * @param label the button-name catalog key
+     * @param lore the button-lore catalog key
+     * @param icon the button material
+     * @param onClick invoked with the viewer when the button is clicked
+     */
+    public record FooterButton(MessageKey label, MessageKey lore, Material icon, Consumer<Player> onClick) {
+
+        public FooterButton {
+            Objects.requireNonNull(label, "label");
+            Objects.requireNonNull(lore, "lore");
+            Objects.requireNonNull(icon, "icon");
+            Objects.requireNonNull(onClick, "onClick");
         }
     }
 }

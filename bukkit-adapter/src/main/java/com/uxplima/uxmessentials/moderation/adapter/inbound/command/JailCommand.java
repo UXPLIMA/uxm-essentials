@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
 
 import java.util.Optional;
 
+import org.bukkit.entity.Player;
+
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
@@ -10,12 +12,15 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /jail <player> <jail> [duration] [reason]}: confine a player to a named jail. With no duration the
@@ -23,14 +28,24 @@ import org.jspecify.annotations.NullMarked;
  * The unknown-jail / exempt / duration gating and the audit line are the {@code Jail} use case's job; this
  * handler maps the name, the jail, the optional duration token and the greedy reason. The target may be
  * offline (offline jail re-applied at the next login).
+ *
+ * <p>Bare {@code /jail} (no arguments) opens the jail management hub — the player picker → jail chooser →
+ * duration flow, with footer buttons into the jail-list manager and the jailed-players release list — when the
+ * command's catalog {@code gui} flag is on: {@link #guiRoot()} returns the opener and the shared
+ * {@code GuiRootBinding} installs it as the root executor. The raw {@code /jail <player> <jail> ...} subcommand
+ * is unchanged either way, and the same {@code .requires} gate covers the bare-root opener.
  */
 @NullMarked
 public final class JailCommand extends ModerationCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.moderation.jail";
 
-    public JailCommand(ModerationServices services, Messages messages, MessageSink sink) {
+    private final @Nullable JailGuiViews jailGui;
+
+    public JailCommand(
+            ModerationServices services, Messages messages, MessageSink sink, @Nullable JailGuiViews jailGui) {
         super(services, messages, sink);
+        this.jailGui = jailGui;
     }
 
     @Override
@@ -56,6 +71,19 @@ public final class JailCommand extends ModerationCommandSupport implements Comma
     @Override
     public String description() {
         return "Confine a player to a jail, optionally for a duration.";
+    }
+
+    @Override
+    public Optional<Command<CommandSourceStack>> guiRoot() {
+        if (jailGui == null) {
+            return Optional.empty();
+        }
+        return Optional.of(ctx -> {
+            if (ctx.getSource().getSender() instanceof Player sender) {
+                jailGui.openHub(sender, BukkitRefs.toRef(sender));
+            }
+            return Command.SINGLE_SUCCESS;
+        });
     }
 
     private int run(CommandContext<CommandSourceStack> ctx, String duration, Optional<String> reason) {

@@ -9,6 +9,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCommands;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationGuiCommand;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentConfirmView;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
@@ -209,6 +210,24 @@ public final class ModerationWiring {
         PunishmentConfirmView confirmView = new PunishmentConfirmView(guiText, kernel.scheduler(), anvil);
         PunishmentGuiFlow guiFlow = new PunishmentGuiFlow(
                 services, picker, durationPicker, confirmView, kernel.messages(), kernel.messageSink());
+        // The bare-/jail management GUI: the jail-a-player flow (picker → jail chooser → duration, permanent
+        // allowed) plus the [Jails] manager and [Jailed players] release list reached from the hub's footer.
+        // It reuses the same shared player/duration pickers and reads FRESH from the same jail directory and
+        // repository the /jails and /jailedplayers commands use, executing through the same audited
+        // jail/unjail/setjail/deljail use cases the raw commands take.
+        JailGuiViews jailGui = JailGuiViews.create(
+                guiText,
+                kernel.scheduler(),
+                services,
+                repository,
+                kernel.playerLookup(),
+                picker,
+                durationPicker,
+                anvil,
+                kernel.messages(),
+                kernel.messageSink(),
+                clock,
+                guiLayouts);
         java.util.List<CommandRegistration> commands = new java.util.ArrayList<>(ModerationCommands.all(
                 services,
                 kernel.messages(),
@@ -219,7 +238,8 @@ public final class ModerationWiring {
                 guiViews,
                 picker,
                 guiText,
-                anvil));
+                anvil,
+                jailGui));
         commands.add(new ModerationGuiCommand(services, kernel.messages(), kernel.messageSink(), guiViews));
         return new Wired(
                 commands,

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
 import java.util.List;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -38,8 +39,10 @@ public final class ModerationCommands {
      * <p>The read-only GUI collaborators thread to the matching command's bare-root opener: {@code guiViews}
      * (the active-punishments list) to {@code /banlist} and (with {@code picker}) the history view to
      * {@code /banhistory}, and {@code guiText} + {@code anvil} to the {@code /checkban}/{@code /checkmute} name
-     * prompts. Each is {@code null} only when no GUI surface was built, in which case the owning command exposes
-     * no opener and keeps its raw chat behaviour.
+     * prompts. The {@code jailGui} threads to the three jail commands' bare roots ({@code /jail} opens the hub,
+     * {@code /jails} the jail-list manager, {@code /jailedplayers} the release list). Each is {@code null} only
+     * when no GUI surface was built, in which case the owning command exposes no opener and keeps its raw chat
+     * behaviour.
      */
     public static List<CommandRegistration> all(
             ModerationServices services,
@@ -51,7 +54,8 @@ public final class ModerationCommands {
             @Nullable ModerationGuiViews guiViews,
             @Nullable PlayerPickerView picker,
             @Nullable GuiText guiText,
-            @Nullable AnvilInput anvil) {
+            @Nullable AnvilInput anvil,
+            @Nullable JailGuiViews jailGui) {
         return List.of(
                 new MuteCommand(services, messages, sink, silentByDefault, guiFlow),
                 new TempmuteCommand(services, messages, sink, silentByDefault, guiFlow),
@@ -63,7 +67,7 @@ public final class ModerationCommands {
                         messages,
                         sink,
                         (a, t) -> services.unmute().unmute(a, t)),
-                new JailCommand(services, messages, sink),
+                new JailCommand(services, messages, sink, jailGui),
                 target(
                         "unjail",
                         "uxmessentials.moderation.unjail",
@@ -73,8 +77,8 @@ public final class ModerationCommands {
                         sink,
                         (a, t) -> services.unjail().unjail(a, t)),
                 new ToggleJailCommand(services, messages, sink),
-                new JailsCommand(services, messages, sink, scheduler),
-                new JailedPlayersCommand(services, messages, sink, scheduler),
+                new JailsCommand(services, messages, sink, scheduler, jailGui),
+                new JailedPlayersCommand(services, messages, sink, scheduler, jailGui),
                 new SetJailCommand(services, messages, sink),
                 new DelJailCommand(services, messages, sink),
                 new TempbanCommand(services, messages, sink, silentByDefault, guiFlow),
