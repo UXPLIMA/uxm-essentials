@@ -16,7 +16,6 @@ dependencies {
     implementation(project(":core"))
     api(project(":api"))
 
-    compileOnly(libs.jedis)
     compileOnly(libs.bundles.db) // Hikari + SQLite + Flyway + jOOQ (default backend)
     compileOnly(libs.bundles.db.mysql) // MySQL/MariaDB driver — activated via modules.conf
     compileOnly(libs.bundles.db.pg) // PostgreSQL driver — activated via modules.conf
@@ -24,7 +23,6 @@ dependencies {
     compileOnly(libs.gson)
     compileOnly(libs.slf4j.api)
 
-    testImplementation(libs.jedis)
     testImplementation(libs.bundles.db)
     testImplementation(libs.bundles.db.mysql)
     testImplementation(libs.bundles.db.pg)

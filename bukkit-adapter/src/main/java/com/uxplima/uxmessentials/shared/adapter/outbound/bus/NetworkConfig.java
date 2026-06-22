@@ -71,14 +71,17 @@ public record NetworkConfig(
 
     /**
      * The canonical Redis connection block, read from the {@code network.redis} subtree. These are exactly the
-     * values the Redis bus transport's factory consumes ({@code NetworkTransports.redis}); the transport selects
-     * {@code db} on every borrowed connection ({@code 0} leaves the default database untouched).
+     * values the Redis bus transport's factory consumes ({@code RedisBusTransports.redis} in the
+     * {@code :redis-adapter} companion); the factory appends {@code db} to the connection URI ({@code 0} leaves
+     * the default database). Redis pub/sub is global across logical databases, so {@code db} has no functional
+     * effect on this transport — it is carried only for back-compat with existing {@code network.redis.db}
+     * settings.
      *
      * @param host the Redis host
      * @param port the Redis port
      * @param password the Redis auth password, or empty to skip auth
      * @param channel the Redis pub/sub channel both sides publish to and subscribe on
-     * @param db the Redis logical database index the transport selects on each connection
+     * @param db the Redis logical database index appended to the connection URI for config back-compat
      */
     public record Redis(String host, int port, String password, String channel, int db) {
 

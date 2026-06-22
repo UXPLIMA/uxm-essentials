@@ -26,7 +26,10 @@ h2             = "2.4.240"       # com.h2database:h2 — latest stable on Maven 
 velocity       = "3.4.0"
 luckperms      = "5.5"
 jda            = "5.6.1"
-jedis          = "5.1.0"        # redis.clients:jedis — Maven Central (cross-server warp/wallet sync)
+lettuce        = "7.6.0.RELEASE" # io.lettuce:lettuce-core — Maven Central; the Redis bus transport ships in the uxmEssentials-redis companion jar
+
+# uxmLib (sibling toolkit; built via composite in dev, resolved from mavenLocal otherwise)
+uxmlib         = "0.1.0-SNAPSHOT"
 
 # economy provider integrations (see docs/11-economy-integration.md, docs/adr/0004)
 treasury       = "1.2.0"        # me.lokka30:treasury-api — CodeMC repo, NOT Maven Central (verified 2026-05-30)
@@ -94,7 +97,8 @@ slf4j-api         = { module = "org.slf4j:slf4j-api",                           
 velocity-api      = { module = "com.velocitypowered:velocity-api",               version.ref = "velocity" }
 luckperms-api     = { module = "net.luckperms:api",                              version.ref = "luckperms" }
 jda               = { module = "net.dv8tion:JDA",                                version.ref = "jda" }
-jedis             = { module = "redis.clients:jedis",                            version.ref = "jedis" }
+lettuce           = { module = "io.lettuce:lettuce-core",                        version.ref = "lettuce" }
+uxmlib-redis      = { module = "com.uxplima.uxmlib:uxmlib-redis",                version.ref = "uxmlib" }
 
 # economy provider APIs — compileOnly soft-depends (see §9 + §16)
 treasury-api      = { module = "me.lokka30:treasury-api",                        version.ref = "treasury" }

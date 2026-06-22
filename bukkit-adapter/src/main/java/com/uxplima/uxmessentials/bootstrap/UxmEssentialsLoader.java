@@ -44,10 +44,11 @@ public final class UxmEssentialsLoader implements PluginLoader {
         resolver.addDependency(new Dependency(
                 new DefaultArtifact("org.spongepowered:configurate-yaml:" + LoaderDependencies.CONFIGURATE_VERSION),
                 null));
-        // Jedis is no longer resolved here: it is shaded into the plugin jar, relocated under
-        // com.uxplima.uxmessentials.libs.jedis (see bukkit-adapter/build.gradle.kts), so the Redis bus and the
-        // cross-server wallet/warp sync run out of the box without a boot-time download or a clash with another
-        // plugin's Jedis. gson stays loader-provided: the npc skin and several row codecs compile against it.
+        // No Redis client is resolved here: the cross-server bus's Redis transport ships in the separate
+        // uxmEssentials-redis companion jar (Lettuce, relocated there — see redis-adapter/build.gradle.kts), so
+        // the main jar carries no Redis client at all. An operator who wants the Redis transport drops that
+        // companion jar in plugins/; otherwise the bus degrades to local-only. gson stays loader-provided: the
+        // npc skin and several row codecs compile against it.
         resolver.addDependency(new Dependency(new DefaultArtifact("com.google.code.gson:gson:2.11.0"), null));
 
         classpath.addLibrary(resolver);

@@ -34,12 +34,12 @@ import org.mockbukkit.mockbukkit.ServerMock;
  * {@link NetworkMessageCodec#encode}, and the exact same bytes fed back through the transport's inbound path
  * decode to a frame equal to the original.
  *
- * <p>The companion sweep over the other transport lives in {@code RedisBusTransportParityTest} in the
- * persistence adapter (the only place the Redis mock-pool seam is reachable). Both sweeps walk the same
- * {@link NetworkFrames#oneOfEach()} list — one representative of every wire type — and both guard that the
- * list size equals {@link NetworkMessage.MessageType#values()} length, so the set of frames proven over this
- * transport, the set proven over Redis, and the full set of wire types are one and the same. The codec's own
- * round-trip across all thirteen is covered in {@code NetworkMessageCodecTest}.
+ * <p>The companion sweep over the other transport lives in {@code RedisBusTransportAdapterParityTest} in the
+ * {@code :redis-adapter} module (where the Redis adapter and its fake-channel seam are reachable). Both sweeps
+ * walk an identical one-representative-of-every-wire-type list and both guard that the list size equals
+ * {@link NetworkMessage.MessageType#values()} length, so the set of frames proven over this transport, the set
+ * proven over Redis, and the full set of wire types are one and the same. The codec's own round-trip across all
+ * thirteen is covered in {@code NetworkMessageCodecTest}.
  */
 class BusTransportParityTest {
 

@@ -4,7 +4,7 @@ import java.util.Objects;
 
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.persistence.network.NetworkTransports;
+import com.uxplima.uxmessentials.redis.RedisBusTransports;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -54,10 +54,10 @@ public final class BusWiring {
 
     /**
      * Build the transport(s) named by {@code network.transport}: the proxy plugin-messaging carrier, the Redis
-     * pub/sub carrier (built through the persistence-adapter factory so the bukkit-adapter never names a Jedis
-     * type), or a {@link CompositeBusTransport} fanning over both. An unrecognised value already fell back to
-     * {@code velocity} in {@link NetworkConfig}; this logs the WARN so the operator sees their typo without the
-     * enable crashing.
+     * pub/sub carrier (built through the {@code :redis-adapter} factory so the bukkit-adapter never names a
+     * Lettuce type and the main jar never bundles a Redis client), or a {@link CompositeBusTransport} fanning
+     * over both. An unrecognised value already fell back to {@code velocity} in {@link NetworkConfig}; this logs
+     * the WARN so the operator sees their typo without the enable crashing.
      */
     private static BusTransport selectTransport(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
         if (!network.transportRecognized()) {
@@ -77,10 +77,25 @@ public final class BusWiring {
         return new PluginMessagingTransport(plugin, scheduler, network.channel(), network.outboundQueueSize());
     }
 
+    /**
+     * Build the Redis transport from the {@code :redis-adapter} factory, which is referenced {@code compileOnly}
+     * so the main jar carries no Lettuce. The class is therefore absent at runtime unless the operator drops the
+     * {@code uxmEssentials-redis} companion jar in {@code plugins/}; if it is missing the factory reference fails
+     * to link, so the call is guarded and the bus degrades to a {@link LocalOnlyBusTransport} (local-only, the
+     * transport degradation contract) with a single WARN telling the operator how to enable it.
+     */
     private static BusTransport redis(NetworkConfig network, Scheduler scheduler, Logger log) {
         NetworkConfig.Redis redis = network.redis();
-        return NetworkTransports.redis(
-                redis.host(), redis.port(), redis.password(), redis.db(), redis.channel(), scheduler, log);
+        try {
+            return RedisBusTransports.redis(
+                    redis.host(), redis.port(), redis.password(), redis.db(), redis.channel(), scheduler, log);
+        } catch (LinkageError absent) {
+            // LinkageError covers NoClassDefFoundError (its subclass) — thrown the moment the JVM tries to resolve
+            // the absent companion-jar factory class — and any other link-time failure of the redis transport.
+            log.warn("network.transport=redis but the uxmEssentials-redis companion jar is not deployed; "
+                    + "redis bus disabled — drop the jar in plugins/ to enable");
+            return new LocalOnlyBusTransport();
+        }
     }
 
     /**
