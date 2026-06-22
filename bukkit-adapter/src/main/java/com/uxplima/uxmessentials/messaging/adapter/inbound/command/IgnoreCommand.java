@@ -24,9 +24,10 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /ignore [player]}: with a player argument, add them to the owner's persistent ignore list — the verb
  * form of the ignore behaviour. With no argument it opens the ignore-list manager GUI, where the owner reviews
- * and un-ignores the players they ignore and adds new ones. The target is resolved by name (online resolution
- * suffices for the verb); the self-check, the idempotent store write, and the feedback are the
- * {@link com.uxplima.uxmessentials.messaging.application.Ignore} use case's job.
+ * and un-ignores the players they ignore and adds new ones. The target is resolved offline-capably by name
+ * (the ignore store is UUID-keyed, so a player who has joined before can be ignored while offline); only a name
+ * the server has never seen is rejected as unknown. The self-check, the idempotent store write, and the
+ * feedback are the {@link com.uxplima.uxmessentials.messaging.application.Ignore} use case's job.
  */
 @NullMarked
 public final class IgnoreCommand extends MessagingCommandSupport implements CommandRegistration {
@@ -70,7 +71,7 @@ public final class IgnoreCommand extends MessagingCommandSupport implements Comm
         }
         PlayerRef owner = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findOnlineByName(name);
+        Optional<PlayerRef> target = services.players().findByName(name);
         if (target.isEmpty()) {
             notify(owner, UNKNOWN_PLAYER, Map.of("player", name));
             return 0;

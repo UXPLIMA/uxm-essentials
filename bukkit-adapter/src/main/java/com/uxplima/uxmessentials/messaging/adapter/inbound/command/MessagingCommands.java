@@ -31,7 +31,7 @@ public final class MessagingCommands {
                 new RtoggleCommand(services, messages, sink),
                 new IgnoreCommand(services, messages, sink, views),
                 new UnignoreCommand(services, messages, sink),
-                new IgnoreListCommand(services, messages, sink),
+                new IgnoreListCommand(services, messages, sink, views),
                 new SocialSpyCommand(services, messages, sink),
                 new MailClearCommand(services, messages, sink),
                 new HelpOpCommand(services, messages, sink),

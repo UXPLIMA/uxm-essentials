@@ -226,6 +226,9 @@ class FoliaThreadingDriftTest {
                 pkg + "playerstate.adapter.inbound.command.PlayerstateCommandSupport",
                 "OFFTICK: Brigadier suggestion provider (player-name type-ahead)");
         allow.put(
+                pkg + "presence.adapter.inbound.command.NickCommand",
+                "OFFTICK: Brigadier suggestion provider (own name + player-name type-ahead)");
+        allow.put(
                 pkg + "shared.adapter.inbound.command.CommandSuggestions",
                 "OFFTICK: Brigadier suggestion provider (player-name type-ahead)");
         allow.put(
