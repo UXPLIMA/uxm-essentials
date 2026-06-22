@@ -28,18 +28,21 @@ class CommandCatalogDefaultsTest {
     @Test
     void generatedFileLoadsBackThroughTheRealLoader(@TempDir Path dataFolder) throws Exception {
         List<EffectiveCommand> surface = List.of(
-                new EffectiveCommand(new CommandId("home"), "home", List.of("h"), true),
-                new EffectiveCommand(new CommandId("tpa"), "call", List.of("tpask", "summon"), true),
-                new EffectiveCommand(new CommandId("spawn"), "spawn", List.of(), false));
+                new EffectiveCommand(new CommandId("home"), "home", List.of("h"), true, true),
+                new EffectiveCommand(new CommandId("tpa"), "call", List.of("tpask", "summon"), true, false),
+                new EffectiveCommand(new CommandId("spawn"), "spawn", List.of(), false, true));
         Path commands = Files.createDirectories(dataFolder.resolve("commands"));
         Files.writeString(commands.resolve("commands.conf"), CommandCatalogRenderer.render(surface));
 
         Map<String, CommandOverride> loaded = new CommandCatalogConfig(dataFolder, new NoopLogger()).load();
 
-        assertThat(loaded.get("home")).isEqualTo(new CommandOverride(true, Optional.of("home"), List.of("h")));
+        assertThat(loaded.get("home"))
+                .isEqualTo(new CommandOverride(true, Optional.of("home"), List.of("h"), Optional.of(true)));
         assertThat(loaded.get("tpa"))
-                .isEqualTo(new CommandOverride(true, Optional.of("call"), List.of("tpask", "summon")));
-        assertThat(loaded.get("spawn")).isEqualTo(new CommandOverride(false, Optional.of("spawn"), List.of()));
+                .isEqualTo(
+                        new CommandOverride(true, Optional.of("call"), List.of("tpask", "summon"), Optional.of(false)));
+        assertThat(loaded.get("spawn"))
+                .isEqualTo(new CommandOverride(false, Optional.of("spawn"), List.of(), Optional.of(true)));
     }
 
     private static final class NoopLogger implements Logger {

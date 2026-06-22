@@ -18,7 +18,7 @@ class CommandModelTest {
 
     @Test
     void effectiveCommandRejectsBlankName() {
-        assertThatThrownBy(() -> new EffectiveCommand(new CommandId("home"), " ", List.of(), true))
+        assertThatThrownBy(() -> new EffectiveCommand(new CommandId("home"), " ", List.of(), true, true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

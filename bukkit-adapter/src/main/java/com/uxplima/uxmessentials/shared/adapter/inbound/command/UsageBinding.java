@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.command;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
@@ -14,7 +15,6 @@ import io.papermc.paper.command.brigadier.Commands;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -66,21 +66,9 @@ public final class UsageBinding {
         }
         builder.executes(usageExecutor(literal, usage, description));
         for (CommandNode<CommandSourceStack> child : node.getChildren()) {
-            builder.then(rebindChild(child));
+            builder.then(BrigadierNodes.rebindChild(child));
         }
         return builder.build();
-    }
-
-    private ArgumentBuilder<CommandSourceStack, ?> rebindChild(CommandNode<CommandSourceStack> child) {
-        @SuppressWarnings("unchecked") // createBuilder() reproduces the node's own builder type
-        ArgumentBuilder<CommandSourceStack, ?> builder = (ArgumentBuilder<CommandSourceStack, ?>) child.createBuilder();
-        if (child.getCommand() != null) {
-            builder.executes(child.getCommand());
-        }
-        for (CommandNode<CommandSourceStack> grandchild : child.getChildren()) {
-            builder.then(rebindChild(grandchild));
-        }
-        return builder;
     }
 
     private Command<CommandSourceStack> usageExecutor(String literal, String usage, String description) {
@@ -134,6 +122,11 @@ public final class UsageBinding {
         @Override
         public List<String> defaultAliases() {
             return delegate.defaultAliases();
+        }
+
+        @Override
+        public Optional<Command<CommandSourceStack>> guiRoot() {
+            return delegate.guiRoot();
         }
     }
 }

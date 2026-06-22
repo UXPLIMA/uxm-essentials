@@ -45,6 +45,8 @@ public final class CommandCatalogRenderer {
                 .append(NL);
         out.append("#   aliases           extra literals that map to the same command.")
                 .append(NL);
+        out.append("#   gui               running the command bare opens its GUI; false falls back to usage text.")
+                .append(NL);
         out.append("#").append(NL);
         out.append("# This file was generated from the live command surface on first run and is left")
                 .append(NL);
@@ -58,6 +60,7 @@ public final class CommandCatalogRenderer {
         out.append("    enabled = ").append(command.enabled()).append(NL);
         out.append("    name = ").append(quote(command.name())).append(NL);
         out.append("    aliases = ").append(renderAliases(command.aliases())).append(NL);
+        out.append("    gui = ").append(command.gui()).append(NL);
         out.append("  }").append(NL);
     }
 

@@ -34,10 +34,12 @@ class CommandCatalogConfigTest {
         Map<String, CommandOverride> map = new CommandCatalogConfig(dataFolder, new NoopLogger()).load();
 
         assertThat(map.get("tpa"))
-                .isEqualTo(new CommandOverride(true, Optional.of("call"), List.of("tpask", "summon")));
+                .isEqualTo(
+                        new CommandOverride(true, Optional.of("call"), List.of("tpask", "summon"), Optional.empty()));
         assertThat(map.get("home").enabled()).isFalse();
         assertThat(map.get("home").name()).isEmpty();
         assertThat(map.get("home").aliases()).isEmpty();
+        assertThat(map.get("home").gui()).isEmpty();
     }
 
     @Test
@@ -58,6 +60,33 @@ class CommandCatalogConfigTest {
         assertThat(tpa.enabled()).isTrue();
         assertThat(tpa.name()).isEmpty();
         assertThat(tpa.aliases()).isEmpty();
+        assertThat(tpa.gui()).isEmpty();
+    }
+
+    @Test
+    void readsPerCommandGuiAndGlobalDefault(@TempDir Path dataFolder) throws Exception {
+        Path commands = Files.createDirectories(dataFolder.resolve("commands"));
+        Files.writeString(
+                commands.resolve("commands.conf"),
+                "gui-default = false\ncommands { kit { gui = true }, pay { gui = false }, msg { } }\n");
+
+        CommandCatalogConfig.Loaded loaded = new CommandCatalogConfig(dataFolder, new NoopLogger()).loadAll();
+
+        assertThat(loaded.guiDefault()).isFalse();
+        assertThat(loaded.overrides().get("kit").gui()).contains(true);
+        assertThat(loaded.overrides().get("pay").gui()).contains(false);
+        assertThat(loaded.overrides().get("msg").gui()).isEmpty();
+    }
+
+    @Test
+    void guiDefaultDefaultsToTrueWhenAbsent(@TempDir Path dataFolder) throws Exception {
+        Path commands = Files.createDirectories(dataFolder.resolve("commands"));
+        Files.writeString(commands.resolve("commands.conf"), "commands { kit { } }\n");
+
+        assertThat(new CommandCatalogConfig(dataFolder, new NoopLogger())
+                        .loadAll()
+                        .guiDefault())
+                .isTrue();
     }
 
     @Test

@@ -4,12 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
-import com.mojang.brigadier.builder.ArgumentBuilder;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.tree.CommandNode;
+import com.mojang.brigadier.Command;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import org.jspecify.annotations.NullMarked;
@@ -45,47 +44,22 @@ public final class CatalogBinding {
             if (effective == null) {
                 result.add(registration);
             } else if (effective.enabled()) {
-                result.add(new BoundRegistration(registration, this, effective));
+                result.add(new BoundRegistration(registration, effective));
             }
         }
         return List.copyOf(result);
     }
 
-    private LiteralCommandNode<CommandSourceStack> rebindRoot(
-            LiteralCommandNode<CommandSourceStack> node, String newLiteral) {
-        LiteralArgumentBuilder<CommandSourceStack> builder =
-                io.papermc.paper.command.brigadier.Commands.literal(newLiteral);
-        if (node.getRequirement() != null) {
-            builder.requires(node.getRequirement());
-        }
-        if (node.getCommand() != null) {
-            builder.executes(node.getCommand());
-        }
-        for (CommandNode<CommandSourceStack> child : node.getChildren()) {
-            builder.then(rebindChild(child));
-        }
-        return builder.build();
-    }
-
-    private ArgumentBuilder<CommandSourceStack, ?> rebindChild(CommandNode<CommandSourceStack> child) {
-        @SuppressWarnings("unchecked") // createBuilder() reproduces the node's own builder type
-        ArgumentBuilder<CommandSourceStack, ?> builder = (ArgumentBuilder<CommandSourceStack, ?>) child.createBuilder();
-        if (child.getCommand() != null) {
-            builder.executes(child.getCommand());
-        }
-        for (CommandNode<CommandSourceStack> grandchild : child.getChildren()) {
-            builder.then(rebindChild(grandchild));
-        }
-        return builder;
-    }
-
     /** A {@link CommandRegistration} whose root literal and aliases come from the catalog entry. */
-    private record BoundRegistration(CommandRegistration delegate, CatalogBinding binding, EffectiveCommand effective)
+    private record BoundRegistration(CommandRegistration delegate, EffectiveCommand effective)
             implements CommandRegistration {
 
         @Override
         public LiteralCommandNode<CommandSourceStack> build() {
-            return binding.rebindRoot(delegate.build(), effective.name());
+            // Naming only: carry the existing root executor across, so a rename never changes what the
+            // command does. The GuiRootBinding (which runs after this) decides the bare-input behaviour.
+            LiteralCommandNode<CommandSourceStack> node = delegate.build();
+            return BrigadierNodes.rebindRoot(node, effective.name(), node.getCommand());
         }
 
         @Override
@@ -101,6 +75,11 @@ public final class CatalogBinding {
         @Override
         public String commandId() {
             return delegate.commandId();
+        }
+
+        @Override
+        public Optional<Command<CommandSourceStack>> guiRoot() {
+            return delegate.guiRoot();
         }
     }
 }

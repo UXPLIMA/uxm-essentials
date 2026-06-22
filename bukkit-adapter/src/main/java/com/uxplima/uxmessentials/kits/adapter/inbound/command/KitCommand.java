@@ -134,6 +134,16 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         return "Claim a kit; list, preview, create, remove, edit or reset kits.";
     }
 
+    /**
+     * Bare {@code /kit} opens the browse menu — the same view {@code /kit list} opens. Installed on the root
+     * only when the command's catalog {@code gui} flag is on; with it off the bare root falls back to the
+     * usage line.
+     */
+    @Override
+    public Optional<Command<CommandSourceStack>> guiRoot() {
+        return Optional.of(this::runList);
+    }
+
     private int claimSelf(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {

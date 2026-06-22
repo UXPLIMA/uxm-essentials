@@ -65,6 +65,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.presence.adapter.PresenceWiring;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
@@ -101,7 +102,6 @@ import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
-import com.uxplima.uxmessentials.shared.application.command.CommandOverride;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
@@ -221,9 +221,9 @@ public final class PluginModule {
         List<CommandDefinition> defs = CommandAliasDefaults.augment(resources.registered().stream()
                 .map(r -> new CommandDefinition(new CommandId(r.commandId()), r.defaultName(), r.defaultAliases()))
                 .toList());
-        Map<String, CommandOverride> overrides =
-                new CommandCatalogConfig(plugin.getDataFolder().toPath(), kernel.log()).load();
-        CommandCatalog.Resolution resolution = CommandCatalog.resolve(defs, overrides);
+        CommandCatalogConfig.Loaded loaded =
+                new CommandCatalogConfig(plugin.getDataFolder().toPath(), kernel.log()).loadAll();
+        CommandCatalog.Resolution resolution = CommandCatalog.resolve(defs, loaded.overrides(), loaded.guiDefault());
         resolution.warnings().forEach(w -> kernel.log().warn("command catalog: {}", w.message()));
         // Seed the editable file from the resolved surface so a fresh install lands a self-documenting
         // commands.conf instead of an empty folder the catalog would silently ignore.
@@ -231,6 +231,8 @@ public final class PluginModule {
         Map<String, EffectiveCommand> byId =
                 resolution.effective().stream().collect(Collectors.toMap(e -> e.id().value(), e -> e));
         resources.catalogBinding(new CatalogBinding(byId));
+        // The GUI binding reuses the same resolved map so a command's gui flag and rename agree on one entry.
+        resources.guiRootBinding(new GuiRootBinding(byId));
     }
 
     private static void writeDefaultCatalog(

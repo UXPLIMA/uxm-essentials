@@ -17,8 +17,8 @@ class CommandCatalogRenderTest {
     @Test
     void rendersNestedBlocksKeyedByCommandId() {
         String rendered = CommandCatalogRenderer.render(List.of(
-                new EffectiveCommand(new CommandId("home"), "home", List.of("h"), true),
-                new EffectiveCommand(new CommandId("tpa"), "tpa", List.of("call", "tpask"), true)));
+                new EffectiveCommand(new CommandId("home"), "home", List.of("h"), true, true),
+                new EffectiveCommand(new CommandId("tpa"), "tpa", List.of("call", "tpask"), true, true)));
 
         assertThat(rendered).startsWith("#");
         assertThat(rendered).contains("commands {");
@@ -33,7 +33,7 @@ class CommandCatalogRenderTest {
     @Test
     void rendersEmptyAliasListForCommandWithNoAliases() {
         String rendered = CommandCatalogRenderer.render(
-                List.of(new EffectiveCommand(new CommandId("back"), "back", List.of(), true)));
+                List.of(new EffectiveCommand(new CommandId("back"), "back", List.of(), true, true)));
 
         assertThat(rendered).contains("aliases = []");
     }
@@ -41,16 +41,27 @@ class CommandCatalogRenderTest {
     @Test
     void rendersDisabledFlag() {
         String rendered = CommandCatalogRenderer.render(
-                List.of(new EffectiveCommand(new CommandId("spawn"), "spawn", List.of(), false)));
+                List.of(new EffectiveCommand(new CommandId("spawn"), "spawn", List.of(), false, true)));
 
         assertThat(rendered).contains("enabled = false");
     }
 
     @Test
+    void rendersGuiFlag() {
+        String rendered = CommandCatalogRenderer.render(List.of(
+                new EffectiveCommand(new CommandId("kit"), "kit", List.of(), true, true),
+                new EffectiveCommand(new CommandId("pay"), "pay", List.of(), true, false)));
+
+        assertThat(rendered).contains("kit {");
+        assertThat(rendered).contains("gui = true");
+        assertThat(rendered).contains("gui = false");
+    }
+
+    @Test
     void emitsIdsInInputOrder() {
         String rendered = CommandCatalogRenderer.render(List.of(
-                new EffectiveCommand(new CommandId("zulu"), "zulu", List.of(), true),
-                new EffectiveCommand(new CommandId("alpha"), "alpha", List.of(), true)));
+                new EffectiveCommand(new CommandId("zulu"), "zulu", List.of(), true, true),
+                new EffectiveCommand(new CommandId("alpha"), "alpha", List.of(), true, true)));
 
         assertThat(rendered.indexOf("zulu {")).isLessThan(rendered.indexOf("alpha {"));
     }
@@ -58,7 +69,7 @@ class CommandCatalogRenderTest {
     @Test
     void quotesNameAndAliasesAndEscapesSpecials() {
         String rendered = CommandCatalogRenderer.render(
-                List.of(new EffectiveCommand(new CommandId("msg"), "te\"ll", List.of("wh\\isper"), true)));
+                List.of(new EffectiveCommand(new CommandId("msg"), "te\"ll", List.of("wh\\isper"), true, true)));
 
         assertThat(rendered).contains("name = \"te\\\"ll\"");
         assertThat(rendered).contains("aliases = [\"wh\\\\isper\"]");

@@ -59,6 +59,15 @@ public final class GuiSubcommand {
                 .executes(this::runGui);
     }
 
+    /**
+     * The bare-input opener for {@code /uxmess}: opens the same management hub the {@code gui} subcommand
+     * does, so an operator who runs {@code /uxmess} with no arguments lands on the hub when the command's
+     * catalog {@code gui} flag is on. Shares one open path so the two never drift.
+     */
+    public Command<CommandSourceStack> opener() {
+        return this::runGui;
+    }
+
     private int runGui(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         if (!(sender instanceof Player player)) {

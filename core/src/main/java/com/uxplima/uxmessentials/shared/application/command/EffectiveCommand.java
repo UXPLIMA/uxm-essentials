@@ -12,8 +12,9 @@ import java.util.Objects;
  * @param name the effective primary literal to register
  * @param aliases the effective, collision-free alias list
  * @param enabled whether to register at all
+ * @param gui whether running the command bare opens its GUI rather than falling back to its usage text
  */
-public record EffectiveCommand(CommandId id, String name, List<String> aliases, boolean enabled) {
+public record EffectiveCommand(CommandId id, String name, List<String> aliases, boolean enabled, boolean gui) {
 
     public EffectiveCommand {
         Objects.requireNonNull(id, "id");

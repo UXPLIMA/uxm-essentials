@@ -53,8 +53,8 @@ class CloseableResourcesCatalogTest {
         resources.addCommand(new StubRegistration("home", List.of("h")));
         resources.addCommand(new StubRegistration("warp", List.of("w")));
         resources.catalogBinding(new CatalogBinding(Map.of(
-                "home", new EffectiveCommand(new CommandId("home"), "ev", List.of("e"), true),
-                "warp", new EffectiveCommand(new CommandId("warp"), "warp", List.of(), false))));
+                "home", new EffectiveCommand(new CommandId("home"), "ev", List.of("e"), true, true),
+                "warp", new EffectiveCommand(new CommandId("warp"), "warp", List.of(), false, true))));
 
         List<CommandRegistration> out = resources.commands();
 
@@ -80,7 +80,7 @@ class CloseableResourcesCatalogTest {
         CloseableResources resources = new CloseableResources();
         resources.addCommand(new StubRegistration("home", List.of("h")));
         resources.catalogBinding(new CatalogBinding(
-                Map.of("home", new EffectiveCommand(new CommandId("home"), "ev", List.of("e"), true))));
+                Map.of("home", new EffectiveCommand(new CommandId("home"), "ev", List.of("e"), true, true))));
         resources.localeBinding(new LocaleBinding(new NoOverrideLocaleStore(), Locale.ENGLISH));
 
         List<CommandRegistration> out = resources.commands();
@@ -112,7 +112,7 @@ class CloseableResourcesCatalogTest {
         CloseableResources resources = new CloseableResources();
         resources.addCommand(new BareArgRegistration("gamemode"));
         resources.catalogBinding(new CatalogBinding(
-                Map.of("gamemode", new EffectiveCommand(new CommandId("gamemode"), "gm", List.of(), true))));
+                Map.of("gamemode", new EffectiveCommand(new CommandId("gamemode"), "gm", List.of(), true, true))));
         resources.usageBinding(new UsageBinding(messages));
 
         LiteralCommandNode<CommandSourceStack> node =

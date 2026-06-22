@@ -135,6 +135,16 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         return "Teleport to a server warp; list, set, delete, move, lock, edit or inspect warps.";
     }
 
+    /**
+     * Bare {@code /warp} opens the warps browse menu — the same view {@code /warp list} opens. Installed on
+     * the root only when the command's catalog {@code gui} flag is on; with it off the bare root falls back
+     * to the usage line.
+     */
+    @Override
+    public Optional<Command<CommandSourceStack>> guiRoot() {
+        return Optional.of(this::runList);
+    }
+
     private int openWarpEditor(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {

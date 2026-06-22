@@ -31,29 +31,39 @@ public final class CommandCatalog {
         }
     }
 
-    /** Resolve {@code definitions} against {@code overrides} (keyed by {@code commandId} value). */
-    public static Resolution resolve(List<CommandDefinition> definitions, Map<String, CommandOverride> overrides) {
+    /**
+     * Resolve {@code definitions} against {@code overrides} (keyed by {@code commandId} value). The
+     * {@code guiDefault} sets the global bare-opens-GUI behaviour each command inherits unless its own
+     * override opts in or out explicitly.
+     */
+    public static Resolution resolve(
+            List<CommandDefinition> definitions, Map<String, CommandOverride> overrides, boolean guiDefault) {
         Objects.requireNonNull(definitions, "definitions");
         Objects.requireNonNull(overrides, "overrides");
         List<EffectiveCommand> out = new ArrayList<>();
         List<CatalogWarning> warnings = new ArrayList<>();
         Set<String> claimed = new HashSet<>();
         for (CommandDefinition def : definitions) {
-            out.add(resolveOne(def, overrides.get(def.id().value()), claimed, warnings));
+            out.add(resolveOne(def, overrides.get(def.id().value()), claimed, warnings, guiDefault));
         }
         return new Resolution(out, warnings);
     }
 
     private static EffectiveCommand resolveOne(
-            CommandDefinition def, @Nullable CommandOverride ov, Set<String> claimed, List<CatalogWarning> warnings) {
+            CommandDefinition def,
+            @Nullable CommandOverride ov,
+            Set<String> claimed,
+            List<CatalogWarning> warnings,
+            boolean guiDefault) {
         boolean enabled = ov == null || ov.enabled();
+        boolean gui = ov == null ? guiDefault : ov.gui().orElse(guiDefault);
         String name = effectiveName(def, ov, warnings);
         if (!enabled) {
-            return new EffectiveCommand(def.id(), name, List.of(), false);
+            return new EffectiveCommand(def.id(), name, List.of(), false, gui);
         }
         name = claimName(def, name, claimed, warnings);
         List<String> aliases = claimAliases(def, ov, claimed, warnings);
-        return new EffectiveCommand(def.id(), name, aliases, true);
+        return new EffectiveCommand(def.id(), name, aliases, true, gui);
     }
 
     private static String effectiveName(

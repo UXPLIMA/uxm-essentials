@@ -15,11 +15,13 @@ import com.uxplima.uxmessentials.shared.application.command.CommandDefinition;
  * resolves the operator's overrides, so the short forms people reach for from other plugins answer out
  * of the box without anyone editing {@code commands/<module>.conf}.
  *
- * <p>The standalone commands ({@code homes}/{@code warps}/{@code kits} and the time/weather literals)
- * are deliberately never produced here: they are real commands in their own right, so aliasing them onto
- * {@code home}/{@code warp}/{@code kit}/{@code time}/{@code weather} would steal a name the resolver
- * would then have to drop. {@link #CONFLICT_TARGETS} backstops that intent — anything that lands on one
- * of those tokens is filtered out rather than silently shipped.
+ * <p>The plural forms {@code homes}/{@code warps}/{@code kits} are shipped as aliases of
+ * {@code home}/{@code warp}/{@code kit}: there are no standalone commands under those literals, so the
+ * resolver is free to claim them and the plural a player reaches for opens the same command. The
+ * time/weather literals ({@code day}/{@code night}/{@code rain}/…) and the speed commands stay reserved —
+ * they are real commands in their own right, so aliasing them would steal a name the resolver would then
+ * have to drop. {@link #CONFLICT_TARGETS} backstops that intent — anything that lands on one of those
+ * tokens is filtered out rather than silently shipped.
  */
 public final class CommandAliasDefaults {
 
@@ -35,9 +37,9 @@ public final class CommandAliasDefaults {
             Map.entry("balance", List.of("bal", "money")),
             Map.entry("eco", List.of("economy")),
             Map.entry("gamemode", List.of("gm")),
-            Map.entry("home", List.of("h")),
-            Map.entry("warp", List.of("wp")),
-            Map.entry("kit", List.of("k")),
+            Map.entry("home", List.of("h", "homes")),
+            Map.entry("warp", List.of("wp", "warps")),
+            Map.entry("kit", List.of("k", "kits")),
             Map.entry("feed", List.of("eat")),
             Map.entry("back", List.of("return")),
             Map.entry("afk", List.of("away")),
@@ -50,7 +52,7 @@ public final class CommandAliasDefaults {
 
     // Real standalone commands that must keep their own literals; never emitted as an added alias.
     private static final Set<String> CONFLICT_TARGETS =
-            Set.of("homes", "warps", "kits", "day", "night", "sun", "rain", "thunder", "walkspeed", "flyspeed");
+            Set.of("day", "night", "sun", "rain", "thunder", "walkspeed", "flyspeed");
 
     /**
      * Returns a copy of {@code defs} where every command with a curated entry has those aliases folded

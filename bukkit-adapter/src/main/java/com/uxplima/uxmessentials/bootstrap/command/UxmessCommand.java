@@ -127,6 +127,16 @@ public final class UxmessCommand implements CommandRegistration {
         return ALIASES;
     }
 
+    /**
+     * Bare {@code /uxmess} opens the management hub — the same screen {@code /uxmess gui} opens. Installed on
+     * the root only when the command's catalog {@code gui} flag is on; with it off the root keeps its
+     * {@code runHelp} fallback, which the {@code GuiRootBinding} leaves in place rather than replacing.
+     */
+    @Override
+    public java.util.Optional<Command<CommandSourceStack>> guiRoot() {
+        return java.util.Optional.of(guiNode.opener());
+    }
+
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> reloadNode() {
         return Commands.literal("reload")
                 .requires(src -> src.getSender().hasPermission(PERMISSION_RELOAD))

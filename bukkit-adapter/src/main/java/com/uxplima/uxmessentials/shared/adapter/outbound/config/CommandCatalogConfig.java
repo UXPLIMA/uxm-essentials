@@ -35,6 +35,8 @@ public final class CommandCatalogConfig {
 
     private static final String COMMANDS_DIR = "commands";
     private static final String CONF_SUFFIX = ".conf";
+    private static final String GUI_DEFAULT_KEY = "gui-default";
+    private static final boolean GUI_DEFAULT = true;
 
     private final Path dataFolder;
     private final Logger log;
@@ -44,34 +46,55 @@ public final class CommandCatalogConfig {
         this.log = Objects.requireNonNull(log, "log");
     }
 
+    /**
+     * The merged override map keyed by command id and the global {@code gui-default}: the bare-opens-GUI
+     * behaviour every command inherits unless its own {@code gui} flag opts in or out.
+     */
+    public record Loaded(Map<String, CommandOverride> overrides, boolean guiDefault) {
+        public Loaded {
+            overrides = Map.copyOf(overrides);
+        }
+    }
+
     /** Merge every {@code commands/*.conf} override into a single map keyed by command id. */
     public Map<String, CommandOverride> load() {
+        return loadAll().overrides();
+    }
+
+    /** Merge every {@code commands/*.conf} file into the override map plus the global {@code gui-default}. */
+    public Loaded loadAll() {
         Path dir = dataFolder.resolve(COMMANDS_DIR);
         if (!Files.isDirectory(dir)) {
-            return Map.of();
+            return new Loaded(Map.of(), GUI_DEFAULT);
         }
         Map<String, CommandOverride> result = new HashMap<>();
+        boolean[] guiDefault = {GUI_DEFAULT};
         try (Stream<Path> files = Files.list(dir)) {
             files.filter(CommandCatalogConfig::isConfFile)
                     .sorted(Comparator.comparing(Path::getFileName))
-                    .forEach(file -> readFile(file, result));
+                    .forEach(file -> readFile(file, result, guiDefault));
         } catch (IOException failure) {
             log.error("failed to list command override directory " + dir, failure);
         }
-        return Map.copyOf(result);
+        return new Loaded(result, guiDefault[0]);
     }
 
     private static boolean isConfFile(Path file) {
         return Files.isRegularFile(file) && file.getFileName().toString().endsWith(CONF_SUFFIX);
     }
 
-    private void readFile(Path file, Map<String, CommandOverride> into) {
+    private void readFile(Path file, Map<String, CommandOverride> into, boolean[] guiDefault) {
         ConfigurationNode root;
         try {
             root = HoconConfigurationLoader.builder().path(file).build().load();
         } catch (ConfigurateException failure) {
             log.error("failed to load command overrides " + file, failure);
             return;
+        }
+        ConfigurationNode guiDefaultNode = root.node(GUI_DEFAULT_KEY);
+        if (!guiDefaultNode.virtual()) {
+            // Files merge in name order, so a later file's gui-default wins, mirroring the override merge.
+            guiDefault[0] = guiDefaultNode.getBoolean(GUI_DEFAULT);
         }
         for (Map.Entry<Object, ? extends ConfigurationNode> entry :
                 root.node("commands").childrenMap().entrySet()) {
@@ -83,7 +106,9 @@ public final class CommandCatalogConfig {
         boolean enabled = node.node("enabled").getBoolean(true);
         String rawName = node.node("name").getString();
         Optional<String> name = (rawName == null || rawName.isBlank()) ? Optional.empty() : Optional.of(rawName);
-        return new CommandOverride(enabled, name, parseAliases(node.node("aliases")));
+        ConfigurationNode guiNode = node.node("gui");
+        Optional<Boolean> gui = guiNode.virtual() ? Optional.empty() : Optional.of(guiNode.getBoolean());
+        return new CommandOverride(enabled, name, parseAliases(node.node("aliases")), gui);
     }
 
     private static List<String> parseAliases(ConfigurationNode node) {

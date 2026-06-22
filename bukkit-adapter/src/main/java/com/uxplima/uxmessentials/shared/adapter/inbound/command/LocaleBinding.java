@@ -139,5 +139,10 @@ public final class LocaleBinding {
         public List<String> aliases() {
             return delegate.aliases();
         }
+
+        @Override
+        public Optional<Command<CommandSourceStack>> guiRoot() {
+            return delegate.guiRoot();
+        }
     }
 }

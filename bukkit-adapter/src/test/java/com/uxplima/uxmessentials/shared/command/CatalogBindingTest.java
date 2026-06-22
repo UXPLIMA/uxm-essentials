@@ -39,7 +39,7 @@ class CatalogBindingTest {
 
     @Test
     void renameAndAliasRebuildsRootLiteral() {
-        EffectiveCommand effective = new EffectiveCommand(new CommandId("home"), "ev", List.of("e"), true);
+        EffectiveCommand effective = new EffectiveCommand(new CommandId("home"), "ev", List.of("e"), true, true);
         CatalogBinding binding = new CatalogBinding(Map.of("home", effective));
 
         List<CommandRegistration> result = binding.apply(List.of(new StubRegistration("home")));
@@ -55,7 +55,7 @@ class CatalogBindingTest {
 
     @Test
     void disabledCommandDroppedFromOutput() {
-        EffectiveCommand effective = new EffectiveCommand(new CommandId("home"), "home", List.of(), false);
+        EffectiveCommand effective = new EffectiveCommand(new CommandId("home"), "home", List.of(), false, true);
         CatalogBinding binding = new CatalogBinding(Map.of("home", effective));
 
         List<CommandRegistration> result = binding.apply(List.of(new StubRegistration("home")));
@@ -78,7 +78,7 @@ class CatalogBindingTest {
 
     @Test
     void emptyAliasOverrideClearsAliases() {
-        EffectiveCommand effective = new EffectiveCommand(new CommandId("home"), "home", List.of(), true);
+        EffectiveCommand effective = new EffectiveCommand(new CommandId("home"), "home", List.of(), true, true);
         CatalogBinding binding = new CatalogBinding(Map.of("home", effective));
 
         List<CommandRegistration> result = binding.apply(List.of(new StubRegistration("home")));

@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 /**
  * Covers the curated muscle-memory alias table that augments each command's code-side defaults before
  * the {@link com.uxplima.uxmessentials.shared.application.command.CommandCatalog} resolves them. The
- * table must add to, never replace, code defaults; must not duplicate; and must never alias the
- * standalone commands ({@code homes}/{@code warps}/{@code kits}, the time/weather literals) onto another
- * command.
+ * table must add to, never replace, code defaults; must not duplicate; ship the plural forms
+ * {@code homes}/{@code warps}/{@code kits} as aliases of their singular commands; and must never alias the
+ * reserved standalone commands (the time/weather literals, the speed commands) onto another command.
  */
 class CommandAliasDefaultsTest {
 
@@ -53,14 +53,24 @@ class CommandAliasDefaultsTest {
     }
 
     @Test
-    void augment_neverAliasesStandaloneConflictTargets() {
+    void augment_neverAliasesReservedConflictTargets() {
         List<CommandDefinition> out =
                 CommandAliasDefaults.augment(List.of(def("home", "home"), def("warp", "warp"), def("kit", "kit")));
 
         assertThat(out)
                 .flatMap(CommandDefinition::defaultAliases)
-                .doesNotContain(
-                        "homes", "warps", "kits", "day", "night", "sun", "rain", "thunder", "walkspeed", "flyspeed");
+                .doesNotContain("day", "night", "sun", "rain", "thunder", "walkspeed", "flyspeed");
+    }
+
+    @Test
+    void augment_shipsPluralAliasesForResourceCommands() {
+        List<CommandDefinition> out =
+                CommandAliasDefaults.augment(List.of(def("home", "home"), def("warp", "warp"), def("kit", "kit")));
+
+        // The plural a player reaches for resolves onto the singular command, alongside the short forms.
+        assertThat(out.get(0).defaultAliases()).contains("h", "homes");
+        assertThat(out.get(1).defaultAliases()).contains("wp", "warps");
+        assertThat(out.get(2).defaultAliases()).contains("k", "kits");
     }
 
     @Test
