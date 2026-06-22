@@ -77,6 +77,13 @@ public enum ItemworldMessageKey implements MessageKey {
     RECIPE_SHAPED("itemworld.recipe.shaped"),
     RECIPE_SHAPELESS("itemworld.recipe.shapeless"),
     RECIPE_NONE("itemworld.recipe.none"),
+    // /recipe — the crafting-grid browse menu (bare /recipe when its gui flag is on)
+    RECIPE_GUI_TITLE("itemworld.recipe.gui.title"),
+    RECIPE_GUI_RESULT_NAME("itemworld.recipe.gui.result-name"),
+    RECIPE_GUI_RESULT_LORE("itemworld.recipe.gui.result-lore"),
+    RECIPE_GUI_INGREDIENT_LORE("itemworld.recipe.gui.ingredient-lore"),
+    RECIPE_GUI_EMPTY_NAME("itemworld.recipe.gui.empty-name"),
+    RECIPE_GUI_NONE_TITLE("itemworld.recipe.gui.none-title"),
     // /unbreakable
     UNBREAKABLE_SET("itemworld.unbreakable.set"),
     // /disenchant
@@ -136,6 +143,13 @@ public enum ItemworldMessageKey implements MessageKey {
     ENTITYCOUNT_HEADER("itemworld.entitycount.header"),
     ENTITYCOUNT_ENTRY("itemworld.entitycount.entry"),
     ENTITYCOUNT_NONE("itemworld.entitycount.none"),
+    // /entitycount — the tally browse menu (bare /entitycount when its gui flag is on)
+    ENTITYCOUNT_GUI_TITLE("itemworld.entitycount.gui.title"),
+    ENTITYCOUNT_GUI_PREV("itemworld.entitycount.gui.prev"),
+    ENTITYCOUNT_GUI_NEXT("itemworld.entitycount.gui.next"),
+    ENTITYCOUNT_GUI_ENTRY_NAME("itemworld.entitycount.gui.entry-name"),
+    ENTITYCOUNT_GUI_ENTRY_LORE("itemworld.entitycount.gui.entry-lore"),
+    ENTITYCOUNT_GUI_EMPTY_TITLE("itemworld.entitycount.gui.empty-title"),
     // /unlimited
     UNLIMITED_ENABLED("itemworld.unlimited.enabled"),
     UNLIMITED_DISABLED("itemworld.unlimited.disabled"),

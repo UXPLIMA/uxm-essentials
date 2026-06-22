@@ -11,6 +11,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.presence.adapter.inbound.command.PresenceCommands;
 import com.uxplima.uxmessentials.presence.adapter.inbound.command.PresenceSettingsCommand;
+import com.uxplima.uxmessentials.presence.adapter.inbound.gui.OnlinePlayerListView;
 import com.uxplima.uxmessentials.presence.adapter.inbound.gui.PresenceSettingsView;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.AfkPickupListener;
 import com.uxplima.uxmessentials.presence.adapter.inbound.listener.PresenceActivityListener;
@@ -99,8 +100,16 @@ public final class PresenceWiring {
                 org.bukkit.Material.CLOCK,
                 "uxmessentials.presence.gui",
                 settingsView::open));
+        // The bare /list head grid (gui-on) reuses the shared paginated list over the data-folder layout loader; the
+        // command snapshots the vanish-aware roster on the global thread and the view only renders it.
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout listLayout = guiLayouts.loadEntityList(
+                "presence",
+                "list",
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.paginatedDefault(
+                        org.bukkit.Material.PLAYER_HEAD));
+        OnlinePlayerListView listView = new OnlinePlayerListView(guiText, kernel.scheduler(), listLayout);
         List<CommandRegistration> commands =
-                new ArrayList<>(PresenceCommands.all(services, kernel.messages(), kernel.scheduler()));
+                new ArrayList<>(PresenceCommands.all(services, kernel.messages(), kernel.scheduler(), listView));
         commands.add(new PresenceSettingsCommand(services, kernel.messages(), kernel.scheduler(), settingsView));
         List<Listener> listeners = listeners(kernel, settings, services, store, visibility, notifier);
         return new Wired(commands, listeners, sweep, store, services, running, clock);

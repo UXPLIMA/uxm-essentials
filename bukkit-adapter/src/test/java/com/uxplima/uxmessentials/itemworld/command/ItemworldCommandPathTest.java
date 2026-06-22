@@ -238,7 +238,7 @@ class ItemworldCommandPathTest {
         ItemworldServices services = new ItemworldServices(
                 kernel(), new NoopAudit(), ItemworldConfig.from(config), GuiLayout.storageDefault(6));
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        for (CommandRegistration command : ItemworldGroupACommands.all(services)) {
+        for (CommandRegistration command : ItemworldGroupACommands.all(services, null)) {
             dispatcher.getRoot().addChild(command.build());
         }
         return dispatcher;

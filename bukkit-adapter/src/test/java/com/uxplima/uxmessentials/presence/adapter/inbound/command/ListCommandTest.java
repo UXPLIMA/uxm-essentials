@@ -12,6 +12,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
+import com.uxplima.uxmessentials.presence.adapter.inbound.gui.OnlinePlayerListView;
 import com.uxplima.uxmessentials.presence.application.ClearAfkOnActivity;
 import com.uxplima.uxmessentials.presence.application.ClearNick;
 import com.uxplima.uxmessentials.presence.application.MarkAfk;
@@ -73,6 +74,74 @@ class ListCommandTest {
     }
 
     @Test
+    void withoutAGuiViewTheGuiRootIsAbsentSoTheBareRootStaysChat() {
+        // No view wired: the GuiRootBinding installs nothing, so the bare /list keeps its chat executor.
+        assertThat(command.guiRoot()).isEmpty();
+    }
+
+    @Test
+    void withAGuiViewBareListOpensTheHeadGridWhileTheChatFormStillWorks() {
+        com.uxplima.uxmlib.gui.Guis.install(MockBukkit.createMockPlugin());
+        try {
+            OnlinePlayerListView view = new OnlinePlayerListView(
+                    new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyEchoMessages()),
+                    new InlineScheduler(),
+                    com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.paginatedDefault(
+                            org.bukkit.Material.PLAYER_HEAD));
+            ListCommand guiCommand = new ListCommand(services(), new KeyEchoMessages(), new InlineScheduler(), view);
+            // The gui opener is exposed for the bare root; firing it opens the head grid.
+            assertThat(guiCommand.guiRoot()).isPresent();
+
+            PlayerMock alice = server.addPlayer("Alice");
+            server.addPlayer("Bob");
+            alice.addAttachment(MockBukkit.createMockPlugin(), PERMISSION, true);
+
+            com.mojang.brigadier.CommandDispatcher<CommandSourceStack> dispatcher =
+                    new com.mojang.brigadier.CommandDispatcher<>();
+            com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> node = guiCommand.build();
+            // Install the gui opener on the bare root the way the GuiRootBinding would when gui is on.
+            dispatcher.getRoot().addChild(rebindRoot(node, guiCommand.guiRoot().orElseThrow()));
+            execute(dispatcher, CommandSourceStackMock.from(alice), "list");
+
+            assertThat(alice.getOpenInventory().getTopInventory().getHolder())
+                    .isInstanceOf(com.uxplima.uxmlib.gui.PaginatedGui.class);
+        } finally {
+            com.uxplima.uxmlib.gui.Guis.uninstall();
+        }
+    }
+
+    private static com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> rebindRoot(
+            com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> node,
+            com.mojang.brigadier.Command<CommandSourceStack> opener) {
+        com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> rebuilt =
+                com.mojang.brigadier.builder.LiteralArgumentBuilder.<CommandSourceStack>literal(node.getLiteral())
+                        .requires(node.getRequirement())
+                        .executes(opener);
+        return rebuilt.build();
+    }
+
+    private void execute(
+            com.mojang.brigadier.CommandDispatcher<CommandSourceStack> dispatcher,
+            CommandSourceStack source,
+            String input) {
+        try {
+            dispatcher.execute(input, source);
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            throw new AssertionError("command did not parse: " + input, e);
+        }
+    }
+
+    private PresenceServices services() {
+        return new PresenceServices(
+                mock(MarkAfk.class),
+                mock(ClearAfkOnActivity.class),
+                mock(ToggleVanish.class),
+                mock(ResolveVisibility.class),
+                mock(SetNick.class),
+                mock(ClearNick.class));
+    }
+
+    @Test
     void aViewerSeesEveryOnlinePlayerTheyCanSee() {
         PlayerMock alice = server.addPlayer("Alice");
         server.addPlayer("Bob");
@@ -117,6 +186,14 @@ class ListCommandTest {
             dispatcher.execute(input, source);
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
             throw new AssertionError("command did not parse: " + input, e);
+        }
+    }
+
+    /** Resolves any key to its own string — used by the GUI path, which raises several different keys. */
+    private static final class KeyEchoMessages implements Messages {
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            return key.key();
         }
     }
 

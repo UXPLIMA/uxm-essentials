@@ -3,10 +3,12 @@ package com.uxplima.uxmessentials.presence.adapter.inbound.command;
 import java.util.List;
 
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
+import com.uxplima.uxmessentials.presence.adapter.inbound.gui.OnlinePlayerListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the presence context's Brigadier command surface (docs/10-feature-modules.md §15.8) as
@@ -23,11 +25,15 @@ public final class PresenceCommands {
     private PresenceCommands() {}
 
     /** Every presence command, in surface order. */
-    public static List<CommandRegistration> all(PresenceServices services, Messages messages, Scheduler scheduler) {
+    public static List<CommandRegistration> all(
+            PresenceServices services,
+            Messages messages,
+            Scheduler scheduler,
+            @Nullable OnlinePlayerListView listView) {
         return List.of(
                 new AfkCommand(services, messages, scheduler),
                 new VanishCommand(services, messages, scheduler),
-                new ListCommand(services, messages, scheduler),
+                new ListCommand(services, messages, scheduler, listView),
                 new RealnameCommand(services, messages, scheduler),
                 new NickCommand(services, messages, scheduler),
                 new WhoisCommand(services, messages, scheduler),

@@ -3,13 +3,16 @@ package com.uxplima.uxmessentials.itemworld.adapter;
 import java.util.List;
 import java.util.Objects;
 
+import org.bukkit.Material;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGroupACommands;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGroupBCommands;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGuiCommand;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountListView;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridView;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.PowertoolInteractListener;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.UnlimitedPlacementListener;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.LoggingItemworldAudit;
@@ -21,6 +24,7 @@ import com.uxplima.uxmessentials.itemworld.application.PowertoolPolicy;
 import com.uxplima.uxmessentials.itemworld.application.PurgePolicy;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
@@ -78,9 +82,18 @@ public final class ItemworldWiring {
         ItemworldHubView hubView = new ItemworldHubView(
                 guiText, kernel.scheduler(), kernel.permissions(), services, purgePolicy, guiLayouts);
 
-        List<CommandRegistration> commands = new java.util.ArrayList<>(ItemworldGroupACommands.all(services));
+        // The bare /entitycount grid (gui-on) and the /recipe grid reuse the shared list/menu over the data-folder
+        // layout loader; the commands run the same region-bound scan / recipe resolution and the views only render.
+        EntityCountListView entityCountView = new EntityCountListView(
+                guiText,
+                kernel.scheduler(),
+                guiLayouts.loadEntityList("itemworld", "entitycount", EntityListLayout.paginatedDefault(Material.EGG)));
+        RecipeGridView recipeView = new RecipeGridView(guiText, kernel.scheduler(), Material.BLACK_STAINED_GLASS_PANE);
+
+        List<CommandRegistration> commands =
+                new java.util.ArrayList<>(ItemworldGroupACommands.all(services, recipeView));
         commands.addAll(ItemworldGroupBCommands.all(
-                services, powertoolPolicy, purgePolicy, powertoolStore, powertoolToggles, unlimited));
+                services, powertoolPolicy, purgePolicy, powertoolStore, powertoolToggles, unlimited, entityCountView));
         commands.add(new ItemworldGuiCommand(hubView, kernel.messages(), kernel.messageSink()));
         List<Listener> listeners = List.of(
                 new PowertoolInteractListener(powertoolStore, powertoolToggles, config),

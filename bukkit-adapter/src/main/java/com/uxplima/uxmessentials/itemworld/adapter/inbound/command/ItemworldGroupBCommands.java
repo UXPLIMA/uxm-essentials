@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountListView;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PdcPowertoolStore;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PowertoolToggleStore;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.UnlimitedPlacementStore;
@@ -12,6 +13,7 @@ import com.uxplima.uxmessentials.itemworld.application.PowertoolPolicy;
 import com.uxplima.uxmessentials.itemworld.application.PurgePolicy;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the inbound Brigadier surface for itemworld group B — powertool, mob/entity, time/weather (with the
@@ -40,7 +42,8 @@ public final class ItemworldGroupBCommands {
             PurgePolicy purgePolicy,
             PdcPowertoolStore powertoolStore,
             PowertoolToggleStore powertoolToggles,
-            UnlimitedPlacementStore unlimited) {
+            UnlimitedPlacementStore unlimited,
+            @Nullable EntityCountListView entityCountView) {
         Objects.requireNonNull(services, "services");
         Objects.requireNonNull(powertoolPolicy, "powertoolPolicy");
         Objects.requireNonNull(purgePolicy, "purgePolicy");
@@ -50,7 +53,7 @@ public final class ItemworldGroupBCommands {
 
         List<CommandRegistration> commands = new ArrayList<>();
         addPowertool(commands, services, powertoolPolicy, powertoolStore, powertoolToggles);
-        addMobEntity(commands, services, purgePolicy, unlimited);
+        addMobEntity(commands, services, purgePolicy, unlimited, entityCountView);
         addTimeWeather(commands, services);
         addAdminFun(commands, services);
         return List.copyOf(commands);
@@ -71,14 +74,15 @@ public final class ItemworldGroupBCommands {
             List<CommandRegistration> commands,
             ItemworldServices services,
             PurgePolicy purgePolicy,
-            UnlimitedPlacementStore unlimited) {
+            UnlimitedPlacementStore unlimited,
+            @Nullable EntityCountListView entityCountView) {
         commands.add(new SpawnMobCommand(services));
         commands.add(new SpawnerCommand(services));
         commands.add(new KillCommand(services));
         commands.add(new ButcherCommand(services, purgePolicy));
         commands.add(new KillAllCommand(services, purgePolicy));
         commands.add(new RemoveCommand(services, purgePolicy));
-        commands.add(new EntityCountCommand(services));
+        commands.add(new EntityCountCommand(services, entityCountView));
         commands.add(new UnlimitedCommand(services, unlimited));
     }
 

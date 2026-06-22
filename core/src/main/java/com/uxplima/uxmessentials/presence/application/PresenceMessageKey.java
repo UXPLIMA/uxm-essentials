@@ -31,6 +31,15 @@ public enum PresenceMessageKey implements MessageKey {
     // /list — the vanish-aware online roster
     LIST_PLAYERS("list.players"),
 
+    // /list — the online-roster browse menu (bare /list when its gui flag is on)
+    LIST_GUI_TITLE("list.gui.title"),
+    LIST_GUI_PREV("list.gui.prev"),
+    LIST_GUI_NEXT("list.gui.next"),
+    LIST_GUI_ENTRY_NAME("list.gui.entry-name"),
+    LIST_GUI_ENTRY_LORE("list.gui.entry-lore"),
+    LIST_GUI_STATUS_ONLINE("list.gui.status-online"),
+    LIST_GUI_EMPTY_TITLE("list.gui.empty-title"),
+
     // /realname — resolve a visible player's display name to their account name
     REALNAME_RESULT("presence.realname-result"),
     REALNAME_NOT_FOUND("presence.realname-not-found"),

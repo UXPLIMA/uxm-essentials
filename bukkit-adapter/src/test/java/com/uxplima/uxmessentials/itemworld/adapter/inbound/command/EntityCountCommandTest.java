@@ -3,30 +3,25 @@ package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.ShapedRecipe;
-import org.bukkit.inventory.ShapelessRecipe;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountListView;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
-import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.itemworld.domain.MobSpec;
 import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -53,18 +48,14 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /recipe} through its real Brigadier node against a real (mock) server. The
- * server starts with no recipes registered, so the craftable paths register a {@link ShapedRecipe} and a
- * {@link ShapelessRecipe} explicitly: a player holding a shaped-recipe result gets {@code RECIPE_SHAPED}, a
- * named shapeless-recipe item gets {@code RECIPE_SHAPELESS}, an item with no recipe gets {@code RECIPE_NONE},
- * an unknown named item gets {@code UNKNOWN_ITEM}, and an empty hand with no argument gets
- * {@code NO_ITEM_IN_HAND}. The message sink records which {@link MessageKey} each path delivered.
+ * MockBukkit coverage of {@code /entitycount}: the GUI seam and the preserved raw form. Without a wired view the
+ * {@code guiRoot} opener is absent, so the bare root keeps its chat behaviour; with a view it is present, so the
+ * {@code GuiRootBinding} installs it. The raw {@code /entitycount <radius>} argument form still parses regardless.
  */
-class RecipeCommandTest {
+class EntityCountCommandTest {
 
     private ServerMock server;
     private PlayerMock player;
-    private RecordingSink sink;
     private MutableConfig config;
 
     @BeforeEach
@@ -73,7 +64,6 @@ class RecipeCommandTest {
         server.addSimpleWorld("world");
         player = server.addPlayer("Alice");
         player.setOp(true);
-        sink = new RecordingSink();
         config = new MutableConfig();
     }
 
@@ -83,89 +73,31 @@ class RecipeCommandTest {
     }
 
     @Test
-    void literalIsRecipe() {
-        assertThat(new RecipeCommand(services()).build().getLiteral()).isEqualTo("recipe");
+    void literalIsEntitycount() {
+        assertThat(new EntityCountCommand(services()).build().getLiteral()).isEqualTo("entitycount");
     }
 
     @Test
-    void withoutAGuiViewTheGuiRootIsAbsentSoTheBareRootStaysText() {
-        // No view wired: the GuiRootBinding installs nothing, so the bare /recipe keeps its text executor.
-        assertThat(new RecipeCommand(services()).guiRoot()).isEmpty();
+    void withoutAGuiViewTheGuiRootIsAbsent() {
+        assertThat(new EntityCountCommand(services()).guiRoot()).isEmpty();
     }
 
     @Test
-    void withAGuiViewTheGuiRootOpenerIsInstalledForTheBareRoot() {
-        RecipeGridView view = new RecipeGridView(
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyMessages()),
-                new SyncScheduler(),
-                Material.BLACK_STAINED_GLASS_PANE);
-        // gui-on: the command exposes its opener for the bare root, while the raw text form keeps working below.
-        assertThat(new RecipeCommand(services(), view).guiRoot()).isPresent();
+    void withAGuiViewTheGuiRootOpenerIsInstalled() {
+        EntityCountListView view = new EntityCountListView(
+                new GuiText(new KeyMessages()), new SyncScheduler(), EntityListLayout.paginatedDefault(Material.EGG));
+        assertThat(new EntityCountCommand(services(), view).guiRoot()).isPresent();
     }
 
     @Test
-    void heldShapedRecipeItemReportsTheShapedGrid() {
-        ShapedRecipe recipe = new ShapedRecipe(new NamespacedKey("uxmtest", "chest"), new ItemStack(Material.CHEST));
-        recipe.shape("PPP", "P P", "PPP");
-        recipe.setIngredient('P', Material.OAK_PLANKS);
-        server.addRecipe(recipe);
-        player.getInventory().setItemInMainHand(new ItemStack(Material.CHEST));
-
-        execute("recipe");
-
-        assertThat(sink.keys).contains(ItemworldMessageKey.RECIPE_SHAPED);
-        assertThat(sink.keys).doesNotContain(ItemworldMessageKey.RECIPE_NONE);
-    }
-
-    @Test
-    void namedShapelessRecipeItemReportsTheIngredients() {
-        ShapelessRecipe recipe =
-                new ShapelessRecipe(new NamespacedKey("uxmtest", "fire_charge"), new ItemStack(Material.FIRE_CHARGE));
-        recipe.addIngredient(Material.GUNPOWDER);
-        recipe.addIngredient(Material.BLAZE_POWDER);
-        recipe.addIngredient(Material.COAL);
-        server.addRecipe(recipe);
-
-        execute("recipe fire_charge");
-
-        assertThat(sink.keys).contains(ItemworldMessageKey.RECIPE_SHAPELESS);
-    }
-
-    @Test
-    void heldItemWithoutARecipeReportsNoRecipe() {
-        player.getInventory().setItemInMainHand(new ItemStack(Material.BEDROCK));
-
-        execute("recipe");
-
-        assertThat(sink.keys).contains(ItemworldMessageKey.RECIPE_NONE);
-    }
-
-    @Test
-    void unknownNamedItemIsRejected() {
-        execute("recipe not_a_real_item");
-
-        assertThat(sink.keys).contains(ItemworldMessageKey.UNKNOWN_ITEM);
-        assertThat(sink.keys)
-                .doesNotContain(
-                        ItemworldMessageKey.RECIPE_SHAPED,
-                        ItemworldMessageKey.RECIPE_SHAPELESS,
-                        ItemworldMessageKey.RECIPE_NONE);
-    }
-
-    @Test
-    void emptyHandWithNoArgumentIsRejected() {
-        execute("recipe");
-
-        assertThat(sink.keys).contains(ItemworldMessageKey.NO_ITEM_IN_HAND);
-    }
-
-    private void execute(String input) {
+    void theRawRadiusFormStillParses() {
+        // gui-off behaviour (and the explicit-radius form) must keep working: /entitycount 32 parses and runs.
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new RecipeCommand(services()).build());
+        dispatcher.getRoot().addChild(new EntityCountCommand(services()).build());
         try {
-            dispatcher.execute(input, CommandSourceStackMock.from(player));
+            dispatcher.execute("entitycount 32", CommandSourceStackMock.from(player));
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
-            throw new AssertionError("command did not parse: " + input, e);
+            throw new AssertionError("command did not parse: entitycount 32", e);
         }
     }
 
@@ -181,7 +113,7 @@ class RecipeCommandTest {
                 new NoCooldowns(),
                 new NoWarmups(),
                 new KeyMessages(),
-                sink,
+                new NoopSink(),
                 new NoPlayerLookup(),
                 new NoWorldLookup(),
                 new NoPlayerLocator(),
@@ -189,7 +121,6 @@ class RecipeCommandTest {
                 new NoopLogger());
     }
 
-    /** A map-backed {@link ConfigStore} scoped to {@code modules.itemworld}; defaults keep /recipe enabled. */
     private static final class MutableConfig implements ConfigStore {
         private final Map<String, Object> values = new HashMap<>();
 
@@ -209,26 +140,18 @@ class RecipeCommandTest {
         }
     }
 
-    /** Records each delivered key so a path's outcome is asserted by the message it produced. */
-    private static final class RecordingSink implements MessageSink {
-        private final List<MessageKey> keys = new ArrayList<>();
-
+    private static final class NoopSink implements MessageSink {
         @Override
-        public void deliver(PlayerRef viewer, String renderedText) {
-            // renderedText is the key() string (see KeyMessages); the key list is what tests assert on
-        }
+        public void deliver(PlayerRef viewer, String renderedText) {}
     }
 
-    /** Resolves a key to its own string and records it on the sink for assertions. */
-    private final class KeyMessages implements Messages {
+    private static final class KeyMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            sink.keys.add(key);
             return key.key();
         }
     }
 
-    /** Runs scheduled work inline so entity-bound effects are observable without ticking Folia. */
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {

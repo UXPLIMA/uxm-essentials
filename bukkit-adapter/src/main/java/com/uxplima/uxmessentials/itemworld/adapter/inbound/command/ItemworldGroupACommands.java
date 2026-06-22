@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the inbound Brigadier surface for itemworld groups A — item utils, virtual workstations, and cleanup
@@ -28,15 +30,16 @@ public final class ItemworldGroupACommands {
     private ItemworldGroupACommands() {}
 
     /** Every itemworld group-A command, in surface order grouped by sub-feature group. */
-    public static List<CommandRegistration> all(ItemworldServices services) {
+    public static List<CommandRegistration> all(ItemworldServices services, @Nullable RecipeGridView recipeView) {
         List<CommandRegistration> commands = new ArrayList<>();
-        addItemUtils(commands, services);
+        addItemUtils(commands, services, recipeView);
         addWorkstations(commands, services);
         addCleanup(commands, services);
         return List.copyOf(commands);
     }
 
-    private static void addItemUtils(List<CommandRegistration> commands, ItemworldServices services) {
+    private static void addItemUtils(
+            List<CommandRegistration> commands, ItemworldServices services, @Nullable RecipeGridView recipeView) {
         commands.add(new GiveCommand(services));
         commands.add(new GiveAllCommand(services));
         commands.add(new ItemCommand(services));
@@ -56,7 +59,7 @@ public final class ItemworldGroupACommands {
         commands.add(new HatCommand(services));
         commands.add(new ItemDbCommand(services));
         commands.add(new ShowItemCommand(services));
-        commands.add(new RecipeCommand(services));
+        commands.add(new RecipeCommand(services, recipeView));
         commands.add(new UnbreakableCommand(services));
         commands.add(new DisenchantCommand(services));
         commands.add(new ItemModelCommand(services));
