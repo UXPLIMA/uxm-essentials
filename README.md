@@ -5,7 +5,7 @@
 [![Paper 26.1.2](https://img.shields.io/badge/Paper-26.1.2-brightgreen.svg)](https://papermc.io/)
 [![Folia](https://img.shields.io/badge/Folia-ready-success.svg)](https://docs.papermc.io/folia)
 [![Modules](https://img.shields.io/badge/modules-22-blueviolet.svg)](#modules)
-[![Version](https://img.shields.io/badge/version-0.2.0-informational.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.3.0-informational.svg)](#)
 
 The all-in-one essentials suite for **Paper 26.1.2** servers, on **Java 25**. Homes, warps, teleports, a
 real economy, kits, vaults, moderation, a staff mode, holograms, NPCs, scoreboards, a vote engine, multi-world
@@ -85,7 +85,7 @@ extensive MockBukkit/JUnit test suite.
 
 ## Installation
 
-1. Download `uxmEssentials-0.2.0.jar` and drop it in your server's `plugins/` folder.
+1. Download `uxmEssentials-0.3.0.jar` and drop it in your server's `plugins/` folder.
 2. Start the server once. uxmEssentials creates `plugins/uxmEssentials/` with a `modules.conf`, a per-module
    `config.conf`, the message catalogs, and the GUI layouts.
 3. Edit what you want, then `/uxmess reload <module>` (or restart). That's it.
@@ -95,9 +95,9 @@ Two optional companion jars extend the suite onto other platforms — see
 
 | Jar | Where it goes | What it adds |
 | --- | --- | --- |
-| `uxmEssentials-0.2.0.jar` | Paper `plugins/` | The plugin itself (required). |
-| `uxmEssentials-velocity-0.2.0.jar` | Velocity `plugins/` | Cross-server sync of homes, warps, economy, and vote parties. |
-| `uxmEssentials-discord-0.2.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
+| `uxmEssentials-0.3.0.jar` | Paper `plugins/` | The plugin itself (required). |
+| `uxmEssentials-velocity-0.3.0.jar` | Velocity `plugins/` | Cross-server sync of homes, warps, economy, and vote parties. |
+| `uxmEssentials-discord-0.3.0.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
 
 ## Modules
 
@@ -284,7 +284,7 @@ network {
 }
 ```
 
-- **Velocity** — drop `uxmEssentials-velocity-0.2.0.jar` on the proxy and the bus rides a proxy-side broker
+- **Velocity** — drop `uxmEssentials-velocity-0.3.0.jar` on the proxy and the bus rides a proxy-side broker
   over plugin messaging.
 - **Redis** — point `network.redis` at a Redis server and the same bus runs over Redis pub/sub with **no
   Velocity proxy required** — a plain set of backends sharing a database and a Redis instance sync directly.
@@ -294,7 +294,7 @@ Either way the sync covers homes, warps, player-warps, economy, vaults, moderati
 party, and the messaging ignore list. With no proxy, no Redis, and no peers the bus degrades cleanly to
 local-only — the single-server path is unchanged. `/uxmess doctor` reports the active transport and its health.
 
-- **Discord** — drop `uxmEssentials-discord-0.2.0.jar` on a Paper node to bridge account linking and push
+- **Discord** — drop `uxmEssentials-discord-0.3.0.jar` on a Paper node to bridge account linking and push
   audit and economy notifications through JDA.
 
 ## Permissions
@@ -345,7 +345,7 @@ Requires a JDK 25 toolchain (Gradle provisions one via the Foojay resolver if ne
 ## Versioning
 
 uxmEssentials follows semantic versioning. Pre-1.0 (`0.x`) releases may still adjust configuration and
-behaviour between minor versions as the surface settles; the current release is **0.2.0**.
+behaviour between minor versions as the surface settles; the current release is **0.3.0**.
 
 ## Contributing
 
