@@ -223,6 +223,8 @@ public final class NpcEditorView {
     // --- appearance enums ---
 
     private EditableProperty typeProperty(NpcName name) {
+        // Each selectable type draws as its own spawn egg (the fake player as a head), so the picker reads like the
+        // vanilla creative menu; selectorOptionIcon stays the fallback for a type with no spawn egg of its own.
         return new EnumProperty<>(
                 NpcMessageKey.NPC_GUI_PROP_TYPE,
                 NpcMessageKey.NPC_GUI_SELECT_TYPE,
@@ -233,6 +235,7 @@ public final class NpcEditorView {
                 (viewer, value) -> value.name(),
                 value -> services.type().setEntityType(GUI_ACTOR, name, value.name()),
                 sub.selectorOptionIcon(),
+                NpcTypeIcon::iconFor,
                 sub.selectorFiller(),
                 sub.selectorSlots(),
                 sub.selectorRows(),

@@ -227,6 +227,36 @@ class NpcGuiTest {
     }
 
     @Test
+    void typeSelectorDrawsEachOptionAsItsSpawnEgg() {
+        create("alpha");
+        Npc holo = npc("alpha");
+        editorView.open(player, viewer, holo);
+
+        fireClick(TYPE_SLOT, ClickType.LEFT); // opens the type selector
+
+        // The fake-player entry (the default, selected option) shows a player head; every other drawn option shows
+        // the icon NpcTypeIcon.iconFor resolves for that type — its spawn egg, or the egg fallback. Assert against
+        // every option actually drawn rather than one fixed type, so the test does not depend on the slot count.
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(selectorIcon(inv, "PLAYER")).isEqualTo(Material.PLAYER_HEAD);
+        int mobOptionsChecked = 0;
+        for (int slot = 0; slot < inv.getSize(); slot++) {
+            org.bukkit.inventory.ItemStack item = inv.getItem(slot);
+            if (item == null || item.getItemMeta() == null || item.getItemMeta().displayName() == null) {
+                continue;
+            }
+            String name = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                    .serialize(item.getItemMeta().displayName());
+            if (name.isBlank() || name.equals("PLAYER")) {
+                continue;
+            }
+            assertThat(item.getType()).isEqualTo(NpcTypeIcon.iconFor(org.bukkit.entity.EntityType.valueOf(name)));
+            mobOptionsChecked++;
+        }
+        assertThat(mobOptionsChecked).isGreaterThan(0);
+    }
+
+    @Test
     void glowColourUsesTheSharedGlassColourPickerNotAPaperEnum() {
         create("alpha");
         EditableProperty glowColour =
@@ -303,6 +333,25 @@ class NpcGuiTest {
             }
         }
         throw new AssertionError("no selector option other than " + excluded);
+    }
+
+    /**
+     * The icon material of the open selector's option whose rendered name is {@code optionName}. The selector
+     * draws one named button per option; the name is the value word wrapped in {@code <value>…</value>}.
+     */
+    private Material selectorIcon(Inventory inv, String optionName) {
+        for (int slot = 0; slot < inv.getSize(); slot++) {
+            org.bukkit.inventory.ItemStack item = inv.getItem(slot);
+            if (item == null || item.getItemMeta() == null || item.getItemMeta().displayName() == null) {
+                continue;
+            }
+            String name = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                    .serialize(item.getItemMeta().displayName());
+            if (name.equals(optionName)) {
+                return item.getType();
+            }
+        }
+        throw new AssertionError("no selector option named " + optionName);
     }
 
     private void fireClick(int slot, ClickType type) {

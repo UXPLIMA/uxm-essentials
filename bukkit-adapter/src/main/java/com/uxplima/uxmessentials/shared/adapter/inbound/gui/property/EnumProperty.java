@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.bukkit.Material;
@@ -38,6 +39,11 @@ import org.jspecify.annotations.NullMarked;
  * region thread (the click already runs there) and is a uxmLib {@link SimpleGui}, so click routing flows
  * through the installed menu listener like every other framework menu.
  *
+ * <p>Every option draws with the same configured {@code optionIcon} by default; a caller that wants a
+ * per-option icon (e.g. the NPC type selector showing each mob's spawn egg) passes an {@code optionIconFn}
+ * that maps an option to its own material. The function is only consulted for the button material — the name,
+ * geometry, glint, and selection behaviour are identical either way.
+ *
  * @param <E> the option type (typically an enum)
  */
 @NullMarked
@@ -51,12 +57,13 @@ public final class EnumProperty<E> implements EditableProperty {
     private final Supplier<E> current;
     private final BiFunction<PlayerRef, E, String> display;
     private final Consumer<E> setter;
-    private final Material optionIcon;
+    private final Function<E, Material> optionIconFn;
     private final Material fillerIcon;
     private final List<Integer> optionSlots;
     private final int rows;
     private final Scheduler scheduler;
 
+    /** A selector whose options all share one {@code optionIcon}. */
     public EnumProperty(
             MessageKey label,
             MessageKey selectorTitle,
@@ -67,6 +74,42 @@ public final class EnumProperty<E> implements EditableProperty {
             BiFunction<PlayerRef, E, String> display,
             Consumer<E> setter,
             Material optionIcon,
+            Material fillerIcon,
+            List<Integer> optionSlots,
+            int rows,
+            Scheduler scheduler) {
+        this(
+                label,
+                selectorTitle,
+                icon,
+                guiText,
+                options,
+                current,
+                display,
+                setter,
+                optionIcon,
+                option -> Objects.requireNonNull(optionIcon, "optionIcon"),
+                fillerIcon,
+                optionSlots,
+                rows,
+                scheduler);
+    }
+
+    /**
+     * A selector that draws each option with its own material via {@code optionIconFn}; the {@code optionIcon}
+     * is kept as the fallback the function may return for an option with no icon of its own.
+     */
+    public EnumProperty(
+            MessageKey label,
+            MessageKey selectorTitle,
+            Material icon,
+            GuiText guiText,
+            List<E> options,
+            Supplier<E> current,
+            BiFunction<PlayerRef, E, String> display,
+            Consumer<E> setter,
+            Material optionIcon,
+            Function<E, Material> optionIconFn,
             Material fillerIcon,
             List<Integer> optionSlots,
             int rows,
@@ -82,7 +125,8 @@ public final class EnumProperty<E> implements EditableProperty {
         this.current = Objects.requireNonNull(current, "current");
         this.display = Objects.requireNonNull(display, "display");
         this.setter = Objects.requireNonNull(setter, "setter");
-        this.optionIcon = Objects.requireNonNull(optionIcon, "optionIcon");
+        Objects.requireNonNull(optionIcon, "optionIcon");
+        this.optionIconFn = Objects.requireNonNull(optionIconFn, "optionIconFn");
         this.fillerIcon = Objects.requireNonNull(fillerIcon, "fillerIcon");
         this.optionSlots = List.copyOf(Objects.requireNonNull(optionSlots, "optionSlots"));
         if (this.optionSlots.isEmpty()) {
@@ -142,7 +186,9 @@ public final class EnumProperty<E> implements EditableProperty {
 
     private ItemStack optionIcon(PlayerRef viewer, E option, E selected) {
         // The option name is a plain value string; wrap it in the value token so it picks up the canon accent.
-        ItemBuilder builder = ItemBuilder.of(optionIcon)
+        // The icon is the per-option material (the type selector's spawn eggs); the fixed-icon constructor passes
+        // a function that always returns the one configured material.
+        ItemBuilder builder = ItemBuilder.of(optionIconFn.apply(option))
                 .name(StyledText.render("<value>" + display.apply(viewer, option) + "</value>"));
         if (Objects.equals(option, selected)) {
             // A glint marks the live option; HIDE_ENCHANTS keeps the enchant invisible in the lore.
