@@ -288,7 +288,21 @@ class CommunicationAdapterTest {
                 scheduler,
                 sink,
                 new com.uxplima.uxmessentials.communication.adapter.ChatLock(),
-                settings);
+                settings,
+                editorView(scheduler));
+    }
+
+    /** A real editor view over an in-memory store; the command tests do not open it, only build the command tree. */
+    private com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView editorView(
+            Scheduler scheduler) {
+        return new com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView(
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(sink),
+                scheduler,
+                sink,
+                new InMemoryAnnouncementStore(),
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(
+                        java.nio.file.Path.of("."), new NoopLogger()),
+                new com.uxplima.uxmlib.gui.anvil.AnvilInput(MockBukkit.createMockPlugin()));
     }
 
     private BukkitAnnouncerBroadcaster announcerBroadcaster() {
@@ -346,6 +360,44 @@ class CommunicationAdapterTest {
      * raw operator line (info-page body, announcer line). The plugin's own confirmations therefore land in
      * {@code keys} while operator content lands in {@code lines}.
      */
+    private static final class InMemoryAnnouncementStore
+            implements com.uxplima.uxmessentials.communication.application.port.AnnouncementStore {
+        private final Map<String, com.uxplima.uxmessentials.communication.domain.StoredAnnouncement> rows =
+                new java.util.concurrent.ConcurrentHashMap<>();
+
+        @Override
+        public List<com.uxplima.uxmessentials.communication.domain.StoredAnnouncement> all() {
+            return List.copyOf(rows.values());
+        }
+
+        @Override
+        public List<com.uxplima.uxmessentials.communication.domain.StoredAnnouncement> enabled() {
+            return all().stream()
+                    .filter(com.uxplima.uxmessentials.communication.domain.StoredAnnouncement::enabled)
+                    .toList();
+        }
+
+        @Override
+        public java.util.Optional<com.uxplima.uxmessentials.communication.domain.StoredAnnouncement> find(String id) {
+            return java.util.Optional.ofNullable(rows.get(id));
+        }
+
+        @Override
+        public boolean exists(String id) {
+            return rows.containsKey(id);
+        }
+
+        @Override
+        public void save(com.uxplima.uxmessentials.communication.domain.StoredAnnouncement announcement) {
+            rows.put(announcement.id(), announcement);
+        }
+
+        @Override
+        public boolean delete(String id) {
+            return rows.remove(id) != null;
+        }
+    }
+
     private static final class RecordingSink implements MessageSink, Messages {
         private final List<String> lines = new ArrayList<>();
         private final List<MessageKey> keys = new ArrayList<>();

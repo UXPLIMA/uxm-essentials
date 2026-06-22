@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationSettings;
+import com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
@@ -55,7 +56,8 @@ public final class CommunicationCommands {
             Scheduler scheduler,
             MessageSink sink,
             ChatLock chatLock,
-            CommunicationSettings settings) {
+            CommunicationSettings settings,
+            AnnouncementEditorView editorView) {
         Objects.requireNonNull(optOut, "optOut");
         Objects.requireNonNull(registry, "registry");
         Objects.requireNonNull(infoSender, "infoSender");
@@ -67,11 +69,12 @@ public final class CommunicationCommands {
         Objects.requireNonNull(sink, "sink");
         Objects.requireNonNull(chatLock, "chatLock");
         Objects.requireNonNull(settings, "settings");
+        Objects.requireNonNull(editorView, "editorView");
         List<CommandRegistration> commands = new ArrayList<>();
         commands.add(new BroadcastCommand(broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastWorldCommand(messages, broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastToggleCommand(optOut, messages));
-        commands.add(new AnnounceCommand(settings, broadcaster, optOut, announcer, scheduler, messages));
+        commands.add(new AnnounceCommand(settings, broadcaster, optOut, announcer, editorView, scheduler, messages));
         commands.add(new MeCommand(messages, notifier, scheduler));
         commands.add(new ClearChatCommand(messages, notifier, sink, scheduler));
         commands.add(new ToggleChatCommand(chatLock, notifier, messages));

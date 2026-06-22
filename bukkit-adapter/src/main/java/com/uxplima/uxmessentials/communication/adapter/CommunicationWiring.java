@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
@@ -14,6 +15,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationCommands;
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationGuiCommand;
+import com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView;
 import com.uxplima.uxmessentials.communication.adapter.inbound.gui.CommunicationAdminView;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.AdvancementMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ChatLockListener;
@@ -28,13 +30,16 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.ThreadLocalRando
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
+import com.uxplima.uxmessentials.communication.application.MergeAnnouncements;
 import com.uxplima.uxmessentials.communication.application.NextAnnouncement;
 import com.uxplima.uxmessentials.communication.application.ResolveConnectionMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveDeathMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
+import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.application.port.RandomSource;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
@@ -72,9 +77,15 @@ public final class CommunicationWiring {
     private CommunicationWiring() {}
 
     /** Build the communication adapters and use cases from {@code plugin} and {@code ctx}, ready to register. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, AnvilInput anvil) {
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            AnnouncementStore announcementStore,
+            GuiLayouts guiLayouts,
+            AnvilInput anvil) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(announcementStore, "announcementStore");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(anvil, "anvil");
         KernelPorts kernel = ctx.kernel();
@@ -89,7 +100,14 @@ public final class CommunicationWiring {
         InfoRegistry registry = settings.infoRegistry();
         ChatLock chatLock = new ChatLock();
 
-        CommunicationServices services = assemble(kernel, settings, optOutStore, random, notifier);
+        // The announcer rotates over the file config PLUS the enabled editor-managed store announcements. This
+        // merged supplier is the single source both the NextAnnouncement rotation and the AnnouncerTask override
+        // loops read, so an editor create/edit/enable takes effect on the next tick with no reload (the supplier
+        // re-reads the store each call).
+        MergeAnnouncements merge = new MergeAnnouncements(announcementStore);
+        Supplier<AnnouncerConfig> mergedConfig = () -> merge.merge(settings.announcerConfig());
+
+        CommunicationServices services = assemble(kernel, settings, mergedConfig, optOutStore, random, notifier);
         ChannelBroadcaster channelBroadcaster = new ChannelBroadcaster(kernel.scheduler(), settings.announcerDisplay());
         BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
                 kernel.messageSink(),
@@ -98,12 +116,19 @@ public final class CommunicationWiring {
                 CommunicationWiring::conditionContext,
                 kernel.scheduler());
         AnnouncerTask announcer = new AnnouncerTask(
-                kernel.scheduler(), services.nextAnnouncement(), broadcaster, settings::announcerConfig, running::get);
+                kernel.scheduler(), services.nextAnnouncement(), broadcaster, mergedConfig, running::get);
         // The admin panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader. It
         // flips the live ChatLock, runs the /clearchat fan-out behind a confirm, broadcasts an anvil line through the
         // same broadcaster as /broadcast, and opens a read-only announcer list — only the surfaces the commands
         // expose, no new domain logic. /communication gui and the /uxmess gui hub entry both open it.
         GuiText guiText = new GuiText(kernel.messages());
+        // The DB-backed announcement editor bare /announce (and /announce editor) opens: a list of the store
+        // announcements with a create button, each opening a per-announcement property editor that writes through
+        // the AnnouncementStore. The announcer's merged source re-reads the store each tick, so an edit here takes
+        // effect on the next tick with no reload. The admin panel's announcer list stays the read-only /announce
+        // list surface (it shows the merged config view); the editor is the writable surface, reached via /announce.
+        AnnouncementEditorView editorView = new AnnouncementEditorView(
+                guiText, kernel.scheduler(), kernel.messages(), announcementStore, guiLayouts, anvil);
         CommunicationAdminView adminView = new CommunicationAdminView(
                 guiText,
                 kernel.scheduler(),
@@ -112,7 +137,7 @@ public final class CommunicationWiring {
                 chatLock,
                 broadcaster,
                 CommunicationCommands.BROADCAST_PREFIX,
-                settings::announcerConfig,
+                mergedConfig,
                 notifier,
                 kernel.messageSink(),
                 anvil);
@@ -127,7 +152,8 @@ public final class CommunicationWiring {
                 kernel.scheduler(),
                 kernel.messageSink(),
                 chatLock,
-                settings));
+                settings,
+                editorView));
         commands.add(new CommunicationGuiCommand(adminView, kernel.messages()));
         List<Listener> listeners = listeners(
                 services,
@@ -158,17 +184,20 @@ public final class CommunicationWiring {
     private static CommunicationServices assemble(
             KernelPorts kernel,
             CommunicationSettings settings,
+            Supplier<AnnouncerConfig> mergedConfig,
             BroadcastOptOutStore optOutStore,
             RandomSource random,
             CommunicationNotifier notifier) {
         ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random);
         return new CommunicationServices(
+                // The connection policies still read straight off the live settings; only the announcer source
+                // widened to the config + enabled-store merge.
                 new ResolveJoinMessage(engine, settings::joinPolicy),
                 new ResolveQuitMessage(engine, settings::quitPolicy),
                 new ResolveDeathMessage(engine, settings::deathPolicy),
-                // The rotation cursor selects only over announcements WITHOUT an interval override; each override
-                // announcement runs on its own independent timer driven by the AnnouncerTask.
-                new NextAnnouncement(() -> settings.announcerConfig().rotating(), random),
+                // The rotation cursor selects only over the merged announcements WITHOUT an interval override; each
+                // override announcement runs on its own independent timer driven by the AnnouncerTask.
+                new NextAnnouncement(() -> mergedConfig.get().rotating(), random),
                 new BroadcastOptOut(optOutStore, notifier, kernel.events(), Clock.systemUTC()));
     }
 

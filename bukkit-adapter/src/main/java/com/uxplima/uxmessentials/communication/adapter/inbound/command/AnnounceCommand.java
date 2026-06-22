@@ -15,6 +15,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationSettings;
+import com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
@@ -22,6 +23,7 @@ import com.uxplima.uxmessentials.communication.application.CommunicationMessageK
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
@@ -29,9 +31,12 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /announce} ({@code uxmessentials.announce.admin}, default op): the operator surface over the rotating
- * announcer. Three admin subcommands plus a per-player toggle alias:
+ * announcer. Bare {@code /announce} (and {@code /announce editor}) opens the DB-backed announcement editor — a GUI
+ * to create, edit, enable/disable, world/permission-target, and delete announcements; the other subcommands stay:
  *
  * <ul>
+ *   <li>{@code editor} (and the bare root via {@link #guiRoot()}) — open the {@link AnnouncementEditorView}: a list
+ *       of the store announcements with a create button, each opening a per-announcement property editor.
  *   <li>{@code reload} — re-read {@code announcer.conf} and swap the live config in, then re-arm the
  *       per-announcement override loops so a newly-added override fires (it is excluded from the shared rotation).
  *       The re-read is HOCON file I/O, so it runs off-tick on the {@code Scheduler} and the confirmation —
@@ -44,9 +49,10 @@ import org.jspecify.annotations.NullMarked;
  *       opt-out lives under one verb too; it reuses the same {@link BroadcastOptOut} use case.
  * </ul>
  *
- * <p>The admin subcommands accept the console; {@code preview} and {@code toggle} act on the invoking player and
- * reject a console source. The announcement ids, channels, and lines are operator content; only the framing
- * (reload confirmation, list header/entry/empty, unknown-id error) is a parity-checked {@code MessageKey}.
+ * <p>The admin subcommands accept the console; {@code editor}, {@code preview}, and {@code toggle} act on the
+ * invoking player and reject a console source. The announcement ids, channels, and lines are operator content; only
+ * the framing (the editor's labels, reload confirmation, list header/entry/empty, unknown-id error) is a
+ * parity-checked {@code MessageKey}.
  */
 @NullMarked
 public final class AnnounceCommand extends CommunicationCommandSupport implements CommandRegistration {
@@ -57,6 +63,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     private final BukkitAnnouncerBroadcaster broadcaster;
     private final BroadcastOptOut optOut;
     private final AnnouncerTask announcer;
+    private final AnnouncementEditorView editorView;
     private final Scheduler scheduler;
 
     public AnnounceCommand(
@@ -64,6 +71,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
             BukkitAnnouncerBroadcaster broadcaster,
             BroadcastOptOut optOut,
             AnnouncerTask announcer,
+            AnnouncementEditorView editorView,
             Scheduler scheduler,
             Messages messages) {
         super(messages);
@@ -71,6 +79,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
         this.announcer = Objects.requireNonNull(announcer, "announcer");
+        this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
@@ -78,6 +87,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("announce")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .then(Commands.literal("editor").executes(this::openEditor))
                 .then(Commands.literal("reload").executes(this::reload))
                 .then(Commands.literal("list").executes(this::list))
                 .then(Commands.literal("preview")
@@ -89,6 +99,26 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     @Override
     public String description() {
         return "Manage the rotating server announcer.";
+    }
+
+    /**
+     * Bare {@code /announce} opens the editor GUI — the same screen {@code /announce editor} opens. The
+     * {@code GuiRootBinding} installs this on the root when the command's catalog {@code gui} flag is on (the
+     * untouched default), so an operator who has not turned the flag off types {@code /announce} and lands in the
+     * editor; with it off the root falls through to the usage text instead.
+     */
+    @Override
+    public Optional<Command<CommandSourceStack>> guiRoot() {
+        return Optional.of(this::openEditor);
+    }
+
+    private int openEditor(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        editorView.open(sender, BukkitRefs.toRef(sender));
+        return Command.SINGLE_SUCCESS;
     }
 
     private int reload(CommandContext<CommandSourceStack> ctx) {

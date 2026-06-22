@@ -17,6 +17,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationSettings;
+import com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView;
 import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.adapter.outbound.PdcBroadcastOptOutStore;
@@ -169,6 +170,33 @@ class AnnounceCommandTest {
         assertThat(canParse(dispatcher, "announce list")).isFalse();
     }
 
+    @Test
+    void theEditorSubcommandParsesAndTheBareRootInstallsTheOpener() {
+        CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
+        AnnounceCommand command = new AnnounceCommand(
+                settings,
+                broadcaster,
+                new BroadcastOptOut(
+                        optOutStore,
+                        new CommunicationNotifier(new EchoMessagesSink(), new EchoMessagesSink()),
+                        new NoEvents(),
+                        Clock.systemUTC()),
+                new AnnouncerTask(
+                        scheduler,
+                        new NextAnnouncement(() -> settings.announcerConfig().rotating(), new ZeroRandom()),
+                        broadcaster,
+                        settings::announcerConfig,
+                        () -> true),
+                editorView(),
+                scheduler,
+                new EchoMessagesSink());
+
+        // /announce editor parses (the subcommand keeps the reload/list/preview/toggle tree intact alongside it).
+        assertThat(canParse(dispatcher, "announce editor")).isTrue();
+        // The bare /announce gains the editor opener via guiRoot() — the GuiRootBinding installs it on the root.
+        assertThat(command.guiRoot()).isPresent();
+    }
+
     private CommandDispatcher<CommandSourceStack> dispatcher() {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         CommunicationNotifier notifier = new CommunicationNotifier(new EchoMessagesSink(), new EchoMessagesSink());
@@ -179,10 +207,22 @@ class AnnounceCommandTest {
                 broadcaster,
                 settings::announcerConfig,
                 () -> true);
-        AnnounceCommand command =
-                new AnnounceCommand(settings, broadcaster, optOut, announcer, scheduler, new EchoMessagesSink());
+        AnnounceCommand command = new AnnounceCommand(
+                settings, broadcaster, optOut, announcer, editorView(), scheduler, new EchoMessagesSink());
         dispatcher.getRoot().addChild(command.build());
         return dispatcher;
+    }
+
+    /** A real editor view over an in-memory store; the subcommand tests never open it, only the editor subcommand. */
+    private AnnouncementEditorView editorView() {
+        EchoMessagesSink messages = new EchoMessagesSink();
+        return new AnnouncementEditorView(
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(messages),
+                scheduler,
+                messages,
+                new InMemoryAnnouncementStore(),
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(moduleDir, new NoopLogger()),
+                new com.uxplima.uxmlib.gui.anvil.AnvilInput(MockBukkit.createMockPlugin()));
     }
 
     private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {
@@ -244,6 +284,44 @@ class AnnounceCommandTest {
         @Override
         public void publish(DomainEvent event) {
             // discarded
+        }
+    }
+
+    private static final class InMemoryAnnouncementStore
+            implements com.uxplima.uxmessentials.communication.application.port.AnnouncementStore {
+        private final Map<String, com.uxplima.uxmessentials.communication.domain.StoredAnnouncement> rows =
+                new java.util.concurrent.ConcurrentHashMap<>();
+
+        @Override
+        public java.util.List<com.uxplima.uxmessentials.communication.domain.StoredAnnouncement> all() {
+            return java.util.List.copyOf(rows.values());
+        }
+
+        @Override
+        public java.util.List<com.uxplima.uxmessentials.communication.domain.StoredAnnouncement> enabled() {
+            return all().stream()
+                    .filter(com.uxplima.uxmessentials.communication.domain.StoredAnnouncement::enabled)
+                    .toList();
+        }
+
+        @Override
+        public java.util.Optional<com.uxplima.uxmessentials.communication.domain.StoredAnnouncement> find(String id) {
+            return java.util.Optional.ofNullable(rows.get(id));
+        }
+
+        @Override
+        public boolean exists(String id) {
+            return rows.containsKey(id);
+        }
+
+        @Override
+        public void save(com.uxplima.uxmessentials.communication.domain.StoredAnnouncement announcement) {
+            rows.put(announcement.id(), announcement);
+        }
+
+        @Override
+        public boolean delete(String id) {
+            return rows.remove(id) != null;
         }
     }
 

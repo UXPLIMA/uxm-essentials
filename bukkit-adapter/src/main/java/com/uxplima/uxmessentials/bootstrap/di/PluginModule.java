@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.bootstrap.health.SchedulerHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.SoftDependencyHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
+import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
@@ -59,6 +60,7 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
 import com.uxplima.uxmessentials.nametags.adapter.NametagsWiring;
 import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
+import com.uxplima.uxmessentials.persistence.communication.AnnouncementStores;
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
@@ -404,7 +406,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry);
         } else if (module.id().equals(ModuleId.of("communication"))) {
-            wireCommunication(plugin, ctx, resources, links, guiLayouts, guiRegistry, anvil);
+            wireCommunication(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
             wireHolograms(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
@@ -877,21 +879,23 @@ public final class PluginModule {
     private static void wireCommunication(
             JavaPlugin plugin,
             ModuleContext ctx,
+            Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
-        // communication persists nothing: the per-player broadcast opt-out is PDC-backed (survives relog), the
-        // sequence counters are transient, and the connection policies, announcer schedule, and info pages are
-        // config-authored content in the modules/communication content files. It carries no cross-context bridge — its
-        // only
-        // collaborators are the shared Scheduler, messages/messageSink, and event ports — so nothing is captured
-        // for a later context. The announcer timer on the Scheduler port is stopped on disable.
-        // The admin panel consumes the SP0 GUI framework: the data-folder layout loader plus the shared anvil
-        // (installed once in wireModules) for the broadcast prompt. /communication gui and the /uxmess gui hub
-        // both open it.
-        CommunicationWiring.Wired wired = CommunicationWiring.wire(plugin, ctx, guiLayouts, anvil);
+        // communication's only durable state is the DB-backed announcement set the /announce editor owns, built
+        // over persistence.dsl(); the per-player broadcast opt-out is PDC-backed (survives relog), the sequence
+        // counters are transient, and the connection policies, file announcer schedule, and info pages are
+        // config-authored content. The announcer rotates over the file config PLUS the enabled store set. It carries
+        // no cross-context bridge, so nothing is captured for a later context. The announcer timer on the Scheduler
+        // port is stopped on disable.
+        // The admin panel and the announcement editor consume the SP0 GUI framework: the data-folder layout loader
+        // plus the shared anvil (installed once in wireModules) for the broadcast and editor prompts. /communication
+        // gui and the /uxmess gui hub open the admin panel; bare /announce opens the editor.
+        AnnouncementStore announcementStore = AnnouncementStores.jooq(persistence);
+        CommunicationWiring.Wired wired = CommunicationWiring.wire(plugin, ctx, announcementStore, guiLayouts, anvil);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
