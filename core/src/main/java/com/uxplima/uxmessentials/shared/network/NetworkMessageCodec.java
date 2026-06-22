@@ -84,6 +84,7 @@ public final class NetworkMessageCodec {
             case MuteChanged mute -> writeUuid(out, mute.target());
             case PlayerWarpChanged playerWarp -> writeUuid(out, playerWarp.owner());
             case HologramChanged hologram -> out.writeUTF(hologram.name());
+            case NpcChanged npc -> out.writeUTF(npc.name());
             case ServerPing ping -> out.writeLong(ping.epochMillis());
             case VotePartyFired party -> out.writeInt(party.threshold());
             case VoteCounterChanged counter -> {
@@ -103,6 +104,7 @@ public final class NetworkMessageCodec {
             case MUTE_CHANGED -> new MuteChanged(origin, readUuid(in));
             case PLAYER_WARP_CHANGED -> new PlayerWarpChanged(origin, readUuid(in));
             case HOLOGRAM_CHANGED -> new HologramChanged(origin, in.readUTF());
+            case NPC_CHANGED -> new NpcChanged(origin, in.readUTF());
             case SERVER_PING -> new ServerPing(origin, in.readLong());
             case VOTE_PARTY_FIRED -> new VotePartyFired(origin, in.readInt());
             case VOTE_COUNTER_CHANGED -> new VoteCounterChanged(origin);

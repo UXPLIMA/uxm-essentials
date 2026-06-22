@@ -20,6 +20,16 @@ public final class NpcRepositories {
 
     /** A cached jOOQ {@link NpcRepository} over the shared persistence DSL. */
     public static NpcRepository cached(Persistence persistence) {
+        return cachedConcrete(persistence);
+    }
+
+    /**
+     * As {@link #cached(Persistence)} but returned as its concrete decorator type, so the wiring can hand the
+     * cross-server bus a per-name reload hook on the same cache the {@code /npc} commands and the renderer read —
+     * a remote NPC change reloads exactly that name from the shared DB and the listener re-renders it. Same
+     * backing as {@link #cached}; this overload exposes the decorator only so the sync seam can reach it.
+     */
+    public static CachedNpcRepository cachedConcrete(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedNpcRepository(new JooqNpcRepository(persistence.dsl()));
     }

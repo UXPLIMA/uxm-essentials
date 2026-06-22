@@ -415,7 +415,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("staff"))) {
             wireStaff(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("npc"))) {
-            wireNpc(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, anvil);
+            wireNpc(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         }
     }
 
@@ -1033,6 +1033,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
@@ -1051,6 +1052,7 @@ public final class PluginModule {
                 plugin,
                 ctx,
                 persistence,
+                bus,
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
                 guiLayouts,
