@@ -7,8 +7,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
@@ -231,7 +234,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
     /** Snapshot the online players to refs — only legal on the global region thread. */
     private List<PlayerRef> onlinePlayerRefs() {
         List<PlayerRef> refs = new ArrayList<>();
-        for (Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
             refs.add(new PlayerRef(player.getUniqueId(), player.getName()));
         }
         return refs;
@@ -265,17 +268,17 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
      * if the entity is gone before the task runs.
      */
     private CompletableFuture<Optional<BaltopRow>> onEntityAsync(
-            PlayerRef owner, java.util.function.Function<Player, Optional<BaltopRow>> work) {
+            PlayerRef owner, Function<Player, Optional<BaltopRow>> work) {
         CompletableFuture<Optional<BaltopRow>> future = new CompletableFuture<>();
         if (scheduler.ownsEntity(owner)) {
-            Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+            Player player = Bukkit.getPlayer(owner.uuid());
             future.complete(player == null || !player.isOnline() ? Optional.empty() : work.apply(player));
             return future;
         }
         scheduler.onEntity(
                 owner,
                 () -> {
-                    Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+                    Player player = Bukkit.getPlayer(owner.uuid());
                     if (player == null || !player.isOnline()) {
                         future.complete(Optional.empty());
                         return;
@@ -298,16 +301,16 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
      * logs off before the task fires completes the future with the fallback instead of hanging until
      * the timeout.
      */
-    private <T> T onEntity(PlayerRef owner, java.util.function.Function<Player, T> work, T fallback) {
+    private <T> T onEntity(PlayerRef owner, Function<Player, T> work, T fallback) {
         if (scheduler.ownsEntity(owner)) {
-            Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+            Player player = Bukkit.getPlayer(owner.uuid());
             return player == null || !player.isOnline() ? fallback : work.apply(player);
         }
         CompletableFuture<T> future = new CompletableFuture<>();
         scheduler.onEntity(
                 owner,
                 () -> {
-                    Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+                    Player player = Bukkit.getPlayer(owner.uuid());
                     if (player == null || !player.isOnline()) {
                         future.complete(fallback);
                         return;
@@ -323,9 +326,9 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
     }
 
     /** Run a side-effecting {@code work} on {@code owner}'s entity thread and wait for it to finish. */
-    private void onEntityVoid(PlayerRef owner, java.util.function.Consumer<Player> work) {
+    private void onEntityVoid(PlayerRef owner, Consumer<Player> work) {
         if (scheduler.ownsEntity(owner)) {
-            Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+            Player player = Bukkit.getPlayer(owner.uuid());
             if (player != null && player.isOnline()) {
                 work.accept(player);
             }
@@ -335,7 +338,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
         scheduler.onEntity(
                 owner,
                 () -> {
-                    Player player = org.bukkit.Bukkit.getPlayer(owner.uuid());
+                    Player player = Bukkit.getPlayer(owner.uuid());
                     if (player == null || !player.isOnline()) {
                         future.complete(Boolean.FALSE);
                         return;
