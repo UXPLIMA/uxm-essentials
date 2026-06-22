@@ -54,8 +54,7 @@ public final class KillAllCommand extends ItemworldCommandSupport implements Com
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(ctx -> run(ctx, ""))
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .executes(ctx -> run(ctx, StringArgumentType.getString(ctx, "type"))))
+                .then(mobTypeArgument().executes(ctx -> run(ctx, StringArgumentType.getString(ctx, "type"))))
                 .build();
     }
 

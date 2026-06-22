@@ -18,7 +18,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /wallet [currency]} (aliases {@code /cüzdan}): opens the visual wallet GUI dashboard.
+ * {@code /wallet [currency]}: opens the visual wallet GUI dashboard.
  */
 @NullMarked
 public final class WalletCommand extends EconomyCommandSupport implements CommandRegistration {
@@ -40,7 +40,7 @@ public final class WalletCommand extends EconomyCommandSupport implements Comman
 
     @Override
     public List<String> aliases() {
-        return List.of("cüzdan");
+        return List.of();
     }
 
     @Override

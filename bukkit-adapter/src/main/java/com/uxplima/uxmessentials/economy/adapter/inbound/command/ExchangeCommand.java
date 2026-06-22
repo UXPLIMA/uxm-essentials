@@ -30,7 +30,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Brigadier command for currency exchange: /exchange or /takas.
+ * Brigadier command for currency exchange: /exchange.
  */
 @NullMarked
 public final class ExchangeCommand extends EconomyCommandSupport implements CommandRegistration {
@@ -57,7 +57,7 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
 
     @Override
     public List<String> aliases() {
-        return List.of("takas");
+        return List.of();
     }
 
     @Override
