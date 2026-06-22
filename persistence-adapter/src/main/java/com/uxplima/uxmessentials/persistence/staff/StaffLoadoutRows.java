@@ -41,8 +41,9 @@ final class StaffLoadoutRows {
     }
 
     /** Populate a {@link StaffLoadoutRecord} from a domain {@link SavedLoadout} for an upsert. */
-    static void apply(StaffLoadoutRecord record, String owner, SavedLoadout loadout, long enteredAt) {
+    static void apply(StaffLoadoutRecord record, String owner, String serverId, SavedLoadout loadout, long enteredAt) {
         record.setPlayer(owner)
+                .setServerId(serverId)
                 .setInventory(encode(loadout.inventory()))
                 .setArmor(encode(loadout.armor()))
                 .setOffhand(encode(loadout.offhand()))

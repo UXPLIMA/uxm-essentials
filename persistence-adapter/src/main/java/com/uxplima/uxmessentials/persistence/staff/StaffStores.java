@@ -16,17 +16,22 @@ import org.jspecify.annotations.NullMarked;
  * <p>The loadout repository is the plain jOOQ adapter (no cache): a row is written once on enter and read
  * once on exit, so caching would only add invalidation surface for no read benefit. The injected {@link Clock}
  * is the capture-instant source the {@code entered_at} column records, kept here so the time source stays
- * swappable in tests.
+ * swappable in tests. The {@code serverId} is this backend's {@code network.server-id}: the loadout is keyed
+ * per {@code (player, server_id)} so two backends sharing one DB never clobber each other's captured row.
  */
 @NullMarked
 public final class StaffStores {
 
     private StaffStores() {}
 
-    /** A jOOQ {@link StaffLoadoutRepository} over the shared persistence DSL, stamping captures from {@code clock}. */
-    public static StaffLoadoutRepository loadouts(Persistence persistence, Clock clock) {
+    /**
+     * A jOOQ {@link StaffLoadoutRepository} over the shared persistence DSL, stamping captures from {@code clock}
+     * and scoping every row to {@code serverId} (this backend's {@code network.server-id}).
+     */
+    public static StaffLoadoutRepository loadouts(Persistence persistence, Clock clock, String serverId) {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(clock, "clock");
-        return new JooqStaffLoadoutRepository(persistence.dsl(), clock);
+        Objects.requireNonNull(serverId, "serverId");
+        return new JooqStaffLoadoutRepository(persistence.dsl(), clock, serverId);
     }
 }
