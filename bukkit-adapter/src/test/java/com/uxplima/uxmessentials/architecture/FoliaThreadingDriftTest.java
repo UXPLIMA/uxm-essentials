@@ -171,6 +171,9 @@ class FoliaThreadingDriftTest {
                 pkg + "shared.adapter.outbound.hud.ChannelBroadcaster",
                 "GLOBAL: channel broadcast fan-out wrapped in scheduler.onGlobal");
         allow.put(
+                pkg + "shared.adapter.inbound.gui.PlayerPickerView",
+                "GLOBAL: online-head roster snapshot taken inside scheduler.onGlobal, then opened per-entity");
+        allow.put(
                 pkg + "staff.adapter.inbound.gui.StaffExamineView",
                 "GLOBAL: examine roster snapshot taken inside scheduler.onGlobal");
         allow.put(

@@ -396,7 +396,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
-            wireModeration(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry);
+            wireModeration(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
@@ -707,7 +707,8 @@ public final class PluginModule {
             ContextLinks links,
             Bus bus,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
         // moderation builds its jOOQ ModerationRepository over persistence.dsl(), the audit logger on the
         // dedicated audit channel, and the login/join/freeze listeners. It rebinds the messaging mute gate and
         // the teleport jail gate captured during their wiring to the real policies — when either context is
@@ -721,7 +722,8 @@ public final class PluginModule {
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(
                         ctx.kernel().messages());
-        ModerationWiring.Wired wired = ModerationWiring.wire(plugin, ctx, persistence, gates, bus, guiText, guiLayouts);
+        ModerationWiring.Wired wired =
+                ModerationWiring.wire(plugin, ctx, persistence, gates, bus, guiText, guiLayouts, anvil);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

@@ -211,7 +211,29 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_GUI_HISTORY_ENTRY_NAME("moderation.gui.history.entry-name"),
     MOD_GUI_HISTORY_ENTRY_LORE("moderation.gui.history.entry-lore"),
     MOD_GUI_HISTORY_EMPTY_NAME("moderation.gui.history.empty-name"),
-    MOD_GUI_HISTORY_EMPTY_LORE("moderation.gui.history.empty-lore");
+    MOD_GUI_HISTORY_EMPTY_LORE("moderation.gui.history.empty-lore"),
+
+    // bare /ban and /mute GUI flow — the player picker title and the per-target confirm screen.
+    // The picker reuses the shared gui.player-picker.* chrome; these are the moderation-specific labels.
+    MOD_GUI_PICK_BAN_TITLE("moderation.gui.pick.ban-title"),
+    MOD_GUI_PICK_MUTE_TITLE("moderation.gui.pick.mute-title"),
+    MOD_GUI_CONFIRM_BAN_TITLE("moderation.gui.confirm.ban-title"),
+    MOD_GUI_CONFIRM_MUTE_TITLE("moderation.gui.confirm.mute-title"),
+    MOD_GUI_CONFIRM_TARGET_NAME("moderation.gui.confirm.target-name"),
+    MOD_GUI_CONFIRM_TARGET_LORE("moderation.gui.confirm.target-lore"),
+    MOD_GUI_CONFIRM_BAN("moderation.gui.confirm.ban"),
+    MOD_GUI_CONFIRM_BAN_LORE("moderation.gui.confirm.ban-lore"),
+    MOD_GUI_CONFIRM_BAN_SILENT("moderation.gui.confirm.ban-silent"),
+    MOD_GUI_CONFIRM_BAN_SILENT_LORE("moderation.gui.confirm.ban-silent-lore"),
+    MOD_GUI_CONFIRM_MUTE("moderation.gui.confirm.mute"),
+    MOD_GUI_CONFIRM_MUTE_LORE("moderation.gui.confirm.mute-lore"),
+    MOD_GUI_CONFIRM_MUTE_SILENT("moderation.gui.confirm.mute-silent"),
+    MOD_GUI_CONFIRM_MUTE_SILENT_LORE("moderation.gui.confirm.mute-silent-lore"),
+    MOD_GUI_CONFIRM_REASON("moderation.gui.confirm.reason"),
+    MOD_GUI_CONFIRM_REASON_SET_LORE("moderation.gui.confirm.reason-set-lore"),
+    MOD_GUI_CONFIRM_REASON_NONE_LORE("moderation.gui.confirm.reason-none-lore"),
+    MOD_GUI_CONFIRM_REASON_PROMPT("moderation.gui.confirm.reason-prompt"),
+    MOD_GUI_CONFIRM_BACK("moderation.gui.confirm.back");
 
     private final String key;
 

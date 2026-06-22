@@ -10,6 +10,8 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCommands;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationGuiCommand;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationGuiViews;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentConfirmView;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.CommandSpyListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.FreezeMoveListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJoinListener;
@@ -81,6 +83,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
@@ -134,7 +137,8 @@ public final class ModerationWiring {
             GateSinks gates,
             Bus bus,
             GuiText guiText,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -142,6 +146,7 @@ public final class ModerationWiring {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(anvil, "anvil");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
@@ -191,8 +196,20 @@ public final class ModerationWiring {
                 sanctionHistory,
                 clock,
                 guiLayouts);
+        // The bare /ban and /mute GUI flow: the reusable player picker into the per-target confirm screen,
+        // ending in the same audited Ban/Mute use cases the raw subcommands take. The picker stays generic — the
+        // flow supplies the moderation TargetResolver as its offline-name resolver and the unknown-target reply.
+        PlayerPickerView picker = new PlayerPickerView(
+                guiText, kernel.scheduler(), anvil, plugin.getServer(), kernel.messages(), kernel.messageSink());
+        PunishmentConfirmView confirmView = new PunishmentConfirmView(guiText, kernel.scheduler(), anvil);
+        PunishmentGuiFlow guiFlow = new PunishmentGuiFlow(services, picker, confirmView);
         java.util.List<CommandRegistration> commands = new java.util.ArrayList<>(ModerationCommands.all(
-                services, kernel.messages(), kernel.messageSink(), kernel.scheduler(), settings.silentByDefault()));
+                services,
+                kernel.messages(),
+                kernel.messageSink(),
+                kernel.scheduler(),
+                settings.silentByDefault(),
+                guiFlow));
         commands.add(new ModerationGuiCommand(services, kernel.messages(), kernel.messageSink(), guiViews));
         return new Wired(
                 commands,

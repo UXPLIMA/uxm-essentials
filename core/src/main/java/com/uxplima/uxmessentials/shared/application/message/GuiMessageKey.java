@@ -31,6 +31,15 @@ public enum GuiMessageKey implements MessageKey {
     COLOUR_PICKER_CLEAR("gui.colour-picker.clear"),
     COLOUR_PICKER_BACK("gui.colour-picker.back"),
 
+    // the shared player-picker widget — online head entries plus the offline-name anvil button and nav
+    PLAYER_PICKER_HEAD_NAME("gui.player-picker.head-name"),
+    PLAYER_PICKER_HEAD_LORE("gui.player-picker.head-lore"),
+    PLAYER_PICKER_CUSTOM("gui.player-picker.custom"),
+    PLAYER_PICKER_CUSTOM_LORE("gui.player-picker.custom-lore"),
+    PLAYER_PICKER_CUSTOM_PROMPT("gui.player-picker.custom-prompt"),
+    PLAYER_PICKER_PREV("gui.player-picker.prev"),
+    PLAYER_PICKER_NEXT("gui.player-picker.next"),
+
     // the shared colour-picker widget — the 16 standard named-colour swatches
     COLOUR_WHITE("gui.colour.white"),
     COLOUR_ORANGE("gui.colour.orange"),

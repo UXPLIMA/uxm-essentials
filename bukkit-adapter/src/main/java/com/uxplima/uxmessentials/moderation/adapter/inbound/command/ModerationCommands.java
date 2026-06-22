@@ -3,11 +3,13 @@ package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
 import java.util.List;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the moderation context's Brigadier command surface (docs/10-feature-modules.md §15.9) as
@@ -23,15 +25,20 @@ public final class ModerationCommands {
 
     private ModerationCommands() {}
 
-    /** Every moderation command, in surface order. */
+    /**
+     * Every moderation command, in surface order. {@code guiFlow} is the bare {@code /ban}/{@code /mute}
+     * picker→confirm opener those two commands expose through {@code guiRoot()}; it is {@code null} only in a
+     * configuration that built no GUI flow (every other command ignores it).
+     */
     public static List<CommandRegistration> all(
             ModerationServices services,
             Messages messages,
             MessageSink sink,
             Scheduler scheduler,
-            boolean silentByDefault) {
+            boolean silentByDefault,
+            @Nullable PunishmentGuiFlow guiFlow) {
         return List.of(
-                new MuteCommand(services, messages, sink, silentByDefault),
+                new MuteCommand(services, messages, sink, silentByDefault, guiFlow),
                 new TempmuteCommand(services, messages, sink, silentByDefault),
                 target(
                         "unmute",
@@ -56,7 +63,7 @@ public final class ModerationCommands {
                 new SetJailCommand(services, messages, sink),
                 new DelJailCommand(services, messages, sink),
                 new TempbanCommand(services, messages, sink, silentByDefault),
-                new BanCommand(services, messages, sink, silentByDefault),
+                new BanCommand(services, messages, sink, silentByDefault, guiFlow),
                 new UnbanCommand(services, messages, sink),
                 new BanListCommand(services, messages, sink, scheduler),
                 new MuteListCommand(services, messages, sink, scheduler),
