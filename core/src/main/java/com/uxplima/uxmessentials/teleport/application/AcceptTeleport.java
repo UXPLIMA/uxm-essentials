@@ -58,7 +58,7 @@ public final class AcceptTeleport {
         Objects.requireNonNull(anchorPosition, "anchorPosition");
         Optional<TeleportRequest> pending = oldestPending(target);
         if (pending.isEmpty()) {
-            return Result.err(TeleportError.NO_PENDING_REQUEST);
+            return noPending(target);
         }
         TeleportRequest request = pending.get();
         Transition accepted = request.accept(clock.instant());
@@ -73,7 +73,7 @@ public final class AcceptTeleport {
         Objects.requireNonNull(target, "target");
         Optional<TeleportRequest> pending = oldestPending(target);
         if (pending.isEmpty()) {
-            return Result.err(TeleportError.NO_PENDING_REQUEST);
+            return noPending(target);
         }
         TeleportRequest request = pending.get();
         finish(request.deny());
@@ -89,7 +89,7 @@ public final class AcceptTeleport {
         Objects.requireNonNull(requester, "requester");
         Optional<TeleportRequest> outgoing = requests.outgoing(requester);
         if (outgoing.isEmpty()) {
-            return Result.err(TeleportError.NO_PENDING_REQUEST);
+            return noPending(requester);
         }
         TeleportRequest request = outgoing.get();
         finish(request.cancel());
@@ -125,6 +125,13 @@ public final class AcceptTeleport {
         engine.stampForPhase(mover, CooldownStartPhase.ACCEPT);
         Destination destination = Destination.following(request.anchor(), anchorPosition);
         engine.beginGatedWarmup(mover, destination, TeleportKind.REQUEST);
+    }
+
+    // /tpaccept, /tpdeny and /tpcancel with nothing waiting used to do nothing at all; tell the
+    // invoking player there is no pending request so the verb never fails silently.
+    private Result<Unit, TeleportError> noPending(PlayerRef invoker) {
+        notifier.send(invoker, TeleportError.NO_PENDING_REQUEST.messageKey());
+        return Result.err(TeleportError.NO_PENDING_REQUEST);
     }
 
     private void finish(Transition transition) {

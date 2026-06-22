@@ -74,19 +74,25 @@ public final class RequestTeleport {
 
     private Optional<TeleportError> gate(PlayerRef requester, PlayerRef target) {
         if (jail.isJailed(requester)) {
-            notifier.send(requester, TeleportMessageKey.JAILED);
-            return Optional.of(TeleportError.JAILED);
+            return reject(requester, TeleportError.JAILED);
         }
         if (requester.equals(target)) {
-            return Optional.of(TeleportError.SELF_REQUEST);
+            return reject(requester, TeleportError.SELF_REQUEST);
         }
         if (!flags.acceptsRequests(target)) {
-            return Optional.of(TeleportError.TARGET_TOGGLED_OFF);
+            return reject(requester, TeleportError.TARGET_TOGGLED_OFF);
         }
         if (flags.hasBlocked(target, requester)) {
-            return Optional.of(TeleportError.REQUESTER_BLOCKED);
+            return reject(requester, TeleportError.REQUESTER_BLOCKED);
         }
         return Optional.empty();
+    }
+
+    // Every gate rejection tells the requester why with the error's own catalog key, so a silent
+    // /tpa (self, toggled-off, blocked, jailed) can't happen: the reason and its text never split.
+    private Optional<TeleportError> reject(PlayerRef requester, TeleportError error) {
+        notifier.send(requester, error.messageKey());
+        return Optional.of(error);
     }
 
     private void announce(TeleportRequest request, RequestDirection direction) {
