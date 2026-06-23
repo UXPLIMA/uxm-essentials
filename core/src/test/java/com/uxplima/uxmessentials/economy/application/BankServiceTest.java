@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.random.RandomGenerator;
 
 import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Money;
@@ -43,32 +44,77 @@ class BankServiceTest {
         banks = new InMemoryBankRepository(wallets);
         events = new CapturingEvents();
         Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
-        service = new BankService(banks, new NoopTransactionHistory(), events, clock, true);
+        service = new BankService(banks, new NoopTransactionHistory(), events, clock, new java.util.Random(1), true);
         leader = new PlayerRef(UUID.randomUUID(), "Leader");
     }
 
     private SharedBank createBank() {
-        return service.createBank("alpha", "Alpha", Currencies.COINS, leader).orElseThrow();
+        return service.createBank("Alpha", Currencies.COINS, leader).orElseThrow();
     }
 
     @Test
-    void createBankRejectsADuplicateId() {
-        createBank();
+    void createBankAssignsAnEightCharAlphanumericId() {
+        SharedBank bank = createBank();
 
-        assertThat(service.createBank("alpha", "Other", Currencies.COINS, leader)
-                        .errorOrThrow())
+        assertThat(bank.id()).hasSize(8).matches("[a-zA-Z0-9]{8}");
+        assertThat(banks.findById(bank.id())).isPresent();
+    }
+
+    @Test
+    void everyCreatedBankGetsADistinctId() {
+        SharedBank first = createBank();
+        SharedBank second = service.createBank("Beta", Currencies.COINS, leader).orElseThrow();
+
+        assertThat(second.id()).isNotEqualTo(first.id());
+    }
+
+    @Test
+    void aCollidingDrawRetriesAgainstTheRepository() {
+        // The first whole id draws all-zeros ("aaaaaaaa"); the second create draws that same id once (a
+        // collision) and then a distinct id, so the bank that lands is the retried, fresh draw.
+        RandomGenerator colliding = new IdSequenceGenerator(0, 0, 1);
+        BankService retrying = new BankService(
+                banks,
+                new NoopTransactionHistory(),
+                events,
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
+                colliding,
+                true);
+        String taken = retrying.createBank("First", Currencies.COINS, leader)
+                .orElseThrow()
+                .id();
+
+        String next = retrying.createBank("Second", Currencies.COINS, leader)
+                .orElseThrow()
+                .id();
+
+        assertThat(next).isNotEqualTo(taken);
+        assertThat(banks.findById(taken)).isPresent();
+        assertThat(banks.findById(next)).isPresent();
+    }
+
+    @Test
+    void exhaustingTheBoundedRetriesFailsWithIdTaken() {
+        // A generator pinned so every id draws all-zeros can only ever produce one id, so the second create
+        // exhausts every bounded attempt against the now-taken id and fails rather than looping forever.
+        RandomGenerator pinned = new IdSequenceGenerator(0);
+        BankService stuck = new BankService(
+                banks, new NoopTransactionHistory(), events, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC), pinned, true);
+        stuck.createBank("First", Currencies.COINS, leader).orElseThrow();
+
+        assertThat(stuck.createBank("Second", Currencies.COINS, leader).errorOrThrow())
                 .isEqualTo(BankError.ID_TAKEN);
     }
 
     @Test
     void depositMovesMoneyAndRaisesOneEvent() {
-        createBank();
+        String id = createBank().id();
         wallets.credit(leader, Money.of(Currencies.COINS, 500));
 
-        Result<Unit, BankError> result = service.deposit(leader, "alpha", Money.of(Currencies.COINS, 200));
+        Result<Unit, BankError> result = service.deposit(leader, id, Money.of(Currencies.COINS, 200));
 
         assertThat(result.isOk()).isTrue();
-        assertThat(banks.findById("alpha").orElseThrow().balance()).isEqualTo(Money.of(Currencies.COINS, 200));
+        assertThat(banks.findById(id).orElseThrow().balance()).isEqualTo(Money.of(Currencies.COINS, 200));
         assertThat(wallets.findByOwner(leader).orElseThrow().balanceOf(Currencies.COINS))
                 .isEqualTo(Money.of(Currencies.COINS, 300));
         assertThat(events.published()).hasSize(1).first().isInstanceOf(BankDeposited.class);
@@ -83,81 +129,122 @@ class BankServiceTest {
 
     @Test
     void depositShortOfFundsIsInsufficientAndMovesNothing() {
-        createBank();
+        String id = createBank().id();
         wallets.credit(leader, Money.of(Currencies.COINS, 50));
 
-        Result<Unit, BankError> result = service.deposit(leader, "alpha", Money.of(Currencies.COINS, 200));
+        Result<Unit, BankError> result = service.deposit(leader, id, Money.of(Currencies.COINS, 200));
 
         assertThat(result.errorOrThrow()).isEqualTo(BankError.INSUFFICIENT_FUNDS);
-        assertThat(banks.findById("alpha").orElseThrow().balance().isZero()).isTrue();
+        assertThat(banks.findById(id).orElseThrow().balance().isZero()).isTrue();
         assertThat(wallets.findByOwner(leader).orElseThrow().balanceOf(Currencies.COINS))
                 .isEqualTo(Money.of(Currencies.COINS, 50));
     }
 
     @Test
     void withdrawMovesMoneyAndRaisesOneEvent() {
-        createBank();
+        String id = createBank().id();
         wallets.credit(leader, Money.of(Currencies.COINS, 500));
-        service.deposit(leader, "alpha", Money.of(Currencies.COINS, 300));
+        service.deposit(leader, id, Money.of(Currencies.COINS, 300));
         events = new CapturingEvents();
         service = new BankService(
-                banks, new NoopTransactionHistory(), events, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC), true);
+                banks,
+                new NoopTransactionHistory(),
+                events,
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
+                new java.util.Random(1),
+                true);
 
-        Result<Unit, BankError> result = service.withdraw(leader, "alpha", Money.of(Currencies.COINS, 120));
+        Result<Unit, BankError> result = service.withdraw(leader, id, Money.of(Currencies.COINS, 120));
 
         assertThat(result.isOk()).isTrue();
-        assertThat(banks.findById("alpha").orElseThrow().balance()).isEqualTo(Money.of(Currencies.COINS, 180));
+        assertThat(banks.findById(id).orElseThrow().balance()).isEqualTo(Money.of(Currencies.COINS, 180));
         assertThat(events.published()).hasSize(1).first().isInstanceOf(BankWithdrawn.class);
     }
 
     @Test
     void withdrawBeyondTheBankBalanceIsInsufficientBankFunds() {
-        createBank();
+        String id = createBank().id();
         wallets.credit(leader, Money.of(Currencies.COINS, 500));
-        service.deposit(leader, "alpha", Money.of(Currencies.COINS, 100));
+        service.deposit(leader, id, Money.of(Currencies.COINS, 100));
 
-        Result<Unit, BankError> result = service.withdraw(leader, "alpha", Money.of(Currencies.COINS, 250));
+        Result<Unit, BankError> result = service.withdraw(leader, id, Money.of(Currencies.COINS, 250));
 
         assertThat(result.errorOrThrow()).isEqualTo(BankError.INSUFFICIENT_BANK_FUNDS);
-        assertThat(banks.findById("alpha").orElseThrow().balance()).isEqualTo(Money.of(Currencies.COINS, 100));
+        assertThat(banks.findById(id).orElseThrow().balance()).isEqualTo(Money.of(Currencies.COINS, 100));
     }
 
     @Test
     void aNonMemberWithoutPermissionIsDenied() {
-        createBank();
+        String id = createBank().id();
         PlayerRef stranger = new PlayerRef(UUID.randomUUID(), "Stranger");
         wallets.credit(stranger, Money.of(Currencies.COINS, 100));
 
-        assertThat(service.deposit(stranger, "alpha", Money.of(Currencies.COINS, 10))
-                        .errorOrThrow())
+        assertThat(service.deposit(stranger, id, Money.of(Currencies.COINS, 10)).errorOrThrow())
                 .isEqualTo(BankError.NO_PERMISSION);
     }
 
     @Test
     void addingAnExistingMemberIsAlreadyMember() {
-        createBank();
-        assertThat(service.addMember(leader, "alpha", leader, BankRole.MEMBER).errorOrThrow())
+        String id = createBank().id();
+        assertThat(service.addMember(leader, id, leader, BankRole.MEMBER).errorOrThrow())
                 .isEqualTo(BankError.ALREADY_MEMBER);
     }
 
     @Test
     void theLeaderCannotBeRemoved() {
-        createBank();
-        assertThat(service.removeMember(leader, "alpha", leader).errorOrThrow())
-                .isEqualTo(BankError.CANNOT_REMOVE_LEADER);
+        String id = createBank().id();
+        assertThat(service.removeMember(leader, id, leader).errorOrThrow()).isEqualTo(BankError.CANNOT_REMOVE_LEADER);
     }
 
     @Test
     void aForeignProviderRefusesBankMoneyMoves() {
         BankService foreign = new BankService(
-                banks, new NoopTransactionHistory(), events, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC), false);
-        createBank();
+                banks,
+                new NoopTransactionHistory(),
+                events,
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
+                new java.util.Random(1),
+                false);
+        String id = createBank().id();
 
-        assertThat(foreign.deposit(leader, "alpha", Money.of(Currencies.COINS, 10))
-                        .errorOrThrow())
+        assertThat(foreign.deposit(leader, id, Money.of(Currencies.COINS, 10)).errorOrThrow())
                 .isEqualTo(BankError.PROVIDER_UNSUPPORTED);
-        assertThat(foreign.withdraw(leader, "alpha", Money.of(Currencies.COINS, 10))
-                        .errorOrThrow())
+        assertThat(foreign.withdraw(leader, id, Money.of(Currencies.COINS, 10)).errorOrThrow())
                 .isEqualTo(BankError.PROVIDER_UNSUPPORTED);
+    }
+
+    /**
+     * A {@link RandomGenerator} that emits one constant digit per whole generated id: every {@code nextInt} call
+     * for the eight characters of one id returns the same value, then the next id advances to the next entry in
+     * the sequence (repeating the last entry once exhausted). With two distinct entries this draws two distinct
+     * ids; pinned to one entry it can only ever draw one. This makes the bounded collision retry deterministic.
+     */
+    private static final class IdSequenceGenerator implements RandomGenerator {
+
+        private static final int ID_LENGTH = 8;
+
+        private final int[] values;
+        private int draws;
+
+        IdSequenceGenerator(int... values) {
+            this.values = values.clone();
+        }
+
+        @Override
+        public long nextLong() {
+            return nextInt();
+        }
+
+        @Override
+        public int nextInt() {
+            int idIndex = draws / ID_LENGTH;
+            draws++;
+            return values[Math.min(idIndex, values.length - 1)];
+        }
+
+        @Override
+        public int nextInt(int bound) {
+            return Math.floorMod(nextInt(), bound);
+        }
     }
 }

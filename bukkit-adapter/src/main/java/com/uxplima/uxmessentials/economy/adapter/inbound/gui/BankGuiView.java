@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.bukkit.Material;
@@ -18,7 +17,6 @@ import com.uxplima.uxmessentials.economy.application.BankService;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Currency;
-import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
@@ -52,6 +50,7 @@ public final class BankGuiView {
     private final BankService bankService;
     private final CurrencyRegistry currencies;
     private final TextInput textInput;
+    private final CurrencyPickerView currencyPicker;
     private final Scheduler scheduler;
     private final Messages messages;
     private final Supplier<BankNavigation> navigation;
@@ -61,6 +60,7 @@ public final class BankGuiView {
             BankService bankService,
             CurrencyRegistry currencies,
             TextInput textInput,
+            CurrencyPickerView currencyPicker,
             Scheduler scheduler,
             Messages messages,
             Supplier<BankNavigation> navigation,
@@ -68,6 +68,7 @@ public final class BankGuiView {
         this.bankService = Objects.requireNonNull(bankService, "bankService");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
+        this.currencyPicker = Objects.requireNonNull(currencyPicker, "currencyPicker");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.navigation = Objects.requireNonNull(navigation, "navigation");
@@ -121,7 +122,7 @@ public final class BankGuiView {
                                 .build(),
                         event -> scheduler.onEntity(viewerRef, () -> {
                             gui.close(player);
-                            promptCreateBank(player);
+                            promptCreateName(player);
                         })));
         gui.set(
                 layout.nextSlot(),
@@ -165,25 +166,8 @@ public final class BankGuiView {
                 .build();
     }
 
-    private void promptCreateBank(Player player) {
+    private void promptCreateName(Player player) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        textInput.prompt(
-                player,
-                viewerRef,
-                InputRequest.of("bank.create-id", EconomyMessageKey.BANK_CREATE_PROMPT_ID),
-                id -> {
-                    String cleanId = id.trim();
-                    if (cleanId.isEmpty() || cleanId.contains(" ")) {
-                        player.sendMessage(text(viewerRef, EconomyMessageKey.BANK_CREATE_INVALID_ID, Map.of()));
-                        open(player);
-                        return;
-                    }
-                    promptCreateName(player, viewerRef, cleanId);
-                },
-                () -> open(player));
-    }
-
-    private void promptCreateName(Player player, PlayerRef viewerRef, String cleanId) {
         textInput.prompt(
                 player,
                 viewerRef,
@@ -195,49 +179,35 @@ public final class BankGuiView {
                         open(player);
                         return;
                     }
-                    promptCreateCurrency(player, viewerRef, cleanId, cleanName);
+                    pickCurrency(player, viewerRef, cleanName);
                 },
                 () -> open(player));
     }
 
-    private void promptCreateCurrency(Player player, PlayerRef viewerRef, String cleanId, String cleanName) {
-        textInput.prompt(
+    private void pickCurrency(Player player, PlayerRef viewerRef, String cleanName) {
+        currencyPicker.open(
                 player,
                 viewerRef,
-                InputRequest.of("bank.create-currency", EconomyMessageKey.BANK_CREATE_PROMPT_CURRENCY),
-                currencyStr -> {
-                    Currency currency = resolveCurrency(player, viewerRef, currencyStr.trim());
-                    scheduler.async(() -> {
-                        Result<SharedBank, BankError> res =
-                                bankService.createBank(cleanId, cleanName, currency, viewerRef);
-                        scheduler.onEntity(viewerRef, () -> {
-                            if (res.isOk()) {
-                                player.sendMessage(text(
-                                        viewerRef, EconomyMessageKey.BANK_CREATE_SUCCESS, Map.of("name", cleanName)));
-                            } else {
-                                player.sendMessage(
-                                        text(viewerRef, EconomyMessageKey.BANK_CREATE_ID_TAKEN, Map.of("id", cleanId)));
-                            }
-                            open(player);
-                        });
-                    });
-                },
-                () -> open(player));
+                List.copyOf(currencies.all()),
+                currencies.defaultCurrency(),
+                currency -> submitCreate(player, viewerRef, cleanName, currency));
     }
 
-    private Currency resolveCurrency(Player player, PlayerRef viewerRef, String cleanCurrency) {
-        if (cleanCurrency.isEmpty()) {
-            return currencies.defaultCurrency();
-        }
-        Optional<Currency> opt = currencies.find(CurrencyId.of(cleanCurrency));
-        if (opt.isPresent()) {
-            return opt.get();
-        }
-        Currency fallback = currencies.defaultCurrency();
-        player.sendMessage(text(
-                viewerRef,
-                EconomyMessageKey.BANK_CREATE_UNKNOWN_CURRENCY,
-                Map.of("currency", cleanCurrency, "default", fallback.id().value())));
-        return fallback;
+    private void submitCreate(Player player, PlayerRef viewerRef, String cleanName, Currency currency) {
+        scheduler.async(() -> {
+            Result<SharedBank, BankError> res = bankService.createBank(cleanName, currency, viewerRef);
+            scheduler.onEntity(viewerRef, () -> {
+                if (res.isOk()) {
+                    SharedBank bank = res.orElseThrow();
+                    player.sendMessage(text(
+                            viewerRef,
+                            EconomyMessageKey.BANK_CREATE_SUCCESS,
+                            Map.of("id", bank.id(), "name", bank.name())));
+                } else {
+                    player.sendMessage(text(viewerRef, res.errorOrThrow().messageKey(), Map.of()));
+                }
+                open(player);
+            });
+        });
     }
 }

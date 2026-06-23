@@ -471,7 +471,7 @@ public final class EconomyWiring {
         // is the native ledger (a foreign economy holds balances we cannot move atomically here).
         com.uxplima.uxmessentials.economy.application.BankService bankService =
                 new com.uxplima.uxmessentials.economy.application.BankService(
-                        bankRepo, history, kernel.events(), clock, nativeLedger);
+                        bankRepo, history, kernel.events(), clock, new java.security.SecureRandom(), nativeLedger);
         com.uxplima.uxmessentials.economy.application.LoanService loanService =
                 new com.uxplima.uxmessentials.economy.application.LoanService(
                         loanRepo, settings.loanPolicy(), kernel.events(), clock, nativeLedger);
@@ -497,8 +497,20 @@ public final class EconomyWiring {
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.paginatedDefault(
                         org.bukkit.Material.PLAYER_HEAD));
 
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText bankGuiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView bankCurrencyPicker =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView(
+                        bankGuiText, kernel.scheduler());
         BankGuiView bankGuiView = new BankGuiView(
-                bankService, currencies, input, kernel.scheduler(), kernel.messages(), navigation, bankListLayout);
+                bankService,
+                currencies,
+                input,
+                bankCurrencyPicker,
+                kernel.scheduler(),
+                kernel.messages(),
+                navigation,
+                bankListLayout);
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout bankActionsLayout =
                 guiLayouts.loadFixedMenu("economy", "bank-actions", BankActionsView.defaultLayout());
         BankActionsView bankActionsView = new BankActionsView(

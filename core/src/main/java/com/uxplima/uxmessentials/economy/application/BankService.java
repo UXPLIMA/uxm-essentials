@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.random.RandomGenerator;
 
 import com.uxplima.uxmessentials.economy.application.port.BankRepository;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
@@ -35,10 +36,21 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  */
 public final class BankService {
 
+    /** The mixed-case alphanumeric alphabet a fresh bank id is drawn from. */
+    private static final char[] ID_ALPHABET =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray();
+
+    /** The length of a generated bank id, e.g. {@code eEa12523}. */
+    private static final int ID_LENGTH = 8;
+
+    /** How many times a draw is retried when it collides with an existing bank before giving up. */
+    private static final int MAX_ID_ATTEMPTS = 5;
+
     private final BankRepository bankRepository;
     private final TransactionHistory history;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final RandomGenerator rng;
     private final boolean nativeLedger;
 
     public BankService(
@@ -46,27 +58,53 @@ public final class BankService {
             TransactionHistory history,
             DomainEventPublisher events,
             Clock clock,
+            RandomGenerator rng,
             boolean nativeLedger) {
         this.bankRepository = Objects.requireNonNull(bankRepository, "bankRepository");
         this.history = Objects.requireNonNull(history, "history");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.rng = Objects.requireNonNull(rng, "rng");
         this.nativeLedger = nativeLedger;
     }
 
-    /** Creates a new shared bank account. */
-    public Result<SharedBank, BankError> createBank(String id, String name, Currency currency, PlayerRef creator) {
-        Objects.requireNonNull(id, "id");
+    /**
+     * Creates a new shared bank account under a system-assigned random 8-character id and returns it so the
+     * caller can show the creator the id they were given. The id is drawn from a mixed-case alphanumeric
+     * alphabet and retried a bounded number of times if a draw collides with an existing bank; the returned
+     * {@link SharedBank} carries the assigned {@link SharedBank#id()}.
+     */
+    public Result<SharedBank, BankError> createBank(String name, Currency currency, PlayerRef creator) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(currency, "currency");
         Objects.requireNonNull(creator, "creator");
-        if (bankRepository.findById(id).isPresent()) {
+        Optional<String> id = freshId();
+        if (id.isEmpty()) {
             return Result.err(BankError.ID_TAKEN);
         }
         List<BankMember> members = List.of(new BankMember(creator, BankRole.LEADER));
-        SharedBank bank = new SharedBank(id, name, Money.zero(currency), creator, members, clock.millis());
+        SharedBank bank = new SharedBank(id.get(), name, Money.zero(currency), creator, members, clock.millis());
         bankRepository.save(bank);
         return Result.ok(bank);
+    }
+
+    /** Draw a fresh, unused bank id, retrying on a collision; empty if every bounded attempt was taken. */
+    private Optional<String> freshId() {
+        for (int attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt++) {
+            String candidate = randomId();
+            if (bankRepository.findById(candidate).isEmpty()) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private String randomId() {
+        StringBuilder out = new StringBuilder(ID_LENGTH);
+        for (int i = 0; i < ID_LENGTH; i++) {
+            out.append(ID_ALPHABET[rng.nextInt(ID_ALPHABET.length)]);
+        }
+        return out.toString();
     }
 
     /** Deposits money from a player's wallet into a shared bank. */

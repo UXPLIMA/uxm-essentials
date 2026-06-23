@@ -250,14 +250,9 @@ public enum EconomyMessageKey implements MessageKey {
     BANK_LIST_GUI_ICON_CREATOR("bank.list-gui-icon-creator"),
     BANK_LIST_GUI_ICON_MEMBERS("bank.list-gui-icon-members"),
     BANK_LIST_GUI_ICON_HINT("bank.list-gui-icon-hint"),
-    BANK_CREATE_PROMPT_ID("bank.create-prompt-id"),
-    BANK_CREATE_INVALID_ID("bank.create-invalid-id"),
     BANK_CREATE_PROMPT_NAME("bank.create-prompt-name"),
     BANK_CREATE_NAME_EMPTY("bank.create-name-empty"),
-    BANK_CREATE_PROMPT_CURRENCY("bank.create-prompt-currency"),
-    BANK_CREATE_UNKNOWN_CURRENCY("bank.create-unknown-currency"),
     BANK_CREATE_SUCCESS("bank.create-success"),
-    BANK_CREATE_ID_TAKEN("bank.create-id-taken"),
 
     // Bank actions GUI
     BANK_ACTIONS_GUI_TITLE("bank.actions-gui-title"),

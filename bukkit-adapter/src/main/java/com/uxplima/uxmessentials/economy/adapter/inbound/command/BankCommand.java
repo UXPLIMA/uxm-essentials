@@ -45,10 +45,9 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::runOpenGui)
                 .then(Commands.literal("create")
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("name", StringArgumentType.string())
-                                        .executes(this::runCreate)
-                                        .then(currencyArgument().executes(this::runCreate)))))
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .executes(this::runCreate)
+                                .then(currencyArgument().executes(this::runCreate))))
                 .then(Commands.literal("deposit")
                         .then(Commands.argument("bank_id", StringArgumentType.word())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
@@ -91,7 +90,6 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
         Player sender = player(ctx);
         if (sender == null) return 0;
 
-        String id = ctx.getArgument("id", String.class);
         String name = ctx.getArgument("name", String.class);
 
         Optional<Currency> currencyOpt = currency(ctx);
@@ -103,10 +101,15 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
 
         PlayerRef senderRef = ref(sender);
         offTick(() -> {
-            Result<SharedBank, BankError> res = services.bankService().createBank(id, name, currency, senderRef);
+            Result<SharedBank, BankError> res = services.bankService().createBank(name, currency, senderRef);
             services.scheduler().onEntity(senderRef, () -> {
                 if (res.isOk()) {
-                    services.notifier().send(senderRef, EconomyMessageKey.BANK_CREATED, java.util.Map.of("name", name));
+                    SharedBank bank = res.orElseThrow();
+                    services.notifier()
+                            .send(
+                                    senderRef,
+                                    EconomyMessageKey.BANK_CREATED,
+                                    java.util.Map.of("id", bank.id(), "name", bank.name()));
                 } else {
                     services.notifier().send(senderRef, res.errorOrThrow().messageKey());
                 }
