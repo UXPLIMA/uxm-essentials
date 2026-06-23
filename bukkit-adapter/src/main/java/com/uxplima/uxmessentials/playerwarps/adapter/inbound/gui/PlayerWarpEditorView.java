@@ -254,12 +254,25 @@ public final class PlayerWarpEditorView {
                 "editor.text-field",
                 PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON,
                 PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON_PROMPT,
-                Material.ITEM_FRAME,
+                iconButtonMaterial(owner, name),
                 () -> current(owner, name).flatMap(PlayerWarp::iconMaterial).orElseGet(this::none),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> mutate(owner, name, warp -> warp.withIconMaterial(optional(value))),
                 textInput,
                 scheduler);
+    }
+
+    /**
+     * The icon button's own material: the warp's configured icon, so the button shows what it sets rather than a
+     * fixed stand-in. The property list is rebuilt from the live row on each open, so resolving here keeps the
+     * button in step with the value. An unset or unparseable icon falls back to {@code ITEM_FRAME}.
+     */
+    private Material iconButtonMaterial(PlayerRef owner, PlayerWarpName name) {
+        return current(owner, name)
+                .flatMap(PlayerWarp::iconMaterial)
+                .map(Material::matchMaterial)
+                .filter(material -> material != Material.AIR)
+                .orElse(Material.ITEM_FRAME);
     }
 
     private EditableProperty visibilityProperty(PlayerRef owner, PlayerWarpName name) {

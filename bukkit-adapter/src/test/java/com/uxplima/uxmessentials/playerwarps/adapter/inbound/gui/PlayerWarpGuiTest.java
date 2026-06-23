@@ -74,6 +74,7 @@ class PlayerWarpGuiTest {
     // name, move, icon, visibility, lock, password, dep-sound, arr-sound, dep-particle, arr-particle, warmup, cooldown.
     private static final List<Integer> EDITOR_SLOTS = List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24);
     private static final int NAME_SLOT = EDITOR_SLOTS.get(0);
+    private static final int ICON_SLOT = EDITOR_SLOTS.get(2);
     private static final int VISIBILITY_SLOT = EDITOR_SLOTS.get(3);
     private static final int LOCK_SLOT = EDITOR_SLOTS.get(4);
     private static final int PASSWORD_SLOT = EDITOR_SLOTS.get(5);
@@ -176,6 +177,25 @@ class PlayerWarpGuiTest {
         assertThat(inv.getItem(0)).isNotNull();
         assertThat(inv.getItem(1)).isNotNull();
         assertThat(inv.getItem(2).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+    }
+
+    @Test
+    void iconButtonWearsTheWarpsConfiguredMaterial() {
+        store(viewer, "alpha");
+        repository.save(warp("alpha").withIconMaterial(Optional.of("DIAMOND")));
+        editorView.open(player, viewer, owned("alpha"));
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(inv.getItem(ICON_SLOT).getType()).isEqualTo(Material.DIAMOND);
+    }
+
+    @Test
+    void iconButtonFallsBackToItemFrameWhenUnset() {
+        store(viewer, "alpha");
+        editorView.open(player, viewer, owned("alpha"));
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        assertThat(inv.getItem(ICON_SLOT).getType()).isEqualTo(Material.ITEM_FRAME);
     }
 
     @Test

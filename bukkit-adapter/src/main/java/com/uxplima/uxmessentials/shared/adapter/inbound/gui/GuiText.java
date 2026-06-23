@@ -40,4 +40,27 @@ public final class GuiText {
         Objects.requireNonNull(placeholders, "placeholders");
         return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
+
+    /**
+     * Resolve {@code key} for {@code viewer} with the leading brand prefix ({@code <tag:'…'>} / {@code <etag:'…'>})
+     * removed before rendering. Catalog prompt keys carry the chat prefix, but an inventory title (such as an anvil
+     * prompt) must read clean — just the prompt, no {@code uxmEssentials »} brand — so this strips that one leading
+     * token. A key with no prefix is rendered unchanged.
+     */
+    public Component unprefixedText(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(placeholders, "placeholders");
+        return StyledText.render(stripBrandPrefix(messages.resolve(viewer, key, placeholders)));
+    }
+
+    /** A leading {@code <tag:'…'>} or {@code <etag:'…'>} brand prefix token and the space after it, if present. */
+    private static final java.util.regex.Pattern BRAND_PREFIX =
+            java.util.regex.Pattern.compile("^\\s*<(?:tag|etag):'[^']*'>\\s*");
+
+    /** Remove a leading brand-prefix token from {@code source}; returns it unchanged when there is none. */
+    static String stripBrandPrefix(String source) {
+        Objects.requireNonNull(source, "source");
+        return BRAND_PREFIX.matcher(source).replaceFirst("");
+    }
 }

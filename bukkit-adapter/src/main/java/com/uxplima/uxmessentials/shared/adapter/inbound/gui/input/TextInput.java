@@ -84,10 +84,12 @@ public final class TextInput {
 
     private Component buildPrompt(
             PlayerRef viewer, MessageKey label, Map<String, String> placeholders, InputMode mode) {
-        Component prompt = guiText.text(viewer, label, placeholders);
         if (mode != InputMode.CHAT) {
-            return prompt;
+            // An anvil shows the prompt as its title; the brand chat prefix belongs to chat lines, not an inventory
+            // title, so render the label without it. A chat prompt keeps the prefix the catalog key carries.
+            return guiText.unprefixedText(viewer, label, placeholders);
         }
+        Component prompt = guiText.text(viewer, label, placeholders);
         // In chat mode a player cannot see a cancel button, so append how to abort.
         Component hint = guiText.text(
                 viewer, GuiMessageKey.INPUT_CANCEL_HINT, Map.of("keyword", settings.primaryCancelKeyword()));

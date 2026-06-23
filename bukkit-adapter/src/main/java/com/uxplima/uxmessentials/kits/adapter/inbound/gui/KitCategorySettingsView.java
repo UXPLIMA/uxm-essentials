@@ -72,7 +72,7 @@ public final class KitCategorySettingsView {
         String matName = category.displayMaterial().orElse("BOOK");
         inventory.setItem(
                 12,
-                ItemBuilder.of(Material.GOLDEN_CHESTPLATE)
+                ItemBuilder.of(buttonMaterial(matName))
                         .name(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_MATERIAL_NAME))
                         .lore(List.of(
                                 text(
@@ -147,6 +147,16 @@ public final class KitCategorySettingsView {
                 ItemBuilder.of(Material.ARROW)
                         .name(text(viewer, KitsMessageKey.KIT_EDITOR_SETTINGS_BACK_BUTTON))
                         .build());
+    }
+
+    /**
+     * The button material for the display-material option: the category's configured material itself, so an
+     * operator sees the icon they set rather than a fixed stand-in. An unset or unparseable name falls back to
+     * the same {@code BOOK} the lore line names.
+     */
+    private static Material buttonMaterial(String name) {
+        Material parsed = Material.matchMaterial(name);
+        return parsed != null && parsed != Material.AIR ? parsed : Material.BOOK;
     }
 
     private Component title(KitCategory category, PlayerRef viewer) {
