@@ -94,7 +94,8 @@ class WarpMenuLayoutTest {
     }
 
     private PaginatedGui openAndReturn(GuiLayout layout) {
-        WarpMenuView view = new WarpMenuView(new KeyMessages(), new SyncScheduler(), useWarp(), layout);
+        WarpMenuView view = new WarpMenuView(
+                new KeyMessages(), new SyncScheduler(), useWarp(), layout, new StubWarpCategoryRepository());
         PlayerRef viewer = new PlayerRef(player.getUniqueId(), player.getName());
         view.open(player, viewer, warps());
         return (PaginatedGui) player.getOpenInventory().getTopInventory().getHolder();

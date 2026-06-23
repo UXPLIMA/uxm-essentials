@@ -97,7 +97,15 @@ public final class WarpsWiring {
         CachedWarpRepository cached = WarpRepositories.cachedConcrete(
                 persistence,
                 com.uxplima.uxmessentials.shared.adapter.outbound.lookup.PlayerNames.resolver(kernel.playerLookup()));
+        var categoryRepository = WarpRepositories.categoriesConcrete(persistence);
         bus.registry().register(WarpSync.listener(cached));
+        // A peer's warp change can also reassign categories, so the same WarpChanged signal that drops the cached
+        // warp set also drops the cached category set; with the bus disabled this listener is never invoked.
+        bus.registry().register(message -> {
+            if (message instanceof com.uxplima.uxmessentials.shared.network.WarpChanged) {
+                categoryRepository.invalidateAll();
+            }
+        });
         // Warm the in-memory warp set once on enable so every later /warp resolve, gate, and tab-complete is
         // served from memory — never a synchronous SQLite read on the command thread. This is the only load on
         // the single-server path; the cross-server bus listener drops the set on a peer's change and the next
@@ -143,6 +151,36 @@ public final class WarpsWiring {
                 notifier,
                 new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
                 kernel.permissions());
+        // Warm the category set once on enable so every browse-menu open and category-GUI render is served from
+        // memory rather than a synchronous SQLite read on the command/region thread.
+        categoryRepository.all();
+        var categoryManagerView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView(
+                kernel.messages(), categoryRepository, kernel.scheduler());
+        var categorySettingsView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView(
+                kernel.messages(), kernel.scheduler());
+        var categorySelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorView(
+                kernel.messages(), categoryRepository, kernel.scheduler());
+        var categoryParentSelectorView =
+                new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView(
+                        kernel.messages(), categoryRepository, kernel.scheduler());
+        var managerView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerView(
+                kernel.messages(), repository, kernel.scheduler(), menuLayout);
+        SetWarp setWarp = new SetWarp(
+                repository,
+                notifier,
+                kernel.events(),
+                Clock.systemUTC(),
+                ctx.config().getStringList("world-blacklist", List.of()));
+        var categoryEditing = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryEditing(
+                managerView,
+                categoryManagerView,
+                categorySettingsView,
+                categoryParentSelectorView,
+                categoryRepository,
+                repository,
+                editorView,
+                textInput,
+                kernel.messages());
         var editorListener = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener(
                 editorView,
                 repository,
@@ -152,9 +190,14 @@ public final class WarpsWiring {
                 particleSelectorView,
                 welcomeMessagesView,
                 useWarp,
-                playerWarpGoTo);
+                playerWarpGoTo,
+                managerView,
+                categorySelectorView,
+                categoryEditing,
+                setWarp);
 
-        WarpServices services = assemble(kernel, repository, notifier, menuLayout, editorView, ctx, useWarp);
+        WarpServices services = assemble(
+                kernel, repository, notifier, menuLayout, editorView, ctx, useWarp, categoryRepository, managerView);
         var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
         var listeners = List.<org.bukkit.event.Listener>of(
                 new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpArrivalNotificationListener(
@@ -181,9 +224,12 @@ public final class WarpsWiring {
             GuiLayout menuLayout,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView editorView,
             com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx,
-            UseWarp useWarp) {
+            UseWarp useWarp,
+            com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository categoryRepository,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerView managerView) {
         Clock clock = Clock.systemUTC();
-        WarpMenuView warpMenu = new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp, menuLayout);
+        WarpMenuView warpMenu =
+                new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp, menuLayout, categoryRepository);
         return new WarpServices(
                 useWarp,
                 new SetWarp(
@@ -200,6 +246,7 @@ public final class WarpsWiring {
                 kernel.playerLookup(),
                 repository,
                 editorView,
+                managerView,
                 kernel.scheduler());
     }
 

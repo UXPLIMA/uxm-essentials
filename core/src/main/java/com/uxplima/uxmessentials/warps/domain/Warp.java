@@ -29,7 +29,8 @@ public record Warp(
         Optional<String> arrivalParticle,
         Optional<Double> warmupOverrideSeconds,
         Optional<Double> cooldownOverrideSeconds,
-        Optional<String> iconMaterial) {
+        Optional<String> iconMaterial,
+        Optional<String> categoryId) {
 
     public Warp {
         Objects.requireNonNull(name, "name");
@@ -47,6 +48,7 @@ public record Warp(
         Objects.requireNonNull(warmupOverrideSeconds, "warmupOverrideSeconds");
         Objects.requireNonNull(cooldownOverrideSeconds, "cooldownOverrideSeconds");
         Objects.requireNonNull(iconMaterial, "iconMaterial");
+        Objects.requireNonNull(categoryId, "categoryId");
     }
 
     public Warp(
@@ -67,6 +69,7 @@ public record Warp(
                 Optional.empty(),
                 false,
                 java.util.List.of(),
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -103,6 +106,7 @@ public record Warp(
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -119,6 +123,7 @@ public record Warp(
                 Optional.empty(),
                 false,
                 java.util.List.of(),
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -150,6 +155,7 @@ public record Warp(
                 Optional.empty(),
                 false,
                 java.util.List.of(),
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -217,6 +223,13 @@ public record Warp(
 
     public Warp withIconMaterial(Optional<String> material) {
         return toBuilder().iconMaterial(material).build();
+    }
+
+    /** A copy assigned to the warp category {@code categoryId}, or uncategorised when empty. */
+    public Warp withCategoryId(Optional<String> categoryId) {
+        return toBuilder()
+                .categoryId(Objects.requireNonNull(categoryId, "categoryId"))
+                .build();
     }
 
     /** True when the warp sets a cost the economy gate should charge (a non-free price). */

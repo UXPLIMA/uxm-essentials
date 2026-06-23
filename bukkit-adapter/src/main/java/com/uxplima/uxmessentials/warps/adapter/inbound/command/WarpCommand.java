@@ -125,6 +125,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                                 .executes(this::getWarpRating)))
                 .then(Commands.literal("edit")
                         .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
+                        .executes(this::openWarpManager)
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::openWarpEditor)))
@@ -149,6 +150,18 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     @Override
     public Optional<Command<CommandSourceStack>> guiRoot() {
         return Optional.of(this::runList);
+    }
+
+    /** Bare {@code /warp edit} opens the admin warp manager GUI — the kit-editor-style manager. */
+    private int openWarpManager(CommandContext<CommandSourceStack> ctx) {
+        Player sender = player(ctx);
+        if (sender == null) {
+            return 0;
+        }
+        if (services.managerView() != null) {
+            services.managerView().open(sender, ref(sender));
+        }
+        return Command.SINGLE_SUCCESS;
     }
 
     private int openWarpEditor(CommandContext<CommandSourceStack> ctx) {

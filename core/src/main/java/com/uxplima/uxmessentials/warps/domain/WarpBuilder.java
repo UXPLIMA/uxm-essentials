@@ -32,6 +32,7 @@ final class WarpBuilder {
     private Optional<Double> warmupOverrideSeconds;
     private Optional<Double> cooldownOverrideSeconds;
     private Optional<String> iconMaterial;
+    private Optional<String> categoryId;
 
     WarpBuilder(Warp source) {
         Objects.requireNonNull(source, "source");
@@ -52,6 +53,7 @@ final class WarpBuilder {
         this.warmupOverrideSeconds = source.warmupOverrideSeconds();
         this.cooldownOverrideSeconds = source.cooldownOverrideSeconds();
         this.iconMaterial = source.iconMaterial();
+        this.categoryId = source.categoryId();
     }
 
     WarpBuilder location(Position value) {
@@ -119,6 +121,11 @@ final class WarpBuilder {
         return this;
     }
 
+    WarpBuilder categoryId(Optional<String> value) {
+        this.categoryId = value;
+        return this;
+    }
+
     Warp build() {
         return new Warp(
                 name,
@@ -137,6 +144,7 @@ final class WarpBuilder {
                 arrivalParticle,
                 warmupOverrideSeconds,
                 cooldownOverrideSeconds,
-                iconMaterial);
+                iconMaterial,
+                categoryId);
     }
 }

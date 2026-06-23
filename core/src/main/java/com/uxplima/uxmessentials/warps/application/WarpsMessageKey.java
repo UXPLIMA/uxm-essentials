@@ -152,7 +152,65 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_SIGN_NO_PERMISSION_CREATE("warp.sign.no-permission-create"),
     WARP_SIGN_NO_PERMISSION_USE("warp.sign.no-permission-use"),
     WARP_SIGN_EMPTY_NAME("warp.sign.empty-name"),
-    WARP_SIGN_CREATED("warp.sign.created");
+    WARP_SIGN_CREATED("warp.sign.created"),
+
+    // manager GUI (the kit-editor-style /warp edit manager)
+    WARP_MANAGER_TITLE("warp.manager.title"),
+    WARP_MANAGER_CREATE_BUTTON_NAME("warp.manager.create-button.name"),
+    WARP_MANAGER_CREATE_BUTTON_LORE("warp.manager.create-button.lore"),
+    WARP_MANAGER_CLOSE_BUTTON_NAME("warp.manager.close-button.name"),
+    WARP_MANAGER_ENTRY_LORE_CATEGORY("warp.manager.entry.lore.category"),
+    WARP_MANAGER_ENTRY_LORE_LOCATION("warp.manager.entry.lore.location"),
+    WARP_MANAGER_ENTRY_LORE_EDIT_HINT("warp.manager.entry.lore.edit-hint"),
+    WARP_MANAGER_MANAGE_CATEGORIES_NAME("warp.manager.manage-categories.name"),
+    WARP_MANAGER_MANAGE_CATEGORIES_LORE("warp.manager.manage-categories.lore"),
+    WARP_MANAGER_CREATE_PROMPT("warp.manager.create-prompt"),
+    WARP_MANAGER_ERROR_INVALID_NAME("warp.manager.error.invalid-name"),
+
+    // browse-menu category grouping
+    WARP_MENU_BACK("warp.menu.back"),
+    WARP_MENU_CATEGORY_NAME("warp.menu.category.name"),
+    WARP_MENU_CATEGORY_LORE("warp.menu.category.lore"),
+
+    // category administration GUIs
+    WARP_EDITOR_CATEGORY_MANAGER_TITLE("warp.editor.category.manager-title"),
+    WARP_EDITOR_CATEGORY_CREATE_BUTTON_NAME("warp.editor.category.create-button.name"),
+    WARP_EDITOR_CATEGORY_CREATE_BUTTON_LORE("warp.editor.category.create-button.lore"),
+    WARP_EDITOR_CATEGORY_LORE_EDIT_HINT("warp.editor.category.lore.edit-hint"),
+    WARP_EDITOR_CATEGORY_ICON_ID("warp.editor.category.icon.id"),
+    WARP_EDITOR_CATEGORY_ICON_SLOT("warp.editor.category.icon.slot"),
+    WARP_EDITOR_CATEGORY_ICON_PARENT("warp.editor.category.icon.parent"),
+    WARP_EDITOR_CATEGORY_PROMPT_CREATE("warp.editor.category.prompt.create"),
+    WARP_EDITOR_CATEGORY_SETTINGS_TITLE("warp.editor.category.settings.title"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_NAME("warp.editor.category.settings.display-name.name"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_CURRENT("warp.editor.category.settings.display-name.current"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_PROMPT("warp.editor.category.settings.display-name.prompt"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_MATERIAL_NAME("warp.editor.category.settings.display-material.name"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_MATERIAL_CURRENT("warp.editor.category.settings.display-material.current"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_MATERIAL_PROMPT("warp.editor.category.settings.display-material.prompt"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_NAME("warp.editor.category.settings.display-lore.name"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_CURRENT("warp.editor.category.settings.display-lore.current"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_PROMPT("warp.editor.category.settings.display-lore.prompt"),
+    WARP_EDITOR_CATEGORY_SETTINGS_SLOT_NAME("warp.editor.category.settings.slot.name"),
+    WARP_EDITOR_CATEGORY_SETTINGS_SLOT_CURRENT("warp.editor.category.settings.slot.current"),
+    WARP_EDITOR_CATEGORY_SETTINGS_SLOT_PROMPT("warp.editor.category.settings.slot.prompt"),
+    WARP_EDITOR_CATEGORY_SETTINGS_PARENT_NAME("warp.editor.category.settings.parent.name"),
+    WARP_EDITOR_CATEGORY_SETTINGS_PARENT_CURRENT("warp.editor.category.settings.parent.current"),
+    WARP_EDITOR_CATEGORY_SETTINGS_PARENT_PROMPT("warp.editor.category.settings.parent.prompt"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DELETE_NAME("warp.editor.category.settings.delete.name"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DELETE_LORE("warp.editor.category.settings.delete.lore"),
+    WARP_EDITOR_CATEGORY_SETTINGS_DELETE_WARNING("warp.editor.category.settings.delete.warning"),
+    WARP_EDITOR_CATEGORY_SELECTOR_TITLE("warp.editor.category.selector.title"),
+    WARP_EDITOR_CATEGORY_SELECTOR_NONE_NAME("warp.editor.category.selector.none.name"),
+    WARP_EDITOR_CATEGORY_SELECTOR_NONE_LORE("warp.editor.category.selector.none.lore"),
+    WARP_EDITOR_CATEGORY_SELECTOR_SELECT_HINT("warp.editor.category.selector.select-hint"),
+    WARP_EDITOR_CATEGORY_PARENT_SELECTOR_TITLE("warp.editor.category.parent-selector.title"),
+    WARP_EDITOR_CATEGORY_PARENT_SELECTOR_SELECT_HINT("warp.editor.category.parent-selector.select-hint"),
+
+    // warp-editor category assignment row
+    WARP_EDITOR_CATEGORY_NAME("warp.editor.category.name"),
+    WARP_EDITOR_CATEGORY_LORE_CURRENT("warp.editor.category.lore.current"),
+    WARP_EDITOR_CATEGORY_LORE_PROMPT("warp.editor.category.lore.prompt");
 
     private final String key;
 

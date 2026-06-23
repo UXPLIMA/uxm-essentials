@@ -162,7 +162,11 @@ class WarpMenuClickTest {
         Clock clock = Clock.systemUTC();
         UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
         WarpMenuView warpMenu = new WarpMenuView(
-                messages, new SyncScheduler(), useWarp, GuiLayout.paginatedDefault(Material.ENDER_PEARL));
+                messages,
+                new SyncScheduler(),
+                useWarp,
+                GuiLayout.paginatedDefault(Material.ENDER_PEARL),
+                new StubWarpCategoryRepository());
         return new WarpServices(
                 useWarp,
                 new SetWarp(repository, notifier, new NoEvents(), clock, List.of()),
@@ -173,6 +177,7 @@ class WarpMenuClickTest {
                 warpMenu,
                 new NoPlayerLookup(),
                 repository,
+                null,
                 null,
                 new SyncScheduler());
     }

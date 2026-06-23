@@ -5,6 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
@@ -30,6 +31,8 @@ import org.jspecify.annotations.NullMarked;
  * @param warpMenu the read-only browse menu {@code /warp list} opens
  * @param players name → ref resolution, available for future owner-attribution forms
  * @param editorView the warp edit chest GUI
+ * @param managerView the admin warp manager GUI {@code /warp edit} (no name) opens, or {@code null} when
+ *     disabled
  * @param scheduler the kernel scheduler the rating commands run their uncached database read/write through off
  *     the tick thread, bridging the confirmation back to the player's region thread
  */
@@ -45,6 +48,7 @@ public record WarpServices(
         PlayerLookup players,
         WarpRepository repository,
         @org.jspecify.annotations.Nullable WarpEditorView editorView,
+        @org.jspecify.annotations.Nullable WarpManagerView managerView,
         Scheduler scheduler) {
 
     public WarpServices {

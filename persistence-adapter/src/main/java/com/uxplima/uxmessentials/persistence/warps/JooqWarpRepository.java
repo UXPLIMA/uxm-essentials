@@ -131,6 +131,7 @@ public final class JooqWarpRepository extends JooqRepository implements WarpRepo
                 .set(WARPS.WARMUP_SECONDS, record.getWarmupSeconds())
                 .set(WARPS.COOLDOWN_SECONDS, record.getCooldownSeconds())
                 .set(WARPS.ICON_MATERIAL, record.getIconMaterial())
+                .set(WARPS.CATEGORY_ID, record.getCategoryId())
                 .execute();
     }
 }

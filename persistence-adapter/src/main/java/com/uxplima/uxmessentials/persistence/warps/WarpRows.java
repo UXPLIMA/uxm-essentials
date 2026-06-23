@@ -60,7 +60,8 @@ final class WarpRows {
                 Optional.ofNullable(row.get(WARPS.ARRIVAL_PARTICLE)),
                 Optional.ofNullable(row.get(WARPS.WARMUP_SECONDS)),
                 Optional.ofNullable(row.get(WARPS.COOLDOWN_SECONDS)),
-                Optional.ofNullable(row.get(WARPS.ICON_MATERIAL)));
+                Optional.ofNullable(row.get(WARPS.ICON_MATERIAL)),
+                Optional.ofNullable(row.get(WARPS.CATEGORY_ID)));
     }
 
     /** Populate a {@link WarpsRecord} from a domain {@link Warp} for an upsert. */
@@ -90,7 +91,8 @@ final class WarpRows {
                 .setArrivalParticle(warp.arrivalParticle().orElse(null))
                 .setWarmupSeconds(warp.warmupOverrideSeconds().orElse(null))
                 .setCooldownSeconds(warp.cooldownOverrideSeconds().orElse(null))
-                .setIconMaterial(warp.iconMaterial().orElse(null));
+                .setIconMaterial(warp.iconMaterial().orElse(null))
+                .setCategoryId(warp.categoryId().orElse(null));
     }
 
     private static WarpCost cost(BigDecimal stored, String currencyId) {

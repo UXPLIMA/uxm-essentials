@@ -35,6 +35,13 @@ public final class WarpEditorView {
     /** The display item a warp shows when no icon is set — the same default the browse menu falls back to. */
     private static final Material DEFAULT_ICON = Material.ENDER_PEARL;
 
+    /**
+     * The fixed slot for the category-assignment button. Categories are a server-warp concept, so this button
+     * appears only when the editor is opened on a server warp; the slot sits in the otherwise-empty top-right
+     * corner of the 3-row editor and is read by {@link WarpEditorListener} to open the category selector.
+     */
+    static final int CATEGORY_SLOT = 8;
+
     private final Messages messages;
     private final Scheduler scheduler;
     private final WarpRepository warpRepository;
@@ -93,10 +100,29 @@ public final class WarpEditorView {
             repo.find(Objects.requireNonNull(holder.warpOwner()), PlayerWarpName.of(holder.warpName()))
                     .ifPresent(warp -> populateFrom(inventory, WarpDisplay.of(warp), viewer));
         } else {
-            warpRepository
-                    .find(WarpName.of(holder.warpName()))
-                    .ifPresent(warp -> populateFrom(inventory, WarpDisplay.of(warp), viewer));
+            warpRepository.find(WarpName.of(holder.warpName())).ifPresent(warp -> {
+                populateFrom(inventory, WarpDisplay.of(warp), viewer);
+                categoryOption(inventory, warp.categoryId(), viewer);
+            });
         }
+    }
+
+    /**
+     * The category-assignment button, shown only for a server warp. Its lore names the warp's current category
+     * (or "none"); a click opens the warp→category selector, handled by {@link WarpEditorListener}.
+     */
+    private void categoryOption(Inventory inventory, java.util.Optional<String> categoryId, PlayerRef viewer) {
+        option(
+                inventory,
+                viewer,
+                CATEGORY_SLOT,
+                Material.BOOK,
+                WarpsMessageKey.WARP_EDITOR_CATEGORY_NAME,
+                List.of(text(
+                        viewer,
+                        WarpsMessageKey.WARP_EDITOR_CATEGORY_LORE_CURRENT,
+                        Map.of("category", categoryId.orElse(none(viewer))))),
+                WarpsMessageKey.WARP_EDITOR_CATEGORY_LORE_PROMPT);
     }
 
     private void populateFrom(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {

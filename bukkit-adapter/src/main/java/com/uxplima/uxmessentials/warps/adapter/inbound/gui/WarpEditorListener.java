@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.warps.application.SetWarp;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
@@ -44,6 +45,11 @@ public final class WarpEditorListener implements Listener {
     private final WarpParticleSelectorView particleSelectorView;
     private final WarpWelcomeMessagesView welcomeMessagesView;
 
+    private final WarpManagerView managerView;
+    private final WarpCategorySelectorView categorySelectorView;
+    private final WarpCategoryEditing categoryEditing;
+    private final SetWarp setWarp;
+
     public WarpEditorListener(
             WarpEditorView editorView,
             WarpRepository warpRepository,
@@ -53,7 +59,11 @@ public final class WarpEditorListener implements Listener {
             WarpParticleSelectorView particleSelectorView,
             WarpWelcomeMessagesView welcomeMessagesView,
             UseWarp useWarp,
-            PlayerWarpGoToHandle playerWarpGoTo) {
+            PlayerWarpGoToHandle playerWarpGoTo,
+            WarpManagerView managerView,
+            WarpCategorySelectorView categorySelectorView,
+            WarpCategoryEditing categoryEditing,
+            SetWarp setWarp) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.messages = Objects.requireNonNull(messages, "messages");
@@ -62,9 +72,63 @@ public final class WarpEditorListener implements Listener {
         this.welcomeMessagesView = Objects.requireNonNull(welcomeMessagesView, "welcomeMessagesView");
         this.useWarp = Objects.requireNonNull(useWarp, "useWarp");
         this.playerWarpGoTo = Objects.requireNonNull(playerWarpGoTo, "playerWarpGoTo");
+        this.managerView = Objects.requireNonNull(managerView, "managerView");
+        this.categorySelectorView = Objects.requireNonNull(categorySelectorView, "categorySelectorView");
+        this.categoryEditing = Objects.requireNonNull(categoryEditing, "categoryEditing");
+        this.setWarp = Objects.requireNonNull(setWarp, "setWarp");
         this.loader = new EditableWarpLoader(Objects.requireNonNull(warpRepository, "warpRepository"), editorView);
         this.subMenuClicks = new WarpSubMenuClicks(
                 editorView, textInput, this.loader, soundSelectorView, particleSelectorView, welcomeMessagesView);
+    }
+
+    /**
+     * Route a click in the warp manager: the create button at {@code prevSlot} prompts for a name and creates a
+     * warp at the operator's current position (the same {@code /warp create} path the command uses), the close
+     * button at {@code nextSlot} closes, the categories button opens the category manager, and a content slot
+     * opens the clicked warp's editor.
+     */
+    private void onManagerClick(Player player, WarpManagerHolder holder, int slot) {
+        PlayerRef viewer = holder.viewer();
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout layout = managerView.layout();
+        if (slot == layout.prevSlot()) {
+            promptCreateWarp(player, viewer);
+        } else if (slot == layout.nextSlot()) {
+            player.closeInventory();
+        } else if (slot == WarpManagerView.CATEGORIES_SLOT) {
+            categoryEditing.openCategoryManager(player, viewer);
+        } else {
+            int index = managerView.contentSlots().indexOf(slot);
+            if (index >= 0 && index < holder.warps().size()) {
+                editorView.open(player, viewer, holder.warps().get(index).name().value(), null);
+            }
+        }
+    }
+
+    /**
+     * Prompt for a new warp name and create the warp at the operator's current position through {@link SetWarp}
+     * — the same use case {@code /warp create} drives, so a manager-created warp is identical to a command-created
+     * one. The new warp's editor opens on success so the operator can configure it immediately.
+     */
+    private void promptCreateWarp(Player player, PlayerRef viewer) {
+        player.closeInventory();
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of("warp.create-name", WarpsMessageKey.WARP_MANAGER_CREATE_PROMPT),
+                name -> {
+                    String clean = name.trim();
+                    if (clean.isEmpty() || clean.contains(" ")) {
+                        player.sendMessage(text(viewer, WarpsMessageKey.WARP_MANAGER_ERROR_INVALID_NAME));
+                        return;
+                    }
+                    var location = Objects.requireNonNull(player.getLocation(), "player location");
+                    setWarp.set(
+                            viewer,
+                            WarpName.of(clean),
+                            com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toPosition(location));
+                    editorView.open(player, viewer, clean, null);
+                },
+                () -> managerView.open(player, viewer));
     }
 
     @EventHandler
@@ -97,6 +161,40 @@ public final class WarpEditorListener implements Listener {
             Player player = (Player) event.getWhoClicked();
             ClickType click = event.getClick();
             subMenuClicks.handleWelcomeMessagesClick(player, welcomeHolder, slot, click);
+            return;
+        }
+
+        if (holder instanceof WarpManagerHolder managerHolder) {
+            event.setCancelled(true);
+            onManagerClick((Player) event.getWhoClicked(), managerHolder, event.getRawSlot());
+            return;
+        }
+
+        if (holder instanceof WarpCategoryManagerHolder categoryManagerHolder) {
+            event.setCancelled(true);
+            categoryEditing.onCategoryManagerClick(
+                    (Player) event.getWhoClicked(), categoryManagerHolder, event.getRawSlot());
+            return;
+        }
+
+        if (holder instanceof WarpCategorySettingsHolder categorySettingsHolder) {
+            event.setCancelled(true);
+            categoryEditing.onCategorySettingsClick(
+                    (Player) event.getWhoClicked(), categorySettingsHolder, event.getRawSlot());
+            return;
+        }
+
+        if (holder instanceof WarpCategorySelectorHolder categorySelectorHolder) {
+            event.setCancelled(true);
+            categoryEditing.onCategorySelectorClick(
+                    (Player) event.getWhoClicked(), categorySelectorHolder, event.getRawSlot());
+            return;
+        }
+
+        if (holder instanceof WarpCategoryParentSelectorHolder parentSelectorHolder) {
+            event.setCancelled(true);
+            categoryEditing.onCategoryParentSelectorClick(
+                    (Player) event.getWhoClicked(), parentSelectorHolder, event.getRawSlot());
             return;
         }
 
@@ -139,6 +237,12 @@ public final class WarpEditorListener implements Listener {
             int slot,
             ClickType click) {
         WarpEditorLayout layout = editorView.layout();
+        // The category button is shown only for server warps (owner == null); a click opens the warp→category
+        // selector, where the operator assigns this warp to a category or clears it.
+        if (owner == null && slot == WarpEditorView.CATEGORY_SLOT) {
+            categorySelectorView.open(player, viewer, name);
+            return;
+        }
         if (slot == layout.iconSlot()) {
             editIcon(player, viewer, name, owner, warp, click);
         } else if (slot == layout.teleportSlot()) {

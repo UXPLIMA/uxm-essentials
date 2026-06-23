@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.warps;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import org.jspecify.annotations.NullMarked;
 
@@ -44,5 +45,20 @@ public final class WarpRepositories {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(names, "names");
         return new CachedWarpRepository(new JooqWarpRepository(persistence.dsl(), names));
+    }
+
+    /** A cached jOOQ {@link WarpCategoryRepository} over the shared persistence DSL. */
+    public static WarpCategoryRepository categories(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new CachedWarpCategoryRepository(new JooqWarpCategoryRepository(persistence.dsl()));
+    }
+
+    /**
+     * The cached jOOQ {@link WarpCategoryRepository} as its concrete decorator type, so the wiring can hold a
+     * reference to warm the set on enable and reach the invalidation seam. Same backing as {@link #categories}.
+     */
+    public static CachedWarpCategoryRepository categoriesConcrete(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new CachedWarpCategoryRepository(new JooqWarpCategoryRepository(persistence.dsl()));
     }
 }

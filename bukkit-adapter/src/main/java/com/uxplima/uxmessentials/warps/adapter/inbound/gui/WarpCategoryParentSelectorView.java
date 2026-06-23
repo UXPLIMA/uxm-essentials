@@ -1,0 +1,126 @@
+package com.uxplima.uxmessentials.warps.adapter.inbound.gui;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
+import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
+import com.uxplima.uxmessentials.warps.domain.WarpCategory;
+import com.uxplima.uxmlib.item.ItemBuilder;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * The parent-category selector: opened from a category's settings, it lists every other category (the edited
+ * category itself is filtered out to prevent a cyclic parent) plus a "no parent" button, and a click sets that
+ * category as the parent. Mirrors {@code KitCategoryParentSelectorView}; routing lives in
+ * {@link WarpCategoryEditing}.
+ */
+@NullMarked
+public final class WarpCategoryParentSelectorView {
+
+    private final Messages messages;
+    private final WarpCategoryRepository categoryRepository;
+    private final Scheduler scheduler;
+    private final MiniMessage miniMessage;
+
+    public WarpCategoryParentSelectorView(
+            Messages messages, WarpCategoryRepository categoryRepository, Scheduler scheduler) {
+        this.messages = Objects.requireNonNull(messages, "messages");
+        this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.miniMessage = MiniMessage.miniMessage();
+    }
+
+    public void open(Player player, PlayerRef viewer, WarpCategory category) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(category, "category");
+        scheduler.onEntity(viewer, () -> {
+            List<WarpCategory> categories = categoryRepository.all().stream()
+                    .filter(cat -> !cat.id().equals(category.id()))
+                    .toList();
+            WarpCategoryParentSelectorHolder holder = new WarpCategoryParentSelectorHolder(viewer, category);
+            Inventory inventory = Bukkit.createInventory(holder, 54, title(viewer));
+            holder.attach(inventory);
+            populate(inventory, categories, viewer);
+            player.openInventory(inventory);
+        });
+    }
+
+    private void populate(Inventory inventory, List<WarpCategory> categories, PlayerRef viewer) {
+        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.empty())
+                .build();
+        for (int i = 0; i < 54; i++) {
+            inventory.setItem(i, filler);
+        }
+
+        int index = 0;
+        for (WarpCategory cat : categories) {
+            if (index >= 45) {
+                break;
+            }
+            inventory.setItem(index, icon(cat, viewer));
+            index++;
+        }
+
+        inventory.setItem(
+                49,
+                ItemBuilder.of(Material.BARRIER)
+                        .name(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_SELECTOR_NONE_NAME))
+                        .lore(List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_SELECTOR_NONE_LORE)))
+                        .build());
+
+        inventory.setItem(
+                53,
+                ItemBuilder.of(Material.ARROW)
+                        .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK))
+                        .build());
+    }
+
+    private ItemStack icon(WarpCategory category, PlayerRef viewer) {
+        Component name = miniMessage.deserialize(category.displayName());
+        List<Component> lore = new ArrayList<>();
+        if (!category.displayLore().isEmpty()) {
+            for (String line : category.displayLore()) {
+                lore.add(miniMessage.deserialize(line));
+            }
+        }
+        lore.add(Component.empty());
+        lore.add(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_ICON_ID, Map.of("id", category.id())));
+        lore.add(Component.empty());
+        lore.add(text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_PARENT_SELECTOR_SELECT_HINT));
+        return ItemBuilder.of(WarpCategoryIcons.material(category))
+                .name(name)
+                .lore(lore)
+                .build();
+    }
+
+    private Component title(PlayerRef viewer) {
+        return text(viewer, WarpsMessageKey.WARP_EDITOR_CATEGORY_PARENT_SELECTOR_TITLE);
+    }
+
+    private Component text(PlayerRef viewer, MessageKey key) {
+        return StyledText.render(messages.resolve(viewer, key, Map.of()));
+    }
+
+    private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+        return StyledText.render(messages.resolve(viewer, key, placeholders));
+    }
+}

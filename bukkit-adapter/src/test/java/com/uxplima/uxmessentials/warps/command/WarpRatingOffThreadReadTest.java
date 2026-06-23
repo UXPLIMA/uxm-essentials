@@ -150,8 +150,12 @@ class WarpRatingOffThreadReadTest {
         Permissions permissions = new AllowAllPermissions();
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         UseWarp useWarp = new UseWarp(repository, access, new NoTeleport(), notifier, pos -> true, permissions);
-        WarpMenuView warpMenu =
-                new WarpMenuView(messages, scheduler, useWarp, GuiLayout.paginatedDefault(Material.ENDER_PEARL));
+        WarpMenuView warpMenu = new WarpMenuView(
+                messages,
+                scheduler,
+                useWarp,
+                GuiLayout.paginatedDefault(Material.ENDER_PEARL),
+                new StubWarpCategoryRepository());
         return new WarpServices(
                 useWarp,
                 new SetWarp(repository, notifier, event -> {}, Clock.systemUTC(), List.of()),
@@ -162,6 +166,7 @@ class WarpRatingOffThreadReadTest {
                 warpMenu,
                 new NoPlayerLookup(),
                 repository,
+                null,
                 null,
                 scheduler);
     }
