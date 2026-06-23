@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.worlds.adapter.inbound.gui;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -99,6 +100,7 @@ class WorldEditorListenerTest {
     private WorldMainView mainView;
     private WorldGenerationView generationView;
     private WorldPropertyGridView gridView;
+    private WorldTeleportService worldTeleport;
     private RecordingScheduler servicesScheduler;
 
     @BeforeEach
@@ -127,6 +129,7 @@ class WorldEditorListenerTest {
         when(unloadWorld.unload(any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
                 .thenReturn(Result.ok());
 
+        worldTeleport = mock(WorldTeleportService.class);
         servicesScheduler = new RecordingScheduler();
         WorldsServices services = services();
         WorldCreateView createView = mock(WorldCreateView.class);
@@ -221,6 +224,30 @@ class WorldEditorListenerTest {
         assertThat(servicesScheduler.globalHops).isGreaterThanOrEqualTo(1);
     }
 
+    @Test
+    void rightClickingAWorldOnTheListTeleportsTheViewerToItOnTheGlobalThread() {
+        listView.open(viewer, ref(viewer), 0);
+
+        fireClick(firstContentSlot(), ClickType.RIGHT);
+
+        // Right-click is the "visit" affordance: it mirrors /worlds tp <self> (staff override, no gate/fee) and,
+        // because loading a world is Folia-legal only on the global region thread, the hand-off hops there first.
+        verify(worldTeleport).forced(ref(viewer), ref(viewer), WORLD);
+        assertThat(servicesScheduler.globalHops).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void leftClickingAWorldOnTheListOpensItsEditorHubWithoutTeleporting() {
+        listView.open(viewer, ref(viewer), 0);
+
+        fireClick(firstContentSlot(), ClickType.LEFT);
+
+        InventoryHolder holder = viewer.getOpenInventory().getTopInventory().getHolder();
+        assertThat(holder).isInstanceOf(WorldEditorHolder.class);
+        assertThat(((WorldEditorHolder) holder).screen()).isEqualTo(WorldEditorScreen.MAIN);
+        verify(worldTeleport, never()).forced(any(), any(), any());
+    }
+
     private void fireClick(int slot, ClickType type) {
         server.getPluginManager().callEvent(clickEvent(slot, type));
     }
@@ -269,7 +296,7 @@ class WorldEditorListenerTest {
                 repository,
                 servicesScheduler,
                 Set::of,
-                mock(WorldTeleportService.class),
+                worldTeleport,
                 mock(BackupWorld.class),
                 mock(ListBackups.class),
                 mock(RestoreWorld.class),

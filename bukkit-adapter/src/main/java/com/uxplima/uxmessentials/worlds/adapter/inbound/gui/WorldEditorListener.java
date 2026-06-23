@@ -22,7 +22,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The single click-routing listener tying the four world-editor views together. It recognises a click in any
  * {@code /worlds editor} window by its {@link WorldEditorHolder}, cancels it, and dispatches by the holder's
- * {@link WorldEditorScreen}: list navigation and world selection, the main hub's branch/back/toggle buttons, the
+ * {@link WorldEditorScreen}: list navigation and world selection (left-click edits, right-click teleports the viewer
+ * to that world), the main hub's branch/back/toggle buttons, the
  * read-only generation back button, and the rules/access property grids where a click cycles the clicked property's
  * value through {@link WorldPropertyCycle} and persists it via {@link com.uxplima.uxmessentials.worlds.application.SetWorldProperty}.
  *
@@ -76,7 +77,7 @@ public final class WorldEditorListener implements Listener {
         }
         int slot = event.getRawSlot();
         switch (h.screen()) {
-            case LIST -> onList(player, h, slot);
+            case LIST -> onList(player, h, slot, event);
             case CREATE -> onCreate(player, h, slot, event);
             case MAIN -> onMain(player, h, slot);
             case GENERATION -> onGeneration(player, h, slot);
@@ -84,7 +85,7 @@ public final class WorldEditorListener implements Listener {
         }
     }
 
-    private void onList(Player player, WorldEditorHolder h, int slot) {
+    private void onList(Player player, WorldEditorHolder h, int slot, InventoryClickEvent event) {
         GuiLayout layout = listView.layout();
         if (slot == layout.prevSlot()) {
             listView.open(player, h.viewer(), Math.max(0, h.page() - 1));
@@ -93,8 +94,24 @@ public final class WorldEditorListener implements Listener {
         } else if (listView.isCreate(slot)) {
             createView.open(player, h.viewer());
         } else {
-            listView.worldAt(h.page(), slot).ifPresent(world -> mainView.open(player, h.viewer(), world));
+            listView.worldAt(h.page(), slot).ifPresent(world -> selectWorld(player, h, world, event.isRightClick()));
         }
+    }
+
+    private void selectWorld(Player player, WorldEditorHolder h, WorldName world, boolean teleport) {
+        if (teleport) {
+            visit(player, h, world);
+        } else {
+            mainView.open(player, h.viewer(), world);
+        }
+    }
+
+    private void visit(Player player, WorldEditorHolder h, WorldName world) {
+        // Right-clicking a world icon teleports the viewer there, mirroring /worlds tp <self>: the staff override
+        // skips the access gate and entry fee (the editor is already permission-gated), and the load-then-teleport
+        // runs on the global region thread because loading a world is legal under Folia only there.
+        player.closeInventory();
+        services.scheduler().onGlobal(() -> services.worldTeleport().forced(h.viewer(), h.viewer(), world));
     }
 
     private void onCreate(Player player, WorldEditorHolder h, int slot, InventoryClickEvent event) {
