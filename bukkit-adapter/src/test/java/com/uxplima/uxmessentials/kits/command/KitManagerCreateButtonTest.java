@@ -1,7 +1,12 @@
 package com.uxplima.uxmessentials.kits.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -19,6 +24,10 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
+import io.papermc.paper.event.player.AsyncChatEvent;
+
+import net.kyori.adventure.text.Component;
+
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
@@ -26,7 +35,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.listener.ChatPromptListener;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
 import com.uxplima.uxmessentials.kits.application.DelKit;
@@ -45,9 +53,13 @@ import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -57,6 +69,7 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,8 +83,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * name prompt, then the new kit's settings window — instead of opening the old create-kit/create-category
  * chooser (category creation already lives in the category manager, so the chooser was redundant). Clicking
  * the create-button slot of an open {@link KitManagerView} closes the manager (the prompt path closes it) and
- * arms the chat prompt; the next chat line names the kit, which is created in the repository and its settings
- * window opens.
+ * arms a chat prompt for the kit name; the next chat line names the kit, which is created in the repository and
+ * its settings window opens. The {@code kit.create-name} input point is configured as chat here so the typed
+ * line round-trips through the shared {@link TextInput} chat backend.
  */
 class KitManagerCreateButtonTest {
 
@@ -92,32 +106,46 @@ class KitManagerCreateButtonTest {
     private PlayerMock player;
     private RecordingRepository repository;
     private KitManagerView managerView;
-    private ChatPromptListener prompts;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         player = server.addPlayer("Alice");
         player.setOp(true);
+
+        // Route the create-name input point through chat so firing an AsyncChatEvent completes the prompt.
+        Path inputDir = plugin.getDataFolder().toPath().resolve("input");
+        Files.createDirectories(inputDir);
+        Files.writeString(inputDir.resolve("config.conf"), """
+                default-mode = anvil
+                modes {
+                  "kit.create-name" = chat
+                }
+                """);
 
         Messages messages = new KeyMessages();
         MessageSink sink = (viewer, text) -> {};
         KitNotifier notifier = new KitNotifier(messages, sink);
         repository = new RecordingRepository();
         Scheduler scheduler = new SyncScheduler();
+        GuiText guiText = new GuiText(messages);
+        AnvilInput anvil = new AnvilInput(plugin);
+        anvil.install();
+        // The installer registers the shared chat backend as a listener, so the AsyncChatEvent below routes.
+        TextInput textInput = TextInputInstaller.install(
+                        plugin, plugin.getDataFolder().toPath(), anvil, guiText, scheduler, new SilentLogger())
+                .textInput();
 
         managerView = new KitManagerView(messages, repository, scheduler, MANAGER_LAYOUT);
         KitSettingsView settingsView = new KitSettingsView(messages, scheduler, SETTINGS_LAYOUT);
-        prompts = new ChatPromptListener(messages);
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView editorView = new KitEditorView(messages, kitEditor, scheduler);
         KitServices services = services(messages, notifier, scheduler, kitEditor, editorView);
 
         KitEditorListener listener = new KitEditorListener(
-                editorView, services, repository, new StubCategoryRepository(), settingsView, prompts, messages);
+                editorView, services, repository, new StubCategoryRepository(), settingsView, textInput, messages);
         server.getPluginManager().registerEvents(listener, plugin);
-        server.getPluginManager().registerEvents(prompts, plugin);
     }
 
     @AfterEach
@@ -143,9 +171,9 @@ class KitManagerCreateButtonTest {
         managerView.open(player, ref(player));
         fireClick(49);
 
-        // Drive the kit-name prompt callback directly (MockBukkit fires chat off-thread), the same callback the
-        // chat listener invokes: it creates the kit and opens its settings window.
-        armedPrompt().accept("freshkit");
+        // The create button armed a chat prompt; the next chat line names the kit, which is created and its
+        // settings window opens — the same name-to-kit flow the shared chat backend drives in production.
+        fireChat("freshkit");
 
         assertThat(repository.exists(KitId.of("freshkit"))).isTrue();
         assertThat(player.getOpenInventory()
@@ -163,26 +191,13 @@ class KitManagerCreateButtonTest {
         server.getPluginManager().callEvent(event);
     }
 
-    /**
-     * The chat-prompt callback the create button armed for this player, read from the listener's pending-prompt
-     * map. Invoking it on the test thread runs the same name-to-kit flow the chat listener triggers, without
-     * MockBukkit's off-thread chat firing the inventory open asynchronously.
-     */
-    @SuppressWarnings("unchecked") // the listener stores UUID -> Consumer<String>; the map type is known here
-    private java.util.function.Consumer<String> armedPrompt() {
-        try {
-            java.lang.reflect.Field field = ChatPromptListener.class.getDeclaredField("activePrompts");
-            field.setAccessible(true);
-            Map<UUID, java.util.function.Consumer<String>> active =
-                    (Map<UUID, java.util.function.Consumer<String>>) field.get(prompts);
-            java.util.function.Consumer<String> callback = active.get(player.getUniqueId());
-            assertThat(callback)
-                    .as("a kit-name prompt is armed after clicking create")
-                    .isNotNull();
-            return callback;
-        } catch (ReflectiveOperationException e) {
-            throw new LinkageError("could not read the armed chat prompt", e);
-        }
+    private void fireChat(String line) {
+        AsyncChatEvent event = mock(AsyncChatEvent.class);
+        when(event.getPlayer()).thenReturn(player);
+        when(event.message()).thenReturn(Component.text(line));
+        // The mock would otherwise report a null handler list; point it at the real one the backend registered on.
+        when(event.getHandlers()).thenReturn(AsyncChatEvent.getHandlerList());
+        server.getPluginManager().callEvent(event);
     }
 
     private KitServices services(
@@ -382,6 +397,20 @@ class KitManagerCreateButtonTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+    }
+
+    private static final class SilentLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class KeyMessages implements Messages {

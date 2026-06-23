@@ -44,13 +44,13 @@ import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -84,13 +84,13 @@ public final class CommunicationWiring {
             AnnouncementStore announcementStore,
             AnnouncerSettingsStore announcerSettingsStore,
             GuiLayouts guiLayouts,
-            AnvilInput anvil) {
+            TextInput textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(announcementStore, "announcementStore");
         Objects.requireNonNull(announcerSettingsStore, "announcerSettingsStore");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
         CommunicationSettings settings = new CommunicationSettings(dir, kernel.log());
@@ -122,8 +122,8 @@ public final class CommunicationWiring {
         AnnouncerTask announcer = new AnnouncerTask(
                 kernel.scheduler(), services.nextAnnouncement(), broadcaster, mergedConfig, running::get);
         // The admin panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader. It
-        // flips the live ChatLock, runs the /clearchat fan-out behind a confirm, broadcasts an anvil line through the
-        // same broadcaster as /broadcast, and opens a read-only announcer list — only the surfaces the commands
+        // flips the live ChatLock, runs the /clearchat fan-out behind a confirm, broadcasts a captured line through
+        // the same broadcaster as /broadcast, and opens a read-only announcer list — only the surfaces the commands
         // expose, no new domain logic. /communication gui and the /uxmess gui hub entry both open it.
         GuiText guiText = new GuiText(kernel.messages());
         // The DB-backed announcement editor bare /announce (and /announce editor) opens: a list of the store
@@ -138,7 +138,7 @@ public final class CommunicationWiring {
                 announcementStore,
                 announcerSettingsStore,
                 guiLayouts,
-                anvil);
+                textInput);
         CommunicationAdminView adminView = new CommunicationAdminView(
                 guiText,
                 kernel.scheduler(),
@@ -150,7 +150,7 @@ public final class CommunicationWiring {
                 mergedConfig,
                 notifier,
                 kernel.messageSink(),
-                anvil);
+                textInput);
         List<CommandRegistration> commands = new ArrayList<>(CommunicationCommands.all(
                 services.broadcastOptOut(),
                 registry,

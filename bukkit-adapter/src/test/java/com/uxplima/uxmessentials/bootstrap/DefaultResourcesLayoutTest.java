@@ -78,7 +78,7 @@ class DefaultResourcesLayoutTest {
         if (!relative.endsWith(".conf")) {
             return false;
         }
-        if (relative.startsWith("messages/")) {
+        if (relative.startsWith("messages/") || relative.startsWith("input/")) {
             return true;
         }
         return relative.startsWith("modules/")

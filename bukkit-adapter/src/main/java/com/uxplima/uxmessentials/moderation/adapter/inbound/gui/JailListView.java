@@ -18,6 +18,8 @@ import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -25,8 +27,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -35,8 +35,8 @@ import org.jspecify.annotations.NullMarked;
  * The jail-management list (capability B of the {@code /jail} GUI): a config-driven, paginated grid of every
  * defined jail name (the config jails merged with the DB-backed {@code /setjail} jails) drawn through the shared
  * {@link EntityListView}, plus a "create jail" button. Clicking a jail opens a small edit screen offering
- * re-anchor (save the jail at the staff member's current location) and delete; the create button opens an anvil
- * for a name and saves a new jail at the staff member's current location.
+ * re-anchor (save the jail at the staff member's current location) and delete; the create button prompts for a
+ * name through the shared text-input seam and saves a new jail at the staff member's current location.
  *
  * <p>The name union is a DB read, so the open resolves it off the tick thread and hops back to the viewer's
  * entity thread to render. Re-anchoring and creating both read the viewer's own location <em>on the viewer's
@@ -57,8 +57,8 @@ public final class JailListView {
     private static final Material GOTO_ICON = Material.ENDER_PEARL;
     private static final Material DELETE_ICON = Material.LAVA_BUCKET;
     private static final Material BACK_ICON = Material.ARROW;
-    private static final Material CREATE_ICON = Material.ANVIL;
     private static final Material JAIL_ICON = Material.IRON_BARS;
+    private static final String CREATE_KEY = "moderation.jail-create";
 
     private final GuiText guiText;
     private final Messages messages;
@@ -66,7 +66,7 @@ public final class JailListView {
     private final ModerationServices services;
     private final Sanctions sanctions;
     private final JailLocator jailLocator;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final AtomicReference<List<String>> snapshot = new AtomicReference<>(List.of());
     private final EntityListView<String> view;
 
@@ -77,7 +77,7 @@ public final class JailListView {
             ModerationServices services,
             Sanctions sanctions,
             JailLocator jailLocator,
-            AnvilInput anvil,
+            TextInput textInput,
             EntityListLayout layout) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.messages = Objects.requireNonNull(messages, "messages");
@@ -85,7 +85,7 @@ public final class JailListView {
         this.services = Objects.requireNonNull(services, "services");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
         this.jailLocator = Objects.requireNonNull(jailLocator, "jailLocator");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(layout, "layout");
         this.view = EntityListView.<String>builder()
                 .guiText(guiText)
@@ -179,24 +179,26 @@ public final class JailListView {
         open(player, viewer);
     }
 
-    /** Open the anvil for a new jail name; a submission saves it at the viewer's current location. */
+    /** Prompt for a new jail name; a submission saves it at the viewer's current location, a cancel reopens the list. */
     private void promptCreate(Player player) {
         PlayerRef viewer = BukkitRefs.toRef(player);
-        scheduler.onEntity(
-                viewer,
-                () -> anvil.open(player, createPrompt(viewer), result -> {
-                    if (result instanceof AnvilResult.Submitted submitted
-                            && !submitted.text().isBlank()) {
-                        createJail(player, viewer, submitted.text().strip());
-                    } else {
-                        open(player, viewer);
-                    }
-                }));
+        InputRequest request = InputRequest.of(CREATE_KEY, ModerationMessageKey.MOD_GUI_JAIL_CREATE_PROMPT);
+        textInput.prompt(
+                player, viewer, request, text -> createOrReopen(player, viewer, text), () -> open(player, viewer));
+    }
+
+    /** A blank name reopens the list; otherwise the trimmed name creates a jail at the viewer's location. */
+    private void createOrReopen(Player player, PlayerRef viewer, String text) {
+        if (text.isBlank()) {
+            open(player, viewer);
+        } else {
+            createJail(player, viewer, text.strip());
+        }
     }
 
     /**
      * Save a new jail at the viewer's current location, read here on the viewer's own region thread.
-     * Package-private so the create path is unit-tested without driving a live anvil submission.
+     * Package-private so the create path is unit-tested without driving a live prompt submission.
      */
     void createJail(Player player, PlayerRef viewer, String name) {
         scheduler.onEntity(viewer, () -> {
@@ -229,12 +231,6 @@ public final class JailListView {
     private ItemStack backIcon(PlayerRef viewer) {
         return ItemBuilder.of(BACK_ICON)
                 .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_BACK))
-                .build();
-    }
-
-    private ItemStack createPrompt(PlayerRef viewer) {
-        return ItemBuilder.of(CREATE_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_CREATE_PROMPT))
                 .build();
     }
 

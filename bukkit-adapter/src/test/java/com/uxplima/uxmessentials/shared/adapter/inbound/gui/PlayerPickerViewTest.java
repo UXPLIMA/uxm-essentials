@@ -19,9 +19,12 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -29,7 +32,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.PaginatedGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,7 +56,7 @@ class PlayerPickerViewTest {
     private Plugin plugin;
     private PlayerMock viewer;
     private PlayerRef viewerRef;
-    private AnvilInput anvil;
+    private TextInput textInput;
     private RecordingSink sink;
 
     @BeforeEach
@@ -63,8 +65,12 @@ class PlayerPickerViewTest {
         plugin = MockBukkit.createMockPlugin();
         viewer = server.addPlayer("Viewer");
         viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
-        anvil = new AnvilInput(plugin);
-        anvil.install();
+        textInput = TextInputTestKit.create(
+                plugin,
+                new GuiText(new KeyMessages()),
+                new SyncScheduler(),
+                java.nio.file.Path.of("nonexistent"),
+                new NoopLogger());
         sink = new RecordingSink();
         Guis.install(plugin);
     }
@@ -154,7 +160,7 @@ class PlayerPickerViewTest {
 
     private PlayerPickerView view() {
         return new PlayerPickerView(
-                new GuiText(new KeyMessages()), new SyncScheduler(), anvil, server, new KeyMessages(), sink);
+                new GuiText(new KeyMessages()), new SyncScheduler(), textInput, server, new KeyMessages(), sink);
     }
 
     private static PlayerPickerView.Request request(
@@ -194,6 +200,20 @@ class PlayerPickerViewTest {
         public void deliver(PlayerRef viewer, String renderedText) {
             delivered.add(renderedText);
         }
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     /** Runs every scheduler hop inline, as the production schedulers would after their marshal. */

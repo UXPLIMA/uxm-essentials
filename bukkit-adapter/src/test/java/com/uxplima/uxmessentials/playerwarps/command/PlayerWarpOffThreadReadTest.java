@@ -33,7 +33,10 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -164,7 +167,8 @@ class PlayerWarpOffThreadReadTest {
             SetPlayerWarpVisibility visibility,
             DelPlayerWarp delPlayerWarp) {
         GuiText guiText = new GuiText(messages);
-        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
+        TextInput textInput =
+                TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         EntityEditorLayout editorLayout = new EntityEditorLayout(
                 6,
                 List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24),
@@ -179,7 +183,7 @@ class PlayerWarpOffThreadReadTest {
                 repository,
                 visibility,
                 delPlayerWarp,
-                anvil,
+                textInput,
                 messages,
                 editorLayout,
                 PlayerWarpEditorSubLayouts.codeDefault(),
@@ -191,7 +195,7 @@ class PlayerWarpOffThreadReadTest {
                 messages,
                 repository,
                 setPlayerWarp,
-                anvil,
+                textInput,
                 EntityListLayout.withCreate(org.bukkit.Material.ENDER_PEARL, 49, org.bukkit.Material.LIME_DYE),
                 editor);
     }
@@ -345,6 +349,20 @@ class PlayerWarpOffThreadReadTest {
             delivered.add(renderedText);
         }
     }
+
+    private static final Logger NOOP = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
 
     private static final class AllowAllPermissions implements Permissions {
         @Override

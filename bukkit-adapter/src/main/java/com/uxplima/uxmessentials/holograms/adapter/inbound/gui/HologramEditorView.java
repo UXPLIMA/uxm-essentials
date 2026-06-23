@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
@@ -45,7 +46,6 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 
 /**
  * The per-hologram property editor: a thin consumer of the shared {@link EntityEditorView} that exposes every
@@ -62,7 +62,7 @@ public final class HologramEditorView {
     private final Scheduler scheduler;
     private final HologramRepository repository;
     private final HologramServices services;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final PlayerLookup players;
     private final Messages messages;
     private final HologramEditorSubLayouts sub;
@@ -75,7 +75,7 @@ public final class HologramEditorView {
             Scheduler scheduler,
             HologramRepository repository,
             HologramServices services,
-            AnvilInput anvil,
+            TextInput textInput,
             PlayerLookup players,
             Messages messages,
             EntityEditorLayout layout,
@@ -86,7 +86,7 @@ public final class HologramEditorView {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.services = Objects.requireNonNull(services, "services");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.players = Objects.requireNonNull(players, "players");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sub = Objects.requireNonNull(sub, "sub");
@@ -175,14 +175,14 @@ public final class HologramEditorView {
 
     private EditableProperty nameProperty(HologramName name) {
         return new TextProperty(
+                "editor.text-field",
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_NAME,
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_NAME_PROMPT,
                 Material.NAME_TAG,
-                guiText,
                 () -> currentName(name).value(),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> rename(name, HologramName.of(value)),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -247,6 +247,7 @@ public final class HologramEditorView {
 
     private EditableProperty linesProperty(HologramName name) {
         return new ListProperty(
+                "editor.list-entry",
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_LINES,
                 Material.WRITABLE_BOOK,
                 guiText,
@@ -262,7 +263,7 @@ public final class HologramEditorView {
                         HologramsMessageKey.HOLOGRAM_GUI_LINES_REMOVE_CONFIRM,
                         HologramsMessageKey.HOLOGRAM_GUI_LINES_BACK),
                 sub.listLayout(),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -490,32 +491,33 @@ public final class HologramEditorView {
 
     private EditableProperty clickCommandProperty(HologramName name) {
         return new TextProperty(
+                "editor.text-field",
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_CLICK_COMMAND,
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_CLICK_COMMAND_PROMPT,
                 Material.COMMAND_BLOCK,
-                guiText,
                 () -> currentHologram(name).map(Hologram::clickCommand).orElse(none()),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> applyClickCommand(name, value),
-                anvil,
+                textInput,
                 scheduler);
     }
 
     private EditableProperty npcLinkProperty(HologramName name) {
         return new TextProperty(
+                "editor.text-field",
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_NPC_LINK,
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_NPC_LINK_PROMPT,
                 Material.PLAYER_HEAD,
-                guiText,
                 () -> currentHologram(name).map(Hologram::linkedNpcName).orElse(none()),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> applyNpcLink(name, value),
-                anvil,
+                textInput,
                 scheduler);
     }
 
     private EditableProperty blacklistProperty(HologramName name) {
         return new ListProperty(
+                "editor.list-entry",
                 HologramsMessageKey.HOLOGRAM_GUI_PROP_BLACKLIST,
                 Material.BARRIER,
                 guiText,
@@ -531,7 +533,7 @@ public final class HologramEditorView {
                         HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_REMOVE_CONFIRM,
                         HologramsMessageKey.HOLOGRAM_GUI_BLACKLIST_BACK),
                 sub.listLayout(),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -549,7 +551,7 @@ public final class HologramEditorView {
                 guiText,
                 colourPickerText,
                 colourPicker,
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -565,7 +567,7 @@ public final class HologramEditorView {
                 guiText,
                 colourPickerText,
                 colourPicker,
-                anvil,
+                textInput,
                 scheduler);
     }
 

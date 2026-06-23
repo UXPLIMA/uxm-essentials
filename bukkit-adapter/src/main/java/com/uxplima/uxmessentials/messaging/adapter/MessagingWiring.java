@@ -44,12 +44,12 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.IgnoreSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -80,7 +80,7 @@ public final class MessagingWiring {
             Bus bus,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            AnvilInput anvil) {
+            TextInput textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -88,7 +88,7 @@ public final class MessagingWiring {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
         MessagingSettings settings = new MessagingSettings(ctx.config());
         AtomicBoolean running = new AtomicBoolean(true);
@@ -123,7 +123,7 @@ public final class MessagingWiring {
                 stores.ignores(),
                 stores.mail(),
                 kernel.playerLookup(),
-                anvil,
+                textInput,
                 guiLayouts);
         List<CommandRegistration> commands =
                 MessagingCommands.all(services, kernel.messages(), kernel.messageSink(), views);

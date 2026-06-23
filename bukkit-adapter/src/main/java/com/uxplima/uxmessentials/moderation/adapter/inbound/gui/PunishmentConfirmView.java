@@ -13,13 +13,13 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.item.SkullData;
@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * The per-target confirm screen the bare {@code /ban}/{@code /mute} GUI flow opens once a target is chosen in the
  * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView}. It shows the target's head, two
  * unambiguous confirm actions — apply (broadcast) and apply silently — plus an optional "set reason" button that
- * captures a free-text reason through a vanilla anvil, and a back button to the picker. One view serves both
+ * captures a free-text reason through the shared text-input seam, and a back button to the picker. One view serves both
  * sanctions: the {@link PunishmentAction} supplies the title and the two confirm-button labels, and the caller
  * passes the {@link PunishmentAction.Executor} the confirm click runs, so this class holds no ban/mute-specific
  * branch.
@@ -37,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>Every visible string is a catalog key in the viewer's locale; the target name and the typed reason are
  * substituted outside any tag argument, per the UI canon. The confirm click hops to the actor's entity region
  * thread, runs the audited use-case call there, and closes — the use case itself kicks/notifies and broadcasts.
- * The reason is carried across the anvil round-trip by reopening the screen with the captured value, so the menu
+ * The reason is carried across the input round-trip by reopening the screen with the captured value, so the menu
  * stays single-viewer and stateless between opens. {@link #confirm} is package-private so a test can drive the
  * normal/silent click and assert the executor sees the right {@code silent} flag without a live inventory.
  */
@@ -56,20 +56,22 @@ public final class PunishmentConfirmView {
     private static final Material REASON_ICON = Material.WRITABLE_BOOK;
     private static final Material BACK_ICON = Material.ARROW;
 
+    private static final String REASON_KEY = "moderation.reason";
+
     private final GuiText guiText;
     private final Scheduler scheduler;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
 
-    public PunishmentConfirmView(GuiText guiText, Scheduler scheduler, AnvilInput anvil) {
+    public PunishmentConfirmView(GuiText guiText, Scheduler scheduler, TextInput textInput) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
     }
 
     /**
      * Open the confirm screen for {@code target}. {@code executor} performs the audited use-case call on confirm;
      * {@code onBack} reopens the picker from the back button. The reason starts empty and is captured through the
-     * reason button's anvil.
+     * reason button's text-input prompt.
      */
     public void open(
             Player viewer,
@@ -149,7 +151,7 @@ public final class PunishmentConfirmView {
         });
     }
 
-    /** Open the anvil to capture a reason; a submission reopens the confirm screen carrying the typed reason. */
+    /** Prompt for a reason; a submission reopens the confirm screen carrying the typed reason, a cancel keeps it. */
     private void promptReason(
             Player viewer,
             PlayerRef actor,
@@ -157,15 +159,18 @@ public final class PunishmentConfirmView {
             PunishmentAction action,
             PunishmentAction.Executor executor,
             Runnable onBack) {
-        scheduler.onEntity(
+        InputRequest request = InputRequest.of(REASON_KEY, ModerationMessageKey.MOD_GUI_CONFIRM_REASON_PROMPT);
+        textInput.prompt(
+                viewer,
                 actor,
-                () -> anvil.open(viewer, reasonPrompt(actor), result -> {
-                    Optional<String> reason = result instanceof AnvilResult.Submitted submitted
-                                    && !submitted.text().isBlank()
-                            ? Optional.of(submitted.text().strip())
-                            : Optional.empty();
-                    open(viewer, actor, target, action, executor, onBack, reason);
-                }));
+                request,
+                text -> open(viewer, actor, target, action, executor, onBack, reasonOf(text)),
+                () -> open(viewer, actor, target, action, executor, onBack, Optional.empty()));
+    }
+
+    /** A blank submission clears the reason; otherwise the trimmed line becomes the carried reason. */
+    private static Optional<String> reasonOf(String text) {
+        return text.isBlank() ? Optional.empty() : Optional.of(text.strip());
     }
 
     private ItemStack targetHead(PlayerRef viewer, PlayerRef target) {
@@ -197,12 +202,6 @@ public final class PunishmentConfirmView {
         return ItemBuilder.of(REASON_ICON)
                 .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_CONFIRM_REASON))
                 .lore(List.of(lore))
-                .build();
-    }
-
-    private ItemStack reasonPrompt(PlayerRef viewer) {
-        return ItemBuilder.of(REASON_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_CONFIRM_REASON_PROMPT))
                 .build();
     }
 

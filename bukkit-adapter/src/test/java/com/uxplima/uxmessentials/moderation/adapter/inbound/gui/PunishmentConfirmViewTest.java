@@ -18,14 +18,16 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +51,7 @@ class PunishmentConfirmViewTest {
     private PlayerMock actor;
     private PlayerRef actorRef;
     private PlayerRef target;
-    private AnvilInput anvil;
+    private TextInput textInput;
 
     @BeforeEach
     void setUp() {
@@ -58,8 +60,12 @@ class PunishmentConfirmViewTest {
         actor = server.addPlayer("Staff");
         actorRef = new PlayerRef(actor.getUniqueId(), actor.getName());
         target = new PlayerRef(java.util.UUID.randomUUID(), "Target");
-        anvil = new AnvilInput(plugin);
-        anvil.install();
+        textInput = TextInputTestKit.create(
+                plugin,
+                new GuiText(new KeyMessages()),
+                new SyncScheduler(),
+                java.nio.file.Path.of("nonexistent"),
+                new NoopLogger());
         Guis.install(plugin);
     }
 
@@ -105,7 +111,7 @@ class PunishmentConfirmViewTest {
     }
 
     private PunishmentConfirmView view() {
-        return new PunishmentConfirmView(new GuiText(new KeyMessages()), new SyncScheduler(), anvil);
+        return new PunishmentConfirmView(new GuiText(new KeyMessages()), new SyncScheduler(), textInput);
     }
 
     private RecordingExecutor recording() {
@@ -135,6 +141,20 @@ class PunishmentConfirmViewTest {
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             return key.key();
         }
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class SyncScheduler implements Scheduler {

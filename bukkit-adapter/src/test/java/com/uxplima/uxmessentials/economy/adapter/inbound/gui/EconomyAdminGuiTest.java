@@ -86,6 +86,7 @@ class EconomyAdminGuiTest {
     private GuiText guiText;
     private Scheduler scheduler;
     private AnvilInput anvil;
+    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput;
     private PlayerPickerView picker;
     private EconomyNotifier notifier;
     private TransactionsHistoryView historyView;
@@ -109,9 +110,17 @@ class EconomyAdminGuiTest {
         anvil = new AnvilInput(plugin);
         anvil.install();
         Guis.install(plugin);
+        textInput = com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller.install(
+                        plugin,
+                        plugin.getDataFolder().toPath(),
+                        anvil,
+                        guiText,
+                        scheduler,
+                        mock(com.uxplima.uxmessentials.shared.application.port.Logger.class))
+                .textInput();
         notifier = new EconomyNotifier(new KeyMessages(), new NoopSink());
         historyView = mock(TransactionsHistoryView.class);
-        picker = new PlayerPickerView(guiText, scheduler, anvil, server, new KeyMessages(), new NoopSink());
+        picker = new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
     }
 
     @AfterEach
@@ -127,13 +136,22 @@ class EconomyAdminGuiTest {
     private EconomyTargetView targetView(CurrencyRegistry currencies) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
         return new EconomyTargetView(
-                guiText, scheduler, anvil, provider, ops, currencies, notifier, historyView, picker(), (p, v) -> {});
+                guiText,
+                scheduler,
+                textInput,
+                provider,
+                ops,
+                currencies,
+                notifier,
+                historyView,
+                picker(),
+                (p, v) -> {});
     }
 
     private EconomyBulkView bulkView(CurrencyRegistry currencies) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
         return new EconomyBulkView(
-                guiText, scheduler, anvil, server, ops, currencies, notifier, picker(), (p, v) -> {});
+                guiText, scheduler, textInput, server, ops, currencies, notifier, picker(), (p, v) -> {});
     }
 
     private static CurrencyRegistry singleCoins() {
@@ -328,7 +346,7 @@ class EconomyAdminGuiTest {
                 scheduler,
                 server,
                 picker,
-                anvil,
+                textInput,
                 mock(PlayerLookup.class),
                 provider,
                 ecoAdmin,

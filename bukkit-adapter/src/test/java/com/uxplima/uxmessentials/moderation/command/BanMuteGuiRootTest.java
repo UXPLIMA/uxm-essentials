@@ -20,9 +20,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.DurationPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -55,12 +58,13 @@ class BanMuteGuiRootTest {
         services = mock(ModerationServices.class);
         GuiText guiText = new GuiText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
-        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
+        TextInput textInput = TextInputTestKit.create(
+                plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), new NoopLogger());
         PlayerPickerView picker =
-                new PlayerPickerView(guiText, scheduler, anvil, server, new KeyMessages(), new NoopSink());
+                new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
         DurationPickerView durations =
-                new DurationPickerView(guiText, scheduler, anvil, new KeyMessages(), new NoopSink());
-        PunishmentConfirmView confirm = new PunishmentConfirmView(guiText, scheduler, anvil);
+                new DurationPickerView(guiText, scheduler, textInput, new KeyMessages(), new NoopSink());
+        PunishmentConfirmView confirm = new PunishmentConfirmView(guiText, scheduler, textInput);
         flow = new PunishmentGuiFlow(services, picker, durations, confirm, new KeyMessages(), new NoopSink());
     }
 
@@ -126,6 +130,20 @@ class BanMuteGuiRootTest {
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class SyncScheduler implements Scheduler {

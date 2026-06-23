@@ -23,7 +23,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.listener.ChatPromptListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.listener.KitsJoinListener;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitActionRunner;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitGranter;
@@ -54,6 +53,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -80,8 +80,8 @@ public final class KitsWiring {
     private KitsWiring() {}
 
     /** Build the kits adapters and use cases with no economy bridge (a recorded kit cost is not charged). */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts) {
-        return wire(plugin, ctx, Optional.empty(), guiLayouts);
+    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, TextInput textInput) {
+        return wire(plugin, ctx, Optional.empty(), guiLayouts, textInput);
     }
 
     /**
@@ -90,11 +90,17 @@ public final class KitsWiring {
      * economy wiring and handed in here; when it is empty (economy disabled), a priced kit's cost is recorded
      * but not charged — the soft coupling the kits context owns.
      */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Optional<KitEconomy> economy, GuiLayouts guiLayouts) {
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Optional<KitEconomy> economy,
+            GuiLayouts guiLayouts,
+            TextInput textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
         Path dataFolder = plugin.getDataFolder().toPath();
         Path kitsDir = dataFolder.resolve("modules").resolve("kits").resolve("kits");
@@ -178,7 +184,6 @@ public final class KitsWiring {
                 () -> ListDisplayMode.from(ctx.config(), SHOWKIT_DISPLAY_KEY),
                 kernel.scheduler());
 
-        ChatPromptListener promptListener = new ChatPromptListener(kernel.messages());
         KitSettingsView settingsView = new KitSettingsView(kernel.messages(), kernel.scheduler(), settingsLayout);
 
         List<Listener> listeners = List.of(
@@ -189,18 +194,13 @@ public final class KitsWiring {
                         repository,
                         categoryRepository,
                         settingsView,
-                        promptListener,
+                        textInput,
                         kernel.messages()),
-                promptListener,
                 new KitsJoinListener(repository, granter, access));
 
         // The kit's claim/deny effects (sound, particles, title, firework, commands, the wait-ticks delay) now run
         // through the KitActionRunner inside ClaimKit, ordered around the item grant — so there is no longer a
         // KitClaimed event subscriber to run them reactively after the fact, and none to unsubscribe on stop.
-
-        // On stop: drop any pending chat prompt so a leftover callback can never fire after teardown (mirrors the
-        // economy PromptRegistry teardown).
-        Runnable stopAction = promptListener::clear;
 
         return new Wired(
                 commands,
@@ -210,7 +210,7 @@ public final class KitsWiring {
                 access,
                 services.listKits(),
                 services.kitMenu(),
-                stopAction);
+                () -> {});
     }
 
     private static KitServices assemble(
@@ -283,7 +283,7 @@ public final class KitsWiring {
      * @param access the claim gate the availability/permission/claims-left placeholders read
      * @param listKits the {@code /kit list} filter the usable-kit-list placeholder reads
      * @param kitMenu the browse menu the {@code /kit} command and the management hub both open
-     * @param stopAction clears any pending chat prompt on stop
+     * @param stopAction extra teardown to run on module stop
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -307,8 +307,7 @@ public final class KitsWiring {
         }
 
         /**
-         * Save every still-open {@code /kit editor} window back to its kit and clear any pending chat prompt.
-         * Called on module stop.
+         * Save every still-open {@code /kit editor} window back to its kit. Called on module stop.
          */
         public void stop() {
             kitEditorView.flushAll();

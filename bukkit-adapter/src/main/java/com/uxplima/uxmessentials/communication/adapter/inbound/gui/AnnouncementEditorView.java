@@ -24,6 +24,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListPropertyLayout;
@@ -37,8 +39,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.display.ConditionTargets;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -63,6 +63,10 @@ public final class AnnouncementEditorView {
     private static final String LIST_LAYOUT = "announcement-editor-list";
     private static final String EDITOR_LAYOUT = "announcement-editor";
     private static final String SETTINGS_LAYOUT = "announcer-settings";
+
+    private static final String CREATE_INPUT_KEY = "communication.announce-create";
+    private static final String TEXT_FIELD_INPUT_KEY = "editor.text-field";
+    private static final String LIST_ENTRY_INPUT_KEY = "editor.list-entry";
 
     /** The default editor property slots: nine buttons across a three-row chest, back and delete on the last row. */
     private static final List<Integer> DEFAULT_PROPERTY_SLOTS = List.of(10, 11, 12, 13, 14, 15, 16, 19, 20);
@@ -98,7 +102,7 @@ public final class AnnouncementEditorView {
     private final Messages messages;
     private final AnnouncementStore store;
     private final AnnouncerSettingsStore settingsStore;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final ListPropertyLayout messageListLayout;
     private final EntityListView<StoredAnnouncement> list;
     private final EntityEditorView<StoredAnnouncement> editor;
@@ -111,13 +115,13 @@ public final class AnnouncementEditorView {
             AnnouncementStore store,
             AnnouncerSettingsStore settingsStore,
             GuiLayouts guiLayouts,
-            AnvilInput anvil) {
+            TextInput textInput) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.store = Objects.requireNonNull(store, "store");
         this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
 
         // The message-lines sub-menu is a ListProperty; GuiLayouts has no list-property loader, so it uses the code
@@ -206,7 +210,7 @@ public final class AnnouncementEditorView {
     /**
      * The two global announcer settings as editable properties: the default interval (seconds between
      * announcements) and the minimum online players gate. Each reads the live persisted value fresh from the store,
-     * accepts a number through an anvil prompt, and writes it back; a blank or non-positive interval and a blank or
+     * accepts a number through a text prompt, and writes it back; a blank or non-positive interval and a blank or
      * negative gate both clear the override, returning that setting to the file default.
      */
     private List<EditableProperty> settingsProperties() {
@@ -215,27 +219,27 @@ public final class AnnouncementEditorView {
 
     private EditableProperty intervalProperty() {
         return new TextProperty(
+                TEXT_FIELD_INPUT_KEY,
                 CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_INTERVAL,
                 CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_INTERVAL_PROMPT,
                 Material.CLOCK,
-                guiText,
                 () -> intervalWord(currentSettings()),
                 AnnouncementEditorView::parseLong,
                 raw -> saveSettings(settings -> settings.withIntervalSeconds(parseLongOrClear(raw))),
-                anvil,
+                textInput,
                 scheduler);
     }
 
     private EditableProperty minPlayersProperty() {
         return new TextProperty(
+                TEXT_FIELD_INPUT_KEY,
                 CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS,
                 CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS_PROMPT,
                 Material.PLAYER_HEAD,
-                guiText,
                 () -> minPlayersWord(currentSettings()),
                 AnnouncementEditorView::parseLong,
                 raw -> saveSettings(settings -> settings.withMinOnlinePlayers((int) parseLongOrClear(raw))),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -329,20 +333,21 @@ public final class AnnouncementEditorView {
 
     private void promptCreate(Player player) {
         PlayerRef viewer = BukkitRefs.toRef(player);
-        ItemStack prompt = ItemBuilder.of(Material.LIME_DYE)
-                .name(guiText.text(viewer, CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_CREATE_PROMPT))
-                .build();
-        anvil.open(player, prompt, result -> handleCreate(player, result));
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of(CREATE_INPUT_KEY, CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_CREATE_PROMPT),
+                text -> handleCreate(player, text),
+                () -> list.open(player, viewer));
     }
 
-    private void handleCreate(Player player, AnvilResult result) {
+    private void handleCreate(Player player, String text) {
         PlayerRef viewer = BukkitRefs.toRef(player);
-        if (!(result instanceof AnvilResult.Submitted submitted)
-                || submitted.text().isBlank()) {
-            scheduler.onEntity(viewer, () -> list.open(player, viewer));
+        if (text.isBlank()) {
+            list.open(player, viewer);
             return;
         }
-        String id = submitted.text().trim();
+        String id = text.trim();
         scheduler.async(() -> {
             if (store.exists(id)) {
                 // A create collision keeps the existing announcement untouched and just reopens the list; the
@@ -392,6 +397,7 @@ public final class AnnouncementEditorView {
 
     private EditableProperty messageProperty(String id) {
         return new ListProperty(
+                LIST_ENTRY_INPUT_KEY,
                 CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_MESSAGE,
                 Material.WRITABLE_BOOK,
                 guiText,
@@ -407,7 +413,7 @@ public final class AnnouncementEditorView {
                         CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_REMOVE_CONFIRM,
                         CommunicationMessageKey.ANNOUNCE_EDITOR_MESSAGE_BACK),
                 messageListLayout,
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -461,10 +467,10 @@ public final class AnnouncementEditorView {
 
     private EditableProperty worldProperty(String id) {
         return new TextProperty(
+                TEXT_FIELD_INPUT_KEY,
                 CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_WORLD,
                 CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_WORLD_PROMPT,
                 Material.GRASS_BLOCK,
-                guiText,
                 () -> current(id)
                         .flatMap(announcement -> ConditionTargets.world(announcement.condition()))
                         .orElseGet(this::none),
@@ -473,16 +479,16 @@ public final class AnnouncementEditorView {
                         id,
                         announcement -> announcement.withCondition(
                                 ConditionTargets.withWorld(announcement.condition(), value))),
-                anvil,
+                textInput,
                 scheduler);
     }
 
     private EditableProperty permissionProperty(String id) {
         return new TextProperty(
+                TEXT_FIELD_INPUT_KEY,
                 CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_PERMISSION,
                 CommunicationMessageKey.ANNOUNCE_EDITOR_PROP_PERMISSION_PROMPT,
                 Material.NAME_TAG,
-                guiText,
                 () -> current(id)
                         .flatMap(announcement -> ConditionTargets.permission(announcement.condition()))
                         .orElseGet(this::none),
@@ -491,7 +497,7 @@ public final class AnnouncementEditorView {
                         id,
                         announcement -> announcement.withCondition(
                                 ConditionTargets.withPermission(announcement.condition(), value))),
-                anvil,
+                textInput,
                 scheduler);
     }
 

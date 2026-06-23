@@ -16,14 +16,14 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -32,7 +32,7 @@ import org.jspecify.annotations.NullMarked;
  * shared {@link EntityListView}, each icon opening the {@link PlayerWarpEditorView} on click. The scope is
  * resolved per open against the viewer's permission — a plain player sees only their own warps
  * ({@code repository.ownedBy}); an operator holding {@code uxmessentials.pwarp.gui} sees every player's
- * ({@code repository.all}) so they can manage all. A create button opens an anvil for a new name and creates a
+ * ({@code repository.all}) so they can manage all. A create button prompts for a new name and creates a
  * private warp at the operator's feet through the existing {@link SetPlayerWarp} use case (the same one
  * {@code /setpwarp} calls).
  *
@@ -54,7 +54,7 @@ public final class PlayerWarpListView {
     private final Messages messages;
     private final PlayerWarpRepository repository;
     private final SetPlayerWarp setPlayerWarp;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final EntityListLayout layout;
     private final PlayerWarpEditorView editor;
 
@@ -65,7 +65,7 @@ public final class PlayerWarpListView {
             Messages messages,
             PlayerWarpRepository repository,
             SetPlayerWarp setPlayerWarp,
-            AnvilInput anvil,
+            TextInput textInput,
             EntityListLayout layout,
             PlayerWarpEditorView editor) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
@@ -74,7 +74,7 @@ public final class PlayerWarpListView {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.setPlayerWarp = Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.editor = Objects.requireNonNull(editor, "editor");
     }
@@ -140,21 +140,22 @@ public final class PlayerWarpListView {
     }
 
     private void promptCreate(Player player, PlayerRef viewer) {
-        ItemStack prompt = ItemBuilder.of(layout.createIcon())
-                .name(guiText.text(viewer, PlayerwarpsMessageKey.PWARP_GUI_LIST_CREATE_PROMPT))
-                .build();
-        anvil.open(player, prompt, result -> handleCreate(player, viewer, result));
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of("playerwarp.create-name", PlayerwarpsMessageKey.PWARP_GUI_LIST_CREATE_PROMPT),
+                text -> handleCreate(player, viewer, text),
+                () -> view(viewer).open(player, viewer));
     }
 
-    private void handleCreate(Player player, PlayerRef viewer, AnvilResult result) {
-        if (!(result instanceof AnvilResult.Submitted submitted)
-                || submitted.text().isBlank()) {
-            scheduler.onEntity(viewer, () -> view(viewer).open(player, viewer));
+    private void handleCreate(Player player, PlayerRef viewer, String text) {
+        if (text.isBlank()) {
+            view(viewer).open(player, viewer);
             return;
         }
         // A warp created from the list belongs to the operator who opened it, at their feet — exactly /setpwarp.
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
-        PlayerWarpName name = PlayerWarpName.of(submitted.text());
+        PlayerWarpName name = PlayerWarpName.of(text);
         scheduler.async(() -> {
             setPlayerWarp.set(viewer, name, at);
             scheduler.onEntity(viewer, () -> view(viewer).open(player, viewer));

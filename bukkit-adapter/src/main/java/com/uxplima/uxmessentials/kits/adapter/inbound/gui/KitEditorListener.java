@@ -20,7 +20,6 @@ import org.bukkit.inventory.InventoryHolder;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
-import com.uxplima.uxmessentials.kits.adapter.inbound.listener.ChatPromptListener;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
@@ -28,6 +27,8 @@ import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -48,7 +49,7 @@ public final class KitEditorListener implements Listener {
     private final @Nullable KitServices services;
     private final @Nullable KitRepository repository;
     private final @Nullable KitSettingsView settingsView;
-    private final @Nullable ChatPromptListener promptListener;
+    private final @Nullable TextInput textInput;
     private final @Nullable KitEditorText text;
     private final @Nullable KitCategoryEditing categoryEditing;
 
@@ -57,7 +58,7 @@ public final class KitEditorListener implements Listener {
         this.services = null;
         this.repository = null;
         this.settingsView = null;
-        this.promptListener = null;
+        this.textInput = null;
         this.text = null;
         this.categoryEditing = null;
     }
@@ -68,16 +69,16 @@ public final class KitEditorListener implements Listener {
             KitRepository repository,
             KitCategoryRepository categoryRepository,
             KitSettingsView settingsView,
-            ChatPromptListener promptListener,
+            TextInput textInput,
             Messages messages) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.services = Objects.requireNonNull(services, "services");
         this.repository = Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(categoryRepository, "categoryRepository");
         this.settingsView = Objects.requireNonNull(settingsView, "settingsView");
-        this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.text = new KitEditorText(Objects.requireNonNull(messages, "messages"));
-        this.categoryEditing = new KitCategoryEditing(services, categoryRepository, promptListener, this.text);
+        this.categoryEditing = new KitCategoryEditing(services, categoryRepository, textInput, this.text);
     }
 
     @EventHandler
@@ -159,7 +160,7 @@ public final class KitEditorListener implements Listener {
     }
 
     private void onSettingsClick(Player player, KitSettingsHolder settingsHolder, int slot) {
-        if (services == null || settingsView == null || promptListener == null) {
+        if (services == null || settingsView == null || textInput == null) {
             return;
         }
         PlayerRef viewer = settingsHolder.viewer();
@@ -221,48 +222,66 @@ public final class KitEditorListener implements Listener {
     }
 
     private void editCooldown(Player player, PlayerRef viewer, KitDefinition kit) {
-        prompt(player, viewer, KitsMessageKey.KIT_EDITOR_PROMPT_COOLDOWN, input -> {
-            long sec;
-            try {
-                sec = Long.parseLong(input);
-            } catch (NumberFormatException e) {
-                player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NUMBER));
-                return;
-            }
-            if (sec < 0) {
-                player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_NEGATIVE_COOLDOWN));
-                return;
-            }
-            saveAndReopen(player, viewer, kit.withCooldown(Duration.ofSeconds(sec)));
-        });
+        prompt(
+                player,
+                viewer,
+                "kit.cooldown",
+                KitsMessageKey.KIT_EDITOR_PROMPT_COOLDOWN,
+                input -> {
+                    long sec;
+                    try {
+                        sec = Long.parseLong(input);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NUMBER));
+                        return;
+                    }
+                    if (sec < 0) {
+                        player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_NEGATIVE_COOLDOWN));
+                        return;
+                    }
+                    saveAndReopen(player, viewer, kit.withCooldown(Duration.ofSeconds(sec)));
+                },
+                () -> reopenSettings(player, viewer, kit));
     }
 
     private void editCost(Player player, PlayerRef viewer, KitDefinition kit) {
-        prompt(player, viewer, KitsMessageKey.KIT_EDITOR_PROMPT_COST, input -> {
-            if (input.equalsIgnoreCase("free") || input.equalsIgnoreCase("0")) {
-                saveAndReopen(player, viewer, kit.withCost(KitCost.free()));
-                return;
-            }
-            BigDecimal amount;
-            try {
-                amount = new BigDecimal(input);
-            } catch (NumberFormatException e) {
-                player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NUMBER));
-                return;
-            }
-            if (amount.compareTo(BigDecimal.ZERO) < 0) {
-                player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_NEGATIVE_COST));
-                return;
-            }
-            saveAndReopen(player, viewer, kit.withCost(KitCost.of(amount)));
-        });
+        prompt(
+                player,
+                viewer,
+                "kit.cost",
+                KitsMessageKey.KIT_EDITOR_PROMPT_COST,
+                input -> {
+                    if (input.equalsIgnoreCase("free") || input.equalsIgnoreCase("0")) {
+                        saveAndReopen(player, viewer, kit.withCost(KitCost.free()));
+                        return;
+                    }
+                    BigDecimal amount;
+                    try {
+                        amount = new BigDecimal(input);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NUMBER));
+                        return;
+                    }
+                    if (amount.compareTo(BigDecimal.ZERO) < 0) {
+                        player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_NEGATIVE_COST));
+                        return;
+                    }
+                    saveAndReopen(player, viewer, kit.withCost(KitCost.of(amount)));
+                },
+                () -> reopenSettings(player, viewer, kit));
     }
 
     private void editDisplayName(Player player, PlayerRef viewer, KitDefinition kit) {
-        prompt(player, viewer, KitsMessageKey.KIT_EDITOR_PROMPT_DISPLAY_NAME, input -> {
-            Optional<String> name = input.equalsIgnoreCase("none") ? Optional.empty() : Optional.of(input);
-            saveAndReopen(player, viewer, kit.withDisplayName(name));
-        });
+        prompt(
+                player,
+                viewer,
+                "kit.display-name",
+                KitsMessageKey.KIT_EDITOR_PROMPT_DISPLAY_NAME,
+                input -> {
+                    Optional<String> name = input.equalsIgnoreCase("none") ? Optional.empty() : Optional.of(input);
+                    saveAndReopen(player, viewer, kit.withDisplayName(name));
+                },
+                () -> reopenSettings(player, viewer, kit));
     }
 
     private void editDisplayMaterial(Player player, PlayerRef viewer, KitDefinition kit) {
@@ -278,16 +297,20 @@ public final class KitEditorListener implements Listener {
         prompt(
                 player,
                 viewer,
+                "kit.display-lore",
                 KitsMessageKey.KIT_EDITOR_PROMPT_DISPLAY_LORE,
-                input -> saveAndReopen(player, viewer, kit.withDisplayLore(splitLines(input))));
+                input -> saveAndReopen(player, viewer, kit.withDisplayLore(splitLines(input))),
+                () -> reopenSettings(player, viewer, kit));
     }
 
     private void editCommands(Player player, PlayerRef viewer, KitDefinition kit) {
         prompt(
                 player,
                 viewer,
+                "kit.commands",
                 KitsMessageKey.KIT_EDITOR_PROMPT_COMMANDS,
-                input -> saveAndReopen(player, viewer, kit.withCommands(splitLines(input))));
+                input -> saveAndReopen(player, viewer, kit.withCommands(splitLines(input))),
+                () -> reopenSettings(player, viewer, kit));
     }
 
     private void deleteKit(Player player, PlayerRef viewer, KitDefinition kit) {
@@ -304,26 +327,38 @@ public final class KitEditorListener implements Listener {
     }
 
     private void promptCreateKit(Player player, PlayerRef viewer) {
-        if (services == null || promptListener == null || repository == null) {
+        if (services == null || textInput == null || repository == null) {
             return;
         }
-        prompt(player, viewer, KitsMessageKey.KIT_EDITOR_PROMPT_CREATE, name -> {
-            String clean = sanitizeId(name);
-            if (clean.isEmpty()) {
-                player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NAME));
-                return;
-            }
-            KitId id = KitId.of(clean);
-            Objects.requireNonNull(services)
-                    .createKit()
-                    .create(viewer, new KitDefinition(id, List.of(), Duration.ZERO, false, false, KitCost.free()));
-            KitSettingsView view = Objects.requireNonNull(settingsView);
-            Objects.requireNonNull(repository).find(id).ifPresent(kit -> view.open(player, viewer, kit));
-        });
+        prompt(
+                player,
+                viewer,
+                "kit.create-name",
+                KitsMessageKey.KIT_EDITOR_PROMPT_CREATE,
+                name -> {
+                    String clean = sanitizeId(name);
+                    if (clean.isEmpty()) {
+                        player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NAME));
+                        return;
+                    }
+                    KitId id = KitId.of(clean);
+                    Objects.requireNonNull(services)
+                            .createKit()
+                            .create(
+                                    viewer,
+                                    new KitDefinition(id, List.of(), Duration.ZERO, false, false, KitCost.free()));
+                    KitSettingsView view = Objects.requireNonNull(settingsView);
+                    Objects.requireNonNull(repository).find(id).ifPresent(kit -> view.open(player, viewer, kit));
+                },
+                () -> openManager(player, viewer));
     }
 
     private void saveAndReopen(Player player, PlayerRef viewer, KitDefinition kit) {
         Objects.requireNonNull(services).kitEditor().save(viewer, kit);
+        Objects.requireNonNull(settingsView).open(player, viewer, kit);
+    }
+
+    private void reopenSettings(Player player, PlayerRef viewer, KitDefinition kit) {
         Objects.requireNonNull(settingsView).open(player, viewer, kit);
     }
 
@@ -334,9 +369,15 @@ public final class KitEditorListener implements Listener {
         }
     }
 
-    private void prompt(Player player, PlayerRef viewer, MessageKey key, java.util.function.Consumer<String> action) {
+    private void prompt(
+            Player player,
+            PlayerRef viewer,
+            String inputKey,
+            MessageKey key,
+            java.util.function.Consumer<String> action,
+            Runnable reopen) {
         player.closeInventory();
-        Objects.requireNonNull(promptListener).prompt(player, text(viewer, key), action);
+        Objects.requireNonNull(textInput).prompt(player, viewer, InputRequest.of(inputKey, key), action, reopen);
     }
 
     private static String sanitizeId(String name) {

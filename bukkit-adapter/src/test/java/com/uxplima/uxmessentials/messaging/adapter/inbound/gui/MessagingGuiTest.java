@@ -43,6 +43,8 @@ import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -54,7 +56,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,7 +100,7 @@ class MessagingGuiTest {
     private Ignore ignore;
     private Unignore unignore;
     private ClearMail clearMail;
-    private AnvilInput anvil;
+    private TextInput textInput;
 
     @BeforeEach
     void setUp() {
@@ -117,14 +118,12 @@ class MessagingGuiTest {
         ignore = new Ignore(ignores, notifier);
         unignore = new Unignore(ignores, notifier);
         clearMail = new ClearMail(mail, notifier);
-        anvil = new AnvilInput(plugin);
-        anvil.install();
+        textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         Guis.install(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        anvil.uninstall();
         Guis.uninstall();
         MockBukkit.unmock();
     }
@@ -231,7 +230,7 @@ class MessagingGuiTest {
 
     private IgnoreListView ignoreView(Path dir) throws Exception {
         EntityListLayout layout = listLayout(dir, "ignore-list");
-        return new IgnoreListView(guiText, scheduler, ignores, ignore, unignore, new OnlineLookup(), anvil, layout);
+        return new IgnoreListView(guiText, scheduler, ignores, ignore, unignore, new OnlineLookup(), textInput, layout);
     }
 
     private MailboxView mailboxView(Path dir) throws Exception {

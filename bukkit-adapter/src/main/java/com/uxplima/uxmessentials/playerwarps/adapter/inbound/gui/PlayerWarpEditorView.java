@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
@@ -32,7 +33,6 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -60,7 +60,7 @@ public final class PlayerWarpEditorView {
     private final Scheduler scheduler;
     private final PlayerWarpRepository repository;
     private final SetPlayerWarpVisibility visibility;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final Messages messages;
     private final PlayerWarpEditorSubLayouts sub;
     private final EntityEditorView<OwnedWarp> view;
@@ -71,7 +71,7 @@ public final class PlayerWarpEditorView {
             PlayerWarpRepository repository,
             SetPlayerWarpVisibility visibility,
             DelPlayerWarp delPlayerWarp,
-            AnvilInput anvil,
+            TextInput textInput,
             Messages messages,
             EntityEditorLayout layout,
             PlayerWarpEditorSubLayouts sub,
@@ -81,7 +81,7 @@ public final class PlayerWarpEditorView {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.visibility = Objects.requireNonNull(visibility, "visibility");
         Objects.requireNonNull(delPlayerWarp, "delPlayerWarp");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sub = Objects.requireNonNull(sub, "sub");
         Objects.requireNonNull(layout, "layout");
@@ -181,14 +181,14 @@ public final class PlayerWarpEditorView {
 
     private EditableProperty nameProperty(PlayerRef owner, PlayerWarpName name) {
         return new TextProperty(
+                "editor.text-field",
                 PlayerwarpsMessageKey.PWARP_GUI_PROP_NAME,
                 PlayerwarpsMessageKey.PWARP_GUI_PROP_NAME_PROMPT,
                 Material.NAME_TAG,
-                guiText,
                 name::value,
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> rename(owner, name, value),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -251,14 +251,14 @@ public final class PlayerWarpEditorView {
 
     private EditableProperty iconProperty(PlayerRef owner, PlayerWarpName name) {
         return new TextProperty(
+                "editor.text-field",
                 PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON,
                 PlayerwarpsMessageKey.PWARP_GUI_PROP_ICON_PROMPT,
                 Material.ITEM_FRAME,
-                guiText,
                 () -> current(owner, name).flatMap(PlayerWarp::iconMaterial).orElseGet(this::none),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> mutate(owner, name, warp -> warp.withIconMaterial(optional(value))),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -299,14 +299,14 @@ public final class PlayerWarpEditorView {
 
     private EditableProperty passwordProperty(PlayerRef owner, PlayerWarpName name) {
         return new TextProperty(
+                "editor.text-field",
                 PlayerwarpsMessageKey.PWARP_GUI_PROP_PASSWORD,
                 PlayerwarpsMessageKey.PWARP_GUI_PROP_PASSWORD_PROMPT,
                 Material.IRON_DOOR,
-                guiText,
                 () -> current(owner, name).flatMap(PlayerWarp::password).isPresent() ? set() : none(),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> mutate(owner, name, warp -> warp.withPassword(optional(value))),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -321,14 +321,14 @@ public final class PlayerWarpEditorView {
             java.util.function.Function<PlayerWarp, Optional<String>> getter,
             java.util.function.BiFunction<PlayerWarp, Optional<String>, PlayerWarp> setter) {
         return new TextProperty(
+                "editor.text-field",
                 label,
                 prompt,
                 icon,
-                guiText,
                 () -> current(owner, name).flatMap(getter).orElseGet(this::none),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> mutate(owner, name, warp -> setter.apply(warp, optional(value))),
-                anvil,
+                textInput,
                 scheduler);
     }
 

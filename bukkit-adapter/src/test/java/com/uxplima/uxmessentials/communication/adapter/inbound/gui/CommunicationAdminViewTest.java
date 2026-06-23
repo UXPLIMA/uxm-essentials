@@ -30,6 +30,8 @@ import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.Ordering;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -42,7 +44,6 @@ import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,7 +82,7 @@ class CommunicationAdminViewTest {
     private RecordingSink sink;
     private BukkitAnnouncerBroadcaster broadcaster;
     private CommunicationNotifier notifier;
-    private AnvilInput anvil;
+    private TextInput textInput;
     private final List<Announcement> announcements = new ArrayList<>();
 
     @BeforeEach
@@ -97,14 +98,12 @@ class CommunicationAdminViewTest {
         notifier = new CommunicationNotifier(new KeyMessages(), sink);
         broadcaster = new BukkitAnnouncerBroadcaster(
                 sink, new AlwaysReceives(), new ChannelBroadcaster(scheduler, display()), p -> null, scheduler);
-        anvil = new AnvilInput(plugin);
-        anvil.install();
+        textInput = TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         Guis.install(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        anvil.uninstall();
         Guis.uninstall();
         MockBukkit.unmock();
     }
@@ -188,7 +187,7 @@ class CommunicationAdminViewTest {
                 () -> new AnnouncerConfig(Duration.ofMinutes(5), 0, Ordering.SEQUENTIAL, List.copyOf(announcements)),
                 notifier,
                 sink,
-                anvil);
+                textInput);
     }
 
     private void panelLayout() throws Exception {

@@ -12,7 +12,6 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BankChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.BankService;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.AmountParseError;
@@ -21,6 +20,8 @@ import com.uxplima.uxmessentials.economy.domain.BankError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -44,7 +45,7 @@ import org.jspecify.annotations.NullMarked;
 public final class BankActionsView {
 
     private final BankService bankService;
-    private final BankChatPromptListener chatPromptListener;
+    private final TextInput textInput;
     private final Scheduler scheduler;
     private final Messages messages;
     private final TransactionsHistoryView historyView;
@@ -53,14 +54,14 @@ public final class BankActionsView {
 
     public BankActionsView(
             BankService bankService,
-            BankChatPromptListener chatPromptListener,
+            TextInput textInput,
             Scheduler scheduler,
             Messages messages,
             TransactionsHistoryView historyView,
             Supplier<BankNavigation> navigation,
             FixedMenuLayout layout) {
         this.bankService = Objects.requireNonNull(bankService, "bankService");
-        this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.historyView = Objects.requireNonNull(historyView, "historyView");
@@ -205,17 +206,22 @@ public final class BankActionsView {
         EconomyMessageKey promptKey = deposit
                 ? EconomyMessageKey.BANK_ACTIONS_DEPOSIT_PROMPT
                 : EconomyMessageKey.BANK_ACTIONS_WITHDRAW_PROMPT;
-        chatPromptListener.prompt(player, text(viewerRef, promptKey, Map.of("bank", bank.name())), input -> {
-            Result<Money, AmountParseError> parsed =
-                    AmountParser.parse(input, bank.balance().currency());
-            if (parsed.isErr()) {
-                player.sendMessage(text(viewerRef, EconomyMessageKey.BANK_ACTIONS_INVALID_AMOUNT, Map.of()));
-                scheduler.onEntity(
-                        viewerRef, () -> navigation.get().bankGuiView().open(player));
-                return;
-            }
-            applyTransfer(player, viewerRef, bank, parsed.orElseThrow(), deposit);
-        });
+        String inputKey = deposit ? "bank.deposit" : "bank.withdraw";
+        textInput.prompt(
+                player,
+                viewerRef,
+                InputRequest.of(inputKey, promptKey, Map.of("bank", bank.name())),
+                input -> {
+                    Result<Money, AmountParseError> parsed =
+                            AmountParser.parse(input, bank.balance().currency());
+                    if (parsed.isErr()) {
+                        player.sendMessage(text(viewerRef, EconomyMessageKey.BANK_ACTIONS_INVALID_AMOUNT, Map.of()));
+                        navigation.get().bankGuiView().open(player);
+                        return;
+                    }
+                    applyTransfer(player, viewerRef, bank, parsed.orElseThrow(), deposit);
+                },
+                () -> navigation.get().bankGuiView().open(player));
     }
 
     private void applyTransfer(Player player, PlayerRef viewerRef, SharedBank bank, Money money, boolean deposit) {

@@ -23,14 +23,16 @@ import com.uxplima.uxmessentials.moderation.application.port.TargetResolver;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.DurationPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,13 +92,13 @@ class JailGuiFlowTest {
 
         GuiText guiText = new GuiText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
-        AnvilInput anvil = new AnvilInput(plugin);
-        anvil.install();
+        TextInput textInput = TextInputTestKit.create(
+                plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), new NoopLogger());
         Guis.install(plugin);
         PlayerPickerView picker =
-                new PlayerPickerView(guiText, scheduler, anvil, server, new KeyMessages(), new NoopSink());
+                new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
         DurationPickerView durations =
-                new DurationPickerView(guiText, scheduler, anvil, new KeyMessages(), new NoopSink());
+                new DurationPickerView(guiText, scheduler, textInput, new KeyMessages(), new NoopSink());
         flow = new JailGuiFlow(guiText, scheduler, services, picker, durations, new KeyMessages(), new NoopSink());
     }
 
@@ -151,6 +153,20 @@ class JailGuiFlowTest {
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class SyncScheduler implements Scheduler {

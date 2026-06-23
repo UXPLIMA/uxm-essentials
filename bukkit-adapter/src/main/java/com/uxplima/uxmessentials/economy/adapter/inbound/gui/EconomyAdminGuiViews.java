@@ -35,13 +35,13 @@ public final class EconomyAdminGuiViews {
         return hub;
     }
 
-    /** Build the eco-admin GUI stack over the resolved provider, the kernel ports, and the shared picker/anvil. */
+    /** Build the eco-admin GUI stack over the resolved provider, the kernel ports, and the shared picker/seam. */
     public static EconomyAdminGuiViews create(
             GuiText guiText,
             Scheduler scheduler,
             Server server,
             PlayerPickerView picker,
-            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput,
             PlayerLookup players,
             EconomyProvider economy,
             EcoAdmin ecoAdmin,
@@ -56,7 +56,7 @@ public final class EconomyAdminGuiViews {
         EconomyTargetView targetView = new EconomyTargetView(
                 guiText,
                 scheduler,
-                anvil,
+                textInput,
                 economy,
                 ops,
                 currencies,
@@ -67,7 +67,7 @@ public final class EconomyAdminGuiViews {
         EconomyBulkView bulkView = new EconomyBulkView(
                 guiText,
                 scheduler,
-                anvil,
+                textInput,
                 server,
                 ops,
                 currencies,

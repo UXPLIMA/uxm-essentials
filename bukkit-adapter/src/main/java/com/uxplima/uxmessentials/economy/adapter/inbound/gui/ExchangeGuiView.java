@@ -14,7 +14,6 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.ExchangeOutcome;
@@ -24,6 +23,8 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -44,7 +45,7 @@ public final class ExchangeGuiView {
     private final Scheduler scheduler;
     private final EconomyNotifier notifier;
     private final Messages messages;
-    private final ExchangeChatPromptListener chatPromptListener;
+    private final TextInput textInput;
     private final FixedMenuLayout layout;
     private final ExchangeIcons icons;
 
@@ -55,14 +56,14 @@ public final class ExchangeGuiView {
             Scheduler scheduler,
             EconomyNotifier notifier,
             Messages messages,
-            ExchangeChatPromptListener chatPromptListener,
+            TextInput textInput,
             FixedMenuLayout layout) {
         this.economyProvider = Objects.requireNonNull(economyProvider, "economyProvider");
         this.exchangeService = Objects.requireNonNull(exchangeService, "exchangeService");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.icons = new ExchangeIcons(messages, notifier, layout);
     }
@@ -228,30 +229,29 @@ public final class ExchangeGuiView {
 
     private void promptCustomAmount(Player player, Currency source, Currency target) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        Component promptMessage = StyledText.render(messages.resolve(
+        Map<String, String> placeholders = Map.of(
+                "source", source.plural(),
+                "target", target.plural());
+        textInput.prompt(
+                player,
                 viewerRef,
-                EconomyMessageKey.EXCHANGE_PROMPT,
-                Map.of(
-                        "source", source.plural(),
-                        "target", target.plural())));
-
-        chatPromptListener.prompt(player, promptMessage, input -> {
-            BigDecimal amount;
-            try {
-                amount = new BigDecimal(input);
-            } catch (NumberFormatException e) {
-                player.sendMessage(StyledText.render(
-                        messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_INVALID_AMOUNT, Map.of())));
-                return;
-            }
-
-            scheduler.async(() -> {
-                ExchangeOutcome result = exchangeService.exchange(viewerRef, amount, source, target);
-                scheduler.onEntity(viewerRef, () -> {
-                    handleExchangeResult(player, result, source, target);
-                });
-            });
-        });
+                InputRequest.of("exchange.amount", EconomyMessageKey.EXCHANGE_PROMPT, placeholders),
+                input -> {
+                    BigDecimal amount;
+                    try {
+                        amount = new BigDecimal(input);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(StyledText.render(
+                                messages.resolve(viewerRef, EconomyMessageKey.EXCHANGE_INVALID_AMOUNT, Map.of())));
+                        open(player, source, target);
+                        return;
+                    }
+                    scheduler.async(() -> {
+                        ExchangeOutcome result = exchangeService.exchange(viewerRef, amount, source, target);
+                        scheduler.onEntity(viewerRef, () -> handleExchangeResult(player, result, source, target));
+                    });
+                },
+                () -> open(player, source, target));
     }
 
     private void handleExchangeResult(Player player, ExchangeOutcome result, Currency source, Currency target) {

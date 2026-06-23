@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -60,8 +61,13 @@ public final class WarpsWiring {
 
     /** Build the warps adapters and use cases with no economy bridge (a recorded warp cost is not charged). */
     public static Wired wire(
-            ModuleContext ctx, Persistence persistence, TeleportEngine teleportEngine, Bus bus, GuiLayouts guiLayouts) {
-        return wire(ctx, persistence, teleportEngine, Optional.empty(), bus, guiLayouts);
+            ModuleContext ctx,
+            Persistence persistence,
+            TeleportEngine teleportEngine,
+            Bus bus,
+            GuiLayouts guiLayouts,
+            TextInput textInput) {
+        return wire(ctx, persistence, teleportEngine, Optional.empty(), bus, guiLayouts, textInput);
     }
 
     /**
@@ -76,13 +82,15 @@ public final class WarpsWiring {
             TeleportEngine teleportEngine,
             Optional<WarpEconomy> economy,
             Bus bus,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            TextInput textInput) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
         // The cached repository is the read accelerator; the bus listener drops the cached set when a peer
         // reports a change, and the broadcasting decorator announces this backend's own writes to peers.
@@ -116,8 +124,6 @@ public final class WarpsWiring {
                 "warps-welcome",
                 com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView.defaultLayout());
 
-        var promptListener =
-                new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpChatPromptListener(kernel.messages());
         var playerWarpHandle = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle();
         var playerWarpGoTo = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle();
         var editorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView(
@@ -140,7 +146,7 @@ public final class WarpsWiring {
         var editorListener = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener(
                 editorView,
                 repository,
-                promptListener,
+                textInput,
                 kernel.messages(),
                 soundSelectorView,
                 particleSelectorView,
@@ -155,7 +161,6 @@ public final class WarpsWiring {
                         kernel.scheduler(), ctx.config(), teleportRegistry),
                 new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpSignListener(
                         repository, services.useWarp(), kernel.permissions(), ctx.config(), kernel.messages()),
-                promptListener,
                 editorListener);
         return new Wired(
                 commands,
@@ -166,11 +171,7 @@ public final class WarpsWiring {
                 playerWarpHandle,
                 playerWarpGoTo,
                 teleportRegistry,
-                () -> {
-                    teleportRegistry.clear();
-                    // Drop any pending editor chat prompt so a leftover callback cannot fire after teardown.
-                    promptListener.clear();
-                });
+                teleportRegistry::clear);
     }
 
     private static WarpServices assemble(

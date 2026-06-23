@@ -14,6 +14,8 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -23,8 +25,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.PaginatedGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.item.SkullData;
@@ -60,6 +60,7 @@ import org.jspecify.annotations.NullMarked;
 public final class PlayerPickerView {
 
     private static final int PICKER_ROWS = 6;
+    private static final String INPUT_KEY = "picker.player-name";
     private static final Material OFFLINE_BUTTON = Material.NAME_TAG;
     private static final int OFFLINE_BUTTON_SLOT = 49;
     private static final int PREV_SLOT = 45;
@@ -72,7 +73,7 @@ public final class PlayerPickerView {
 
     private final GuiText guiText;
     private final Scheduler scheduler;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final Server server;
     private final Messages messages;
     private final MessageSink sink;
@@ -80,13 +81,13 @@ public final class PlayerPickerView {
     public PlayerPickerView(
             GuiText guiText,
             Scheduler scheduler,
-            AnvilInput anvil,
+            TextInput textInput,
             Server server,
             Messages messages,
             MessageSink sink) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.server = Objects.requireNonNull(server, "server");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
@@ -141,17 +142,14 @@ public final class PlayerPickerView {
         }
     }
 
-    /** Open the anvil for a typed name; a submission flows through {@link #resolveTyped}. */
+    /** Open the input prompt for a typed name; a submission flows through {@link #resolveTyped}. */
     private void promptOffline(Player viewer, PlayerRef viewerRef, Request request) {
-        scheduler.onEntity(
+        textInput.prompt(
+                viewer,
                 viewerRef,
-                () -> anvil.open(viewer, offlinePrompt(viewerRef), result -> {
-                    if (result instanceof AnvilResult.Submitted submitted) {
-                        resolveTyped(viewer, viewerRef, request, submitted.text());
-                    } else {
-                        open(viewer, viewerRef, request);
-                    }
-                }));
+                InputRequest.of(INPUT_KEY, GuiMessageKey.PLAYER_PICKER_CUSTOM_PROMPT),
+                text -> resolveTyped(viewer, viewerRef, request, text),
+                () -> open(viewer, viewerRef, request));
     }
 
     /**
@@ -188,12 +186,6 @@ public final class PlayerPickerView {
         return ItemBuilder.of(OFFLINE_BUTTON)
                 .name(guiText.text(viewer, GuiMessageKey.PLAYER_PICKER_CUSTOM))
                 .lore(List.of(guiText.text(viewer, GuiMessageKey.PLAYER_PICKER_CUSTOM_LORE)))
-                .build();
-    }
-
-    private ItemStack offlinePrompt(PlayerRef viewer) {
-        return ItemBuilder.of(OFFLINE_BUTTON)
-                .name(guiText.text(viewer, GuiMessageKey.PLAYER_PICKER_CUSTOM_PROMPT))
                 .build();
     }
 

@@ -9,11 +9,12 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
-import com.uxplima.uxmessentials.kits.adapter.inbound.listener.ChatPromptListener;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -31,31 +32,35 @@ final class KitCategoryEditing {
 
     private final KitServices services;
     private final KitCategoryRepository categoryRepository;
-    private final ChatPromptListener promptListener;
+    private final TextInput textInput;
     private final KitEditorText text;
 
     KitCategoryEditing(
-            KitServices services,
-            KitCategoryRepository categoryRepository,
-            ChatPromptListener promptListener,
-            KitEditorText text) {
+            KitServices services, KitCategoryRepository categoryRepository, TextInput textInput, KitEditorText text) {
         this.services = Objects.requireNonNull(services, "services");
         this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
-        this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.text = Objects.requireNonNull(text, "text");
     }
 
     void promptCreateCategory(Player player, PlayerRef viewer) {
-        prompt(player, viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_PROMPT_CREATE, name -> {
-            String clean = sanitizeId(name);
-            if (clean.isEmpty()) {
-                player.sendMessage(text.text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NAME));
-                return;
-            }
-            KitCategory category = new KitCategory(clean, name, Optional.empty(), List.of(), 0, Optional.empty());
-            categoryRepository.save(category);
-            openCategorySettings(player, viewer, category);
-        });
+        prompt(
+                player,
+                viewer,
+                "kit.category.create-name",
+                KitsMessageKey.KIT_EDITOR_CATEGORY_PROMPT_CREATE,
+                name -> {
+                    String clean = sanitizeId(name);
+                    if (clean.isEmpty()) {
+                        player.sendMessage(text.text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NAME));
+                        return;
+                    }
+                    KitCategory category =
+                            new KitCategory(clean, name, Optional.empty(), List.of(), 0, Optional.empty());
+                    categoryRepository.save(category);
+                    openCategorySettings(player, viewer, category);
+                },
+                () -> openCategoryManager(player, viewer));
     }
 
     void onCategoryManagerClick(Player player, KitCategoryManagerHolder managerHolder, int slot) {
@@ -99,8 +104,10 @@ final class KitCategoryEditing {
         prompt(
                 player,
                 viewer,
+                "kit.category.display-name",
                 KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_PROMPT,
-                input -> saveCategory(player, viewer, category.withDisplayName(input)));
+                input -> saveCategory(player, viewer, category.withDisplayName(input)),
+                () -> openCategorySettings(player, viewer, category));
     }
 
     private void editCategoryMaterial(Player player, PlayerRef viewer, KitCategory category) {
@@ -116,21 +123,29 @@ final class KitCategoryEditing {
         prompt(
                 player,
                 viewer,
+                "kit.category.display-lore",
                 KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_PROMPT,
-                input -> saveCategory(player, viewer, category.withDisplayLore(splitLines(input))));
+                input -> saveCategory(player, viewer, category.withDisplayLore(splitLines(input))),
+                () -> openCategorySettings(player, viewer, category));
     }
 
     private void editCategorySlot(Player player, PlayerRef viewer, KitCategory category) {
-        prompt(player, viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_PROMPT, input -> {
-            int targetSlot;
-            try {
-                targetSlot = Integer.parseInt(input);
-            } catch (NumberFormatException e) {
-                player.sendMessage(text.text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NUMBER));
-                return;
-            }
-            saveCategory(player, viewer, category.withSlot(targetSlot));
-        });
+        prompt(
+                player,
+                viewer,
+                "kit.category.slot",
+                KitsMessageKey.KIT_EDITOR_CATEGORY_SETTINGS_SLOT_PROMPT,
+                input -> {
+                    int targetSlot;
+                    try {
+                        targetSlot = Integer.parseInt(input);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(text.text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NUMBER));
+                        return;
+                    }
+                    saveCategory(player, viewer, category.withSlot(targetSlot));
+                },
+                () -> openCategorySettings(player, viewer, category));
     }
 
     private void openParentSelector(Player player, PlayerRef viewer, KitCategory category) {
@@ -210,6 +225,13 @@ final class KitCategoryEditing {
         }
     }
 
+    private void openCategoryManager(Player player, PlayerRef viewer) {
+        KitCategoryManagerView view = services.kitCategoryManagerView();
+        if (view != null) {
+            view.open(player, viewer);
+        }
+    }
+
     private void openCategorySettings(Player player, PlayerRef viewer, KitCategory category) {
         KitCategorySettingsView view = services.kitCategorySettingsView();
         if (view != null) {
@@ -217,9 +239,15 @@ final class KitCategoryEditing {
         }
     }
 
-    private void prompt(Player player, PlayerRef viewer, MessageKey key, Consumer<String> action) {
+    private void prompt(
+            Player player,
+            PlayerRef viewer,
+            String inputKey,
+            MessageKey key,
+            Consumer<String> action,
+            Runnable reopen) {
         player.closeInventory();
-        promptListener.prompt(player, text.text(viewer, key), action);
+        textInput.prompt(player, viewer, InputRequest.of(inputKey, key), action, reopen);
     }
 
     private static String sanitizeId(String name) {

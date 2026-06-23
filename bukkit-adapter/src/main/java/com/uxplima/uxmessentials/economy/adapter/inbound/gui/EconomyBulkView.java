@@ -20,6 +20,8 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -28,15 +30,14 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmlib.gui.ConfirmMenu;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The server-wide eco-admin screen reached from the hub's [Server-wide] button: give-all (an amount anvil whose
- * value is credited to every online wallet) and reset-all (confirm-gated, zeroing every online balance). Both
+ * The server-wide eco-admin screen reached from the hub's [Server-wide] button: give-all (an amount captured
+ * through the shared input seam, credited to every online wallet) and reset-all (confirm-gated, zeroing every
+ * online balance). Both
  * operate on the currently-online roster — the same scope the {@code /eco giveall|resetall} commands use until a
  * repository {@code allOwners()} read-model lands (see {@code EcoTargets}). The roster is enumerated on the
  * global region thread (the one thread {@code Server.getOnlinePlayers()} is safely readable on Folia), snapshotted
@@ -57,7 +58,7 @@ public final class EconomyBulkView {
 
     private final GuiText guiText;
     private final Scheduler scheduler;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final Server server;
     private final EcoAdminOps ops;
     private final CurrencyRegistry currencies;
@@ -68,7 +69,7 @@ public final class EconomyBulkView {
     public EconomyBulkView(
             GuiText guiText,
             Scheduler scheduler,
-            AnvilInput anvil,
+            TextInput textInput,
             Server server,
             EcoAdminOps ops,
             CurrencyRegistry currencies,
@@ -77,7 +78,7 @@ public final class EconomyBulkView {
             java.util.function.BiConsumer<Player, PlayerRef> onBack) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.server = Objects.requireNonNull(server, "server");
         this.ops = Objects.requireNonNull(ops, "ops");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
@@ -155,15 +156,12 @@ public final class EconomyBulkView {
     }
 
     private void promptGiveAll(Player viewer, PlayerRef viewerRef, Currency active) {
-        scheduler.onEntity(
+        textInput.prompt(
+                viewer,
                 viewerRef,
-                () -> anvil.open(viewer, amountPrompt(viewerRef), result -> {
-                    if (result instanceof AnvilResult.Submitted submitted) {
-                        applyGiveAll(viewer, viewerRef, active, submitted.text());
-                    } else {
-                        open(viewer, viewerRef, active);
-                    }
-                }));
+                InputRequest.of("eco.bulk-amount", EconomyMessageKey.ECO_ADMIN_GUI_AMOUNT_PROMPT),
+                text -> applyGiveAll(viewer, viewerRef, active, text),
+                () -> open(viewer, viewerRef, active));
     }
 
     /**
@@ -229,12 +227,6 @@ public final class EconomyBulkView {
     private ItemStack backIcon(PlayerRef viewer) {
         return ItemBuilder.of(Material.ARROW)
                 .name(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_BACK))
-                .build();
-    }
-
-    private ItemStack amountPrompt(PlayerRef viewer) {
-        return ItemBuilder.of(Material.NAME_TAG)
-                .name(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_AMOUNT_PROMPT))
                 .build();
     }
 

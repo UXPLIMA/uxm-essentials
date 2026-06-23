@@ -25,6 +25,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
@@ -39,7 +41,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.ConfirmMenu;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,6 +74,7 @@ class EntityEditorViewTest {
     private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
+    private TextInput textInput;
     private Widget widget;
 
     @BeforeEach
@@ -83,6 +85,7 @@ class EntityEditorViewTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
+        textInput = TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         widget = new Widget();
         Guis.install(plugin);
     }
@@ -135,14 +138,14 @@ class EntityEditorViewTest {
     @Test
     void textPropertyRoutesValidatedInputToItsSetter() {
         TextProperty property = new TextProperty(
+                "editor.text-field",
                 Key.LABEL,
                 Key.PROMPT,
                 Material.NAME_TAG,
-                guiText,
                 () -> widget.label,
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> widget.label = value,
-                new AnvilInput(plugin),
+                textInput,
                 scheduler);
 
         ClickContext context = new ClickContext(player, viewer, false, false, () -> {});
@@ -154,14 +157,14 @@ class EntityEditorViewTest {
     @Test
     void textPropertyRejectsBlankInputWithoutCallingSetter() {
         TextProperty property = new TextProperty(
+                "editor.text-field",
                 Key.LABEL,
                 Key.PROMPT,
                 Material.NAME_TAG,
-                guiText,
                 () -> widget.label,
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> widget.label = value,
-                new AnvilInput(plugin),
+                textInput,
                 scheduler);
 
         property.applyInput(new ClickContext(player, viewer, false, false, () -> {}), "   ");

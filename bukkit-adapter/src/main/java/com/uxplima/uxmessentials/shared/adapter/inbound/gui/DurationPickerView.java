@@ -12,6 +12,8 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -20,8 +22,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -49,6 +49,7 @@ import org.jspecify.annotations.NullMarked;
 public final class DurationPickerView {
 
     private static final int ROWS = 3;
+    private static final String INPUT_KEY = "picker.duration";
     private static final int CUSTOM_SLOT = 22;
     private static final int BACK_SLOT = 18;
     private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
@@ -63,15 +64,15 @@ public final class DurationPickerView {
 
     private final GuiText guiText;
     private final Scheduler scheduler;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final Messages messages;
     private final MessageSink sink;
 
     public DurationPickerView(
-            GuiText guiText, Scheduler scheduler, AnvilInput anvil, Messages messages, MessageSink sink) {
+            GuiText guiText, Scheduler scheduler, TextInput textInput, Messages messages, MessageSink sink) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
     }
@@ -108,17 +109,14 @@ public final class DurationPickerView {
         return gui;
     }
 
-    /** Open the anvil for a typed span; a submission flows through {@link #resolveTyped}. */
+    /** Open the input prompt for a typed span; a submission flows through {@link #resolveTyped}. */
     private void promptCustom(Player viewer, PlayerRef viewerRef, Request request) {
-        scheduler.onEntity(
+        textInput.prompt(
+                viewer,
                 viewerRef,
-                () -> anvil.open(viewer, customPrompt(viewerRef), result -> {
-                    if (result instanceof AnvilResult.Submitted submitted) {
-                        resolveTyped(viewer, viewerRef, request, submitted.text());
-                    } else {
-                        open(viewer, viewerRef, request);
-                    }
-                }));
+                InputRequest.of(INPUT_KEY, GuiMessageKey.DURATION_PICKER_CUSTOM_PROMPT),
+                text -> resolveTyped(viewer, viewerRef, request, text),
+                () -> open(viewer, viewerRef, request));
     }
 
     /**
@@ -128,14 +126,12 @@ public final class DurationPickerView {
      */
     void resolveTyped(Player viewer, PlayerRef viewerRef, Request request, String input) {
         String trimmed = input.strip();
-        scheduler.onEntity(viewerRef, () -> {
-            if (!request.validator().apply(trimmed)) {
-                sink.deliver(viewerRef, messages.resolve(viewerRef, request.rejectKey(), Map.of("input", trimmed)));
-                promptCustom(viewer, viewerRef, request);
-                return;
-            }
-            request.onPick().accept(trimmed);
-        });
+        if (!request.validator().apply(trimmed)) {
+            sink.deliver(viewerRef, messages.resolve(viewerRef, request.rejectKey(), Map.of("input", trimmed)));
+            promptCustom(viewer, viewerRef, request);
+            return;
+        }
+        request.onPick().accept(trimmed);
     }
 
     private ItemStack presetIcon(PlayerRef viewer, String preset) {
@@ -149,12 +145,6 @@ public final class DurationPickerView {
         return ItemBuilder.of(CUSTOM_ICON)
                 .name(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_CUSTOM))
                 .lore(List.of(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_CUSTOM_LORE)))
-                .build();
-    }
-
-    private ItemStack customPrompt(PlayerRef viewer) {
-        return ItemBuilder.of(CUSTOM_ICON)
-                .name(guiText.text(viewer, GuiMessageKey.DURATION_PICKER_CUSTOM_PROMPT))
                 .build();
     }
 

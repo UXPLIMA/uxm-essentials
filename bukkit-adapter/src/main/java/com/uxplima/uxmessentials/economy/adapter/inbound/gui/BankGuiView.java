@@ -14,7 +14,6 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BankChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.BankService;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.BankError;
@@ -23,6 +22,8 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -50,7 +51,7 @@ public final class BankGuiView {
 
     private final BankService bankService;
     private final CurrencyRegistry currencies;
-    private final BankChatPromptListener chatPromptListener;
+    private final TextInput textInput;
     private final Scheduler scheduler;
     private final Messages messages;
     private final Supplier<BankNavigation> navigation;
@@ -59,14 +60,14 @@ public final class BankGuiView {
     public BankGuiView(
             BankService bankService,
             CurrencyRegistry currencies,
-            BankChatPromptListener chatPromptListener,
+            TextInput textInput,
             Scheduler scheduler,
             Messages messages,
             Supplier<BankNavigation> navigation,
             GuiLayout layout) {
         this.bankService = Objects.requireNonNull(bankService, "bankService");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
-        this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.navigation = Objects.requireNonNull(navigation, "navigation");
@@ -166,31 +167,45 @@ public final class BankGuiView {
 
     private void promptCreateBank(Player player) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        chatPromptListener.prompt(player, text(viewerRef, EconomyMessageKey.BANK_CREATE_PROMPT_ID, Map.of()), id -> {
-            String cleanId = id.trim();
-            if (cleanId.isEmpty() || cleanId.contains(" ")) {
-                player.sendMessage(text(viewerRef, EconomyMessageKey.BANK_CREATE_INVALID_ID, Map.of()));
-                return;
-            }
-            promptCreateName(player, viewerRef, cleanId);
-        });
+        textInput.prompt(
+                player,
+                viewerRef,
+                InputRequest.of("bank.create-id", EconomyMessageKey.BANK_CREATE_PROMPT_ID),
+                id -> {
+                    String cleanId = id.trim();
+                    if (cleanId.isEmpty() || cleanId.contains(" ")) {
+                        player.sendMessage(text(viewerRef, EconomyMessageKey.BANK_CREATE_INVALID_ID, Map.of()));
+                        open(player);
+                        return;
+                    }
+                    promptCreateName(player, viewerRef, cleanId);
+                },
+                () -> open(player));
     }
 
     private void promptCreateName(Player player, PlayerRef viewerRef, String cleanId) {
-        chatPromptListener.prompt(
-                player, text(viewerRef, EconomyMessageKey.BANK_CREATE_PROMPT_NAME, Map.of()), name -> {
+        textInput.prompt(
+                player,
+                viewerRef,
+                InputRequest.of("bank.create-name", EconomyMessageKey.BANK_CREATE_PROMPT_NAME),
+                name -> {
                     String cleanName = name.trim();
                     if (cleanName.isEmpty()) {
                         player.sendMessage(text(viewerRef, EconomyMessageKey.BANK_CREATE_NAME_EMPTY, Map.of()));
+                        open(player);
                         return;
                     }
                     promptCreateCurrency(player, viewerRef, cleanId, cleanName);
-                });
+                },
+                () -> open(player));
     }
 
     private void promptCreateCurrency(Player player, PlayerRef viewerRef, String cleanId, String cleanName) {
-        chatPromptListener.prompt(
-                player, text(viewerRef, EconomyMessageKey.BANK_CREATE_PROMPT_CURRENCY, Map.of()), currencyStr -> {
+        textInput.prompt(
+                player,
+                viewerRef,
+                InputRequest.of("bank.create-currency", EconomyMessageKey.BANK_CREATE_PROMPT_CURRENCY),
+                currencyStr -> {
                     Currency currency = resolveCurrency(player, viewerRef, currencyStr.trim());
                     scheduler.async(() -> {
                         Result<SharedBank, BankError> res =
@@ -206,7 +221,8 @@ public final class BankGuiView {
                             open(player);
                         });
                     });
-                });
+                },
+                () -> open(player));
     }
 
     private Currency resolveCurrency(Player player, PlayerRef viewerRef, String cleanCurrency) {

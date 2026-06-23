@@ -274,14 +274,21 @@ class AnnounceCommandTest {
     /** A real editor view over the in-memory stores; the subcommand tests never open it, only the editor subcommand. */
     private AnnouncementEditorView editorView() {
         EchoMessagesSink messages = new EchoMessagesSink();
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(messages);
         return new AnnouncementEditorView(
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(messages),
+                guiText,
                 scheduler,
                 messages,
                 announcementStore,
                 settingsStore,
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(moduleDir, new NoopLogger()),
-                new com.uxplima.uxmlib.gui.anvil.AnvilInput(MockBukkit.createMockPlugin()));
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit.create(
+                        MockBukkit.createMockPlugin(),
+                        guiText,
+                        scheduler,
+                        java.nio.file.Path.of("nonexistent"),
+                        new NoopLogger()));
     }
 
     private void execute(CommandDispatcher<CommandSourceStack> dispatcher, String input) {

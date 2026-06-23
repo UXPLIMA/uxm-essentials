@@ -55,6 +55,7 @@ import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
@@ -67,7 +68,6 @@ import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -78,8 +78,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>The repository is the jOOQ adapter behind a Caffeine read-cache decorator (write-through at the delegate,
  * invalidate in the cache) wrapped by {@link HomeSync} so a local write announces itself across servers. The
  * teleporter delegates execution to the teleport context — homes never re-implements movement — which is why the
- * wiring receives the already-constructed {@link TeleportEngine}. The anvil-input helper used for renaming is
- * installed once here and torn down on disable.
+ * wiring receives the already-constructed {@link TeleportEngine}. Text prompts (home rename, invite add) go through
+ * the shared {@link TextInput} seam installed once in bootstrap, so homes installs no input machinery of its own.
  */
 @NullMarked
 public final class HomesWiring {
@@ -102,8 +102,9 @@ public final class HomesWiring {
             TeleportEngine teleportEngine,
             Bus bus,
             GuiLayouts guiLayouts,
-            CloseableResources resources) {
-        return wire(plugin, ctx, persistence, teleportEngine, Optional.empty(), bus, guiLayouts, resources);
+            CloseableResources resources,
+            TextInput textInput) {
+        return wire(plugin, ctx, persistence, teleportEngine, Optional.empty(), bus, guiLayouts, resources, textInput);
     }
 
     /**
@@ -120,7 +121,8 @@ public final class HomesWiring {
             Optional<HomeEconomy> homeEconomy,
             Bus bus,
             GuiLayouts guiLayouts,
-            CloseableResources resources) {
+            CloseableResources resources,
+            TextInput textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -129,6 +131,7 @@ public final class HomesWiring {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(resources, "resources");
+        Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
         CachedHomeRepository cached = HomeRepositories.cachedConcrete(persistence);
         bus.registry().register(HomeSync.listener(cached));
@@ -138,7 +141,7 @@ public final class HomesWiring {
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx), limitMode(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
         HomeServices services = assemble(
-                plugin, ctx, repository, invites, notifier, quota, teleporter, homeEconomy, guiLayouts, resources);
+                plugin, ctx, repository, invites, notifier, quota, teleporter, homeEconomy, guiLayouts, textInput);
         HomesJoinListener joinWarmer = new HomesJoinListener(repository, kernel.scheduler());
         return new Wired(
                 HomeCommands.all(services, kernel.messages(), kernel.scheduler()),
@@ -158,12 +161,11 @@ public final class HomesWiring {
             HomeTeleporter teleporter,
             Optional<HomeEconomy> homeEconomy,
             GuiLayouts guiLayouts,
-            CloseableResources resources) {
+            TextInput textInput) {
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         int unlimitedMax = unlimitedMax(ctx);
         DateTimeFormatter dateFormat = dateFormat(ctx);
-        AnvilInput anvil = installAnvil(plugin, resources);
 
         SafeLocationGuard safeGuard = buildSafeGuard(plugin, ctx);
         ClaimService claimService = buildClaimService(plugin, ctx, kernel);
@@ -197,7 +199,7 @@ public final class HomesWiring {
                 uninviteFromHome,
                 kernel.playerLookup(),
                 notifier,
-                anvil,
+                textInput,
                 invitesLayout(guiLayouts));
         HomeActionView actionView = new HomeActionView(
                 kernel.messages(),
@@ -212,7 +214,7 @@ public final class HomesWiring {
                 iconSelector,
                 invitesMenu,
                 repository,
-                anvil,
+                textInput,
                 actionsLayout(guiLayouts),
                 dateFormat,
                 confirmDelete,
@@ -246,13 +248,6 @@ public final class HomesWiring {
                 uninviteFromHome,
                 kernel.playerLookup(),
                 repository);
-    }
-
-    private static AnvilInput installAnvil(Plugin plugin, CloseableResources resources) {
-        AnvilInput anvil = new AnvilInput(plugin);
-        anvil.install();
-        resources.onClose(anvil::uninstall);
-        return anvil;
     }
 
     private static HomeListLayout listLayout(GuiLayouts guiLayouts) {
@@ -338,8 +333,8 @@ public final class HomesWiring {
 
     /**
      * Everything the homes module contributes once wired: the Brigadier commands plus the read seams the
-     * PlaceholderAPI expansion queries. The homes context holds no repeating scheduled work, so there is
-     * nothing to drain on stop beyond the anvil/navigator teardown already registered with the resources.
+     * PlaceholderAPI expansion queries. The homes context holds no repeating scheduled work and installs no
+     * input machinery of its own (text prompts go through the shared seam), so there is nothing to drain on stop.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the join cache-warmer the plugin registers

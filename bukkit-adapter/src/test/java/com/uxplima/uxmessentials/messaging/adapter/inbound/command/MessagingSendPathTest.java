@@ -265,7 +265,8 @@ class MessagingSendPathTest {
     private MessagingGuiViews guiViews() {
         var plugin = MockBukkit.createMockPlugin();
         var guiText = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyMessages());
-        var anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
+        var textInput = com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit.create(
+                plugin, guiText, scheduler, Path.of("nonexistent"), NO_LOG);
         var layouts = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(guiDir, NO_LOG);
         return MessagingGuiViews.create(
                 guiText,
@@ -278,7 +279,7 @@ class MessagingSendPathTest {
                 new NoIgnores(),
                 mail,
                 new CapturingLookup(server),
-                anvil,
+                textInput,
                 layouts);
     }
 

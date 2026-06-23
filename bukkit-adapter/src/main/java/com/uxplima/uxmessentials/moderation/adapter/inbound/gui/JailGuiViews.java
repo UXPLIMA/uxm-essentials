@@ -14,13 +14,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -65,7 +65,7 @@ public final class JailGuiViews {
             PlayerLookup players,
             PlayerPickerView picker,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.DurationPickerView durations,
-            AnvilInput anvil,
+            TextInput textInput,
             Messages messages,
             MessageSink sink,
             Clock clock,
@@ -79,7 +79,7 @@ public final class JailGuiViews {
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(picker, "picker");
         Objects.requireNonNull(durations, "durations");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(sink, "sink");
         Objects.requireNonNull(clock, "clock");
@@ -89,7 +89,7 @@ public final class JailGuiViews {
         EntityListLayout jailedLayout = layouts.loadEntityList(MODULE, "jailed-players", jailedCodeDefault());
 
         JailListView jailList =
-                new JailListView(guiText, messages, scheduler, services, sanctions, jailLocator, anvil, listLayout);
+                new JailListView(guiText, messages, scheduler, services, sanctions, jailLocator, textInput, listLayout);
         JailedPlayersView jailedPlayers =
                 new JailedPlayersView(guiText, scheduler, services, repository, players, clock, jailedLayout);
         JailGuiFlow flow = new JailGuiFlow(guiText, scheduler, services, picker, durations, messages, sink);

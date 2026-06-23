@@ -9,10 +9,10 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlo
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -38,7 +38,7 @@ public final class ModerationCommands {
      *
      * <p>The read-only GUI collaborators thread to the matching command's bare-root opener: {@code guiViews}
      * (the active-punishments list) to {@code /banlist} and (with {@code picker}) the history view to
-     * {@code /banhistory}, and {@code guiText} + {@code anvil} to the {@code /checkban}/{@code /checkmute} name
+     * {@code /banhistory}, and {@code guiText} + {@code textInput} to the {@code /checkban}/{@code /checkmute} name
      * prompts. The {@code jailGui} threads to the three jail commands' bare roots ({@code /jail} opens the hub,
      * {@code /jails} the jail-list manager, {@code /jailedplayers} the release list). Each is {@code null} only
      * when no GUI surface was built, in which case the owning command exposes no opener and keeps its raw chat
@@ -54,7 +54,7 @@ public final class ModerationCommands {
             @Nullable ModerationGuiViews guiViews,
             @Nullable PlayerPickerView picker,
             @Nullable GuiText guiText,
-            @Nullable AnvilInput anvil,
+            @Nullable TextInput textInput,
             @Nullable JailGuiViews jailGui) {
         return List.of(
                 new MuteCommand(services, messages, sink, silentByDefault, guiFlow),
@@ -90,8 +90,8 @@ public final class ModerationCommands {
                 new HistoryCommand(services, messages, sink, scheduler),
                 new StaffHistoryCommand(services, messages, sink, scheduler),
                 new StaffRollbackCommand(services, messages, sink, scheduler),
-                new CheckBanCommand(services, messages, sink, scheduler, guiText, anvil),
-                new CheckMuteCommand(services, messages, sink, scheduler, guiText, anvil),
+                new CheckBanCommand(services, messages, sink, scheduler, guiText, textInput),
+                new CheckMuteCommand(services, messages, sink, scheduler, guiText, textInput),
                 new KickCommand(services, messages, sink, silentByDefault),
                 new KickallCommand(services, messages, sink),
                 new WarnCommand(services, messages, sink, silentByDefault, guiFlow),

@@ -19,6 +19,8 @@ import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -27,8 +29,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.PaginatedGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -36,14 +36,14 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The invited-players menu, opened from a home's {@link HomeActionView}. A {@link PaginatedGui} of the players
  * the owner has invited to one of their homes; each entry resolves a UUID to a name through the kernel
- * {@link PlayerLookup} and revokes that invite on click. An add button opens a vanilla anvil to type a player
- * name to invite, and a back button returns to the action menu. Every visible string resolves from a
+ * {@link PlayerLookup} and revokes that invite on click. An add button opens the shared text-input seam to type a
+ * player name to invite, and a back button returns to the action menu. Every visible string resolves from a
  * {@link MessageKey} in the viewer's locale, never an inline literal.
  *
  * <p>Every invite read or write hits the DB, so it runs off the tick thread through the kernel
  * {@link Scheduler}; the menu builds and opens on the viewer's entity thread only after the invite set has been
  * loaded async. The add and revoke decision branches are extracted into {@link #handleAddInput} and
- * {@link #revoke} so they can be unit-tested without driving a live anvil or inventory.
+ * {@link #revoke} so they can be unit-tested without driving a live prompt or inventory.
  */
 @NullMarked
 public final class InvitedPlayersMenu {
@@ -55,7 +55,7 @@ public final class InvitedPlayersMenu {
     private final UninviteFromHome uninviteFromHome;
     private final PlayerLookup players;
     private final HomeNotifier notifier;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final InvitesMenuLayout layout;
 
     public InvitedPlayersMenu(
@@ -66,7 +66,7 @@ public final class InvitedPlayersMenu {
             UninviteFromHome uninviteFromHome,
             PlayerLookup players,
             HomeNotifier notifier,
-            AnvilInput anvil,
+            TextInput textInput,
             InvitesMenuLayout layout) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -75,7 +75,7 @@ public final class InvitedPlayersMenu {
         this.uninviteFromHome = Objects.requireNonNull(uninviteFromHome, "uninviteFromHome");
         this.players = Objects.requireNonNull(players, "players");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.layout = Objects.requireNonNull(layout, "layout");
     }
 
@@ -131,17 +131,14 @@ public final class InvitedPlayersMenu {
         gui.set(layout.backSlot(), GuiItem.button(backIcon(viewer), e -> onBack.run()));
     }
 
-    /** Open the anvil prompt for a player name; the submission flows through {@link #handleAddInput}. */
+    /** Open the text prompt for a player name; the submission flows through {@link #handleAddInput}. */
     private void promptAdd(Player player, PlayerRef viewer, Home home, Runnable onBack) {
-        scheduler.onEntity(
+        textInput.prompt(
+                player,
                 viewer,
-                () -> anvil.open(player, addPrompt(viewer), result -> {
-                    if (result instanceof AnvilResult.Submitted submitted) {
-                        handleAddInput(player, viewer, home, onBack, submitted.text());
-                    } else {
-                        open(player, viewer, home, onBack);
-                    }
-                }));
+                InputRequest.of("home.invite-add", HomesMessageKey.HOME_INVITES_ADD_PROMPT),
+                text -> handleAddInput(player, viewer, home, onBack, text),
+                () -> open(player, viewer, home, onBack));
     }
 
     /**
@@ -149,7 +146,7 @@ public final class InvitedPlayersMenu {
      * performed off the tick thread (it may call a blocking offline-player lookup); on the async result, an
      * unresolvable name sends the unknown-player message and reopens unchanged on the entity thread, while a
      * successful resolve runs the invite (a DB write, fine async) and then reopens on the entity thread.
-     * Package-private so the resolve-then-invite decision can be unit-tested without driving a live anvil; the
+     * Package-private so the resolve-then-invite decision can be unit-tested without driving a live prompt; the
      * sync test scheduler runs callbacks inline, so tests pass without any threading.
      */
     void handleAddInput(Player player, PlayerRef viewer, Home home, Runnable onBack, String input) {
@@ -213,12 +210,6 @@ public final class InvitedPlayersMenu {
     private ItemStack backIcon(PlayerRef viewer) {
         return ItemBuilder.of(layout.backMaterial())
                 .name(text(viewer, HomesMessageKey.HOME_INVITES_BACK, Map.of()))
-                .build();
-    }
-
-    private ItemStack addPrompt(PlayerRef viewer) {
-        return ItemBuilder.of(layout.addMaterial())
-                .name(text(viewer, HomesMessageKey.HOME_INVITES_ADD_PROMPT, Map.of()))
                 .build();
     }
 

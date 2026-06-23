@@ -17,10 +17,8 @@ import com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmationView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletGuiView;
-import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BankChatPromptListener;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteListener;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.CommandCostListener;
-import com.uxplima.uxmessentials.economy.adapter.inbound.listener.LoanChatPromptListener;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitInventoryCalculations;
 import com.uxplima.uxmessentials.economy.adapter.outbound.EconomyProviderRegistrar;
@@ -107,16 +105,19 @@ public final class EconomyWiring {
     }
 
     /**
-     * Build the economy context, threading the shared {@code anvil} into the bare-{@code /eco} admin GUI so its
-     * Give / Take / Set amount entry reuses the one installed anvil listener. A {@code null} anvil disables the
-     * admin GUI (bare {@code /eco} then falls through to usage); the raw subcommands are unaffected either way.
+     * Build the economy context, threading the shared {@code textInput} seam into every menu that captures a typed
+     * line — the bare-{@code /eco} admin GUI's Give / Take / Set / bulk amount entry and the bank, loan, and
+     * exchange dashboards. A {@code null} {@code textInput} disables the admin GUI (bare {@code /eco} then falls
+     * through to usage); the bank/loan/exchange views always receive the seam, and the raw subcommands are
+     * unaffected either way.
      */
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
             Bus bus,
-            com.uxplima.uxmlib.gui.anvil.@org.jspecify.annotations.Nullable AnvilInput anvil) {
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
+                    textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -168,7 +169,7 @@ public final class EconomyWiring {
                 resolved,
                 decoratedRepository,
                 pendingRepo,
-                anvil);
+                textInput);
     }
 
     private static EconomyProvider resolveProvider(
@@ -203,7 +204,8 @@ public final class EconomyWiring {
             EconomyProvider resolved,
             WalletRepository repository,
             PendingTransactionRepository pendingRepo,
-            com.uxplima.uxmlib.gui.anvil.@org.jspecify.annotations.Nullable AnvilInput anvil) {
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
+                    textInput) {
         KernelPorts kernel = ctx.kernel();
         BaltopExemption exemption = new PermissionBaltopExemption(kernel.permissions(), settings.baltopExemptNode());
         BaltopSnapshots snapshots = new BaltopSnapshots(
@@ -215,13 +217,6 @@ public final class EconomyWiring {
                 settings.baltopExcludeBanned(),
                 settings.baltopMinBalance(),
                 new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitBannedLookup());
-
-        com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener chatPromptListener =
-                new com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener(
-                        kernel.messages());
-
-        BankChatPromptListener bankChatPromptListener = new BankChatPromptListener(kernel.messages());
-        LoanChatPromptListener loanChatPromptListener = new LoanChatPromptListener(kernel.messages());
 
         // GUI geometry is operator-editable in modules/economy/gui/*.conf; titles and labels stay in the catalog.
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts guiLayouts =
@@ -238,23 +233,21 @@ public final class EconomyWiring {
                 resolved,
                 snapshots,
                 ledger.telemetry(),
-                chatPromptListener,
-                bankChatPromptListener,
-                loanChatPromptListener,
+                textInput,
                 guiLayouts);
         // The bare-/eco admin GUI (item 19): a hub over picker → per-player Give/Take/Set/Reset and a server-wide
-        // bulk screen, reusing the one installed anvil for amount entry. Built only when an anvil is supplied (the
+        // bulk screen, reusing the shared input seam for amount entry. Built only when a seam is supplied (the
         // module is wired with GUIs available); GuiRootBinding then opens it on bare /eco when the catalog gui flag
         // is on, and the .requires(economy.admin) gate is carried by the rebind.
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews adminGui = null;
-        if (anvil != null) {
+        if (textInput != null) {
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
                     new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView picker =
                     new com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView(
                             guiText,
                             kernel.scheduler(),
-                            anvil,
+                            textInput,
                             plugin.getServer(),
                             kernel.messages(),
                             kernel.messageSink());
@@ -263,7 +256,7 @@ public final class EconomyWiring {
                     kernel.scheduler(),
                     plugin.getServer(),
                     picker,
-                    anvil,
+                    textInput,
                     kernel.playerLookup(),
                     resolved,
                     services.ecoAdmin(),
@@ -300,15 +293,6 @@ public final class EconomyWiring {
                     true,
                     settings.dailyRewardAmount(),
                     settings.dailyRewardCooldown()));
-        }
-        if (settings.exchangeEnabled()) {
-            listenersList.add(chatPromptListener);
-        }
-        if (settings.bankEnabled()) {
-            listenersList.add(bankChatPromptListener);
-        }
-        if (settings.loansEnabled()) {
-            listenersList.add(loanChatPromptListener);
         }
         List<org.bukkit.event.Listener> listeners = List.copyOf(listenersList);
 
@@ -353,13 +337,6 @@ public final class EconomyWiring {
                         kernel.scheduler(),
                         kernel.log());
 
-        // Clears every pending chat prompt on stop so a leftover callback can never fire after teardown.
-        Runnable promptCleanup = () -> {
-            chatPromptListener.clear();
-            bankChatPromptListener.clear();
-            loanChatPromptListener.clear();
-        };
-
         return new Wired(
                 commands,
                 listeners,
@@ -379,7 +356,6 @@ public final class EconomyWiring {
                 loanRepaymentTask,
                 maintenanceTask,
                 bankInterestTask,
-                promptCleanup,
                 services.walletView());
     }
 
@@ -393,10 +369,13 @@ public final class EconomyWiring {
             EconomyProvider resolved,
             BaltopSnapshots snapshots,
             com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
-            com.uxplima.uxmessentials.economy.adapter.inbound.listener.ExchangeChatPromptListener chatPromptListener,
-            BankChatPromptListener bankChatPromptListener,
-            LoanChatPromptListener loanChatPromptListener,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
+                    textInput,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts guiLayouts) {
+        // The bank, loan, and exchange dashboards all capture a typed amount through the shared input seam, so a
+        // non-null TextInput is required to build them; bootstrap always supplies it.
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput input =
+                Objects.requireNonNull(textInput, "textInput");
         EconomyNotifier notifier =
                 new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat());
 
@@ -469,7 +448,7 @@ public final class EconomyWiring {
                 kernel.scheduler(),
                 notifier,
                 kernel.messages(),
-                chatPromptListener,
+                input,
                 exchangeLayout);
 
         com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore =
@@ -519,26 +498,14 @@ public final class EconomyWiring {
                         org.bukkit.Material.PLAYER_HEAD));
 
         BankGuiView bankGuiView = new BankGuiView(
-                bankService,
-                currencies,
-                bankChatPromptListener,
-                kernel.scheduler(),
-                kernel.messages(),
-                navigation,
-                bankListLayout);
+                bankService, currencies, input, kernel.scheduler(), kernel.messages(), navigation, bankListLayout);
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout bankActionsLayout =
                 guiLayouts.loadFixedMenu("economy", "bank-actions", BankActionsView.defaultLayout());
         BankActionsView bankActionsView = new BankActionsView(
-                bankService,
-                bankChatPromptListener,
-                kernel.scheduler(),
-                kernel.messages(),
-                historyView,
-                navigation,
-                bankActionsLayout);
+                bankService, input, kernel.scheduler(), kernel.messages(), historyView, navigation, bankActionsLayout);
         BankMembersView bankMembersView = new BankMembersView(
                 bankService,
-                bankChatPromptListener,
+                input,
                 kernel.scheduler(),
                 kernel.playerLookup(),
                 kernel.messages(),
@@ -548,8 +515,8 @@ public final class EconomyWiring {
                 bankGuiView, bankActionsView, bankMembersView));
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout loanLayout =
                 guiLayouts.loadFixedMenu("economy", "loan-dashboard", LoanGuiView.defaultLayout());
-        LoanGuiView loanGuiView = new LoanGuiView(
-                loanService, currencies, loanChatPromptListener, kernel.scheduler(), kernel.messages(), loanLayout);
+        LoanGuiView loanGuiView =
+                new LoanGuiView(loanService, currencies, input, kernel.scheduler(), kernel.messages(), loanLayout);
 
         return new EconomyServices(
                 new Balance(resolved, notifier),
@@ -624,7 +591,6 @@ public final class EconomyWiring {
             @org.jspecify.annotations.Nullable LoanRepaymentTask loanRepaymentTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask bankInterestTask,
-            Runnable promptCleanup,
             WalletGuiView walletView) {
 
         public Wired {
@@ -643,7 +609,6 @@ public final class EconomyWiring {
             Objects.requireNonNull(amountFormat, "amountFormat");
             Objects.requireNonNull(maintenanceTask, "maintenanceTask");
             Objects.requireNonNull(bankInterestTask, "bankInterestTask");
-            Objects.requireNonNull(promptCleanup, "promptCleanup");
             Objects.requireNonNull(walletView, "walletView");
         }
 
@@ -663,7 +628,6 @@ public final class EconomyWiring {
 
         /** Drain the queues, stop the loops, and drop this plugin's provider registration. */
         public void stop() {
-            promptCleanup.run();
             bankInterestTask.stop();
             maintenanceTask.stop();
             if (loanRepaymentTask != null) {

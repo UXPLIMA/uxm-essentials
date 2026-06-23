@@ -86,6 +86,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.DurationPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
@@ -140,7 +141,7 @@ public final class ModerationWiring {
             Bus bus,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            com.uxplima.uxmlib.gui.anvil.AnvilInput anvil) {
+            TextInput textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -148,7 +149,7 @@ public final class ModerationWiring {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
@@ -204,10 +205,10 @@ public final class ModerationWiring {
         // the flow supplies the moderation TargetResolver as its offline-name resolver, the unknown-target reply,
         // and the SanctionDuration-backed validator for the timed verbs.
         PlayerPickerView picker = new PlayerPickerView(
-                guiText, kernel.scheduler(), anvil, plugin.getServer(), kernel.messages(), kernel.messageSink());
+                guiText, kernel.scheduler(), textInput, plugin.getServer(), kernel.messages(), kernel.messageSink());
         DurationPickerView durationPicker =
-                new DurationPickerView(guiText, kernel.scheduler(), anvil, kernel.messages(), kernel.messageSink());
-        PunishmentConfirmView confirmView = new PunishmentConfirmView(guiText, kernel.scheduler(), anvil);
+                new DurationPickerView(guiText, kernel.scheduler(), textInput, kernel.messages(), kernel.messageSink());
+        PunishmentConfirmView confirmView = new PunishmentConfirmView(guiText, kernel.scheduler(), textInput);
         PunishmentGuiFlow guiFlow = new PunishmentGuiFlow(
                 services, picker, durationPicker, confirmView, kernel.messages(), kernel.messageSink());
         // The bare-/jail management GUI: the jail-a-player flow (picker → jail chooser → duration, permanent
@@ -227,7 +228,7 @@ public final class ModerationWiring {
                 kernel.playerLookup(),
                 picker,
                 durationPicker,
-                anvil,
+                textInput,
                 kernel.messages(),
                 kernel.messageSink(),
                 clock,
@@ -242,7 +243,7 @@ public final class ModerationWiring {
                 guiViews,
                 picker,
                 guiText,
-                anvil,
+                textInput,
                 jailGui));
         commands.add(new ModerationGuiCommand(services, kernel.messages(), kernel.messageSink(), guiViews));
         return new Wired(

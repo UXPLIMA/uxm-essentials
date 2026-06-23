@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,12 +32,15 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.NumberProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -45,7 +49,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -113,7 +116,7 @@ class PlayerWarpGuiTest {
                 List.of());
         SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
-        AnvilInput anvil = new AnvilInput(plugin);
+        TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
 
         EntityEditorLayout editorLayout = new EntityEditorLayout(
                 6,
@@ -129,7 +132,7 @@ class PlayerWarpGuiTest {
                 repository,
                 visibility,
                 delPlayerWarp,
-                anvil,
+                textInput,
                 messages,
                 editorLayout,
                 PlayerWarpEditorSubLayouts.codeDefault(),
@@ -143,7 +146,15 @@ class PlayerWarpGuiTest {
                 java.util.OptionalInt.of(49),
                 Material.LIME_DYE);
         listView = new PlayerWarpListView(
-                guiText, scheduler, permissions, messages, repository, setPlayerWarp, anvil, listLayout, editorView);
+                guiText,
+                scheduler,
+                permissions,
+                messages,
+                repository,
+                setPlayerWarp,
+                textInput,
+                listLayout,
+                editorView);
     }
 
     @AfterEach
@@ -417,6 +428,20 @@ class PlayerWarpGuiTest {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
     }
+
+    private static final Logger NOOP = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
 
     private static final class KeyMessages implements Messages {
         @Override

@@ -77,6 +77,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -87,7 +88,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCom
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import com.uxplima.uxmlib.npc.ChannelResolver;
 import com.uxplima.uxmlib.npc.PacketSender;
 import com.uxplima.uxmlib.packet.npc.NpcPackets;
@@ -128,7 +128,7 @@ public final class NpcWiring {
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            AnvilInput anvil,
+            TextInput textInput,
             ManagementGuiRegistry guiRegistry) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
@@ -137,7 +137,7 @@ public final class NpcWiring {
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         KernelPorts kernel = ctx.kernel();
         NpcSettings settings = new NpcSettings(ctx.config());
@@ -176,7 +176,8 @@ public final class NpcWiring {
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
         // The management GUI: an editor exposing every NPC property over the use cases, and a list that opens it.
         // The list backs both /npc (no args) and the /uxmess gui hub entry; the editor's back button returns to it.
-        NpcListView listView = buildGui(plugin, kernel, repository, services, skinByName, guiText, guiLayouts, anvil);
+        NpcListView listView =
+                buildGui(plugin, kernel, repository, services, skinByName, guiText, guiLayouts, textInput);
         guiRegistry.register(new ManagementGuiEntry(
                 "npc",
                 NpcMessageKey.NPC_GUI_LIST_TITLE,
@@ -224,7 +225,7 @@ public final class NpcWiring {
             NpcSkinByName skinByName,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            AnvilInput anvil) {
+            TextInput textInput) {
         NpcEditorSubLayouts subLayouts =
                 NpcEditorSubLayouts.load(plugin.getDataFolder().toPath(), "npc", "npc-editor", kernel.log());
         EntityListLayout listLayout = guiLayouts.loadEntityList(
@@ -242,14 +243,14 @@ public final class NpcWiring {
                 repository,
                 services,
                 skinByName,
-                anvil,
+                textInput,
                 kernel.messages(),
                 editorLayout,
                 subLayouts,
                 colourPicker,
                 (player, viewer) -> listHolder[0].open(player, viewer));
         NpcListView listView =
-                new NpcListView(guiText, kernel.scheduler(), repository, services, anvil, listLayout, editor);
+                new NpcListView(guiText, kernel.scheduler(), repository, services, textInput, listLayout, editor);
         listHolder[0] = listView;
         return listView;
     }

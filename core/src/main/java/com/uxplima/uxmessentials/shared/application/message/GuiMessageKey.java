@@ -24,6 +24,10 @@ public enum GuiMessageKey implements MessageKey {
     HUB_PREV("gui.hub.prev"),
     HUB_NEXT("gui.hub.next"),
 
+    // the shared text-input seam — the cancel acknowledgement and the chat-mode cancel hint
+    INPUT_CANCELLED("gui.input.cancelled"),
+    INPUT_CANCEL_HINT("gui.input.cancel-hint"),
+
     // the shared colour-picker widget — its chrome buttons
     COLOUR_PICKER_TITLE("gui.colour-picker.title"),
     COLOUR_PICKER_CUSTOM("gui.colour-picker.custom"),

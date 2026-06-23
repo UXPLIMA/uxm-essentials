@@ -3,20 +3,16 @@ package com.uxplima.uxmessentials.warps.adapter.inbound.gui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 
-import net.kyori.adventure.text.Component;
-
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpChatPromptListener;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
 import org.jspecify.annotations.NullMarked;
@@ -34,8 +30,7 @@ import org.jspecify.annotations.Nullable;
 final class WarpSubMenuClicks {
 
     private final WarpEditorView editorView;
-    private final WarpChatPromptListener promptListener;
-    private final Messages messages;
+    private final TextInput textInput;
     private final EditableWarpLoader loader;
     private final WarpSoundSelectorView soundSelectorView;
     private final WarpParticleSelectorView particleSelectorView;
@@ -43,15 +38,13 @@ final class WarpSubMenuClicks {
 
     WarpSubMenuClicks(
             WarpEditorView editorView,
-            WarpChatPromptListener promptListener,
-            Messages messages,
+            TextInput textInput,
             EditableWarpLoader loader,
             WarpSoundSelectorView soundSelectorView,
             WarpParticleSelectorView particleSelectorView,
             WarpWelcomeMessagesView welcomeMessagesView) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
-        this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
-        this.messages = Objects.requireNonNull(messages, "messages");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.loader = Objects.requireNonNull(loader, "loader");
         this.soundSelectorView = Objects.requireNonNull(soundSelectorView, "soundSelectorView");
         this.particleSelectorView = Objects.requireNonNull(particleSelectorView, "particleSelectorView");
@@ -80,10 +73,15 @@ final class WarpSubMenuClicks {
             MessageKey promptKey = isDeparture
                     ? WarpsMessageKey.WARP_EDITOR_SOUND_DEPARTURE_PROMPT
                     : WarpsMessageKey.WARP_EDITOR_SOUND_ARRIVAL_PROMPT;
-            promptListener.prompt(player, text(viewer, promptKey), input -> {
-                saveSound(holder, Optional.of(input.toLowerCase(Locale.ROOT)));
-                editorView.open(player, viewer, name, owner);
-            });
+            textInput.prompt(
+                    player,
+                    viewer,
+                    InputRequest.of("warp.sound", promptKey),
+                    input -> {
+                        saveSound(holder, Optional.of(input.toLowerCase(Locale.ROOT)));
+                        editorView.open(player, viewer, name, owner);
+                    },
+                    () -> soundSelectorView.open(player, viewer, name, owner, isDeparture));
             return;
         }
 
@@ -131,10 +129,15 @@ final class WarpSubMenuClicks {
             MessageKey promptKey = isDeparture
                     ? WarpsMessageKey.WARP_EDITOR_PARTICLE_DEPARTURE_PROMPT
                     : WarpsMessageKey.WARP_EDITOR_PARTICLE_ARRIVAL_PROMPT;
-            promptListener.prompt(player, text(viewer, promptKey), input -> {
-                saveParticle(holder, Optional.of(input.toUpperCase(Locale.ROOT)));
-                editorView.open(player, viewer, name, owner);
-            });
+            textInput.prompt(
+                    player,
+                    viewer,
+                    InputRequest.of("warp.particle", promptKey),
+                    input -> {
+                        saveParticle(holder, Optional.of(input.toUpperCase(Locale.ROOT)));
+                        editorView.open(player, viewer, name, owner);
+                    },
+                    () -> particleSelectorView.open(player, viewer, name, owner, isDeparture));
             return;
         }
 
@@ -181,12 +184,17 @@ final class WarpSubMenuClicks {
 
         if (slot == welcomeMessagesView.addSlot()) {
             player.closeInventory();
-            promptListener.prompt(player, text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT), input -> {
-                List<WelcomeMessage> updatedList = new ArrayList<>(currentMsgs);
-                updatedList.add(new WelcomeMessage(input, "CHAT"));
-                saveWelcomeMessages(holder, updatedList);
-                welcomeMessagesView.open(player, viewer, name, owner);
-            });
+            textInput.prompt(
+                    player,
+                    viewer,
+                    InputRequest.of("warp.welcome", WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT),
+                    input -> {
+                        List<WelcomeMessage> updatedList = new ArrayList<>(currentMsgs);
+                        updatedList.add(new WelcomeMessage(input, "CHAT"));
+                        saveWelcomeMessages(holder, updatedList);
+                        welcomeMessagesView.open(player, viewer, name, owner);
+                    },
+                    () -> welcomeMessagesView.open(player, viewer, name, owner));
             return;
         }
 
@@ -208,12 +216,17 @@ final class WarpSubMenuClicks {
             welcomeMessagesView.open(player, viewer, name, owner);
         } else if (c == ClickType.LEFT) { // Edit text
             player.closeInventory();
-            promptListener.prompt(player, text(viewer, WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT), input -> {
-                List<WelcomeMessage> updatedList = new ArrayList<>(currentMsgs);
-                updatedList.set(slot, new WelcomeMessage(input, targetMsg.type()));
-                saveWelcomeMessages(holder, updatedList);
-                welcomeMessagesView.open(player, viewer, name, owner);
-            });
+            textInput.prompt(
+                    player,
+                    viewer,
+                    InputRequest.of("warp.welcome", WarpsMessageKey.WARP_EDITOR_WELCOME_PROMPT),
+                    input -> {
+                        List<WelcomeMessage> updatedList = new ArrayList<>(currentMsgs);
+                        updatedList.set(slot, new WelcomeMessage(input, targetMsg.type()));
+                        saveWelcomeMessages(holder, updatedList);
+                        welcomeMessagesView.open(player, viewer, name, owner);
+                    },
+                    () -> welcomeMessagesView.open(player, viewer, name, owner));
         } else if (c == ClickType.SHIFT_LEFT || c == ClickType.SHIFT_RIGHT) { // Cycle type
             List<WelcomeMessage> updatedList = new ArrayList<>(currentMsgs);
             updatedList.set(slot, new WelcomeMessage(targetMsg.message(), nextWelcomeType(targetMsg.type())));
@@ -237,9 +250,5 @@ final class WarpSubMenuClicks {
         if (warp != null) {
             warp.setWelcomeMessages(msgs);
         }
-    }
-
-    private Component text(PlayerRef viewer, MessageKey key) {
-        return StyledText.render(messages.resolve(viewer, key, Map.of()));
     }
 }

@@ -18,19 +18,20 @@ import com.uxplima.uxmessentials.messaging.domain.IgnoreEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * The ignore-list manager (opened by {@code /ignore} with no arguments): a config-driven, paginated grid of the
  * players the viewer ignores, drawn through the shared {@link EntityListView}, each icon a clickable head that
- * un-ignores that player. A create button opens an anvil for a name and ignores that player. The view holds no
+ * un-ignores that player. A create button prompts for a name through the shared text-input seam and ignores that
+ * player. The view holds no
  * domain logic — the un-ignore and the ignore route through the same {@code Unignore} / {@code Ignore} use cases
  * the {@code /unignore} and {@code /ignore <player>} verbs use, so a notifier line still fires and the store
  * stays consistent.
@@ -47,9 +48,8 @@ public final class IgnoreListView {
     private final Ignore ignoreUseCase;
     private final Unignore unignoreUseCase;
     private final PlayerLookup players;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final GuiText guiText;
-    private final EntityListLayout layout;
     private final AtomicReference<List<IgnoreEntry>> snapshot = new AtomicReference<>(List.of());
     private final EntityListView<IgnoreEntry> view;
 
@@ -60,7 +60,7 @@ public final class IgnoreListView {
             Ignore ignoreUseCase,
             Unignore unignoreUseCase,
             PlayerLookup players,
-            AnvilInput anvil,
+            TextInput textInput,
             EntityListLayout layout) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -68,12 +68,11 @@ public final class IgnoreListView {
         this.ignoreUseCase = Objects.requireNonNull(ignoreUseCase, "ignoreUseCase");
         this.unignoreUseCase = Objects.requireNonNull(unignoreUseCase, "unignoreUseCase");
         this.players = Objects.requireNonNull(players, "players");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
-        this.layout = Objects.requireNonNull(layout, "layout");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.view = EntityListView.<IgnoreEntry>builder()
                 .guiText(guiText)
                 .scheduler(scheduler)
-                .layout(layout)
+                .layout(Objects.requireNonNull(layout, "layout"))
                 .title(MessagingMessageKey.GUI_IGNORE_TITLE)
                 .navNames(MessagingMessageKey.GUI_IGNORE_PREV, MessagingMessageKey.GUI_IGNORE_NEXT)
                 .entities(snapshot::get)
@@ -110,27 +109,20 @@ public final class IgnoreListView {
     }
 
     private void promptAdd(Player player) {
-        ItemStack prompt = ItemBuilder.of(layout.createIcon())
-                .name(guiText.text(BukkitRefs.toRef(player), MessagingMessageKey.GUI_IGNORE_ADD_PROMPT))
-                .build();
-        anvil.open(player, prompt, result -> handleAdd(player, result));
-    }
-
-    private void handleAdd(Player player, AnvilResult result) {
         PlayerRef owner = BukkitRefs.toRef(player);
-        if (!(result instanceof AnvilResult.Submitted submitted)
-                || submitted.text().isBlank()) {
-            scheduler.onEntity(owner, () -> open(player, owner));
-            return;
-        }
-        addByName(player, submitted.text());
+        textInput.prompt(
+                player,
+                owner,
+                InputRequest.of("messaging.ignore-add", MessagingMessageKey.GUI_IGNORE_ADD_PROMPT),
+                name -> addByName(player, name),
+                () -> open(player, owner));
     }
 
     /**
      * Resolve {@code name} to an online player and ignore them through the use case, then reopen the list. An
      * unknown name reopens the list unchanged (the same online-resolution the {@code /ignore <player>} verb
-     * applies; the self-check and idempotency are the use case's). The anvil callback routes here; it is also the
-     * seam a test drives directly without firing a live anvil.
+     * applies; the self-check and idempotency are the use case's). The input seam routes a submitted line here; it
+     * is also the seam a test drives directly without firing a live prompt.
      */
     void addByName(Player player, String name) {
         PlayerRef owner = BukkitRefs.toRef(player);

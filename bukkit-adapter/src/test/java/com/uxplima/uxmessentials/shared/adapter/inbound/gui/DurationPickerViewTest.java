@@ -2,6 +2,9 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +22,10 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -27,10 +33,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
@@ -47,20 +53,26 @@ class DurationPickerViewTest {
     // The first preset sits one slot in from the top-left corner (see DurationPickerView#presetSlot).
     private static final int FIRST_PRESET_SLOT = 1;
 
+    @TempDir
+    private Path inputDir;
+
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock viewer;
     private PlayerRef viewerRef;
-    private AnvilInput anvil;
+    private TextInput textInput;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         viewer = server.addPlayer("Staff");
         viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
-        anvil = new AnvilInput(plugin);
-        anvil.install();
+        // A rejected span reopens the prompt; chat mode keeps that reopen off the anvil (MockBukkit cannot render
+        // a live anvil), so the reject branch is observable while the reopen is a harmless chat send.
+        Files.writeString(inputDir.resolve("config.conf"), "default-mode = chat\n");
+        textInput = TextInputTestKit.create(
+                plugin, new GuiText(new KeyMessages()), new SyncScheduler(), inputDir, new NoopLogger());
         Guis.install(plugin);
     }
 
@@ -127,7 +139,7 @@ class DurationPickerViewTest {
 
     private DurationPickerView view(MessageSink sink) {
         return new DurationPickerView(
-                new GuiText(new KeyMessages()), new SyncScheduler(), anvil, new KeyMessages(), sink);
+                new GuiText(new KeyMessages()), new SyncScheduler(), textInput, new KeyMessages(), sink);
     }
 
     // The validator mirrors the timed-verb rule the moderation flow supplies: only a positive, well-formed span.
@@ -171,6 +183,20 @@ class DurationPickerViewTest {
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             return key.key();
         }
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class SyncScheduler implements Scheduler {

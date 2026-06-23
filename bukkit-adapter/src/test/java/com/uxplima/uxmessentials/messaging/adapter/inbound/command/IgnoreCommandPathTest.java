@@ -53,6 +53,8 @@ import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -68,7 +70,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.PaginatedGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -238,8 +239,7 @@ class IgnoreCommandPathTest {
     private MessagingGuiViews views(Path dir) {
         GuiText guiText = new GuiText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
-        AnvilInput anvil = new AnvilInput(plugin);
-        anvil.install();
+        TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         GuiLayouts layouts = new GuiLayouts(dir, NOOP);
         return MessagingGuiViews.create(
                 guiText,
@@ -252,7 +252,7 @@ class IgnoreCommandPathTest {
                 ignores,
                 new EmptyMail(),
                 players,
-                anvil,
+                textInput,
                 layouts);
     }
 

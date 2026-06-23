@@ -13,7 +13,6 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.listener.LoanChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.LoanService;
 import com.uxplima.uxmessentials.economy.domain.AmountParseError;
@@ -23,6 +22,8 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -44,7 +45,7 @@ final class LoanRequestFlow {
 
     private final LoanService loanService;
     private final CurrencyRegistry currencies;
-    private final LoanChatPromptListener chatPromptListener;
+    private final TextInput textInput;
     private final Scheduler scheduler;
     private final Messages messages;
     private final LoanIcons icons;
@@ -53,14 +54,14 @@ final class LoanRequestFlow {
     LoanRequestFlow(
             LoanService loanService,
             CurrencyRegistry currencies,
-            LoanChatPromptListener chatPromptListener,
+            TextInput textInput,
             Scheduler scheduler,
             Messages messages,
             LoanIcons icons,
             Consumer<Player> refresh) {
         this.loanService = Objects.requireNonNull(loanService, "loanService");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
-        this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.icons = Objects.requireNonNull(icons, "icons");
@@ -109,41 +110,47 @@ final class LoanRequestFlow {
 
     private void promptLoanAmount(Player player, Currency currency) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        chatPromptListener.prompt(
+        textInput.prompt(
                 player,
-                text(
-                        viewerRef,
+                viewerRef,
+                InputRequest.of(
+                        "loan.amount",
                         EconomyMessageKey.LOAN_GUI_AMOUNT_PROMPT,
                         Map.of("currency", currency.id().value())),
                 amountStr -> {
                     Result<Money, AmountParseError> parsed = AmountParser.parse(amountStr, currency);
                     if (parsed.isErr()) {
                         player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_INVALID_AMOUNT, Map.of()));
-                        scheduler.onEntity(viewerRef, () -> refresh.accept(player));
+                        refresh.accept(player);
                         return;
                     }
                     promptInstallments(player, viewerRef, currency, parsed.orElseThrow());
-                });
+                },
+                () -> refresh.accept(player));
     }
 
     private void promptInstallments(Player player, PlayerRef viewerRef, Currency currency, Money amount) {
-        chatPromptListener.prompt(
-                player, text(viewerRef, EconomyMessageKey.LOAN_GUI_INSTALLMENTS_PROMPT, Map.of()), installmentsStr -> {
+        textInput.prompt(
+                player,
+                viewerRef,
+                InputRequest.of("loan.installments", EconomyMessageKey.LOAN_GUI_INSTALLMENTS_PROMPT),
+                installmentsStr -> {
                     int installments;
                     try {
                         installments = Integer.parseInt(installmentsStr.trim());
                     } catch (NumberFormatException malformed) {
                         player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_INSTALLMENTS_INVALID, Map.of()));
-                        scheduler.onEntity(viewerRef, () -> refresh.accept(player));
+                        refresh.accept(player);
                         return;
                     }
                     if (installments < 1 || installments > 100) {
                         player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_INSTALLMENTS_RANGE, Map.of()));
-                        scheduler.onEntity(viewerRef, () -> refresh.accept(player));
+                        refresh.accept(player);
                         return;
                     }
                     submitLoan(player, viewerRef, currency, amount, installments);
-                });
+                },
+                () -> refresh.accept(player));
     }
 
     private void submitLoan(Player player, PlayerRef viewerRef, Currency currency, Money amount, int installments) {

@@ -13,14 +13,14 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.ConfirmMenu;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -40,6 +40,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ListProperty implements EditableProperty {
 
+    private final String inputKey;
     private final MessageKey label;
     private final Material icon;
     private final GuiText guiText;
@@ -47,10 +48,11 @@ public final class ListProperty implements EditableProperty {
     private final Consumer<List<String>> setter;
     private final ListPropertyText keys;
     private final ListPropertyLayout layout;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final Scheduler scheduler;
 
     public ListProperty(
+            String inputKey,
             MessageKey label,
             Material icon,
             GuiText guiText,
@@ -58,8 +60,9 @@ public final class ListProperty implements EditableProperty {
             Consumer<List<String>> setter,
             ListPropertyText keys,
             ListPropertyLayout layout,
-            AnvilInput anvil,
+            TextInput textInput,
             Scheduler scheduler) {
+        this.inputKey = Objects.requireNonNull(inputKey, "inputKey");
         this.label = Objects.requireNonNull(label, "label");
         this.icon = Objects.requireNonNull(icon, "icon");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
@@ -67,7 +70,7 @@ public final class ListProperty implements EditableProperty {
         this.setter = Objects.requireNonNull(setter, "setter");
         this.keys = Objects.requireNonNull(keys, "keys");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
@@ -144,37 +147,43 @@ public final class ListProperty implements EditableProperty {
     }
 
     private void add(ClickContext context) {
-        ItemStack prompt = ItemBuilder.of(layout.addIcon())
-                .name(guiText.text(context.viewer(), keys.addPrompt()))
-                .build();
-        anvil.open(context.player(), prompt, result -> {
-            if (result instanceof AnvilResult.Submitted submitted
-                    && !submitted.text().isBlank()) {
-                List<String> next = new ArrayList<>(current.get());
-                next.add(submitted.text());
-                save(context, next);
-            } else {
-                scheduler.onEntity(context.viewer(), () -> openList(context));
-            }
-        });
+        textInput.prompt(
+                context.player(),
+                context.viewer(),
+                InputRequest.of(inputKey, keys.addPrompt()),
+                text -> applyAdd(context, text),
+                () -> openList(context));
+    }
+
+    /** Append a non-blank submitted line; a blank line reopens the list unchanged. Package-private for unit tests. */
+    void applyAdd(ClickContext context, String text) {
+        if (text.isBlank()) {
+            openList(context);
+            return;
+        }
+        List<String> next = new ArrayList<>(current.get());
+        next.add(text);
+        save(context, next);
     }
 
     private void edit(ClickContext context, int index, String existing) {
-        ItemStack prompt = ItemBuilder.of(layout.entryIcon())
-                .name(guiText.text(context.viewer(), keys.editPrompt(), Map.of("entry", existing)))
-                .build();
-        anvil.open(context.player(), prompt, result -> {
-            if (result instanceof AnvilResult.Submitted submitted
-                    && !submitted.text().isBlank()) {
-                List<String> next = new ArrayList<>(current.get());
-                if (index < next.size()) {
-                    next.set(index, submitted.text());
-                    save(context, next);
-                    return;
-                }
-            }
-            scheduler.onEntity(context.viewer(), () -> openList(context));
-        });
+        textInput.prompt(
+                context.player(),
+                context.viewer(),
+                InputRequest.of(inputKey, keys.editPrompt(), Map.of("entry", existing)),
+                text -> applyEdit(context, index, text),
+                () -> openList(context));
+    }
+
+    /** Replace entry {@code index} with a non-blank submitted line; otherwise reopen unchanged. Package-private for tests. */
+    void applyEdit(ClickContext context, int index, String text) {
+        List<String> next = new ArrayList<>(current.get());
+        if (!text.isBlank() && index < next.size()) {
+            next.set(index, text);
+            save(context, next);
+            return;
+        }
+        openList(context);
     }
 
     private void confirmRemove(ClickContext context, int index) {

@@ -16,6 +16,8 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -23,8 +25,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -49,6 +49,7 @@ public final class ColourProperty implements EditableProperty {
 
     private static final int OPAQUE_ALPHA = 0xFF;
     private static final int BYTE_MASK = 0xFF;
+    private static final String INPUT_KEY = "editor.colour-hex";
 
     private final MessageKey label;
     private final Material icon;
@@ -60,7 +61,7 @@ public final class ColourProperty implements EditableProperty {
     private final GuiText guiText;
     private final ColourPickerText text;
     private final ColourPickerLayout layout;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final Scheduler scheduler;
 
     public ColourProperty(
@@ -74,7 +75,7 @@ public final class ColourProperty implements EditableProperty {
             GuiText guiText,
             ColourPickerText text,
             ColourPickerLayout layout,
-            AnvilInput anvil,
+            TextInput textInput,
             Scheduler scheduler) {
         this.label = Objects.requireNonNull(label, "label");
         this.icon = Objects.requireNonNull(icon, "icon");
@@ -86,7 +87,7 @@ public final class ColourProperty implements EditableProperty {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.text = Objects.requireNonNull(text, "text");
         this.layout = Objects.requireNonNull(layout, "layout");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
@@ -165,18 +166,12 @@ public final class ColourProperty implements EditableProperty {
     }
 
     private void openCustom(ClickContext context) {
-        ItemStack prompt = ItemBuilder.of(layout.customIcon())
-                .name(guiText.text(context.viewer(), text.customPrompt()))
-                .build();
-        anvil.open(context.player(), prompt, result -> handleCustom(context, result));
-    }
-
-    private void handleCustom(ClickContext context, AnvilResult result) {
-        if (result instanceof AnvilResult.Submitted submitted) {
-            applyCustom(context, submitted.text());
-        } else {
-            scheduler.onEntity(context.viewer(), () -> openPicker(context));
-        }
+        textInput.prompt(
+                context.player(),
+                context.viewer(),
+                InputRequest.of(INPUT_KEY, text.customPrompt()),
+                raw -> applyCustom(context, raw),
+                () -> openPicker(context));
     }
 
     /**
@@ -189,7 +184,7 @@ public final class ColourProperty implements EditableProperty {
         Objects.requireNonNull(raw, "raw");
         Optional<Integer> parsed = ColourHex.parse(raw);
         if (parsed.isEmpty()) {
-            scheduler.onEntity(context.viewer(), () -> openPicker(context));
+            openPicker(context);
             return;
         }
         pick(context, parsed.get());

@@ -349,15 +349,22 @@ class CommunicationAdapterTest {
     /** A real editor view over the in-memory stores; the command tests do not open it, only build the command tree. */
     private com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView editorView(
             Scheduler scheduler) {
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(sink);
         return new com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView(
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(sink),
+                guiText,
                 scheduler,
                 sink,
                 commandAnnouncementStore,
                 announcerSettingsStore,
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(
                         java.nio.file.Path.of("."), new NoopLogger()),
-                new com.uxplima.uxmlib.gui.anvil.AnvilInput(MockBukkit.createMockPlugin()));
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit.create(
+                        MockBukkit.createMockPlugin(),
+                        guiText,
+                        scheduler,
+                        java.nio.file.Path.of("nonexistent"),
+                        new NoopLogger()));
     }
 
     private BukkitAnnouncerBroadcaster announcerBroadcaster() {

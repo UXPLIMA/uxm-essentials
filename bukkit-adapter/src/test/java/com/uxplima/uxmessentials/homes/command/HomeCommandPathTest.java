@@ -55,9 +55,13 @@ import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -69,7 +73,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -465,6 +468,20 @@ class HomeCommandPathTest {
         public void publish(DomainEvent event) {}
     }
 
+    private static final class NoLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
@@ -503,6 +520,8 @@ class HomeCommandPathTest {
         InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);
         UninviteFromHome uninviteFromHome = new UninviteFromHome(invites, notifier);
         VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier);
+        TextInput textInput = TextInputTestKit.create(
+                plugin, new GuiText(messages), scheduler, java.nio.file.Path.of("nonexistent"), new NoLogger());
         IconSelectorView iconSelector = new IconSelectorView(
                 messages,
                 scheduler,
@@ -516,7 +535,7 @@ class HomeCommandPathTest {
                 uninviteFromHome,
                 lookup,
                 notifier,
-                new AnvilInput(plugin),
+                textInput,
                 InvitesMenuLayout.codeDefault());
         HomeActionView actionView = new HomeActionView(
                 messages,
@@ -531,7 +550,7 @@ class HomeCommandPathTest {
                 iconSelector,
                 invitesMenu,
                 repository,
-                new AnvilInput(plugin),
+                textInput,
                 HomeActionsLayout.codeDefault(),
                 fmt,
                 false,

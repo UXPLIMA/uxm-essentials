@@ -80,6 +80,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -96,7 +97,6 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import com.uxplima.uxmlib.hologram.HologramManager;
 import com.uxplima.uxmlib.npc.ChannelResolver;
 import com.uxplima.uxmlib.npc.PacketSender;
@@ -137,7 +137,7 @@ public final class HologramsWiring {
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            AnvilInput anvil) {
+            TextInput textInput) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -146,7 +146,7 @@ public final class HologramsWiring {
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         KernelPorts kernel = ctx.kernel();
         // The concrete cache is what the cross-server listener reloads per name; the broadcasting decorator wraps
         // that same cache so a local hologram write announces it to peers, and the listener reloads + re-renders
@@ -274,15 +274,15 @@ public final class HologramsWiring {
                 kernel.scheduler(),
                 repository,
                 services,
-                anvil,
+                textInput,
                 kernel.playerLookup(),
                 kernel.messages(),
                 editorLayout,
                 subLayouts,
                 colourPicker,
                 (player, viewer) -> listHolder[0].open(player, viewer));
-        HologramListView listView =
-                new HologramListView(guiText, kernel.scheduler(), repository, services, anvil, listLayout, editorView);
+        HologramListView listView = new HologramListView(
+                guiText, kernel.scheduler(), repository, services, textInput, listLayout, editorView);
         listHolder[0] = listView;
         return new Wired(
                 HologramCommands.all(services, kernel.messages(), hologramNames, npcNames, listView),

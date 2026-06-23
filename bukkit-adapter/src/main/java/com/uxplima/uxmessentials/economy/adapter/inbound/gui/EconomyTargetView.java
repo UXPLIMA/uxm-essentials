@@ -20,6 +20,8 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -27,8 +29,6 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmlib.gui.ConfirmMenu;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.item.SkullData;
@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * current balance per currency, the Give / Take / Set / Reset action buttons, a [History] link into the
  * transaction-history GUI, and — when more than one currency is configured — a single [Currency] item that
  * opens a paginated {@link CurrencyPickerView} to switch the active currency the four actions apply to. Give /
- * Take / Set open the vanilla anvil for an amount and run the matching {@code EcoAdmin} op with
+ * Take / Set capture an amount through the shared input seam and run the matching {@code EcoAdmin} op with
  * {@code Money.of(activeCurrency, amount)}; Reset is confirm-gated (it zeroes a balance) before calling
  * {@code reset(actor, target, activeCurrency)}.
  *
@@ -64,7 +64,7 @@ public final class EconomyTargetView {
 
     private final GuiText guiText;
     private final Scheduler scheduler;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final EconomyProvider economy;
     private final EcoAdminOps ops;
     private final CurrencyRegistry currencies;
@@ -76,7 +76,7 @@ public final class EconomyTargetView {
     public EconomyTargetView(
             GuiText guiText,
             Scheduler scheduler,
-            AnvilInput anvil,
+            TextInput textInput,
             EconomyProvider economy,
             EcoAdminOps ops,
             CurrencyRegistry currencies,
@@ -86,7 +86,7 @@ public final class EconomyTargetView {
             java.util.function.BiConsumer<Player, PlayerRef> onBack) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.ops = Objects.requireNonNull(ops, "ops");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
@@ -187,15 +187,12 @@ public final class EconomyTargetView {
 
     private void promptAmount(
             Player viewer, PlayerRef viewerRef, PlayerRef target, Currency active, EcoAdminOps.Verb verb) {
-        scheduler.onEntity(
+        textInput.prompt(
+                viewer,
                 viewerRef,
-                () -> anvil.open(viewer, amountPrompt(viewerRef), result -> {
-                    if (result instanceof AnvilResult.Submitted submitted) {
-                        applyAmount(viewer, viewerRef, target, active, verb, submitted.text());
-                    } else {
-                        open(viewer, viewerRef, target, active);
-                    }
-                }));
+                InputRequest.of("eco.amount", EconomyMessageKey.ECO_ADMIN_GUI_AMOUNT_PROMPT),
+                text -> applyAmount(viewer, viewerRef, target, active, verb, text),
+                () -> open(viewer, viewerRef, target, active));
     }
 
     /**
@@ -292,12 +289,6 @@ public final class EconomyTargetView {
     private ItemStack backIcon(PlayerRef viewer) {
         return ItemBuilder.of(Material.ARROW)
                 .name(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_BACK))
-                .build();
-    }
-
-    private ItemStack amountPrompt(PlayerRef viewer) {
-        return ItemBuilder.of(Material.NAME_TAG)
-                .name(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_AMOUNT_PROMPT))
                 .build();
     }
 

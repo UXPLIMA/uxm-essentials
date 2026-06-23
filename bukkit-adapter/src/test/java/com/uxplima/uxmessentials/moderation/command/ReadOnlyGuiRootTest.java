@@ -19,9 +19,12 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationGuiVie
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -57,8 +60,9 @@ class ReadOnlyGuiRootTest {
         services = mock(ModerationServices.class);
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
-        com.uxplima.uxmlib.gui.anvil.AnvilInput anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
-        picker = new PlayerPickerView(guiText, scheduler, anvil, server, new KeyMessages(), new NoopSink());
+        TextInput textInput = TextInputTestKit.create(
+                plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), new NoopLogger());
+        picker = new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
         // A fully built ModerationGuiViews needs a repository/history fake; the wiring tests only need a non-null
         // instance because they assert the opener is installed, not that it opens a live menu.
         views = mock(ModerationGuiViews.class);
@@ -143,6 +147,20 @@ class ReadOnlyGuiRootTest {
     private static final class NoopSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class SyncScheduler implements Scheduler {

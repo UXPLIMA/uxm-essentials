@@ -12,7 +12,6 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BankChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.BankService;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.BankError;
@@ -20,6 +19,8 @@ import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankAction;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankMember;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankRole;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -38,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
 public final class BankMembersView {
 
     private final BankService bankService;
-    private final BankChatPromptListener chatPromptListener;
+    private final TextInput textInput;
     private final Scheduler scheduler;
     private final PlayerLookup players;
     private final Messages messages;
@@ -47,14 +48,14 @@ public final class BankMembersView {
 
     public BankMembersView(
             BankService bankService,
-            BankChatPromptListener chatPromptListener,
+            TextInput textInput,
             Scheduler scheduler,
             PlayerLookup players,
             Messages messages,
             Supplier<BankNavigation> navigation,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout layout) {
         this.bankService = Objects.requireNonNull(bankService, "bankService");
-        this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.players = Objects.requireNonNull(players, "players");
         this.messages = Objects.requireNonNull(messages, "messages");
@@ -194,8 +195,11 @@ public final class BankMembersView {
 
     private void promptAddMember(Player player, SharedBank bank) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        chatPromptListener.prompt(
-                player, text(viewerRef, EconomyMessageKey.BANK_MEMBERS_GUI_ADD_PROMPT, Map.of()), targetName -> {
+        textInput.prompt(
+                player,
+                viewerRef,
+                InputRequest.of("bank.member-add", EconomyMessageKey.BANK_MEMBERS_GUI_ADD_PROMPT),
+                targetName -> {
                     String cleanName = targetName.trim();
                     if (cleanName.isEmpty()) {
                         player.sendMessage(text(viewerRef, EconomyMessageKey.BANK_MEMBERS_GUI_NAME_EMPTY, Map.of()));
@@ -228,6 +232,7 @@ public final class BankMembersView {
                             open(player, bank);
                         });
                     });
-                });
+                },
+                () -> open(player, bank));
     }
 }

@@ -23,6 +23,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
@@ -32,8 +34,6 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.ConfirmMenu;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -41,14 +41,15 @@ import org.jspecify.annotations.NullMarked;
  * The communication admin panel ({@code /communication gui}, and the communication entry on the {@code /uxmess gui}
  * hub): a {@link SettingsPanelView} of admin buttons, each wired to the same surface the communication commands use.
  * The chat-lock toggle flips the live {@link ChatLock} the {@code /togglechat} command does; the clearchat button
- * runs the {@code /clearchat} fan-out behind a confirm; the broadcast button captures a line through a vanilla anvil
- * and sends it through the same {@link BukkitAnnouncerBroadcaster} as {@code /broadcast}; the announcer button opens
- * a read-only list of the configured announcements (the {@code /announce list} surface).
+ * runs the {@code /clearchat} fan-out behind a confirm; the broadcast button captures a line through the shared
+ * {@link TextInput} prompt and sends it through the same {@link BukkitAnnouncerBroadcaster} as {@code /broadcast};
+ * the announcer button opens a read-only list of the configured announcements (the {@code /announce list} surface).
  *
  * <p>The panel holds no domain logic of its own. Only the surfaces the commands actually expose are placed: there
  * is no per-announcement toggle (the announcer is config-driven, with no global on/off the use case exposes), so the
  * announcer view is read-only — exactly what {@code /announce list} shows. Every visible string is a
- * {@link CommunicationMessageKey}; the clearchat fan-out and the anvil hop run on the kernel {@link Scheduler}.
+ * {@link CommunicationMessageKey}; the clearchat fan-out runs on the kernel {@link Scheduler}, and the broadcast
+ * prompt's callbacks are hopped onto the viewer's region thread by the {@link TextInput} seam.
  */
 @NullMarked
 public final class CommunicationAdminView {
@@ -58,6 +59,7 @@ public final class CommunicationAdminView {
     private static final String ANNOUNCER_LAYOUT = "announcer-list";
     private static final String CLEARCHAT_EXEMPT = "uxmessentials.communication.clearchat.exempt";
     private static final int CLEARCHAT_BLANK_LINES = 100;
+    private static final String BROADCAST_INPUT_KEY = "communication.broadcast";
 
     private final SettingsPanelView panel;
     private final EntityListView<Announcement> announcerView;
@@ -75,7 +77,7 @@ public final class CommunicationAdminView {
             Supplier<AnnouncerConfig> announcerConfig,
             CommunicationNotifier notifier,
             MessageSink sink,
-            AnvilInput anvil) {
+            TextInput textInput) {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
@@ -86,7 +88,7 @@ public final class CommunicationAdminView {
         Objects.requireNonNull(announcerConfig, "announcerConfig");
         Objects.requireNonNull(notifier, "notifier");
         Objects.requireNonNull(sink, "sink");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         this.broadcaster = broadcaster;
         this.broadcastPrefix = broadcastPrefix;
 
@@ -112,7 +114,7 @@ public final class CommunicationAdminView {
                 .title(CommunicationMessageKey.GUI_PANEL_TITLE)
                 .valueLore(CommunicationMessageKey.GUI_PANEL_VALUE_LORE)
                 .backName(CommunicationMessageKey.GUI_PANEL_BACK)
-                .settings(viewer -> buttons(scheduler, messages, chatLock, notifier, sink, anvil, guiText))
+                .settings(viewer -> buttons(scheduler, messages, chatLock, notifier, sink, textInput, guiText))
                 .onBack((player, who) -> player.closeInventory())
                 .build();
     }
@@ -138,7 +140,7 @@ public final class CommunicationAdminView {
             ChatLock chatLock,
             CommunicationNotifier notifier,
             MessageSink sink,
-            AnvilInput anvil,
+            TextInput textInput,
             GuiText guiText) {
         ToggleProperty<Boolean> lock = ToggleProperty.ofBoolean(
                 CommunicationMessageKey.GUI_CHAT_LOCK,
@@ -162,7 +164,7 @@ public final class CommunicationAdminView {
                 CommunicationMessageKey.GUI_BROADCAST,
                 Material.BELL,
                 hint,
-                (player, reopen) -> promptBroadcast(guiText, scheduler, anvil, player, reopen));
+                (player, reopen) -> promptBroadcast(textInput, player, reopen));
         ActionProperty announcer = new ActionProperty(
                 CommunicationMessageKey.GUI_ANNOUNCER,
                 Material.WRITABLE_BOOK,
@@ -205,25 +207,19 @@ public final class CommunicationAdminView {
         });
     }
 
-    private void promptBroadcast(
-            GuiText guiText, Scheduler scheduler, AnvilInput anvil, Player player, Runnable reopen) {
+    private void promptBroadcast(TextInput textInput, Player player, Runnable reopen) {
         PlayerRef viewer = BukkitRefs.toRef(player);
-        var prompt = ItemBuilder.of(Material.BELL)
-                .name(guiText.text(viewer, CommunicationMessageKey.GUI_BROADCAST_PROMPT))
-                .build();
-        scheduler.onEntity(viewer, () -> anvil.open(player, prompt, result -> onBroadcastInput(result, reopen)));
-    }
-
-    private void onBroadcastInput(AnvilResult result, Runnable reopen) {
-        if (result instanceof AnvilResult.Submitted submitted) {
-            submitBroadcast(submitted.text());
-        }
-        reopen.run();
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of(BROADCAST_INPUT_KEY, CommunicationMessageKey.GUI_BROADCAST_PROMPT),
+                this::submitBroadcast,
+                reopen);
     }
 
     /**
      * Send the typed line through the broadcaster (mirroring {@code /broadcast}); a blank line is a no-op.
-     * Package-private so the panel test can drive the broadcast seam without opening a live anvil.
+     * Package-private so the panel test can drive the broadcast seam without opening a live prompt.
      */
     void submitBroadcast(String raw) {
         Objects.requireNonNull(raw, "raw");

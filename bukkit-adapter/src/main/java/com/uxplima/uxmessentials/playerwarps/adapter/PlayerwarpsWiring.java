@@ -32,10 +32,10 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -78,7 +78,7 @@ public final class PlayerwarpsWiring {
                     teleportRegistry,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            AnvilInput anvil,
+            TextInput textInput,
             ManagementGuiRegistry guiRegistry) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
@@ -87,7 +87,7 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         KernelPorts kernel = ctx.kernel();
         // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
@@ -133,7 +133,7 @@ public final class PlayerwarpsWiring {
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, kernel.events());
         SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
         PlayerWarpListView listView = buildGui(
-                plugin, kernel, repository, setPlayerWarp, visibility, delPlayerWarp, guiText, guiLayouts, anvil);
+                plugin, kernel, repository, setPlayerWarp, visibility, delPlayerWarp, guiText, guiLayouts, textInput);
         guiRegistry.register(new ManagementGuiEntry(
                 "playerwarps",
                 PlayerwarpsMessageKey.PWARP_GUI_LIST_TITLE,
@@ -168,7 +168,7 @@ public final class PlayerwarpsWiring {
             DelPlayerWarp delPlayerWarp,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            AnvilInput anvil) {
+            TextInput textInput) {
         PlayerWarpEditorSubLayouts subLayouts = PlayerWarpEditorSubLayouts.load(
                 plugin.getDataFolder().toPath(), "playerwarps", "pwarp-editor", kernel.log());
         EntityListLayout listLayout = guiLayouts.loadEntityList(
@@ -184,7 +184,7 @@ public final class PlayerwarpsWiring {
                 repository,
                 visibility,
                 delPlayerWarp,
-                anvil,
+                textInput,
                 kernel.messages(),
                 editorLayout,
                 subLayouts,
@@ -196,7 +196,7 @@ public final class PlayerwarpsWiring {
                 kernel.messages(),
                 repository,
                 setPlayerWarp,
-                anvil,
+                textInput,
                 listLayout,
                 editor);
         listHolder[0] = listView;

@@ -13,12 +13,12 @@ import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -58,7 +58,7 @@ public final class MessagingGuiViews {
             IgnoreStore ignores,
             MailRepository mail,
             PlayerLookup players,
-            AnvilInput anvil,
+            TextInput textInput,
             GuiLayouts layouts) {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
@@ -70,7 +70,7 @@ public final class MessagingGuiViews {
         Objects.requireNonNull(ignores, "ignores");
         Objects.requireNonNull(mail, "mail");
         Objects.requireNonNull(players, "players");
-        Objects.requireNonNull(anvil, "anvil");
+        Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(layouts, "layouts");
 
         MessagingSettingsView settingsView =
@@ -79,7 +79,7 @@ public final class MessagingGuiViews {
         EntityListLayout ignoreLayout = layouts.loadEntityList(
                 MODULE, "ignore-list", EntityListLayout.withCreate(Material.PLAYER_HEAD, 49, Material.LIME_DYE));
         IgnoreListView ignoreView = new IgnoreListView(
-                guiText, scheduler, ignores, services.ignore(), services.unignore(), players, anvil, ignoreLayout);
+                guiText, scheduler, ignores, services.ignore(), services.unignore(), players, textInput, ignoreLayout);
 
         EntityListLayout mailLayout = layouts.loadEntityList(
                 MODULE, "mailbox", EntityListLayout.withCreate(Material.PAPER, 49, Material.LAVA_BUCKET));

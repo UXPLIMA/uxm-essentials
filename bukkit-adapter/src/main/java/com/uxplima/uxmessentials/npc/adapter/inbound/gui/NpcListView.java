@@ -17,18 +17,18 @@ import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.item.ItemBuilder;
 
 /**
  * The {@code /npc} management list: a config-driven, paginated grid of every stored NPC drawn through the shared
  * {@link EntityListView}, each icon showing the NPC's name, type, world, and position and opening
- * {@link NpcEditorView} on click. A create button opens an anvil for a new name and creates a fresh fake-player
+ * {@link NpcEditorView} on click. A create button prompts for a new name and creates a fresh fake-player
  * NPC at the operator's feet (with the operator's own skin) through the existing {@code create} use case. The
  * view holds no domain logic — the entity supplier and the create call are the same ones the {@code /npc list}
  * and {@code /npc create} subcommands use.
@@ -37,6 +37,7 @@ public final class NpcListView {
 
     private final GuiText guiText;
     private final Scheduler scheduler;
+    private final TextInput textInput;
     private final EntityListView<Npc> view;
 
     public NpcListView(
@@ -44,14 +45,14 @@ public final class NpcListView {
             Scheduler scheduler,
             NpcRepository repository,
             NpcServices services,
-            AnvilInput anvil,
+            TextInput textInput,
             EntityListLayout layout,
             NpcEditorView editor) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(services, "services");
-        Objects.requireNonNull(anvil, "anvil");
         Objects.requireNonNull(layout, "layout");
         Objects.requireNonNull(editor, "editor");
         this.view = EntityListView.<Npc>builder()
@@ -63,7 +64,7 @@ public final class NpcListView {
                 .entities(repository::all)
                 .iconRenderer(this::icon)
                 .onSelect((player, npc) -> editor.open(player, BukkitRefs.toRef(player), npc))
-                .onCreate(NpcMessageKey.NPC_GUI_LIST_CREATE, player -> promptCreate(player, services, anvil, layout))
+                .onCreate(NpcMessageKey.NPC_GUI_LIST_CREATE, player -> promptCreate(player, services))
                 .build();
     }
 
@@ -89,22 +90,24 @@ public final class NpcListView {
                 .build();
     }
 
-    private void promptCreate(Player player, NpcServices services, AnvilInput anvil, EntityListLayout layout) {
-        ItemStack prompt = ItemBuilder.of(layout.createIcon())
-                .name(guiText.text(BukkitRefs.toRef(player), NpcMessageKey.NPC_GUI_LIST_CREATE_PROMPT))
-                .build();
-        anvil.open(player, prompt, result -> handleCreate(player, services, result));
+    private void promptCreate(Player player, NpcServices services) {
+        PlayerRef viewer = BukkitRefs.toRef(player);
+        textInput.prompt(
+                player,
+                viewer,
+                InputRequest.of("npc.create-name", NpcMessageKey.NPC_GUI_LIST_CREATE_PROMPT),
+                text -> createNpc(player, viewer, services, text),
+                () -> view.open(player, viewer));
     }
 
-    private void handleCreate(Player player, NpcServices services, AnvilResult result) {
-        PlayerRef viewer = BukkitRefs.toRef(player);
-        if (!(result instanceof AnvilResult.Submitted submitted)
-                || submitted.text().isBlank()) {
-            scheduler.onEntity(viewer, () -> view.open(player, viewer));
+    /** Create the NPC at the player's feet from the submitted name; a blank line reopens the list unchanged. */
+    private void createNpc(Player player, PlayerRef viewer, NpcServices services, String text) {
+        if (text.isBlank()) {
+            view.open(player, viewer);
             return;
         }
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
-        NpcName name = NpcName.of(submitted.text());
+        NpcName name = NpcName.of(text);
         NpcSkin skin = BukkitNpcSkins.of(player).orElse(null);
         scheduler.async(() -> {
             services.create().create(viewer, name, at, skin);

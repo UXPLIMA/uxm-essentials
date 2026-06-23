@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ListProperty;
@@ -45,7 +46,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 
 /**
  * The per-NPC property editor: a thin consumer of the shared {@link EntityEditorView} that exposes every NPC
@@ -68,7 +68,7 @@ public final class NpcEditorView {
     private final NpcRepository repository;
     private final NpcServices services;
     private final NpcSkinByName skinByName;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final Messages messages;
     private final NpcEditorSubLayouts sub;
     private final ColourPickerLayout colourPicker;
@@ -81,7 +81,7 @@ public final class NpcEditorView {
             NpcRepository repository,
             NpcServices services,
             NpcSkinByName skinByName,
-            AnvilInput anvil,
+            TextInput textInput,
             Messages messages,
             EntityEditorLayout layout,
             NpcEditorSubLayouts sub,
@@ -92,7 +92,7 @@ public final class NpcEditorView {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.services = Objects.requireNonNull(services, "services");
         this.skinByName = Objects.requireNonNull(skinByName, "skinByName");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sub = Objects.requireNonNull(sub, "sub");
         this.colourPicker = Objects.requireNonNull(colourPicker, "colourPicker");
@@ -163,14 +163,14 @@ public final class NpcEditorView {
 
     private EditableProperty nameProperty(NpcName name) {
         return new TextProperty(
+                "editor.text-field",
                 NpcMessageKey.NPC_GUI_PROP_NAME,
                 NpcMessageKey.NPC_GUI_PROP_NAME_PROMPT,
                 Material.NAME_TAG,
-                guiText,
                 name::value,
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> rename(name, NpcName.of(value)),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -195,14 +195,14 @@ public final class NpcEditorView {
 
     private EditableProperty skinProperty(NpcName name) {
         return new TextProperty(
+                "editor.text-field",
                 NpcMessageKey.NPC_GUI_PROP_SKIN,
                 NpcMessageKey.NPC_GUI_PROP_SKIN_PROMPT,
                 Material.PLAYER_HEAD,
-                guiText,
                 () -> skinSummary(name),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> applySkin(name, value),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -277,7 +277,7 @@ public final class NpcEditorView {
                 guiText,
                 colourPickerText,
                 colourPicker,
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -370,17 +370,17 @@ public final class NpcEditorView {
 
     private EditableProperty displayNameProperty(NpcName name) {
         return new TextProperty(
+                "editor.text-field",
                 NpcMessageKey.NPC_GUI_PROP_DISPLAY_NAME,
                 NpcMessageKey.NPC_GUI_PROP_DISPLAY_NAME_PROMPT,
                 Material.OAK_SIGN,
-                guiText,
                 () -> current(name)
                         .map(Npc::displayName)
                         .filter(s -> !s.isBlank())
                         .orElseGet(this::none),
                 raw -> raw.isBlank() ? Optional.empty() : Optional.of(raw.trim()),
                 value -> applyDisplayName(name, value),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -400,6 +400,7 @@ public final class NpcEditorView {
 
     private EditableProperty actionsProperty(NpcName name) {
         return new ListProperty(
+                "editor.list-entry",
                 NpcMessageKey.NPC_GUI_PROP_ACTIONS,
                 Material.COMMAND_BLOCK,
                 guiText,
@@ -415,7 +416,7 @@ public final class NpcEditorView {
                         NpcMessageKey.NPC_GUI_ACTIONS_REMOVE_CONFIRM,
                         NpcMessageKey.NPC_GUI_ACTIONS_BACK),
                 sub.actions(),
-                anvil,
+                textInput,
                 scheduler);
     }
 

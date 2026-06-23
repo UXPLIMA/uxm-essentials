@@ -72,6 +72,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
@@ -88,7 +90,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -149,7 +150,7 @@ class NpcGuiTest {
 
         EntityEditorLayout editorLayout = editorLayout(dir);
         EntityListLayout listLayout = listLayout(dir);
-        AnvilInput anvil = new AnvilInput(plugin);
+        TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         NpcSkinByName skinByName =
                 new NpcSkinByName(new NoSkinService(), services.skin(), repository, notifier(), scheduler);
         editorView = new NpcEditorView(
@@ -158,13 +159,13 @@ class NpcGuiTest {
                 repository,
                 services,
                 skinByName,
-                anvil,
+                textInput,
                 new KeyMessages(),
                 editorLayout,
                 NpcEditorSubLayouts.codeDefault(),
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.codeDefault(),
                 (p, v) -> listView.open(p, v));
-        listView = new NpcListView(guiText, scheduler, repository, services, anvil, listLayout, editorView);
+        listView = new NpcListView(guiText, scheduler, repository, services, textInput, listLayout, editorView);
     }
 
     @AfterEach

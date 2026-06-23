@@ -12,11 +12,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.bukkit.plugin.Plugin;
+
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.TargetResolver;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -74,13 +79,20 @@ class CheckTargetPromptTest {
     }
 
     private CheckTargetPrompt prompt() {
+        Scheduler scheduler = new RunInline();
+        TextInput textInput = TextInputTestKit.create(
+                mock(Plugin.class),
+                new GuiText(messages),
+                scheduler,
+                java.nio.file.Path.of("nonexistent"),
+                new NoopLogger());
         return new CheckTargetPrompt(
                 services,
-                new GuiText(messages),
-                mock(com.uxplima.uxmlib.gui.anvil.AnvilInput.class),
-                new RunInline(),
+                textInput,
+                scheduler,
                 messages,
                 sink,
+                "moderation.check-ban",
                 ModerationMessageKey.MOD_GUI_CHECK_BAN_PROMPT,
                 (actor, target) -> checked.add(target));
     }
@@ -140,5 +152,19 @@ class CheckTargetPromptTest {
     private static final class RecordingSink implements MessageSink {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

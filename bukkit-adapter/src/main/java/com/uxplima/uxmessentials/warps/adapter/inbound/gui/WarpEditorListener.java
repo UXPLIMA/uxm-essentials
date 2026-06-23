@@ -16,11 +16,12 @@ import org.bukkit.inventory.InventoryHolder;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpChatPromptListener;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
@@ -32,7 +33,7 @@ import org.jspecify.annotations.Nullable;
 public final class WarpEditorListener implements Listener {
 
     private final WarpEditorView editorView;
-    private final WarpChatPromptListener promptListener;
+    private final TextInput textInput;
     private final Messages messages;
     private final EditableWarpLoader loader;
     private final WarpSubMenuClicks subMenuClicks;
@@ -46,7 +47,7 @@ public final class WarpEditorListener implements Listener {
     public WarpEditorListener(
             WarpEditorView editorView,
             WarpRepository warpRepository,
-            WarpChatPromptListener promptListener,
+            TextInput textInput,
             Messages messages,
             WarpSoundSelectorView soundSelectorView,
             WarpParticleSelectorView particleSelectorView,
@@ -54,7 +55,7 @@ public final class WarpEditorListener implements Listener {
             UseWarp useWarp,
             PlayerWarpGoToHandle playerWarpGoTo) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
-        this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.soundSelectorView = Objects.requireNonNull(soundSelectorView, "soundSelectorView");
         this.particleSelectorView = Objects.requireNonNull(particleSelectorView, "particleSelectorView");
@@ -63,13 +64,7 @@ public final class WarpEditorListener implements Listener {
         this.playerWarpGoTo = Objects.requireNonNull(playerWarpGoTo, "playerWarpGoTo");
         this.loader = new EditableWarpLoader(Objects.requireNonNull(warpRepository, "warpRepository"), editorView);
         this.subMenuClicks = new WarpSubMenuClicks(
-                editorView,
-                promptListener,
-                messages,
-                this.loader,
-                soundSelectorView,
-                particleSelectorView,
-                welcomeMessagesView);
+                editorView, textInput, this.loader, soundSelectorView, particleSelectorView, welcomeMessagesView);
     }
 
     @EventHandler
@@ -205,10 +200,15 @@ public final class WarpEditorListener implements Listener {
             editorView.open(player, viewer, name, owner);
         } else if (c == ClickType.LEFT) {
             player.closeInventory();
-            promptListener.prompt(player, text(viewer, WarpsMessageKey.WARP_EDITOR_PASSWORD_PROMPT), input -> {
-                warp.setPassword(Optional.of(input));
-                editorView.open(player, viewer, name, owner);
-            });
+            textInput.prompt(
+                    player,
+                    viewer,
+                    InputRequest.of("warp.password", WarpsMessageKey.WARP_EDITOR_PASSWORD_PROMPT),
+                    input -> {
+                        warp.setPassword(Optional.of(input));
+                        editorView.open(player, viewer, name, owner);
+                    },
+                    () -> editorView.open(player, viewer, name, owner));
         }
     }
 
@@ -245,20 +245,36 @@ public final class WarpEditorListener implements Listener {
             editorView.open(player, viewer, name, owner);
         } else if (c == ClickType.LEFT) {
             player.closeInventory();
+            String key = warmup ? "warp.warmup" : "warp.cooldown";
             MessageKey promptKey =
                     warmup ? WarpsMessageKey.WARP_EDITOR_WARMUP_PROMPT : WarpsMessageKey.WARP_EDITOR_COOLDOWN_PROMPT;
-            promptListener.prompt(player, text(viewer, promptKey), input -> {
-                double seconds;
-                try {
-                    seconds = Double.parseDouble(input);
-                } catch (NumberFormatException e) {
-                    player.sendMessage(text(viewer, WarpsMessageKey.WARP_EDITOR_INVALID_NUMBER));
-                    return;
-                }
-                applyDuration(warp, warmup, Optional.of(seconds));
-                editorView.open(player, viewer, name, owner);
-            });
+            textInput.prompt(
+                    player,
+                    viewer,
+                    InputRequest.of(key, promptKey),
+                    input -> submitDuration(player, viewer, name, owner, warp, warmup, input),
+                    () -> editorView.open(player, viewer, name, owner));
         }
+    }
+
+    private void submitDuration(
+            Player player,
+            PlayerRef viewer,
+            String name,
+            @Nullable PlayerRef owner,
+            EditableWarp warp,
+            boolean warmup,
+            String input) {
+        double seconds;
+        try {
+            seconds = Double.parseDouble(input);
+        } catch (NumberFormatException e) {
+            player.sendMessage(text(viewer, WarpsMessageKey.WARP_EDITOR_INVALID_NUMBER));
+            editorView.open(player, viewer, name, owner);
+            return;
+        }
+        applyDuration(warp, warmup, Optional.of(seconds));
+        editorView.open(player, viewer, name, owner);
     }
 
     private void applyDuration(EditableWarp warp, boolean warmup, Optional<Double> seconds) {

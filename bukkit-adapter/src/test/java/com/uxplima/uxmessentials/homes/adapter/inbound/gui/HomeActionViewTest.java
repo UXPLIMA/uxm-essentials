@@ -50,10 +50,14 @@ import com.uxplima.uxmessentials.homes.domain.HomeIcon;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -67,7 +71,6 @@ import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.PaginatedGui;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -660,8 +663,13 @@ class HomeActionViewTest {
                 new UninviteFromHome(invites, notifier),
                 new ServerPlayerLookup(),
                 notifier,
-                new AnvilInput(plugin),
+                textInput(messages, sync),
                 InvitesMenuLayout.codeDefault());
+    }
+
+    private TextInput textInput(Messages messages, Scheduler scheduler) {
+        return TextInputTestKit.create(
+                plugin, new GuiText(messages), scheduler, java.nio.file.Path.of("nonexistent"), new NoLogger());
     }
 
     private HomeActionView viewWith(
@@ -697,6 +705,7 @@ class HomeActionViewTest {
                 scheduler,
                 new SetHomeIcon(repository, notifier, events, clock),
                 IconSelectorLayout.codeDefault());
+        TextInput textInput = textInput(messages, scheduler);
         InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
                 messages,
                 scheduler,
@@ -705,7 +714,7 @@ class HomeActionViewTest {
                 new UninviteFromHome(invites, notifier),
                 new ServerPlayerLookup(),
                 notifier,
-                new AnvilInput(plugin),
+                textInput,
                 InvitesMenuLayout.codeDefault());
         return new HomeActionView(
                 messages,
@@ -720,7 +729,7 @@ class HomeActionViewTest {
                 iconSelector,
                 invitesMenu,
                 repository,
-                new AnvilInput(plugin),
+                textInput,
                 HomeActionsLayout.codeDefault(),
                 fmt,
                 confirmDelete,
@@ -868,6 +877,20 @@ class HomeActionViewTest {
     private static final class NoEvents implements DomainEventPublisher {
         @Override
         public void publish(DomainEvent event) {}
+    }
+
+    private static final class NoLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     /**

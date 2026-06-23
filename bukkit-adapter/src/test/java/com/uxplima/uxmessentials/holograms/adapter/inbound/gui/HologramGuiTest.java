@@ -69,6 +69,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
@@ -85,7 +87,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -147,20 +148,20 @@ class HologramGuiTest {
 
         EntityEditorLayout editorLayout = editorLayout(dir);
         EntityListLayout listLayout = listLayout(dir);
-        AnvilInput anvil = new AnvilInput(plugin);
+        TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         editorView = new HologramEditorView(
                 guiText,
                 scheduler,
                 repository,
                 services,
-                anvil,
+                textInput,
                 new FakeLookup(),
                 new KeyMessages(),
                 editorLayout,
                 HologramEditorSubLayouts.codeDefault(),
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.codeDefault(),
                 (p, v) -> listView.open(p, v));
-        listView = new HologramListView(guiText, scheduler, repository, services, anvil, listLayout, editorView);
+        listView = new HologramListView(guiText, scheduler, repository, services, textInput, listLayout, editorView);
     }
 
     @AfterEach

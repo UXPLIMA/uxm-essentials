@@ -11,7 +11,6 @@ import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 
-import com.uxplima.uxmessentials.economy.adapter.inbound.listener.LoanChatPromptListener;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.LoanService;
 import com.uxplima.uxmessentials.economy.domain.AmountParseError;
@@ -22,6 +21,8 @@ import com.uxplima.uxmessentials.economy.domain.Loan;
 import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -44,7 +45,7 @@ import org.jspecify.annotations.NullMarked;
 public final class LoanGuiView {
 
     private final LoanService loanService;
-    private final LoanChatPromptListener chatPromptListener;
+    private final TextInput textInput;
     private final Scheduler scheduler;
     private final Messages messages;
     private final LoanIcons icons;
@@ -54,19 +55,19 @@ public final class LoanGuiView {
     public LoanGuiView(
             LoanService loanService,
             CurrencyRegistry currencies,
-            LoanChatPromptListener chatPromptListener,
+            TextInput textInput,
             Scheduler scheduler,
             Messages messages,
             FixedMenuLayout layout) {
         this.loanService = Objects.requireNonNull(loanService, "loanService");
         Objects.requireNonNull(currencies, "currencies");
-        this.chatPromptListener = Objects.requireNonNull(chatPromptListener, "chatPromptListener");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.icons = new LoanIcons(loanService, messages, currencies);
-        this.requestFlow = new LoanRequestFlow(
-                loanService, currencies, chatPromptListener, scheduler, messages, icons, this::open);
+        this.requestFlow =
+                new LoanRequestFlow(loanService, currencies, textInput, scheduler, messages, icons, this::open);
     }
 
     /** The shipped geometry: profile, active-loan strip, request, and close, externalised to loan-dashboard.conf. */
@@ -170,12 +171,15 @@ public final class LoanGuiView {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
         Currency currency = loan.remainingAmount().currency();
         String shortId = loan.id().substring(Math.max(0, loan.id().length() - 8));
-        chatPromptListener.prompt(
-                player, text(viewerRef, EconomyMessageKey.LOAN_GUI_CUSTOM_PROMPT, Map.of("id", shortId)), amountStr -> {
+        textInput.prompt(
+                player,
+                viewerRef,
+                InputRequest.of("loan.repay-custom", EconomyMessageKey.LOAN_GUI_CUSTOM_PROMPT, Map.of("id", shortId)),
+                amountStr -> {
                     Result<Money, AmountParseError> parsed = AmountParser.parse(amountStr, currency);
                     if (parsed.isErr()) {
                         player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_INVALID_AMOUNT, Map.of()));
-                        scheduler.onEntity(viewerRef, () -> open(player));
+                        open(player);
                         return;
                     }
                     Money amount = parsed.orElseThrow();
@@ -186,7 +190,8 @@ public final class LoanGuiView {
                             amount,
                             EconomyMessageKey.LOAN_GUI_CUSTOM_PAID,
                             EconomyMessageKey.LOAN_GUI_PAYMENT_FAILED);
-                });
+                },
+                () -> open(player));
     }
 
     private void payInstallment(Player player, Loan loan) {

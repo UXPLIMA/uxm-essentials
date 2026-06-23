@@ -17,6 +17,8 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerText;
@@ -24,12 +26,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.Colo
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourSwatch;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,7 +57,7 @@ class ColourPropertyTest {
     private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
-    private AnvilInput anvil;
+    private TextInput textInput;
     private AtomicInteger stored;
     private AtomicBoolean cleared;
     private ColourProperty property;
@@ -68,7 +70,7 @@ class ColourPropertyTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
-        anvil = new AnvilInput(plugin);
+        textInput = TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         Guis.install(plugin);
         stored = new AtomicInteger(SENTINEL);
         cleared = new AtomicBoolean(false);
@@ -86,7 +88,7 @@ class ColourPropertyTest {
                 guiText,
                 ColourPickerText.shared(),
                 ColourPickerLayout.codeDefault(),
-                anvil,
+                textInput,
                 scheduler);
     }
 
@@ -169,6 +171,20 @@ class ColourPropertyTest {
             return key.key();
         }
     }
+
+    private static final Logger NOOP = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
 
     private static final class SyncScheduler implements Scheduler {
         @Override

@@ -22,6 +22,8 @@ import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -35,15 +37,13 @@ import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmlib.gui.ConfirmMenu;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
 import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * The per-home action menu, opened by clicking a filled slot in the {@link HomeListView}. Buttons drive the
- * player-facing use cases: teleport, delete, relocate-here, rename (through a vanilla anvil), change-icon (the
+ * player-facing use cases: teleport, delete, relocate-here, rename (through the shared text-input seam), change-icon (the
  * {@link IconSelectorView}, gated behind {@code uxmessentials.home.icon}), a read-only info display, and a back
  * button. Every visible string resolves from a {@link MessageKey} in the viewer's locale, never an inline
  * literal, and player feedback is delivered through the {@link HomeNotifier}. The menu builds and clicks on the
@@ -87,7 +87,7 @@ public final class HomeActionView {
     private final IconSelectorView iconSelector;
     private final InvitedPlayersMenu invitesMenu;
     private final HomeRepository repository;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final HomeActionsLayout layout;
     private final DateTimeFormatter dateFormat;
     private final boolean confirmDelete;
@@ -110,7 +110,7 @@ public final class HomeActionView {
             IconSelectorView iconSelector,
             InvitedPlayersMenu invitesMenu,
             HomeRepository repository,
-            AnvilInput anvil,
+            TextInput textInput,
             HomeActionsLayout layout,
             DateTimeFormatter dateFormat,
             boolean confirmDelete,
@@ -131,7 +131,7 @@ public final class HomeActionView {
         this.iconSelector = Objects.requireNonNull(iconSelector, "iconSelector");
         this.invitesMenu = Objects.requireNonNull(invitesMenu, "invitesMenu");
         this.repository = Objects.requireNonNull(repository, "repository");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.dateFormat = Objects.requireNonNull(dateFormat, "dateFormat");
         this.confirmDelete = confirmDelete;
@@ -328,26 +328,19 @@ public final class HomeActionView {
     }
 
     private void rename(Player player, PlayerRef viewer, Home home, Runnable reopenList) {
-        scheduler.onEntity(
+        textInput.prompt(
+                player,
                 viewer,
-                () -> anvil.open(
-                        player, renamePrompt(viewer), result -> onRenamed(player, viewer, home, reopenList, result)));
-    }
-
-    private void onRenamed(Player player, PlayerRef viewer, Home home, Runnable reopenList, AnvilResult result) {
-        if (result instanceof AnvilResult.Submitted submitted) {
-            handleRenameInput(player, viewer, home, reopenList, submitted.text());
-        } else {
-            notifier.send(viewer, HomesMessageKey.HOME_RENAME_CANCELLED);
-            open(player, viewer, home, reopenList);
-        }
+                InputRequest.of("home.rename", HomesMessageKey.HOME_RENAME_PROMPT),
+                text -> handleRenameInput(player, viewer, home, reopenList, text),
+                () -> open(player, viewer, home, reopenList));
     }
 
     /**
-     * Apply anvil rename input. Blank or overlong text is an error — it does not clear the label: the viewer is
+     * Apply typed rename input. Blank or overlong text is an error — it does not clear the label: the viewer is
      * told the input was rejected and the menu reopens unchanged. There is no "clear label" gesture here, so
      * {@link HomeLabel#of} is only ever called on validated input. Valid input renames off-thread and reopens.
-     * Package-private so the decision branches can be unit-tested without driving a live anvil.
+     * Package-private so the decision branches can be unit-tested without driving a live prompt.
      */
     void handleRenameInput(Player player, PlayerRef viewer, Home home, Runnable reopenList, String input) {
         String text = input.strip();
@@ -444,12 +437,6 @@ public final class HomeActionView {
         return ItemBuilder.of(material)
                 .name(text(viewer, name, Map.of()))
                 .lore(List.of(text(viewer, lore, Map.of())))
-                .build();
-    }
-
-    private ItemStack renamePrompt(PlayerRef viewer) {
-        return ItemBuilder.of(layout.renameMaterial())
-                .name(text(viewer, HomesMessageKey.HOME_RENAME_PROMPT, Map.of()))
                 .build();
     }
 

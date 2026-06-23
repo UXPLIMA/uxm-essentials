@@ -21,6 +21,8 @@ import com.uxplima.uxmessentials.communication.application.port.AnnouncementStor
 import com.uxplima.uxmessentials.communication.domain.StoredAnnouncement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
@@ -32,7 +34,6 @@ import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,9 +81,10 @@ class AnnouncementEditorViewTest {
         Scheduler scheduler = new SyncScheduler();
         store = new InMemoryAnnouncementStore();
         settingsStore = new InMemoryAnnouncerSettingsStore();
-        AnvilInput anvil = new AnvilInput(plugin);
+        TextInput textInput =
+                TextInputTestKit.create(plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), NOOP);
         view = new AnnouncementEditorView(
-                guiText, scheduler, new KeyMessages(), store, settingsStore, new GuiLayouts(dir, NOOP), anvil);
+                guiText, scheduler, new KeyMessages(), store, settingsStore, new GuiLayouts(dir, NOOP), textInput);
     }
 
     @AfterEach

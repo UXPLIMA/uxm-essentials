@@ -7,60 +7,58 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import com.uxplima.uxmlib.gui.anvil.AnvilResult;
-import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * A property whose click opens a uxmLib {@link AnvilInput} text prompt, validates the typed line, and hands
- * the accepted value to a setter. The prompt's hint is a catalog line resolved through {@link GuiText}; the
- * validator turns the raw text into the accepted value or rejects it (an empty {@link Optional}), so a module
- * can trim, length-check, or pattern-match without the framework knowing the rules. An accepted value is
- * written through the caller's setter off the tick thread via the shared {@link Scheduler}; on submit (valid
- * or not) and on cancel the editor is redrawn so the viewer lands back where they were.
+ * A property whose click opens a {@link TextInput} prompt (anvil or chat, per the operator's per-key config),
+ * validates the typed line, and hands the accepted value to a setter. The prompt's hint is a catalog line; the
+ * validator turns the raw text into the accepted value or rejects it (an empty {@link Optional}), so a module can
+ * trim, length-check, or pattern-match without the framework knowing the rules. An accepted value is written through
+ * the caller's setter off the tick thread via the shared {@link Scheduler}; on a rejected submit and on cancel the
+ * editor is redrawn so the viewer lands back where they were.
  *
- * <p>The setter is the module's existing application use case wrapped as a {@link Consumer}; this property
- * holds no domain logic. The anvil callback fires on the player's region thread, so the redraw and the
- * scheduler hop are both safe.
+ * <p>The {@code inputKey} identifies this field to the input config — every text field in an entity editor shares the
+ * one {@code editor.text-field} key, so an operator flips all editor text fields to chat (or anvil) with a single
+ * override. The {@link TextInput} seam already hops the callback onto the viewer's region thread and handles the
+ * cancel keywords, so this property only validates and sets.
  */
 @NullMarked
 public final class TextProperty implements EditableProperty {
 
+    private final String inputKey;
     private final MessageKey label;
     private final MessageKey promptHint;
     private final Material icon;
-    private final GuiText guiText;
     private final Supplier<String> current;
     private final Function<String, Optional<String>> validator;
     private final Consumer<String> setter;
-    private final AnvilInput anvil;
+    private final TextInput textInput;
     private final Scheduler scheduler;
 
     public TextProperty(
+            String inputKey,
             MessageKey label,
             MessageKey promptHint,
             Material icon,
-            GuiText guiText,
             Supplier<String> current,
             Function<String, Optional<String>> validator,
             Consumer<String> setter,
-            AnvilInput anvil,
+            TextInput textInput,
             Scheduler scheduler) {
+        this.inputKey = Objects.requireNonNull(inputKey, "inputKey");
         this.label = Objects.requireNonNull(label, "label");
         this.promptHint = Objects.requireNonNull(promptHint, "promptHint");
         this.icon = Objects.requireNonNull(icon, "icon");
-        this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.current = Objects.requireNonNull(current, "current");
         this.validator = Objects.requireNonNull(validator, "validator");
         this.setter = Objects.requireNonNull(setter, "setter");
-        this.anvil = Objects.requireNonNull(anvil, "anvil");
+        this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
@@ -83,25 +81,18 @@ public final class TextProperty implements EditableProperty {
     @Override
     public void onClick(ClickContext context) {
         Objects.requireNonNull(context, "context");
-        ItemStack prompt = ItemBuilder.of(icon)
-                .name(guiText.text(context.viewer(), promptHint))
-                .build();
-        anvil.open(context.player(), prompt, result -> handle(context, result));
-    }
-
-    private void handle(ClickContext context, AnvilResult result) {
-        if (result instanceof AnvilResult.Submitted submitted) {
-            applyInput(context, submitted.text());
-        } else {
-            context.reopen().run();
-        }
+        textInput.prompt(
+                context.player(),
+                context.viewer(),
+                InputRequest.of(inputKey, promptHint),
+                raw -> applyInput(context, raw),
+                context.reopen());
     }
 
     /**
-     * Apply a submitted line: validate it, and on acceptance write it through the setter off-thread and redraw;
-     * on rejection redraw without writing. The anvil callback delegates here; it is also the seam a test drives
-     * to pin the validate-then-set behaviour without opening a live anvil, the same pattern the home rename
-     * editor uses.
+     * Apply a submitted line: validate it, and on acceptance write it through the setter off-thread and redraw; on
+     * rejection redraw without writing. The seam delegates here; it is also the seam a test drives to pin the
+     * validate-then-set behaviour without opening a live prompt, the same pattern the home rename editor uses.
      */
     public void applyInput(ClickContext context, String raw) {
         Objects.requireNonNull(context, "context");
