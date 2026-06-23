@@ -101,6 +101,7 @@ public final class WarpEditorView {
 
     private void populateFrom(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
         iconOption(inventory, warp, viewer);
+        teleportOption(inventory, warp, viewer);
         lockOption(inventory, warp, viewer);
         passwordOption(inventory, warp, viewer);
         option(
@@ -136,6 +137,32 @@ public final class WarpEditorView {
                 ItemBuilder.of(Material.BARRIER)
                         .name(text(viewer, WarpsMessageKey.WARP_EDITOR_CLOSE))
                         .build());
+    }
+
+    /**
+     * The "go to" button: a navigation action that teleports the viewer to the warp, the GUI twin of
+     * {@code /warp <name>}. The lore names the warp's world and integer coordinates so an operator sees where the
+     * click will send them; the teleport itself runs through the same {@code UseWarp} path the command takes,
+     * driven by {@link WarpEditorListener} on click.
+     */
+    private void teleportOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
+        option(
+                inventory,
+                viewer,
+                layout.teleportSlot(),
+                layout.teleportMaterial(),
+                WarpsMessageKey.WARP_EDITOR_TELEPORT_NAME,
+                List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_TELEPORT_LORE_LOCATION, coords(warp))),
+                WarpsMessageKey.WARP_EDITOR_TELEPORT_LORE_PROMPT);
+    }
+
+    /** The warp's world and integer block coordinates as the placeholder map the location lore line fills. */
+    private static Map<String, String> coords(WarpDisplay warp) {
+        return Map.of(
+                "world", warp.location().world().name(),
+                "x", Integer.toString(warp.location().blockX()),
+                "y", Integer.toString(warp.location().blockY()),
+                "z", Integer.toString(warp.location().blockZ()));
     }
 
     private void lockOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {

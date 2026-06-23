@@ -215,10 +215,14 @@ public final class ModerationWiring {
         // It reuses the same shared player/duration pickers and reads FRESH from the same jail directory and
         // repository the /jails and /jailedplayers commands use, executing through the same audited
         // jail/unjail/setjail/del use cases the raw commands take.
+        com.uxplima.uxmessentials.moderation.application.port.JailLocator jailLocator =
+                new com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitJailLocator(settings, jailLocations);
         JailGuiViews jailGui = JailGuiViews.create(
                 guiText,
                 kernel.scheduler(),
                 services,
+                sanctions,
+                jailLocator,
                 repository,
                 kernel.playerLookup(),
                 picker,

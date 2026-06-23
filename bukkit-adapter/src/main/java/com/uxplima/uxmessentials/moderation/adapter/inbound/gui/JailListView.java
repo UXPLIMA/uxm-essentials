@@ -13,10 +13,13 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
+import com.uxplima.uxmessentials.moderation.application.port.JailLocator;
+import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -47,30 +50,41 @@ public final class JailListView {
     private static final int EDIT_ROWS = 3;
     private static final int EDIT_BACK_SLOT = 18;
     private static final int EDIT_ANCHOR_SLOT = 11;
+    private static final int EDIT_GOTO_SLOT = 13;
     private static final int EDIT_DELETE_SLOT = 15;
     private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
     private static final Material ANCHOR_ICON = Material.COMPASS;
+    private static final Material GOTO_ICON = Material.ENDER_PEARL;
     private static final Material DELETE_ICON = Material.LAVA_BUCKET;
     private static final Material BACK_ICON = Material.ARROW;
     private static final Material CREATE_ICON = Material.ANVIL;
     private static final Material JAIL_ICON = Material.IRON_BARS;
 
     private final GuiText guiText;
+    private final Messages messages;
     private final Scheduler scheduler;
     private final ModerationServices services;
+    private final Sanctions sanctions;
+    private final JailLocator jailLocator;
     private final AnvilInput anvil;
     private final AtomicReference<List<String>> snapshot = new AtomicReference<>(List.of());
     private final EntityListView<String> view;
 
     public JailListView(
             GuiText guiText,
+            Messages messages,
             Scheduler scheduler,
             ModerationServices services,
+            Sanctions sanctions,
+            JailLocator jailLocator,
             AnvilInput anvil,
             EntityListLayout layout) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
+        this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.services = Objects.requireNonNull(services, "services");
+        this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
+        this.jailLocator = Objects.requireNonNull(jailLocator, "jailLocator");
         this.anvil = Objects.requireNonNull(anvil, "anvil");
         Objects.requireNonNull(layout, "layout");
         this.view = EntityListView.<String>builder()
@@ -97,11 +111,29 @@ public final class JailListView {
     }
 
     private ItemStack icon(PlayerRef viewer, String name) {
-        Map<String, String> placeholders = Map.of("jail", name);
+        Map<String, String> placeholders = placeholders(viewer, name);
         return ItemBuilder.of(JAIL_ICON)
                 .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_LIST_ENTRY_NAME, placeholders))
                 .lore(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_LIST_ENTRY_LORE, placeholders))
                 .build();
+    }
+
+    /**
+     * The placeholder map every jail item shares: the jail name and its location as a single {@code world x, y, z}
+     * string. The coordinates are resolved store-first then config (the same precedence a jailed player is sent
+     * to); a jail whose world cannot be resolved shows the localised "unknown" word so the lore line is never
+     * blank.
+     */
+    private Map<String, String> placeholders(PlayerRef viewer, String name) {
+        return Map.of("jail", name, "coords", coords(viewer, name));
+    }
+
+    private String coords(PlayerRef viewer, String name) {
+        return jailLocator
+                .locate(name)
+                .map(at -> at.world() + " " + at.x() + ", " + at.y() + ", " + at.z())
+                .orElseGet(
+                        () -> messages.resolve(viewer, ModerationMessageKey.MOD_GUI_JAIL_LOCATION_UNKNOWN, Map.of()));
     }
 
     /** The per-jail edit screen: re-anchor at the viewer's location, delete, or go back to the list. */
@@ -110,13 +142,14 @@ public final class JailListView {
     }
 
     private SimpleGui build(PlayerRef viewer, Player player, String name) {
-        Map<String, String> ph = Map.of("jail", name);
+        Map<String, String> ph = placeholders(viewer, name);
         SimpleGui gui = Guis.gui()
                 .title(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_TITLE, ph))
                 .rows(EDIT_ROWS)
                 .build();
         fill(gui);
         gui.set(EDIT_ANCHOR_SLOT, GuiItem.button(anchorIcon(viewer, ph), e -> reAnchor(player, viewer, name)));
+        gui.set(EDIT_GOTO_SLOT, GuiItem.button(goToIcon(viewer, ph), e -> goTo(player, viewer, name)));
         gui.set(EDIT_DELETE_SLOT, GuiItem.button(deleteIcon(viewer, ph), e -> delete(player, viewer, name)));
         gui.set(EDIT_BACK_SLOT, GuiItem.button(backIcon(viewer), e -> open(player, viewer)));
         return gui;
@@ -127,6 +160,18 @@ public final class JailListView {
         Position at = position(player);
         services.setJail().set(viewer, name, at);
         open(player, viewer);
+    }
+
+    /**
+     * Teleport the viewer to the jail — the inverse of re-anchor, a navigation action. Closes the screen first so
+     * a rapid double-click cannot fire a second hop, then reuses {@link Sanctions#sendToJail} (which resolves the
+     * jail store-first, falls back to config, and hops to the viewer's region thread before {@code teleportAsync}),
+     * so the operator arrives exactly where a jailed player would. No confirm and no re-open — the viewer is
+     * leaving for the jail.
+     */
+    private void goTo(Player player, PlayerRef viewer, String name) {
+        player.closeInventory();
+        sanctions.sendToJail(viewer, name);
     }
 
     private void delete(Player player, PlayerRef viewer, String name) {
@@ -164,6 +209,13 @@ public final class JailListView {
         return ItemBuilder.of(ANCHOR_ICON)
                 .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_ANCHOR))
                 .lore(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_ANCHOR_LORE, ph))
+                .build();
+    }
+
+    private ItemStack goToIcon(PlayerRef viewer, Map<String, String> ph) {
+        return ItemBuilder.of(GOTO_ICON)
+                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_GOTO))
+                .lore(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_GOTO_LORE, ph))
                 .build();
     }
 

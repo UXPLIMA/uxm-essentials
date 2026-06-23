@@ -119,6 +119,7 @@ public final class WarpsWiring {
         var promptListener =
                 new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpChatPromptListener(kernel.messages());
         var playerWarpHandle = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle();
+        var playerWarpGoTo = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle();
         var editorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView(
                 kernel.messages(), kernel.scheduler(), repository, editorLayout, playerWarpHandle);
         var soundSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView(
@@ -127,6 +128,15 @@ public final class WarpsWiring {
                 kernel.messages(), kernel.scheduler(), particleLayout);
         var welcomeMessagesView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView(
                 kernel.messages(), kernel.scheduler(), repository, editorView, welcomeLayout);
+        // UseWarp is built once here so the editor's "go to" button and the /warp command share the exact same
+        // teleport path, then handed to assemble() rather than rebuilt there.
+        UseWarp useWarp = new UseWarp(
+                repository,
+                new WarpAccess(kernel.permissions(), economy),
+                teleporter,
+                notifier,
+                new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
+                kernel.permissions());
         var editorListener = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener(
                 editorView,
                 repository,
@@ -134,10 +144,11 @@ public final class WarpsWiring {
                 kernel.messages(),
                 soundSelectorView,
                 particleSelectorView,
-                welcomeMessagesView);
+                welcomeMessagesView,
+                useWarp,
+                playerWarpGoTo);
 
-        WarpServices services =
-                assemble(kernel, repository, notifier, teleporter, economy, menuLayout, editorView, ctx);
+        WarpServices services = assemble(kernel, repository, notifier, menuLayout, editorView, ctx, useWarp);
         var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
         var listeners = List.<org.bukkit.event.Listener>of(
                 new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpArrivalNotificationListener(
@@ -153,6 +164,7 @@ public final class WarpsWiring {
                 services.warpMenu(),
                 editorView,
                 playerWarpHandle,
+                playerWarpGoTo,
                 teleportRegistry,
                 () -> {
                     teleportRegistry.clear();
@@ -165,20 +177,11 @@ public final class WarpsWiring {
             KernelPorts kernel,
             WarpRepository repository,
             WarpNotifier notifier,
-            WarpTeleporter teleporter,
-            Optional<WarpEconomy> economy,
             GuiLayout menuLayout,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView editorView,
-            com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx) {
-        WarpAccess access = new WarpAccess(kernel.permissions(), economy);
+            com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx,
+            UseWarp useWarp) {
         Clock clock = Clock.systemUTC();
-        UseWarp useWarp = new UseWarp(
-                repository,
-                access,
-                teleporter,
-                notifier,
-                new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
-                kernel.permissions());
         WarpMenuView warpMenu = new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp, menuLayout);
         return new WarpServices(
                 useWarp,
@@ -208,6 +211,7 @@ public final class WarpsWiring {
      * @param warpMenu the browse menu the {@code /warp list} command and the management hub both open
      * @param editorView the warp editor view player-warps re-uses for its own editor entry, or {@code null}
      * @param playerWarpHandle the late-bound handle player-warps binds its repository into for the editor
+     * @param playerWarpGoTo the late-bound handle player-warps binds its go-to teleport into for the editor button
      * @param teleportRegistry the warp-arrival notification handoff player-warps shares so its hops also notify
      * @param stopAction cleanup action on shutdown
      */
@@ -219,6 +223,7 @@ public final class WarpsWiring {
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle playerWarpHandle,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle playerWarpGoTo,
             WarpTeleportRegistry teleportRegistry,
             Runnable stopAction) {
 
@@ -228,6 +233,7 @@ public final class WarpsWiring {
             Objects.requireNonNull(listWarps, "listWarps");
             Objects.requireNonNull(warpMenu, "warpMenu");
             Objects.requireNonNull(playerWarpHandle, "playerWarpHandle");
+            Objects.requireNonNull(playerWarpGoTo, "playerWarpGoTo");
             Objects.requireNonNull(teleportRegistry, "teleportRegistry");
             Objects.requireNonNull(stopAction, "stopAction");
         }

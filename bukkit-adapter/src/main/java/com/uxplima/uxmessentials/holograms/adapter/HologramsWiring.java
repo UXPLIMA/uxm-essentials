@@ -298,7 +298,7 @@ public final class HologramsWiring {
     /** The editor's property-button slots, the code default matching the bundled hologram-editor.conf. */
     private static final List<Integer> EDITOR_PROPERTY_SLOTS = List.of(
             10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42,
-            43, 46, 47);
+            43, 46, 47, 48);
 
     /**
      * The 6-row editor code default used when no {@code hologram-editor.conf} is present. The shared

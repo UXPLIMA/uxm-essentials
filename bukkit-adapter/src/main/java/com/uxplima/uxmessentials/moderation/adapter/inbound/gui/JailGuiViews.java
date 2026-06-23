@@ -59,6 +59,8 @@ public final class JailGuiViews {
             GuiText guiText,
             Scheduler scheduler,
             ModerationServices services,
+            com.uxplima.uxmessentials.moderation.application.port.Sanctions sanctions,
+            com.uxplima.uxmessentials.moderation.application.port.JailLocator jailLocator,
             ModerationRepository repository,
             PlayerLookup players,
             PlayerPickerView picker,
@@ -71,6 +73,8 @@ public final class JailGuiViews {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(services, "services");
+        Objects.requireNonNull(sanctions, "sanctions");
+        Objects.requireNonNull(jailLocator, "jailLocator");
         Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(picker, "picker");
@@ -84,7 +88,8 @@ public final class JailGuiViews {
         EntityListLayout listLayout = layouts.loadEntityList(MODULE, "jail-list", jailListCodeDefault());
         EntityListLayout jailedLayout = layouts.loadEntityList(MODULE, "jailed-players", jailedCodeDefault());
 
-        JailListView jailList = new JailListView(guiText, scheduler, services, anvil, listLayout);
+        JailListView jailList =
+                new JailListView(guiText, messages, scheduler, services, sanctions, jailLocator, anvil, listLayout);
         JailedPlayersView jailedPlayers =
                 new JailedPlayersView(guiText, scheduler, services, repository, players, clock, jailedLayout);
         JailGuiFlow flow = new JailGuiFlow(guiText, scheduler, services, picker, durations, messages, sink);

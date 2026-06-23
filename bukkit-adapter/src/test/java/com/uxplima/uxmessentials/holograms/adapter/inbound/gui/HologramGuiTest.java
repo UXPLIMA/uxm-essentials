@@ -110,13 +110,14 @@ class HologramGuiTest {
     // Editor property slots, in the order HologramEditorView builds its properties.
     private static final List<Integer> EDITOR_SLOTS = List.of(
             10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42,
-            43, 46, 47);
+            43, 46, 47, 48);
     private static final int NAME_SLOT = EDITOR_SLOTS.get(0);
-    private static final int LINES_SLOT = EDITOR_SLOTS.get(2);
-    private static final int SCALE_SLOT = EDITOR_SLOTS.get(3);
-    private static final int TEXT_SHADOW_SLOT = EDITOR_SLOTS.get(12);
-    private static final int BACKGROUND_SLOT = EDITOR_SLOTS.get(22);
-    private static final int GLOW_SLOT = EDITOR_SLOTS.get(23);
+    private static final int TELEPORT_SLOT = EDITOR_SLOTS.get(2); // "Teleport here", inserted after "Move here"
+    private static final int LINES_SLOT = EDITOR_SLOTS.get(3);
+    private static final int SCALE_SLOT = EDITOR_SLOTS.get(4);
+    private static final int TEXT_SHADOW_SLOT = EDITOR_SLOTS.get(13);
+    private static final int BACKGROUND_SLOT = EDITOR_SLOTS.get(23);
+    private static final int GLOW_SLOT = EDITOR_SLOTS.get(24);
     private static final int DELETE_SLOT = 53;
     private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
 
@@ -130,6 +131,7 @@ class HologramGuiTest {
     private HologramServices services;
     private HologramListView listView;
     private HologramEditorView editorView;
+    private final List<Position> teleportDestinations = new java.util.ArrayList<>();
 
     @BeforeEach
     void setUp(@TempDir Path dir) throws Exception {
@@ -338,6 +340,17 @@ class HologramGuiTest {
         assertThat(repository.find(HologramName.of("alpha"))).isEmpty();
     }
 
+    @Test
+    void teleportButtonSendsTheViewerToTheHologramLocation() {
+        create("alpha");
+        editorView.open(
+                player, viewer, repository.find(HologramName.of("alpha")).orElseThrow());
+
+        fireClick(TELEPORT_SLOT, ClickType.LEFT);
+
+        assertThat(teleportDestinations).containsExactly(AT);
+    }
+
     // --- helpers ---
 
     private void create(String name) {
@@ -419,7 +432,7 @@ class HologramGuiTest {
         HologramNotifier notifier = new HologramNotifier(new KeyMessages(), new SilentSink());
         HologramView view = new SilentView();
         DomainEventPublisher events = new SilentEvents();
-        HologramTeleporter teleporter = (who, destination) -> {};
+        HologramTeleporter teleporter = (who, destination) -> teleportDestinations.add(destination);
         LinkedNpcLocator npc = name -> Optional.of(AT);
         return new HologramServices(
                 new CreateHologram(repository, view, notifier, events, Clock.systemUTC()),

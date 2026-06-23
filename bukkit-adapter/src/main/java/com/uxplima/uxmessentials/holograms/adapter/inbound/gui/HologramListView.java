@@ -75,10 +75,14 @@ public final class HologramListView {
     }
 
     private ItemStack icon(PlayerRef viewer, Hologram holo) {
+        Position at = holo.location();
         Map<String, String> placeholders = Map.of(
                 "name", holo.name().value(),
-                "world", holo.location().world().name(),
-                "lines", Integer.toString(holo.lineCount()));
+                "world", at.world().name(),
+                "lines", Integer.toString(holo.lineCount()),
+                "x", Long.toString(Math.round(at.x())),
+                "y", Long.toString(Math.round(at.y())),
+                "z", Long.toString(Math.round(at.z())));
         return ItemBuilder.of(Material.ARMOR_STAND)
                 .name(guiText.text(viewer, HologramsMessageKey.HOLOGRAM_GUI_LIST_ENTRY_NAME, placeholders))
                 .lore(guiText.text(viewer, HologramsMessageKey.HOLOGRAM_GUI_LIST_ENTRY_LORE, placeholders))

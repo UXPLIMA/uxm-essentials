@@ -132,6 +132,7 @@ public final class HologramEditorView {
         List<EditableProperty> props = new ArrayList<>();
         props.add(nameProperty(name));
         props.add(moveProperty(name));
+        props.add(teleportProperty(name));
         props.add(linesProperty(name));
         props.add(scaleProperty(name));
         props.add(billboardProperty(name));
@@ -212,6 +213,27 @@ public final class HologramEditorView {
                         services.move().move(ref(player), name, at);
                         scheduler.onEntity(ref(player), reopen);
                     });
+                },
+                scheduler);
+    }
+
+    /**
+     * The inverse of {@link #moveProperty}: teleport the viewer to the hologram's anchor, the GUI twin of
+     * {@code /hologram teleport <name>}. Reuses the existing {@code teleport} use case, which hands the
+     * destination to the region-aware teleport adapter (Folia-safe {@code teleportAsync}); the editor is not
+     * reopened — the viewer is leaving for the hologram, so the menu closes as the inventory click resolves. The
+     * value lore shows the destination coordinates, the same hint the move button shows for the current anchor.
+     */
+    private EditableProperty teleportProperty(HologramName name) {
+        String hint =
+                currentHologram(name).map(holo -> locationHint(holo.location())).orElse("");
+        return new ActionProperty(
+                HologramsMessageKey.HOLOGRAM_GUI_PROP_TELEPORT,
+                Material.ENDER_PEARL,
+                hint,
+                (player, reopen) -> {
+                    player.closeInventory();
+                    scheduler.async(() -> services.teleport().teleport(ref(player), name));
                 },
                 scheduler);
     }

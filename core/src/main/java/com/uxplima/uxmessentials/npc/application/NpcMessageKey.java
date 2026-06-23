@@ -175,6 +175,7 @@ public enum NpcMessageKey implements MessageKey {
     NPC_GUI_PROP_SHOW_IN_TAB("npc.gui.prop.show-in-tab"),
     NPC_GUI_PROP_ACTIONS("npc.gui.prop.actions"),
     NPC_GUI_PROP_MOVE("npc.gui.prop.move"),
+    NPC_GUI_PROP_TELEPORT("npc.gui.prop.teleport"),
 
     // management GUI — value words
     NPC_GUI_VALUE_ON("npc.gui.value.on"),

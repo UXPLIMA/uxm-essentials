@@ -155,6 +155,7 @@ public final class NpcEditorView {
         props.add(showInTabProperty(name));
         props.add(actionsProperty(name));
         props.add(moveProperty(name));
+        props.add(teleportProperty(name));
         return props;
     }
 
@@ -430,6 +431,26 @@ public final class NpcEditorView {
                         services.move().move(ref(player), name, at);
                         scheduler.onEntity(ref(player), reopen);
                     });
+                },
+                scheduler);
+    }
+
+    /**
+     * The inverse of {@link #moveProperty}: teleport the viewer to the NPC's location, the GUI twin of
+     * {@code /npc teleport <name>}. Reuses the existing {@code teleport} use case, which hands the destination to
+     * the region-aware teleport adapter (Folia-safe {@code teleportAsync}); the editor is not reopened — the
+     * viewer is leaving for the NPC, so the menu closes as the inventory click resolves. The value lore shows the
+     * destination coordinates, the same hint the move button shows for the current anchor.
+     */
+    private EditableProperty teleportProperty(NpcName name) {
+        String hint = current(name).map(npc -> locationHint(npc.location())).orElse("");
+        return new NpcActionButton(
+                NpcMessageKey.NPC_GUI_PROP_TELEPORT,
+                Material.ENDER_PEARL,
+                hint,
+                (player, reopen) -> {
+                    player.closeInventory();
+                    scheduler.async(() -> services.teleport().teleport(ref(player), name));
                 },
                 scheduler);
     }

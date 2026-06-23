@@ -21,8 +21,10 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpChatPromptListener;
+import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -34,6 +36,8 @@ public final class WarpEditorListener implements Listener {
     private final Messages messages;
     private final EditableWarpLoader loader;
     private final WarpSubMenuClicks subMenuClicks;
+    private final UseWarp useWarp;
+    private final PlayerWarpGoToHandle playerWarpGoTo;
 
     private final WarpSoundSelectorView soundSelectorView;
     private final WarpParticleSelectorView particleSelectorView;
@@ -46,13 +50,17 @@ public final class WarpEditorListener implements Listener {
             Messages messages,
             WarpSoundSelectorView soundSelectorView,
             WarpParticleSelectorView particleSelectorView,
-            WarpWelcomeMessagesView welcomeMessagesView) {
+            WarpWelcomeMessagesView welcomeMessagesView,
+            UseWarp useWarp,
+            PlayerWarpGoToHandle playerWarpGoTo) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.soundSelectorView = Objects.requireNonNull(soundSelectorView, "soundSelectorView");
         this.particleSelectorView = Objects.requireNonNull(particleSelectorView, "particleSelectorView");
         this.welcomeMessagesView = Objects.requireNonNull(welcomeMessagesView, "welcomeMessagesView");
+        this.useWarp = Objects.requireNonNull(useWarp, "useWarp");
+        this.playerWarpGoTo = Objects.requireNonNull(playerWarpGoTo, "playerWarpGoTo");
         this.loader = new EditableWarpLoader(Objects.requireNonNull(warpRepository, "warpRepository"), editorView);
         this.subMenuClicks = new WarpSubMenuClicks(
                 editorView,
@@ -138,6 +146,8 @@ public final class WarpEditorListener implements Listener {
         WarpEditorLayout layout = editorView.layout();
         if (slot == layout.iconSlot()) {
             editIcon(player, viewer, name, owner, warp, click);
+        } else if (slot == layout.teleportSlot()) {
+            goTo(player, viewer, name, owner);
         } else if (slot == layout.lockSlot()) {
             warp.setLocked(!warp.isLocked());
             editorView.open(player, viewer, name, owner);
@@ -153,6 +163,22 @@ public final class WarpEditorListener implements Listener {
             editDuration(player, viewer, name, owner, warp, click, true);
         } else if (slot == layout.cooldownSlot()) {
             editDuration(player, viewer, name, owner, warp, click, false);
+        }
+    }
+
+    /**
+     * The "go to" navigation action: close the editor, then teleport the viewer to the warp through the same
+     * path the {@code /warp <name>} command uses ({@code UseWarp} for a server warp, the late-bound player-warp
+     * go-to for a player warp). Closing before the teleport keeps a rapid double-click from firing two hops, and
+     * the teleport executor itself is region-aware (Folia-safe {@code teleportAsync}). No confirm — it is a
+     * navigation action — and the warp's own access/cost gate still applies inside the use case.
+     */
+    private void goTo(Player player, PlayerRef viewer, String name, @Nullable PlayerRef owner) {
+        player.closeInventory();
+        if (owner == null) {
+            useWarp.use(viewer, WarpName.of(name));
+        } else {
+            playerWarpGoTo.teleport(viewer, owner, name);
         }
     }
 

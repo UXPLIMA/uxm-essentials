@@ -8,6 +8,7 @@ import org.bukkit.Material;
 public record WarpEditorLayout(
         int rows,
         int iconSlot,
+        int teleportSlot,
         int lockSlot,
         int passwordSlot,
         int welcomeSlot,
@@ -16,6 +17,7 @@ public record WarpEditorLayout(
         int warmupSlot,
         int cooldownSlot,
         int closeSlot,
+        Material teleportMaterial,
         Material lockMaterial,
         Material passwordMaterial,
         Material welcomeMaterial,
@@ -27,6 +29,7 @@ public record WarpEditorLayout(
         return new WarpEditorLayout(
                 3,
                 4,
+                0,
                 10,
                 11,
                 12,
@@ -35,6 +38,7 @@ public record WarpEditorLayout(
                 15,
                 16,
                 22,
+                Material.ENDER_PEARL,
                 Material.LEVER,
                 Material.PAPER,
                 Material.WRITABLE_BOOK,

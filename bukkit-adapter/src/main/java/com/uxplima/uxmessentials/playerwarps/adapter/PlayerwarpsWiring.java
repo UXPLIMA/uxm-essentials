@@ -72,6 +72,8 @@ public final class PlayerwarpsWiring {
                     editorView,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
                     playerWarpHandle,
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpGoToHandle
+                    playerWarpGoTo,
             com.uxplima.uxmessentials.warps.adapter.@org.jspecify.annotations.Nullable WarpTeleportRegistry
                     teleportRegistry,
             GuiText guiText,
@@ -105,8 +107,20 @@ public final class PlayerwarpsWiring {
                 : new com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry();
         PlayerWarpTeleporter teleporter = new TeleportPlayerWarpAdapter(teleportEngine, registry);
         PlayerWarpQuota quota = new PlayerWarpQuota(kernel.permissions(), defaultLimit(ctx));
+        // UsePlayerWarp is built once so the /pwarp command, the browse menu, and the shared warp editor's "go to"
+        // button all teleport through the same path; the go-to handle the warps editor reads is bound to it here.
+        UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
+                repository,
+                teleporter,
+                notifier,
+                new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
+                kernel.permissions());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
+        }
+        if (playerWarpGoTo != null) {
+            playerWarpGoTo.bind((viewer, owner, name) -> usePlayerWarp.useFor(
+                    viewer, owner, com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName.of(name)));
         }
         // Build the use cases, then the management GUI over them, then the services holder carrying both editors.
         SetPlayerWarp setPlayerWarp = new SetPlayerWarp(
@@ -129,7 +143,7 @@ public final class PlayerwarpsWiring {
         PlayerWarpServices services = assemble(
                 kernel,
                 repository,
-                teleporter,
+                usePlayerWarp,
                 setPlayerWarp,
                 delPlayerWarp,
                 visibility,
@@ -211,7 +225,7 @@ public final class PlayerwarpsWiring {
     private static PlayerWarpServices assemble(
             KernelPorts kernel,
             PlayerWarpRepository repository,
-            PlayerWarpTeleporter teleporter,
+            UsePlayerWarp usePlayerWarp,
             SetPlayerWarp setPlayerWarp,
             DelPlayerWarp delPlayerWarp,
             SetPlayerWarpVisibility visibility,
@@ -222,12 +236,7 @@ public final class PlayerwarpsWiring {
         return new PlayerWarpServices(
                 setPlayerWarp,
                 delPlayerWarp,
-                new UsePlayerWarp(
-                        repository,
-                        teleporter,
-                        notifier,
-                        new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
-                        kernel.permissions()),
+                usePlayerWarp,
                 new ListPlayerWarps(repository, notifier),
                 visibility,
                 kernel.playerLookup(),

@@ -154,6 +154,7 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_GUI_PROP_NAME("hologram.gui.prop.name"),
     HOLOGRAM_GUI_PROP_NAME_PROMPT("hologram.gui.prop.name-prompt"),
     HOLOGRAM_GUI_PROP_MOVE("hologram.gui.prop.move"),
+    HOLOGRAM_GUI_PROP_TELEPORT("hologram.gui.prop.teleport"),
     HOLOGRAM_GUI_PROP_LINES("hologram.gui.prop.lines"),
     HOLOGRAM_GUI_PROP_SCALE("hologram.gui.prop.scale"),
     HOLOGRAM_GUI_PROP_BILLBOARD("hologram.gui.prop.billboard"),

@@ -604,6 +604,7 @@ public final class PluginModule {
                 WarpsWiring.wire(ctx, persistence, engine, Optional.ofNullable(links.warpEconomy), bus, guiLayouts);
         links.warpEditorView = wired.editorView();
         links.warpPlayerWarpHandle = wired.playerWarpHandle();
+        links.warpPlayerWarpGoTo = wired.playerWarpGoTo();
         links.warpTeleportRegistry = wired.teleportRegistry();
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -996,6 +997,7 @@ public final class PluginModule {
                 bus,
                 links.warpEditorView,
                 links.warpPlayerWarpHandle,
+                links.warpPlayerWarpGoTo,
                 links.warpTeleportRegistry,
                 guiText,
                 guiLayouts,
@@ -1241,6 +1243,8 @@ public final class PluginModule {
                 warpEditorView;
         private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
                 warpPlayerWarpHandle;
+        private com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpGoToHandle
+                warpPlayerWarpGoTo;
         private com.uxplima.uxmessentials.warps.adapter.@org.jspecify.annotations.Nullable WarpTeleportRegistry
                 warpTeleportRegistry;
         // The soft-couple seams staff binds when it wires (it lands last). Each is captured during the source

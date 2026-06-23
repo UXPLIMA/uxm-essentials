@@ -81,6 +81,31 @@ class WarpEditorIconOptionTest {
         assertThat(loreText(icon)).contains("diamond");
     }
 
+    @Test
+    void teleportOptionRendersAnEnderPearlNamingTheWarpCoordinates() {
+        WarpEditorLayout layout = WarpEditorLayout.defaultLayout();
+        ItemStack teleport = optionAt(warpWithIcon(Optional.empty()), layout.teleportSlot());
+
+        assertThat(teleport.getType()).isEqualTo(Material.ENDER_PEARL);
+        assertThat(loreText(teleport)).contains("world 0, 64, 0");
+    }
+
+    private ItemStack optionAt(Warp warp, int slot) {
+        WarpEditorView view = new WarpEditorView(
+                new EchoMessages(),
+                new SyncScheduler(),
+                new SingleWarpRepository(warp),
+                WarpEditorLayout.defaultLayout(),
+                new PlayerWarpRepositoryHandle());
+        Inventory inventory =
+                server.createInventory(null, WarpEditorLayout.defaultLayout().rows() * 9);
+        WarpEditorHolder holder = new WarpEditorHolder(viewer, warp.name().value(), null);
+        view.populate(inventory, holder);
+        ItemStack item = inventory.getItem(slot);
+        assertThat(item).as("option at slot %s", slot).isNotNull();
+        return item;
+    }
+
     private ItemStack iconItemFor(Warp warp) {
         WarpEditorView view = new WarpEditorView(
                 new EchoMessages(),
@@ -148,12 +173,18 @@ class WarpEditorIconOptionTest {
         }
     }
 
-    /** Substitutes placeholders into the key so the rendered text carries the material name for assertions. */
+    /**
+     * Substitutes placeholders into the key so the rendered text carries the values under test: the icon
+     * option's material name, and the teleport option's world and coordinates as a {@code world x, y, z} string.
+     */
     private static final class EchoMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            String value = placeholders.getOrDefault("material", key.key());
-            return value;
+            if (placeholders.containsKey("world")) {
+                return placeholders.get("world") + " " + placeholders.get("x") + ", " + placeholders.get("y") + ", "
+                        + placeholders.get("z");
+            }
+            return placeholders.getOrDefault("material", key.key());
         }
     }
 

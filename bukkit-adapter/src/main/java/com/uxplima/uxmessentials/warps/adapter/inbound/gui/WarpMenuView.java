@@ -126,6 +126,15 @@ public final class WarpMenuView {
         warp.requiredPermission()
                 .ifPresent(permission -> lines.add(
                         text(viewer, WarpsMessageKey.WARP_MENU_LORE_PERMISSION, Map.of("permission", permission))));
+        var at = warp.location();
+        lines.add(text(
+                viewer,
+                WarpsMessageKey.WARP_MENU_LORE_LOCATION,
+                Map.of(
+                        "world", at.world().name(),
+                        "x", Integer.toString(at.blockX()),
+                        "y", Integer.toString(at.blockY()),
+                        "z", Integer.toString(at.blockZ()))));
         lines.add(text(
                 viewer,
                 WarpsMessageKey.WARP_MENU_LORE_USABLE,

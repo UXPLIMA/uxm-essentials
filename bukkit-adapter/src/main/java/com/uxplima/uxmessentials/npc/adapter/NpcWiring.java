@@ -209,7 +209,7 @@ public final class NpcWiring {
 
     /** The editor's property-button slots, the code default matching the bundled npc-editor.conf. */
     private static final List<Integer> EDITOR_PROPERTY_SLOTS =
-            List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31);
+            List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32);
 
     /**
      * Build the NPC management list and editor over the shared GUI framework. The editor's back button reopens

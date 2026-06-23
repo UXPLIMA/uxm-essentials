@@ -213,6 +213,7 @@ public final class GuiLayouts {
         }
         int rows = clampRows(root.node("rows").getInt(codeDefault.rows()), codeDefault.rows());
         int iconSlot = root.node("icon-slot").getInt(codeDefault.iconSlot());
+        int teleportSlot = root.node("teleport-slot").getInt(codeDefault.teleportSlot());
         int lockSlot = root.node("lock-slot").getInt(codeDefault.lockSlot());
         int passwordSlot = root.node("password-slot").getInt(codeDefault.passwordSlot());
         int welcomeSlot = root.node("welcome-slot").getInt(codeDefault.welcomeSlot());
@@ -222,6 +223,8 @@ public final class GuiLayouts {
         int cooldownSlot = root.node("cooldown-slot").getInt(codeDefault.cooldownSlot());
         int closeSlot = root.node("close-slot").getInt(codeDefault.closeSlot());
 
+        Material teleportMaterial =
+                material(root.node("teleport-material").getString(), codeDefault.teleportMaterial());
         Material lockMaterial = material(root.node("lock-material").getString(), codeDefault.lockMaterial());
         Material passwordMaterial =
                 material(root.node("password-material").getString(), codeDefault.passwordMaterial());
@@ -236,6 +239,7 @@ public final class GuiLayouts {
         return new WarpEditorLayout(
                 rows,
                 iconSlot,
+                teleportSlot,
                 lockSlot,
                 passwordSlot,
                 welcomeSlot,
@@ -244,6 +248,7 @@ public final class GuiLayouts {
                 warmupSlot,
                 cooldownSlot,
                 closeSlot,
+                teleportMaterial,
                 lockMaterial,
                 passwordMaterial,
                 welcomeMaterial,

@@ -23,6 +23,8 @@ import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.application.DelJail;
 import com.uxplima.uxmessentials.moderation.application.ListJails;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
+import com.uxplima.uxmessentials.moderation.application.port.JailLocator;
+import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -50,6 +52,7 @@ class JailListViewTest {
 
     private static final int FIRST_JAIL_SLOT = 0;
     private static final int EDIT_ANCHOR_SLOT = 11;
+    private static final int EDIT_GOTO_SLOT = 13;
     private static final int EDIT_DELETE_SLOT = 15;
 
     private ServerMock server;
@@ -60,6 +63,8 @@ class JailListViewTest {
     private ModerationServices services;
     private SetJail setJail;
     private DelJail delJail;
+    private Sanctions sanctions;
+    private JailLocator jailLocator;
     private JailListView view;
 
     @BeforeEach
@@ -72,19 +77,26 @@ class JailListViewTest {
         services = mock(ModerationServices.class);
         setJail = mock(SetJail.class);
         delJail = mock(DelJail.class);
+        sanctions = mock(Sanctions.class);
+        jailLocator = mock(JailLocator.class);
         ListJails listJails = mock(ListJails.class);
         when(services.setJail()).thenReturn(setJail);
         when(services.delJail()).thenReturn(delJail);
         when(services.listJails()).thenReturn(listJails);
         when(listJails.names()).thenReturn(List.of("alcatraz"));
+        when(jailLocator.locate("alcatraz"))
+                .thenReturn(java.util.Optional.of(new JailLocator.JailCoords("world", 10, 64, -20)));
 
         AnvilInput anvil = new AnvilInput(plugin);
         anvil.install();
         Guis.install(plugin);
         view = new JailListView(
                 new GuiText(new KeyMessages()),
+                new KeyMessages(),
                 new SyncScheduler(),
                 services,
+                sanctions,
+                jailLocator,
                 anvil,
                 EntityListLayout.withCreate(Material.IRON_BARS, 49, Material.ANVIL));
     }
@@ -131,6 +143,36 @@ class JailListViewTest {
         verify(setJail).set(eq(staffRef), eq("shawshank"), any(Position.class));
     }
 
+    @Test
+    void goToTeleportsTheViewerToTheJail() {
+        view.open(staff, staffRef);
+        fireClick(FIRST_JAIL_SLOT); // open the edit screen for "alcatraz"
+
+        fireClick(EDIT_GOTO_SLOT);
+
+        verify(sanctions).sendToJail(eq(staffRef), eq("alcatraz"));
+    }
+
+    @Test
+    void listIconLoreShowsTheJailCoordinates() {
+        view.open(staff, staffRef);
+
+        Inventory menu = staff.getOpenInventory().getTopInventory();
+        String lore = loreOf(menu.getItem(FIRST_JAIL_SLOT));
+        assertThat(lore).contains("world 10, 64, -20");
+    }
+
+    private static String loreOf(org.bukkit.inventory.ItemStack item) {
+        net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer plain =
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+        StringBuilder out = new StringBuilder();
+        java.util.List<net.kyori.adventure.text.Component> lore = java.util.Objects.requireNonNull(item.lore(), "lore");
+        for (net.kyori.adventure.text.Component line : lore) {
+            out.append(plain.serialize(line)).append('\n');
+        }
+        return out.toString();
+    }
+
     private void fireClick(int slot) {
         InventoryView inventoryView = staff.getOpenInventory();
         InventoryClickEvent event = new InventoryClickEvent(
@@ -138,10 +180,15 @@ class JailListViewTest {
         server.getPluginManager().callEvent(event);
     }
 
+    /**
+     * Echoes the key and any placeholder values it carried, so a rendered lore line exposes the substituted
+     * values (the coordinates) the production catalog would interpolate — there is no catalog file under test.
+     */
     private static final class KeyMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, java.util.Map<String, String> placeholders) {
-            return key.key();
+            String coords = placeholders.get("coords");
+            return coords == null ? key.key() : key.key() + " " + coords;
         }
     }
 

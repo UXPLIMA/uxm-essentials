@@ -112,12 +112,13 @@ class NpcGuiTest {
 
     // Editor property slots, in the order NpcEditorView builds its properties.
     private static final List<Integer> EDITOR_SLOTS =
-            List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31);
+            List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32);
     private static final int NAME_SLOT = EDITOR_SLOTS.get(0);
     private static final int TYPE_SLOT = EDITOR_SLOTS.get(2);
     private static final int EQUIPMENT_SLOT = EDITOR_SLOTS.get(3);
     private static final int GLOW_SLOT = EDITOR_SLOTS.get(7);
     private static final int GLOW_COLOR_SLOT = EDITOR_SLOTS.get(8);
+    private static final int TELEPORT_SLOT = EDITOR_SLOTS.get(18); // "Teleport here", the last property
     private static final int DELETE_SLOT = 53;
     private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
     private static final int EQUIP_HEAD_SLOT = 11; // first armour slot in the equipment sub-menu (code default)
@@ -132,6 +133,7 @@ class NpcGuiTest {
     private NpcServices services;
     private NpcListView listView;
     private NpcEditorView editorView;
+    private final List<Position> teleportDestinations = new java.util.ArrayList<>();
 
     @BeforeEach
     void setUp(@TempDir Path dir) throws Exception {
@@ -303,6 +305,16 @@ class NpcGuiTest {
         assertThat(repository.find(NpcName.of("alpha"))).isEmpty();
     }
 
+    @Test
+    void teleportButtonSendsTheViewerToTheNpcLocation() {
+        create("alpha");
+        editorView.open(player, viewer, npc("alpha"));
+
+        fireClick(TELEPORT_SLOT, ClickType.LEFT);
+
+        assertThat(teleportDestinations).containsExactly(AT);
+    }
+
     // --- helpers ---
 
     private void create(String name) {
@@ -421,7 +433,7 @@ class NpcGuiTest {
                 new ListNpcs(repository, notifier),
                 new NearbyNpcs(repository, notifier),
                 new DescribeNpc(repository, notifier),
-                new TeleportToNpc(repository, (who, destination) -> {}, notifier),
+                new TeleportToNpc(repository, (who, destination) -> teleportDestinations.add(destination), notifier),
                 new MoveNpc(repository, view, notifier, events),
                 new CopyNpc(repository, view, notifier, events, clock),
                 new CenterNpc(repository, view, notifier, events),
