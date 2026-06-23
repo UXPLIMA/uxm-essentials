@@ -19,6 +19,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The holder is created first and the menu is built against it; {@link #attach} then stores the built
  * inventory so {@link #getInventory()} can answer it, the way Bukkit's holder contract expects.
+ *
+ * <p>The {@link #draft()} is non-null only on the {@link WorldEditorScreen#CREATE} new-world screen, which carries
+ * its in-flight {@link WorldCreateDraft} on the window so a selector cycle or an input submission can rebuild the
+ * screen from the prior choices; every other screen leaves it {@code null}.
  */
 @NullMarked
 public final class WorldEditorHolder implements InventoryHolder {
@@ -27,13 +31,24 @@ public final class WorldEditorHolder implements InventoryHolder {
     private final WorldEditorScreen screen;
     private final @Nullable WorldName world;
     private final int page;
+    private final @Nullable WorldCreateDraft draft;
     private @Nullable Inventory inventory;
 
     public WorldEditorHolder(PlayerRef viewer, WorldEditorScreen screen, @Nullable WorldName world, int page) {
+        this(viewer, screen, world, page, null);
+    }
+
+    public WorldEditorHolder(
+            PlayerRef viewer,
+            WorldEditorScreen screen,
+            @Nullable WorldName world,
+            int page,
+            @Nullable WorldCreateDraft draft) {
         this.viewer = Objects.requireNonNull(viewer, "viewer");
         this.screen = Objects.requireNonNull(screen, "screen");
         this.world = world;
         this.page = page;
+        this.draft = draft;
     }
 
     /** The staff member viewing the editor; prompts and feedback are attributed to them. */
@@ -54,6 +69,11 @@ public final class WorldEditorHolder implements InventoryHolder {
     /** The page within the current screen, for screens that paginate. */
     public int page() {
         return page;
+    }
+
+    /** The in-flight new-world draft on the {@link WorldEditorScreen#CREATE} screen, or {@code null} elsewhere. */
+    public @Nullable WorldCreateDraft draft() {
+        return draft;
     }
 
     /** Store the built menu so the holder contract can answer {@link #getInventory()}. */

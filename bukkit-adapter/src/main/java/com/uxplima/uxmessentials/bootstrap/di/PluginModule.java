@@ -398,7 +398,7 @@ public final class PluginModule {
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
-            wireWorlds(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
+            wireWorlds(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("homes"))) {
             wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("economy"))) {
@@ -481,7 +481,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            TextInput textInput) {
         // worlds builds its cached jOOQ WorldRepository over persistence.dsl() and its BukkitWorldEngine over the
         // plugin's Server. It delegates /worlds tp and /worlds spawn execution to the captured teleport engine (wired
         // earlier) and charges the per-world entry fee through the economy bridge — but economy lands after worlds, so
@@ -507,6 +508,7 @@ public final class PluginModule {
                 engine,
                 entryFee,
                 guiLayouts,
+                textInput,
                 plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);

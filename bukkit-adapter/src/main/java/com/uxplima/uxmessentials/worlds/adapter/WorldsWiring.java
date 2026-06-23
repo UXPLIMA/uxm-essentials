@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWorldsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.WorldsPlaceholders;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorText;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationView;
@@ -108,6 +110,7 @@ public final class WorldsWiring {
             TeleportEngine teleportEngine,
             WorldEntryFee entryFee,
             GuiLayouts guiLayouts,
+            TextInput textInput,
             Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -116,6 +119,7 @@ public final class WorldsWiring {
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(entryFee, "entryFee");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
 
@@ -216,8 +220,21 @@ public final class WorldsWiring {
                 restoreWorld,
                 editor.listView(),
                 editor.mainView());
+        // The create screen reuses the list view (to reopen on cancel/create) and the started CreateWorld use case,
+        // and captures text through the shared input seam; its layout is a fixed three-row window like the main and
+        // generation screens.
+        GuiLayout createLayout = guiLayouts.load("worlds", "editor-create", threeRow());
+        WorldCreateView createView = new WorldCreateView(
+                editor.editorText(),
+                services.createWorld(),
+                notifier,
+                editor.listView(),
+                textInput,
+                tracked,
+                createLayout);
         WorldEditorListener editorListener = new WorldEditorListener(
                 editor.listView(),
+                createView,
                 editor.mainView(),
                 editor.generationView(),
                 editor.gridView(),
@@ -368,7 +385,7 @@ public final class WorldsWiring {
         WorldMainView mainView = new WorldMainView(editorText, repository, engine, tracked, mainLayout);
         WorldGenerationView generationView = new WorldGenerationView(editorText, repository, tracked, genLayout);
         WorldPropertyGridView gridView = new WorldPropertyGridView(editorText, repository, tracked, gridLayout);
-        return new Editor(listView, mainView, generationView, gridView);
+        return new Editor(editorText, listView, mainView, generationView, gridView);
     }
 
     /**
@@ -380,8 +397,12 @@ public final class WorldsWiring {
         return new GuiLayout(3, Material.GRAY_STAINED_GLASS_PANE, Material.ARROW, 0, 1, List.of());
     }
 
-    /** The four world-editor views built together, so {@link #wire} threads them into the services and the listener. */
+    /**
+     * The world-editor views built together with their shared text helper, so {@link #wire} threads them into the
+     * services and the listener (and builds the create screen against the same {@link WorldEditorText}).
+     */
     private record Editor(
+            WorldEditorText editorText,
             WorldListView listView,
             WorldMainView mainView,
             WorldGenerationView generationView,

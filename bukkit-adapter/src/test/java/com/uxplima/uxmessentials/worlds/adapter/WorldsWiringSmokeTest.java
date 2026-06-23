@@ -248,6 +248,7 @@ class WorldsWiringSmokeTest {
     private static WorldEditorListener editorListener() {
         return new WorldEditorListener(
                 listView(),
+                mock(com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateView.class),
                 mainView(),
                 new WorldGenerationView(editorText(), new NoOpRepository(), new NoOpScheduler(), listLayout()),
                 new WorldPropertyGridView(editorText(), new NoOpRepository(), new NoOpScheduler(), listLayout()),

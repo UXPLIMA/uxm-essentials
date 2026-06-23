@@ -170,6 +170,16 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 + " backup, backups, restore, restoreconfirm.";
     }
 
+    /**
+     * With the catalog {@code gui} flag on, bare {@code /worlds} opens the world list GUI — the same picker
+     * {@code /worlds gui} opens — from which a staff member can edit or create a world. With the flag off the root
+     * falls through to the usage text instead.
+     */
+    @Override
+    public Optional<Command<CommandSourceStack>> guiRoot() {
+        return Optional.of(this::runGuiList);
+    }
+
     private static Predicate<CommandSourceStack> p(String node) {
         return src -> src.getSender().hasPermission(node);
     }

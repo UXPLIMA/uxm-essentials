@@ -35,6 +35,7 @@ import org.jspecify.annotations.NullMarked;
 public final class WorldEditorListener implements Listener {
 
     private final WorldListView listView;
+    private final WorldCreateView createView;
     private final WorldMainView mainView;
     private final WorldGenerationView generationView;
     private final WorldPropertyGridView gridView;
@@ -44,6 +45,7 @@ public final class WorldEditorListener implements Listener {
 
     public WorldEditorListener(
             WorldListView listView,
+            WorldCreateView createView,
             WorldMainView mainView,
             WorldGenerationView generationView,
             WorldPropertyGridView gridView,
@@ -51,6 +53,7 @@ public final class WorldEditorListener implements Listener {
             WorldRepository repository,
             WorldEngine engine) {
         this.listView = Objects.requireNonNull(listView, "listView");
+        this.createView = Objects.requireNonNull(createView, "createView");
         this.mainView = Objects.requireNonNull(mainView, "mainView");
         this.generationView = Objects.requireNonNull(generationView, "generationView");
         this.gridView = Objects.requireNonNull(gridView, "gridView");
@@ -74,6 +77,7 @@ public final class WorldEditorListener implements Listener {
         int slot = event.getRawSlot();
         switch (h.screen()) {
             case LIST -> onList(player, h, slot);
+            case CREATE -> onCreate(player, h, slot, event);
             case MAIN -> onMain(player, h, slot);
             case GENERATION -> onGeneration(player, h, slot);
             case RULES, ACCESS -> onGrid(player, h, slot, event);
@@ -86,8 +90,17 @@ public final class WorldEditorListener implements Listener {
             listView.open(player, h.viewer(), Math.max(0, h.page() - 1));
         } else if (slot == layout.nextSlot()) {
             listView.open(player, h.viewer(), h.page() + 1);
+        } else if (listView.isCreate(slot)) {
+            createView.open(player, h.viewer());
         } else {
             listView.worldAt(h.page(), slot).ifPresent(world -> mainView.open(player, h.viewer(), world));
+        }
+    }
+
+    private void onCreate(Player player, WorldEditorHolder h, int slot, InventoryClickEvent event) {
+        WorldCreateDraft draft = h.draft();
+        if (draft != null) {
+            createView.onClick(player, h.viewer(), draft, slot, event.isRightClick());
         }
     }
 

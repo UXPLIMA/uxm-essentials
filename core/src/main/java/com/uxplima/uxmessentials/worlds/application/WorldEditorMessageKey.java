@@ -10,11 +10,13 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  */
 public enum WorldEditorMessageKey implements MessageKey {
     LIST_TITLE("world.editor.list-title"),
+    CREATE_TITLE("world.editor.create-title"),
     MAIN_TITLE("world.editor.main-title"),
     RULES_TITLE("world.editor.rules-title"),
     GENERATION_TITLE("world.editor.generation-title"),
     ACCESS_TITLE("world.editor.access-title"),
 
+    NAV_CREATE("world.editor.nav.create"),
     NAV_RULES("world.editor.nav.rules"),
     NAV_GENERATION("world.editor.nav.generation"),
     NAV_ACCESS("world.editor.nav.access"),
@@ -26,6 +28,23 @@ public enum WorldEditorMessageKey implements MessageKey {
 
     LIST_ENTRY_NAME("world.editor.list.entry-name"),
     LIST_ENTRY_LORE("world.editor.list.entry-lore"),
+
+    CREATE_BUTTON_NAME("world.editor.create.button-name"),
+    CREATE_BUTTON_LORE("world.editor.create.button-lore"),
+    CREATE_NAME("world.editor.create.name"),
+    CREATE_NAME_LORE("world.editor.create.name-lore"),
+    CREATE_NAME_PROMPT("world.editor.create.name-prompt"),
+    CREATE_NAME_REQUIRED("world.editor.create.name-required"),
+    CREATE_ENVIRONMENT("world.editor.create.environment"),
+    CREATE_TYPE("world.editor.create.type"),
+    CREATE_GENERATOR("world.editor.create.generator"),
+    CREATE_SEED("world.editor.create.seed"),
+    CREATE_SEED_LORE("world.editor.create.seed-lore"),
+    CREATE_SEED_PROMPT("world.editor.create.seed-prompt"),
+    CREATE_SEED_INVALID("world.editor.create.seed-invalid"),
+    CREATE_CYCLE_HINT("world.editor.create.cycle-hint"),
+    CREATE_CONFIRM("world.editor.create.confirm"),
+    CREATE_CONFIRM_LORE("world.editor.create.confirm-lore"),
 
     MAIN_SUMMARY_NAME("world.editor.main.summary-name"),
     MAIN_SUMMARY_LORE("world.editor.main.summary-lore"),

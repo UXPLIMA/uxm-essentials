@@ -129,8 +129,9 @@ class WorldEditorListenerTest {
 
         servicesScheduler = new RecordingScheduler();
         WorldsServices services = services();
-        WorldEditorListener listener =
-                new WorldEditorListener(listView, mainView, generationView, gridView, services, repository, engine);
+        WorldCreateView createView = mock(WorldCreateView.class);
+        WorldEditorListener listener = new WorldEditorListener(
+                listView, createView, mainView, generationView, gridView, services, repository, engine);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 

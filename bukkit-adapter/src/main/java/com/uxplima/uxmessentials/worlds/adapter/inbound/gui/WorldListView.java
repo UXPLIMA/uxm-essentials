@@ -41,6 +41,12 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WorldListView {
 
+    /**
+     * The bottom-row slot the "Create world" button is pinned to — slot 49, between the layout's reserved prev/next
+     * nav slots (48/50 in the default layout) and below the page-content slots, so it never collides with a world icon.
+     */
+    public static final int CREATE_SLOT = 49;
+
     private final WorldEditorText text;
     private final WorldRepository repository;
     private final WorldEngine engine;
@@ -63,6 +69,11 @@ public final class WorldListView {
     /** The layout the listener reads to recognise the nav slots and the page-content slots. */
     public GuiLayout layout() {
         return layout;
+    }
+
+    /** Whether {@code slot} is the "Create world" button — the listener calls this to open the create screen. */
+    public boolean isCreate(int slot) {
+        return slot == CREATE_SLOT;
     }
 
     /** Open the world-picker for {@code viewer} at {@code page}, scheduled on their entity thread. */
@@ -120,6 +131,18 @@ public final class WorldListView {
         }
         nav(inventory, viewer, layout.prevSlot(), size, WorldEditorMessageKey.NAV_PREV);
         nav(inventory, viewer, layout.nextSlot(), size, WorldEditorMessageKey.NAV_NEXT);
+        createButton(inventory, viewer, size);
+    }
+
+    private void createButton(Inventory inventory, PlayerRef viewer, int size) {
+        if (CREATE_SLOT >= 0 && CREATE_SLOT < size) {
+            inventory.setItem(
+                    CREATE_SLOT,
+                    ItemBuilder.of(Material.NETHER_STAR)
+                            .name(text.text(viewer, WorldEditorMessageKey.CREATE_BUTTON_NAME))
+                            .lore(List.of(text.text(viewer, WorldEditorMessageKey.CREATE_BUTTON_LORE)))
+                            .build());
+        }
     }
 
     private ItemStack entry(PlayerRef viewer, ManagedWorld world) {
