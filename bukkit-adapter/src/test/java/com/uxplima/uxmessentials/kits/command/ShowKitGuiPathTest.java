@@ -198,7 +198,6 @@ class ShowKitGuiPathTest {
                 null,
                 null,
                 null,
-                null,
                 null);
     }
 

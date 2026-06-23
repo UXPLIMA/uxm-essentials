@@ -47,7 +47,6 @@ public final class KitEditorListener implements Listener {
     private final KitEditorView editorView;
     private final @Nullable KitServices services;
     private final @Nullable KitRepository repository;
-    private final @Nullable KitCategoryRepository categoryRepository;
     private final @Nullable KitSettingsView settingsView;
     private final @Nullable ChatPromptListener promptListener;
     private final @Nullable KitEditorText text;
@@ -57,7 +56,6 @@ public final class KitEditorListener implements Listener {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.services = null;
         this.repository = null;
-        this.categoryRepository = null;
         this.settingsView = null;
         this.promptListener = null;
         this.text = null;
@@ -75,7 +73,7 @@ public final class KitEditorListener implements Listener {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.services = Objects.requireNonNull(services, "services");
         this.repository = Objects.requireNonNull(repository, "repository");
-        this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
+        Objects.requireNonNull(categoryRepository, "categoryRepository");
         this.settingsView = Objects.requireNonNull(settingsView, "settingsView");
         this.promptListener = Objects.requireNonNull(promptListener, "promptListener");
         this.text = new KitEditorText(Objects.requireNonNull(messages, "messages"));
@@ -102,9 +100,6 @@ public final class KitEditorListener implements Listener {
         } else if (holder instanceof KitSettingsHolder h) {
             event.setCancelled(true);
             onSettingsClick(player, h, slot);
-        } else if (holder instanceof KitCreateChooserHolder h) {
-            event.setCancelled(true);
-            onCreateChooserClick(player, h, slot);
         } else if (holder instanceof KitCategoryManagerHolder h) {
             event.setCancelled(true);
             if (categoryEditing != null) {
@@ -135,9 +130,9 @@ public final class KitEditorListener implements Listener {
         PlayerRef viewer = managerHolder.viewer();
         GuiLayout layout = services.kitManagerView().layout();
         if (slot == layout.prevSlot()) {
-            if (services.kitCreateChooserView() != null) {
-                services.kitCreateChooserView().open(player, viewer);
-            }
+            // Category creation already lives in the category manager, so the create button starts a kit
+            // directly (name prompt → new kit → its settings) rather than opening a redundant chooser.
+            promptCreateKit(player, viewer);
         } else if (slot == layout.nextSlot()) {
             player.closeInventory();
         } else if (slot == 51) {
@@ -308,21 +303,10 @@ public final class KitEditorListener implements Listener {
         }
     }
 
-    private void onCreateChooserClick(Player player, KitCreateChooserHolder chooserHolder, int slot) {
-        if (services == null || promptListener == null || repository == null || categoryRepository == null) {
+    private void promptCreateKit(Player player, PlayerRef viewer) {
+        if (services == null || promptListener == null || repository == null) {
             return;
         }
-        PlayerRef viewer = chooserHolder.viewer();
-        if (slot == 22) {
-            openManager(player, viewer);
-        } else if (slot == 11) {
-            promptCreateKit(player, viewer);
-        } else if (slot == 15 && categoryEditing != null) {
-            categoryEditing.promptCreateCategory(player, viewer);
-        }
-    }
-
-    private void promptCreateKit(Player player, PlayerRef viewer) {
         prompt(player, viewer, KitsMessageKey.KIT_EDITOR_PROMPT_CREATE, name -> {
             String clean = sanitizeId(name);
             if (clean.isEmpty()) {

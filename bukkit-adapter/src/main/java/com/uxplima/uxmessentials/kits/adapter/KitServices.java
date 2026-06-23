@@ -6,7 +6,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreateChooserView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
@@ -59,8 +58,7 @@ public record KitServices(
         @Nullable KitCategoryManagerView kitCategoryManagerView,
         @Nullable KitCategorySettingsView kitCategorySettingsView,
         @Nullable KitCategorySelectorView kitCategorySelectorView,
-        @Nullable KitCategoryParentSelectorView kitCategoryParentSelectorView,
-        @Nullable KitCreateChooserView kitCreateChooserView) {
+        @Nullable KitCategoryParentSelectorView kitCategoryParentSelectorView) {
 
     public KitServices {
         Objects.requireNonNull(claimKit, "claimKit");

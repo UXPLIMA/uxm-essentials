@@ -162,7 +162,6 @@ class KitGiveDispatchTest {
                 null,
                 null,
                 null,
-                null,
                 null);
     }
 

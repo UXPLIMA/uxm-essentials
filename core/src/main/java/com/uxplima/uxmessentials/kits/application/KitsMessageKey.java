@@ -170,11 +170,6 @@ public enum KitsMessageKey implements MessageKey {
     KIT_EDITOR_CATEGORY_PARENT_SELECTOR_TITLE("kit.editor.category.parent-selector.title"),
     KIT_EDITOR_SETTINGS_CATEGORY_NAME("kit.editor.settings.category.name"),
     KIT_EDITOR_SETTINGS_CATEGORY_LORE("kit.editor.settings.category.lore"),
-    KIT_EDITOR_CREATE_CHOOSER_TITLE("kit.editor.create-chooser.title"),
-    KIT_EDITOR_CREATE_KIT_OPTION_NAME("kit.editor.create-kit-option.name"),
-    KIT_EDITOR_CREATE_KIT_OPTION_LORE("kit.editor.create-kit-option.lore"),
-    KIT_EDITOR_CREATE_CATEGORY_OPTION_NAME("kit.editor.create-category-option.name"),
-    KIT_EDITOR_CREATE_CATEGORY_OPTION_LORE("kit.editor.create-category-option.lore"),
 
     // category icon lore (shared across manager + selectors)
     KIT_EDITOR_CATEGORY_ICON_ID("kit.editor.category.icon.id"),

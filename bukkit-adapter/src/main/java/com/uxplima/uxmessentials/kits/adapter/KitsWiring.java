@@ -16,7 +16,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreateChooserView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
@@ -138,7 +137,6 @@ public final class KitsWiring {
                 new KitCategorySelectorView(kernel.messages(), categoryRepository, kernel.scheduler());
         KitCategoryParentSelectorView categoryParentSelectorView =
                 new KitCategoryParentSelectorView(kernel.messages(), categoryRepository, kernel.scheduler());
-        KitCreateChooserView kitCreateChooserView = new KitCreateChooserView(kernel.messages(), kernel.scheduler());
 
         // The placeholder requirement evaluator soft-couples to PlaceholderAPI exactly like the economy bridge:
         // present only when PlaceholderAPI is installed, otherwise empty, in which case a kit that declares
@@ -171,8 +169,7 @@ public final class KitsWiring {
                 categoryManagerView,
                 categorySettingsView,
                 categorySelectorView,
-                categoryParentSelectorView,
-                kitCreateChooserView);
+                categoryParentSelectorView);
 
         List<CommandRegistration> commands = KitCommands.all(
                 services,
@@ -232,8 +229,7 @@ public final class KitsWiring {
             KitCategoryManagerView categoryManagerView,
             KitCategorySettingsView categorySettingsView,
             KitCategorySelectorView categorySelectorView,
-            KitCategoryParentSelectorView categoryParentSelectorView,
-            KitCreateChooserView kitCreateChooserView) {
+            KitCategoryParentSelectorView categoryParentSelectorView) {
         // Server-local zone so kit schedules (and the matching browse-menu lock state) read in the time an
         // operator authors a window in; the event timestamp uses clock.instant(), which is zone-independent.
         Clock clock = Clock.system(ZoneId.systemDefault());
@@ -268,8 +264,7 @@ public final class KitsWiring {
                 categoryManagerView,
                 categorySettingsView,
                 categorySelectorView,
-                categoryParentSelectorView,
-                kitCreateChooserView);
+                categoryParentSelectorView);
     }
 
     /**

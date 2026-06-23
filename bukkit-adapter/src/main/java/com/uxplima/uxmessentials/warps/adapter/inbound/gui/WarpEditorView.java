@@ -32,6 +32,9 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class WarpEditorView {
 
+    /** The display item a warp shows when no icon is set — the same default the browse menu falls back to. */
+    private static final Material DEFAULT_ICON = Material.ENDER_PEARL;
+
     private final Messages messages;
     private final Scheduler scheduler;
     private final WarpRepository warpRepository;
@@ -201,16 +204,25 @@ public final class WarpEditorView {
                 WarpsMessageKey.WARP_EDITOR_PARTICLES_LORE_PROMPT);
     }
 
-    /** The icon material option: the current material plus the set/clear prompt, parsed-material icon. */
+    /**
+     * The icon material option. The button itself shows the warp's live display item, and its lore names that
+     * material — so the option always reflects what the browse menu actually renders. A warp with no icon set
+     * falls back to the same {@link #DEFAULT_ICON} the browse menu uses ({@code enderpearl}), shown both as the
+     * button material and in the "Current:" line, never a stand-in like {@code item_frame}.
+     */
     private void iconOption(Inventory inventory, WarpDisplay warp, PlayerRef viewer) {
         Material iconMat = warp.iconMaterial()
                 .map(Material::matchMaterial)
                 .filter(m -> m != Material.AIR)
-                .orElse(Material.ITEM_FRAME);
-        List<Component> current = List.of(text(
-                viewer,
-                WarpsMessageKey.WARP_EDITOR_ICON_LORE_CURRENT,
-                Map.of("material", warp.iconMaterial().orElse(none(viewer)))));
+                .orElse(DEFAULT_ICON);
+        String currentName = warp.iconMaterial()
+                .map(Material::matchMaterial)
+                .filter(m -> m != Material.AIR)
+                .orElse(DEFAULT_ICON)
+                .name()
+                .toLowerCase(java.util.Locale.ROOT);
+        List<Component> current =
+                List.of(text(viewer, WarpsMessageKey.WARP_EDITOR_ICON_LORE_CURRENT, Map.of("material", currentName)));
         option(
                 inventory,
                 viewer,

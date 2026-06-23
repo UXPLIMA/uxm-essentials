@@ -37,8 +37,9 @@ import org.jspecify.annotations.NullMarked;
  *       {@code uxmessentials.warp.use}.
  *   <li>{@code /warp list} opens the warps browse menu (or the chat list when the operator selects
  *       {@code chat} mode, and always for a console). Gated by {@code uxmessentials.warp.list}.
- *   <li>{@code /warp set <name>} creates a server-wide warp at the operator's position or re-anchors one of
- *       the same name. Gated by {@code uxmessentials.warp.set}.
+ *   <li>{@code /warp create <name>} creates a server-wide warp at the operator's position or re-anchors one
+ *       of the same name; {@code /warp set <name>} stays as a hidden alias of the same action so existing
+ *       muscle-memory keeps working. Gated by {@code uxmessentials.warp.set}.
  *   <li>{@code /warp del <name>} removes a warp. Gated by {@code uxmessentials.warp.delete}.
  *   <li>{@code /warp info <name>} shows a warp's owner, creation time and cost. Gated by
  *       {@code uxmessentials.warp.info}.
@@ -81,6 +82,11 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                 .then(Commands.literal("list")
                         .requires(src -> src.getSender().hasPermission(LIST_PERMISSION))
                         .executes(this::runList))
+                .then(Commands.literal("create")
+                        .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(this::runSet)))
+                // Hidden alias of `create` so existing `/warp set <name>` muscle-memory and docs keep working.
                 .then(Commands.literal("set")
                         .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
                         .then(Commands.argument("name", StringArgumentType.word())
@@ -132,7 +138,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
 
     @Override
     public String description() {
-        return "Teleport to a server warp; list, set, delete, move, lock, edit or inspect warps.";
+        return "Teleport to a server warp; list, create, delete, move, lock, edit or inspect warps.";
     }
 
     /**
@@ -221,6 +227,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         return Command.SINGLE_SUCCESS;
     }
 
+    /** Backs both {@code /warp create <name>} and its hidden {@code /warp set <name>} alias. */
     private int runSet(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {

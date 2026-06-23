@@ -12,6 +12,7 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
@@ -144,16 +145,17 @@ public final class KitSettingsView {
                 KitsMessageKey.KIT_EDITOR_SETTINGS_DISPLAY_NAME_LORE,
                 kit.displayName().orElseGet(() -> resolve(viewer, KitsMessageKey.KIT_EDITOR_VALUE_NONE)),
                 KitsMessageKey.KIT_EDITOR_SETTINGS_DISPLAY_NAME_PROMPT);
+        Material displayMaterial = resolveDisplayMaterial(kit);
         button(
                 inventory,
                 viewer,
                 size,
                 6,
                 12,
-                Material.GOLDEN_CHESTPLATE,
+                displayMaterial,
                 KitsMessageKey.KIT_EDITOR_SETTINGS_DISPLAY_MATERIAL_NAME,
                 KitsMessageKey.KIT_EDITOR_SETTINGS_DISPLAY_MATERIAL_LORE,
-                kit.displayMaterial().orElseGet(() -> resolve(viewer, KitsMessageKey.KIT_EDITOR_VALUE_NONE)),
+                displayMaterial.name().toLowerCase(java.util.Locale.ROOT),
                 KitsMessageKey.KIT_EDITOR_SETTINGS_DISPLAY_MATERIAL_PROMPT);
         button(
                 inventory,
@@ -307,6 +309,25 @@ public final class KitSettingsView {
                             .name(text(viewer, KitsMessageKey.KIT_EDITOR_SETTINGS_BACK_BUTTON))
                             .build());
         }
+    }
+
+    /**
+     * The display item the kit actually shows in the browse menu — the configured display material if it parses,
+     * otherwise the first kit item's type, otherwise {@link Material#CHEST}. The display-material button renders
+     * with this so the editor always reflects the live icon rather than a fixed placeholder.
+     */
+    private Material resolveDisplayMaterial(KitDefinition kit) {
+        if (kit.displayMaterial().isPresent()) {
+            Material parsed = Material.matchMaterial(kit.displayMaterial().get().toUpperCase(java.util.Locale.ROOT));
+            if (parsed != null && !parsed.isAir()) {
+                return parsed;
+            }
+        }
+        if (kit.items().isEmpty()) {
+            return Material.CHEST;
+        }
+        Material type = KitItemCodec.decode(kit.items().get(0)).getType();
+        return type.isAir() ? Material.CHEST : type;
     }
 
     private String resolve(PlayerRef viewer, KitsMessageKey key) {

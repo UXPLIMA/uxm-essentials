@@ -260,7 +260,6 @@ class KitsMenuPathTest {
                 null,
                 null,
                 null,
-                null,
                 null);
     }
 

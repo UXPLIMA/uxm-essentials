@@ -139,6 +139,25 @@ class WarpsMenuPathTest {
     }
 
     @Test
+    void createSubcommandRequiresTheSetPermission() {
+        assertCanUse("create", "uxmessentials.warp.set", "uxmessentials.warp.use");
+    }
+
+    @Test
+    void createAndSetAreAliasesThatBothCreateAWarp() {
+        CommandDispatcher<CommandSourceStack> dispatcher =
+                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
+
+        execute(dispatcher, "warp create viacreate");
+        execute(dispatcher, "warp set viaset");
+
+        // Both literals run the same SetWarp use case, which emits WARP_SET when it creates a new warp.
+        assertThat(java.util.Collections.frequency(sink.keys, WarpsMessageKey.WARP_SET))
+                .as("both /warp create and /warp set should create a warp")
+                .isEqualTo(2);
+    }
+
+    @Test
     void delSubcommandRequiresTheDeletePermission() {
         assertCanUse("del", "uxmessentials.warp.delete", "uxmessentials.warp.use");
     }

@@ -233,7 +233,6 @@ class KitMenuClickTest {
                 null,
                 null,
                 null,
-                null,
                 null);
     }
 
