@@ -19,6 +19,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -75,7 +76,9 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
     public LiteralCommandNode<CommandSourceStack> build() {
         var root = Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(permission))
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::run));
+                .then(Commands.argument("player", ArgumentTypes.player())
+                        .suggests(CommandSuggestions.singlePlayerTarget())
+                        .executes(this::run));
         // The coordinate form mirrors /tppos and only makes sense for the GO variants (/tp, /tpo) —
         // moving the actor to a raw point — so /tphere and /tpohere keep the player-only argument.
         if (pull == Pull.GO) {

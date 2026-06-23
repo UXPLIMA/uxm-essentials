@@ -17,6 +17,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -63,7 +64,9 @@ public final class ExperienceCommand extends PlayerstateCommandSupport implement
     private LiteralArgumentBuilder<CommandSourceStack> plainVerb(String literal, ExperienceChange change) {
         return Commands.literal(literal)
                 .executes(ctx -> run(ctx, change))
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(ctx -> run(ctx, change)));
+                .then(Commands.argument("player", ArgumentTypes.player())
+                        .suggests(CommandSuggestions.singlePlayerTarget())
+                        .executes(ctx -> run(ctx, change)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> amountVerb(String literal, ExperienceChange.Op op) {
@@ -73,6 +76,7 @@ public final class ExperienceCommand extends PlayerstateCommandSupport implement
                         .then(unitNode(op, ExperienceChange.Unit.LEVELS, "levels"))
                         .then(unitNode(op, ExperienceChange.Unit.POINTS, "points"))
                         .then(Commands.argument("player", ArgumentTypes.player())
+                                .suggests(CommandSuggestions.singlePlayerTarget())
                                 .executes(ctx -> runAmount(ctx, op, ExperienceChange.Unit.POINTS))));
     }
 
@@ -80,7 +84,9 @@ public final class ExperienceCommand extends PlayerstateCommandSupport implement
             ExperienceChange.Op op, ExperienceChange.Unit unit, String literal) {
         return Commands.literal(literal)
                 .executes(ctx -> runAmount(ctx, op, unit))
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(ctx -> runAmount(ctx, op, unit)));
+                .then(Commands.argument("player", ArgumentTypes.player())
+                        .suggests(CommandSuggestions.singlePlayerTarget())
+                        .executes(ctx -> runAmount(ctx, op, unit)));
     }
 
     private int runAmount(CommandContext<CommandSourceStack> ctx, ExperienceChange.Op op, ExperienceChange.Unit unit) {

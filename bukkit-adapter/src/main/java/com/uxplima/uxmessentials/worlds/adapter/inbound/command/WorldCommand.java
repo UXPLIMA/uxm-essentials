@@ -133,6 +133,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         .then(nameArg()
                                 .executes(this::runTpSelf)
                                 .then(Commands.argument("player", ArgumentTypes.player())
+                                        .suggests(CommandSuggestions.singlePlayerTarget())
                                         .requires(p(TP_OTHERS))
                                         .executes(this::runTpOther))))
                 .then(Commands.literal("gui")

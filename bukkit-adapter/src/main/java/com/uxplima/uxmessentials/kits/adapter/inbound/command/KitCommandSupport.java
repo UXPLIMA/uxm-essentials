@@ -91,10 +91,10 @@ abstract class KitCommandSupport {
         }
     }
 
-    /** A {@code player} selector argument, accepting a name or {@code @a}/{@code @p}/{@code @s}/{@code @r}. */
+    /** A {@code player} selector argument, accepting a name or {@code @p}/{@code @s}/{@code @r}. */
     static RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> playerSelectorArgument(
             String argName) {
-        return Commands.argument(argName, ArgumentTypes.player());
+        return Commands.argument(argName, ArgumentTypes.player()).suggests(CommandSuggestions.singlePlayerTarget());
     }
 
     /** A {@link PlayerRef} for the live player. */

@@ -21,6 +21,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -61,6 +62,7 @@ public final class SudoCommand implements CommandRegistration {
         return Commands.literal("sudo")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.argument(PLAYER_ARG, ArgumentTypes.player())
+                        .suggests(CommandSuggestions.singlePlayerTarget())
                         .then(Commands.argument(COMMAND_ARG, StringArgumentType.greedyString())
                                 .executes(this::run)))
                 .build();

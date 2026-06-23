@@ -14,6 +14,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -38,7 +39,9 @@ public final class ClearInventoryCommand extends PlayerstateCommandSupport imple
         return Commands.literal("clearinventory")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::clear)
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::clear))
+                .then(Commands.argument("player", ArgumentTypes.player())
+                        .suggests(CommandSuggestions.singlePlayerTarget())
+                        .executes(this::clear))
                 .build();
     }
 

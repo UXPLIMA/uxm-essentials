@@ -1,8 +1,11 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.command;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -16,6 +19,8 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -28,7 +33,10 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The two building blocks cover the two shapes Wave 2 needs: {@link #onlinePlayers()} for a player target
  * that should complete against the online roster, and {@link #fromStrings(Supplier)} for any dynamic name list
- * (currency ids, warp names, kit ids) sourced from an in-memory, side-effect-free supplier.
+ * (currency ids, warp names, kit ids) sourced from an in-memory, side-effect-free supplier. On top of those,
+ * {@link #playerTargets()} and {@link #singlePlayerTarget()} complete a Mojang player-selector argument with
+ * only the selectors that argument can actually resolve (plus online names) — never an entity selector the
+ * parser would reject.
  */
 @NullMarked
 public final class CommandSuggestions {
@@ -55,6 +63,51 @@ public final class CommandSuggestions {
             }
             return builder.buildFuture();
         };
+    }
+
+    /** The selectors that resolve to one or more PLAYERS for a multi-target argument. Never @e/@n (entities). */
+    private static final List<String> MULTI_PLAYER_SELECTORS = List.of("@a", "@p", "@r", "@s");
+
+    /** The selectors valid for a SINGLE-target argument — @a is excluded (it can match more than one player). */
+    private static final List<String> SINGLE_PLAYER_SELECTORS = List.of("@p", "@r", "@s");
+
+    /** The player-valid selector tokens that match {@code typed} (case-insensitive prefix). Pure: no server access. */
+    static List<String> playerSelectorTokens(boolean multi, String typed) {
+        String prefix = typed.toLowerCase(Locale.ROOT);
+        List<String> source = multi ? MULTI_PLAYER_SELECTORS : SINGLE_PLAYER_SELECTORS;
+        List<String> out = new ArrayList<>();
+        for (String selector : source) {
+            if (matches(selector, prefix)) {
+                out.add(selector);
+            }
+        }
+        return out;
+    }
+
+    /** Suggestions for a MULTI-target player argument: @a/@p/@r/@s plus online names. No @e/@n. */
+    public static SuggestionProvider<CommandSourceStack> playerTargets() {
+        return (ctx, builder) -> selectorSuggestions(builder, true);
+    }
+
+    /** Suggestions for a SINGLE-target player argument: @p/@r/@s plus online names. No @a/@e/@n. */
+    public static SuggestionProvider<CommandSourceStack> singlePlayerTarget() {
+        return (ctx, builder) -> selectorSuggestions(builder, false);
+    }
+
+    private static CompletableFuture<Suggestions> selectorSuggestions(SuggestionsBuilder builder, boolean multi) {
+        // Offer only the selectors this argument arity actually resolves, then the online roster — the default
+        // Mojang suggester lists @e/@n too, which a player-target parser rejects, so we override suggestions only.
+        for (String token : playerSelectorTokens(multi, builder.getRemaining())) {
+            builder.suggest(token);
+        }
+        String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            String name = online.getName();
+            if (matches(name, prefix)) {
+                builder.suggest(name);
+            }
+        }
+        return builder.buildFuture();
     }
 
     /**

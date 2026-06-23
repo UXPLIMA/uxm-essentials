@@ -23,6 +23,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -113,6 +114,7 @@ public final class VaultCommand implements CommandRegistration {
                 .then(Commands.argument("n", IntegerArgumentType.integer(1))
                         .executes(ctx -> openOwn(ctx, ctx.getArgument("n", Integer.class))))
                 .then(Commands.argument("player", ArgumentTypes.player())
+                        .suggests(CommandSuggestions.singlePlayerTarget())
                         .requires(src -> src.getSender().hasPermission(OTHERS))
                         .executes(ctx -> openOther(ctx, DEFAULT_INDEX))
                         .then(Commands.argument("idx", IntegerArgumentType.integer(1))

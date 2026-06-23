@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import org.jspecify.annotations.NullMarked;
 
@@ -57,7 +58,9 @@ public final class WorkstationCommand extends ItemworldCommandSupport implements
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(station.permission()))
                 .executes(this::run)
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::run))
+                .then(Commands.argument("player", ArgumentTypes.player())
+                        .suggests(CommandSuggestions.singlePlayerTarget())
+                        .executes(this::run))
                 .build();
     }
 

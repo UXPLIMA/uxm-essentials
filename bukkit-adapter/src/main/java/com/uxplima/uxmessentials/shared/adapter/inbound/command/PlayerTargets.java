@@ -17,10 +17,14 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The multi-target counterpart to {@link CommandSuggestions#playerArgument}: a player argument that accepts a
- * full selector ({@code @a}, {@code @p}, {@code @e}, {@code @s}, {@code @r}) or a single name and resolves to
+ * player selector ({@code @a}, {@code @p}, {@code @s}, {@code @r}) or a single name and resolves to
  * <em>every</em> matched online player. The verbs that apply a per-player effect ({@code /air}, {@code /burn},
  * {@code /feed}, {@code /ice}, {@code /kill}, {@code /nuke}, {@code /lightning}) use this so {@code /burn @a}
  * fans out to all online players instead of acting on one arbitrary match.
+ *
+ * <p>The argument only <em>suggests</em> the selectors it can resolve to players ({@code @a @p @r @s}), never an
+ * entity selector. An entity selector such as {@code @e} is still rejected at parse time if typed by hand — it
+ * is simply no longer offered, so the completion list no longer advertises a token the command cannot use.
  *
  * <p>This deliberately wraps {@link ArgumentTypes#players()} rather than {@link ArgumentTypes#player()}: the
  * single-target form rejects a selector that matches more than one entity at parse time, which is exactly the
@@ -41,7 +45,7 @@ public final class PlayerTargets {
      */
     public static RequiredArgumentBuilder<CommandSourceStack, PlayerSelectorArgumentResolver> players(String name) {
         Objects.requireNonNull(name, "name");
-        return Commands.argument(name, ArgumentTypes.players());
+        return Commands.argument(name, ArgumentTypes.players()).suggests(CommandSuggestions.playerTargets());
     }
 
     /**

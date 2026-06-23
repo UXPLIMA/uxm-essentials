@@ -16,6 +16,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -58,7 +59,9 @@ public final class TpaRequestCommand extends TeleportCommandSupport implements C
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(permission))
-                .then(Commands.argument("player", ArgumentTypes.player()).executes(this::run))
+                .then(Commands.argument("player", ArgumentTypes.player())
+                        .suggests(CommandSuggestions.singlePlayerTarget())
+                        .executes(this::run))
                 .build();
     }
 
