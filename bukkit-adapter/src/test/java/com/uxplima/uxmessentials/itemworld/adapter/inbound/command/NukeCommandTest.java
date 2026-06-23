@@ -49,14 +49,17 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /nuke} through its real Brigadier node. With admin-fun enabled an op rains
- * lightning over the area they are looking at ({@code NUKE_DONE}); a named target that is offline answers
- * {@code UNKNOWN_TARGET}. MockBukkit's {@code strikeLightning} is a no-op, so the outcome is asserted by the
- * reply key rather than world state — exactly like {@code /lightning} would be.
+ * MockBukkit coverage of {@code /nuke} through its real Brigadier node. With admin-fun enabled the self/look
+ * form rains a storm where the caller aims and answers {@code NUKE_DONE_SELF} (no target player); a named target
+ * is struck at its own position and answers {@code NUKE_DONE}; a named target that is offline answers
+ * {@code UNKNOWN_TARGET}. MockBukkit's stock {@code strikeLightning} aborts the test (it is unimplemented), so a
+ * recording {@link RecordingWorld} captures the struck points and the self/look behaviour is asserted against
+ * them: aiming at open air strikes out along the look direction, never back on the caller's own position.
  */
 class NukeCommandTest {
 
     private ServerMock server;
+    private RecordingWorld world;
     private TargetingPlayer player;
     private RecordingSink sink;
     private MutableConfig config;
@@ -64,9 +67,11 @@ class NukeCommandTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        server.addSimpleWorld("world");
+        world = new RecordingWorld();
+        server.addWorld(world);
         player = new TargetingPlayer(server, "Alice");
         server.addPlayer(player);
+        player.setLocation(new org.bukkit.Location(world, 0, 64, 0));
         player.setOp(true);
         sink = new RecordingSink();
         config = new MutableConfig();
@@ -88,14 +93,46 @@ class NukeCommandTest {
     }
 
     @Test
-    void selfNukeStrikesAndReports() {
-        Block target = player.getWorld().getBlockAt(0, 64, 0);
+    void selfNukeAtBlockReportsSelfKey() {
+        Block target = player.getWorld().getBlockAt(0, 64, 5);
         target.setType(Material.STONE);
         player.target = target;
 
         execute("nuke");
 
-        assertThat(sink.keys).contains(ItemworldMessageKey.NUKE_DONE);
+        // The self/look form has no target player, so it must use the SELF key, not the {target} one.
+        assertThat(sink.keys)
+                .contains(ItemworldMessageKey.NUKE_DONE_SELF)
+                .doesNotContain(ItemworldMessageKey.NUKE_DONE);
+    }
+
+    @Test
+    void selfNukeAtAirStrikesAlongLookDirectionNotSelf() {
+        // Face straight along +X (yaw -90) with no block in range, so the look ray hits open air.
+        player.setLocation(new org.bukkit.Location(world, 0, 64, 0, -90f, 0f));
+        player.target = null;
+
+        execute("nuke");
+
+        // Aiming at air must throw the storm out in front (positive X), never back onto the caller's column.
+        assertThat(world.strikes).isNotEmpty();
+        double centreX = world.strikes.get(0).getX();
+        assertThat(centreX).isGreaterThan(1.0);
+        assertThat(sink.keys).contains(ItemworldMessageKey.NUKE_DONE_SELF);
+    }
+
+    @Test
+    void namedTargetReportsTargetKey() {
+        TargetingPlayer bob = new TargetingPlayer(server, "Bob");
+        server.addPlayer(bob);
+        bob.setLocation(new org.bukkit.Location(world, 20, 64, 20));
+
+        execute("nuke Bob");
+
+        // The named form names its struck player, so it keeps the {target} key.
+        assertThat(sink.keys)
+                .contains(ItemworldMessageKey.NUKE_DONE)
+                .doesNotContain(ItemworldMessageKey.NUKE_DONE_SELF);
     }
 
     @Test
@@ -133,6 +170,22 @@ class NukeCommandTest {
                 new NoPlayerLocator(),
                 new NoEvents(),
                 new NoopLogger());
+    }
+
+    /** A {@link WorldMock} that records each lightning strike, since the stock strike aborts the test. */
+    private static final class RecordingWorld extends org.mockbukkit.mockbukkit.world.WorldMock {
+        private final List<org.bukkit.Location> strikes = new ArrayList<>();
+
+        RecordingWorld() {
+            super(Material.DIRT, 0);
+        }
+
+        @Override
+        public org.bukkit.entity.@org.jspecify.annotations.Nullable LightningStrike strikeLightning(
+                org.bukkit.Location at) {
+            strikes.add(at);
+            return null;
+        }
     }
 
     /** A {@link PlayerMock} whose looked-at block is supplied directly, since MockBukkit does not raytrace. */

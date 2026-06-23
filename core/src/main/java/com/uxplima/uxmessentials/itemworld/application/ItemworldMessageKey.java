@@ -159,10 +159,12 @@ public enum ItemworldMessageKey implements MessageKey {
     // /weather, /sun, /rain, /thunder
     WEATHER_SET("itemworld.weather.set"),
 
-    // Admin-fun — /lightning
+    // Admin-fun — /lightning. The self/look form has no target player, so it gets its own wording.
     LIGHTNING_STRUCK("itemworld.lightning.struck"),
-    // /nuke
+    LIGHTNING_STRUCK_SELF("itemworld.lightning.struck-self"),
+    // /nuke — same split: the self/look form names no target.
     NUKE_DONE("itemworld.nuke.done"),
+    NUKE_DONE_SELF("itemworld.nuke.done-self"),
     // /fireball
     FIREBALL_LAUNCHED("itemworld.fireball.launched"),
     // /kittycannon

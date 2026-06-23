@@ -3,26 +3,26 @@ package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Material;
+import org.bukkit.block.Block;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountListView;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.itemworld.domain.MobSpec;
 import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -49,27 +49,32 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /entitycount}: the GUI seam, the preserved raw form, and the {@code <radius>}
- * child mirroring the bare root. Without a wired view the {@code guiRoot} opener is absent, so the bare root keeps
- * its chat behaviour and the radius child chats too; with a view the opener is present and the radius child opens
- * the grid instead. The empty-area chat path emits {@code ENTITYCOUNT_NONE}, so the two radius forms are told
- * apart by whether that key reaches the player.
+ * MockBukkit coverage of {@code /lightning} through its real Brigadier node. The self/look form strikes where
+ * the caller aims and answers {@code LIGHTNING_STRUCK_SELF} (no target player); a named target is struck at its
+ * own position and answers {@code LIGHTNING_STRUCK}; a name that matches no online player answers
+ * {@code UNKNOWN_TARGET}. MockBukkit's stock {@code strikeLightning} aborts the test (it is unimplemented), so a
+ * recording {@link RecordingWorld} captures the struck point and the self/look behaviour is asserted against it:
+ * aiming at open air strikes out along the look direction, never back on the caller's own position.
  */
-class EntityCountCommandTest {
+class LightningCommandTest {
 
     private ServerMock server;
-    private PlayerMock player;
-    private MutableConfig config;
+    private RecordingWorld world;
+    private TargetingPlayer player;
     private RecordingSink sink;
+    private MutableConfig config;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        server.addSimpleWorld("world");
-        player = server.addPlayer("Alice");
+        world = new RecordingWorld();
+        server.addWorld(world);
+        player = new TargetingPlayer(server, "Alice");
+        server.addPlayer(player);
+        player.setLocation(new org.bukkit.Location(world, 0, 64, 0));
         player.setOp(true);
-        config = new MutableConfig();
         sink = new RecordingSink();
+        config = new MutableConfig();
     }
 
     @AfterEach
@@ -78,56 +83,67 @@ class EntityCountCommandTest {
     }
 
     @Test
-    void literalIsEntitycount() {
-        assertThat(new EntityCountCommand(services()).build().getLiteral()).isEqualTo("entitycount");
+    void literalIsLightning() {
+        assertThat(new LightningCommand(services()).build().getLiteral()).isEqualTo("lightning");
     }
 
     @Test
-    void withoutAGuiViewTheGuiRootIsAbsent() {
-        assertThat(new EntityCountCommand(services()).guiRoot()).isEmpty();
+    void smiteIsAnAlias() {
+        assertThat(new LightningCommand(services()).aliases()).containsExactly("smite");
     }
 
     @Test
-    void withAGuiViewTheGuiRootOpenerIsInstalled() {
-        EntityCountListView view = new EntityCountListView(
-                new GuiText(new KeyMessages()), new SyncScheduler(), EntityListLayout.paginatedDefault(Material.EGG));
-        assertThat(new EntityCountCommand(services(), view).guiRoot()).isPresent();
+    void selfStrikeAtBlockReportsSelfKey() {
+        Block target = player.getWorld().getBlockAt(0, 64, 5);
+        target.setType(Material.STONE);
+        player.target = target;
+
+        execute("lightning");
+
+        // The self/look form has no target player, so it must use the SELF key, not the {target} one.
+        assertThat(sink.keys)
+                .contains(ItemworldMessageKey.LIGHTNING_STRUCK_SELF)
+                .doesNotContain(ItemworldMessageKey.LIGHTNING_STRUCK);
     }
 
     @Test
-    void theRawRadiusFormStillParses() {
-        // gui-off behaviour (and the explicit-radius form) must keep working: /entitycount 32 parses and runs.
+    void selfStrikeAtAirStrikesAlongLookDirectionNotSelf() {
+        // Face straight along +X (yaw -90) with no block in range, so the look ray hits open air.
+        player.setLocation(new org.bukkit.Location(world, 0, 64, 0, -90f, 0f));
+        player.target = null;
+
+        execute("lightning");
+
+        // Aiming at air must strike out in front (positive X), never back onto the caller's column.
+        assertThat(world.strikes).isNotEmpty();
+        assertThat(world.strikes.get(0).getX()).isGreaterThan(1.0);
+        assertThat(sink.keys).contains(ItemworldMessageKey.LIGHTNING_STRUCK_SELF);
+    }
+
+    @Test
+    void namedTargetReportsTargetKey() {
+        TargetingPlayer bob = new TargetingPlayer(server, "Bob");
+        server.addPlayer(bob);
+        bob.setLocation(new org.bukkit.Location(world, 20, 64, 20));
+
+        execute("lightning Bob");
+
+        // The named form names its struck player, so it keeps the {target} key.
+        assertThat(sink.keys)
+                .contains(ItemworldMessageKey.LIGHTNING_STRUCK)
+                .doesNotContain(ItemworldMessageKey.LIGHTNING_STRUCK_SELF);
+    }
+
+    @Test
+    void namedUnknownTargetReported() {
+        execute("lightning Ghost");
+
+        assertThat(sink.keys).contains(ItemworldMessageKey.UNKNOWN_TARGET);
+    }
+
+    private void execute(String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(new EntityCountCommand(services()).build());
-        try {
-            dispatcher.execute("entitycount 32", CommandSourceStackMock.from(player));
-        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
-            throw new AssertionError("command did not parse: entitycount 32", e);
-        }
-    }
-
-    @Test
-    void radiusFormChatsWhenNoViewIsWired() {
-        // gui-off: the radius child mirrors the bare root and chats. The empty area answers ENTITYCOUNT_NONE.
-        dispatch(new EntityCountCommand(services()), "entitycount 26");
-
-        assertThat(sink.rendered).contains(ItemworldMessageKey.ENTITYCOUNT_NONE.key());
-    }
-
-    @Test
-    void radiusFormOpensGuiWhenViewIsWired() {
-        // gui-on: a wired view makes the radius child open the grid instead, so no chat read-out is sent.
-        EntityCountListView view = new EntityCountListView(
-                new GuiText(new KeyMessages()), new SyncScheduler(), EntityListLayout.paginatedDefault(Material.EGG));
-
-        dispatch(new EntityCountCommand(services(), view), "entitycount 26");
-
-        assertThat(sink.rendered).doesNotContain(ItemworldMessageKey.ENTITYCOUNT_NONE.key());
-    }
-
-    private void dispatch(EntityCountCommand command, String input) {
-        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
-        dispatcher.getRoot().addChild(command.build());
+        dispatcher.getRoot().addChild(new LightningCommand(services()).build());
         try {
             dispatcher.execute(input, CommandSourceStackMock.from(player));
         } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
@@ -155,6 +171,37 @@ class EntityCountCommandTest {
                 new NoopLogger());
     }
 
+    /** A {@link WorldMock} that records each lightning strike, since the stock strike aborts the test. */
+    private static final class RecordingWorld extends org.mockbukkit.mockbukkit.world.WorldMock {
+        private final List<org.bukkit.Location> strikes = new ArrayList<>();
+
+        RecordingWorld() {
+            super(Material.DIRT, 0);
+        }
+
+        @Override
+        public org.bukkit.entity.@org.jspecify.annotations.Nullable LightningStrike strikeLightning(
+                org.bukkit.Location at) {
+            strikes.add(at);
+            return null;
+        }
+    }
+
+    /** A {@link PlayerMock} whose looked-at block is supplied directly, since MockBukkit does not raytrace. */
+    private static final class TargetingPlayer extends PlayerMock {
+        private org.bukkit.block.@org.jspecify.annotations.Nullable Block target;
+
+        TargetingPlayer(ServerMock server, String name) {
+            super(server, name);
+        }
+
+        @Override
+        public org.bukkit.block.@org.jspecify.annotations.Nullable Block getTargetBlockExact(int maxDistance) {
+            return target;
+        }
+    }
+
+    /** A map-backed {@link ConfigStore} scoped to {@code modules.itemworld}; defaults keep /lightning enabled. */
     private static final class MutableConfig implements ConfigStore {
         private final Map<String, Object> values = new HashMap<>();
 
@@ -174,23 +221,26 @@ class EntityCountCommandTest {
         }
     }
 
-    /** Records the rendered text the chat path delivers; with {@link KeyMessages} that text is the key string. */
+    /** Records each delivered key so a path's outcome is asserted by the message it produced. */
     private static final class RecordingSink implements MessageSink {
-        private final java.util.List<String> rendered = new java.util.ArrayList<>();
+        private final List<MessageKey> keys = new ArrayList<>();
 
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
-            rendered.add(renderedText);
+            // renderedText is the key() string (see KeyMessages); the key list is what tests assert on
         }
     }
 
-    private static final class KeyMessages implements Messages {
+    /** Resolves a key to its own string and records it on the sink for assertions. */
+    private final class KeyMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            sink.keys.add(key);
             return key.key();
         }
     }
 
+    /** Runs scheduled work inline so the entity-bound strike is observable without ticking Folia. */
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
