@@ -15,6 +15,8 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
+import com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerSettings;
 import com.uxplima.uxmessentials.communication.domain.StoredAnnouncement;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorView;
@@ -60,6 +62,7 @@ public final class AnnouncementEditorView {
     private static final String MODULE = "communication";
     private static final String LIST_LAYOUT = "announcement-editor-list";
     private static final String EDITOR_LAYOUT = "announcement-editor";
+    private static final String SETTINGS_LAYOUT = "announcer-settings";
 
     /** The default editor property slots: nine buttons across a three-row chest, back and delete on the last row. */
     private static final List<Integer> DEFAULT_PROPERTY_SLOTS = List.of(10, 11, 12, 13, 14, 15, 16, 19, 20);
@@ -67,6 +70,21 @@ public final class AnnouncementEditorView {
     private static final int DEFAULT_BACK_SLOT = 22;
     private static final int DEFAULT_DELETE_SLOT = 26;
     private static final int DEFAULT_CREATE_SLOT = 49;
+
+    /** The last slot of the six-row list chest, where the announcer-settings button sits. */
+    private static final int SETTINGS_BUTTON_SLOT = 53;
+
+    /** The two settings-screen property slots and its back button — a single three-row chest. */
+    private static final List<Integer> SETTINGS_PROPERTY_SLOTS = List.of(11, 15);
+
+    private static final int SETTINGS_BACK_SLOT = 22;
+
+    /**
+     * The settings screen edits one global record, so it has no list of entities to key the editor by; this is the
+     * stable singleton handle the {@link EntityEditorView} is opened with. The properties read the live settings
+     * fresh from the store on each open, so the marker carries no state of its own.
+     */
+    private static final Object SETTINGS_SINGLETON = new Object();
 
     /**
      * The stable synthetic actor a GUI value-lore word ("None", "On") is resolved for. A value-lore render has no
@@ -79,22 +97,26 @@ public final class AnnouncementEditorView {
     private final Scheduler scheduler;
     private final Messages messages;
     private final AnnouncementStore store;
+    private final AnnouncerSettingsStore settingsStore;
     private final AnvilInput anvil;
     private final ListPropertyLayout messageListLayout;
     private final EntityListView<StoredAnnouncement> list;
     private final EntityEditorView<StoredAnnouncement> editor;
+    private final EntityEditorView<Object> settings;
 
     public AnnouncementEditorView(
             GuiText guiText,
             Scheduler scheduler,
             Messages messages,
             AnnouncementStore store,
+            AnnouncerSettingsStore settingsStore,
             GuiLayouts guiLayouts,
             AnvilInput anvil) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.store = Objects.requireNonNull(store, "store");
+        this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
         this.anvil = Objects.requireNonNull(anvil, "anvil");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
 
@@ -128,6 +150,19 @@ public final class AnnouncementEditorView {
                 MODULE,
                 LIST_LAYOUT,
                 EntityListLayout.withCreate(Material.PAPER, DEFAULT_CREATE_SLOT, Material.LIME_DYE));
+        EntityEditorLayout settingsLayout = guiLayouts.loadEntityEditor(
+                MODULE, SETTINGS_LAYOUT, EntityEditorLayout.codeDefault(SETTINGS_PROPERTY_SLOTS, SETTINGS_BACK_SLOT));
+        this.settings = EntityEditorView.builder()
+                .guiText(guiText)
+                .scheduler(scheduler)
+                .layout(settingsLayout)
+                .title((viewer, ignored) -> guiText.text(viewer, CommunicationMessageKey.ANNOUNCE_SETTINGS_TITLE))
+                .valueLore(CommunicationMessageKey.ANNOUNCE_SETTINGS_VALUE_LORE)
+                .backName(CommunicationMessageKey.ANNOUNCE_SETTINGS_BACK)
+                .properties(ignored -> settingsProperties())
+                .onBack((player, viewer) -> openList(player, viewer))
+                .build();
+
         this.list = EntityListView.<StoredAnnouncement>builder()
                 .guiText(guiText)
                 .scheduler(scheduler)
@@ -140,6 +175,11 @@ public final class AnnouncementEditorView {
                 .iconRenderer(this::listIcon)
                 .onSelect((player, announcement) -> editor.open(player, BukkitRefs.toRef(player), announcement))
                 .onCreate(CommunicationMessageKey.ANNOUNCE_EDITOR_LIST_CREATE, this::promptCreate)
+                .onAction(
+                        SETTINGS_BUTTON_SLOT,
+                        Material.COMPARATOR,
+                        CommunicationMessageKey.ANNOUNCE_SETTINGS_BUTTON,
+                        this::openSettings)
                 .build();
     }
 
@@ -151,6 +191,109 @@ public final class AnnouncementEditorView {
     /** Reopen the editor list — the back target and the post-delete landing, read at click time. */
     private void openList(Player player, PlayerRef viewer) {
         list.open(player, viewer);
+    }
+
+    /** Open the global announcer-settings screen — the list GUI's last-slot button opens it. */
+    private void openSettings(Player player) {
+        settings.open(player, BukkitRefs.toRef(player), SETTINGS_SINGLETON);
+    }
+
+    /** The settings screen, exposed so a test can resolve its property slots without a live click. */
+    public EntityEditorView<Object> settings() {
+        return settings;
+    }
+
+    /**
+     * The two global announcer settings as editable properties: the default interval (seconds between
+     * announcements) and the minimum online players gate. Each reads the live persisted value fresh from the store,
+     * accepts a number through an anvil prompt, and writes it back; a blank or non-positive interval and a blank or
+     * negative gate both clear the override, returning that setting to the file default.
+     */
+    private List<EditableProperty> settingsProperties() {
+        return List.of(intervalProperty(), minPlayersProperty());
+    }
+
+    private EditableProperty intervalProperty() {
+        return new TextProperty(
+                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_INTERVAL,
+                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_INTERVAL_PROMPT,
+                Material.CLOCK,
+                guiText,
+                () -> intervalWord(currentSettings()),
+                AnnouncementEditorView::parseLong,
+                raw -> saveSettings(settings -> settings.withIntervalSeconds(parseLongOrClear(raw))),
+                anvil,
+                scheduler);
+    }
+
+    private EditableProperty minPlayersProperty() {
+        return new TextProperty(
+                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS,
+                CommunicationMessageKey.ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS_PROMPT,
+                Material.PLAYER_HEAD,
+                guiText,
+                () -> minPlayersWord(currentSettings()),
+                AnnouncementEditorView::parseLong,
+                raw -> saveSettings(settings -> settings.withMinOnlinePlayers((int) parseLongOrClear(raw))),
+                anvil,
+                scheduler);
+    }
+
+    /** The live persisted settings, read fresh each time a property renders or applies. */
+    private AnnouncerSettings currentSettings() {
+        return settingsStore.load();
+    }
+
+    /** Load, mutate, and persist the global settings in one write; the editor reopens once the write lands. */
+    private void saveSettings(UnaryOperator<AnnouncerSettings> mutation) {
+        settingsStore.save(mutation.apply(currentSettings()));
+    }
+
+    private String intervalWord(AnnouncerSettings settings) {
+        return settings.interval()
+                .map(duration -> Long.toString(duration.toSeconds()))
+                .orElseGet(this::defaultWord);
+    }
+
+    private String minPlayersWord(AnnouncerSettings settings) {
+        return settings.minOnlinePlayers().isPresent()
+                ? Integer.toString(settings.minOnlinePlayers().getAsInt())
+                : defaultWord();
+    }
+
+    private String defaultWord() {
+        return messages.resolve(GUI_ACTOR, CommunicationMessageKey.ANNOUNCE_SETTINGS_VALUE_DEFAULT, Map.of());
+    }
+
+    /**
+     * Accept a typed settings value: a non-negative integer, or a clear token ({@code -}, {@code default}) that
+     * resets the setting to the file default. A non-numeric, non-clear entry is rejected so the prompt reopens
+     * without writing.
+     */
+    private static Optional<String> parseLong(String raw) {
+        String trimmed = raw.trim();
+        if (isClearToken(trimmed)) {
+            return Optional.of(trimmed);
+        }
+        try {
+            long value = Long.parseLong(trimmed);
+            return value >= 0 ? Optional.of(Long.toString(value)) : Optional.empty();
+        } catch (NumberFormatException notANumber) {
+            return Optional.empty();
+        }
+    }
+
+    /** The already-validated value as a long; a clear token maps to {@code -1}, the "unset" sentinel the setters read. */
+    private static long parseLongOrClear(String accepted) {
+        String trimmed = accepted.trim();
+        if (isClearToken(trimmed)) {
+            return -1L;
+        }
+        return Long.parseLong(trimmed);
+    }
+
+    private static boolean isClearToken(String trimmed) {
+        return trimmed.equals("-") || trimmed.equalsIgnoreCase("default") || trimmed.equalsIgnoreCase("clear");
     }
 
     /** Delete the announcement off-thread and return the viewer to the list once the row is gone. */

@@ -99,7 +99,8 @@ class CommunicationAdapterTest {
         ConnectionMessageListener listener = new ConnectionMessageListener(
                 new ResolveJoinMessage(engine, settings::joinPolicy),
                 new ResolveQuitMessage(engine, settings::quitPolicy),
-                settings);
+                settings,
+                new BukkitInfoSender(sink));
         PlayerJoinEvent join = new PlayerJoinEvent(player, Component.text("Alice joined the game"));
 
         listener.onJoin(join);
@@ -107,6 +108,50 @@ class CommunicationAdapterTest {
         Component overridden = join.joinMessage();
         assertThat(overridden).isNotNull();
         assertThat(PLAIN.serialize(overridden)).isEqualTo("welcome Alice"); // {player} substituted, vanilla replaced
+    }
+
+    @Test
+    void theJoinListenerSendsTheMotdPageWhenMotdOnJoinIsOn() {
+        // motd-on-join defaults true and the test content ships a one-line motd, so a join delivers that line to the
+        // joiner through the info sender. {player} is substituted per viewer.
+        ConnectionMessageListener listener = joinListener();
+        PlayerJoinEvent join = new PlayerJoinEvent(player, Component.text("Alice joined the game"));
+
+        listener.onJoin(join);
+
+        assertThat(sink.lines).containsExactly("Welcome Alice");
+    }
+
+    @Test
+    void theJoinListenerSendsNoMotdWhenMotdOnJoinIsOff(@TempDir Path offDir) throws Exception {
+        // With motd-on-join = false the joiner is sent nothing — only the join broadcast (set on the event) fires.
+        Path dir = offDir.resolve("modules").resolve("communication");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("info-pages.conf"), """
+                motd-on-join = false
+                info-pages { motd = [ "Welcome {player}" ] }
+                """);
+        CommunicationSettings offSettings = new CommunicationSettings(dir, new NoopLogger());
+        ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random());
+        ConnectionMessageListener listener = new ConnectionMessageListener(
+                new ResolveJoinMessage(engine, offSettings::joinPolicy),
+                new ResolveQuitMessage(engine, offSettings::quitPolicy),
+                offSettings,
+                new BukkitInfoSender(sink));
+        PlayerJoinEvent join = new PlayerJoinEvent(player, Component.text("Alice joined the game"));
+
+        listener.onJoin(join);
+
+        assertThat(sink.lines).isEmpty();
+    }
+
+    private ConnectionMessageListener joinListener() {
+        ResolveConnectionMessage engine = new ResolveConnectionMessage(new AtomicSequenceCounter(), random());
+        return new ConnectionMessageListener(
+                new ResolveJoinMessage(engine, settings::joinPolicy),
+                new ResolveQuitMessage(engine, settings::quitPolicy),
+                settings,
+                new BukkitInfoSender(sink));
     }
 
     @Test
@@ -265,10 +310,18 @@ class CommunicationAdapterTest {
         return dispatcher;
     }
 
+    private final InMemoryAnnouncerSettingsStore announcerSettingsStore = new InMemoryAnnouncerSettingsStore();
+    private final InMemoryAnnouncementStore commandAnnouncementStore = new InMemoryAnnouncementStore();
+
     private List<CommandRegistration> commands() {
         CommunicationNotifier notifier = new CommunicationNotifier(sink, sink);
         BroadcastOptOut optOut = new BroadcastOptOut(optOutStore, notifier, new NoEvents(), Clock.systemUTC());
         InfoRegistry registry = settings.infoRegistry();
+        com.uxplima.uxmessentials.communication.application.MergeAnnouncements merge =
+                new com.uxplima.uxmessentials.communication.application.MergeAnnouncements(
+                        commandAnnouncementStore, announcerSettingsStore);
+        java.util.function.Supplier<com.uxplima.uxmessentials.communication.domain.AnnouncerConfig> mergedConfig =
+                () -> merge.merge(settings.announcerConfig());
         BukkitAnnouncerBroadcaster broadcaster = announcerBroadcaster();
         Scheduler scheduler = new SyncScheduler();
         AnnouncerTask announcer = new AnnouncerTask(
@@ -285,6 +338,7 @@ class CommunicationAdapterTest {
                 sink,
                 broadcaster,
                 announcer,
+                mergedConfig,
                 scheduler,
                 sink,
                 new com.uxplima.uxmessentials.communication.adapter.ChatLock(),
@@ -292,14 +346,15 @@ class CommunicationAdapterTest {
                 editorView(scheduler));
     }
 
-    /** A real editor view over an in-memory store; the command tests do not open it, only build the command tree. */
+    /** A real editor view over the in-memory stores; the command tests do not open it, only build the command tree. */
     private com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView editorView(
             Scheduler scheduler) {
         return new com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView(
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(sink),
                 scheduler,
                 sink,
-                new InMemoryAnnouncementStore(),
+                commandAnnouncementStore,
+                announcerSettingsStore,
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(
                         java.nio.file.Path.of("."), new NoopLogger()),
                 new com.uxplima.uxmlib.gui.anvil.AnvilInput(MockBukkit.createMockPlugin()));
@@ -395,6 +450,22 @@ class CommunicationAdapterTest {
         @Override
         public boolean delete(String id) {
             return rows.remove(id) != null;
+        }
+    }
+
+    private static final class InMemoryAnnouncerSettingsStore
+            implements com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore {
+        private com.uxplima.uxmessentials.communication.domain.AnnouncerSettings settings =
+                com.uxplima.uxmessentials.communication.domain.AnnouncerSettings.unset();
+
+        @Override
+        public com.uxplima.uxmessentials.communication.domain.AnnouncerSettings load() {
+            return settings;
+        }
+
+        @Override
+        public void save(com.uxplima.uxmessentials.communication.domain.AnnouncerSettings value) {
+            settings = value;
         }
     }
 

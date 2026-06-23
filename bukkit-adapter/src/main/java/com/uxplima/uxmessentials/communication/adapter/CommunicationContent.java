@@ -31,6 +31,7 @@ import org.jspecify.annotations.NullMarked;
  * @param advancements the advancement-notification config (filtering, template, channels, sound)
  * @param firstJoinTemplate the optional broadcast shown only on a player's first-ever join
  * @param deathInfoPage the optional info-page name shown to a dying player
+ * @param motdOnJoin whether the {@code motd} info page is sent to a player when they join
  * @param infoPages the operator's info pages (one auto-registered command each)
  */
 @NullMarked
@@ -43,6 +44,7 @@ public record CommunicationContent(
         AdvancementNoticeConfig advancements,
         Optional<String> firstJoinTemplate,
         Optional<String> deathInfoPage,
+        boolean motdOnJoin,
         List<InfoPage> infoPages) {
 
     public CommunicationContent {
@@ -57,7 +59,11 @@ public record CommunicationContent(
         infoPages = List.copyOf(Objects.requireNonNull(infoPages, "infoPages"));
     }
 
-    /** Fully inert content: every channel defers to vanilla, the announcer is silent, no info pages. */
+    /**
+     * Fully inert content: every channel defers to vanilla, the announcer is silent, no info pages. The MOTD-on-join
+     * default is off here — inert content is the "module disabled / files unreadable" shape, where nothing should
+     * fire; the shipped {@code info-pages.conf} turns it on for a normal install.
+     */
     public static CommunicationContent inert() {
         return new CommunicationContent(
                 MessagePolicy.vanilla(),
@@ -68,6 +74,7 @@ public record CommunicationContent(
                 AdvancementNoticeConfig.disabled(),
                 Optional.empty(),
                 Optional.empty(),
+                false,
                 List.of());
     }
 }

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.communication.adapter.inbound.command;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -42,9 +43,12 @@ import org.jspecify.annotations.NullMarked;
  *       The re-read is HOCON file I/O, so it runs off-tick on the {@code Scheduler} and the confirmation —
  *       the count of announcements through {@link CommunicationMessageKey#ANNOUNCER_RELOADED} — bridges back to the
  *       global region for delivery, mirroring {@code /uxmess}'s off-tick reload commands.
- *   <li>{@code list} — list the configured announcement ids and the channels each pushes to.
+ *   <li>{@code list} — list the announcement ids and the channels each pushes to. The set listed is the same merged
+ *       set the announcer rotates: the file {@code announcer.conf} announcements plus the enabled editor-managed
+ *       store announcements, so an announcement created in the GUI appears here too.
  *   <li>{@code preview <id>} — show that announcement to the invoking player alone, bypassing the opt-out and
- *       condition gates; an unknown id answers with {@link CommunicationMessageKey#ANNOUNCE_PREVIEW_UNKNOWN}.
+ *       condition gates; the id is resolved against the same merged set, so a GUI-created id previews. An unknown id
+ *       answers with {@link CommunicationMessageKey#ANNOUNCE_PREVIEW_UNKNOWN}.
  *   <li>{@code toggle} — flip the invoking player's broadcast opt-out, an alias for {@code /broadcasttoggle} so the
  *       opt-out lives under one verb too; it reuses the same {@link BroadcastOptOut} use case.
  * </ul>
@@ -60,6 +64,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     private static final String PERMISSION = "uxmessentials.announce.admin";
 
     private final CommunicationSettings settings;
+    private final Supplier<AnnouncerConfig> mergedConfig;
     private final BukkitAnnouncerBroadcaster broadcaster;
     private final BroadcastOptOut optOut;
     private final AnnouncerTask announcer;
@@ -68,6 +73,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
 
     public AnnounceCommand(
             CommunicationSettings settings,
+            Supplier<AnnouncerConfig> mergedConfig,
             BukkitAnnouncerBroadcaster broadcaster,
             BroadcastOptOut optOut,
             AnnouncerTask announcer,
@@ -76,6 +82,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
             Messages messages) {
         super(messages);
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.mergedConfig = Objects.requireNonNull(mergedConfig, "mergedConfig");
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
         this.announcer = Objects.requireNonNull(announcer, "announcer");
@@ -139,10 +146,19 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
 
     private int list(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        AnnouncerConfig config = settings.announcerConfig();
+        // The merged set reads the enabled store announcements, a DB query, so it is resolved off the tick thread and
+        // the framing hops back to the global region for delivery — the same off-tick shape as reload.
+        scheduler.async(() -> {
+            AnnouncerConfig config = mergedConfig.get();
+            scheduler.onGlobal(() -> sendList(sender, config));
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void sendList(CommandSender sender, AnnouncerConfig config) {
         if (!config.hasAnnouncements()) {
             feedback.send(sender, CommunicationMessageKey.ANNOUNCE_LIST_EMPTY, Map.of());
-            return Command.SINGLE_SUCCESS;
+            return;
         }
         feedback.send(
                 sender,
@@ -154,7 +170,6 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
                     CommunicationMessageKey.ANNOUNCE_LIST_ENTRY,
                     Map.of("id", announcement.id(), "channels", channels(announcement)));
         }
-        return Command.SINGLE_SUCCESS;
     }
 
     private int preview(CommandContext<CommandSourceStack> ctx) {
@@ -163,15 +178,23 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
             return 0;
         }
         String id = ctx.getArgument("id", String.class);
-        Optional<Announcement> found = settings.announcerConfig().announcements().stream()
-                .filter(announcement -> announcement.id().equalsIgnoreCase(id))
-                .findFirst();
+        // Resolve the id against the merged set (config + enabled store), a DB read, off the tick thread; the preview
+        // delivery hops to the player's region inside the broadcaster, so the global hop here just routes the result.
+        scheduler.async(() -> {
+            Optional<Announcement> found = mergedConfig.get().announcements().stream()
+                    .filter(announcement -> announcement.id().equalsIgnoreCase(id))
+                    .findFirst();
+            scheduler.onGlobal(() -> sendPreview(sender, id, found));
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void sendPreview(Player sender, String id, Optional<Announcement> found) {
         if (found.isEmpty()) {
             feedback.send(sender, CommunicationMessageKey.ANNOUNCE_PREVIEW_UNKNOWN, Map.of("id", id));
-            return Command.SINGLE_SUCCESS;
+            return;
         }
         broadcaster.preview(found.get(), sender);
-        return Command.SINGLE_SUCCESS;
     }
 
     private int toggle(CommandContext<CommandSourceStack> ctx) {

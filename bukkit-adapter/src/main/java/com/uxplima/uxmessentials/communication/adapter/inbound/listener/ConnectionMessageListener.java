@@ -14,10 +14,13 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.communication.adapter.CommunicationSettings;
+import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender;
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
 import com.uxplima.uxmessentials.communication.application.ResolvedMessage;
+import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -32,6 +35,11 @@ import org.jspecify.annotations.NullMarked;
  * message when present so every viewer sees the welcome rather than the ordinary join line. The events fire on
  * the joining/quitting player's region thread, so reading the live player and setting the event component is
  * region-local.
+ *
+ * <p>When {@code motd-on-join} is on (the shipped default), the joining player is also sent the {@code motd} info
+ * page — the same body {@code /motd} prints, rendered through the {@link BukkitInfoSender}. This is the personal
+ * welcome the joiner sees; it is independent of the broadcast join line every viewer sees, so a server can show the
+ * motd, the join broadcast, both, or neither. The page body is operator content, never a {@code MessageKey}.
  */
 @NullMarked
 public final class ConnectionMessageListener implements Listener {
@@ -41,12 +49,17 @@ public final class ConnectionMessageListener implements Listener {
     private final ResolveJoinMessage resolveJoin;
     private final ResolveQuitMessage resolveQuit;
     private final CommunicationSettings settings;
+    private final BukkitInfoSender infoSender;
 
     public ConnectionMessageListener(
-            ResolveJoinMessage resolveJoin, ResolveQuitMessage resolveQuit, CommunicationSettings settings) {
+            ResolveJoinMessage resolveJoin,
+            ResolveQuitMessage resolveQuit,
+            CommunicationSettings settings,
+            BukkitInfoSender infoSender) {
         this.resolveJoin = Objects.requireNonNull(resolveJoin, "resolveJoin");
         this.resolveQuit = Objects.requireNonNull(resolveQuit, "resolveQuit");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.infoSender = Objects.requireNonNull(infoSender, "infoSender");
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -56,9 +69,27 @@ public final class ConnectionMessageListener implements Listener {
         Optional<String> firstJoin = firstJoinLine(player, bindings);
         if (firstJoin.isPresent()) {
             event.joinMessage(MINI.deserialize(firstJoin.get()));
+        } else {
+            apply(resolveJoin.resolve(bindings), event::joinMessage);
+        }
+        sendMotd(player);
+    }
+
+    /**
+     * Send the joining player the {@code motd} info page when {@code motd-on-join} is on and a {@code motd} page is
+     * configured. The body delivers through the {@link BukkitInfoSender} (the same path {@code /motd} uses), which
+     * hops to the player's region thread per line, so this is safe from the join handler. Only the motd is sent
+     * here; the broadcast join line above is set independently.
+     */
+    private void sendMotd(Player player) {
+        if (!settings.motdOnJoin()) {
             return;
         }
-        apply(resolveJoin.resolve(bindings), event::joinMessage);
+        Optional<InfoPage> motd = settings.motdPage();
+        if (motd.isEmpty()) {
+            return;
+        }
+        infoSender.send(BukkitRefs.toRef(player), motd.get());
     }
 
     @EventHandler(priority = EventPriority.HIGH)

@@ -3,11 +3,13 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -38,6 +40,10 @@ import org.jspecify.annotations.Nullable;
  * {@link Scheduler}; if the entity list read is expensive a caller passes a supplier that has already been
  * resolved off-thread.
  *
+ * <p>A caller may also wire one optional <em>action button</em> at a fixed slot — a non-entity control such as a
+ * settings opener — through {@code onAction}. It is drawn over the filler at its slot and its click runs the
+ * supplied handler; the list stays the same paginated entity browser otherwise.
+ *
  * @param <T> the managed entity type
  */
 @NullMarked
@@ -54,6 +60,10 @@ public final class EntityListView<T> {
     private final BiFunction<PlayerRef, T, ItemStack> iconRenderer;
     private final BiConsumer<Player, T> onSelect;
     private final @Nullable Consumer<Player> onCreate;
+    private final OptionalInt actionSlot;
+    private final Material actionIcon;
+    private final @Nullable MessageKey actionName;
+    private final @Nullable Consumer<Player> onAction;
 
     private EntityListView(Builder<T> builder) {
         this.guiText = Objects.requireNonNull(builder.guiText, "guiText");
@@ -67,6 +77,10 @@ public final class EntityListView<T> {
         this.iconRenderer = Objects.requireNonNull(builder.iconRenderer, "iconRenderer");
         this.onSelect = Objects.requireNonNull(builder.onSelect, "onSelect");
         this.onCreate = builder.onCreate;
+        this.actionSlot = builder.actionSlot;
+        this.actionIcon = builder.actionIcon;
+        this.actionName = builder.actionName;
+        this.onAction = builder.onAction;
     }
 
     /** Start building a list view; the required fields are validated at {@link Builder#build}. */
@@ -104,6 +118,12 @@ public final class EntityListView<T> {
                     .name(guiText.text(viewer, createName))
                     .build();
             gui.set(layout.createSlot().getAsInt(), GuiItem.button(create, e -> onCreate.accept(player)));
+        }
+        if (onAction != null && actionName != null && actionSlot.isPresent()) {
+            ItemStack action = ItemBuilder.of(actionIcon)
+                    .name(guiText.text(viewer, actionName))
+                    .build();
+            gui.set(actionSlot.getAsInt(), GuiItem.button(action, e -> onAction.accept(player)));
         }
     }
 
@@ -149,6 +169,10 @@ public final class EntityListView<T> {
         private @Nullable BiFunction<PlayerRef, T, ItemStack> iconRenderer;
         private @Nullable BiConsumer<Player, T> onSelect;
         private @Nullable Consumer<Player> onCreate;
+        private OptionalInt actionSlot = OptionalInt.empty();
+        private Material actionIcon = Material.COMPARATOR;
+        private @Nullable MessageKey actionName;
+        private @Nullable Consumer<Player> onAction;
 
         private Builder() {}
 
@@ -198,6 +222,18 @@ public final class EntityListView<T> {
         public Builder<T> onCreate(MessageKey createName, Consumer<Player> onCreate) {
             this.createName = Objects.requireNonNull(createName, "createName");
             this.onCreate = Objects.requireNonNull(onCreate, "onCreate");
+            return this;
+        }
+
+        /**
+         * Wire one optional action button at {@code slot}: a non-entity control (e.g. a settings opener) drawn over
+         * the filler with {@code icon} and {@code name}, whose click runs {@code onAction}.
+         */
+        public Builder<T> onAction(int slot, Material icon, MessageKey name, Consumer<Player> onAction) {
+            this.actionSlot = OptionalInt.of(slot);
+            this.actionIcon = Objects.requireNonNull(icon, "icon");
+            this.actionName = Objects.requireNonNull(name, "name");
+            this.onAction = Objects.requireNonNull(onAction, "onAction");
             return this;
         }
 

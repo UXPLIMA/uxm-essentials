@@ -12,8 +12,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
+import com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerSettings;
 import com.uxplima.uxmessentials.communication.domain.Ordering;
 import com.uxplima.uxmessentials.communication.domain.StoredAnnouncement;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
@@ -31,7 +33,7 @@ class MergeAnnouncementsTest {
     void anEnabledStoreAnnouncementIsAddedToTheConfigSet() {
         InMemoryAnnouncementStore store = new InMemoryAnnouncementStore();
         store.save(StoredAnnouncement.fresh("stored", "from the editor"));
-        MergeAnnouncements merge = new MergeAnnouncements(store);
+        MergeAnnouncements merge = new MergeAnnouncements(store, unsetSettings());
 
         AnnouncerConfig merged = merge.merge(configWith("file"));
 
@@ -43,7 +45,7 @@ class MergeAnnouncementsTest {
         InMemoryAnnouncementStore store = new InMemoryAnnouncementStore();
         store.save(StoredAnnouncement.fresh("on", "shown"));
         store.save(StoredAnnouncement.fresh("off", "hidden").withEnabled(false));
-        MergeAnnouncements merge = new MergeAnnouncements(store);
+        MergeAnnouncements merge = new MergeAnnouncements(store, unsetSettings());
 
         AnnouncerConfig merged = merge.merge(configWith("file"));
 
@@ -52,7 +54,7 @@ class MergeAnnouncementsTest {
 
     @Test
     void anEmptyStoreLeavesTheConfigSetUnchanged() {
-        MergeAnnouncements merge = new MergeAnnouncements(new InMemoryAnnouncementStore());
+        MergeAnnouncements merge = new MergeAnnouncements(new InMemoryAnnouncementStore(), unsetSettings());
 
         AnnouncerConfig merged = merge.merge(configWith("a", "b"));
 
@@ -70,7 +72,7 @@ class MergeAnnouncementsTest {
                 "",
                 Optional.empty(),
                 OptionalLong.empty()));
-        MergeAnnouncements merge = new MergeAnnouncements(store);
+        MergeAnnouncements merge = new MergeAnnouncements(store, unsetSettings());
 
         AnnouncerConfig merged = merge.merge(configWith("shared"));
 
@@ -85,7 +87,7 @@ class MergeAnnouncementsTest {
     void theIntervalGateAndOrderingCarryThroughFromTheConfig() {
         InMemoryAnnouncementStore store = new InMemoryAnnouncementStore();
         store.save(StoredAnnouncement.fresh("stored", "line"));
-        MergeAnnouncements merge = new MergeAnnouncements(store);
+        MergeAnnouncements merge = new MergeAnnouncements(store, unsetSettings());
         AnnouncerConfig config =
                 new AnnouncerConfig(Duration.ofSeconds(90), 3, Ordering.RANDOM, List.of(announcement("file")));
 
@@ -100,12 +102,33 @@ class MergeAnnouncementsTest {
     void anEmptyConfigWithOnlyAStoreAnnouncementStillRotates() {
         InMemoryAnnouncementStore store = new InMemoryAnnouncementStore();
         store.save(StoredAnnouncement.fresh("stored", "line"));
-        MergeAnnouncements merge = new MergeAnnouncements(store);
+        MergeAnnouncements merge = new MergeAnnouncements(store, unsetSettings());
 
         AnnouncerConfig merged = merge.merge(AnnouncerConfig.empty());
 
         assertThat(merged.hasAnnouncements()).isTrue();
         assertThat(merged.announcements()).extracting(Announcement::id).containsExactly("stored");
+    }
+
+    @Test
+    void aPersistedIntervalAndGateOverrideTheFileDefaults() {
+        InMemoryAnnouncementStore store = new InMemoryAnnouncementStore();
+        store.save(StoredAnnouncement.fresh("stored", "line"));
+        InMemorySettingsStore settings = new InMemorySettingsStore();
+        settings.save(AnnouncerSettings.unset().withIntervalSeconds(45).withMinOnlinePlayers(7));
+        MergeAnnouncements merge = new MergeAnnouncements(store, settings);
+        AnnouncerConfig config =
+                new AnnouncerConfig(Duration.ofMinutes(5), 1, Ordering.SEQUENTIAL, List.of(announcement("file")));
+
+        AnnouncerConfig merged = merge.merge(config);
+
+        assertThat(merged.defaultInterval()).isEqualTo(Duration.ofSeconds(45));
+        assertThat(merged.minOnlinePlayers()).isEqualTo(7);
+    }
+
+    /** An always-unset settings store — both globals defer to the file, the pre-feature behaviour. */
+    private static AnnouncerSettingsStore unsetSettings() {
+        return new InMemorySettingsStore();
     }
 
     private static AnnouncerConfig configWith(String... ids) {
@@ -164,6 +187,21 @@ class MergeAnnouncementsTest {
         @Override
         public boolean delete(String id) {
             return rows.remove(id) != null;
+        }
+    }
+
+    /** A hand-rolled in-memory settings store holding the single global record. */
+    private static final class InMemorySettingsStore implements AnnouncerSettingsStore {
+        private AnnouncerSettings settings = AnnouncerSettings.unset();
+
+        @Override
+        public AnnouncerSettings load() {
+            return settings;
+        }
+
+        @Override
+        public void save(AnnouncerSettings value) {
+            settings = value;
         }
     }
 }

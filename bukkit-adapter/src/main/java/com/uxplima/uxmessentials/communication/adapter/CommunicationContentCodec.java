@@ -84,6 +84,9 @@ final class CommunicationContentCodec {
                 advancements(root.node("advancements")),
                 optionalString(root.node("first-join")),
                 optionalString(root.node("death-info-page")).map(name -> name.toLowerCase(Locale.ROOT)),
+                // Default true so a fresh install — and an upgraded one whose file predates the key — greets joining
+                // players with the motd; an operator who wants silence sets motd-on-join = false.
+                root.node("motd-on-join").getBoolean(true),
                 infoPages(root.node("info-pages")));
     }
 

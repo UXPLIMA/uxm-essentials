@@ -65,6 +65,9 @@ class AnnounceCommandTest {
     private BukkitAnnouncerBroadcaster broadcaster;
     private BroadcastOptOutStore optOutStore;
     private RecordingScheduler scheduler;
+    private InMemoryAnnouncementStore announcementStore;
+    private InMemoryAnnouncerSettingsStore settingsStore;
+    private java.util.function.Supplier<com.uxplima.uxmessentials.communication.domain.AnnouncerConfig> mergedConfig;
 
     @BeforeEach
     void setUp(@TempDir Path dataDir) throws Exception {
@@ -79,6 +82,12 @@ class AnnounceCommandTest {
         broadcaster = new BukkitAnnouncerBroadcaster(
                 new EchoMessagesSink(), optOutStore, channels, AnnounceCommandTest::context, new SyncScheduler());
         scheduler = new RecordingScheduler();
+        announcementStore = new InMemoryAnnouncementStore();
+        settingsStore = new InMemoryAnnouncerSettingsStore();
+        com.uxplima.uxmessentials.communication.application.MergeAnnouncements merge =
+                new com.uxplima.uxmessentials.communication.application.MergeAnnouncements(
+                        announcementStore, settingsStore);
+        mergedConfig = () -> merge.merge(settings.announcerConfig());
     }
 
     @AfterEach
@@ -162,6 +171,47 @@ class AnnounceCommandTest {
     }
 
     @Test
+    void listShowsAnEditorCreatedStoreAnnouncement() {
+        // An announcement created in the GUI (enabled) lives only in the store, not announcer.conf. list reads the
+        // merged set, so it appears alongside the file announcement rather than being missed.
+        announcementStore.save(
+                com.uxplima.uxmessentials.communication.domain.StoredAnnouncement.fresh("deneme", "<gold>gui line"));
+        CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
+
+        execute(dispatcher, "announce list");
+
+        assertThat(PLAIN.serialize(alice.nextComponentMessage()))
+                .contains(CommunicationMessageKey.ANNOUNCE_LIST_HEADER.key());
+        java.util.List<String> entries = java.util.List.of(
+                PLAIN.serialize(alice.nextComponentMessage()), PLAIN.serialize(alice.nextComponentMessage()));
+        assertThat(entries).allMatch(line -> line.contains(CommunicationMessageKey.ANNOUNCE_LIST_ENTRY.key()));
+    }
+
+    @Test
+    void previewResolvesAnEditorCreatedStoreAnnouncementById() {
+        announcementStore.save(
+                com.uxplima.uxmessentials.communication.domain.StoredAnnouncement.fresh("deneme", "gui line"));
+        CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
+
+        execute(dispatcher, "announce preview deneme");
+
+        // The store announcement previews (delivered to the sender), not answered with the unknown-id key.
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("gui line");
+    }
+
+    @Test
+    void previewOfADisabledStoreAnnouncementIsUnknown() {
+        announcementStore.save(com.uxplima.uxmessentials.communication.domain.StoredAnnouncement.fresh("off", "hidden")
+                .withEnabled(false));
+        CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
+
+        execute(dispatcher, "announce preview off");
+
+        assertThat(PLAIN.serialize(alice.nextComponentMessage()))
+                .contains(CommunicationMessageKey.ANNOUNCE_PREVIEW_UNKNOWN.key());
+    }
+
+    @Test
     void theTreeIsGatedByTheAdminPermission() {
         alice.setOp(false);
         CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
@@ -175,6 +225,7 @@ class AnnounceCommandTest {
         CommandDispatcher<CommandSourceStack> dispatcher = dispatcher();
         AnnounceCommand command = new AnnounceCommand(
                 settings,
+                mergedConfig,
                 broadcaster,
                 new BroadcastOptOut(
                         optOutStore,
@@ -208,19 +259,27 @@ class AnnounceCommandTest {
                 settings::announcerConfig,
                 () -> true);
         AnnounceCommand command = new AnnounceCommand(
-                settings, broadcaster, optOut, announcer, editorView(), scheduler, new EchoMessagesSink());
+                settings,
+                mergedConfig,
+                broadcaster,
+                optOut,
+                announcer,
+                editorView(),
+                scheduler,
+                new EchoMessagesSink());
         dispatcher.getRoot().addChild(command.build());
         return dispatcher;
     }
 
-    /** A real editor view over an in-memory store; the subcommand tests never open it, only the editor subcommand. */
+    /** A real editor view over the in-memory stores; the subcommand tests never open it, only the editor subcommand. */
     private AnnouncementEditorView editorView() {
         EchoMessagesSink messages = new EchoMessagesSink();
         return new AnnouncementEditorView(
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(messages),
                 scheduler,
                 messages,
-                new InMemoryAnnouncementStore(),
+                announcementStore,
+                settingsStore,
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(moduleDir, new NoopLogger()),
                 new com.uxplima.uxmlib.gui.anvil.AnvilInput(MockBukkit.createMockPlugin()));
     }
@@ -322,6 +381,22 @@ class AnnounceCommandTest {
         @Override
         public boolean delete(String id) {
             return rows.remove(id) != null;
+        }
+    }
+
+    private static final class InMemoryAnnouncerSettingsStore
+            implements com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore {
+        private com.uxplima.uxmessentials.communication.domain.AnnouncerSettings settings =
+                com.uxplima.uxmessentials.communication.domain.AnnouncerSettings.unset();
+
+        @Override
+        public com.uxplima.uxmessentials.communication.domain.AnnouncerSettings load() {
+            return settings;
+        }
+
+        @Override
+        public void save(com.uxplima.uxmessentials.communication.domain.AnnouncerSettings value) {
+            settings = value;
         }
     }
 

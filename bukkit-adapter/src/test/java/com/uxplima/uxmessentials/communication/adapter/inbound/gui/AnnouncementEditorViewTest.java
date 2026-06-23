@@ -66,6 +66,7 @@ class AnnouncementEditorViewTest {
     private PlayerMock player;
     private PlayerRef viewer;
     private InMemoryAnnouncementStore store;
+    private InMemoryAnnouncerSettingsStore settingsStore;
     private AnnouncementEditorView view;
 
     @BeforeEach
@@ -78,9 +79,10 @@ class AnnouncementEditorViewTest {
         GuiText guiText = new GuiText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
         store = new InMemoryAnnouncementStore();
+        settingsStore = new InMemoryAnnouncerSettingsStore();
         AnvilInput anvil = new AnvilInput(plugin);
         view = new AnnouncementEditorView(
-                guiText, scheduler, new KeyMessages(), store, new GuiLayouts(dir, NOOP), anvil);
+                guiText, scheduler, new KeyMessages(), store, settingsStore, new GuiLayouts(dir, NOOP), anvil);
     }
 
     @AfterEach
@@ -180,6 +182,55 @@ class AnnouncementEditorViewTest {
     }
 
     @Test
+    void theSettingsScreenPersistsAndAppliesTheInterval() {
+        // The interval property (settings slot 11) writes the typed seconds through the settings store; the override
+        // then wins over the file default when the merge folds it in.
+        EditableProperty interval = view.settings().propertyAt(11, new Object()).orElseThrow();
+        assertThat(interval).isInstanceOf(TextProperty.class);
+
+        ((TextProperty) interval).applyInput(context(), "150");
+
+        assertThat(settingsStore.load().interval())
+                .hasValueSatisfying(d -> assertThat(d.toSeconds()).isEqualTo(150L));
+        // The persisted override replaces the file default interval through the domain fold.
+        com.uxplima.uxmessentials.communication.domain.AnnouncerConfig file =
+                new com.uxplima.uxmessentials.communication.domain.AnnouncerConfig(
+                        java.time.Duration.ofMinutes(5),
+                        0,
+                        com.uxplima.uxmessentials.communication.domain.Ordering.SEQUENTIAL,
+                        List.of(new com.uxplima.uxmessentials.communication.domain.Announcement(
+                                "x",
+                                List.of("line"),
+                                com.uxplima.uxmessentials.shared.display.DisplayCondition.always(),
+                                Optional.empty(),
+                                java.util.Set.of(com.uxplima.uxmessentials.shared.display.BroadcastChannel.CHAT),
+                                Optional.empty(),
+                                false)));
+        assertThat(settingsStore.load().applyTo(file).defaultInterval()).isEqualTo(java.time.Duration.ofSeconds(150));
+    }
+
+    @Test
+    void theSettingsScreenClearsTheIntervalBackToTheFileDefault() {
+        settingsStore.save(com.uxplima.uxmessentials.communication.domain.AnnouncerSettings.unset()
+                .withIntervalSeconds(90));
+        EditableProperty interval = view.settings().propertyAt(11, new Object()).orElseThrow();
+
+        ((TextProperty) interval).applyInput(context(), "-");
+
+        assertThat(settingsStore.load().interval()).isEmpty();
+    }
+
+    @Test
+    void theSettingsScreenPersistsTheMinPlayersGate() {
+        EditableProperty minPlayers =
+                view.settings().propertyAt(15, new Object()).orElseThrow();
+
+        ((TextProperty) minPlayers).applyInput(context(), "5");
+
+        assertThat(settingsStore.load().minOnlinePlayers()).hasValue(5);
+    }
+
+    @Test
     void deleteIsGatedByAConfirmMenu() {
         store.save(StoredAnnouncement.fresh("alpha", "one"));
         view.editor().open(player, viewer, store.find("alpha").orElseThrow());
@@ -251,6 +302,22 @@ class AnnouncementEditorViewTest {
         @Override
         public boolean delete(String id) {
             return rows.remove(id) != null;
+        }
+    }
+
+    private static final class InMemoryAnnouncerSettingsStore
+            implements com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore {
+        private com.uxplima.uxmessentials.communication.domain.AnnouncerSettings settings =
+                com.uxplima.uxmessentials.communication.domain.AnnouncerSettings.unset();
+
+        @Override
+        public com.uxplima.uxmessentials.communication.domain.AnnouncerSettings load() {
+            return settings;
+        }
+
+        @Override
+        public void save(com.uxplima.uxmessentials.communication.domain.AnnouncerSettings value) {
+            settings = value;
         }
     }
 

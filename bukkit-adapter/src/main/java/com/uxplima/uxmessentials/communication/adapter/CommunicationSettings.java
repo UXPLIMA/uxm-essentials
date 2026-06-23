@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.domain.AdvancementNoticeConfig;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
+import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.MessagePolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -39,6 +40,9 @@ public final class CommunicationSettings {
 
     private static final List<String> CONTENT_FILES =
             List.of("join-quit.conf", "announcer.conf", "advancements.conf", "info-pages.conf");
+
+    /** The reserved info-page name shown on join when {@code motd-on-join} is on. */
+    private static final String MOTD_PAGE = "motd";
 
     private final Path moduleDir;
     private final Logger log;
@@ -88,6 +92,16 @@ public final class CommunicationSettings {
     /** The optional info-page name shown to a dying player when send-info-after-death is configured. */
     public Optional<String> deathInfoPage() {
         return current().deathInfoPage();
+    }
+
+    /** Whether a joining player is sent the {@code motd} info page; on by default, gated by {@code motd-on-join}. */
+    public boolean motdOnJoin() {
+        return current().motdOnJoin();
+    }
+
+    /** The live {@code motd} info page, or empty when no {@code motd} entry is configured. */
+    public Optional<InfoPage> motdPage() {
+        return InfoRegistry.of(current().infoPages()).find(MOTD_PAGE);
     }
 
     /** A fresh {@link InfoRegistry} over the live info pages; the dynamic info commands are built from this. */

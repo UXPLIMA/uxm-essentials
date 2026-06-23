@@ -895,7 +895,10 @@ public final class PluginModule {
         // plus the shared anvil (installed once in wireModules) for the broadcast and editor prompts. /communication
         // gui and the /uxmess gui hub open the admin panel; bare /announce opens the editor.
         AnnouncementStore announcementStore = AnnouncementStores.jooq(persistence);
-        CommunicationWiring.Wired wired = CommunicationWiring.wire(plugin, ctx, announcementStore, guiLayouts, anvil);
+        com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore announcerSettingsStore =
+                AnnouncementStores.settings(persistence);
+        CommunicationWiring.Wired wired =
+                CommunicationWiring.wire(plugin, ctx, announcementStore, announcerSettingsStore, guiLayouts, anvil);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

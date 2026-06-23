@@ -37,6 +37,7 @@ import com.uxplima.uxmessentials.communication.application.ResolveDeathMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveJoinMessage;
 import com.uxplima.uxmessentials.communication.application.ResolveQuitMessage;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
+import com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.application.port.RandomSource;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
@@ -81,11 +82,13 @@ public final class CommunicationWiring {
             Plugin plugin,
             ModuleContext ctx,
             AnnouncementStore announcementStore,
+            AnnouncerSettingsStore announcerSettingsStore,
             GuiLayouts guiLayouts,
             AnvilInput anvil) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(announcementStore, "announcementStore");
+        Objects.requireNonNull(announcerSettingsStore, "announcerSettingsStore");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(anvil, "anvil");
         KernelPorts kernel = ctx.kernel();
@@ -100,11 +103,12 @@ public final class CommunicationWiring {
         InfoRegistry registry = settings.infoRegistry();
         ChatLock chatLock = new ChatLock();
 
-        // The announcer rotates over the file config PLUS the enabled editor-managed store announcements. This
-        // merged supplier is the single source both the NextAnnouncement rotation and the AnnouncerTask override
-        // loops read, so an editor create/edit/enable takes effect on the next tick with no reload (the supplier
-        // re-reads the store each call).
-        MergeAnnouncements merge = new MergeAnnouncements(announcementStore);
+        // The announcer rotates over the file config PLUS the enabled editor-managed store announcements, with the
+        // global interval/min-players override from the settings screen folded in. This merged supplier is the single
+        // source both the NextAnnouncement rotation and the AnnouncerTask override loops read, so an editor
+        // create/edit/enable or a settings change takes effect on the next tick with no reload (the supplier re-reads
+        // the store and the settings each call).
+        MergeAnnouncements merge = new MergeAnnouncements(announcementStore, announcerSettingsStore);
         Supplier<AnnouncerConfig> mergedConfig = () -> merge.merge(settings.announcerConfig());
 
         CommunicationServices services = assemble(kernel, settings, mergedConfig, optOutStore, random, notifier);
@@ -128,7 +132,13 @@ public final class CommunicationWiring {
         // effect on the next tick with no reload. The admin panel's announcer list stays the read-only /announce
         // list surface (it shows the merged config view); the editor is the writable surface, reached via /announce.
         AnnouncementEditorView editorView = new AnnouncementEditorView(
-                guiText, kernel.scheduler(), kernel.messages(), announcementStore, guiLayouts, anvil);
+                guiText,
+                kernel.scheduler(),
+                kernel.messages(),
+                announcementStore,
+                announcerSettingsStore,
+                guiLayouts,
+                anvil);
         CommunicationAdminView adminView = new CommunicationAdminView(
                 guiText,
                 kernel.scheduler(),
@@ -149,6 +159,7 @@ public final class CommunicationWiring {
                 kernel.messages(),
                 broadcaster,
                 announcer,
+                mergedConfig,
                 kernel.scheduler(),
                 kernel.messageSink(),
                 chatLock,
@@ -212,7 +223,7 @@ public final class CommunicationWiring {
             BroadcastOptOutStore optOutStore,
             Scheduler scheduler) {
         return List.of(
-                new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings),
+                new ConnectionMessageListener(services.resolveJoin(), services.resolveQuit(), settings, infoSender),
                 new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
                 // English-only project (a founding decision): vanilla advancement titles are translatable components,
                 // so the listener renders them through the GlobalTranslator in this locale before flattening to text.

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.communication.adapter.inbound.command;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationSettings;
@@ -13,6 +14,7 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitInfoSender
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.communication.application.CommunicationNotifier;
 import com.uxplima.uxmessentials.communication.application.InfoRegistry;
+import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -53,6 +55,7 @@ public final class CommunicationCommands {
             Messages messages,
             BukkitAnnouncerBroadcaster broadcaster,
             AnnouncerTask announcer,
+            Supplier<AnnouncerConfig> mergedConfig,
             Scheduler scheduler,
             MessageSink sink,
             ChatLock chatLock,
@@ -65,6 +68,7 @@ public final class CommunicationCommands {
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(broadcaster, "broadcaster");
         Objects.requireNonNull(announcer, "announcer");
+        Objects.requireNonNull(mergedConfig, "mergedConfig");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(sink, "sink");
         Objects.requireNonNull(chatLock, "chatLock");
@@ -74,7 +78,8 @@ public final class CommunicationCommands {
         commands.add(new BroadcastCommand(broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastWorldCommand(messages, broadcaster, BROADCAST_PREFIX));
         commands.add(new BroadcastToggleCommand(optOut, messages));
-        commands.add(new AnnounceCommand(settings, broadcaster, optOut, announcer, editorView, scheduler, messages));
+        commands.add(new AnnounceCommand(
+                settings, mergedConfig, broadcaster, optOut, announcer, editorView, scheduler, messages));
         commands.add(new MeCommand(messages, notifier, scheduler));
         commands.add(new ClearChatCommand(messages, notifier, sink, scheduler));
         commands.add(new ToggleChatCommand(chatLock, notifier, messages));

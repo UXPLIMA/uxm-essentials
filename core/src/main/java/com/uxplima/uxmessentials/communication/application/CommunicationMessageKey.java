@@ -119,7 +119,21 @@ public enum CommunicationMessageKey implements MessageKey {
     ANNOUNCE_EDITOR_PROP_WORLD("communication.announce.editor.prop-world"),
     ANNOUNCE_EDITOR_PROP_WORLD_PROMPT("communication.announce.editor.prop-world-prompt"),
     ANNOUNCE_EDITOR_PROP_PERMISSION("communication.announce.editor.prop-permission"),
-    ANNOUNCE_EDITOR_PROP_PERMISSION_PROMPT("communication.announce.editor.prop-permission-prompt");
+    ANNOUNCE_EDITOR_PROP_PERMISSION_PROMPT("communication.announce.editor.prop-permission-prompt"),
+
+    // /announce settings — the global announcer settings screen reached from the list GUI's last slot. The list
+    // button that opens it, the screen title and back button, the value lore each setting renders into, the word
+    // shown for a setting deferring to the file default, and the two settings (default interval, min-players) with
+    // their anvil prompts.
+    ANNOUNCE_SETTINGS_BUTTON("communication.announce.settings.button"),
+    ANNOUNCE_SETTINGS_TITLE("communication.announce.settings.title"),
+    ANNOUNCE_SETTINGS_BACK("communication.announce.settings.back"),
+    ANNOUNCE_SETTINGS_VALUE_LORE("communication.announce.settings.value-lore"),
+    ANNOUNCE_SETTINGS_VALUE_DEFAULT("communication.announce.settings.value-default"),
+    ANNOUNCE_SETTINGS_PROP_INTERVAL("communication.announce.settings.prop-interval"),
+    ANNOUNCE_SETTINGS_PROP_INTERVAL_PROMPT("communication.announce.settings.prop-interval-prompt"),
+    ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS("communication.announce.settings.prop-min-players"),
+    ANNOUNCE_SETTINGS_PROP_MIN_PLAYERS_PROMPT("communication.announce.settings.prop-min-players-prompt");
 
     private final String key;
 
