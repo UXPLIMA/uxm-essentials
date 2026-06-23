@@ -37,10 +37,11 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The per-player eco-admin screen reached after a target is picked from the hub: the target's head with their
  * current balance per currency, the Give / Take / Set / Reset action buttons, a [History] link into the
- * transaction-history GUI, and — when more than one currency is configured — a row of currency icons that
- * switches the active currency the four actions apply to. Give / Take / Set open the vanilla anvil for an
- * amount and run the matching {@code EcoAdmin} op with {@code Money.of(activeCurrency, amount)}; Reset is
- * confirm-gated (it zeroes a balance) before calling {@code reset(actor, target, activeCurrency)}.
+ * transaction-history GUI, and — when more than one currency is configured — a single [Currency] item that
+ * opens a paginated {@link CurrencyPickerView} to switch the active currency the four actions apply to. Give /
+ * Take / Set open the vanilla anvil for an amount and run the matching {@code EcoAdmin} op with
+ * {@code Money.of(activeCurrency, amount)}; Reset is confirm-gated (it zeroes a balance) before calling
+ * {@code reset(actor, target, activeCurrency)}.
  *
  * <p>The balance read uses the resolved {@link EconomyProvider} directly (synchronous, no chat side effect),
  * hopped off the tick thread before the menu is built so a foreign provider never blocks the viewer's region
@@ -58,7 +59,7 @@ public final class EconomyTargetView {
     private static final int RESET_SLOT = 25;
     private static final int HISTORY_SLOT = 31;
     private static final int BACK_SLOT = 40;
-    private static final int[] CURRENCY_SLOTS = {37, 38, 39, 41, 42, 43};
+    private static final int SELECT_CURRENCY_SLOT = 38;
     private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     private final GuiText guiText;
@@ -69,6 +70,7 @@ public final class EconomyTargetView {
     private final CurrencyRegistry currencies;
     private final EconomyNotifier notifier;
     private final TransactionsHistoryView historyView;
+    private final CurrencyPickerView currencyPicker;
     private final java.util.function.BiConsumer<Player, PlayerRef> onBack;
 
     public EconomyTargetView(
@@ -80,6 +82,7 @@ public final class EconomyTargetView {
             CurrencyRegistry currencies,
             EconomyNotifier notifier,
             TransactionsHistoryView historyView,
+            CurrencyPickerView currencyPicker,
             java.util.function.BiConsumer<Player, PlayerRef> onBack) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -89,6 +92,7 @@ public final class EconomyTargetView {
         this.currencies = Objects.requireNonNull(currencies, "currencies");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.historyView = Objects.requireNonNull(historyView, "historyView");
+        this.currencyPicker = Objects.requireNonNull(currencyPicker, "currencyPicker");
         this.onBack = Objects.requireNonNull(onBack, "onBack");
     }
 
@@ -159,26 +163,26 @@ public final class EconomyTargetView {
                         Material.TNT,
                         () -> confirmReset(viewer, viewerRef, target, active)));
         gui.set(HISTORY_SLOT, GuiItem.button(historyIcon(viewerRef), e -> openHistory(viewer, viewerRef, target)));
-        currencySelector(gui, viewer, viewerRef, target, active);
+        selectCurrency(gui, viewer, viewerRef, target, active);
         gui.set(BACK_SLOT, GuiItem.button(backIcon(viewerRef), e -> onBack.accept(viewer, viewerRef)));
         gui.open(viewer);
     }
 
-    /** Render the currency row only when more than one currency is configured; clicking one re-opens active. */
-    private void currencySelector(
-            SimpleGui gui, Player viewer, PlayerRef viewerRef, PlayerRef target, Currency active) {
+    /**
+     * Render the single [Currency] item only when more than one currency is configured; clicking it opens the
+     * paginated picker, and choosing a currency re-opens this screen with that currency active.
+     */
+    private void selectCurrency(SimpleGui gui, Player viewer, PlayerRef viewerRef, PlayerRef target, Currency active) {
         List<Currency> all = List.copyOf(currencies.all());
         if (all.size() <= 1) {
             return;
         }
-        for (int i = 0; i < all.size() && i < CURRENCY_SLOTS.length; i++) {
-            Currency currency = all.get(i);
-            ItemStack icon = currencyIcon(viewerRef, currency, currency.equals(active));
-            gui.set(
-                    CURRENCY_SLOTS[i],
-                    GuiItem.button(
-                            icon, e -> scheduler.onEntity(viewerRef, () -> open(viewer, viewerRef, target, currency))));
-        }
+        gui.set(
+                SELECT_CURRENCY_SLOT,
+                GuiItem.button(
+                        selectCurrencyIcon(viewerRef, active),
+                        e -> currencyPicker.open(
+                                viewer, viewerRef, all, active, chosen -> open(viewer, viewerRef, target, chosen))));
     }
 
     private void promptAmount(
@@ -270,17 +274,11 @@ public final class EconomyTargetView {
                 .build();
     }
 
-    private ItemStack currencyIcon(PlayerRef viewer, Currency currency, boolean active) {
-        Material material = CurrencyIcons.materialFor(currency, Material.SUNFLOWER);
-        Map<String, String> placeholders = Map.of("currency", currency.plural());
-        List<Component> lore = new ArrayList<>();
-        lore.add(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_LORE, placeholders));
-        if (active) {
-            lore.add(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_ACTIVE_LORE));
-        }
-        return ItemBuilder.of(material)
-                .name(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_NAME, placeholders))
-                .lore(lore)
+    private ItemStack selectCurrencyIcon(PlayerRef viewer, Currency active) {
+        Map<String, String> placeholders = Map.of("currency", active.plural());
+        return ItemBuilder.of(Material.SUNFLOWER)
+                .name(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_SELECT_CURRENCY_NAME))
+                .lore(List.of(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_SELECT_CURRENCY_LORE, placeholders)))
                 .build();
     }
 

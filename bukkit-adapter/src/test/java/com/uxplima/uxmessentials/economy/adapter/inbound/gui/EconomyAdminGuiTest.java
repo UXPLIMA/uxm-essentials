@@ -120,15 +120,20 @@ class EconomyAdminGuiTest {
         MockBukkit.unmock();
     }
 
+    private CurrencyPickerView picker() {
+        return new CurrencyPickerView(guiText, scheduler);
+    }
+
     private EconomyTargetView targetView(CurrencyRegistry currencies) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
         return new EconomyTargetView(
-                guiText, scheduler, anvil, provider, ops, currencies, notifier, historyView, (p, v) -> {});
+                guiText, scheduler, anvil, provider, ops, currencies, notifier, historyView, picker(), (p, v) -> {});
     }
 
     private EconomyBulkView bulkView(CurrencyRegistry currencies) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
-        return new EconomyBulkView(guiText, scheduler, anvil, server, ops, currencies, notifier, (p, v) -> {});
+        return new EconomyBulkView(
+                guiText, scheduler, anvil, server, ops, currencies, notifier, picker(), (p, v) -> {});
     }
 
     private static CurrencyRegistry singleCoins() {
@@ -211,25 +216,65 @@ class EconomyAdminGuiTest {
     }
 
     @Test
-    void theCurrencyRowIsAbsentWithASingleCurrency() {
+    void theSelectCurrencyItemIsAbsentWithASingleCurrency() {
         EconomyTargetView view = targetView(singleCoins());
         view.open(admin, adminRef, target);
 
         Inventory menu = admin.getOpenInventory().getTopInventory();
-        // Currency slots (37..43) carry only filler when a single currency is configured.
-        assertThat(menu.getItem(37).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
+        // The select-currency slot (38) carries only filler when a single currency is configured.
         assertThat(menu.getItem(38).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test
-    void theCurrencyRowIsPresentWithMultipleCurrencies() {
+    void theSelectCurrencyItemIsPresentWithMultipleCurrencies() {
         EconomyTargetView view = targetView(coinsAndGems());
         view.open(admin, adminRef, target);
 
         Inventory menu = admin.getOpenInventory().getTopInventory();
-        // Two configured currencies fill the first two selector slots with non-filler icons.
-        assertThat(menu.getItem(37).getType()).isNotEqualTo(Material.GRAY_STAINED_GLASS_PANE);
-        assertThat(menu.getItem(38).getType()).isNotEqualTo(Material.GRAY_STAINED_GLASS_PANE);
+        // The single [Currency] item opens the paginated picker; it is the sunflower at slot 38.
+        assertThat(menu.getItem(38).getType()).isEqualTo(Material.SUNFLOWER);
+    }
+
+    @Test
+    void clickingTheSelectCurrencyItemOpensThePaginatedPicker() {
+        EconomyTargetView view = targetView(coinsAndGems());
+        view.open(admin, adminRef, target);
+        fireClick(38); // [Currency] -> the paginated picker
+
+        Inventory picker = admin.getOpenInventory().getTopInventory();
+        // The picker grids one icon per currency in its content slots; both currencies are present.
+        assertThat(picker.getSize()).isEqualTo(54); // 6-row picker
+        assertThat(picker.getItem(0)).isNotNull();
+        assertThat(picker.getItem(1)).isNotNull();
+    }
+
+    @Test
+    void pickingACurrencyInThePickerReopensTheManageScreenWithItActive() {
+        EconomyTargetView view = targetView(coinsAndGems());
+        view.open(admin, adminRef, target);
+        fireClick(38); // open the picker
+        // The picker lists COINS at slot 0 and GEMS at slot 1 (registry order); pick GEMS.
+        fireClick(1);
+        // Back on the manage screen, entering an amount now parses against GEMS (precision 0).
+        view.applyAmount(admin, adminRef, target, GEMS, EcoAdminOps.Verb.GIVE, "7");
+
+        verify(ecoAdmin).give(eq(adminRef), eq(target), eq(Money.of(GEMS, 7L)));
+    }
+
+    @Test
+    void theBulkScreenSelectCurrencyItemOpensThePicker() {
+        EconomyBulkView view = bulkView(coinsAndGems());
+        view.open(admin, adminRef);
+
+        Inventory menu = admin.getOpenInventory().getTopInventory();
+        // The single [Currency] item sits between give-all (11) and reset-all (15) at slot 13.
+        assertThat(menu.getItem(13).getType()).isEqualTo(Material.SUNFLOWER);
+
+        fireClick(13); // -> the paginated picker
+        Inventory picker = admin.getOpenInventory().getTopInventory();
+        assertThat(picker.getSize()).isEqualTo(54);
+        assertThat(picker.getItem(0)).isNotNull();
+        assertThat(picker.getItem(1)).isNotNull();
     }
 
     @Test

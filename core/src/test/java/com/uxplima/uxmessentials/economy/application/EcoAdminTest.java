@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.fakes.CapturingSink;
+import com.uxplima.uxmessentials.economy.fakes.CapturingTransactionHistory;
 import com.uxplima.uxmessentials.economy.fakes.Currencies;
 import com.uxplima.uxmessentials.economy.fakes.InMemoryWalletRepository;
 import com.uxplima.uxmessentials.economy.fakes.KeyMessages;
@@ -33,6 +34,7 @@ class EcoAdminTest {
 
     private InMemoryWalletRepository repo;
     private RecordingAudit audit;
+    private CapturingTransactionHistory history;
     private EcoAdmin admin;
     private PlayerRef operator;
     private PlayerRef target;
@@ -41,11 +43,12 @@ class EcoAdminTest {
     void setUp() {
         repo = new InMemoryWalletRepository();
         audit = new RecordingAudit();
+        history = new CapturingTransactionHistory();
         CurrencyRegistry registry = CurrencyRegistry.of(Set.of(Currencies.COINS), Currencies.COINS.id());
         Clock clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
         NativeEconomyProvider provider = new NativeEconomyProvider(repo, registry, clock);
         EconomyNotifier notifier = new EconomyNotifier(new KeyMessages(), new CapturingSink());
-        admin = new EcoAdmin(provider, repo, audit, notifier);
+        admin = new EcoAdmin(provider, repo, audit, notifier, history, clock);
         operator = new PlayerRef(UUID.randomUUID(), "Operator");
         target = new PlayerRef(UUID.randomUUID(), "Target");
     }
@@ -136,6 +139,62 @@ class EcoAdminTest {
         Money credited = admin.giveRandomRange(operator, target, exact, exact).orElseThrow();
 
         assertThat(credited).isEqualTo(exact);
+    }
+
+    @Test
+    void giveRecordsACreditTransaction() {
+        admin.give(operator, target, Money.of(Currencies.COINS, 100));
+
+        assertThat(history.entries()).singleElement().satisfies(entry -> {
+            assertThat(entry.kind()).isEqualTo("CREDIT");
+            assertThat(entry.ownerId()).isEqualTo(target.uuid().toString());
+            assertThat(entry.amount()).isEqualTo(Money.of(Currencies.COINS, 100));
+            assertThat(entry.reason()).isEqualTo(EconomyReason.ADMIN_GIVE);
+        });
+    }
+
+    @Test
+    void takeRecordsADebitTransaction() {
+        repo.credit(target, Money.of(Currencies.COINS, 100));
+
+        admin.take(operator, target, Money.of(Currencies.COINS, 40));
+
+        assertThat(history.entries()).singleElement().satisfies(entry -> {
+            assertThat(entry.kind()).isEqualTo("DEBIT");
+            assertThat(entry.ownerId()).isEqualTo(target.uuid().toString());
+            assertThat(entry.amount()).isEqualTo(Money.of(Currencies.COINS, 40));
+            assertThat(entry.reason()).isEqualTo(EconomyReason.ADMIN_TAKE);
+        });
+    }
+
+    @Test
+    void aFailedTakeRecordsNoTransaction() {
+        // The target has no funds, so the guarded debit rejects — nothing should reach the transaction trail.
+        admin.take(operator, target, Money.of(Currencies.COINS, 40));
+
+        assertThat(history.entries()).isEmpty();
+    }
+
+    @Test
+    void setRecordsTheNetChangeAgainstThePriorBalance() {
+        repo.credit(target, Money.of(Currencies.COINS, 100));
+
+        admin.set(operator, target, Money.of(Currencies.COINS, 30));
+
+        assertThat(history.entries()).singleElement().satisfies(entry -> {
+            assertThat(entry.kind()).isEqualTo("DEBIT");
+            assertThat(entry.amount()).isEqualTo(Money.of(Currencies.COINS, 70));
+            assertThat(entry.reason()).isEqualTo(EconomyReason.ADMIN_SET);
+        });
+    }
+
+    @Test
+    void aZeroDeltaSetRecordsNoTransaction() {
+        repo.credit(target, Money.of(Currencies.COINS, 50));
+
+        admin.set(operator, target, Money.of(Currencies.COINS, 50));
+
+        assertThat(history.entries()).isEmpty();
     }
 
     @Test

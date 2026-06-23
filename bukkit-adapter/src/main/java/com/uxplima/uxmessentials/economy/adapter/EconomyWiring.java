@@ -561,7 +561,7 @@ public final class EconomyWiring {
                 new SellItem(resolved, worth, notifier, defaultCurrency, currencies.all()),
                 new SellAll(resolved, worth, notifier, defaultCurrency, currencies.all()),
                 new SetWorth(worthOverrides, notifier, audit, defaultCurrency, currencies.all()),
-                new EcoAdmin(resolved, repository, audit, notifier),
+                new EcoAdmin(resolved, repository, audit, notifier, history, clock),
                 exchangeService,
                 currencies,
                 snapshots,

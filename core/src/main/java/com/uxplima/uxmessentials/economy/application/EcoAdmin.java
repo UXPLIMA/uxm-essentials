@@ -1,11 +1,13 @@
 package com.uxplima.uxmessentials.economy.application;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
+import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
@@ -32,13 +34,22 @@ public final class EcoAdmin {
     private final WalletRepository repository;
     private final EconomyAudit audit;
     private final EconomyNotifier notifier;
+    private final TransactionHistory history;
+    private final Clock clock;
 
     public EcoAdmin(
-            EconomyProvider economy, WalletRepository repository, EconomyAudit audit, EconomyNotifier notifier) {
+            EconomyProvider economy,
+            WalletRepository repository,
+            EconomyAudit audit,
+            EconomyNotifier notifier,
+            TransactionHistory history,
+            Clock clock) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.history = Objects.requireNonNull(history, "history");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /** {@code /eco give <target> <amount> [currency]}: credit {@code target} by {@code amount}. */
@@ -55,7 +66,9 @@ public final class EcoAdmin {
     public Result<Unit, TransferError> set(PlayerRef actor, PlayerRef target, Money amount) {
         validate(actor, target, amount);
         repository.ensureOwner(target);
+        Money before = economy.balance(target, amount.currency());
         repository.upsertBalance(target, amount);
+        recordNetChange(target, before, amount, EconomyReason.ADMIN_SET);
         audit.adminMutation(actor, target, amount, EconomyReason.ADMIN_SET);
         notify(actor, target, amount, EconomyMessageKey.ECO_ADMIN_SET);
         return Result.ok();
@@ -66,7 +79,9 @@ public final class EcoAdmin {
         Money starting = Money.of(currency, currency.starting());
         validate(actor, target, starting);
         repository.ensureOwner(target);
+        Money before = economy.balance(target, currency);
         repository.upsertBalance(target, starting);
+        recordNetChange(target, before, starting, EconomyReason.ADMIN_RESET);
         audit.adminMutation(actor, target, starting, EconomyReason.ADMIN_RESET);
         notify(actor, target, starting, EconomyMessageKey.ECO_ADMIN_RESET);
         return Result.ok();
@@ -75,7 +90,7 @@ public final class EcoAdmin {
     /** {@code /eco giveall <amount> [currency]}: credit every wallet in {@code targets} by {@code amount}. */
     public int giveAll(PlayerRef actor, List<PlayerRef> targets, Money amount) {
         validateBulk(actor, amount);
-        int affected = creditEach(targets, amount);
+        int affected = creditEach(targets, amount, EconomyReason.ADMIN_GIVEALL);
         audit.bulkMutation(actor, amount, affected, EconomyReason.ADMIN_GIVEALL);
         notifier.send(
                 actor,
@@ -92,6 +107,7 @@ public final class EcoAdmin {
         if (result.isErr()) {
             return result;
         }
+        history.recordCredit(ownerId(chosen), amount, EconomyReason.ADMIN_GIVERANDOM, clock.millis());
         audit.bulkMutation(actor, amount, 1, EconomyReason.ADMIN_GIVERANDOM);
         notifier.send(
                 actor,
@@ -118,6 +134,7 @@ public final class EcoAdmin {
         if (result.isErr()) {
             return Result.err(result.errorOrThrow());
         }
+        history.recordCredit(ownerId(target), amount, EconomyReason.ADMIN_GIVE, clock.millis());
         audit.adminMutation(actor, target, amount, EconomyReason.ADMIN_GIVE);
         notifier.send(
                 actor,
@@ -133,7 +150,9 @@ public final class EcoAdmin {
         int affected = 0;
         for (PlayerRef target : List.copyOf(targets)) {
             repository.ensureOwner(target);
+            Money before = economy.balance(target, currency);
             repository.upsertBalance(target, starting);
+            recordNetChange(target, before, starting, EconomyReason.ADMIN_RESETALL);
             affected++;
         }
         audit.bulkMutation(actor, starting, affected, EconomyReason.ADMIN_RESETALL);
@@ -170,16 +189,44 @@ public final class EcoAdmin {
             notifier.send(actor, result.errorOrThrow().messageKey(), Map.of("amount", notifier.amount(amount)));
             return result;
         }
+        if (credit) {
+            history.recordCredit(ownerId(target), amount, reason, clock.millis());
+        } else {
+            history.recordDebit(ownerId(target), amount, reason, clock.millis());
+        }
         audit.adminMutation(actor, target, amount, reason);
         notify(actor, target, amount, feedback);
         return Result.ok();
     }
 
-    private int creditEach(List<PlayerRef> targets, Money amount) {
+    private static String ownerId(PlayerRef owner) {
+        return owner.uuid().toString();
+    }
+
+    /**
+     * Records the net change of an exact-balance write (set/reset) as a single credit or debit. A no-op write
+     * (the new balance already matches the old) records nothing, so a zero-delta set never logs a phantom row.
+     */
+    private void recordNetChange(PlayerRef target, Money before, Money after, EconomyReason reason) {
+        int sign = after.amount().compareTo(before.amount());
+        if (sign == 0) {
+            return;
+        }
+        Money delta = Money.of(
+                after.currency(), after.amount().subtract(before.amount()).abs());
+        if (sign > 0) {
+            history.recordCredit(ownerId(target), delta, reason, clock.millis());
+        } else {
+            history.recordDebit(ownerId(target), delta, reason, clock.millis());
+        }
+    }
+
+    private int creditEach(List<PlayerRef> targets, Money amount, EconomyReason reason) {
         int affected = 0;
         for (PlayerRef target : List.copyOf(targets)) {
             repository.ensureOwner(target);
             if (economy.credit(target, amount).isOk()) {
+                history.recordCredit(ownerId(target), amount, reason, clock.millis());
                 affected++;
             }
         }

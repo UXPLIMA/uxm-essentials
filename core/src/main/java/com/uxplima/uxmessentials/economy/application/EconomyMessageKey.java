@@ -364,7 +364,14 @@ public enum EconomyMessageKey implements MessageKey {
     ECO_ADMIN_GUI_GIVEALL_LORE("eco.admin-gui.giveall-lore"),
     ECO_ADMIN_GUI_RESETALL_NAME("eco.admin-gui.resetall-name"),
     ECO_ADMIN_GUI_RESETALL_LORE("eco.admin-gui.resetall-lore"),
-    ECO_ADMIN_GUI_RESETALL_CONFIRM_TITLE("eco.admin-gui.resetall-confirm-title");
+    ECO_ADMIN_GUI_RESETALL_CONFIRM_TITLE("eco.admin-gui.resetall-confirm-title"),
+
+    // Eco-admin GUI — currency picker (paginated, shared by the manage and bulk screens)
+    ECO_ADMIN_GUI_SELECT_CURRENCY_NAME("eco.admin-gui.select-currency-name"),
+    ECO_ADMIN_GUI_SELECT_CURRENCY_LORE("eco.admin-gui.select-currency-lore"),
+    ECO_ADMIN_GUI_CURRENCY_PICKER_TITLE("eco.admin-gui.currency-picker-title"),
+    ECO_ADMIN_GUI_CURRENCY_PICKER_PREVIOUS("eco.admin-gui.currency-picker-previous"),
+    ECO_ADMIN_GUI_CURRENCY_PICKER_NEXT("eco.admin-gui.currency-picker-next");
 
     private final String key;
 

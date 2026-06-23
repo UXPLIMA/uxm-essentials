@@ -49,6 +49,7 @@ public final class EconomyAdminGuiViews {
             EconomyNotifier notifier,
             TransactionsHistoryView historyView) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
+        CurrencyPickerView currencyPicker = new CurrencyPickerView(guiText, scheduler);
         // Both child screens return to the hub; the hub is constructed last, so the back-callbacks read it
         // through a one-slot holder rather than a setter, keeping every cross-link constructor-injected.
         EconomyAdminView[] hubHolder = new EconomyAdminView[1];
@@ -61,6 +62,7 @@ public final class EconomyAdminGuiViews {
                 currencies,
                 notifier,
                 historyView,
+                currencyPicker,
                 (player, viewer) -> hubHolder[0].open(player, viewer));
         EconomyBulkView bulkView = new EconomyBulkView(
                 guiText,
@@ -70,6 +72,7 @@ public final class EconomyAdminGuiViews {
                 ops,
                 currencies,
                 notifier,
+                currencyPicker,
                 (player, viewer) -> hubHolder[0].open(player, viewer));
         EconomyAdminView hub =
                 new EconomyAdminView(guiText, scheduler, picker, players, targetView, bulkView, historyView);

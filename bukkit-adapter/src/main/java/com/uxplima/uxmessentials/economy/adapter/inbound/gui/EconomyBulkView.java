@@ -41,12 +41,16 @@ import org.jspecify.annotations.NullMarked;
  * repository {@code allOwners()} read-model lands (see {@code EcoTargets}). The roster is enumerated on the
  * global region thread (the one thread {@code Server.getOnlinePlayers()} is safely readable on Folia), snapshotted
  * to {@link PlayerRef}s, and the bulk op runs off the tick thread.
+ *
+ * <p>When more than one currency is configured a single [Currency] item between give-all and reset-all opens the
+ * shared paginated {@link CurrencyPickerView}; choosing a currency re-opens this screen with it active.
  */
 @NullMarked
 public final class EconomyBulkView {
 
     private static final int ROWS = 3;
     private static final int GIVEALL_SLOT = 11;
+    private static final int SELECT_CURRENCY_SLOT = 13;
     private static final int RESETALL_SLOT = 15;
     private static final int BACK_SLOT = 22;
     private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
@@ -58,6 +62,7 @@ public final class EconomyBulkView {
     private final EcoAdminOps ops;
     private final CurrencyRegistry currencies;
     private final EconomyNotifier notifier;
+    private final CurrencyPickerView currencyPicker;
     private final java.util.function.BiConsumer<Player, PlayerRef> onBack;
 
     public EconomyBulkView(
@@ -68,6 +73,7 @@ public final class EconomyBulkView {
             EcoAdminOps ops,
             CurrencyRegistry currencies,
             EconomyNotifier notifier,
+            CurrencyPickerView currencyPicker,
             java.util.function.BiConsumer<Player, PlayerRef> onBack) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -76,14 +82,20 @@ public final class EconomyBulkView {
         this.ops = Objects.requireNonNull(ops, "ops");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.currencyPicker = Objects.requireNonNull(currencyPicker, "currencyPicker");
         this.onBack = Objects.requireNonNull(onBack, "onBack");
     }
 
     /** Open the server-wide screen for {@code viewer}, with the default currency active. */
     public void open(Player viewer, PlayerRef viewerRef) {
+        open(viewer, viewerRef, currencies.defaultCurrency());
+    }
+
+    /** Open the server-wide screen for {@code viewer} with {@code active} as the currency the actions apply to. */
+    public void open(Player viewer, PlayerRef viewerRef, Currency active) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(viewerRef, "viewerRef");
-        Currency active = currencies.defaultCurrency();
+        Objects.requireNonNull(active, "active");
         scheduler.onEntity(viewerRef, () -> buildAndOpen(viewer, viewerRef, active));
     }
 
@@ -103,6 +115,7 @@ public final class EconomyBulkView {
                         currencyName,
                         Material.EMERALD_BLOCK,
                         () -> promptGiveAll(viewer, viewerRef, active)));
+        selectCurrency(gui, viewer, viewerRef, active);
         gui.set(
                 RESETALL_SLOT,
                 action(
@@ -116,6 +129,31 @@ public final class EconomyBulkView {
         gui.open(viewer);
     }
 
+    /**
+     * Render the single [Currency] item only when more than one currency is configured; clicking it opens the
+     * shared paginated picker, and choosing a currency re-opens this screen with that currency active.
+     */
+    private void selectCurrency(SimpleGui gui, Player viewer, PlayerRef viewerRef, Currency active) {
+        List<Currency> all = List.copyOf(currencies.all());
+        if (all.size() <= 1) {
+            return;
+        }
+        gui.set(
+                SELECT_CURRENCY_SLOT,
+                GuiItem.button(
+                        selectCurrencyIcon(viewerRef, active),
+                        e -> currencyPicker.open(
+                                viewer, viewerRef, all, active, chosen -> open(viewer, viewerRef, chosen))));
+    }
+
+    private ItemStack selectCurrencyIcon(PlayerRef viewer, Currency active) {
+        Map<String, String> placeholders = Map.of("currency", active.plural());
+        return ItemBuilder.of(Material.SUNFLOWER)
+                .name(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_SELECT_CURRENCY_NAME))
+                .lore(List.of(guiText.text(viewer, EconomyMessageKey.ECO_ADMIN_GUI_SELECT_CURRENCY_LORE, placeholders)))
+                .build();
+    }
+
     private void promptGiveAll(Player viewer, PlayerRef viewerRef, Currency active) {
         scheduler.onEntity(
                 viewerRef,
@@ -123,7 +161,7 @@ public final class EconomyBulkView {
                     if (result instanceof AnvilResult.Submitted submitted) {
                         applyGiveAll(viewer, viewerRef, active, submitted.text());
                     } else {
-                        open(viewer, viewerRef);
+                        open(viewer, viewerRef, active);
                     }
                 }));
     }
@@ -138,7 +176,7 @@ public final class EconomyBulkView {
         Result<Money, AmountParseError> parsed = AmountParser.parse(raw, active);
         if (parsed.isErr()) {
             notifier.send(viewerRef, parsed.errorOrThrow().messageKey());
-            open(viewer, viewerRef);
+            open(viewer, viewerRef, active);
             return;
         }
         Money money = parsed.orElseThrow();
@@ -146,14 +184,15 @@ public final class EconomyBulkView {
             List<PlayerRef> roster = roster();
             scheduler.async(() -> ops.giveAll(viewerRef, roster, money));
         });
-        open(viewer, viewerRef);
+        open(viewer, viewerRef, active);
     }
 
     private void confirmResetAll(Player viewer, PlayerRef viewerRef, Currency active) {
         Component title = guiText.text(viewerRef, EconomyMessageKey.ECO_ADMIN_GUI_RESETALL_CONFIRM_TITLE);
         scheduler.onEntity(
                 viewerRef,
-                () -> ConfirmMenu.of(title, () -> resetAll(viewer, viewerRef, active), () -> open(viewer, viewerRef))
+                () -> ConfirmMenu.of(
+                                title, () -> resetAll(viewer, viewerRef, active), () -> open(viewer, viewerRef, active))
                         .open(viewer));
     }
 
@@ -162,7 +201,7 @@ public final class EconomyBulkView {
             List<PlayerRef> roster = roster();
             scheduler.async(() -> ops.resetAll(viewerRef, roster, active));
         });
-        open(viewer, viewerRef);
+        open(viewer, viewerRef, active);
     }
 
     private List<PlayerRef> roster() {
