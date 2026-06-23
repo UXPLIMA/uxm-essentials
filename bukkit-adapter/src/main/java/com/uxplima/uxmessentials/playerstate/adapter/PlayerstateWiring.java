@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.NoFlyWorldListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.WorldCommandListener;
@@ -68,6 +69,8 @@ import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -89,10 +92,12 @@ public final class PlayerstateWiring {
     private PlayerstateWiring() {}
 
     /** Build the playerstate adapters and use cases from {@code ctx}, ready to register with the plugin. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, PlaytimeRepository playtimeRepository) {
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, PlaytimeRepository playtimeRepository, GuiLayouts guiLayouts) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(playtimeRepository, "playtimeRepository");
+        Objects.requireNonNull(guiLayouts, "guiLayouts");
         KernelPorts kernel = ctx.kernel();
         ConfigStore config = ctx.config();
         Clock clock = Clock.systemUTC();
@@ -127,7 +132,14 @@ public final class PlayerstateWiring {
                 clock,
                 settings.playtimeTracking(),
                 Duration.ofSeconds(settings.playtimeSampleSeconds()));
-        List<CommandRegistration> commands = PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds);
+        PlaytimeView playtimeView = new PlaytimeView(
+                new GuiText(kernel.messages()),
+                kernel.scheduler(),
+                guiLayouts,
+                kernel.messages(),
+                services.showPlaytime());
+        List<CommandRegistration> commands =
+                PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds, playtimeView);
         List<Listener> listeners = List.of(
                 new PlayerStateListener(store, reconciler),
                 new InvseeListener(invseeView),

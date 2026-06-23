@@ -46,8 +46,18 @@ public final class ShowPlaytime {
     public void showFor(PlayerRef actor, PlayerRef subject) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(subject, "subject");
+        notifier.send(actor, headerKey(actor, subject), breakdown(subject));
+    }
+
+    /**
+     * The rendered placeholder map for {@code subject}'s breakdown — the same compact-formatted today / week /
+     * month / all-time / lifetime values the chat lines interpolate. Exposed so the {@code /playtime} GUI renders
+     * the identical figures without duplicating the formatting; reads the repository, so callers run it off-tick.
+     */
+    public Map<String, String> breakdown(PlayerRef subject) {
+        Objects.requireNonNull(subject, "subject");
         PlaytimeSummary summary = repository.summaryOf(subject.uuid(), LocalDate.now(clock));
-        notifier.send(actor, headerKey(actor, subject), placeholders(subject, summary));
+        return placeholders(subject, summary);
     }
 
     private static PlayerstateMessageKey headerKey(PlayerRef actor, PlayerRef subject) {

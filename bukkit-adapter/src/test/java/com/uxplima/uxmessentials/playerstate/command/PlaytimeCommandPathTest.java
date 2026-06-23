@@ -61,28 +61,33 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@code /playtime} and {@code /playtime reset}, driving the real {@code ShowPlaytime} and
- * {@code ResetPlaytime} use cases over a fake {@link PlaytimeRepository}. It proves the breakdown is rendered with
- * the today/week/month/all-time placeholders, that {@code reset} is gated by {@code uxmessentials.playtime.reset}
- * (a sender without it cannot run the subcommand, so nothing is reset), and that with the node a self-reset wipes
- * the ledger and confirms.
+ * MockBukkit coverage of {@code /playtime}, {@code /playtime reset} and {@code /playtime resetall}, driving the
+ * real {@code ShowPlaytime} and {@code ResetPlaytime} use cases over a fake {@link PlaytimeRepository}. It proves
+ * the breakdown is rendered with the today/week/month/all-time placeholders; that the {@code player} target is a
+ * plain online-name word (never a selector, so {@code @a} never reaches a single-target read) and resolves a named
+ * target under the {@code .others} node; that {@code reset} and {@code resetall} are gated by
+ * {@code uxmessentials.playtime.reset} (a sender without it cannot run either subcommand); that with the node a
+ * self-reset wipes one ledger and resetall wipes every ledger, each confirming; and that the catalog {@code gui}
+ * flag swaps the bare-root chat executor for the GUI panel opener while leaving it for the chat fallback when off.
  */
 class PlaytimeCommandPathTest {
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
     private static final String USE = "uxmessentials.playtime.use";
     private static final String RESET = "uxmessentials.playtime.reset";
+    private static final String OTHERS = "uxmessentials.playerstate.others";
 
     private ServerMock server;
     private PlaytimeCommand command;
     private FakePlaytimeRepository repo;
+    private ShowPlaytime show;
 
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
         repo = new FakePlaytimeRepository();
         PlayerStateNotifier notifier = new PlayerStateNotifier(new EchoMessages(), new BukkitMessageSink());
-        ShowPlaytime show = new ShowPlaytime(repo, new EmptyInfo(), notifier, Clock.systemUTC());
+        show = new ShowPlaytime(repo, new EmptyInfo(), notifier, Clock.systemUTC());
         ResetPlaytime reset = new ResetPlaytime(repo, notifier);
         PlayerStateServices services = new PlayerStateServices(
                 mock(ToggleGod.class),
@@ -122,9 +127,63 @@ class PlaytimeCommandPathTest {
     }
 
     @Test
-    void theLiteralIsPlaytimeWithAResetSubcommand() {
+    void theLiteralIsPlaytimeWithResetAndResetAllSubcommands() {
         assertThat(command.build().getLiteral()).isEqualTo("playtime");
         assertThat(command.build().getChild("reset")).isNotNull();
+        assertThat(command.build().getChild("resetall")).isNotNull();
+    }
+
+    @Test
+    void theNameArgumentIsAPlainWordNotASelector() {
+        // The /playtime player argument completes against the online roster as a plain word; it is not a Paper
+        // entity-selector node, so @a/@p/@s never parse here — showing one player's stats is a single-target read.
+        var playerArg = command.build().getChild("player");
+        assertThat(playerArg).isNotNull();
+        assertThat(playerArg.getName()).isEqualTo("player");
+        assertThat(playerArg).isInstanceOf(com.mojang.brigadier.tree.ArgumentCommandNode.class);
+        var argNode = (com.mojang.brigadier.tree.ArgumentCommandNode<?, ?>) playerArg;
+        assertThat(argNode.getType()).isInstanceOf(com.mojang.brigadier.arguments.StringArgumentType.class);
+    }
+
+    @Test
+    void aPlainNameResolvesTheNamedTargetWithOthers() {
+        PlayerMock viewer = server.addPlayer("Viewer");
+        viewer.addAttachment(MockBukkit.createMockPlugin(), USE, true);
+        viewer.addAttachment(MockBukkit.createMockPlugin(), OTHERS, true);
+        PlayerMock other = server.addPlayer("Other");
+        repo.addSeconds(other.getUniqueId(), LocalDate.now(java.time.ZoneOffset.UTC), 60L, 0L);
+
+        execute(CommandSourceStackMock.from(viewer), "playtime Other");
+
+        String line = PLAIN.serialize(viewer.nextComponentMessage());
+        assertThat(line).contains("playerstate.playtime.show-other").contains("player=Other");
+    }
+
+    @Test
+    void resetAllWithoutTheResetNodeDoesNothing() {
+        PlayerMock player = server.addPlayer("Player");
+        player.addAttachment(MockBukkit.createMockPlugin(), USE, true); // has /playtime, not the reset node
+
+        boolean parsed = tryExecute(CommandSourceStackMock.from(player), "playtime resetall");
+
+        assertThat(parsed)
+                .as("the resetall subcommand is unreachable without the reset node")
+                .isFalse();
+        assertThat(repo.resetAllCalls).isZero();
+    }
+
+    @Test
+    void resetAllWithTheNodeWipesEveryLedgerAndConfirms() {
+        PlayerMock player = server.addPlayer("Player");
+        player.addAttachment(MockBukkit.createMockPlugin(), USE, true);
+        player.addAttachment(MockBukkit.createMockPlugin(), RESET, true);
+        repo.addSeconds(player.getUniqueId(), LocalDate.now(java.time.ZoneOffset.UTC), 100L, 0L);
+
+        execute(CommandSourceStackMock.from(player), "playtime resetall");
+
+        assertThat(repo.resetAllCalls).isEqualTo(1);
+        String line = PLAIN.serialize(player.nextComponentMessage());
+        assertThat(line).contains("playerstate.playtime.reset-all");
     }
 
     @Test
@@ -171,6 +230,90 @@ class PlaytimeCommandPathTest {
         assertThat(line).contains("playerstate.playtime.reset");
     }
 
+    @Test
+    void bareRootGainsTheGuiOpenerWhenGuiOn(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dataFolder) {
+        PlaytimeCommand guiCommand = withView(dataFolder);
+        var node = binding("playtime", true).wrap(guiCommand).build();
+
+        assertThat(guiCommand.guiRoot()).isPresent();
+        // The bare root gains the opener and the reset/resetall/name children carry across.
+        assertThat(node.getCommand()).isNotNull();
+        assertThat(node.getChild("reset")).isNotNull();
+        assertThat(node.getChild("resetall")).isNotNull();
+        assertThat(node.getChild("player")).isNotNull();
+    }
+
+    @Test
+    void bareRootKeepsTheChatExecutorWhenGuiOff(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dataFolder) {
+        PlaytimeCommand guiCommand = withView(dataFolder);
+        var node = binding("playtime", false).wrap(guiCommand).build();
+
+        // gui off leaves the command's own bare-root chat show executor untouched.
+        assertThat(node.getCommand()).isNotNull();
+        assertThat(node.getChild("player")).isNotNull();
+    }
+
+    @Test
+    void aPlaytimeWithNoGuiExposesNoOpener() {
+        assertThat(command.guiRoot()).isEmpty();
+    }
+
+    /** A {@link PlaytimeCommand} carrying a real {@link PlaytimeView} over the test fakes and a temp gui folder. */
+    private PlaytimeCommand withView(java.nio.file.Path dataFolder) {
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new EchoMessages());
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts layouts =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(dataFolder, new NoopLogger());
+        var view = new com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView(
+                guiText, new SyncScheduler(), layouts, new EchoMessages(), show);
+        return new PlaytimeCommand(servicesWith(), new EchoMessages(), view);
+    }
+
+    /** The same mock service bundle as {@link #setUp}, with the real show/reset use cases wired. */
+    private PlayerStateServices servicesWith() {
+        return new PlayerStateServices(
+                mock(ToggleGod.class),
+                mock(ToggleFly.class),
+                mock(Heal.class),
+                mock(Feed.class),
+                mock(SetFoodLevel.class),
+                mock(SetHealth.class),
+                mock(SetGamemode.class),
+                mock(SetSpeed.class),
+                mock(Extinguish.class),
+                mock(ClearInventory.class),
+                mock(ToggleClearInventoryConfirm.class),
+                mock(OpenContainer.class),
+                mock(Suicide.class),
+                mock(ListNearby.class),
+                mock(ToggleNightVision.class),
+                mock(ToggleGlow.class),
+                mock(SetPersonalTime.class),
+                mock(SetPersonalWeather.class),
+                mock(SetExperience.class),
+                mock(SetAir.class),
+                mock(Burn.class),
+                mock(Freeze.class),
+                mock(ShowPosition.class),
+                mock(ShowPing.class),
+                show,
+                new ResetPlaytime(repo, new PlayerStateNotifier(new EchoMessages(), new BukkitMessageSink())),
+                mock(ResetRest.class),
+                mock(PlayerLookup.class));
+    }
+
+    private static com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding binding(
+            String id, boolean gui) {
+        return new com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding(Map.of(
+                id,
+                new com.uxplima.uxmessentials.shared.application.command.EffectiveCommand(
+                        new com.uxplima.uxmessentials.shared.application.command.CommandId(id),
+                        id,
+                        java.util.List.of(),
+                        true,
+                        gui)));
+    }
+
     private void execute(CommandSourceStack source, String input) {
         if (!tryExecute(source, input)) {
             throw new AssertionError("command did not parse: " + input);
@@ -211,6 +354,49 @@ class PlaytimeCommandPathTest {
         }
     }
 
+    /** Runs every scheduled hop inline, so the GUI build path is exercised synchronously in the opener tests. */
+    private static final class SyncScheduler implements com.uxplima.uxmessentials.shared.application.port.Scheduler {
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(java.time.Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** A logger that swallows output, for the temp-folder GuiLayouts in the opener tests. */
+    private static final class NoopLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
     /** A {@link PlayerInfo} with no live data — the lifetime line falls back to the tracked all-time total. */
     private static final class EmptyInfo implements PlayerInfo {
         @Override
@@ -232,6 +418,7 @@ class PlaytimeCommandPathTest {
     /** A map-backed ledger recording resets, for the command-path assertions. */
     private static final class FakePlaytimeRepository implements PlaytimeRepository {
         private final java.util.List<UUID> reset = new java.util.ArrayList<>();
+        private int resetAllCalls;
         private final Map<UUID, long[]> totals = new ConcurrentHashMap<>();
 
         @Override
@@ -249,6 +436,12 @@ class PlaytimeCommandPathTest {
         public void reset(UUID uuid) {
             reset.add(uuid);
             totals.remove(uuid);
+        }
+
+        @Override
+        public void resetAll() {
+            resetAllCalls++;
+            totals.clear();
         }
     }
 }

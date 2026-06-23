@@ -97,6 +97,18 @@ class JooqPlaytimeRepositoryTest {
         assertThat(repository.summaryOf(other, TODAY).todayActive().toSeconds()).isEqualTo(200L);
     }
 
+    @Test
+    void resetAllClearsEveryPlayersRows() {
+        UUID other = UUID.randomUUID();
+        repository.addSeconds(player, TODAY, 100L, 10L);
+        repository.addSeconds(other, TODAY, 200L, 20L);
+
+        repository.resetAll();
+
+        assertThat(repository.summaryOf(player, TODAY)).isEqualTo(PlaytimeSummary.empty());
+        assertThat(repository.summaryOf(other, TODAY)).isEqualTo(PlaytimeSummary.empty());
+    }
+
     /** A config that selects the embedded SQLite backend with every default — no network coordinates. */
     private record SqliteConfig() implements ConfigStore {
         @Override

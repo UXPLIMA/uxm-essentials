@@ -150,5 +150,10 @@ class PlaytimeSamplerTest {
         public void reset(UUID uuid) {
             totals.remove(uuid);
         }
+
+        @Override
+        public void resetAll() {
+            totals.clear();
+        }
     }
 }

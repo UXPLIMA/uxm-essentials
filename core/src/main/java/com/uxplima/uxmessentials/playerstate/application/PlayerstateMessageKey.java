@@ -138,6 +138,22 @@ public enum PlayerstateMessageKey implements MessageKey {
     PLAYTIME_RESET("playerstate.playtime.reset"),
     PLAYTIME_RESET_OTHER("playerstate.playtime.reset-other"),
 
+    // /playtime resetall
+    PLAYTIME_RESET_ALL("playerstate.playtime.reset-all"),
+
+    // /playtime GUI
+    PLAYTIME_GUI_TITLE("playerstate.playtime.gui.title"),
+    PLAYTIME_GUI_TITLE_OTHER("playerstate.playtime.gui.title-other"),
+    PLAYTIME_GUI_VALUE_LORE("playerstate.playtime.gui.value-lore"),
+    PLAYTIME_GUI_BACK("playerstate.playtime.gui.back"),
+    PLAYTIME_GUI_TODAY("playerstate.playtime.gui.today"),
+    PLAYTIME_GUI_WEEK("playerstate.playtime.gui.week"),
+    PLAYTIME_GUI_MONTH("playerstate.playtime.gui.month"),
+    PLAYTIME_GUI_TOTAL("playerstate.playtime.gui.total"),
+    PLAYTIME_GUI_LIFETIME("playerstate.playtime.gui.lifetime"),
+    PLAYTIME_GUI_ROW_VALUE("playerstate.playtime.gui.row-value"),
+    PLAYTIME_GUI_LIFETIME_VALUE("playerstate.playtime.gui.lifetime-value"),
+
     // /rest
     REST_DONE("playerstate.rest.done"),
     REST_DONE_OTHER("playerstate.rest.done-other"),

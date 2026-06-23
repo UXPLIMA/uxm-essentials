@@ -3,11 +3,13 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 import java.util.List;
 
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the playerstate context's Brigadier command surface (docs/10-feature-modules.md §15.6) as
@@ -24,9 +26,12 @@ public final class PlayerStateCommands {
 
     private PlayerStateCommands() {}
 
-    /** Every playerstate command, in surface order. */
+    /** Every playerstate command, in surface order. The {@code playtimeView} is null when no GUI is wired. */
     public static List<CommandRegistration> all(
-            PlayerStateServices services, Messages messages, NoFlyWorldPolicy noFlyWorlds) {
+            PlayerStateServices services,
+            Messages messages,
+            NoFlyWorldPolicy noFlyWorlds,
+            @Nullable PlaytimeView playtimeView) {
         return List.of(
                 new GodCommand(services, messages),
                 new FlyCommand(services, messages, noFlyWorlds),
@@ -65,7 +70,7 @@ public final class PlayerStateCommands {
                 new WorldCommand(services, messages),
                 new DimensionCommand(services, messages),
                 new PingCommand(services, messages),
-                new PlaytimeCommand(services, messages),
+                new PlaytimeCommand(services, messages, playtimeView),
                 new RestCommand(services, messages));
     }
 }

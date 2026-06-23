@@ -46,4 +46,10 @@ public interface PlaytimeRepository {
 
     /** Delete every row for {@code uuid}, resetting their tracked playtime to nothing. A no-op when none exist. */
     void reset(UUID uuid);
+
+    /**
+     * Delete every row for every player, clearing the whole tracked ledger. The administrative companion to
+     * {@link #reset(UUID)} behind {@code /playtime resetall}; a no-op on an already-empty store.
+     */
+    void resetAll();
 }

@@ -368,6 +368,19 @@ class PlayerStateUseCasesTest {
         assertThat(captured).containsExactly(PlayerstateMessageKey.PLAYTIME_RESET.key());
     }
 
+    @Test
+    void resetAllPlaytimeWipesEveryLedgerAndConfirms() {
+        FakePlaytimeRepository repo = new FakePlaytimeRepository();
+        var captured = new ArrayList<String>();
+        PlayerStateNotifier capturing =
+                new PlayerStateNotifier(new KeyMessages(), (viewer, renderedText) -> captured.add(renderedText));
+
+        new ResetPlaytime(repo, capturing).resetAll(alice);
+
+        assertThat(repo.resetAllCalls).isEqualTo(1);
+        assertThat(captured).containsExactly(PlayerstateMessageKey.PLAYTIME_RESET_ALL.key());
+    }
+
     /** A map-backed {@link PlayerStateStore} mutated via the same compute contract as the real adapter. */
     private static final class FakeStore implements PlayerStateStore {
         private final ConcurrentHashMap<UUID, PlayerStateSnapshot> map = new ConcurrentHashMap<>();
@@ -559,6 +572,7 @@ class PlayerStateUseCasesTest {
     private static final class FakePlaytimeRepository
             implements com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository {
         private final List<UUID> reset = new ArrayList<>();
+        private int resetAllCalls;
         private final Map<UUID, long[]> totals = new ConcurrentHashMap<>(); // [active, afk]
 
         @Override
@@ -578,6 +592,12 @@ class PlayerStateUseCasesTest {
         public void reset(UUID uuid) {
             reset.add(uuid);
             totals.remove(uuid);
+        }
+
+        @Override
+        public void resetAll() {
+            resetAllCalls++;
+            totals.clear();
         }
     }
 

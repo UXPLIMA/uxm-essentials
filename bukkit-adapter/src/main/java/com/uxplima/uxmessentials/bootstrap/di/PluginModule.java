@@ -394,7 +394,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("kits"))) {
             wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
-            wirePlayerstate(plugin, ctx, persistence, resources, links);
+            wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
             wireMessaging(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, anvil);
         } else if (module.id().equals(ModuleId.of("presence"))) {
@@ -651,13 +651,14 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            GuiLayouts guiLayouts) {
         // playerstate's only durable state is the per-day playtime ledger behind /playtime, built over
         // persistence.dsl(); the per-player snapshot map stays transient in-memory and all live-player
         // reconciliation routes through the kernel Scheduler port onto the owning region thread. The AFK-aware
         // playtime sampler is armed below and stopped on module disable, leaving no orphaned tick.
         PlaytimeRepository playtimeRepository = PlaytimeRepositories.jooq(persistence);
-        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(plugin, ctx, playtimeRepository);
+        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

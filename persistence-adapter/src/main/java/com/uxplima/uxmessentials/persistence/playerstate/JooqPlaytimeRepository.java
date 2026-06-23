@@ -114,6 +114,11 @@ public final class JooqPlaytimeRepository extends JooqRepository implements Play
                 .execute());
     }
 
+    @Override
+    public void resetAll() {
+        write(dsl -> dsl.deleteFrom(PLAYERSTATE_PLAYTIME).execute());
+    }
+
     /** SUM of {@code column} over the rows where {@code inWindow} holds, zero outside it — one window's total. */
     private static Field<Long> windowed(Field<Long> column, org.jooq.Condition inWindow) {
         return org.jooq

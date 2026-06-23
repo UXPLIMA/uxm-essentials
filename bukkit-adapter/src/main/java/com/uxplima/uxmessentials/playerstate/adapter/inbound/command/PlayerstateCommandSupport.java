@@ -20,6 +20,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -96,11 +97,13 @@ abstract class PlayerstateCommandSupport {
     }
 
     /**
-     * Resolve the optional {@code player} argument to a single target, for the read/report verbs that name one
-     * player ({@code /playtime}, {@code /getpos}, {@code /ping}) where a fan-out would only spam the same answer.
-     * Those verbs keep an {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#player()} argument,
-     * which already rejects a multi-match selector at parse, so the list this returns holds at most one element;
-     * its first is taken. Empty means the rejection (no-permission or unknown-player) was already sent.
+     * Resolve the optional {@code player} selector argument to a single target, taking the first match of an
+     * {@link io.papermc.paper.command.brigadier.argument.ArgumentTypes#player()} argument. Used by the
+     * single-target write verbs that keep a selector by design ({@code /clearinventory}, {@code /exp}), where
+     * naming one player via a selector is reasonable. The single-target <em>read</em> verbs ({@code /playtime},
+     * {@code /getpos}, {@code /ping}) deliberately do <em>not</em> use this — they take a plain name through
+     * {@link #resolveNamedTarget} so they never surface the {@code @a} selector on a read where a fan-out is
+     * nonsensical. Empty means the rejection (no-permission or unknown-player) was already sent.
      */
     final Optional<PlayerRef> resolveTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
         List<PlayerRef> targets = resolveTargets(ctx, sender);
@@ -110,6 +113,32 @@ abstract class PlayerstateCommandSupport {
     /** A {@link PlayerRef} for the live player. */
     static PlayerRef ref(Player player) {
         return BukkitRefs.toRef(player);
+    }
+
+    /**
+     * Resolve the optional {@code player} string argument to a single online target, for the read/report verbs
+     * that name one player ({@code /playtime}, {@code /getpos}, {@code /ping}). An absent argument is the sender;
+     * a present one resolves only when the sender holds {@link #OTHERS_PERMISSION}, matching exactly one online
+     * name — anything else is the unknown-player rejection. The argument is a plain {@link CommandSuggestions#playerArgument}
+     * word completing against the online roster, so these reads never expose the {@code @a}/{@code @p}/{@code @s}
+     * selector syntax: showing one player's stats is a single-target read where fanning out to every player is
+     * nonsensical. Empty means the rejection (no-permission or unknown-player) was already sent.
+     */
+    final Optional<PlayerRef> resolveNamedTarget(CommandContext<CommandSourceStack> ctx, Player sender) {
+        String typed = typedPlayerArg(ctx);
+        if (typed.isEmpty()) {
+            return Optional.of(BukkitRefs.toRef(sender));
+        }
+        if (!sender.hasPermission(OTHERS_PERMISSION)) {
+            reply(sender, NO_PERMISSION, Map.of());
+            return Optional.empty();
+        }
+        Player online = Bukkit.getPlayerExact(typed);
+        if (online != null) {
+            return Optional.of(BukkitRefs.toRef(online));
+        }
+        reply(sender, UNKNOWN_PLAYER, Map.of("player", typed));
+        return Optional.empty();
     }
 
     /**
