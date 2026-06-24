@@ -517,7 +517,18 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
-            wirePlayerwarps(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+            wirePlayerwarps(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    bus,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
             wireScoreboard(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
@@ -1144,7 +1155,9 @@ public final class PluginModule {
             Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // player-warps delegates teleport execution to the captured teleport engine exactly as warps does; its
         // cached jOOQ repository over persistence.dsl() is keyed per owner, and the player_warps table ships in
         // the persistence V14 baseline, always applied. It carries no cross-context bridge beyond the engine.
@@ -1169,7 +1182,9 @@ public final class PluginModule {
                 guiText,
                 guiLayouts,
                 textInput,
-                guiRegistry);
+                guiRegistry,
+                menus,
+                menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands

@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommands;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
-import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListView;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
@@ -27,12 +27,13 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpReposito
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -79,7 +80,9 @@ public final class PlayerwarpsWiring {
             GuiText guiText,
             GuiLayouts guiLayouts,
             TextInput textInput,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -89,6 +92,8 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
         // wraps that same cache so a local write announces it to peers (the homes seam, copied for player-warps).
@@ -132,14 +137,24 @@ public final class PlayerwarpsWiring {
                 ctx.config().getStringList("world-blacklist", List.of()));
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, kernel.events());
         SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
-        PlayerWarpListView listView = buildGui(
-                plugin, kernel, repository, setPlayerWarp, visibility, delPlayerWarp, guiText, guiLayouts, textInput);
+        PlayerWarpListMenu listMenu = buildGui(
+                plugin,
+                kernel,
+                repository,
+                setPlayerWarp,
+                visibility,
+                delPlayerWarp,
+                guiText,
+                guiLayouts,
+                textInput,
+                menus);
+        listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         guiRegistry.register(new ManagementGuiEntry(
                 "playerwarps",
                 PlayerwarpsMessageKey.PWARP_GUI_LIST_TITLE,
                 org.bukkit.Material.ENDER_PEARL,
-                PlayerWarpListView.MANAGE_PERMISSION,
-                listView::open));
+                PlayerWarpListMenu.MANAGE_PERMISSION,
+                listMenu::open));
         PlayerWarpServices services = assemble(
                 kernel,
                 repository,
@@ -149,17 +164,19 @@ public final class PlayerwarpsWiring {
                 visibility,
                 notifier,
                 editorView,
-                listView);
+                listMenu);
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(PlayerWarpCommands.all(services, kernel.messages()), List.of(joinWarmer), repository, quota);
     }
 
     /**
-     * Build the player-warp management list and editor over the shared GUI framework. The editor's back button
-     * reopens the list, so a one-slot holder breaks the list↔editor construction cycle (the editor is built first,
-     * the list second, and the holder is filled before either is shown) — the same pattern the NPC GUI uses.
+     * Build the player-warp management list (now an engine menu) and editor over the shared GUI framework. The
+     * editor's back button reopens the list, so a one-slot holder breaks the list↔editor construction cycle (the
+     * editor is built first, the list second, and the holder is filled before either is shown) — the same pattern
+     * the NPC GUI uses. The list's grid geometry and per-entry rendering now live in the {@code playerwarp-list}
+     * menu spec rather than the old {@code pwarp-list.conf} layout, so only the editor still reads a GUI layout.
      */
-    private static PlayerWarpListView buildGui(
+    private static PlayerWarpListMenu buildGui(
             Plugin plugin,
             KernelPorts kernel,
             PlayerWarpRepository repository,
@@ -168,16 +185,13 @@ public final class PlayerwarpsWiring {
             DelPlayerWarp delPlayerWarp,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus) {
         PlayerWarpEditorSubLayouts subLayouts = PlayerWarpEditorSubLayouts.load(
                 plugin.getDataFolder().toPath(), "playerwarps", "pwarp-editor", kernel.log());
-        EntityListLayout listLayout = guiLayouts.loadEntityList(
-                "playerwarps",
-                "pwarp-list",
-                EntityListLayout.withCreate(org.bukkit.Material.ENDER_PEARL, 49, org.bukkit.Material.LIME_DYE));
         EntityEditorLayout editorLayout =
                 guiLayouts.loadEntityEditor("playerwarps", "pwarp-editor", editorCodeDefault());
-        PlayerWarpListView[] listHolder = new PlayerWarpListView[1];
+        PlayerWarpListMenu[] listHolder = new PlayerWarpListMenu[1];
         PlayerWarpEditorView editor = new PlayerWarpEditorView(
                 guiText,
                 kernel.scheduler(),
@@ -189,18 +203,17 @@ public final class PlayerwarpsWiring {
                 editorLayout,
                 subLayouts,
                 (player, viewer) -> listHolder[0].open(player, viewer));
-        PlayerWarpListView listView = new PlayerWarpListView(
-                guiText,
+        PlayerWarpListMenu listMenu = new PlayerWarpListMenu(
+                menus,
                 kernel.scheduler(),
                 kernel.permissions(),
                 kernel.messages(),
                 repository,
                 setPlayerWarp,
                 textInput,
-                listLayout,
                 editor);
-        listHolder[0] = listView;
-        return listView;
+        listHolder[0] = listMenu;
+        return listMenu;
     }
 
     /** The editor's property-button slots, the code default matching the bundled pwarp-editor.conf. */
@@ -232,7 +245,7 @@ public final class PlayerwarpsWiring {
             PlayerWarpNotifier notifier,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
-            PlayerWarpListView listView) {
+            PlayerWarpListMenu listMenu) {
         return new PlayerWarpServices(
                 setPlayerWarp,
                 delPlayerWarp,
@@ -243,7 +256,7 @@ public final class PlayerwarpsWiring {
                 repository,
                 editorView,
                 kernel.scheduler(),
-                listView);
+                listMenu);
     }
 
     private static int defaultLimit(ModuleContext ctx) {

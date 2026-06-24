@@ -18,7 +18,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.command.PlayerWarpCommand;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorSubLayouts;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpEditorView;
-import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListView;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
@@ -31,10 +31,13 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleport
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -160,7 +163,7 @@ class PlayerWarpOffThreadReadTest {
     }
 
     /** A minimal real management list (this test does not open it; it only needs a non-null view in services). */
-    private PlayerWarpListView listView(
+    private PlayerWarpListMenu listView(
             Messages messages,
             Permissions permissions,
             SetPlayerWarp setPlayerWarp,
@@ -188,16 +191,12 @@ class PlayerWarpOffThreadReadTest {
                 editorLayout,
                 PlayerWarpEditorSubLayouts.codeDefault(),
                 (p, v) -> {});
-        return new PlayerWarpListView(
-                guiText,
-                scheduler,
-                permissions,
-                messages,
-                repository,
-                setPlayerWarp,
-                textInput,
-                EntityListLayout.withCreate(org.bukkit.Material.ENDER_PEARL, 49, org.bukkit.Material.LIME_DYE),
-                editor);
+        MenuBindings bindings = new MenuBindings();
+        MenuRenderer renderer =
+                new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
+        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        return new PlayerWarpListMenu(
+                menus, scheduler, permissions, messages, repository, setPlayerWarp, textInput, editor);
     }
 
     /** Counts repository reads and serves a single owner's warps from memory. */

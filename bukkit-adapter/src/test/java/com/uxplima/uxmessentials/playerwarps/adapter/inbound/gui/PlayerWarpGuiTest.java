@@ -23,14 +23,11 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpNotifier;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
-import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarpVisibility;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
@@ -43,7 +40,6 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -57,13 +53,12 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the player-warps management GUI. The list renders one icon per warp the viewer owns and
- * a click opens the editor; a text property (password) routes a validated anvil line to the store; a number
- * property (warmup) steps, clamps, and persists; a toggle property (lock) flips and persists; the visibility
- * change persists; delete is confirm-gated; and a non-owner without the manage node never sees another player's
- * warp in their list (the editor is reachable only from the owner-scoped list). The views are laid out from a
+ * MockBukkit coverage of the player-warps property editor. A text property (password) routes a validated anvil
+ * line to the store; a number property (warmup) steps, clamps, and persists; a toggle property (lock) flips and
+ * persists; the visibility change persists; and delete is confirm-gated. The editor is laid out from a
  * code-default layout (no hardcoded slots in the view), and the scheduler runs every hop inline so the
- * off-thread writes land synchronously.
+ * off-thread writes land synchronously. The list itself now renders through the menu engine and is covered by
+ * {@code PlayerWarpListGoldenTest}.
  */
 class PlayerWarpGuiTest {
 
@@ -73,7 +68,6 @@ class PlayerWarpGuiTest {
     // Editor property slots, in the order PlayerWarpEditorView builds its properties:
     // name, move, icon, visibility, lock, password, dep-sound, arr-sound, dep-particle, arr-particle, warmup, cooldown.
     private static final List<Integer> EDITOR_SLOTS = List.of(10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24);
-    private static final int NAME_SLOT = EDITOR_SLOTS.get(0);
     private static final int ICON_SLOT = EDITOR_SLOTS.get(2);
     private static final int VISIBILITY_SLOT = EDITOR_SLOTS.get(3);
     private static final int LOCK_SLOT = EDITOR_SLOTS.get(4);
@@ -89,9 +83,7 @@ class PlayerWarpGuiTest {
     private GuiText guiText;
     private Scheduler scheduler;
     private FakeRepository repository;
-    private PlayerWarpListView listView;
     private PlayerWarpEditorView editorView;
-    private boolean managePerm;
 
     @BeforeEach
     void setUp() {
@@ -102,19 +94,10 @@ class PlayerWarpGuiTest {
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         repository = new FakeRepository();
-        managePerm = false;
         Guis.install(plugin);
 
         Messages messages = new KeyMessages();
         PlayerWarpNotifier notifier = new PlayerWarpNotifier(messages, new SilentSink());
-        Permissions permissions = new ManagePermissions(() -> managePerm);
-        SetPlayerWarp setPlayerWarp = new SetPlayerWarp(
-                repository,
-                new PlayerWarpQuota(permissions, 3),
-                notifier,
-                event -> {},
-                java.time.Clock.systemUTC(),
-                List.of());
         SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier);
         DelPlayerWarp delPlayerWarp = new DelPlayerWarp(repository, notifier, event -> {});
         TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
@@ -137,46 +120,13 @@ class PlayerWarpGuiTest {
                 messages,
                 editorLayout,
                 PlayerWarpEditorSubLayouts.codeDefault(),
-                (p, v) -> listView.open(p, v));
-        // Two explicit content slots so an unused slot shows the background filler rather than a null cell — the
-        // same way the bundled conf's empty content-slots resolve to a page region with filler around it.
-        EntityListLayout listLayout = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout(
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout(
-                        6, Material.ENDER_PEARL, Material.ARROW, 48, 50, List.of(0, 1)),
-                Material.BLACK_STAINED_GLASS_PANE,
-                java.util.OptionalInt.of(49),
-                Material.LIME_DYE);
-        listView = new PlayerWarpListView(
-                guiText,
-                scheduler,
-                permissions,
-                messages,
-                repository,
-                setPlayerWarp,
-                textInput,
-                listLayout,
-                editorView);
+                (p, v) -> {});
     }
 
     @AfterEach
     void tearDown() {
         Guis.uninstall();
         MockBukkit.unmock();
-    }
-
-    @Test
-    void listRendersTheViewersOwnWarps() {
-        store(viewer, "alpha");
-        store(viewer, "beta");
-        store(new PlayerRef(UUID.randomUUID(), "Bob"), "secret"); // another owner's warp, not the viewer's
-
-        listView.open(player, viewer);
-
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        // The viewer owns two warps; the third belongs to Bob and a player without the manage node never sees it.
-        assertThat(inv.getItem(0)).isNotNull();
-        assertThat(inv.getItem(1)).isNotNull();
-        assertThat(inv.getItem(2).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
     }
 
     @Test
@@ -196,18 +146,6 @@ class PlayerWarpGuiTest {
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getItem(ICON_SLOT).getType()).isEqualTo(Material.ITEM_FRAME);
-    }
-
-    @Test
-    void clickingAWarpOpensTheEditor() {
-        store(viewer, "alpha");
-        listView.open(player, viewer);
-
-        fireClick(0, ClickType.LEFT);
-
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getItem(NAME_SLOT)).isNotNull();
-        assertThat(inv.getItem(NAME_SLOT).getType()).isEqualTo(Material.NAME_TAG);
     }
 
     @Test
@@ -285,36 +223,6 @@ class PlayerWarpGuiTest {
 
         fireClick(CONFIRM_SLOT, ClickType.LEFT); // the confirm button deletes
         assertThat(repository.find(viewer, PlayerWarpName.of("alpha"))).isEmpty();
-    }
-
-    @Test
-    void aNonOwnerWithoutThePermNeverSeesAnotherPlayersWarp() {
-        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
-        store(bob, "bobwarp");
-        // Alice (the viewer) owns nothing and lacks the manage node.
-
-        listView.open(player, viewer);
-
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        // No entity icon is drawn into the page region, so Bob's warp is unreachable from Alice's list.
-        assertThat(inv.getItem(0)).isNull();
-        assertThat(inv.getItem(1)).isNull();
-    }
-
-    @Test
-    void anOperatorWithThePermSeesEveryOwnersWarps() {
-        managePerm = true;
-        PlayerRef bob = new PlayerRef(UUID.randomUUID(), "Bob");
-        store(viewer, "alpha");
-        store(bob, "bobwarp");
-
-        listView.open(player, viewer);
-
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getItem(0)).isNotNull();
-        assertThat(inv.getItem(1)).isNotNull();
-        assertThat(inv.getItem(0).getType()).isNotEqualTo(Material.BLACK_STAINED_GLASS_PANE);
-        assertThat(inv.getItem(1).getType()).isNotEqualTo(Material.BLACK_STAINED_GLASS_PANE);
     }
 
     // --- helpers ---
@@ -419,28 +327,6 @@ class PlayerWarpGuiTest {
         @Override
         public double averageRating(PlayerRef owner, PlayerWarpName name) {
             return 0.0;
-        }
-    }
-
-    private static final class ManagePermissions implements Permissions {
-        private final java.util.function.BooleanSupplier grants;
-
-        ManagePermissions(java.util.function.BooleanSupplier grants) {
-            this.grants = grants;
-        }
-
-        @Override
-        public boolean has(PlayerRef who, String node) {
-            return grants.getAsBoolean();
-        }
-
-        @Override
-        public Permissions.QuotaResult resolveQuota(
-                PlayerRef who,
-                Permissions.QuotaFamily family,
-                @org.jspecify.annotations.Nullable WorldRef world,
-                long configDefault) {
-            return Permissions.QuotaResult.unlimited();
         }
     }
 

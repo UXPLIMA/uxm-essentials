@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.adapter;
 import java.util.List;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListView;
+import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpListMenu;
 import com.uxplima.uxmessentials.playerwarps.application.DelPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
@@ -34,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
  * @param editorView the per-warp settings editor GUI reused from the warps module (opened by {@code /pwarp edit})
  * @param scheduler the kernel scheduler the commands run their repository reads through off the tick thread,
  *     bridging any Bukkit feedback back to the player's region thread (the homes async-read pattern)
- * @param listView the management-GUI list opened by {@code /pwarp} with no arguments (the framework SP3 panel),
+ * @param listView the management-GUI list opened by {@code /pwarp} with no arguments (the menu-engine panel),
  *     owner-scoped for a player and cross-owner for a holder of {@code uxmessentials.pwarp.gui}
  */
 @NullMarked
@@ -48,7 +48,7 @@ public record PlayerWarpServices(
         PlayerWarpRepository repository,
         @org.jspecify.annotations.Nullable WarpEditorView editorView,
         Scheduler scheduler,
-        PlayerWarpListView listView) {
+        PlayerWarpListMenu listView) {
 
     public PlayerWarpServices {
         Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
