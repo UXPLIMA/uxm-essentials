@@ -110,7 +110,7 @@ public final class MenuListener implements Listener {
      */
     private boolean clickConditionsPass(ClickSpec click, ClickKind kind, MenuContext ctx) {
         for (Ref ref : merged(click.conditions().get(kind), click.conditions().get(ClickKind.ANY))) {
-            if (!conditions.get(ref.id()).map(p -> p.test(ctx)).orElse(false)) {
+            if (!conditions.get(ref.id()).map(p -> p.test(ctx, ref.args())).orElse(false)) {
                 return false;
             }
         }

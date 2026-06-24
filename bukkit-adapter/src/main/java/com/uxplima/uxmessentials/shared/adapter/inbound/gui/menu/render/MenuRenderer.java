@@ -103,7 +103,8 @@ public final class MenuRenderer {
      */
     private boolean viewPasses(MenuItemSpec item, MenuContext ctx) {
         for (Ref ref : item.view()) {
-            boolean passes = conditions.get(ref.id()).map(p -> p.test(ctx)).orElse(false);
+            boolean passes =
+                    conditions.get(ref.id()).map(p -> p.test(ctx, ref.args())).orElse(false);
             if (!passes) {
                 return false;
             }

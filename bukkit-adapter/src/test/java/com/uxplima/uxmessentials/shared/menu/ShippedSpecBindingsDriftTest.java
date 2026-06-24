@@ -54,7 +54,7 @@ class ShippedSpecBindingsDriftTest {
 
         MenuBindings bindings = new MenuBindings();
         EXPECTED_ACTIONS.forEach(id -> bindings.action(id, ctx -> {}));
-        EXPECTED_CONDITIONS.forEach(id -> bindings.condition(id, ctx -> true));
+        EXPECTED_CONDITIONS.forEach(id -> bindings.condition(id, (ctx, args) -> true));
         EXPECTED_PLACEHOLDERS.forEach(id -> bindings.placeholder(id, ctx -> ""));
         EXPECTED_LISTS.forEach(id -> bindings.list(id, ctx -> List.of()));
 

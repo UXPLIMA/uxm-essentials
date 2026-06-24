@@ -61,7 +61,7 @@ class MenuRendererTest {
         placeholders.register("v", ctx -> ctx.entry(String.class));
         ItemRenderer itemRenderer = new ItemRenderer(guiText, placeholders);
         ConditionRegistry conditions = new ConditionRegistry();
-        conditions.register("always-false", c -> false);
+        conditions.register("always-false", (c, args) -> false);
         ListSourceRegistry lists = new ListSourceRegistry();
         lists.register("t:list", c -> List.of("a", "b", "c", "d"));
         renderer = new MenuRenderer(itemRenderer, conditions, lists);

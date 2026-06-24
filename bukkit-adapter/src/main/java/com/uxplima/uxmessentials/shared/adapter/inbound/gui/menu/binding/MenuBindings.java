@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -42,7 +44,7 @@ public final class MenuBindings {
         actions.register(id, handler);
     }
 
-    public void condition(String id, Predicate<MenuContext> handler) {
+    public void condition(String id, BiPredicate<MenuContext, Map<String, String>> handler) {
         conditions.register(id, handler);
     }
 
@@ -58,7 +60,7 @@ public final class MenuBindings {
         return actions.get(id);
     }
 
-    public Optional<Predicate<MenuContext>> condition(String id) {
+    public Optional<BiPredicate<MenuContext, Map<String, String>>> condition(String id) {
         return conditions.get(id);
     }
 
