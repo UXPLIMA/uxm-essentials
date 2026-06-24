@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.messaging.adapter.inbound.gui;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
@@ -11,7 +10,6 @@ import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -38,16 +36,14 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class MessagingGuiViews {
 
-    private static final String MODULE = "messaging";
-
     private final MessagingSettingsView settingsView;
     private final IgnoreListMenu ignoreMenu;
-    private final MailboxView mailboxView;
+    private final MailboxMenu mailboxMenu;
 
-    private MessagingGuiViews(MessagingSettingsView settingsView, IgnoreListMenu ignoreMenu, MailboxView mailboxView) {
+    private MessagingGuiViews(MessagingSettingsView settingsView, IgnoreListMenu ignoreMenu, MailboxMenu mailboxMenu) {
         this.settingsView = settingsView;
         this.ignoreMenu = ignoreMenu;
-        this.mailboxView = mailboxView;
+        this.mailboxMenu = mailboxMenu;
     }
 
     /** Build the three views over the messaging use cases, the raw stores, and the module's GUI layouts. */
@@ -94,11 +90,13 @@ public final class MessagingGuiViews {
                 menus, scheduler, ignores, services.ignore(), services.unignore(), players, textInput);
         ignoreMenu.register(menuBindings, dataFolder, log);
 
-        EntityListLayout mailLayout = layouts.loadEntityList(
-                MODULE, "mailbox", EntityListLayout.withCreate(Material.PAPER, 49, Material.LAVA_BUCKET));
-        MailboxView mailboxView = new MailboxView(guiText, scheduler, mail, services.clearMail(), mailLayout);
+        // The mailbox renders through the menu engine too: the list and per-mail detail geometry live in the
+        // messaging-mailbox / messaging-mail-detail specs, its clear button routes through the same ClearMail use
+        // case, and opening the list marks the box read in the same off-thread hop the old view did.
+        MailboxMenu mailboxMenu = new MailboxMenu(menus, guiText, scheduler, mail, services.clearMail());
+        mailboxMenu.register(menuBindings, dataFolder, log);
 
-        return new MessagingGuiViews(settingsView, ignoreMenu, mailboxView);
+        return new MessagingGuiViews(settingsView, ignoreMenu, mailboxMenu);
     }
 
     /** Open the messaging settings panel for {@code viewer}. */
@@ -111,9 +109,9 @@ public final class MessagingGuiViews {
         ignoreMenu.open(viewer);
     }
 
-    /** Open the mailbox for {@code viewer}. */
+    /** Open the mailbox for {@code viewer}; the engine resolves the live player from {@code viewer}. */
     public void openMailbox(Player player, PlayerRef viewer) {
-        mailboxView.open(player, viewer);
+        mailboxMenu.open(viewer);
     }
 
     /** The settings panel, for tests. */
@@ -127,7 +125,7 @@ public final class MessagingGuiViews {
     }
 
     /** The mailbox, for tests. */
-    public MailboxView mailboxView() {
-        return mailboxView;
+    public MailboxMenu mailboxMenu() {
+        return mailboxMenu;
     }
 }
