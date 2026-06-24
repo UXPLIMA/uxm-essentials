@@ -46,7 +46,7 @@ import org.jspecify.annotations.NullMarked;
  * {@link PlayerHeads} subject; the {@code staff:players} source only reads that subject — it touches no Bukkit API.
  * Building and opening the window runs on the looker's entity thread (the engine hops there), and the head click
  * fires its action there too (the {@code MenuListener} dispatches actions on the viewer's entity thread), where the
- * target is re-resolved and the admin teleport runs — exactly the threads the old {@code StaffTeleportPicker} used.
+ * target is re-resolved and the admin teleport runs — exactly the threads the old bespoke picker base used.
  */
 @NullMarked
 public final class StaffPlayerMenu {

@@ -32,6 +32,9 @@ public enum StaffMessageKey implements MessageKey {
     // EXAMINE gadget info line — {target}{ping}{gamemode}{health}{world}
     STAFF_EXAMINE_INFO("staff.examine.info"),
 
+    // EXAMINE gadget picker menu title
+    STAFF_EXAMINE_TITLE("staff.examine.title"),
+
     // shared gadget feedback — a gadget was used while not looking at a player
     STAFF_GADGET_NO_TARGET("staff.gadget.no-target"),
 

@@ -113,6 +113,7 @@ final class DefaultResources {
             "modules/menu/specs/itemworld-hub.conf",
             "modules/menu/specs/staff-navigator.conf",
             "modules/menu/specs/staff-list.conf",
+            "modules/menu/specs/staff-examine.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

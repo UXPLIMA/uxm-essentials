@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffGadget;
-import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffFollowService;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
@@ -40,7 +40,7 @@ public final class StaffGadgetActions {
     private final StaffFreeze freeze;
     private final StaffTeleport teleport;
     private final StaffFollowService follow;
-    private final StaffExamineView examineView;
+    private final StaffExamineMenu examineMenu;
     private final StaffPlayerMenu playerMenu;
     private final Scheduler scheduler;
     private final Server server;
@@ -51,7 +51,7 @@ public final class StaffGadgetActions {
             StaffFreeze freeze,
             StaffTeleport teleport,
             StaffFollowService follow,
-            StaffExamineView examineView,
+            StaffExamineMenu examineMenu,
             StaffPlayerMenu playerMenu,
             Scheduler scheduler,
             Server server,
@@ -60,7 +60,7 @@ public final class StaffGadgetActions {
         this.freeze = Objects.requireNonNull(freeze, "freeze");
         this.teleport = Objects.requireNonNull(teleport, "teleport");
         this.follow = Objects.requireNonNull(follow, "follow");
-        this.examineView = Objects.requireNonNull(examineView, "examineView");
+        this.examineMenu = Objects.requireNonNull(examineMenu, "examineMenu");
         this.playerMenu = Objects.requireNonNull(playerMenu, "playerMenu");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.server = Objects.requireNonNull(server, "server");
@@ -71,7 +71,7 @@ public final class StaffGadgetActions {
     void onAir(StaffGadget gadget, Player player, PlayerRef who) {
         switch (gadget) {
             case VANISH -> vanish.setVanished(who, !player.isInvisible());
-            case EXAMINE -> examineView.open(player, who);
+            case EXAMINE -> openExamine(who);
             case COMPASS -> openNavigator(player, who);
             case FREEZE, FOLLOW -> notifier.send(who, StaffMessageKey.STAFF_GADGET_NO_TARGET);
         }
@@ -100,8 +100,21 @@ public final class StaffGadgetActions {
             case FOLLOW -> follow(actor, who, targetPlayer);
             case COMPASS -> teleport(who, targetPlayer, targetRef);
             case VANISH -> vanish.setVanished(who, !actor.isInvisible());
-            case EXAMINE -> examineView.open(actor, who);
+            case EXAMINE -> openExamine(who);
         }
+    }
+
+    /**
+     * Open the EXAMINE picker: snapshot the online roster on the global region thread (iterating the online list off
+     * it is illegal on Folia), then hand it to the menu engine, which builds and opens on the looker's entity
+     * thread. The picker lists every online player, as the old view did. Mirrors the old picker's open.
+     */
+    private void openExamine(PlayerRef who) {
+        scheduler.onGlobal(() -> {
+            List<PlayerRef> roster =
+                    server.getOnlinePlayers().stream().map(BukkitRefs::toRef).collect(Collectors.toList());
+            examineMenu.open(who, roster);
+        });
     }
 
     private void follow(Player actor, PlayerRef who, Player targetPlayer) {

@@ -61,7 +61,8 @@ class ShippedSpecBindingsDriftTest {
             "itemworld:weather-rain",
             "itemworld:clear-drops",
             "itemworld:clear-mobs",
-            "staff:teleport-to");
+            "staff:teleport-to",
+            "staff:examine");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm");

@@ -24,7 +24,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
-import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -34,7 +33,7 @@ import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingTelepo
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingVanish;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.SilentSink;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.StaffKeySink;
-import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActions;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffModeListener;
@@ -234,13 +233,25 @@ class StaffModeListenerTest {
     }
 
     private StaffGadgetActions actions() {
+        // One menu engine registers both the teleport pickers and the examine picker over a shared MenuBindings, so
+        // an air-COMPASS / air-EXAMINE open resolves its spec and does not throw.
+        GuiText guiText = new GuiText(new EchoMessages());
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        Menus menus = new Menus(renderer, guiText, new SyncScheduler(), bindings.lists());
+        StaffPlayerMenu playerMenu = new StaffPlayerMenu(menus, server, new EchoMessages(), new SilentSink(), teleport);
+        playerMenu.register(bindings, specResources(), new StaffAdapterFakes.NoopLogger());
+        StaffExamineMenu examineMenu =
+                new StaffExamineMenu(menus, server, new EchoMessages(), new SilentSink(), inspector);
+        examineMenu.register(bindings, specResources(), new StaffAdapterFakes.NoopLogger());
         return new StaffGadgetActions(
                 vanish,
                 freeze,
                 teleport,
                 follow,
-                examineView(),
-                playerMenu(),
+                examineMenu,
+                playerMenu,
                 new SyncScheduler(),
                 server,
                 StaffAdapterFakes.notifier(keySink));
@@ -274,24 +285,7 @@ class StaffModeListenerTest {
         return new StaffServices(enter, exit, recover, chat, inspector, store);
     }
 
-    private StaffExamineView examineView() {
-        Messages messages = new EchoMessages();
-        return new StaffExamineView(messages, new SilentSink(), new SyncScheduler(), services());
-    }
-
-    /** A live menu engine with the navigator/list specs registered, so an air-COMPASS open does not throw. */
-    private StaffPlayerMenu playerMenu() {
-        GuiText guiText = new GuiText(new EchoMessages());
-        MenuBindings bindings = new MenuBindings();
-        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
-        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, guiText, new SyncScheduler(), bindings.lists());
-        StaffPlayerMenu menu = new StaffPlayerMenu(menus, server, new EchoMessages(), new SilentSink(), teleport);
-        menu.register(bindings, specResources(), new StaffAdapterFakes.NoopLogger());
-        return menu;
-    }
-
-    /** The bundled spec directory under the source tree, so the menu loads the shipped navigator/list specs. */
+    /** The bundled spec directory under the source tree, so the menu loads the shipped picker specs. */
     private static java.nio.file.Path specResources() {
         java.nio.file.Path dir = java.nio.file.Path.of("").toAbsolutePath();
         while (dir != null && !java.nio.file.Files.exists(dir.resolve("settings.gradle.kts"))) {

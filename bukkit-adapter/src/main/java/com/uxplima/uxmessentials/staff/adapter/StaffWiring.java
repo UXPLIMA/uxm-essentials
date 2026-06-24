@@ -33,7 +33,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffChatCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffListCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffModeCommand;
-import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActions;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffJoinListener;
@@ -142,21 +142,25 @@ public final class StaffWiring {
                 kernel.log(),
                 staffId -> store.activePlayers().contains(staffId),
                 settings.followIntervalTicks());
-        StaffExamineView examineView =
-                new StaffExamineView(kernel.messages(), kernel.messageSink(), kernel.scheduler(), services);
-        // The COMPASS navigator and /stafflist render through the shared menu engine: one StaffPlayerMenu owns both
-        // teleport-picker specs, the staff:players list source (reads the pre-computed roster subject), the
-        // staff_player_name head label, and the staff:teleport-to click. The open sites snapshot the visible roster
-        // on the global region thread and hand it in, so no Bukkit API runs off the list-source thread.
+        // The COMPASS navigator, /stafflist, and the EXAMINE picker all render through the shared menu engine. The
+        // StaffPlayerMenu owns the two teleport-picker specs plus the shared staff:players list source (reads the
+        // pre-computed roster subject), the staff_player_name head label, and the staff:teleport-to click; the
+        // StaffExamineMenu reuses that source and label, adding only its own spec and the staff:examine click. Every
+        // open site snapshots the roster on the global region thread and hands it in, so no Bukkit API runs off the
+        // list-source thread.
+        java.nio.file.Path dataFolder = plugin.getDataFolder().toPath();
         StaffPlayerMenu playerMenu =
                 new StaffPlayerMenu(menus, plugin.getServer(), kernel.messages(), kernel.messageSink(), teleport);
-        playerMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        playerMenu.register(menuBindings, dataFolder, kernel.log());
+        StaffExamineMenu examineMenu =
+                new StaffExamineMenu(menus, plugin.getServer(), kernel.messages(), kernel.messageSink(), inspector);
+        examineMenu.register(menuBindings, dataFolder, kernel.log());
         StaffGadgetActions actions = new StaffGadgetActions(
                 vanish,
                 freeze,
                 teleport,
                 followService,
-                examineView,
+                examineMenu,
                 playerMenu,
                 kernel.scheduler(),
                 plugin.getServer(),
