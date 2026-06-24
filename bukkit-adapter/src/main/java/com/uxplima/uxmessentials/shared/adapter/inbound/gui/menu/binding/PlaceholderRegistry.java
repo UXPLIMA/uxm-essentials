@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,5 +33,28 @@ public final class PlaceholderRegistry {
     public boolean has(String id) {
         Objects.requireNonNull(id, "id");
         return handlers.containsKey(id);
+    }
+
+    /**
+     * Resolve every registered placeholder against {@code ctx} into an {@code id -> value} map, so a catalog
+     * {@code @key} text can fill its {@code {token}} arguments from the same placeholders a {@code %token%}
+     * spec uses. A resolver that throws because this context does not carry what it needs (a placeholder owned
+     * by a different menu) is skipped rather than aborting the render — the token it would fill simply stays
+     * unresolved, the same fail-soft stance the rest of the renderer takes.
+     */
+    public Map<String, String> resolveAll(MenuContext ctx) {
+        Objects.requireNonNull(ctx, "ctx");
+        Map<String, String> resolved = new HashMap<>();
+        handlers.forEach((id, handler) -> {
+            try {
+                String value = handler.apply(ctx);
+                if (value != null) {
+                    resolved.put(id, value);
+                }
+            } catch (RuntimeException notApplicableHere) {
+                // This placeholder belongs to a context shape this menu does not have; leave its token unfilled.
+            }
+        });
+        return resolved;
     }
 }

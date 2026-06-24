@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -87,7 +86,9 @@ public final class ItemRenderer {
         String substituted = substitutePlaceholders(s, ctx);
         if (s.startsWith("@")) {
             String key = substituted.substring(1);
-            return guiText.text(ctx.viewer(), () -> key, Map.of());
+            // The catalog entry may carry {token} arguments (e.g. {sound}, {warp}); fill them from the same
+            // placeholders a %token% would use, so a per-entry list item shows that entry's value.
+            return guiText.text(ctx.viewer(), () -> key, placeholders.resolveAll(ctx));
         }
         return StyledText.render(substituted);
     }

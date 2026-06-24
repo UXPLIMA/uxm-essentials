@@ -87,10 +87,50 @@ class ItemRendererTest {
                 ItemType.NONE);
     }
 
+    @Test
+    void catalogKeyFillsTokensFromPlaceholders() {
+        // A list template re-renders each entry with ctx.withEntry(...); the catalog key carries {sound}, which
+        // the engine must fill from the registered placeholder so the option shows that entry's name, not "{sound}".
+        PlaceholderRegistry ph = new PlaceholderRegistry();
+        ph.register("sound", c -> c.entry(String.class));
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+        MenuContext entryCtx =
+                MenuContext.of(new PlayerRef(UUID.randomUUID(), "P"), null, 0).withEntry("Enderman Teleport");
+
+        ItemStack it = r.render(itemNamed("@Sound: {sound}"), entryCtx);
+
+        assertThat(plainName(it)).isEqualTo("Sound: Enderman Teleport");
+    }
+
+    private static MenuItemSpec itemNamed(String name) {
+        return new MenuItemSpec(
+                new SlotSet(List.of(0)),
+                0,
+                "STONE",
+                name,
+                List.of(),
+                new ItemDecor(1, Optional.empty(), false, List.of()),
+                List.of(),
+                new ClickSpec(Map.of(), Map.of()),
+                false,
+                Optional.empty(),
+                ItemType.NONE);
+    }
+
+    private static String plainName(ItemStack item) {
+        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(item.getItemMeta().displayName());
+    }
+
     private static final class KeyMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            return key.key();
+            // Mirror the real catalog: the key's text carries {token} arguments the placeholders map fills.
+            String text = key.key();
+            for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+                text = text.replace("{" + entry.getKey() + "}", entry.getValue());
+            }
+            return text;
         }
     }
 }
