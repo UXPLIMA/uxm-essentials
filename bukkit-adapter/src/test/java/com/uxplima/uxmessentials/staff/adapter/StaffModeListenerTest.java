@@ -19,6 +19,11 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -30,7 +35,7 @@ import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingVanish
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.SilentSink;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.StaffKeySink;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
-import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffNavigatorView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActions;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffModeListener;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffFollowService;
@@ -230,7 +235,15 @@ class StaffModeListenerTest {
 
     private StaffGadgetActions actions() {
         return new StaffGadgetActions(
-                vanish, freeze, teleport, follow, examineView(), navigatorView(), StaffAdapterFakes.notifier(keySink));
+                vanish,
+                freeze,
+                teleport,
+                follow,
+                examineView(),
+                playerMenu(),
+                new SyncScheduler(),
+                server,
+                StaffAdapterFakes.notifier(keySink));
     }
 
     private StaffServices services() {
@@ -266,8 +279,25 @@ class StaffModeListenerTest {
         return new StaffExamineView(messages, new SilentSink(), new SyncScheduler(), services());
     }
 
-    private StaffNavigatorView navigatorView() {
-        return new StaffNavigatorView(server, new EchoMessages(), new SilentSink(), new SyncScheduler(), teleport);
+    /** A live menu engine with the navigator/list specs registered, so an air-COMPASS open does not throw. */
+    private StaffPlayerMenu playerMenu() {
+        GuiText guiText = new GuiText(new EchoMessages());
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        Menus menus = new Menus(renderer, guiText, new SyncScheduler(), bindings.lists());
+        StaffPlayerMenu menu = new StaffPlayerMenu(menus, server, new EchoMessages(), new SilentSink(), teleport);
+        menu.register(bindings, specResources(), new StaffAdapterFakes.NoopLogger());
+        return menu;
+    }
+
+    /** The bundled spec directory under the source tree, so the menu loads the shipped navigator/list specs. */
+    private static java.nio.file.Path specResources() {
+        java.nio.file.Path dir = java.nio.file.Path.of("").toAbsolutePath();
+        while (dir != null && !java.nio.file.Files.exists(dir.resolve("settings.gradle.kts"))) {
+            dir = dir.getParent();
+        }
+        return java.util.Objects.requireNonNull(dir, "repo root").resolve("bukkit-adapter/src/main/resources");
     }
 
     /** A {@link StaffInspector} that records who inspected whom. */

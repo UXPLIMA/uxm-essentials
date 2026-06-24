@@ -111,6 +111,8 @@ final class DefaultResources {
             "modules/menu/specs/itemworld-entitycount.conf",
             "modules/menu/specs/itemworld-entitycount-empty.conf",
             "modules/menu/specs/itemworld-hub.conf",
+            "modules/menu/specs/staff-navigator.conf",
+            "modules/menu/specs/staff-list.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

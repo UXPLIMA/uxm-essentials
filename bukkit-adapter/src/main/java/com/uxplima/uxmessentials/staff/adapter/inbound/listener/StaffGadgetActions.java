@@ -1,14 +1,19 @@
 package com.uxplima.uxmessentials.staff.adapter.inbound.listener;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
+import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffGadget;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
-import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffNavigatorView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffFollowService;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.staff.application.StaffNotifier;
@@ -36,7 +41,9 @@ public final class StaffGadgetActions {
     private final StaffTeleport teleport;
     private final StaffFollowService follow;
     private final StaffExamineView examineView;
-    private final StaffNavigatorView navigatorView;
+    private final StaffPlayerMenu playerMenu;
+    private final Scheduler scheduler;
+    private final Server server;
     private final StaffNotifier notifier;
 
     public StaffGadgetActions(
@@ -45,14 +52,18 @@ public final class StaffGadgetActions {
             StaffTeleport teleport,
             StaffFollowService follow,
             StaffExamineView examineView,
-            StaffNavigatorView navigatorView,
+            StaffPlayerMenu playerMenu,
+            Scheduler scheduler,
+            Server server,
             StaffNotifier notifier) {
         this.vanish = Objects.requireNonNull(vanish, "vanish");
         this.freeze = Objects.requireNonNull(freeze, "freeze");
         this.teleport = Objects.requireNonNull(teleport, "teleport");
         this.follow = Objects.requireNonNull(follow, "follow");
         this.examineView = Objects.requireNonNull(examineView, "examineView");
-        this.navigatorView = Objects.requireNonNull(navigatorView, "navigatorView");
+        this.playerMenu = Objects.requireNonNull(playerMenu, "playerMenu");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.server = Objects.requireNonNull(server, "server");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
@@ -61,9 +72,25 @@ public final class StaffGadgetActions {
         switch (gadget) {
             case VANISH -> vanish.setVanished(who, !player.isInvisible());
             case EXAMINE -> examineView.open(player, who);
-            case COMPASS -> navigatorView.open(player, who);
+            case COMPASS -> openNavigator(player, who);
             case FREEZE, FOLLOW -> notifier.send(who, StaffMessageKey.STAFF_GADGET_NO_TARGET);
         }
+    }
+
+    /**
+     * Open the COMPASS navigator: snapshot the visible online roster on the global region thread (iterating the
+     * online list off it is illegal on Folia, and {@code canSee} is the looker's vanish-aware visibility), then hand
+     * it to the menu engine, which builds and opens on the looker's entity thread. Mirrors the old picker's open.
+     */
+    private void openNavigator(Player looker, PlayerRef who) {
+        scheduler.onGlobal(() -> {
+            List<PlayerRef> roster = server.getOnlinePlayers().stream()
+                    .filter(online -> !online.getUniqueId().equals(looker.getUniqueId()))
+                    .filter(looker::canSee)
+                    .map(BukkitRefs::toRef)
+                    .collect(Collectors.toList());
+            playerMenu.openNavigator(who, roster);
+        });
     }
 
     /** A gadget right-clicked directly onto {@code targetPlayer}. */

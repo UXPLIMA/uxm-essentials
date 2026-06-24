@@ -60,7 +60,8 @@ class ShippedSpecBindingsDriftTest {
             "itemworld:weather-clear",
             "itemworld:weather-rain",
             "itemworld:clear-drops",
-            "itemworld:clear-mobs");
+            "itemworld:clear-mobs",
+            "staff:teleport-to");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm");
@@ -123,7 +124,8 @@ class ShippedSpecBindingsDriftTest {
             "iw_station_loom",
             "iw_station_smithingtable",
             "iw_station_stonecutter",
-            "iw_station_enderchest");
+            "iw_station_enderchest",
+            "staff_player_name");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
@@ -132,7 +134,8 @@ class ShippedSpecBindingsDriftTest {
             "communication:announcements",
             "messaging:ignores",
             "messaging:mail",
-            "itemworld:entity-tally");
+            "itemworld:entity-tally",
+            "staff:players");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

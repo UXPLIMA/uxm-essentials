@@ -22,6 +22,8 @@ import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.presence.application.ToggleVanish;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -33,7 +35,7 @@ import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffListCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffModeCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffListView;
-import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffNavigatorView;
+import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActions;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffJoinListener;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffModeListener;
@@ -86,12 +88,16 @@ public final class StaffWiring {
             ModuleContext ctx,
             Persistence persistence,
             StaffSeams seams,
-            InProcessDomainEventPublisher events) {
+            InProcessDomainEventPublisher events,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(seams, "seams");
         Objects.requireNonNull(events, "events");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         StaffSettings settings = new StaffSettings(ctx.config(), kernel.log());
         AtomicBoolean running = new AtomicBoolean(true);
@@ -139,12 +145,25 @@ public final class StaffWiring {
                 settings.followIntervalTicks());
         StaffExamineView examineView =
                 new StaffExamineView(kernel.messages(), kernel.messageSink(), kernel.scheduler(), services);
-        StaffNavigatorView navigatorView = new StaffNavigatorView(
-                plugin.getServer(), kernel.messages(), kernel.messageSink(), kernel.scheduler(), teleport);
+        // The COMPASS navigator and /stafflist render through the shared menu engine: one StaffPlayerMenu owns both
+        // teleport-picker specs, the staff:players list source (reads the pre-computed roster subject), the
+        // staff_player_name head label, and the staff:teleport-to click. The open sites snapshot the visible roster
+        // on the global region thread and hand it in, so no Bukkit API runs off the list-source thread.
+        StaffPlayerMenu playerMenu =
+                new StaffPlayerMenu(menus, plugin.getServer(), kernel.messages(), kernel.messageSink(), teleport);
+        playerMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         StaffListView listView = new StaffListView(
                 plugin.getServer(), kernel.messages(), kernel.messageSink(), kernel.scheduler(), teleport);
-        StaffGadgetActions actions =
-                new StaffGadgetActions(vanish, freeze, teleport, followService, examineView, navigatorView, notifier);
+        StaffGadgetActions actions = new StaffGadgetActions(
+                vanish,
+                freeze,
+                teleport,
+                followService,
+                examineView,
+                playerMenu,
+                kernel.scheduler(),
+                plugin.getServer(),
+                notifier);
 
         List<CommandRegistration> commands = List.of(
                 new StaffModeCommand(

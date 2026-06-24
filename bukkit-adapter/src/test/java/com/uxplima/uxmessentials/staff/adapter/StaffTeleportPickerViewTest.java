@@ -7,12 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.InventoryAction;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -23,7 +18,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.staff.adapter.StaffAdapterFakes.RecordingTeleport;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffListView;
-import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffNavigatorView;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmlib.gui.PaginatedGui;
 import org.junit.jupiter.api.AfterEach;
@@ -34,10 +28,10 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The COMPASS navigator and {@code /stafflist} pickers: each opens a paginated head menu, and clicking a head
- * teleports the looker to that player through the soft-coupled teleport. The navigator lists every online player
- * but the looker; the list filters to staff-member holders the looker can see, and an empty staff roster sends
- * the empty line instead of opening a window.
+ * The {@code /stafflist} picker: it opens a paginated head menu of online staff-member holders the looker can see,
+ * an empty staff roster sends the empty line instead of opening a window, and clicking a head teleports the looker
+ * to that staff member through the soft-coupled teleport. The COMPASS navigator's equivalent coverage moved to the
+ * engine golden test once it migrated to the menu engine.
  */
 class StaffTeleportPickerViewTest {
 
@@ -64,26 +58,6 @@ class StaffTeleportPickerViewTest {
     }
 
     @Test
-    void theNavigatorOpensAndListsOthers() {
-        server.addPlayer("Other");
-        navigator().open(looker, ref(looker));
-
-        Inventory menu = looker.getOpenInventory().getTopInventory();
-        assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
-    }
-
-    @Test
-    void clickingANavigatorHeadTeleportsToThatPlayer() {
-        PlayerMock other = server.addPlayer("Other");
-        navigator().open(looker, ref(looker));
-
-        fireClick(0); // the first (and only) head
-
-        assertThat(teleport.targets).extracting(PlayerRef::uuid).containsExactly(other.getUniqueId());
-        assertThat(sink.keys).contains(StaffMessageKey.STAFF_TELEPORTED);
-    }
-
-    @Test
     void anEmptyStaffRosterSendsTheEmptyLineAndOpensNothing() {
         listView().open(looker, ref(looker));
 
@@ -103,17 +77,6 @@ class StaffTeleportPickerViewTest {
 
         Inventory menu = looker.getOpenInventory().getTopInventory();
         assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
-    }
-
-    private void fireClick(int slot) {
-        InventoryView view = looker.getOpenInventory();
-        InventoryClickEvent event = new InventoryClickEvent(
-                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
-        server.getPluginManager().callEvent(event);
-    }
-
-    private StaffNavigatorView navigator() {
-        return new StaffNavigatorView(server, new KeyMessages(), sink, new SyncScheduler(), teleport);
     }
 
     private StaffListView listView() {

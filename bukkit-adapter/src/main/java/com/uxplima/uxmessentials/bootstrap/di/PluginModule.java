@@ -518,7 +518,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("nametags"))) {
             wireNametags(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("staff"))) {
-            wireStaff(plugin, ctx, persistence, resources, links);
+            wireStaff(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("npc"))) {
             wireNpc(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
@@ -1267,7 +1267,9 @@ public final class PluginModule {
             ModuleContext ctx,
             Persistence persistence,
             CloseableResources resources,
-            ContextLinks links) {
+            ContextLinks links,
+            Menus menus,
+            MenuBindings menuBindings) {
         // staff persists the captured loadout through the jOOQ StaffLoadoutRepository over persistence.dsl() (the
         // staff_loadout table ships in the persistence V29 baseline, always applied) — the item-loss-safe net, so
         // a crash mid-mode leaves the real loadout recoverable. It wires last, so it binds its three soft-couple
@@ -1285,7 +1287,7 @@ public final class PluginModule {
         // and unsubscribed on stop (the kernel port exposes only publish). With messaging off no alert is wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        StaffWiring.Wired wired = StaffWiring.wire(plugin, ctx, persistence, seams, events);
+        StaffWiring.Wired wired = StaffWiring.wire(plugin, ctx, persistence, seams, events, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The staff PAPI seam reads the same staff-mode marker the /staffmode use cases hold and counts the online
