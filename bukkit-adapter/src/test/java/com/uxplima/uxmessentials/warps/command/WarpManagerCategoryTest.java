@@ -22,6 +22,7 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -211,6 +212,19 @@ class WarpManagerCategoryTest {
                         .getSimpleName())
                 .as("the new warp's editor opens after creation")
                 .isEqualTo("WarpEditorHolder");
+    }
+
+    @Test
+    void managerBackgroundFillerIsAPaneNotTheWarpFallbackIcon() {
+        // MANAGER_LAYOUT's fallback icon is ENDER_PEARL — a server warp's default icon. The empty-slot filler must
+        // not reuse it, or the whole manager reads as a wall of ender pearls (the "GUI looks broken" report). Slot
+        // 53 is a corner that is never a warp (content is slots 0-44) nor a button (48/50/51), so it is pure filler.
+        managerView.open(player, ref());
+        ItemStack corner = player.getOpenInventory().getTopInventory().getItem(53);
+        assertThat(corner).isNotNull();
+        assertThat(corner.getType())
+                .as("the background filler is a neutral pane, not the ENDER_PEARL warp fallback icon")
+                .isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test

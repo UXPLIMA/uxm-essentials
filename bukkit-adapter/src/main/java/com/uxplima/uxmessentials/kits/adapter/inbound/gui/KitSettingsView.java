@@ -76,8 +76,11 @@ public final class KitSettingsView {
     }
 
     private void populate(Inventory inventory, KitDefinition kit, PlayerRef viewer) {
-        ItemStack filler =
-                ItemBuilder.of(layout.fallbackIcon()).name(Component.empty()).build();
+        // A neutral background pane, decoupled from the kit fallback icon so a non-pane fallback never tiles the
+        // whole settings screen with itself.
+        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.empty())
+                .build();
         int size = layout.rows() * 9;
         for (int i = 0; i < size; i++) {
             inventory.setItem(i, filler);

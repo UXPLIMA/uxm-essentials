@@ -82,8 +82,11 @@ public final class WarpManagerView {
     }
 
     private void populate(Inventory inventory, List<Warp> warps, PlayerRef viewer) {
-        ItemStack filler =
-                ItemBuilder.of(layout.fallbackIcon()).name(Component.empty()).build();
+        // The background filler is a neutral pane, never the warp fallback icon: that icon is ENDER_PEARL for
+        // server warps, so reusing it here painted the whole manager with ender pearls and read as broken.
+        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.empty())
+                .build();
         int size = layout.rows() * 9;
         for (int i = 0; i < size; i++) {
             inventory.setItem(i, filler);

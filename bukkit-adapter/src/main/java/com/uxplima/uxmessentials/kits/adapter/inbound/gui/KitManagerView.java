@@ -69,8 +69,11 @@ public final class KitManagerView {
     }
 
     private void populate(Inventory inventory, List<KitDefinition> kits, PlayerRef viewer) {
-        ItemStack filler =
-                ItemBuilder.of(layout.fallbackIcon()).name(Component.empty()).build();
+        // A neutral background pane, decoupled from the kit fallback icon so changing that icon never fills the
+        // whole manager with it (the warp manager hit exactly that with its ENDER_PEARL fallback).
+        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
+                .name(Component.empty())
+                .build();
         int size = layout.rows() * 9;
         for (int i = 0; i < size; i++) {
             inventory.setItem(i, filler);
