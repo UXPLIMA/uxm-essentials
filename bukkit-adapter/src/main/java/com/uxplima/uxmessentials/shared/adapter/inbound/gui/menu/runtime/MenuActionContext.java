@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
+import java.util.Map;
 import java.util.Objects;
 
 import org.bukkit.entity.Player;
@@ -22,10 +23,13 @@ public final class MenuActionContext {
 
     private final ClickKind clickKind;
 
-    public MenuActionContext(MenuContext ctx, Player player, ClickKind clickKind) {
+    private final Map<String, String> args;
+
+    public MenuActionContext(MenuContext ctx, Player player, ClickKind clickKind, Map<String, String> args) {
         this.ctx = Objects.requireNonNull(ctx, "ctx");
         this.player = Objects.requireNonNull(player, "player");
         this.clickKind = Objects.requireNonNull(clickKind, "clickKind");
+        this.args = Map.copyOf(Objects.requireNonNull(args, "args"));
     }
 
     public PlayerRef viewer() {
@@ -50,5 +54,15 @@ public final class MenuActionContext {
 
     public <T> T entry(Class<T> type) {
         return ctx.entry(type);
+    }
+
+    /** The invoked action ref's arguments — {@code "command:spawn"} arrives as {@code {value: "spawn"}}. */
+    public Map<String, String> args() {
+        return args;
+    }
+
+    /** The single positional argument of an {@code id:value} action ref, or empty when the ref carried none. */
+    public String arg() {
+        return args.getOrDefault("value", "");
     }
 }

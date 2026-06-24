@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.Bukkit;
 import org.bukkit.event.inventory.ClickType;
@@ -98,6 +99,20 @@ class MenuListenerTest {
 
         assertThat(event.isCancelled()).isTrue();
         assertThat(hits.get()).isEqualTo(1);
+    }
+
+    @Test
+    void boundActionReceivesTheRefArgument() {
+        // A generic action like "command:spawn" carries its argument; the handler must read it off the context,
+        // otherwise close/sound/command/message actions have nothing to act on.
+        AtomicReference<String> seen = new AtomicReference<>("");
+        actions.register("command", ctx -> seen.set(ctx.arg()));
+        MenuHolder holder = holderWithSlotZero(new RenderedSlot(itemBoundLeftTo("command:spawn"), null));
+        openMenu(holder);
+
+        server.getPluginManager().callEvent(clickEvent(0, ClickType.LEFT));
+
+        assertThat(seen.get()).isEqualTo("spawn");
     }
 
     @Test

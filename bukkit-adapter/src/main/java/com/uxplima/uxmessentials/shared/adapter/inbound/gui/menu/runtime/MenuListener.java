@@ -99,7 +99,7 @@ public final class MenuListener implements Listener {
             return;
         }
         for (Ref ref : rs.item().click().actionsFor(kind)) {
-            actions.get(ref.id()).ifPresent(handler -> runAction(holder, base, kind, handler));
+            actions.get(ref.id()).ifPresent(handler -> runAction(holder, base, kind, ref, handler));
         }
     }
 
@@ -129,13 +129,14 @@ public final class MenuListener implements Listener {
     }
 
     /** Hop to the viewer's entity thread, re-resolve the live player, and run one bound action there. */
-    private void runAction(MenuHolder holder, MenuContext base, ClickKind kind, Consumer<MenuActionContext> handler) {
+    private void runAction(
+            MenuHolder holder, MenuContext base, ClickKind kind, Ref ref, Consumer<MenuActionContext> handler) {
         scheduler.onEntity(holder.ctx().viewer(), () -> {
             Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
             if (live == null) {
                 return;
             }
-            handler.accept(new MenuActionContext(base, live, kind));
+            handler.accept(new MenuActionContext(base, live, kind, ref.args()));
         });
     }
 
