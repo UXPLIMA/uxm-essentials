@@ -63,9 +63,8 @@ public final class ItemRenderer {
      */
     private Material resolveMaterial(String raw, MenuContext ctx) {
         Matcher matcher = PLACEHOLDER.matcher(raw);
-        String name = matcher.find()
-                ? placeholders.get(matcher.group(1)).map(fn -> fn.apply(ctx)).orElse("")
-                : raw;
+        String name =
+                matcher.find() ? placeholders.resolve(matcher.group(1), ctx).orElse("") : raw;
         if (name.isBlank()) {
             return Material.STONE;
         }
@@ -98,8 +97,7 @@ public final class ItemRenderer {
         Matcher matcher = PLACEHOLDER.matcher(source);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
-            String value =
-                    placeholders.get(matcher.group(1)).map(fn -> fn.apply(ctx)).orElse("");
+            String value = placeholders.resolve(matcher.group(1), ctx).orElse("");
             matcher.appendReplacement(out, Matcher.quoteReplacement(value));
         }
         matcher.appendTail(out);
