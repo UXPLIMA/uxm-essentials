@@ -70,8 +70,8 @@ class GenericActionsTest {
         GuiText guiText = new GuiText(new KeyMessages());
         bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
-        MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry(), new ListSourceRegistry());
-        menus = new Menus(renderer, guiText, new SyncScheduler());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
+        menus = new Menus(renderer, guiText, new SyncScheduler(), new ListSourceRegistry());
         MenuSpec target = new MenuSpecLoader().parse(OPEN_TARGET_HOCON);
         menus.registerSpec("target", target);
         log = new RecordingLogger();

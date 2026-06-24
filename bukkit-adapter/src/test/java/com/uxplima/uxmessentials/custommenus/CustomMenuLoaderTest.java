@@ -11,6 +11,7 @@ import java.util.List;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenuLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
@@ -61,7 +62,8 @@ class CustomMenuLoaderTest {
     }
 
     private static Menus newMenus() {
-        return new Menus(mock(MenuRenderer.class), mock(GuiText.class), mock(Scheduler.class));
+        return new Menus(
+                mock(MenuRenderer.class), mock(GuiText.class), mock(Scheduler.class), new ListSourceRegistry());
     }
 
     /** Captures the SLF4J-style lines the loader emits so the test can assert on what an operator would read. */

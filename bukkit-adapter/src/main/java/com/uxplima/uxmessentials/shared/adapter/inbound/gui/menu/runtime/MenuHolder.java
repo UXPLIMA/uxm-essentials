@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,6 +29,13 @@ public final class MenuHolder implements InventoryHolder {
     private MenuContext ctx;
 
     private final Map<Integer, RenderedSlot> clickMap = new HashMap<>();
+
+    /**
+     * The list-source entries this open resolved once off the viewer's region thread, keyed by source id. Every
+     * redraw — a page flip, a refresh tick — re-renders from this cache rather than re-querying, so a database-backed
+     * source is touched once per open and never on the region thread.
+     */
+    private Map<String, List<?>> resolvedLists = Map.of();
 
     @Nullable private Cancellable refreshHandle;
 
@@ -72,6 +80,17 @@ public final class MenuHolder implements InventoryHolder {
     /** Drops every recorded slot ahead of a re-render so stale entries can never be clicked. */
     public void clearClickMap() {
         clickMap.clear();
+    }
+
+    /** Caches the list-source entries this open resolved off-thread; a defensive copy keeps the holder the owner. */
+    public void setResolvedLists(Map<String, List<?>> resolved) {
+        Objects.requireNonNull(resolved, "resolved");
+        this.resolvedLists = Map.copyOf(resolved);
+    }
+
+    /** The cached list-source entries every redraw of this menu renders from, never re-querying the source. */
+    public Map<String, List<?>> resolvedLists() {
+        return resolvedLists;
     }
 
     public void recordSlot(int slot, RenderedSlot rs) {

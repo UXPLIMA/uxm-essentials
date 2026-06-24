@@ -194,11 +194,11 @@ public final class PluginModule {
         // register its bindings and open a spec through them); Phase 3 reuses the same path for the rest.
         MenuBindings menuBindings = new MenuBindings();
         ItemRenderer menuItemRenderer = new ItemRenderer(guiText, menuBindings.placeholders());
-        MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions(), menuBindings.lists());
+        MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions());
         MenuListener menuListener = new MenuListener(
                 menuRenderer, menuBindings.actions(), menuBindings.conditions(), kernel.scheduler(), plugin);
         menuListener.install();
-        Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler());
+        Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler(), menuBindings.lists());
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
         // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted —
         // this flag only governs the generic console action a disk-loaded menu can reference.

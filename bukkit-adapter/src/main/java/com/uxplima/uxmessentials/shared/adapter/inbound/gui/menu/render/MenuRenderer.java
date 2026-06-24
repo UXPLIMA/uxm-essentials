@@ -9,7 +9,6 @@ import java.util.function.BiConsumer;
 import org.bukkit.inventory.Inventory;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PriorityLayering;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
@@ -22,22 +21,24 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Lays a whole menu spec into an open inventory for one viewer. Static items are collapsed through
  * {@link PriorityLayering} (the visible, highest-priority item wins each slot) and rendered into place; a
- * list-backed item asks its registered source for entries and {@link Pagination paginates} them across its content
- * slots, stamping the list template once per entry. Every slot the renderer fills is reported to {@code clickSink}
- * as a {@link RenderedSlot} so the runtime can route a later click back to the spec — and, for a list cell, to the
- * live element that filled it. The renderer reads only the registries and the spec; it never names a feature.
+ * list-backed item draws its entries from the {@code resolvedLists} the caller passes in and
+ * {@link Pagination paginates} them across its content slots, stamping the list template once per entry. The
+ * renderer never queries a list source itself — {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus}
+ * resolves every source off the viewer's region thread once and hands the cached result here, so a redraw (a page
+ * flip, a refresh tick) re-renders from the cache and never blocks the region thread on a database. Every slot the
+ * renderer fills is reported to {@code clickSink} as a {@link RenderedSlot} so the runtime can route a later click
+ * back to the spec — and, for a list cell, to the live element that filled it. The renderer reads only the
+ * conditions registry, the spec, and the resolved lists; it never names a feature.
  */
 @NullMarked
 public final class MenuRenderer {
 
     private final ItemRenderer itemRenderer;
     private final ConditionRegistry conditions;
-    private final ListSourceRegistry lists;
 
-    public MenuRenderer(ItemRenderer itemRenderer, ConditionRegistry conditions, ListSourceRegistry lists) {
+    public MenuRenderer(ItemRenderer itemRenderer, ConditionRegistry conditions) {
         this.itemRenderer = Objects.requireNonNull(itemRenderer, "itemRenderer");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
-        this.lists = Objects.requireNonNull(lists, "lists");
     }
 
     /**
@@ -45,11 +46,17 @@ public final class MenuRenderer {
      * placed slot to {@code clickSink}. Static items are placed first, then list cells overwrite their own content
      * slots; a spec keeps the two slot ranges disjoint, so order only matters for code clarity here.
      */
-    public void populate(Inventory inv, MenuSpec spec, MenuContext ctx, BiConsumer<Integer, RenderedSlot> clickSink) {
+    public void populate(
+            Inventory inv,
+            MenuSpec spec,
+            MenuContext ctx,
+            BiConsumer<Integer, RenderedSlot> clickSink,
+            Map<String, List<?>> resolvedLists) {
         Objects.requireNonNull(inv, "inv");
         Objects.requireNonNull(spec, "spec");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(clickSink, "clickSink");
+        Objects.requireNonNull(resolvedLists, "resolvedLists");
         List<MenuItemSpec> staticItems = new ArrayList<>();
         List<MenuItemSpec> listItems = new ArrayList<>();
         for (MenuItemSpec item : spec.items().values()) {
@@ -57,7 +64,7 @@ public final class MenuRenderer {
         }
         populateStatic(inv, staticItems, ctx, clickSink);
         for (MenuItemSpec listItem : listItems) {
-            populateList(inv, listItem, ctx, clickSink);
+            populateList(inv, listItem, ctx, clickSink, resolvedLists);
         }
     }
 
@@ -76,15 +83,15 @@ public final class MenuRenderer {
         }
     }
 
-    /** Page one list item's source entries across its content slots, stamping the template once per entry. */
+    /** Page one list item's pre-resolved entries across its content slots, stamping the template once per entry. */
     private void populateList(
-            Inventory inv, MenuItemSpec item, MenuContext ctx, BiConsumer<Integer, RenderedSlot> clickSink) {
+            Inventory inv,
+            MenuItemSpec item,
+            MenuContext ctx,
+            BiConsumer<Integer, RenderedSlot> clickSink,
+            Map<String, List<?>> resolvedLists) {
         ListSpec listSpec = item.list().orElseThrow();
-        var source = lists.get(listSpec.source().id());
-        if (source.isEmpty()) {
-            return;
-        }
-        List<?> entries = source.get().apply(ctx);
+        List<?> entries = resolvedLists.getOrDefault(listSpec.source().id(), List.of());
         List<Integer> contentSlots = item.slots().slots();
         @SuppressWarnings("unchecked") // a list source's element type is opaque to the engine; entries flow as Object
         Pagination.Page<Object> page = Pagination.paginate((List<Object>) entries, contentSlots, ctx.page());

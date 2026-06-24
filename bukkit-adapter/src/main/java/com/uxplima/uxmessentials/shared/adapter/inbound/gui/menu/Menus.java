@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,10 +14,12 @@ import org.bukkit.inventory.InventoryHolder;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -24,23 +28,28 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The one entry point a feature uses to open a registered menu for a viewer. A feature registers its specs once at
- * wiring time, then calls {@link #open} to show one to a player. The façade hops onto the viewer's entity thread
- * (where the live inventory may legally be touched), builds the {@link MenuHolder} that owns every per-open piece
- * of state, renders the spec into a fresh inventory the holder backs, and arms the refresh task — so the click
- * listener can recover all of it from the window alone and no player-keyed side map is needed.
+ * wiring time, then calls {@link #open} to show one to a player. The façade first resolves every list source the
+ * spec names off any tick thread — a list source may read a database, which must never block the viewer's region
+ * thread on Folia — then hops onto the viewer's entity thread (where the live inventory may legally be touched),
+ * builds the {@link MenuHolder} that owns every per-open piece of state, caches the resolved lists on it, renders
+ * the spec into a fresh inventory the holder backs, and arms the refresh task. Pagination and refresh re-render
+ * from the holder's cache, so a page flip never re-queries. The click listener recovers all of this from the
+ * window alone, so no player-keyed side map is needed.
  */
 public final class Menus {
 
     private final MenuRenderer renderer;
     private final GuiText guiText;
     private final Scheduler scheduler;
+    private final ListSourceRegistry lists;
 
     private final Map<String, MenuSpec> specs = new ConcurrentHashMap<>();
 
-    public Menus(MenuRenderer renderer, GuiText guiText, Scheduler scheduler) {
+    public Menus(MenuRenderer renderer, GuiText guiText, Scheduler scheduler, ListSourceRegistry lists) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.lists = Objects.requireNonNull(lists, "lists");
     }
 
     /** Registers a parsed spec under its id; a feature does this once at wiring time. */
@@ -62,20 +71,43 @@ public final class Menus {
         if (spec == null) {
             throw new IllegalArgumentException("no menu spec registered under id: " + specId);
         }
-        scheduler.onEntity(viewer, () -> openResolved(viewer, specId, spec, subject));
+        MenuContext ctx = MenuContext.of(viewer, subject, 0);
+        scheduler.async(() -> {
+            Map<String, List<?>> resolved = resolveLists(spec, ctx);
+            scheduler.onEntity(viewer, () -> openResolved(viewer, specId, spec, subject, resolved));
+        });
     }
 
-    /** On the viewer's entity thread: build the holder-backed window, render it, show it, and arm refresh. */
-    private void openResolved(PlayerRef viewer, String specId, MenuSpec spec, @Nullable Object subject) {
+    /**
+     * Resolve every list source the spec names, keyed by source id. Runs off the viewer's region thread because a
+     * source may read a database; an unregistered source resolves to an empty list so a wiring gap renders an empty
+     * grid rather than failing the open. This is the only place a source is queried for one open.
+     */
+    private Map<String, List<?>> resolveLists(MenuSpec spec, MenuContext ctx) {
+        Map<String, List<?>> resolved = new HashMap<>();
+        for (MenuItemSpec item : spec.items().values()) {
+            item.list().ifPresent(listSpec -> {
+                String sourceId = listSpec.source().id();
+                resolved.put(
+                        sourceId, lists.get(sourceId).map(fn -> fn.apply(ctx)).orElse(List.of()));
+            });
+        }
+        return resolved;
+    }
+
+    /** On the viewer's entity thread: build the holder-backed window, cache the lists, render, show, arm refresh. */
+    private void openResolved(
+            PlayerRef viewer, String specId, MenuSpec spec, @Nullable Object subject, Map<String, List<?>> resolved) {
         Player live = Bukkit.getPlayer(viewer.uuid());
         if (live == null || !live.isOnline()) {
             return;
         }
         MenuContext ctx = MenuContext.of(viewer, subject, 0);
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
+        holder.setResolvedLists(resolved);
         Inventory inv = Bukkit.createInventory(holder, spec.rows() * 9, title(viewer, spec));
         holder.attach(inv);
-        renderer.populate(inv, spec, ctx, holder::recordSlot);
+        renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
         live.openInventory(inv);
         MenuRefresh.start(holder, scheduler, () -> reRender(holder));
     }
@@ -91,7 +123,8 @@ public final class Menus {
                 return;
             }
             holder.clearClickMap();
-            renderer.populate(holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot);
+            renderer.populate(
+                    holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
         });
     }
 

@@ -23,7 +23,6 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
@@ -75,9 +74,7 @@ class MenuListenerTest {
         actions = new ActionRegistry();
         ConditionRegistry conditions = new ConditionRegistry();
         MenuRenderer renderer = new MenuRenderer(
-                new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry()),
-                conditions,
-                new ListSourceRegistry());
+                new ItemRenderer(new GuiText(new KeyMessages()), new PlaceholderRegistry()), conditions);
         listener = new MenuListener(renderer, actions, conditions, new SyncScheduler(), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
     }

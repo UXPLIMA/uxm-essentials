@@ -14,7 +14,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
@@ -49,6 +48,8 @@ class MenuRendererTest {
             }
             """;
 
+    private static final Map<String, List<?>> RESOLVED = Map.of("t:list", List.of("a", "b", "c", "d"));
+
     private MenuRenderer renderer;
     private MenuSpec spec;
     private PlayerRef ref;
@@ -62,9 +63,7 @@ class MenuRendererTest {
         ItemRenderer itemRenderer = new ItemRenderer(guiText, placeholders);
         ConditionRegistry conditions = new ConditionRegistry();
         conditions.register("always-false", (c, args) -> false);
-        ListSourceRegistry lists = new ListSourceRegistry();
-        lists.register("t:list", c -> List.of("a", "b", "c", "d"));
-        renderer = new MenuRenderer(itemRenderer, conditions, lists);
+        renderer = new MenuRenderer(itemRenderer, conditions);
         spec = new MenuSpecLoader().parse(HOCON);
         ref = new PlayerRef(UUID.randomUUID(), "P");
     }
@@ -77,7 +76,7 @@ class MenuRendererTest {
     @Test
     void rendersListPageZeroAndHidesFailingView() {
         Inventory inv = Bukkit.createInventory(null, 9);
-        renderer.populate(inv, spec, MenuContext.of(ref, null, 0), (s, r) -> {});
+        renderer.populate(inv, spec, MenuContext.of(ref, null, 0), (s, r) -> {}, RESOLVED);
         assertThat(plainName(inv, 3)).isEqualTo("a");
         assertThat(plainName(inv, 4)).isEqualTo("b");
         assertThat(plainName(inv, 5)).isEqualTo("c");
@@ -88,7 +87,7 @@ class MenuRendererTest {
     @Test
     void rendersListPageOne() {
         Inventory inv = Bukkit.createInventory(null, 9);
-        renderer.populate(inv, spec, MenuContext.of(ref, null, 1), (s, r) -> {});
+        renderer.populate(inv, spec, MenuContext.of(ref, null, 1), (s, r) -> {}, RESOLVED);
         assertThat(plainName(inv, 3)).isEqualTo("d");
         assertThat(inv.getItem(4)).isNull();
     }
@@ -97,7 +96,7 @@ class MenuRendererTest {
     void recordsRenderedSlotsForClickRouting() {
         Inventory inv = Bukkit.createInventory(null, 9);
         Map<Integer, RenderedSlot> sink = new HashMap<>();
-        renderer.populate(inv, spec, MenuContext.of(ref, null, 0), sink::put);
+        renderer.populate(inv, spec, MenuContext.of(ref, null, 0), sink::put, RESOLVED);
         assertThat(sink.get(3).entry()).isEqualTo("a");
     }
 

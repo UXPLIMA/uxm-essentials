@@ -70,8 +70,8 @@ class CustomMenusWiringTest {
     private static Menus menus() {
         GuiText guiText = new GuiText(new KeyMessages());
         ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
-        MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry(), new ListSourceRegistry());
-        return new Menus(renderer, guiText, new SyncScheduler());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
+        return new Menus(renderer, guiText, new SyncScheduler(), new ListSourceRegistry());
     }
 
     private static Path shippedExample() {

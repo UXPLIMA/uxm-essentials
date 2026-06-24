@@ -169,9 +169,9 @@ class WarpManagerCategoryTest {
         var menuItemRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
                 new GuiText(messages), menuBindings.placeholders());
         var menuRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
-                menuItemRenderer, menuBindings.conditions(), menuBindings.lists());
+                menuItemRenderer, menuBindings.conditions());
         var menus = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
-                menuRenderer, new GuiText(messages), scheduler);
+                menuRenderer, new GuiText(messages), scheduler, menuBindings.lists());
         var soundMenu = WarpSoundMenu.create(menus, soundOptionSource, repository, editorView, textInput);
         soundMenu.register(menuBindings, plugin.getDataFolder().toPath(), new SilentLogger());
         WarpEditorListener listener = new WarpEditorListener(

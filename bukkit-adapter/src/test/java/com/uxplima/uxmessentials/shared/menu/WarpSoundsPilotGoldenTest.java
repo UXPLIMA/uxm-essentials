@@ -142,10 +142,10 @@ class WarpSoundsPilotGoldenTest {
         GuiText guiText = new GuiText(messages);
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
-        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions(), bindings.lists());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         MenuListener listener = new MenuListener(renderer, bindings.actions(), bindings.conditions(), sync(), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, sync());
+        Menus menus = new Menus(renderer, guiText, sync(), bindings.lists());
 
         WarpEditorView editorView =
                 new WarpEditorView(messages, sync(), repository, editorLayout(), playerWarpHandle());

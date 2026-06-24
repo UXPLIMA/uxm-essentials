@@ -155,7 +155,8 @@ public final class MenuListener implements Listener {
     private void repaginate(MenuHolder holder, int newPage) {
         holder.setCtx(holder.ctx().withPage(newPage));
         holder.clearClickMap();
-        renderer.populate(holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot);
+        renderer.populate(
+                holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
     }
 
     @EventHandler
