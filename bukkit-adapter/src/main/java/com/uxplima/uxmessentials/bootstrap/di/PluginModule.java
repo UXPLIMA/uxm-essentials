@@ -488,7 +488,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
-            wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry);
+            wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("communication"))) {
@@ -910,13 +910,16 @@ public final class PluginModule {
             ModuleContext ctx,
             CloseableResources resources,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            MenuBindings menuBindings) {
         // itemworld persists nothing: it is the full item/world command surface as stateless ACL-thin
         // mutations validated at the adapter boundary and applied through the kernel Scheduler. The only runtime
         // state is the powertool/unlimited per-player toggles and the item-PDC powertool bindings, all transient
         // and dropped with the wiring on module stop. /repair /repairall /hat /more are owned here (playerstate
-        // deferred them, §15.6), so they register here and the two modules never double-register.
-        ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx, guiLayouts);
+        // deferred them, §15.6), so they register here and the two modules never double-register. The utilities
+        // hub, the /recipe grid, and the /entitycount tally render through the shared menu engine.
+        ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx, guiLayouts, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Register the itemworld utilities hub on the /uxmess gui hub, gated by the itemworld GUI node.

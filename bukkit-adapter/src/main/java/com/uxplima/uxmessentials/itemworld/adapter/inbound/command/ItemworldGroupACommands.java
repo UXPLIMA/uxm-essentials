@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -30,7 +30,7 @@ public final class ItemworldGroupACommands {
     private ItemworldGroupACommands() {}
 
     /** Every itemworld group-A command, in surface order grouped by sub-feature group. */
-    public static List<CommandRegistration> all(ItemworldServices services, @Nullable RecipeGridView recipeView) {
+    public static List<CommandRegistration> all(ItemworldServices services, @Nullable RecipeGridMenu recipeView) {
         List<CommandRegistration> commands = new ArrayList<>();
         addItemUtils(commands, services, recipeView);
         addWorkstations(commands, services);
@@ -39,7 +39,7 @@ public final class ItemworldGroupACommands {
     }
 
     private static void addItemUtils(
-            List<CommandRegistration> commands, ItemworldServices services, @Nullable RecipeGridView recipeView) {
+            List<CommandRegistration> commands, ItemworldServices services, @Nullable RecipeGridMenu recipeView) {
         commands.add(new GiveCommand(services));
         commands.add(new GiveAllCommand(services));
         commands.add(new ItemCommand(services));

@@ -20,13 +20,17 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.itemworld.domain.MobSpec;
 import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -95,10 +99,7 @@ class RecipeCommandTest {
 
     @Test
     void withAGuiViewTheGuiRootOpenerIsInstalledForTheBareRoot() {
-        RecipeGridView view = new RecipeGridView(
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyMessages()),
-                new SyncScheduler(),
-                Material.BLACK_STAINED_GLASS_PANE);
+        RecipeGridMenu view = new RecipeGridMenu(menus(), new KeyMessages(), Material.BLACK_STAINED_GLASS_PANE);
         // gui-on: the command exposes its opener for the bare root, while the raw text form keeps working below.
         assertThat(new RecipeCommand(services(), view).guiRoot()).isPresent();
     }
@@ -172,6 +173,16 @@ class RecipeCommandTest {
     private ItemworldServices services() {
         return new ItemworldServices(
                 kernel(), new NoopAudit(), ItemworldConfig.from(config), GuiLayout.storageDefault(6));
+    }
+
+    /** A bare engine façade for the wiring-presence test; the menu is never opened, so no listener is installed. */
+    private Menus menus() {
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyMessages());
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        return new Menus(renderer, guiText, new SyncScheduler(), bindings.lists());
     }
 
     private KernelPorts kernel() {

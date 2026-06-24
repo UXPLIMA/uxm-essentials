@@ -106,6 +106,8 @@ final class DefaultResources {
             "modules/menu/specs/messaging-ignore.conf",
             "modules/menu/specs/messaging-mailbox.conf",
             "modules/menu/specs/messaging-mail-detail.conf",
+            "modules/menu/specs/itemworld-recipe.conf",
+            "modules/menu/specs/itemworld-recipe-none.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

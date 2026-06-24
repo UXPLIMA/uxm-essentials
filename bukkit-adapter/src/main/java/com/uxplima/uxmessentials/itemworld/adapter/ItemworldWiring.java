@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGrou
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGuiCommand;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountListView;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubView;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.PowertoolInteractListener;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.UnlimitedPlacementListener;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.LoggingItemworldAudit;
@@ -28,6 +28,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -58,10 +60,13 @@ public final class ItemworldWiring {
     private ItemworldWiring() {}
 
     /** Build the itemworld adapters from {@code ctx}, ready to register with the plugin. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts) {
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, Menus menus, MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         ItemworldConfig config = ItemworldConfig.from(ctx.config());
         ItemworldAudit audit = new LoggingItemworldAudit(auditLogger(), config);
@@ -88,7 +93,10 @@ public final class ItemworldWiring {
                 guiText,
                 kernel.scheduler(),
                 guiLayouts.loadEntityList("itemworld", "entitycount", EntityListLayout.paginatedDefault(Material.EGG)));
-        RecipeGridView recipeView = new RecipeGridView(guiText, kernel.scheduler(), Material.BLACK_STAINED_GLASS_PANE);
+        // The /recipe crafting grid renders through the shared menu engine: it registers its per-slot placeholders
+        // and the two specs (grid + empty-state), then opens over a RecipeDisplay subject the command resolves.
+        RecipeGridMenu recipeView = new RecipeGridMenu(menus, kernel.messages(), Material.BLACK_STAINED_GLASS_PANE);
+        recipeView.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
 
         List<CommandRegistration> commands =
                 new java.util.ArrayList<>(ItemworldGroupACommands.all(services, recipeView));

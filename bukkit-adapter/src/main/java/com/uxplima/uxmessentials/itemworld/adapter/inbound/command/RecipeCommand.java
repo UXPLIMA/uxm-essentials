@@ -23,7 +23,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.BukkitItemResolver;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.ItemQuery;
@@ -42,7 +42,7 @@ import org.jspecify.annotations.Nullable;
  * {@link ItemworldMessageKey#NO_ITEM_IN_HAND}.
  *
  * <p>With its catalog {@code gui} flag on, bare {@code /recipe} (held item) and {@code /recipe <item>} open the
- * {@link RecipeGridView} crafting grid instead — the same first recipe, laid into a 3x3 ingredient grid with the
+ * {@link RecipeGridMenu} crafting grid instead — the same first recipe, laid into a 3x3 ingredient grid with the
  * result in its own slot. The {@link #runGui} opener installed on the bare root by the {@code GuiRootBinding}
  * reuses the same recipe resolution, mapping each shape cell (or each shapeless ingredient, in order) to a
  * representative item; the empty-hand, unknown-item, and no-recipe replies are unchanged, with no-recipe opening
@@ -54,13 +54,13 @@ public final class RecipeCommand extends ItemworldCommandSupport implements Comm
     private static final String PERMISSION = "uxmessentials.recipe.use";
     private static final int GRID_CELLS = 9;
 
-    private final @Nullable RecipeGridView gridView;
+    private final @Nullable RecipeGridMenu gridView;
 
     public RecipeCommand(ItemworldServices services) {
         this(services, null);
     }
 
-    public RecipeCommand(ItemworldServices services, @Nullable RecipeGridView gridView) {
+    public RecipeCommand(ItemworldServices services, @Nullable RecipeGridMenu gridView) {
         super(services, "recipe", SubFeatureGroup.ITEM_UTILS, "Show an item's crafting recipe.");
         this.gridView = gridView;
     }
@@ -103,7 +103,7 @@ public final class RecipeCommand extends ItemworldCommandSupport implements Comm
      * empty-hand / unknown-item replies are unchanged; an item with no crafting recipe opens an empty-state title.
      */
     private int runGui(CommandContext<CommandSourceStack> ctx, Optional<String> named) {
-        RecipeGridView view = gridView;
+        RecipeGridMenu view = gridView;
         if (view == null) {
             return run(ctx, named);
         }
@@ -119,13 +119,13 @@ public final class RecipeCommand extends ItemworldCommandSupport implements Comm
         return Command.SINGLE_SUCCESS;
     }
 
-    private void openGrid(RecipeGridView view, Player player, Material material) {
+    private void openGrid(RecipeGridMenu view, Player player, Material material) {
         Optional<Recipe> crafting = firstCraftingRecipe(material);
         if (crafting.isEmpty()) {
-            view.openEmpty(player, ref(player));
+            view.openEmpty(ref(player));
             return;
         }
-        view.open(player, ref(player), gridCells(crafting.get()), material);
+        view.open(ref(player), gridCells(crafting.get()), material);
     }
 
     private Optional<Material> namedItem(CommandContext<CommandSourceStack> ctx, String raw) {
