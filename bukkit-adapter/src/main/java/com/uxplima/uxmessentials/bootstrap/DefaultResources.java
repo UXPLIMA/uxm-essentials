@@ -102,6 +102,7 @@ final class DefaultResources {
             "modules/management/gui/hub.conf",
             "modules/management/gui/colour-picker.conf",
             "modules/menu/specs/warp-sounds.conf",
+            "modules/menu/specs/vault-selector.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

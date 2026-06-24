@@ -141,7 +141,7 @@ public final class VaultCommand implements CommandRegistration {
             scheduler.onEntity(viewer, () -> {
                 if (owned.size() > 1) {
                     if (services.selectorEnabled()) {
-                        services.selector().open(player, viewer);
+                        services.selector().open(viewer);
                     } else {
                         notifier.list(viewer, owned);
                     }

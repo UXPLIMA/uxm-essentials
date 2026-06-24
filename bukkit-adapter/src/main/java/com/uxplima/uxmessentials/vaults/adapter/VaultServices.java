@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.vaults.adapter;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
@@ -35,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
  * @param sizeQuota the owner's per-vault row count, read by {@code /vault info}
  * @param notifier player-facing feedback
  * @param view the inventory-holder GUI builder
- * @param selector the paginated vault-picker the no-arg {@code /vault} opens when several vaults are owned
+ * @param selector the engine-rendered vault-picker the no-arg {@code /vault} opens when several vaults are owned
  * @param selectorEnabled whether {@code /vault} routes to the picker (else the chat list) for a multi-vault owner
  * @param maxNameLength the longest custom vault name {@code /vault rename} accepts (a longer name is rejected)
  * @param allowCustomIcon whether {@code /vault icon} may set a custom per-vault icon at all
@@ -55,7 +55,7 @@ public record VaultServices(
         VaultSizeQuota sizeQuota,
         VaultNotifier notifier,
         VaultView view,
-        VaultSelectorView selector,
+        VaultSelectorMenu selector,
         boolean selectorEnabled,
         int maxNameLength,
         boolean allowCustomIcon,

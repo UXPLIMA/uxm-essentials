@@ -14,6 +14,8 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.vaults.CachedVaultRepository;
 import com.uxplima.uxmessentials.persistence.vaults.VaultRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VaultSync;
@@ -22,7 +24,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommands;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.LoggingVaultAudit;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultCleanupSweep;
@@ -76,8 +78,14 @@ public final class VaultsWiring {
      * Build the vaults adapters and use cases from {@code ctx}, the {@code persistence} DSL, and the bus, with
      * no economy bridge — a configured vault cost is recorded but not charged.
      */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus) {
-        return wire(plugin, ctx, persistence, bus, Optional.empty());
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            Bus bus,
+            Menus menus,
+            MenuBindings menuBindings) {
+        return wire(plugin, ctx, persistence, bus, Optional.empty(), menus, menuBindings);
     }
 
     /**
@@ -86,14 +94,25 @@ public final class VaultsWiring {
      * {@link VaultEconomy} bridge is captured during economy wiring and handed in here; when it is empty
      * (economy disabled, or {@code economy.enabled = false} in vaults config), a configured cost is recorded
      * but not charged and no refund is paid.
+     *
+     * <p>The {@code menus}/{@code menuBindings} pair is the data-driven menu engine: vaults registers the
+     * selector's slot source, placeholders, and open action through the bindings and opens it through the façade.
      */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus, Optional<VaultEconomy> vaultEconomy) {
+            Plugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            Bus bus,
+            Optional<VaultEconomy> vaultEconomy,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(vaultEconomy, "vaultEconomy");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         VaultSettings settings = new VaultSettings(ctx.config());
@@ -107,8 +126,18 @@ public final class VaultsWiring {
         // vault.amount / vault.size the use cases enforce, rather than constructing a second pair.
         VaultAmountQuota amountQuota = new VaultAmountQuota(kernel.permissions(), settings.defaultAmount());
         VaultSizeQuota sizeQuota = new VaultSizeQuota(kernel.permissions(), settings.defaultSize());
-        VaultServices services =
-                assemble(kernel, settings, repository, clock, vaultEconomy, audit, amountQuota, sizeQuota);
+        VaultServices services = assemble(
+                plugin,
+                kernel,
+                settings,
+                repository,
+                clock,
+                vaultEconomy,
+                audit,
+                amountQuota,
+                sizeQuota,
+                menus,
+                menuBindings);
         // The cleanup sweep is opt-in: when cleanup.enabled is false it is never built, so a disabled module
         // arms zero background work. The running flag is flipped on stop so the self-rescheduling loop exits.
         AtomicBoolean running = new AtomicBoolean(true);
@@ -147,6 +176,7 @@ public final class VaultsWiring {
     }
 
     private static VaultServices assemble(
+            Plugin plugin,
             KernelPorts kernel,
             VaultSettings settings,
             VaultRepository repository,
@@ -154,7 +184,9 @@ public final class VaultsWiring {
             Optional<VaultEconomy> vaultEconomy,
             VaultAudit audit,
             VaultAmountQuota amountQuota,
-            VaultSizeQuota sizeQuota) {
+            VaultSizeQuota sizeQuota,
+            Menus menus,
+            MenuBindings menuBindings) {
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
         VaultCharge charge = buildCharge(kernel, settings, vaultEconomy);
         SaveVault saveVault = new SaveVault(repository, kernel.events(), clock);
@@ -169,7 +201,8 @@ public final class VaultsWiring {
                 openSound);
         OpenVault openVault = new OpenVault(repository, amountQuota, sizeQuota, charge, clock);
         ListVaults listVaults = new ListVaults(repository);
-        VaultSelectorView selector = new VaultSelectorView(
+        VaultSelectorMenu selector = new VaultSelectorMenu(
+                menus,
                 kernel.messages(),
                 kernel.messageSink(),
                 kernel.scheduler(),
@@ -180,6 +213,7 @@ public final class VaultsWiring {
                 notifier,
                 settings.chargeSettings(),
                 settings.selectorSettings());
+        selector.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         return new VaultServices(
                 openVault,
                 listVaults,
@@ -224,7 +258,7 @@ public final class VaultsWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register (none here; the menu listener is uxmLib's)
      * @param view the GUI, held for the stop-time flush
-     * @param selector the vault selector the {@code /vault} command and the management hub both open
+     * @param selector the engine-rendered vault selector the {@code /vault} command and the management hub both open
      * @param repository the vault store the {@code vaults_count} placeholder reads
      * @param amountQuota the vault-count reducer the {@code vaults_max}/{@code vaults_left} placeholders read
      * @param sizeQuota the per-vault size reducer the {@code vaults_size} placeholder reads
@@ -235,7 +269,7 @@ public final class VaultsWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             VaultView view,
-            VaultSelectorView selector,
+            VaultSelectorMenu selector,
             VaultRepository repository,
             VaultAmountQuota amountQuota,
             VaultSizeQuota sizeQuota,

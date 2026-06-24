@@ -24,23 +24,24 @@ import org.junit.jupiter.api.Test;
  * mirrors the ids the feature wiring registers.
  *
  * <p>The four {@code EXPECTED_*} sets are the contract: keep them in sync with the ids registered through
- * {@link MenuBindings} in the production wiring. They are empty for the engine-only milestone because no spec
- * ships yet; the pilot (warp-sounds) lands its ids here in the same change that adds the spec and the wiring.
+ * {@link MenuBindings} in the production wiring. Each migrated menu lands its ids here in the same change that adds
+ * the spec and the wiring (warp-sounds and the vault selector are wired today).
  */
 class ShippedSpecBindingsDriftTest {
 
     /** Action ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_ACTIONS =
-            Set.of("warp:set-sound", "warp:custom-sound", "warp:remove-sound", "warp:edit-back");
+            Set.of("warp:set-sound", "warp:custom-sound", "warp:remove-sound", "warp:edit-back", "vault:open-slot");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of();
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of("sound", "sound_material");
+    private static final Set<String> EXPECTED_PLACEHOLDERS =
+            Set.of("sound", "sound_material", "vault_icon", "vault_name", "vault_lore");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_LISTS = Set.of("warp:sound-options");
+    private static final Set<String> EXPECTED_LISTS = Set.of("warp:sound-options", "vault:slots");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

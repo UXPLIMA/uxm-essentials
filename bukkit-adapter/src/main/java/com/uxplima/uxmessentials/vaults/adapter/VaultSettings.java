@@ -9,7 +9,7 @@ import org.bukkit.Material;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView.VaultSelectorSettings;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu.VaultSelectorSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.domain.VaultItemPolicy;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;

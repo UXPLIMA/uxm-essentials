@@ -3,9 +3,11 @@ package com.uxplima.uxmessentials.vaults.command;
 import org.bukkit.Material;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView.VaultSelectorSettings;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu.VaultSelectorSettings;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
@@ -16,10 +18,13 @@ import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.domain.VaultItemPolicy;
 
 /**
- * Shared test fixtures for the vaults command/GUI tests: a {@link VaultView} and {@link VaultSelectorView}
+ * Shared test fixtures for the vaults command/GUI tests: a {@link VaultView} and {@link VaultSelectorMenu}
  * wired off a {@link KernelPorts} double the same way {@code VaultsWiring} wires them, so each test's
  * {@code services()} helper stays a single call rather than repeating the selector plumbing. The selector
- * settings default to a three-row picker showing locked indices, mirroring the shipped config.
+ * settings default to a three-row picker showing locked indices, mirroring the shipped config. The selector is
+ * built over a real (but listener-less) engine through {@link TestMenuEngine}; the command tests it feeds either
+ * never open it or only check the window opens, while the dedicated golden and off-thread tests open and click it
+ * through engines of their own.
  */
 final class VaultViews {
 
@@ -48,8 +53,8 @@ final class VaultViews {
         return new VaultSelectorSettings(layout, Material.CHEST, Material.GRAY_STAINED_GLASS_PANE, true);
     }
 
-    /** A {@link VaultSelectorView} wired off the kernel doubles and the given collaborators. */
-    static VaultSelectorView selector(
+    /** A {@link VaultSelectorMenu} wired off the kernel doubles and the given collaborators, over a fresh engine. */
+    static VaultSelectorMenu selector(
             KernelPorts kernel,
             ListVaults listVaults,
             VaultAmountQuota amountQuota,
@@ -57,7 +62,10 @@ final class VaultViews {
             VaultView view,
             VaultNotifier notifier,
             VaultChargeSettings chargeSettings) {
-        return new VaultSelectorView(
+        TestMenuEngine engine = TestMenuEngine.create(kernel.messages(), kernel.scheduler());
+        MenuBindings bindings = engine.bindings();
+        VaultSelectorMenu menu = new VaultSelectorMenu(
+                engine.menus(),
                 kernel.messages(),
                 kernel.messageSink(),
                 kernel.scheduler(),
@@ -68,5 +76,25 @@ final class VaultViews {
                 notifier,
                 chargeSettings,
                 selectorSettings());
+        // Register the bindings and the bundled spec so menus.open resolves; a non-existent disk path makes the
+        // loader fall through to the classpath resource. The command tests that open the picker get a working
+        // engine; those that only fill VaultServices never open it, so this is harmless to them.
+        menu.register(bindings, java.nio.file.Path.of("nonexistent-menu-data"), new SilentLogger());
+        return menu;
+    }
+
+    /** Swallows the loader's diagnostics; the bundled spec loads cleanly in tests, so nothing is expected. */
+    private static final class SilentLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

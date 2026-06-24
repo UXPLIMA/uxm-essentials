@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vaults.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -18,7 +19,15 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -26,7 +35,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
@@ -44,27 +53,27 @@ import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultItemPolicy;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
 import com.uxplima.uxmlib.gui.StorageGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * Pins that clicking an owned icon in the {@code /vault} selector resolves the vault's contents <em>off</em> the
- * click (region) thread. uxmLib dispatches the click handler on the viewer's entity thread; the vault-contents
- * read it triggers must not run there. It belongs in a {@link Scheduler#async} task whose continuation bridges
- * the window open back to the viewer's region thread — the same shape {@code /vault <n>} uses.
+ * Pins that clicking an owned cell in the engine-rendered {@code /vault} selector resolves the vault's contents
+ * <em>off</em> the click (region) thread. The engine dispatches the click handler on the viewer's entity thread;
+ * the vault-contents read it triggers must not run there. It belongs in a {@link Scheduler#async} task whose
+ * continuation bridges the window open back to the viewer's region thread — the same shape {@code /vault <n>} uses.
  *
  * <p>The scheduler is a <em>deferring</em> double: {@code async} captures the task without running it, while
- * {@code onEntity} runs inline (the region bridge). The menu is opened first with the captured load drained (so
- * the picker is on screen), the read counter is then reset, and a click is fired. After the click the repository
- * has seen zero further reads — proving the contents read did not run on the click thread — and only once the
- * captured task is drained does the read happen and the vault window open.
+ * {@code onEntity} runs inline (the region bridge). The menu is opened first with the captured slot-source load
+ * drained (so the picker is on screen), the read counter is then reset, and a click is fired. After the click the
+ * repository has seen zero further reads — proving the contents read did not run on the click thread — and only
+ * once the captured task is drained does the read happen and the vault window open.
  */
 class VaultSelectorOffThreadReadTest {
 
@@ -74,6 +83,9 @@ class VaultSelectorOffThreadReadTest {
     private RecordingSink sink;
     private CountingRepository repository;
     private DeferringScheduler scheduler;
+
+    @TempDir
+    Path dataFolder;
 
     @BeforeEach
     void setUp() {
@@ -97,11 +109,9 @@ class VaultSelectorOffThreadReadTest {
     void clickingAnOwnedIconReadsTheContentsOffTheClickThread() {
         repository.allocate(1);
         repository.allocate(2);
-        VaultSelectorView selector = selector(4);
-
-        selector.open(player, ref());
-        scheduler.drain(); // the deferred owned-index load builds and opens the picker on the entity bridge
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(PaginatedGui.class);
+        openSelector(4);
+        scheduler.drain(); // the deferred slot-source load builds and opens the picker on the entity bridge
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
 
         repository.reads = 0; // ignore the index/summary reads that built the menu; measure only the click
 
@@ -110,7 +120,7 @@ class VaultSelectorOffThreadReadTest {
         // The click handler returned without reading the vault's contents — that read was handed to async.
         assertThat(repository.reads).isZero();
         assertThat(scheduler.deferred).isNotEmpty();
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
 
         scheduler.drain();
 
@@ -127,9 +137,18 @@ class VaultSelectorOffThreadReadTest {
         server.getPluginManager().callEvent(event);
     }
 
-    /** A selector whose amount quota resolves to {@code cap}, wired off the real open/list use cases. */
-    private VaultSelectorView selector(int cap) {
+    /** Build the engine over the deferring scheduler, register the vault bindings + spec, and open the picker. */
+    private void openSelector(int cap) {
         Messages messages = new KeyMessages();
+        GuiText guiText = new GuiText(messages);
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        MenuListener listener =
+                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        server.getPluginManager().registerEvents(listener, plugin);
+        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+
         Permissions permissions = new CapPermissions(cap);
         VaultAmountQuota amount = new VaultAmountQuota(permissions, cap);
         VaultSizeQuota size = new VaultSizeQuota(permissions, 6);
@@ -141,7 +160,8 @@ class VaultSelectorOffThreadReadTest {
                 new VaultView(messages, sink, saveVault, scheduler, permissions, VaultItemPolicy.allowAll(), null);
         OpenVault openVault = new OpenVault(repository, amount, size, charge, Clock.systemUTC());
         ListVaults listVaults = new ListVaults(repository);
-        return new VaultSelectorView(
+        VaultSelectorMenu menu = new VaultSelectorMenu(
+                menus,
                 messages,
                 sink,
                 scheduler,
@@ -152,6 +172,8 @@ class VaultSelectorOffThreadReadTest {
                 notifier,
                 chargeSettings,
                 VaultViews.selectorSettings());
+        menu.register(bindings, dataFolder, new NoopLogger());
+        menu.open(ref());
     }
 
     private PlayerRef ref() {
@@ -289,5 +311,19 @@ class VaultSelectorOffThreadReadTest {
             implements com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher {
         @Override
         public void publish(com.uxplima.uxmessentials.shared.domain.DomainEvent event) {}
+    }
+
+    private static final class NoopLogger implements Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

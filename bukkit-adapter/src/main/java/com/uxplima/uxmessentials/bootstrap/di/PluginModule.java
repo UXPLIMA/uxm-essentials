@@ -479,7 +479,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("itemworld"))) {
             wireItemworld(plugin, ctx, resources, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("vaults"))) {
-            wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry);
+            wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("communication"))) {
             wireCommunication(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
@@ -912,15 +912,18 @@ public final class PluginModule {
             CloseableResources resources,
             Bus bus,
             ContextLinks links,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            MenuBindings menuBindings) {
         // vaults builds its cached jOOQ VaultRepository over persistence.dsl(), the audit logger on the dedicated
         // audit channel, the inventory-holder GUI and the InventoryClose save listener. It opts into cross-server
         // sync through the bus handle — a remote vault save invalidates exactly that vault here. The economy
         // bridge captured during economy wiring is handed in so a configured vault cost can be charged; when it
-        // is absent a configured cost is recorded but never charged. On stop the still-open vault windows are
-        // close-and-saved before the pool closes.
-        VaultsWiring.Wired wired =
-                VaultsWiring.wire(plugin, ctx, persistence, bus, Optional.ofNullable(links.vaultEconomy));
+        // is absent a configured cost is recorded but never charged. The selector is registered with and opened
+        // through the shared menu engine. On stop the still-open vault windows are close-and-saved before the pool
+        // closes.
+        VaultsWiring.Wired wired = VaultsWiring.wire(
+                plugin, ctx, persistence, bus, Optional.ofNullable(links.vaultEconomy), menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -933,7 +936,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_SELECTOR_TITLE,
                 Material.ENDER_CHEST,
                 "uxmessentials.vault.use",
-                (player, viewer) -> wired.selector().open(player, viewer)));
+                (player, viewer) -> wired.selector().open(viewer)));
     }
 
     private static void bindMute(

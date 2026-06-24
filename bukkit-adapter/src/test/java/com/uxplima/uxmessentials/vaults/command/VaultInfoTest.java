@@ -36,7 +36,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommand;
-import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorView;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
@@ -148,7 +148,7 @@ class VaultInfoTest {
         VaultAudit audit = new NoAudit();
         OpenVault openVault = new OpenVault(repository, amount, size, charge, Clock.systemUTC());
         ListVaults listVaults = new ListVaults(repository);
-        VaultSelectorView selector =
+        VaultSelectorMenu selector =
                 VaultViews.selector(kernel, listVaults, amount, openVault, view, notifier, chargeSettings);
         return new VaultServices(
                 openVault,
