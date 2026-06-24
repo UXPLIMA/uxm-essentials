@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
@@ -97,8 +99,11 @@ class ArchitectureTest {
             .resideInAnyPackage("org.bukkit..", "io.papermc..", "net.minecraft..")
             .because("the menu engine's spec model and evaluation must stay pure for plain-JUnit testing");
 
-    // Only the Menus facade and the binding registries are the engine's public surface. The render and
-    // runtime internals stay private to the engine, so features wire behaviour through the facade alone.
+    // The engine's public surface is the Menus facade, the MenuBindings registries, and the two context
+    // types a binding lambda is handed — MenuContext (condition/placeholder/list) and MenuActionContext
+    // (action). A feature wires behaviour by reading those contexts, so they are public by contract even
+    // though they live alongside the runtime. Everything else under render/ and runtime/ — the holder, the
+    // click listener, the refresh task — is the engine's private machinery and stays off-limits outside it.
     // Two packages are exempt for the same reason they are everywhere else: bootstrap is the composition
     // root that constructs the engine (it is not a feature), and the engine's own tests under
     // shared.menu.. legitimately exercise render/runtime directly.
@@ -106,9 +111,36 @@ class ArchitectureTest {
     static final ArchRule menuInternalsAreNotUsedOutsideTheEngine = noClasses()
             .that()
             .resideOutsideOfPackages("..gui.menu..", "..bootstrap..", "com.uxplima.uxmessentials.shared.menu..")
+            .and(areProductionClasses())
             .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage("..gui.menu.render..", "..gui.menu.runtime..")
-            .because(
-                    "only the Menus facade and MenuBindings are the public surface; render/runtime internals stay private to the engine");
+            .dependOnClassesThat(menuInternals())
+            .because("only the Menus facade, the MenuBindings registries, and the MenuContext/MenuActionContext a "
+                    + "binding reads are the public surface; the holder, listener, refresh task and renderer stay "
+                    + "private to the engine");
+
+    /**
+     * The engine's private machinery: everything under {@code render/} plus the runtime internals, but not the
+     * two public context types a binding lambda reads. Naming the runtime internals one by one (by their fully
+     * qualified names, so this predicate itself does not depend on those classes) is what lets feature wiring
+     * register a binding through {@code MenuContext}/{@code MenuActionContext} while keeping the holder, listener
+     * and refresh task encapsulated.
+     */
+    private static DescribedPredicate<JavaClass> menuInternals() {
+        String runtime = "com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.";
+        java.util.Set<String> runtimeInternals = java.util.Set.of(
+                runtime + "MenuHolder", runtime + "MenuListener", runtime + "MenuRefresh", runtime + "Cancellable");
+        return JavaClass.Predicates.resideInAPackage("..gui.menu.render..")
+                .or(DescribedPredicate.describe(
+                        "are menu runtime internals", javaClass -> runtimeInternals.contains(javaClass.getFullName())))
+                .as("menu engine render/runtime internals");
+    }
+
+    /**
+     * Production classes only — the architecture tests and their nested helpers legitimately wire the engine to
+     * exercise it, so this rule must not flag a test that constructs the renderer or listener for a fixture.
+     */
+    private static DescribedPredicate<JavaClass> areProductionClasses() {
+        return DescribedPredicate.describe(
+                "are production classes", javaClass -> !javaClass.getName().contains("Test"));
+    }
 }

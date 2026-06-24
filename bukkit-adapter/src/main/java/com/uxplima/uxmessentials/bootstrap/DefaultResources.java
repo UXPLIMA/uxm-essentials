@@ -100,6 +100,7 @@ final class DefaultResources {
             "modules/scoreboard/gui/scoreboard-settings.conf",
             "modules/management/gui/hub.conf",
             "modules/management/gui/colour-picker.conf",
+            "modules/menu/specs/warp-sounds.conf",
             "input/config.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");

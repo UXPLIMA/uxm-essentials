@@ -54,6 +54,7 @@ import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView;
 import com.uxplima.uxmessentials.warps.application.SetWarp;
@@ -163,12 +164,22 @@ class WarpManagerCategoryTest {
                 textInput,
                 messages);
 
+        var soundOptionSource = new WarpSoundSelectorView(messages, scheduler, WarpSoundSelectorView.defaultLayout());
+        var menuBindings = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
+        var menuItemRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
+                new GuiText(messages), menuBindings.placeholders());
+        var menuRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
+                menuItemRenderer, menuBindings.conditions(), menuBindings.lists());
+        var menus = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
+                menuRenderer, new GuiText(messages), scheduler);
+        var soundMenu = WarpSoundMenu.create(menus, soundOptionSource, repository, editorView, textInput);
+        soundMenu.register(menuBindings, plugin.getDataFolder().toPath(), new SilentLogger());
         WarpEditorListener listener = new WarpEditorListener(
                 editorView,
                 repository,
                 textInput,
                 messages,
-                new WarpSoundSelectorView(messages, scheduler, WarpSoundSelectorView.defaultLayout()),
+                soundOptionSource,
                 new WarpParticleSelectorView(messages, scheduler, WarpParticleSelectorView.defaultLayout()),
                 new WarpWelcomeMessagesView(
                         messages, scheduler, repository, editorView, WarpWelcomeMessagesView.defaultLayout()),
@@ -177,7 +188,8 @@ class WarpManagerCategoryTest {
                 managerView,
                 categorySelectorView,
                 categoryEditing,
-                setWarp);
+                setWarp,
+                soundMenu);
         server.getPluginManager().registerEvents(listener, plugin);
     }
 

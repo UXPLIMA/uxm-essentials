@@ -49,6 +49,7 @@ public final class WarpEditorListener implements Listener {
     private final WarpCategorySelectorView categorySelectorView;
     private final WarpCategoryEditing categoryEditing;
     private final SetWarp setWarp;
+    private final WarpSoundMenu soundMenu;
 
     public WarpEditorListener(
             WarpEditorView editorView,
@@ -63,7 +64,8 @@ public final class WarpEditorListener implements Listener {
             WarpManagerView managerView,
             WarpCategorySelectorView categorySelectorView,
             WarpCategoryEditing categoryEditing,
-            SetWarp setWarp) {
+            SetWarp setWarp,
+            WarpSoundMenu soundMenu) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.messages = Objects.requireNonNull(messages, "messages");
@@ -76,6 +78,7 @@ public final class WarpEditorListener implements Listener {
         this.categorySelectorView = Objects.requireNonNull(categorySelectorView, "categorySelectorView");
         this.categoryEditing = Objects.requireNonNull(categoryEditing, "categoryEditing");
         this.setWarp = Objects.requireNonNull(setWarp, "setWarp");
+        this.soundMenu = Objects.requireNonNull(soundMenu, "soundMenu");
         this.loader = new EditableWarpLoader(Objects.requireNonNull(warpRepository, "warpRepository"), editorView);
         this.subMenuClicks = new WarpSubMenuClicks(
                 editorView, textInput, this.loader, soundSelectorView, particleSelectorView, welcomeMessagesView);
@@ -321,6 +324,10 @@ public final class WarpEditorListener implements Listener {
         if (c == ClickType.SHIFT_LEFT || c == ClickType.SHIFT_RIGHT) {
             warp.clearSounds();
             editorView.open(player, viewer, name, owner);
+        } else if (owner == null) {
+            // Server warps render the selector through the menu engine — the migrated pilot path. Player warps still
+            // use the original fixed view until Phase 3 migrates them with a player-warp subject.
+            soundMenu.open(viewer, new WarpSoundEdit(WarpName.of(name), c == ClickType.LEFT));
         } else {
             soundSelectorView.open(player, viewer, name, owner, c == ClickType.LEFT);
         }

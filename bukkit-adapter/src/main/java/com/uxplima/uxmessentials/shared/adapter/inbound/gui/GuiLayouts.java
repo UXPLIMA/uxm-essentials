@@ -47,6 +47,14 @@ public final class GuiLayouts {
     }
 
     /**
+     * The plugin data folder these layouts resolve against, so a caller that loads a different disk-first/bundled
+     * resource (such as a menu-engine spec) resolves it under the same root rather than threading the path again.
+     */
+    public Path dataFolder() {
+        return dataFolder;
+    }
+
+    /**
      * Resolve the layout for {@code module}/{@code name}, falling back to {@code codeDefault} when no conf is
      * present or a conf cannot be parsed.
      */

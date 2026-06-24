@@ -59,22 +59,15 @@ public final class WarpsWiring {
 
     private WarpsWiring() {}
 
-    /** Build the warps adapters and use cases with no economy bridge (a recorded warp cost is not charged). */
-    public static Wired wire(
-            ModuleContext ctx,
-            Persistence persistence,
-            TeleportEngine teleportEngine,
-            Bus bus,
-            GuiLayouts guiLayouts,
-            TextInput textInput) {
-        return wire(ctx, persistence, teleportEngine, Optional.empty(), bus, guiLayouts, textInput);
-    }
-
     /**
      * Build the warps context, charging a recorded per-warp cost through {@code economy} when present. The
      * economy context lands before warps in the registry, so its {@link WarpEconomy} bridge is captured during
      * economy wiring and handed in here; when it is empty (economy disabled), a priced warp's cost is recorded
      * but not charged — the soft coupling the warps context owns.
+     *
+     * <p>The {@code menus}/{@code menuBindings} pair is the data-driven menu engine: warps registers the sound
+     * selector's list source, placeholders, and actions through the bindings and opens it through the façade. This
+     * is the engine pilot and the pattern the remaining feature menus follow when they migrate.
      */
     public static Wired wire(
             ModuleContext ctx,
@@ -83,7 +76,9 @@ public final class WarpsWiring {
             Optional<WarpEconomy> economy,
             Bus bus,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus,
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings menuBindings) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
@@ -91,6 +86,8 @@ public final class WarpsWiring {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         // The cached repository is the read accelerator; the bus listener drops the cached set when a peer
         // reports a change, and the broadcasting decorator announces this backend's own writes to peers.
@@ -138,6 +135,9 @@ public final class WarpsWiring {
                 kernel.messages(), kernel.scheduler(), repository, editorLayout, playerWarpHandle);
         var soundSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView(
                 kernel.messages(), kernel.scheduler(), soundLayout);
+        var soundMenu = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu.create(
+                menus, soundSelectorView, repository, editorView, textInput);
+        soundMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var particleSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView(
                 kernel.messages(), kernel.scheduler(), particleLayout);
         var welcomeMessagesView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView(
@@ -194,7 +194,8 @@ public final class WarpsWiring {
                 managerView,
                 categorySelectorView,
                 categoryEditing,
-                setWarp);
+                setWarp,
+                soundMenu);
 
         WarpServices services = assemble(
                 kernel, repository, notifier, menuLayout, editorView, ctx, useWarp, categoryRepository, managerView);

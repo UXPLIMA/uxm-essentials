@@ -30,16 +30,17 @@ import org.junit.jupiter.api.Test;
 class ShippedSpecBindingsDriftTest {
 
     /** Action ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_ACTIONS = Set.of();
+    private static final Set<String> EXPECTED_ACTIONS =
+            Set.of("warp:set-sound", "warp:custom-sound", "warp:remove-sound", "warp:edit-back");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of();
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of();
+    private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of("sound", "sound_material");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_LISTS = Set.of();
+    private static final Set<String> EXPECTED_LISTS = Set.of("warp:sound-options");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

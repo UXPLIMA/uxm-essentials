@@ -182,8 +182,37 @@ public final class PluginModule {
         BusWiring.Wired bus = BusWiring.wire(plugin, config, kernel.scheduler(), kernel.log());
         resources.onClose(bus::stop);
 
-        PlaceholderContexts placeholders =
-                wireModules(plugin, registry, config, kernel, persistence, resources, log, bus.bus(), guiRegistry);
+        GuiText guiText = new GuiText(kernel.messages());
+        // The data-driven menu engine: one binding façade holds every feature's handlers, and the renderer and
+        // click listener share those exact registry instances so a feature registering behaviour after wiring is
+        // seen by the already-built engine. The single click listener is installed once here, before any feature
+        // wires, and both it and the open windows are torn down on disable so a reload re-installs cleanly. The
+        // façade and the bindings are threaded into module wiring (the warp sound selector is the first feature to
+        // register its bindings and open a spec through them); Phase 3 reuses the same path for the rest.
+        MenuBindings menuBindings = new MenuBindings();
+        ItemRenderer menuItemRenderer = new ItemRenderer(guiText, menuBindings.placeholders());
+        MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions(), menuBindings.lists());
+        MenuListener menuListener = new MenuListener(
+                menuRenderer, menuBindings.actions(), menuBindings.conditions(), kernel.scheduler(), plugin);
+        menuListener.install();
+        Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler());
+        resources.onClose(() -> {
+            menuListener.uninstall();
+            menus.shutdown();
+        });
+
+        PlaceholderContexts placeholders = wireModules(
+                plugin,
+                registry,
+                config,
+                kernel,
+                persistence,
+                resources,
+                log,
+                bus.bus(),
+                guiRegistry,
+                menus,
+                menuBindings);
         bus.start();
         registerPlaceholders(plugin, placeholders, resources, kernel.log());
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
@@ -200,24 +229,6 @@ public final class PluginModule {
         // registry is constructed here and is threaded to module wiring (SP1+ each registers its opener);
         // an empty registry is the valid first state, so /uxmess gui replies with the empty-hub line until a
         // module plugs in. Geometry/materials load disk-first then bundled from modules/management/gui/hub.conf.
-        GuiText guiText = new GuiText(kernel.messages());
-        // The data-driven menu engine: one binding façade holds every feature's handlers, and the renderer and
-        // click listener share those exact registry instances so a feature registering behaviour after wiring is
-        // seen by the already-built engine. The single click listener is installed once here, before any feature
-        // pilot spec lands, and both it and the open windows are torn down on disable so a reload re-installs
-        // cleanly. The bindings and façade are locals for now; Task 17 threads the bindings into the warps wiring
-        // and registers the first pilot spec.
-        MenuBindings menuBindings = new MenuBindings();
-        ItemRenderer menuItemRenderer = new ItemRenderer(guiText, menuBindings.placeholders());
-        MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions(), menuBindings.lists());
-        MenuListener menuListener = new MenuListener(
-                menuRenderer, menuBindings.actions(), menuBindings.conditions(), kernel.scheduler(), plugin);
-        menuListener.install();
-        Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler());
-        resources.onClose(() -> {
-            menuListener.uninstall();
-            menus.shutdown();
-        });
         GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
         EntityListLayout hubLayout =
                 guiLayouts.loadEntityList("management", "hub", EntityListLayout.paginatedDefault(Material.NETHER_STAR));
@@ -357,7 +368,9 @@ public final class PluginModule {
             CloseableResources resources,
             Logger log,
             Bus bus,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            MenuBindings menuBindings) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks();
@@ -394,7 +407,19 @@ public final class PluginModule {
                 continue;
             }
             startModule(module, ctx, resources, log);
-            wireAdapters(plugin, module, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+            wireAdapters(
+                    plugin,
+                    module,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    bus,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         }
         // The server-metrics seam belongs to no feature context — it reads Bukkit/JVM globals — so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
@@ -413,7 +438,9 @@ public final class PluginModule {
             Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // The bukkit-side adapters of each context are wired here once the context's pure module has
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
@@ -426,7 +453,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("economy"))) {
             wireEconomy(plugin, ctx, persistence, resources, links, bus, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("warps"))) {
-            wireWarps(ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+            wireWarps(ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("kits"))) {
             wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
@@ -645,11 +672,21 @@ public final class PluginModule {
             Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "warps delegates teleport execution but the teleport engine is unavailable");
         WarpsWiring.Wired wired = WarpsWiring.wire(
-                ctx, persistence, engine, Optional.ofNullable(links.warpEconomy), bus, guiLayouts, textInput);
+                ctx,
+                persistence,
+                engine,
+                Optional.ofNullable(links.warpEconomy),
+                bus,
+                guiLayouts,
+                textInput,
+                menus,
+                menuBindings);
         links.warpEditorView = wired.editorView();
         links.warpPlayerWarpHandle = wired.playerWarpHandle();
         links.warpPlayerWarpGoTo = wired.playerWarpGoTo();
