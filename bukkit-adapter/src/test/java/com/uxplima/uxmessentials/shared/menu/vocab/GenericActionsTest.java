@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -27,6 +29,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -58,6 +61,7 @@ class GenericActionsTest {
     private PlayerMock player;
     private MenuBindings bindings;
     private Menus menus;
+    private RecordingLogger log;
 
     @BeforeEach
     void setUp() {
@@ -70,7 +74,8 @@ class GenericActionsTest {
         menus = new Menus(renderer, guiText, new SyncScheduler());
         MenuSpec target = new MenuSpecLoader().parse(OPEN_TARGET_HOCON);
         menus.registerSpec("target", target);
-        MenuVocabulary.registerActions(bindings, menus);
+        log = new RecordingLogger();
+        MenuVocabulary.registerActions(bindings, menus, true, log);
     }
 
     @AfterEach
@@ -125,6 +130,38 @@ class GenericActionsTest {
         assertThat(holder).isInstanceOf(MenuHolder.class);
     }
 
+    @Test
+    void consoleEnabledDispatches() {
+        FlagCommand flag = new FlagCommand();
+        server.getCommandMap().register("test", flag);
+
+        invoke("console", "flagme");
+
+        assertThat(flag.ran)
+                .as("console action should dispatch when allow-console is true")
+                .isTrue();
+        assertThat(log.warnings)
+                .as("dispatching console action should not warn")
+                .isEmpty();
+    }
+
+    @Test
+    void consoleDisabledIsANoOpAndWarns() {
+        bindings = new MenuBindings();
+        log = new RecordingLogger();
+        MenuVocabulary.registerActions(bindings, menus, false, log);
+        FlagCommand flag = new FlagCommand();
+        server.getCommandMap().register("test", flag);
+
+        invoke("console", "flagme");
+
+        assertThat(flag.ran)
+                .as("disabled console action must not run the command")
+                .isFalse();
+        assertThat(log.warnings).as("disabled console action must warn once").hasSize(1);
+        assertThat(log.warnings.getFirst()).contains("flagme");
+    }
+
     /** Builds the context the click listener would build, then fires the handler registered under {@code id}. */
     private void invoke(String id, String arg) {
         Consumer<MenuActionContext> handler =
@@ -146,6 +183,44 @@ class GenericActionsTest {
             sender.sendMessage("echoed: " + String.join(" ", args));
             return true;
         }
+    }
+
+    /** A console-dispatched command that flips a flag, so a test can prove whether the console actually ran it. */
+    private static final class FlagCommand extends Command {
+        private boolean ran;
+
+        FlagCommand() {
+            super("flagme");
+        }
+
+        @Override
+        public boolean execute(CommandSender sender, String label, String[] args) {
+            ran = true;
+            return true;
+        }
+    }
+
+    /** Captures expanded warning lines so a test can assert a disabled console action logged exactly once. */
+    private static final class RecordingLogger implements Logger {
+        private final List<String> warnings = new ArrayList<>();
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {
+            String expanded = message;
+            for (Object arg : args) {
+                expanded = expanded.replaceFirst("\\{}", String.valueOf(arg));
+            }
+            warnings.add(expanded);
+        }
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private static final class KeyMessages implements Messages {

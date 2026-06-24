@@ -197,7 +197,8 @@ public final class PluginModule {
                 menuRenderer, menuBindings.actions(), menuBindings.conditions(), kernel.scheduler(), plugin);
         menuListener.install();
         Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler());
-        MenuVocabulary.registerActions(menuBindings, menus);
+        // Task B3 wires the custommenus.allow-console config flag here
+        MenuVocabulary.registerActions(menuBindings, menus, false, kernel.log());
         resources.onClose(() -> {
             menuListener.uninstall();
             menus.shutdown();
