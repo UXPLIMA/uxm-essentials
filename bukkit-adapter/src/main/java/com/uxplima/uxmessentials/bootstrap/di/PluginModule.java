@@ -84,6 +84,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -196,6 +197,7 @@ public final class PluginModule {
                 menuRenderer, menuBindings.actions(), menuBindings.conditions(), kernel.scheduler(), plugin);
         menuListener.install();
         Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler());
+        MenuVocabulary.registerActions(menuBindings, menus);
         resources.onClose(() -> {
             menuListener.uninstall();
             menus.shutdown();
