@@ -1,0 +1,75 @@
+package com.uxplima.uxmessentials.shared.menu.vocab;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Plain-JUnit coverage of the generic menu conditions and placeholders. The {@code perm} condition reads the
+ * permission node from the condition ref's arguments — the same arg-carrier actions use — so a spec writes
+ * {@code perm:some.node} and the engine threads {@code some.node} through to the {@link Permissions} port. The
+ * {@code player} and {@code page} placeholders expand against the per-open {@link MenuContext}.
+ */
+class GenericConditionsTest {
+
+    @Test
+    void permConditionChecksTheViewerNode() {
+        MenuBindings bindings = new MenuBindings();
+        MenuVocabulary.registerConditions(bindings, new GrantOnly("x.allow"));
+        BiPredicate<MenuContext, Map<String, String>> perm =
+                bindings.condition("perm").orElseThrow(() -> new AssertionError("perm condition not registered"));
+        MenuContext ctx = MenuContext.of(viewer("Allowed"), null, 0);
+
+        assertThat(perm.test(ctx, Map.of("value", "x.allow"))).isTrue();
+        assertThat(perm.test(ctx, Map.of("value", "x.deny"))).isFalse();
+    }
+
+    @Test
+    void playerAndPagePlaceholdersResolve() {
+        MenuBindings bindings = new MenuBindings();
+        MenuVocabulary.registerPlaceholders(bindings);
+        Function<MenuContext, String> player =
+                bindings.placeholder("player").orElseThrow(() -> new AssertionError("player not registered"));
+        Function<MenuContext, String> page =
+                bindings.placeholder("page").orElseThrow(() -> new AssertionError("page not registered"));
+        MenuContext ctx = MenuContext.of(viewer("Steve"), null, 2);
+
+        assertThat(player.apply(ctx)).isEqualTo("Steve");
+        assertThat(page.apply(ctx)).isEqualTo("3");
+    }
+
+    private static PlayerRef viewer(String name) {
+        return new PlayerRef(UUID.randomUUID(), name);
+    }
+
+    /** A {@link Permissions} fake that grants exactly one node and rejects every other; only {@link #has} is used. */
+    private static final class GrantOnly implements Permissions {
+        private final Set<String> granted;
+
+        GrantOnly(String node) {
+            this.granted = Set.of(node);
+        }
+
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return granted.contains(node);
+        }
+
+        @Override
+        public QuotaResult resolveQuota(PlayerRef who, QuotaFamily family, WorldRef world, long configDefault) {
+            return QuotaResult.limited(configDefault);
+        }
+    }
+}

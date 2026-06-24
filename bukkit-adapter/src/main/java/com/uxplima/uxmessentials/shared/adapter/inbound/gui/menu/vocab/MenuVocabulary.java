@@ -9,8 +9,10 @@ import org.bukkit.Bukkit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 
 /**
  * The generic action vocabulary every menu can lean on without a feature wiring it. Registered once at startup
@@ -42,6 +44,30 @@ public final class MenuVocabulary {
         bindings.action("console", consoleAction(allowConsole, log));
         bindings.action("message", ctx -> ctx.player().sendMessage(StyledText.render(ctx.arg())));
         bindings.action("sound", MenuVocabulary::playSound);
+    }
+
+    /**
+     * Register the generic conditions into {@code bindings}. A condition handler receives the per-open context plus
+     * the condition ref's parsed args — the same arg carrier an action reads — so a spec writes {@code perm:some.node}
+     * and the node arrives in {@code args.get("value")}. The {@code perm} condition gates an item's view or a click
+     * on whether the viewer holds that node through the shared {@link Permissions} port.
+     */
+    public static void registerConditions(MenuBindings bindings, Permissions permissions) {
+        Objects.requireNonNull(bindings, "bindings");
+        Objects.requireNonNull(permissions, "permissions");
+        bindings.condition("perm", (ctx, args) -> permissions.has(ctx.viewer(), args.getOrDefault("value", "")));
+    }
+
+    /**
+     * Register the generic placeholders into {@code bindings}. {@code player} expands to the viewer's name and
+     * {@code page} to the one-based page number for display ({@code ctx.page()} is zero-based). {@code max-page} is
+     * deliberately left out: it needs the render-time page count, which the {@link MenuContext} does not carry — a
+     * later refinement resolves it where the renderer knows how many pages a list produced.
+     */
+    public static void registerPlaceholders(MenuBindings bindings) {
+        Objects.requireNonNull(bindings, "bindings");
+        bindings.placeholder("player", ctx -> ctx.viewer().name());
+        bindings.placeholder("page", ctx -> String.valueOf(ctx.page() + 1));
     }
 
     /**
