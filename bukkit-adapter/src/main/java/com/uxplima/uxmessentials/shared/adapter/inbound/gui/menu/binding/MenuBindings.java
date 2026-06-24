@@ -71,6 +71,27 @@ public final class MenuBindings {
     }
 
     /**
+     * The four backing registries, handed to the renderer and click listener so they resolve refs against the
+     * very instances this façade writes to. A feature registering a handler after wiring is therefore visible to
+     * an already-built engine — there is one registry per kind, not a copy per consumer.
+     */
+    public ActionRegistry actions() {
+        return actions;
+    }
+
+    public ConditionRegistry conditions() {
+        return conditions;
+    }
+
+    public PlaceholderRegistry placeholders() {
+        return placeholders;
+    }
+
+    public ListSourceRegistry lists() {
+        return lists;
+    }
+
+    /**
      * Every ref id a spec names that no registry knows, de-duplicated. An empty list means the specs are fully
      * wired; anything returned is a missing binding the operator must fix before the menu can open cleanly.
      */

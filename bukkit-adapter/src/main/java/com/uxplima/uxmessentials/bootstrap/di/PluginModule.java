@@ -79,6 +79,11 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -196,6 +201,23 @@ public final class PluginModule {
         // an empty registry is the valid first state, so /uxmess gui replies with the empty-hub line until a
         // module plugs in. Geometry/materials load disk-first then bundled from modules/management/gui/hub.conf.
         GuiText guiText = new GuiText(kernel.messages());
+        // The data-driven menu engine: one binding façade holds every feature's handlers, and the renderer and
+        // click listener share those exact registry instances so a feature registering behaviour after wiring is
+        // seen by the already-built engine. The single click listener is installed once here, before any feature
+        // pilot spec lands, and both it and the open windows are torn down on disable so a reload re-installs
+        // cleanly. The bindings and façade are locals for now; Task 17 threads the bindings into the warps wiring
+        // and registers the first pilot spec.
+        MenuBindings menuBindings = new MenuBindings();
+        ItemRenderer menuItemRenderer = new ItemRenderer(guiText, menuBindings.placeholders());
+        MenuRenderer menuRenderer = new MenuRenderer(menuItemRenderer, menuBindings.conditions(), menuBindings.lists());
+        MenuListener menuListener = new MenuListener(
+                menuRenderer, menuBindings.actions(), menuBindings.conditions(), kernel.scheduler(), plugin);
+        menuListener.install();
+        Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler());
+        resources.onClose(() -> {
+            menuListener.uninstall();
+            menus.shutdown();
+        });
         GuiLayouts guiLayouts = new GuiLayouts(plugin.getDataFolder().toPath(), kernel.log());
         EntityListLayout hubLayout =
                 guiLayouts.loadEntityList("management", "hub", EntityListLayout.paginatedDefault(Material.NETHER_STAR));

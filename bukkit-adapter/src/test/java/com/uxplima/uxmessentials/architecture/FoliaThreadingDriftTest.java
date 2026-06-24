@@ -178,6 +178,9 @@ class FoliaThreadingDriftTest {
                 pkg + "shared.adapter.inbound.gui.PlayerPickerView",
                 "GLOBAL: online-head roster snapshot taken inside scheduler.onGlobal, then opened per-entity");
         allow.put(
+                pkg + "shared.adapter.inbound.gui.menu.Menus",
+                "GLOBAL: engine shutdown() closes open menus inside scheduler.onGlobal");
+        allow.put(
                 pkg + "economy.adapter.inbound.gui.EconomyBulkView",
                 "GLOBAL: give-all/reset-all roster snapshot taken inside scheduler.onGlobal, then applied async");
         allow.put(
