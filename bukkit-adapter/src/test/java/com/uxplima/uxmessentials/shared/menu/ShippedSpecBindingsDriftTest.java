@@ -40,7 +40,9 @@ class ShippedSpecBindingsDriftTest {
             "communication:clearchat",
             "communication:broadcast",
             "communication:open-announcer",
-            "communication:close");
+            "communication:close",
+            "messaging:unignore",
+            "messaging:ignore-add");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of();
@@ -55,11 +57,12 @@ class ShippedSpecBindingsDriftTest {
             "communication_lock_state",
             "announcement_id",
             "announcement_lines",
-            "announcement_channels");
+            "announcement_channels",
+            "ignore_target");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS =
-            Set.of("warp:sound-options", "vault:slots", "communication:announcements");
+            Set.of("warp:sound-options", "vault:slots", "communication:announcements", "messaging:ignores");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

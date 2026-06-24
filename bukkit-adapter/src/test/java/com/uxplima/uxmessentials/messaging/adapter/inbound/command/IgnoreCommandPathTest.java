@@ -55,6 +55,11 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -69,7 +74,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,7 +88,8 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * rework. {@code /ignore <player>} now resolves offline-capably, so a player who has joined before can be ignored
  * while offline (the write lands on the UUID-keyed store), and only a never-seen name is rejected as unknown.
  * {@code /ignore} with no argument and the standalone {@code /ignorelist} both open the one ignore-list GUI, so
- * the list lives in a single place. The lookup is a fake that knows one offline profile; the GUI is the real view.
+ * the list lives in a single place. The lookup is a fake that knows one offline profile; the GUI is the real
+ * engine-rendered menu, so its window is backed by a {@link MenuHolder}.
  */
 class IgnoreCommandPathTest {
 
@@ -145,7 +150,7 @@ class IgnoreCommandPathTest {
 
         execute(new IgnoreCommand(services, new KeyMessages(), sink, views), owner, "ignore");
 
-        assertThat(openGuiHolder(owner)).isInstanceOf(PaginatedGui.class);
+        assertThat(openGuiHolder(owner)).isInstanceOf(MenuHolder.class);
     }
 
     @Test
@@ -154,7 +159,7 @@ class IgnoreCommandPathTest {
 
         execute(new IgnoreListCommand(services, new KeyMessages(), sink, views), owner, "ignorelist");
 
-        assertThat(openGuiHolder(owner)).isInstanceOf(PaginatedGui.class);
+        assertThat(openGuiHolder(owner)).isInstanceOf(MenuHolder.class);
     }
 
     private PlayerMock addPlayer(String name) {
@@ -241,6 +246,10 @@ class IgnoreCommandPathTest {
         Scheduler scheduler = new SyncScheduler();
         TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         GuiLayouts layouts = new GuiLayouts(dir, NOOP);
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
         return MessagingGuiViews.create(
                 guiText,
                 scheduler,
@@ -253,7 +262,11 @@ class IgnoreCommandPathTest {
                 new EmptyMail(),
                 players,
                 textInput,
-                layouts);
+                layouts,
+                menus,
+                bindings,
+                dir,
+                NOOP);
     }
 
     /** Resolves online players against the live mock server; "Ghost" is the one known offline profile. */

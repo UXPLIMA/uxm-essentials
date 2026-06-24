@@ -268,6 +268,13 @@ class MessagingSendPathTest {
         var textInput = com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit.create(
                 plugin, guiText, scheduler, Path.of("nonexistent"), NO_LOG);
         var layouts = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(guiDir, NO_LOG);
+        var bindings = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
+        var itemRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
+                guiText, bindings.placeholders());
+        var renderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
+                itemRenderer, bindings.conditions());
+        var menus = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
+                renderer, guiText, scheduler, bindings.lists());
         return MessagingGuiViews.create(
                 guiText,
                 scheduler,
@@ -280,7 +287,11 @@ class MessagingSendPathTest {
                 mail,
                 new CapturingLookup(server),
                 textInput,
-                layouts);
+                layouts,
+                menus,
+                bindings,
+                guiDir,
+                NO_LOG);
     }
 
     /** A deny-all permission seam: the GUIs built here are inert, so nothing depends on a real check. */

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.messaging.adapter.inbound.gui;
 
+import java.nio.file.Path;
 import java.util.Objects;
 
 import org.bukkit.Material;
@@ -14,6 +15,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -37,12 +41,12 @@ public final class MessagingGuiViews {
     private static final String MODULE = "messaging";
 
     private final MessagingSettingsView settingsView;
-    private final IgnoreListView ignoreView;
+    private final IgnoreListMenu ignoreMenu;
     private final MailboxView mailboxView;
 
-    private MessagingGuiViews(MessagingSettingsView settingsView, IgnoreListView ignoreView, MailboxView mailboxView) {
+    private MessagingGuiViews(MessagingSettingsView settingsView, IgnoreListMenu ignoreMenu, MailboxView mailboxView) {
         this.settingsView = settingsView;
-        this.ignoreView = ignoreView;
+        this.ignoreMenu = ignoreMenu;
         this.mailboxView = mailboxView;
     }
 
@@ -59,7 +63,11 @@ public final class MessagingGuiViews {
             MailRepository mail,
             PlayerLookup players,
             TextInput textInput,
-            GuiLayouts layouts) {
+            GuiLayouts layouts,
+            Menus menus,
+            MenuBindings menuBindings,
+            Path dataFolder,
+            Logger log) {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(messages, "messages");
@@ -72,20 +80,25 @@ public final class MessagingGuiViews {
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(layouts, "layouts");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
 
         MessagingSettingsView settingsView =
                 new MessagingSettingsView(guiText, scheduler, layouts, messages, toggles, socialSpy, permissions);
 
-        EntityListLayout ignoreLayout = layouts.loadEntityList(
-                MODULE, "ignore-list", EntityListLayout.withCreate(Material.PLAYER_HEAD, 49, Material.LIME_DYE));
-        IgnoreListView ignoreView = new IgnoreListView(
-                guiText, scheduler, ignores, services.ignore(), services.unignore(), players, textInput, ignoreLayout);
+        // The ignore-list manager now renders through the menu engine: its grid geometry lives in the
+        // messaging-ignore spec, its un-ignore and add-by-name clicks route through the same use cases.
+        IgnoreListMenu ignoreMenu = new IgnoreListMenu(
+                menus, scheduler, ignores, services.ignore(), services.unignore(), players, textInput);
+        ignoreMenu.register(menuBindings, dataFolder, log);
 
         EntityListLayout mailLayout = layouts.loadEntityList(
                 MODULE, "mailbox", EntityListLayout.withCreate(Material.PAPER, 49, Material.LAVA_BUCKET));
         MailboxView mailboxView = new MailboxView(guiText, scheduler, mail, services.clearMail(), mailLayout);
 
-        return new MessagingGuiViews(settingsView, ignoreView, mailboxView);
+        return new MessagingGuiViews(settingsView, ignoreMenu, mailboxView);
     }
 
     /** Open the messaging settings panel for {@code viewer}. */
@@ -93,9 +106,9 @@ public final class MessagingGuiViews {
         settingsView.open(player, viewer);
     }
 
-    /** Open the ignore-list manager for {@code viewer}. */
+    /** Open the ignore-list manager for {@code viewer}; the engine resolves the live player from {@code viewer}. */
     public void openIgnore(Player player, PlayerRef viewer) {
-        ignoreView.open(player, viewer);
+        ignoreMenu.open(viewer);
     }
 
     /** Open the mailbox for {@code viewer}. */
@@ -109,8 +122,8 @@ public final class MessagingGuiViews {
     }
 
     /** The ignore-list manager, for tests. */
-    public IgnoreListView ignoreView() {
-        return ignoreView;
+    public IgnoreListMenu ignoreMenu() {
+        return ignoreMenu;
     }
 
     /** The mailbox, for tests. */

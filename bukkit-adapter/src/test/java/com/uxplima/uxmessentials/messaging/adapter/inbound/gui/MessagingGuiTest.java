@@ -9,10 +9,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,15 +24,10 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.messaging.application.ClearMail;
-import com.uxplima.uxmessentials.messaging.application.Ignore;
 import com.uxplima.uxmessentials.messaging.application.MessagingNotifier;
-import com.uxplima.uxmessentials.messaging.application.Unignore;
-import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
-import com.uxplima.uxmessentials.messaging.domain.IgnoreList;
-import com.uxplima.uxmessentials.messaging.domain.IgnoreScope;
 import com.uxplima.uxmessentials.messaging.domain.MailBox;
 import com.uxplima.uxmessentials.messaging.domain.MailId;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
@@ -43,14 +36,11 @@ import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -66,12 +56,12 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the three messaging GUIs. The settings panel renders the accept-messages toggle at its
- * conf slot and a click flips and persists it; the social-spy toggle is present only for a permitted viewer. The
- * ignore-list manager renders the viewer's ignored players, a click un-ignores through the use case, and the add
- * seam ignores a resolvable name. The mailbox renders the viewer's mail, a click opens the read-only detail, and
- * the clear button is confirm-gated. The views are laid out from temp confs (no hardcoded slots) and the
- * scheduler runs every hop inline so the off-thread reads and writes land synchronously.
+ * MockBukkit coverage of the messaging settings panel and the mailbox. The settings panel renders the
+ * accept-messages toggle at its conf slot and a click flips and persists it; the social-spy toggle is present only
+ * for a permitted viewer. The mailbox renders the viewer's mail, a click opens the read-only detail, and the clear
+ * button is confirm-gated. The views are laid out from temp confs (no hardcoded slots) and the scheduler runs every
+ * hop inline so the off-thread reads and writes land synchronously. The ignore-list manager, now engine-rendered,
+ * is covered by {@code IgnoreMenuGoldenTest}.
  */
 class MessagingGuiTest {
 
@@ -95,12 +85,8 @@ class MessagingGuiTest {
     private Scheduler scheduler;
     private FakeToggles toggles;
     private FakeSocialSpy socialSpy;
-    private FakeIgnores ignores;
     private FakeMail mail;
-    private Ignore ignore;
-    private Unignore unignore;
     private ClearMail clearMail;
-    private TextInput textInput;
 
     @BeforeEach
     void setUp() {
@@ -112,13 +98,9 @@ class MessagingGuiTest {
         scheduler = new SyncScheduler();
         toggles = new FakeToggles();
         socialSpy = new FakeSocialSpy();
-        ignores = new FakeIgnores();
         mail = new FakeMail();
         MessagingNotifier notifier = new MessagingNotifier(new KeyMessages(), new NoopSink());
-        ignore = new Ignore(ignores, notifier);
-        unignore = new Unignore(ignores, notifier);
         clearMail = new ClearMail(mail, notifier);
-        textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         Guis.install(plugin);
     }
 
@@ -149,42 +131,6 @@ class MessagingGuiTest {
 
         MessagingSettingsView playerView = settingsView(dir, new GrantingPermissions(false));
         assertThat(playerView.panel().settingAt(SOCIALSPY_SLOT, viewer)).isEmpty();
-    }
-
-    @Test
-    void ignoreListRendersTheViewersIgnoredPlayers() throws Exception {
-        ignores.ignore(viewer, ref("Mallory"), IgnoreScope.ALL);
-        ignores.ignore(viewer, ref("Eve"), IgnoreScope.ALL);
-        IgnoreListView view = ignoreView(dir);
-
-        view.open(player, viewer);
-
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getItem(CONTENT_SLOTS.get(0)).getType()).isEqualTo(Material.PLAYER_HEAD);
-        assertThat(inv.getItem(CONTENT_SLOTS.get(1)).getType()).isEqualTo(Material.PLAYER_HEAD);
-    }
-
-    @Test
-    void clickingAnIgnoreEntryUnignoresThroughTheUseCase() throws Exception {
-        ignores.ignore(viewer, ref("Mallory"), IgnoreScope.ALL);
-        IgnoreListView view = ignoreView(dir);
-        view.open(player, viewer);
-        assertThat(ignores.load(viewer).ignores(ref("Mallory"))).isTrue();
-
-        fireClick(CONTENT_SLOTS.get(0), ClickType.LEFT);
-
-        assertThat(ignores.load(viewer).ignores(ref("Mallory"))).isFalse();
-    }
-
-    @Test
-    void addingAResolvableNameIgnoresThroughTheUseCase() throws Exception {
-        IgnoreListView view = ignoreView(dir);
-        view.open(player, viewer);
-        assertThat(ignores.load(viewer).size()).isZero();
-
-        view.addByName(player, "Mallory");
-
-        assertThat(ignores.load(viewer).ignores(ref("Mallory"))).isTrue();
     }
 
     @Test
@@ -228,11 +174,6 @@ class MessagingGuiTest {
                 guiText, scheduler, new GuiLayouts(dir, NOOP), new KeyMessages(), toggles, socialSpy, permissions);
     }
 
-    private IgnoreListView ignoreView(Path dir) throws Exception {
-        EntityListLayout layout = listLayout(dir, "ignore-list");
-        return new IgnoreListView(guiText, scheduler, ignores, ignore, unignore, new OnlineLookup(), textInput, layout);
-    }
-
     private MailboxView mailboxView(Path dir) throws Exception {
         EntityListLayout layout = listLayout(dir, "mailbox");
         return new MailboxView(guiText, scheduler, mail, clearMail, layout);
@@ -274,14 +215,6 @@ class MessagingGuiTest {
     }
 
     // --- helpers ---
-
-    private static PlayerRef ref(String name) {
-        return new PlayerRef(uuid(name), name);
-    }
-
-    private static UUID uuid(String name) {
-        return UUID.nameUUIDFromBytes(name.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-    }
 
     private void fireClick(int slot, ClickType type) {
         InventoryView view = player.getOpenInventory();
@@ -337,33 +270,6 @@ class MessagingGuiTest {
         }
     }
 
-    private static final class FakeIgnores implements IgnoreStore {
-        private final Map<UUID, Map<UUID, PlayerRef>> store = new HashMap<>();
-
-        @Override
-        public IgnoreList load(PlayerRef owner) {
-            Map<UUID, PlayerRef> entries = store.getOrDefault(owner.uuid(), Map.of());
-            List<com.uxplima.uxmessentials.messaging.domain.IgnoreEntry> rows = new ArrayList<>();
-            for (PlayerRef ignored : entries.values()) {
-                rows.add(com.uxplima.uxmessentials.messaging.domain.IgnoreEntry.all(ignored));
-            }
-            return IgnoreList.of(owner, rows);
-        }
-
-        @Override
-        public void ignore(PlayerRef owner, PlayerRef ignored, IgnoreScope scope) {
-            store.computeIfAbsent(owner.uuid(), k -> new LinkedHashMap<>()).put(ignored.uuid(), ignored);
-        }
-
-        @Override
-        public void unignore(PlayerRef owner, PlayerRef ignored) {
-            Map<UUID, PlayerRef> entries = store.get(owner.uuid());
-            if (entries != null) {
-                entries.remove(ignored.uuid());
-            }
-        }
-    }
-
     private static final class FakeMail implements MailRepository {
         private final Map<UUID, List<MailItem>> boxes = new HashMap<>();
         private long nextId = 1L;
@@ -411,23 +317,6 @@ class MessagingGuiTest {
         @Override
         public int deleteSentBefore(Instant cutoff) {
             return 0;
-        }
-    }
-
-    private static final class OnlineLookup implements PlayerLookup {
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.of(ref(name));
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.of(new PlayerRef(uuid, "player"));
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return true;
         }
     }
 

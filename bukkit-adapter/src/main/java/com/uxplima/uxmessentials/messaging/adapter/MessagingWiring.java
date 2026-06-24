@@ -45,6 +45,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.IgnoreSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
@@ -80,7 +82,9 @@ public final class MessagingWiring {
             Bus bus,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -89,6 +93,8 @@ public final class MessagingWiring {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         MessagingSettings settings = new MessagingSettings(ctx.config());
         AtomicBoolean running = new AtomicBoolean(true);
@@ -124,7 +130,11 @@ public final class MessagingWiring {
                 stores.mail(),
                 kernel.playerLookup(),
                 textInput,
-                guiLayouts);
+                guiLayouts,
+                menus,
+                menuBindings,
+                plugin.getDataFolder().toPath(),
+                kernel.log());
         List<CommandRegistration> commands =
                 MessagingCommands.all(services, kernel.messages(), kernel.messageSink(), views);
         return new Wired(commands, sweep, stores, mutePolicy, afkStatus, running, views);

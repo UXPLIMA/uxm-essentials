@@ -471,7 +471,18 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
-            wireMessaging(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+            wireMessaging(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    bus,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
@@ -812,7 +823,9 @@ public final class PluginModule {
             Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // messaging builds its jOOQ mail/ignore stores over persistence.dsl() and its transient reply /
         // socialspy / toggle stores in-memory/PDC. The mute gate starts on MutePolicy.NEVER and is captured
         // here so moderation rebinds it when it lands; the vanish gate degrades to "fully visible" without
@@ -821,8 +834,8 @@ public final class PluginModule {
         // loader, and the shared text-input seam (installed once in wireModules) for the ignore-list add prompt.
         // /msgsettings opens the settings panel; /ignore and /mail with no args open the ignore-list and mailbox.
         GuiText guiText = new GuiText(ctx.kernel().messages());
-        MessagingWiring.Wired wired =
-                MessagingWiring.wire(plugin, ctx, persistence, Optional.empty(), bus, guiText, guiLayouts, textInput);
+        MessagingWiring.Wired wired = MessagingWiring.wire(
+                plugin, ctx, persistence, Optional.empty(), bus, guiText, guiLayouts, textInput, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
