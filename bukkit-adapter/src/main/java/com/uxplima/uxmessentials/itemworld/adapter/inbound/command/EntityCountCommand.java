@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -18,7 +19,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountListView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountMenu;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -37,7 +38,7 @@ import org.jspecify.annotations.Nullable;
  * {@link ItemworldMessageKey#ENTITYCOUNT_ENTRY} per type, ordered by count descending.
  *
  * <p>Both forms — bare {@code /entitycount} and {@code /entitycount <radius>} — open the
- * {@link EntityCountListView} grid when a view is wired (the same tally, one spawn-egg icon per type sorted by
+ * {@link EntityCountMenu} grid when a view is wired (the same tally, one spawn-egg icon per type sorted by
  * count), and otherwise print the chat listing. The bare root's gui-vs-chat choice is made externally: the
  * {@code GuiRootBinding} installs {@link #guiRoot} as the root executor only when the catalog {@code gui} flag is
  * on, and the flag defaults on. The {@code <radius>} child cannot see that flag at build time — its executor is
@@ -57,13 +58,13 @@ public final class EntityCountCommand extends ItemworldCommandSupport implements
     private static final int DEFAULT_RADIUS = 64;
     private static final int MAX_RADIUS = 256;
 
-    private final @Nullable EntityCountListView listView;
+    private final @Nullable EntityCountMenu listView;
 
     public EntityCountCommand(ItemworldServices services) {
         this(services, null);
     }
 
-    public EntityCountCommand(ItemworldServices services, @Nullable EntityCountListView listView) {
+    public EntityCountCommand(ItemworldServices services, @Nullable EntityCountMenu listView) {
         super(services, "entitycount", SubFeatureGroup.MOB_ENTITY, "Count nearby entities by type.");
         this.listView = listView;
     }
@@ -118,7 +119,7 @@ public final class EntityCountCommand extends ItemworldCommandSupport implements
      * the grid. A console has no inventory, so it falls back to the chat read-out.
      */
     private int runGui(CommandContext<CommandSourceStack> ctx, int requested) {
-        EntityCountListView view = listView;
+        EntityCountMenu view = listView;
         if (view == null) {
             return run(ctx, requested);
         }
@@ -153,12 +154,17 @@ public final class EntityCountCommand extends ItemworldCommandSupport implements
                         Map.of("type", entry.getKey().getKey().toString(), "count", String.valueOf(entry.getValue()))));
     }
 
-    private void countGui(EntityCountListView view, Player player, int radius) {
-        List<EntityCountListView.Entry> sorted = tally(player, radius).entrySet().stream()
+    private void countGui(EntityCountMenu view, Player player, int radius) {
+        // Runs on the actor's region thread (the scan reads the live world), so every per-type icon material is
+        // resolved here too; the menu's list source only reads the pre-computed tally and touches no Bukkit API.
+        List<EntityCountMenu.Tally> sorted = tally(player, radius).entrySet().stream()
                 .sorted(Map.Entry.<EntityType, Integer>comparingByValue().reversed())
-                .map(e -> new EntityCountListView.Entry(e.getKey(), e.getValue()))
+                .map(e -> new EntityCountMenu.Tally(
+                        e.getKey().getKey().getKey(),
+                        e.getValue(),
+                        iconMaterial(e.getKey()).name()))
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        view.open(player, ref(player), sorted, radius);
+        view.open(ref(player), sorted, radius);
     }
 
     /** Tally the entities within {@code radius} of {@code player} by type; runs on the actor's region thread. */
@@ -168,5 +174,19 @@ public final class EntityCountCommand extends ItemworldCommandSupport implements
             tally.merge(nearby.getType(), 1, Integer::sum);
         }
         return tally;
+    }
+
+    /**
+     * That type's spawn egg ({@code ZOMBIE_SPAWN_EGG}, …) where the registry has one, falling back to a generic: a
+     * plain egg for a spawnable type that has no dedicated egg material, and paper for the non-spawnable
+     * pseudo-types (item drops, projectiles, the markers). The {@code valueOf} is guarded so a type whose egg name
+     * does not resolve never throws. Resolved on the actor's region thread with the rest of the tally.
+     */
+    private static Material iconMaterial(EntityType type) {
+        try {
+            return Material.valueOf(type.name() + "_SPAWN_EGG");
+        } catch (IllegalArgumentException noEgg) {
+            return type.isSpawnable() ? Material.EGG : Material.PAPER;
+        }
     }
 }

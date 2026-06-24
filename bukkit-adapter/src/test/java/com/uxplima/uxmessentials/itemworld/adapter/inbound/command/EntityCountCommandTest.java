@@ -8,21 +8,23 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.bukkit.Material;
-
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountListView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountMenu;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.itemworld.domain.MobSpec;
 import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -89,9 +91,7 @@ class EntityCountCommandTest {
 
     @Test
     void withAGuiViewTheGuiRootOpenerIsInstalled() {
-        EntityCountListView view = new EntityCountListView(
-                new GuiText(new KeyMessages()), new SyncScheduler(), EntityListLayout.paginatedDefault(Material.EGG));
-        assertThat(new EntityCountCommand(services(), view).guiRoot()).isPresent();
+        assertThat(new EntityCountCommand(services(), menu()).guiRoot()).isPresent();
     }
 
     @Test
@@ -117,10 +117,7 @@ class EntityCountCommandTest {
     @Test
     void radiusFormOpensGuiWhenViewIsWired() {
         // gui-on: a wired view makes the radius child open the grid instead, so no chat read-out is sent.
-        EntityCountListView view = new EntityCountListView(
-                new GuiText(new KeyMessages()), new SyncScheduler(), EntityListLayout.paginatedDefault(Material.EGG));
-
-        dispatch(new EntityCountCommand(services(), view), "entitycount 26");
+        dispatch(new EntityCountCommand(services(), menu()), "entitycount 26");
 
         assertThat(sink.rendered).doesNotContain(ItemworldMessageKey.ENTITYCOUNT_NONE.key());
     }
@@ -138,6 +135,33 @@ class EntityCountCommandTest {
     private ItemworldServices services() {
         return new ItemworldServices(
                 kernel(), new NoopAudit(), ItemworldConfig.from(config), GuiLayout.storageDefault(6));
+    }
+
+    /** A fully-wired {@link EntityCountMenu} over the engine, with its shipped specs registered from the source tree. */
+    private EntityCountMenu menu() {
+        org.bukkit.plugin.Plugin plugin = MockBukkit.createMockPlugin();
+        GuiText guiText = new GuiText(new KeyMessages());
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        SyncScheduler scheduler = new SyncScheduler();
+        server.getPluginManager()
+                .registerEvents(
+                        new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin),
+                        plugin);
+        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        EntityCountMenu menu = new EntityCountMenu(menus);
+        menu.register(bindings, specDir(), new NoopLogger());
+        return menu;
+    }
+
+    /** The bundled spec directory under the source tree, so the engine loads the shipped tally + empty specs. */
+    private static java.nio.file.Path specDir() {
+        java.nio.file.Path repoRoot = java.nio.file.Path.of("").toAbsolutePath();
+        while (repoRoot != null && !java.nio.file.Files.exists(repoRoot.resolve("settings.gradle.kts"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        return java.util.Objects.requireNonNull(repoRoot, "repo root").resolve("bukkit-adapter/src/main/resources");
     }
 
     private KernelPorts kernel() {

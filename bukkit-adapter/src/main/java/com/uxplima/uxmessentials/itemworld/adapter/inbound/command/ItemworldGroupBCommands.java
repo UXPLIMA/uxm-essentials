@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountListView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PdcPowertoolStore;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.PowertoolToggleStore;
 import com.uxplima.uxmessentials.itemworld.adapter.outbound.UnlimitedPlacementStore;
@@ -43,7 +43,7 @@ public final class ItemworldGroupBCommands {
             PdcPowertoolStore powertoolStore,
             PowertoolToggleStore powertoolToggles,
             UnlimitedPlacementStore unlimited,
-            @Nullable EntityCountListView entityCountView) {
+            @Nullable EntityCountMenu entityCountView) {
         Objects.requireNonNull(services, "services");
         Objects.requireNonNull(powertoolPolicy, "powertoolPolicy");
         Objects.requireNonNull(purgePolicy, "purgePolicy");
@@ -75,7 +75,7 @@ public final class ItemworldGroupBCommands {
             ItemworldServices services,
             PurgePolicy purgePolicy,
             UnlimitedPlacementStore unlimited,
-            @Nullable EntityCountListView entityCountView) {
+            @Nullable EntityCountMenu entityCountView) {
         commands.add(new SpawnMobCommand(services));
         commands.add(new SpawnerCommand(services));
         commands.add(new KillCommand(services));

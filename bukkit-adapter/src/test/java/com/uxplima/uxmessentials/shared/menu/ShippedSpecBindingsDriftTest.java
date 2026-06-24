@@ -96,11 +96,20 @@ class ShippedSpecBindingsDriftTest {
             "recipe_slot8_lore",
             "recipe_result_material",
             "recipe_result_name",
-            "recipe_result_lore");
+            "recipe_result_lore",
+            "entity_icon",
+            "entity_type",
+            "entity_count",
+            "entity_radius");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
-            "warp:sound-options", "vault:slots", "communication:announcements", "messaging:ignores", "messaging:mail");
+            "warp:sound-options",
+            "vault:slots",
+            "communication:announcements",
+            "messaging:ignores",
+            "messaging:mail",
+            "itemworld:entity-tally");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

@@ -108,6 +108,8 @@ final class DefaultResources {
             "modules/menu/specs/messaging-mail-detail.conf",
             "modules/menu/specs/itemworld-recipe.conf",
             "modules/menu/specs/itemworld-recipe-none.conf",
+            "modules/menu/specs/itemworld-entitycount.conf",
+            "modules/menu/specs/itemworld-entitycount-empty.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",
