@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
+import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
@@ -119,7 +120,8 @@ class MessageKeyLocaleParityDriftTest {
                 Map.entry(VaultsMessageKey.values(), List.of("vault", "vaults")),
                 Map.entry(CommunicationMessageKey.values(), List.of("communication")),
                 Map.entry(HologramsMessageKey.values(), List.of("hologram")),
-                Map.entry(StaffMessageKey.values(), List.of("staff")));
+                Map.entry(StaffMessageKey.values(), List.of("staff")),
+                Map.entry(CustomMenusMessageKey.values(), List.of("menu")));
     }
 
     @Test

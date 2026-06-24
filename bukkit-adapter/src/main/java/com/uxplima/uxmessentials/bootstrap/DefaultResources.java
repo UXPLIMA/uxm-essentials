@@ -62,6 +62,7 @@ final class DefaultResources {
             "modules/nametags/config.conf",
             "modules/staff/config.conf",
             "modules/npc/config.conf",
+            "modules/custommenus/config.conf",
             "modules/migration/config.conf",
             "modules/kits/gui/kits-menu.conf",
             "modules/kits/gui/kits-manager.conf",
@@ -101,6 +102,7 @@ final class DefaultResources {
             "modules/management/gui/hub.conf",
             "modules/management/gui/colour-picker.conf",
             "modules/menu/specs/warp-sounds.conf",
+            "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",
             "messages/messages_tr.conf");

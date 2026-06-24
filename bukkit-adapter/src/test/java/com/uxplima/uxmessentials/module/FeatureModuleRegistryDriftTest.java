@@ -70,6 +70,7 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
         assertThat(registry.byId(ModuleId.of("staff"))).isPresent();
         assertThat(registry.byId(ModuleId.of("npc"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("custommenus"))).isPresent();
         assertThat(registry.all().stream().map(m -> m.id().value()))
                 .containsExactly(
                         "teleport",
@@ -93,7 +94,8 @@ class FeatureModuleRegistryDriftTest {
                         "discordlink",
                         "nametags",
                         "staff",
-                        "npc");
+                        "npc",
+                        "custommenus");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -487,14 +489,14 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void npcIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+    void npcShipsEnabledAndPublishesItsSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule npc =
                 registry.byId(ModuleId.of("npc")).orElseThrow(() -> new AssertionError("npc is not registered"));
 
-        // npc is the 21st context — server-wide fake-player NPCs behind /npc — registered last after the twenty
-        // prior modules.
-        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("npc");
+        // npc is the 21st context — server-wide fake-player NPCs behind /npc. The later custommenus context now lands
+        // last, so npc must merely be registered, not last.
+        assertThat(registry.byId(ModuleId.of("npc"))).isPresent();
 
         // It ships ENABLED but inert (a steady-state feature like holograms — nothing renders until an operator
         // creates an NPC): with no modules.conf override it is on, and disabling exactly npc removes only it while
@@ -514,6 +516,39 @@ class FeatureModuleRegistryDriftTest {
         Set<String> literals = npc.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
         assertThat(literals).containsExactly("npc");
         assertThat(npc.migrations()).isEmpty();
+    }
+
+    @Test
+    void customMenusIsTheLastModuleShipsEnabledAndPublishesItsSurface() {
+        DefaultModuleRegistry registry = new DefaultModuleRegistry();
+        FeatureModule custommenus = registry.byId(ModuleId.of("custommenus"))
+                .orElseThrow(() -> new AssertionError("custommenus is not registered"));
+
+        // custommenus is the 22nd context — the operator surface over the menu engine (/menu) — registered last.
+        assertThat(registry.all().get(registry.all().size() - 1).id().value()).isEqualTo("custommenus");
+
+        // It ships ENABLED but inert (a steady-state feature — nothing opens until a player runs /menu open): with no
+        // modules.conf override it is on, and disabling exactly custommenus removes only it while every sibling stays
+        // on. Crucially a disabled custommenus contributes no command and loads no menus — the four-way guard's
+        // "disabled means absent" property is exactly what makes the /menu surface vanish when it is off.
+        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
+                .map(m -> m.id().value())
+                .collect(Collectors.toSet());
+        assertThat(defaults).contains("custommenus", "teleport", "economy", "holograms", "npc");
+        Set<String> off =
+                registry.enabledModules(new FixedConfig(Map.of("modules.custommenus.enabled", false))).stream()
+                        .map(m -> m.id().value())
+                        .collect(Collectors.toSet());
+        assertThat(off).doesNotContain("custommenus");
+        assertThat(off).contains("teleport", "holograms", "npc");
+
+        // Enabled, custommenus contributes its single /menu command (the real Brigadier node is built in the adapter
+        // wiring over the menu engine; this is its catalog/drift descriptor) and persists nothing (its menus are
+        // operator-authored .conf files), so it declares no MigrationSet of its own.
+        Set<String> literals =
+                custommenus.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
+        assertThat(literals).containsExactly("menu");
+        assertThat(custommenus.migrations()).isEmpty();
     }
 
     @Test

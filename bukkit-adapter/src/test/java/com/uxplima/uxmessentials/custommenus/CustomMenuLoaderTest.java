@@ -44,6 +44,7 @@ class CustomMenuLoaderTest {
         CustomMenuLoader.LoadResult result = loader.loadFrom(dir);
 
         assertThat(result.loaded()).isEqualTo(1);
+        assertThat(result.loadedNames()).containsExactly("good");
         assertThat(result.skipped()).containsExactly("bad");
         assertThat(log.warnings).anyMatch(line -> line.contains("bad"));
     }

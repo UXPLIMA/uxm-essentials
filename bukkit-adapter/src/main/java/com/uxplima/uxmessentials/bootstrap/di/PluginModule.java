@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.bootstrap.health.SoftDependencyHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
+import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
 import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
@@ -198,8 +199,12 @@ public final class PluginModule {
                 menuRenderer, menuBindings.actions(), menuBindings.conditions(), kernel.scheduler(), plugin);
         menuListener.install();
         Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler());
-        // Task B3 wires the custommenus.allow-console config flag here
-        MenuVocabulary.registerActions(menuBindings, menus, false, kernel.log());
+        // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
+        // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted —
+        // this flag only governs the generic console action a disk-loaded menu can reference.
+        boolean allowMenuConsole =
+                config.scoped(ModuleId.of("custommenus").configRoot()).getBoolean("allow-console", false);
+        MenuVocabulary.registerActions(menuBindings, menus, allowMenuConsole, kernel.log());
         MenuVocabulary.registerConditions(menuBindings, kernel.permissions());
         MenuVocabulary.registerPlaceholders(menuBindings);
         PapiPlaceholders.registerInto(menuBindings);
@@ -495,7 +500,29 @@ public final class PluginModule {
             wireStaff(plugin, ctx, persistence, resources, links);
         } else if (module.id().equals(ModuleId.of("npc"))) {
             wireNpc(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+        } else if (module.id().equals(ModuleId.of("custommenus"))) {
+            wireCustomMenus(plugin, ctx, resources, menus, menuBindings);
         }
+    }
+
+    private static void wireCustomMenus(
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            CloseableResources resources,
+            Menus menus,
+            MenuBindings menuBindings) {
+        // custommenus consumes the always-on menu engine (the façade + bindings built in PluginModule): it loads the
+        // operator's menus/*.conf into the engine on enable and registers the /menu command. There is no per-context
+        // repository or listener — the single menu click listener is installed once in bootstrap — so the wiring is a
+        // loader run plus the command. The console-dispatch flag is read once in PluginModule and threaded into the
+        // engine's action vocabulary there, not here.
+        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(
+                menus,
+                menuBindings,
+                plugin.getDataFolder().toPath(),
+                ctx.kernel().log(),
+                ctx.kernel().messages());
+        wired.commands().forEach(resources::addCommand);
     }
 
     private static void wireTeleport(

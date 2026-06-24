@@ -37,11 +37,21 @@ public final class CustomMenuLoader {
         this.log = Objects.requireNonNull(log, "log");
     }
 
-    /** The outcome of one load pass: how many specs registered, and the ids skipped over a parse or ref error. */
-    public record LoadResult(int loaded, List<String> skipped) {
+    /**
+     * The outcome of one load pass: how many specs registered, and the ids skipped over a parse or ref error. The
+     * convenience constructor keeps the older {@code (count, skipped)} shape for callers and tests that only need the
+     * counts; {@link #loadedNames()} carries the registered ids so {@code /menu list} can name what is open.
+     */
+    public record LoadResult(int loaded, List<String> loadedNames, List<String> skipped) {
 
         public LoadResult {
+            loadedNames = List.copyOf(Objects.requireNonNull(loadedNames, "loadedNames"));
             skipped = List.copyOf(Objects.requireNonNull(skipped, "skipped"));
+        }
+
+        /** Build a result from the registered ids and the skipped ids, deriving the loaded count from the former. */
+        public LoadResult(List<String> loadedNames, List<String> skipped) {
+            this(loadedNames.size(), loadedNames, skipped);
         }
     }
 
@@ -53,20 +63,18 @@ public final class CustomMenuLoader {
     public LoadResult loadFrom(Path menusDir) {
         Objects.requireNonNull(menusDir, "menusDir");
         if (!Files.isDirectory(menusDir)) {
-            return new LoadResult(0, List.of());
+            return new LoadResult(List.of(), List.of());
         }
+        List<String> loaded = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
-        int loaded = 0;
         try (Stream<Path> entries = Files.list(menusDir)) {
             for (Path file : confFiles(entries)) {
-                if (loadOne(file, skipped)) {
-                    loaded++;
-                }
+                loadOne(file, loaded, skipped);
             }
         } catch (java.io.IOException failure) {
             log.warn("could not list menu directory {} : {}", menusDir, String.valueOf(failure.getMessage()));
         }
-        log.info("loaded {} custom menus, skipped {}", loaded, skipped.size());
+        log.info("loaded {} custom menus, skipped {}", loaded.size(), skipped.size());
         return new LoadResult(loaded, skipped);
     }
 
@@ -78,8 +86,8 @@ public final class CustomMenuLoader {
                 .toList();
     }
 
-    /** Load one file; returns true when it registered, false when it was parsed or ref-validated away. */
-    private boolean loadOne(Path file, List<String> skipped) {
+    /** Load one file; records its id in {@code loaded} when it registered, or in {@code skipped} on a parse/ref error. */
+    private void loadOne(Path file, List<String> loaded, List<String> skipped) {
         String id = stripConf(file.getFileName().toString());
         MenuSpec spec;
         try {
@@ -87,16 +95,16 @@ public final class CustomMenuLoader {
         } catch (MenuSpecException invalid) {
             log.warn("skipped menu {} : {}", id, String.valueOf(invalid.getMessage()));
             skipped.add(id);
-            return false;
+            return;
         }
         List<String> missing = bindings.validate(List.of(spec));
         if (!missing.isEmpty()) {
             log.warn("skipped menu {} : references unknown ids {}", id, missing);
             skipped.add(id);
-            return false;
+            return;
         }
         menus.registerSpec(id, spec);
-        return true;
+        loaded.add(id);
     }
 
     private static String stripConf(String fileName) {

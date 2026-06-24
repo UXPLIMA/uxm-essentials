@@ -1059,3 +1059,16 @@ permissions:
   uxmessentials.npc.gui:
     description: '/npc (no args) opens the NPC management GUI.'
     default: op
+  # custommenus context (docs/permissions.md "Custom Menus"). The operator surface over the menu engine behind
+  # the single /menu command: /menu open <name> opens a loaded menu (default-everyone use tier), /menu list shows
+  # them, and /menu reload re-reads the menus/ folder (admin tier). uxmessentials.module.custommenus is the
+  # reload/inspect tier.
+  uxmessentials.module.custommenus:
+    description: 'Hot-reload / inspect the custommenus module (operator custom menus behind /menu).'
+    default: op
+  uxmessentials.menu.use:
+    description: '/menu open <name> to open an operator custom menu, and /menu list to see the loaded menus.'
+    default: true
+  uxmessentials.menu.admin:
+    description: '/menu reload to re-read the menus/ folder from disk.'
+    default: op

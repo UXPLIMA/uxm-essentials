@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
+import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
@@ -63,7 +64,8 @@ public final class MessageKeyCatalog {
             VoteMessageKey.values(),
             DiscordlinkMessageKey.values(),
             StaffMessageKey.values(),
-            NpcMessageKey.values());
+            NpcMessageKey.values(),
+            CustomMenusMessageKey.values());
 
     private MessageKeyCatalog() {}
 

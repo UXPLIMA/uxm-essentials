@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.communication.application.CommunicationModule;
+import com.uxplima.uxmessentials.custommenus.application.CustomMenusModule;
 import com.uxplima.uxmessentials.discordlink.application.DiscordlinkModule;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.holograms.application.HologramsModule;
@@ -140,6 +141,12 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // DSL, the Scheduler, messages, and event ports), and like the steady-state features it ships ENABLED but
         // inert until an operator creates an NPC, so it lands last after staff.
         delegate.register(new NpcModule());
+        // custommenus is the 22nd context — the operator surface over the Phase-2 menu engine (/menu open/list/reload
+        // over operator-authored menus/*.conf). It consumes the always-on engine bindings rather than owning a domain
+        // aggregate, carries no hard dependency edge (its only collaborators are the shared menu façade + bindings,
+        // built in bootstrap), and like the steady-state features ships ENABLED but inert until an operator authors a
+        // menu, so it lands last after npc.
+        delegate.register(new CustomMenusModule());
         // The shared kernel is not a module and never appears here.
     }
 
