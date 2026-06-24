@@ -34,7 +34,6 @@ import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffChatCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffListCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffModeCommand;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineView;
-import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffListView;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActions;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffJoinListener;
@@ -152,8 +151,6 @@ public final class StaffWiring {
         StaffPlayerMenu playerMenu =
                 new StaffPlayerMenu(menus, plugin.getServer(), kernel.messages(), kernel.messageSink(), teleport);
         playerMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
-        StaffListView listView = new StaffListView(
-                plugin.getServer(), kernel.messages(), kernel.messageSink(), kernel.scheduler(), teleport);
         StaffGadgetActions actions = new StaffGadgetActions(
                 vanish,
                 freeze,
@@ -169,7 +166,13 @@ public final class StaffWiring {
                 new StaffModeCommand(
                         services, kernel.messages(), kernel.scheduler(), kernel.playerLookup(), running::get),
                 new StaffChatCommand(services, kernel.messages()),
-                new StaffListCommand(services, kernel.messages(), listView));
+                new StaffListCommand(
+                        services,
+                        kernel.messages(),
+                        kernel.scheduler(),
+                        plugin.getServer(),
+                        kernel.messageSink(),
+                        playerMenu));
         List<Listener> listeners = List.of(
                 new StaffModeListener(services, gadgetItems, followService, actions),
                 new StaffJoinListener(services, repository, kernel.scheduler()));

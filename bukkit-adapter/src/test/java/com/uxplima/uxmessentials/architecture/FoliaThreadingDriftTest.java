@@ -187,8 +187,8 @@ class FoliaThreadingDriftTest {
                 pkg + "staff.adapter.inbound.gui.StaffExamineView",
                 "GLOBAL: examine roster snapshot taken inside scheduler.onGlobal");
         allow.put(
-                pkg + "staff.adapter.inbound.gui.StaffListView",
-                "GLOBAL: candidate roster read from the picker's onGlobal open");
+                pkg + "staff.adapter.inbound.command.StaffListCommand",
+                "GLOBAL: /stafflist staff roster snapshot taken inside scheduler.onGlobal, then opened via the engine");
         allow.put(
                 pkg + "staff.adapter.inbound.listener.StaffGadgetActions",
                 "GLOBAL: COMPASS navigator roster snapshot taken inside scheduler.onGlobal, then opened via the engine");
