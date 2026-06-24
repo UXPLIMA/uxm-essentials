@@ -45,10 +45,25 @@ class ShippedSpecBindingsDriftTest {
             "messaging:ignore-add",
             "messaging:read-mail",
             "messaging:clear-mail",
-            "messaging:mail-back");
+            "messaging:mail-back",
+            "close",
+            "itemworld:open-workbench",
+            "itemworld:open-anvil",
+            "itemworld:open-cartography",
+            "itemworld:open-grindstone",
+            "itemworld:open-loom",
+            "itemworld:open-smithingtable",
+            "itemworld:open-stonecutter",
+            "itemworld:open-enderchest",
+            "itemworld:time-day",
+            "itemworld:time-night",
+            "itemworld:weather-clear",
+            "itemworld:weather-rain",
+            "itemworld:clear-drops",
+            "itemworld:clear-mobs");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_CONDITIONS = Set.of();
+    private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm");
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
@@ -100,7 +115,15 @@ class ShippedSpecBindingsDriftTest {
             "entity_icon",
             "entity_type",
             "entity_count",
-            "entity_radius");
+            "entity_radius",
+            "iw_station_workbench",
+            "iw_station_anvil",
+            "iw_station_cartography",
+            "iw_station_grindstone",
+            "iw_station_loom",
+            "iw_station_smithingtable",
+            "iw_station_stonecutter",
+            "iw_station_enderchest");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(

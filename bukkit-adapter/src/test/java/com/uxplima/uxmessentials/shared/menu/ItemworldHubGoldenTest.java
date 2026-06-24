@@ -1,12 +1,12 @@
-package com.uxplima.uxmessentials.itemworld.adapter.inbound.gui;
+package com.uxplima.uxmessentials.shared.menu;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,17 +18,27 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubMenu;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.itemworld.application.PurgePolicy;
 import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.itemworld.domain.MobSpec;
 import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -46,42 +56,39 @@ import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the itemworld utilities hub. The launcher renders one button per action at its conf slot;
- * clicking the ender-chest button opens that workstation (the {@code MenuType}-backed stations need a titled view
- * the mock server cannot create, so the ender chest — a plain inventory — stands in for the workstation group);
- * clicking a time button sets the world time through the same path {@code /day} uses, and a weather button sets the
- * weather like {@code /weather}. The scheduler runs every hop inline so the entity- and global-bound actions are
- * observable synchronously.
+ * The itemworld utilities-hub golden test: the engine-rendered launcher must draw the exact panel the original
+ * {@code ItemworldHubView} drew, and its buttons must run the same surfaces. With every permission granted the
+ * panel draws the eight workstation buttons, the two time and two weather buttons, the two cleanup buttons, the
+ * back arrow, and the glass backdrop in between — snapshotted as {@code (slot -> material, plain name)} and
+ * asserted equal, slot for slot, to the baseline the old view produced (frozen here so the old class could be
+ * deleted). Clicking the ender-chest button opens that workstation, clicking the night button sets the world time
+ * through the same path {@code /night} uses, and clicking the rain button storms the world like {@code /weather};
+ * all three fire through the engine's own {@link MenuListener}. With no permission the world-action slots fall back
+ * to the backdrop, exactly as the old launcher hid a button the viewer could not use.
  */
-class ItemworldHubViewTest {
+class ItemworldHubGoldenTest {
 
     private static final int ENDERCHEST_SLOT = 7;
     private static final int TIME_NIGHT_SLOT = 11;
     private static final int WEATHER_RAIN_SLOT = 13;
-    private static final int BACK_SLOT = 22;
-
-    @TempDir
-    Path dir;
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
     private PlayerRef viewer;
     private World world;
-    private GuiText guiText;
-    private Scheduler scheduler;
+    private Messages messages;
     private MutableConfig config;
 
     @BeforeEach
@@ -91,8 +98,7 @@ class ItemworldHubViewTest {
         world = server.addSimpleWorld("world");
         player = server.addPlayer("Alice");
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
-        guiText = new GuiText(new KeyMessages());
-        scheduler = new SyncScheduler();
+        messages = new KeyMessages();
         config = new MutableConfig();
         Guis.install(plugin);
     }
@@ -104,133 +110,162 @@ class ItemworldHubViewTest {
     }
 
     @Test
-    void rendersLauncherButtonsAtTheirConfSlots() throws Exception {
-        view(new AllowAllPermissions()).open(player, viewer);
+    void engineRendersTheSameLauncherPanelAsTheOldView() {
+        openEngine(new AllowAllPermissions());
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getHolder()).isInstanceOf(SimpleGui.class);
-        assertThat(inv.getItem(ENDERCHEST_SLOT).getType()).isEqualTo(Material.ENDER_CHEST);
-        assertThat(inv.getItem(TIME_NIGHT_SLOT).getType()).isEqualTo(Material.CLOCK);
-        assertThat(inv.getItem(WEATHER_RAIN_SLOT).getType()).isEqualTo(Material.WATER_BUCKET);
-        assertThat(inv.getItem(BACK_SLOT).getType()).isEqualTo(Material.ARROW);
-        assertThat(inv.getItem(0).getType()).isEqualTo(Material.CRAFTING_TABLE); // workbench at slot 0
+        assertThat(inv.getSize()).isEqualTo(27);
+        assertThat(snapshot(inv)).isEqualTo(baseline());
     }
 
     @Test
-    void clickingTheEnderchestButtonOpensThatWorkstation() throws Exception {
-        view(new AllowAllPermissions()).open(player, viewer);
-
-        fireClick(ENDERCHEST_SLOT, ClickType.LEFT);
+    void clickingTheEnderchestButtonOpensThatWorkstation() {
+        openEngine(new AllowAllPermissions());
+        fireClick(ENDERCHEST_SLOT);
 
         assertThat(player.getOpenInventory().getType()).isEqualTo(InventoryType.ENDER_CHEST);
     }
 
     @Test
-    void clickingTheTimeButtonSetsTheWorldTime() throws Exception {
-        world.setTime(6000L); // midday
-        view(new AllowAllPermissions()).open(player, viewer);
+    void clickingTheTimeButtonSetsTheWorldTime() {
+        world.setTime(6000L);
+        openEngine(new AllowAllPermissions());
+        fireClick(TIME_NIGHT_SLOT);
 
-        fireClick(TIME_NIGHT_SLOT, ClickType.LEFT);
-
-        assertThat(world.getTime()).isEqualTo(13_000L); // /night through the same path
+        assertThat(world.getTime()).isEqualTo(13_000L);
     }
 
     @Test
-    void clickingTheWeatherButtonRunsTheUseCase() throws Exception {
+    void clickingTheWeatherButtonStormsTheWorld() {
         world.setStorm(false);
-        view(new AllowAllPermissions()).open(player, viewer);
+        openEngine(new AllowAllPermissions());
+        fireClick(WEATHER_RAIN_SLOT);
 
-        fireClick(WEATHER_RAIN_SLOT, ClickType.LEFT);
-
-        assertThat(world.hasStorm()).isTrue(); // /weather rain through the same applier
+        assertThat(world.hasStorm()).isTrue();
     }
 
     @Test
-    void aButtonTheViewerMayNotUseIsNotDrawn() throws Exception {
-        view(new DenyAllPermissions()).open(player, viewer);
+    void aButtonTheViewerMayNotUseFallsBackToTheBackdrop() {
+        openEngine(new DenyAllPermissions());
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        // No permission for any action, so the world-action slots stay filler, not buttons.
         assertThat(inv.getItem(TIME_NIGHT_SLOT).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
         assertThat(inv.getItem(ENDERCHEST_SLOT).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+        // The back button is never gated, so it is still drawn.
+        assertThat(inv.getItem(22).getType()).isEqualTo(Material.ARROW);
     }
 
-    private ItemworldHubView view(Permissions permissions) throws Exception {
-        layout();
-        GuiLayouts layouts = new GuiLayouts(dir, NOOP);
-        ItemworldServices services = new ItemworldServices(
-                kernel(permissions), new NoopAudit(), ItemworldConfig.from(config), GuiLayout.storageDefault(6));
-        return new ItemworldHubView(
-                guiText, scheduler, permissions, services, new PurgePolicy(ItemworldConfig.from(config)), layouts);
+    /**
+     * The slot -> (material, plain name) map the deleted {@code ItemworldHubView} produced for the all-permissions
+     * fixture, captured once while both paths rendered it identically and frozen here as the contract: the eight
+     * workstation buttons (each carrying the shared workstation key), the time/weather/cleanup buttons (their own
+     * keys), the back arrow, and the glass backdrop filling every other slot. The plain names are the bare catalog
+     * keys because the test's {@code KeyMessages} returns each key verbatim, so a real rendering difference still
+     * shows up as a mismatch.
+     */
+    private static Map<Integer, Snapshot> baseline() {
+        Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
+        for (int slot = 0; slot < 27; slot++) {
+            baseline.put(slot, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, ""));
+        }
+        String station = "itemworld.gui.hub.workstation";
+        baseline.put(0, new Snapshot(Material.CRAFTING_TABLE, station));
+        baseline.put(1, new Snapshot(Material.ANVIL, station));
+        baseline.put(2, new Snapshot(Material.CARTOGRAPHY_TABLE, station));
+        baseline.put(3, new Snapshot(Material.GRINDSTONE, station));
+        baseline.put(4, new Snapshot(Material.LOOM, station));
+        baseline.put(5, new Snapshot(Material.SMITHING_TABLE, station));
+        baseline.put(6, new Snapshot(Material.STONECUTTER, station));
+        baseline.put(7, new Snapshot(Material.ENDER_CHEST, station));
+        baseline.put(10, new Snapshot(Material.SUNFLOWER, "itemworld.gui.hub.time-day"));
+        baseline.put(11, new Snapshot(Material.CLOCK, "itemworld.gui.hub.time-night"));
+        baseline.put(12, new Snapshot(Material.YELLOW_STAINED_GLASS, "itemworld.gui.hub.weather-clear"));
+        baseline.put(13, new Snapshot(Material.WATER_BUCKET, "itemworld.gui.hub.weather-rain"));
+        baseline.put(15, new Snapshot(Material.HOPPER, "itemworld.gui.hub.clear-drops"));
+        baseline.put(16, new Snapshot(Material.IRON_SWORD, "itemworld.gui.hub.clear-mobs"));
+        baseline.put(22, new Snapshot(Material.ARROW, "itemworld.gui.hub.back"));
+        return baseline;
     }
 
-    private void layout() throws Exception {
-        Path file = dir.resolve("modules").resolve("itemworld").resolve("gui").resolve("itemworld-hub.conf");
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, """
-                rows = 3
-                filler-material = "BLACK_STAINED_GLASS_PANE"
-                slots {
-                  workbench = 0
-                  anvil = 1
-                  cartography = 2
-                  grindstone = 3
-                  loom = 4
-                  smithingtable = 5
-                  stonecutter = 6
-                  enderchest = 7
-                  time-day = 10
-                  time-night = 11
-                  weather-clear = 12
-                  weather-rain = 13
-                  clear-drops = 15
-                  clear-mobs = 16
-                  back = 22
-                }
-                materials {
-                  workbench = "CRAFTING_TABLE"
-                  anvil = "ANVIL"
-                  cartography = "CARTOGRAPHY_TABLE"
-                  grindstone = "GRINDSTONE"
-                  loom = "LOOM"
-                  smithingtable = "SMITHING_TABLE"
-                  stonecutter = "STONECUTTER"
-                  enderchest = "ENDER_CHEST"
-                  time-day = "SUNFLOWER"
-                  time-night = "CLOCK"
-                  weather-clear = "YELLOW_STAINED_GLASS"
-                  weather-rain = "WATER_BUCKET"
-                  clear-drops = "HOPPER"
-                  clear-mobs = "IRON_SWORD"
-                  back = "ARROW"
-                }
-                """);
+    /** Build the engine, register the generic + hub bindings + spec, and open the launcher for the player. */
+    private void openEngine(Permissions permissions) {
+        GuiText guiText = new GuiText(messages);
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        Scheduler scheduler = new SyncScheduler();
+        MenuListener listener =
+                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        server.getPluginManager().registerEvents(listener, plugin);
+        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        // The hub leans on the generic perm view-condition and close action, registered into the shared bindings
+        // exactly as production wiring does.
+        MenuVocabulary.registerConditions(bindings, permissions);
+        MenuVocabulary.registerActions(bindings, menus, false, new NoopLogger());
+        ItemworldHubMenu menu = new ItemworldHubMenu(menus, messages, scheduler, services(permissions), purge());
+        menu.register(bindings, specDir(), new NoopLogger());
+        menu.open(viewer);
     }
 
-    private KernelPorts kernel(Permissions permissions) {
-        return new KernelPorts(
-                scheduler,
+    private PurgePolicy purge() {
+        return new PurgePolicy(ItemworldConfig.from(config));
+    }
+
+    private ItemworldServices services(Permissions permissions) {
+        KernelPorts kernel = new KernelPorts(
+                new SyncScheduler(),
                 permissions,
                 new NoCooldowns(),
                 new NoWarmups(),
-                new KeyMessages(),
+                messages,
                 new NoopSink(),
                 new NoPlayerLookup(),
                 new NoWorldLookup(),
                 new NoPlayerLocator(),
                 new NoEvents(),
-                NOOP);
+                new NoopLogger());
+        return new ItemworldServices(
+                kernel, new NoopAudit(), ItemworldConfig.from(config), GuiLayout.storageDefault(6));
     }
 
-    private void fireClick(int slot, ClickType type) {
+    private void fireClick(int slot) {
         InventoryView view = player.getOpenInventory();
-        InventoryClickEvent event =
-                new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, slot, type, InventoryAction.PICKUP_ALL);
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
     }
 
+    /** The bundled spec directory under the source tree, so the test loads the shipped hub spec. */
+    private static Path specDir() {
+        Path repoRoot = Path.of("").toAbsolutePath();
+        while (repoRoot != null && !java.nio.file.Files.exists(repoRoot.resolve("settings.gradle.kts"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        Objects.requireNonNull(repoRoot, "repo root");
+        return repoRoot.resolve("bukkit-adapter/src/main/resources");
+    }
+
+    private static Map<Integer, Snapshot> snapshot(Inventory inv) {
+        Map<Integer, Snapshot> out = new LinkedHashMap<>();
+        for (int slot = 0; slot < inv.getSize(); slot++) {
+            ItemStack item = inv.getItem(slot);
+            if (item == null) {
+                continue;
+            }
+            out.put(slot, new Snapshot(item.getType(), plainName(item)));
+        }
+        return out;
+    }
+
+    private static String plainName(ItemStack item) {
+        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
+        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+    }
+
+    private record Snapshot(Material material, String name) {}
+
     private static final class MutableConfig implements ConfigStore {
-        private final Map<String, Object> values = new HashMap<>();
+        private final Map<String, Object> values = new java.util.HashMap<>();
 
         @Override
         public boolean getBoolean(String path, boolean fallback) {
@@ -263,10 +298,7 @@ class ItemworldHubViewTest {
 
         @Override
         public QuotaResult resolveQuota(
-                PlayerRef who,
-                QuotaFamily family,
-                com.uxplima.uxmessentials.shared.domain.@Nullable WorldRef world,
-                long configDefault) {
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
             return QuotaResult.limited(configDefault);
         }
     }
@@ -279,10 +311,7 @@ class ItemworldHubViewTest {
 
         @Override
         public QuotaResult resolveQuota(
-                PlayerRef who,
-                QuotaFamily family,
-                com.uxplima.uxmessentials.shared.domain.@Nullable WorldRef world,
-                long configDefault) {
+                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
             return QuotaResult.limited(configDefault);
         }
     }
@@ -339,12 +368,12 @@ class ItemworldHubViewTest {
 
     private static final class NoWorldLookup implements WorldLookup {
         @Override
-        public Optional<com.uxplima.uxmessentials.shared.domain.WorldRef> findByName(String name) {
+        public Optional<WorldRef> findByName(String name) {
             return Optional.empty();
         }
 
         @Override
-        public Optional<com.uxplima.uxmessentials.shared.domain.WorldRef> findByUid(UUID uid) {
+        public Optional<WorldRef> findByUid(UUID uid) {
             return Optional.empty();
         }
     }
@@ -408,19 +437,19 @@ class ItemworldHubViewTest {
         public void nuked(PlayerRef actor, Optional<PlayerRef> target) {}
     }
 
-    private static final Logger NOOP = new Logger() {
+    private static final class NoopLogger implements Logger {
         @Override
-        public void info(String m, Object... a) {}
+        public void info(String message, Object... args) {}
 
         @Override
-        public void warn(String m, Object... a) {}
+        public void warn(String message, Object... args) {}
 
         @Override
-        public void error(String m, Throwable t) {}
+        public void error(String message, Throwable cause) {}
 
         @Override
-        public void debug(String m, Object... a) {}
-    };
+        public void debug(String message, Object... args) {}
+    }
 
     private static final class SyncScheduler implements Scheduler {
         @Override

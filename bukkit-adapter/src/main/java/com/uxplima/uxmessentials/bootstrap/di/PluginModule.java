@@ -928,7 +928,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey.GUI_HUB_TITLE,
                 Material.CRAFTING_TABLE,
                 "uxmessentials.itemworld.gui",
-                (player, viewer) -> wired.hubView().open(player, viewer)));
+                (player, viewer) -> wired.hubView().open(viewer)));
     }
 
     private static void wireVaults(

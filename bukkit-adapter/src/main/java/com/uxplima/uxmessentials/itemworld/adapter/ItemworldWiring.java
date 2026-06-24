@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGrou
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGroupBCommands;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.command.ItemworldGuiCommand;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountMenu;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.RecipeGridMenu;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.PowertoolInteractListener;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.listener.UnlimitedPlacementListener;
@@ -26,7 +26,6 @@ import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
@@ -78,18 +77,15 @@ public final class ItemworldWiring {
         PowertoolToggleStore powertoolToggles = new PowertoolToggleStore();
         UnlimitedPlacementStore unlimited = new UnlimitedPlacementStore();
 
-        // The utilities hub reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader.
-        // Each launcher button runs the same surface a command does (open a workstation, set time/weather, sweep
-        // drops/mobs) and is drawn only when the viewer holds that command's permission. /itemworld gui and the
-        // /uxmess gui hub both open it; no new domain logic — only the surfaces the commands expose.
-        GuiText guiText = new GuiText(kernel.messages());
-        ItemworldHubView hubView = new ItemworldHubView(
-                guiText, kernel.scheduler(), kernel.permissions(), services, purgePolicy, guiLayouts);
-
-        // The bare /entitycount grid (gui-on) and the /recipe grid render through the shared menu engine; each
-        // registers its bindings and specs once here, and the commands run the same region-bound scan / recipe
-        // resolution then open over a pre-computed subject the engine renders.
+        // The utilities hub, the /entitycount grid, and the /recipe grid all render through the shared menu engine;
+        // each registers its bindings and specs once here. A hub button runs the same surface a command does (open a
+        // workstation, set time/weather, sweep drops/mobs) and is drawn only when the viewer holds that command's
+        // permission (the engine's perm view-condition); /itemworld gui and the /uxmess gui hub both open it. No new
+        // domain logic — only the surfaces the commands expose.
         java.nio.file.Path dataFolder = plugin.getDataFolder().toPath();
+        ItemworldHubMenu hubView =
+                new ItemworldHubMenu(menus, kernel.messages(), kernel.scheduler(), services, purgePolicy);
+        hubView.register(menuBindings, dataFolder, kernel.log());
         EntityCountMenu entityCountView = new EntityCountMenu(menus);
         entityCountView.register(menuBindings, dataFolder, kernel.log());
         RecipeGridMenu recipeView = new RecipeGridMenu(menus, kernel.messages(), Material.BLACK_STAINED_GLASS_PANE);
@@ -120,7 +116,7 @@ public final class ItemworldWiring {
      * @param listeners the powertool interact + unlimited-placement listeners to register
      * @param hubView the utilities hub the {@code /uxmess gui} hub entry opens
      */
-    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, ItemworldHubView hubView) {
+    public record Wired(List<CommandRegistration> commands, List<Listener> listeners, ItemworldHubMenu hubView) {
 
         public Wired {
             commands = List.copyOf(commands);

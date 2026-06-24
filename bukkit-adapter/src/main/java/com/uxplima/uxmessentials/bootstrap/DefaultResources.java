@@ -110,6 +110,7 @@ final class DefaultResources {
             "modules/menu/specs/itemworld-recipe-none.conf",
             "modules/menu/specs/itemworld-entitycount.conf",
             "modules/menu/specs/itemworld-entitycount-empty.conf",
+            "modules/menu/specs/itemworld-hub.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

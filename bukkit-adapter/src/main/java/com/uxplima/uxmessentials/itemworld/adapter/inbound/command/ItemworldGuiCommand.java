@@ -12,7 +12,7 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
-import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubView;
+import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /itemworld gui} ({@code uxmessentials.itemworld.gui}, default op): open the itemworld utilities hub — the
  * launcher of virtual workstations, world time/weather actions, and cleanup sweeps. A players-only command that
- * opens the same {@link ItemworldHubView} the {@code /uxmess gui} hub does; it mutates nothing itself, and each
+ * opens the same {@link ItemworldHubMenu} the {@code /uxmess gui} hub does; it mutates nothing itself, and each
  * launcher button is additionally gated by the permission of the command it stands in for, so a viewer only sees
  * the actions they may already run.
  */
@@ -33,11 +33,11 @@ public final class ItemworldGuiCommand implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.itemworld.gui";
 
-    private final ItemworldHubView view;
+    private final ItemworldHubMenu view;
     private final Messages messages;
     private final MessageSink sink;
 
-    public ItemworldGuiCommand(ItemworldHubView view, Messages messages, MessageSink sink) {
+    public ItemworldGuiCommand(ItemworldHubMenu view, Messages messages, MessageSink sink) {
         this.view = Objects.requireNonNull(view, "view");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
@@ -64,7 +64,7 @@ public final class ItemworldGuiCommand implements CommandRegistration {
             sink.deliver(console, messages.resolve(console, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of()));
             return 0;
         }
-        view.open(player, BukkitRefs.toRef(player));
+        view.open(BukkitRefs.toRef(player));
         return Command.SINGLE_SUCCESS;
     }
 }
