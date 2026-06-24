@@ -1,0 +1,113 @@
+package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.BiConsumer;
+
+import org.bukkit.inventory.Inventory;
+
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PriorityLayering;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.Ref;
+import org.jspecify.annotations.NullMarked;
+
+/**
+ * Lays a whole menu spec into an open inventory for one viewer. Static items are collapsed through
+ * {@link PriorityLayering} (the visible, highest-priority item wins each slot) and rendered into place; a
+ * list-backed item asks its registered source for entries and {@link Pagination paginates} them across its content
+ * slots, stamping the list template once per entry. Every slot the renderer fills is reported to {@code clickSink}
+ * as a {@link RenderedSlot} so the runtime can route a later click back to the spec — and, for a list cell, to the
+ * live element that filled it. The renderer reads only the registries and the spec; it never names a feature.
+ */
+@NullMarked
+public final class MenuRenderer {
+
+    private final ItemRenderer itemRenderer;
+    private final ConditionRegistry conditions;
+    private final ListSourceRegistry lists;
+
+    public MenuRenderer(ItemRenderer itemRenderer, ConditionRegistry conditions, ListSourceRegistry lists) {
+        this.itemRenderer = Objects.requireNonNull(itemRenderer, "itemRenderer");
+        this.conditions = Objects.requireNonNull(conditions, "conditions");
+        this.lists = Objects.requireNonNull(lists, "lists");
+    }
+
+    /**
+     * Fills {@code inv} with the items {@code spec} resolves to for {@code ctx}'s viewer and page, reporting each
+     * placed slot to {@code clickSink}. Static items are placed first, then list cells overwrite their own content
+     * slots; a spec keeps the two slot ranges disjoint, so order only matters for code clarity here.
+     */
+    public void populate(Inventory inv, MenuSpec spec, MenuContext ctx, BiConsumer<Integer, RenderedSlot> clickSink) {
+        Objects.requireNonNull(inv, "inv");
+        Objects.requireNonNull(spec, "spec");
+        Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(clickSink, "clickSink");
+        List<MenuItemSpec> staticItems = new ArrayList<>();
+        List<MenuItemSpec> listItems = new ArrayList<>();
+        for (MenuItemSpec item : spec.items().values()) {
+            (item.list().isPresent() ? listItems : staticItems).add(item);
+        }
+        populateStatic(inv, staticItems, ctx, clickSink);
+        for (MenuItemSpec listItem : listItems) {
+            populateList(inv, listItem, ctx, clickSink);
+        }
+    }
+
+    /** Resolve the static items to one-per-slot and render the survivors, recording each as a static slot. */
+    private void populateStatic(
+            Inventory inv,
+            List<MenuItemSpec> staticItems,
+            MenuContext ctx,
+            BiConsumer<Integer, RenderedSlot> clickSink) {
+        Map<Integer, MenuItemSpec> placed = PriorityLayering.resolve(staticItems, it -> viewPasses(it, ctx));
+        for (Map.Entry<Integer, MenuItemSpec> entry : placed.entrySet()) {
+            int slot = entry.getKey();
+            MenuItemSpec item = entry.getValue();
+            inv.setItem(slot, itemRenderer.render(item, ctx));
+            clickSink.accept(slot, new RenderedSlot(item, null));
+        }
+    }
+
+    /** Page one list item's source entries across its content slots, stamping the template once per entry. */
+    private void populateList(
+            Inventory inv, MenuItemSpec item, MenuContext ctx, BiConsumer<Integer, RenderedSlot> clickSink) {
+        ListSpec listSpec = item.list().orElseThrow();
+        var source = lists.get(listSpec.source().id());
+        if (source.isEmpty()) {
+            return;
+        }
+        List<?> entries = source.get().apply(ctx);
+        List<Integer> contentSlots = item.slots().slots();
+        @SuppressWarnings("unchecked") // a list source's element type is opaque to the engine; entries flow as Object
+        Pagination.Page<Object> page = Pagination.paginate((List<Object>) entries, contentSlots, ctx.page());
+        MenuItemSpec template = listSpec.template();
+        for (Map.Entry<Integer, Object> placement : page.placements()) {
+            MenuContext entryCtx = ctx.withEntry(placement.getValue());
+            inv.setItem(placement.getKey(), itemRenderer.render(template, entryCtx));
+            clickSink.accept(placement.getKey(), new RenderedSlot(template, placement.getValue()));
+        }
+    }
+
+    /**
+     * Whether every condition an item names in its {@code view} resolves to a registered predicate that passes for
+     * {@code ctx}. An empty view is visible; an unregistered condition is treated as failing so a wiring gap hides
+     * the item rather than silently showing it.
+     */
+    private boolean viewPasses(MenuItemSpec item, MenuContext ctx) {
+        for (Ref ref : item.view()) {
+            boolean passes = conditions.get(ref.id()).map(p -> p.test(ctx)).orElse(false);
+            if (!passes) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
