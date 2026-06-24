@@ -1,13 +1,18 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalDouble;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.bukkit.Bukkit;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -22,6 +27,9 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
  * cannot dispatch privileged commands by default.
  */
 public final class MenuVocabulary {
+
+    /** A {@code %token%} placeholder inside a {@code papi-compare} operand; {@code group(1)} is the bare id. */
+    private static final Pattern PLACEHOLDER = Pattern.compile("%([a-zA-Z0-9_]+)%");
 
     private MenuVocabulary() {}
 
@@ -50,12 +58,73 @@ public final class MenuVocabulary {
      * Register the generic conditions into {@code bindings}. A condition handler receives the per-open context plus
      * the condition ref's parsed args — the same arg carrier an action reads — so a spec writes {@code perm:some.node}
      * and the node arrives in {@code args.get("value")}. The {@code perm} condition gates an item's view or a click
-     * on whether the viewer holds that node through the shared {@link Permissions} port.
+     * on whether the viewer holds that node through the shared {@link Permissions} port. {@code papi-compare} reads
+     * three named args ({@code left}, {@code op}, {@code right}) and compares the two operands after expanding any
+     * {@code %token%} in them, so a spec gates on a (PlaceholderAPI-bridged) value such as a balance or vote count.
      */
     public static void registerConditions(MenuBindings bindings, Permissions permissions) {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(permissions, "permissions");
         bindings.condition("perm", (ctx, args) -> permissions.has(ctx.viewer(), args.getOrDefault("value", "")));
+        PlaceholderRegistry placeholders = bindings.placeholders();
+        bindings.condition("papi-compare", (ctx, args) -> compare(ctx, args, placeholders));
+    }
+
+    /**
+     * Evaluate a {@code papi-compare} ref: expand any {@code %token%} in the {@code left}/{@code right} operands
+     * through {@code placeholders} (so a {@code %papi_*%} value compares live), then apply {@code op}. When both
+     * operands parse as numbers the comparison is numeric; otherwise only {@code =}/{@code !=} are meaningful and
+     * fall back to a string equality test. An unknown operator yields {@code false} rather than throwing, so a spec
+     * typo hides the item rather than aborting the menu.
+     */
+    private static boolean compare(MenuContext ctx, Map<String, String> args, PlaceholderRegistry placeholders) {
+        String left = expand(args.getOrDefault("left", ""), ctx, placeholders);
+        String op = args.getOrDefault("op", "=").strip();
+        String right = expand(args.getOrDefault("right", ""), ctx, placeholders);
+        OptionalDouble leftNum = parseNumber(left);
+        OptionalDouble rightNum = parseNumber(right);
+        if (leftNum.isPresent() && rightNum.isPresent()) {
+            return compareNumeric(leftNum.getAsDouble(), op, rightNum.getAsDouble());
+        }
+        return switch (op) {
+            case "=" -> left.equals(right);
+            case "!=" -> !left.equals(right);
+            default -> false;
+        };
+    }
+
+    /** Apply a relational/equality {@code op} to two numbers; an unknown operator is {@code false}. */
+    private static boolean compareNumeric(double left, String op, double right) {
+        return switch (op) {
+            case "=" -> left == right;
+            case "!=" -> left != right;
+            case "<" -> left < right;
+            case ">" -> left > right;
+            case "<=" -> left <= right;
+            case ">=" -> left >= right;
+            default -> false;
+        };
+    }
+
+    /** Replace every {@code %token%} in {@code operand} with its resolved placeholder value (or empty). */
+    private static String expand(String operand, MenuContext ctx, PlaceholderRegistry placeholders) {
+        Matcher matcher = PLACEHOLDER.matcher(operand);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            String value = placeholders.resolve(matcher.group(1), ctx).orElse("");
+            matcher.appendReplacement(out, Matcher.quoteReplacement(value));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    /** The operand as a number, or empty when it is not numeric — the signal to fall back to string comparison. */
+    private static OptionalDouble parseNumber(String operand) {
+        try {
+            return OptionalDouble.of(Double.parseDouble(operand.strip()));
+        } catch (NumberFormatException notNumeric) {
+            return OptionalDouble.empty();
+        }
     }
 
     /**

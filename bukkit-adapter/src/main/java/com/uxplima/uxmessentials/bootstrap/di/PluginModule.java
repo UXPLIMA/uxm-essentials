@@ -85,6 +85,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRend
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocabulary;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.PapiPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -201,6 +202,7 @@ public final class PluginModule {
         MenuVocabulary.registerActions(menuBindings, menus, false, kernel.log());
         MenuVocabulary.registerConditions(menuBindings, kernel.permissions());
         MenuVocabulary.registerPlaceholders(menuBindings);
+        PapiPlaceholders.registerInto(menuBindings);
         resources.onClose(() -> {
             menuListener.uninstall();
             menus.shutdown();
