@@ -1,0 +1,92 @@
+package com.uxplima.uxmessentials.shared.menu;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
+
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import org.junit.jupiter.api.Test;
+
+/**
+ * A shipped menu spec may only name binding ids that production wiring actually registers. Without this guard a
+ * typo in a {@code .conf} — or a spec that outlives the wiring that fed it — becomes a broken menu a player meets
+ * at runtime instead of a failure a maintainer meets at build time. The test walks the bundled specs, parses each
+ * (a parse failure is itself a drift the test surfaces), and asserts every ref resolves against an allowlist that
+ * mirrors the ids the feature wiring registers.
+ *
+ * <p>The four {@code EXPECTED_*} sets are the contract: keep them in sync with the ids registered through
+ * {@link MenuBindings} in the production wiring. They are empty for the engine-only milestone because no spec
+ * ships yet; the pilot (warp-sounds) lands its ids here in the same change that adds the spec and the wiring.
+ */
+class ShippedSpecBindingsDriftTest {
+
+    /** Action ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
+    private static final Set<String> EXPECTED_ACTIONS = Set.of();
+
+    /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
+    private static final Set<String> EXPECTED_CONDITIONS = Set.of();
+
+    /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
+    private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of();
+
+    /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
+    private static final Set<String> EXPECTED_LISTS = Set.of();
+
+    @Test
+    void everyShippedSpecReferencesOnlyKnownBindingIds() {
+        Path specsDir = repoRoot().resolve("bukkit-adapter/src/main/resources/modules/menu/specs");
+        if (!Files.isDirectory(specsDir)) {
+            // No spec ships yet — the pilot (Task 17) creates the directory and its first spec. Nothing to guard.
+            return;
+        }
+
+        List<MenuSpec> specs = loadAll(specsDir);
+
+        MenuBindings bindings = new MenuBindings();
+        EXPECTED_ACTIONS.forEach(id -> bindings.action(id, ctx -> {}));
+        EXPECTED_CONDITIONS.forEach(id -> bindings.condition(id, ctx -> true));
+        EXPECTED_PLACEHOLDERS.forEach(id -> bindings.placeholder(id, ctx -> ""));
+        EXPECTED_LISTS.forEach(id -> bindings.list(id, ctx -> List.of()));
+
+        assertThat(bindings.validate(specs))
+                .as("shipped menu specs reference binding ids not registered in production wiring; register them "
+                        + "in the feature wiring (and add them to the matching EXPECTED_* set here), or fix "
+                        + "the spec")
+                .isEmpty();
+    }
+
+    /** Parses every {@code .conf} under {@code specsDir}; a parse failure propagates as the drift it is. */
+    private static List<MenuSpec> loadAll(Path specsDir) {
+        MenuSpecLoader loader = new MenuSpecLoader();
+        List<MenuSpec> specs = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(specsDir)) {
+            walk.filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().endsWith(".conf"))
+                    .sorted()
+                    .forEach(p -> specs.add(loader.load(p)));
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
+        return specs;
+    }
+
+    private static Path repoRoot() {
+        Path dir = Path.of("").toAbsolutePath();
+        while (dir != null) {
+            if (Files.exists(dir.resolve("settings.gradle.kts"))) {
+                return dir;
+            }
+            dir = dir.getParent();
+        }
+        throw new IllegalStateException("could not locate the repo root (settings.gradle.kts)");
+    }
+}
