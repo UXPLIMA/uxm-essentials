@@ -504,7 +504,18 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
-            wireHolograms(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+            wireHolograms(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    bus,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
             wirePlayerwarps(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
@@ -1078,7 +1089,9 @@ public final class PluginModule {
             Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // holograms builds its cached jOOQ HologramRepository over persistence.dsl() and its renderer over the
         // uxmLib native-Display API; the holograms / hologram_lines tables ship in the persistence V13 baseline,
         // always applied. Its one cross-context bridge is the leaderboard data-source registry: the economy module
@@ -1105,7 +1118,9 @@ public final class PluginModule {
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
                 guiLayouts,
-                textInput);
+                textInput,
+                menus,
+                menuBindings);
         wired.commands().forEach(resources::addCommand);
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
@@ -1116,7 +1131,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.holograms.application.HologramsMessageKey.HOLOGRAM_GUI_LIST_TITLE,
                 org.bukkit.Material.ARMOR_STAND,
                 "uxmessentials.holograms.gui",
-                (player, viewer) -> wired.listView().open(player, viewer)));
+                (player, viewer) -> wired.listMenu().open(viewer)));
         resources.onClose(wired::stop);
     }
 

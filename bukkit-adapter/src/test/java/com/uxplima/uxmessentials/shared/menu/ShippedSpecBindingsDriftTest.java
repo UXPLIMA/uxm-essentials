@@ -62,7 +62,9 @@ class ShippedSpecBindingsDriftTest {
             "itemworld:clear-drops",
             "itemworld:clear-mobs",
             "staff:teleport-to",
-            "staff:examine");
+            "staff:examine",
+            "holograms:edit",
+            "holograms:create");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm");
@@ -126,7 +128,13 @@ class ShippedSpecBindingsDriftTest {
             "iw_station_smithingtable",
             "iw_station_stonecutter",
             "iw_station_enderchest",
-            "staff_player_name");
+            "staff_player_name",
+            "hologram_name",
+            "hologram_lines",
+            "hologram_world",
+            "hologram_x",
+            "hologram_y",
+            "hologram_z");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
@@ -136,7 +144,8 @@ class ShippedSpecBindingsDriftTest {
             "messaging:ignores",
             "messaging:mail",
             "itemworld:entity-tally",
-            "staff:players");
+            "staff:players",
+            "holograms:list");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

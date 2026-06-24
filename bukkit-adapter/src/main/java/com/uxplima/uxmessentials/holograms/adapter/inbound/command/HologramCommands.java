@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
-import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListView;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
@@ -24,7 +24,7 @@ public final class HologramCommands {
     /**
      * Every holograms command (one: {@code /hologram}). {@code hologramNames} is a side-effect-free, non-blocking
      * source of the current hologram names used to tab-complete every {@code name} argument across the surface;
-     * {@code npcNames} is the same for the NPC argument of {@code /hologram linknpc}. {@code listView} is the
+     * {@code npcNames} is the same for the NPC argument of {@code /hologram linknpc}. {@code listMenu} is the
      * management-GUI list {@code /hologram} with no arguments opens for a holder of the GUI permission.
      */
     public static List<CommandRegistration> all(
@@ -32,7 +32,7 @@ public final class HologramCommands {
             Messages messages,
             Supplier<? extends Collection<String>> hologramNames,
             Supplier<? extends Collection<String>> npcNames,
-            HologramListView listView) {
-        return List.of(new HologramCommand(services, messages, hologramNames, npcNames, listView));
+            HologramListMenu listMenu) {
+        return List.of(new HologramCommand(services, messages, hologramNames, npcNames, listMenu));
     }
 }

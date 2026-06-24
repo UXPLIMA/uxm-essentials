@@ -17,7 +17,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.command.HologramCommands;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramEditorSubLayouts;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramEditorView;
-import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListView;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListMenu;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.DamageIndicatorListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramClickListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
@@ -77,10 +77,11 @@ import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -137,7 +138,9 @@ public final class HologramsWiring {
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -147,6 +150,8 @@ public final class HologramsWiring {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         // The concrete cache is what the cross-server listener reloads per name; the broadcasting decorator wraps
         // that same cache so a local hologram write announces it to peers, and the listener reloads + re-renders
@@ -262,13 +267,9 @@ public final class HologramsWiring {
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout colourPicker =
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.load(
                         plugin.getDataFolder().toPath(), kernel.log());
-        EntityListLayout listLayout = guiLayouts.loadEntityList(
-                "holograms",
-                "hologram-list",
-                EntityListLayout.withCreate(org.bukkit.Material.ARMOR_STAND, 49, org.bukkit.Material.LIME_DYE));
         EntityEditorLayout editorLayout =
                 guiLayouts.loadEntityEditor("holograms", "hologram-editor", editorCodeDefault());
-        HologramListView[] listHolder = new HologramListView[1];
+        HologramListMenu[] listHolder = new HologramListMenu[1];
         HologramEditorView editorView = new HologramEditorView(
                 guiText,
                 kernel.scheduler(),
@@ -280,19 +281,20 @@ public final class HologramsWiring {
                 editorLayout,
                 subLayouts,
                 colourPicker,
-                (player, viewer) -> listHolder[0].open(player, viewer));
-        HologramListView listView = new HologramListView(
-                guiText, kernel.scheduler(), repository, services, textInput, listLayout, editorView);
-        listHolder[0] = listView;
+                (player, viewer) -> listHolder[0].open(viewer));
+        HologramListMenu listMenu =
+                new HologramListMenu(menus, kernel.scheduler(), repository, services, textInput, editorView);
+        listHolder[0] = listMenu;
+        listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         return new Wired(
-                HologramCommands.all(services, kernel.messages(), hologramNames, npcNames, listView),
+                HologramCommands.all(services, kernel.messages(), hologramNames, npcNames, listMenu),
                 renderer,
                 repository,
                 refreshTask,
                 events,
                 npcSubscriber,
                 connector,
-                listView);
+                listMenu);
     }
 
     /** The editor's property-button slots, the code default matching the bundled hologram-editor.conf. */
@@ -420,7 +422,7 @@ public final class HologramsWiring {
      * @param events the domain-event bus the npc-link locator subscribed to, dropped on stop
      * @param npcSubscriber the npc-link locator subscription, unsubscribed on stop so it does not outlive a reload
      * @param connector the proxy connect channel the click-action engine uses, unregistered on stop so nothing outlives a disable
-     * @param listView the management-GUI list view, opened by /hologram (no args) and the /uxmess gui hub entry
+     * @param listMenu the management-GUI list, opened by /hologram (no args) and the /uxmess gui hub entry
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -430,7 +432,7 @@ public final class HologramsWiring {
             InProcessDomainEventPublisher events,
             Consumer<DomainEvent> npcSubscriber,
             BukkitServerConnector connector,
-            HologramListView listView) {
+            HologramListMenu listMenu) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -440,7 +442,7 @@ public final class HologramsWiring {
             Objects.requireNonNull(events, "events");
             Objects.requireNonNull(npcSubscriber, "npcSubscriber");
             Objects.requireNonNull(connector, "connector");
-            Objects.requireNonNull(listView, "listView");
+            Objects.requireNonNull(listMenu, "listMenu");
         }
 
         /**

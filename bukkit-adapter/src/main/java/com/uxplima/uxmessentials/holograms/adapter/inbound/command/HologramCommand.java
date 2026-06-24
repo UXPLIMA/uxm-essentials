@@ -17,7 +17,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
-import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListView;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListMenu;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -42,18 +42,18 @@ public final class HologramCommand extends HologramCommandSupport implements Com
 
     private final Supplier<? extends Collection<String>> hologramNames;
     private final Supplier<? extends Collection<String>> npcNames;
-    private final HologramListView listView;
+    private final HologramListMenu listMenu;
 
     public HologramCommand(
             HologramServices services,
             Messages messages,
             Supplier<? extends Collection<String>> hologramNames,
             Supplier<? extends Collection<String>> npcNames,
-            HologramListView listView) {
+            HologramListMenu listMenu) {
         super(services, messages, hologramNames);
         this.hologramNames = hologramNames;
         this.npcNames = Objects.requireNonNull(npcNames, "npcNames");
-        this.listView = Objects.requireNonNull(listView, "listView");
+        this.listMenu = Objects.requireNonNull(listMenu, "listMenu");
     }
 
     @Override
@@ -151,7 +151,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
             return 0;
         }
         if (sender.hasPermission(GUI_PERMISSION)) {
-            listView.open(sender, ref(sender));
+            listMenu.open(ref(sender));
         } else {
             services.list().list(ref(sender));
         }
