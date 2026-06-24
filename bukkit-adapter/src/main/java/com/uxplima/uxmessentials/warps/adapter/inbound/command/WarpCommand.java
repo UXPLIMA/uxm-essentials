@@ -45,7 +45,7 @@ import org.jspecify.annotations.NullMarked;
  *       {@code uxmessentials.warp.info}.
  *   <li>{@code /warp move <name>} re-anchors an existing warp to the operator's current position. Gated by
  *       {@code uxmessentials.warp.move}.
- *   <li>{@code /warp lock|password|rate|rating|edit <name>} keep their prior per-warp management behaviour.
+ *   <li>{@code /warp lock|password|rate|rating|editor <name>} keep their prior per-warp management behaviour.
  * </ul>
  *
  * <p>The positional {@code <name>} could in principle collide with a subcommand literal (a warp literally
@@ -123,7 +123,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::getWarpRating)))
-                .then(Commands.literal("edit")
+                .then(Commands.literal("editor")
                         .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
                         .executes(this::openWarpManager)
                         .then(Commands.argument("name", StringArgumentType.word())
@@ -152,7 +152,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         return Optional.of(this::runList);
     }
 
-    /** Bare {@code /warp edit} opens the admin warp manager GUI — the kit-editor-style manager. */
+    /** Bare {@code /warp editor} opens the admin warp manager GUI — the kit-editor-style manager. */
     private int openWarpManager(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {

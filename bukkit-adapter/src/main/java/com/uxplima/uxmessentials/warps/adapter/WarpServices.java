@@ -31,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
  * @param warpMenu the read-only browse menu {@code /warp list} opens
  * @param players name → ref resolution, available for future owner-attribution forms
  * @param editorView the warp edit chest GUI
- * @param managerView the admin warp manager GUI {@code /warp edit} (no name) opens, or {@code null} when
+ * @param managerView the admin warp manager GUI {@code /warp editor} (no name) opens, or {@code null} when
  *     disabled
  * @param scheduler the kernel scheduler the rating commands run their uncached database read/write through off
  *     the tick thread, bridging the confirmation back to the player's region thread

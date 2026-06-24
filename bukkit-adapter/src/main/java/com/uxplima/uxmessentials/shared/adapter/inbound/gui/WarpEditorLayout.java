@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 import org.bukkit.Material;
 
 /**
- * Geometry, slot assignments, and materials for the /warp edit <name> configuration menu.
+ * Geometry, slot assignments, and materials for the /warp editor <name> configuration menu.
  */
 public record WarpEditorLayout(
         int rows,

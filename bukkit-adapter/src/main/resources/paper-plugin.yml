@@ -233,7 +233,7 @@ permissions:
     description: '/warp password <name> to set or clear a warp''s access password.'
     default: op
   uxmessentials.warp.edit:
-    description: '/warp edit <name> to open the warp editor (cost, gates, effects, welcome message, icon).'
+    description: '/warp editor <name> to open the warp editor (cost, gates, effects, welcome message, icon).'
     default: op
   uxmessentials.warp.sign.create:
     description: 'Create a [warp] sign that teleports players to a warp on click.'
