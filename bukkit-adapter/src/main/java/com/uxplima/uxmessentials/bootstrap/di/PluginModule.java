@@ -481,7 +481,17 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("vaults"))) {
             wireVaults(plugin, ctx, persistence, resources, bus, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("communication"))) {
-            wireCommunication(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, textInput);
+            wireCommunication(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("holograms"))) {
             wireHolograms(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("playerwarps"))) {
@@ -1010,7 +1020,9 @@ public final class PluginModule {
             ContextLinks links,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // communication's only durable state is the DB-backed announcement set the /announce editor owns, built
         // over persistence.dsl(); the per-player broadcast opt-out is PDC-backed (survives relog), the sequence
         // counters are transient, and the connection policies, file announcer schedule, and info pages are
@@ -1023,8 +1035,8 @@ public final class PluginModule {
         AnnouncementStore announcementStore = AnnouncementStores.jooq(persistence);
         com.uxplima.uxmessentials.communication.application.port.AnnouncerSettingsStore announcerSettingsStore =
                 AnnouncementStores.settings(persistence);
-        CommunicationWiring.Wired wired =
-                CommunicationWiring.wire(plugin, ctx, announcementStore, announcerSettingsStore, guiLayouts, textInput);
+        CommunicationWiring.Wired wired = CommunicationWiring.wire(
+                plugin, ctx, announcementStore, announcerSettingsStore, guiLayouts, textInput, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -1038,7 +1050,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.communication.application.CommunicationMessageKey.GUI_PANEL_TITLE,
                 Material.WRITABLE_BOOK,
                 "uxmessentials.communication.gui",
-                (player, viewer) -> wired.adminView().open(player, viewer)));
+                (player, viewer) -> wired.adminMenu().open(viewer)));
     }
 
     private static void wireHolograms(

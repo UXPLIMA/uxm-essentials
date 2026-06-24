@@ -113,7 +113,7 @@ class FoliaThreadingDriftTest {
                 pkg + "communication.adapter.inbound.command.MeCommand",
                 "GLOBAL: /me broadcast wrapped in scheduler.onGlobal");
         allow.put(
-                pkg + "communication.adapter.inbound.gui.CommunicationAdminView",
+                pkg + "communication.adapter.inbound.gui.CommunicationAdminMenu",
                 "GLOBAL: admin-GUI clear-chat wrapped in scheduler.onGlobal");
         allow.put(
                 pkg + "communication.adapter.outbound.BukkitAnnouncerBroadcaster",

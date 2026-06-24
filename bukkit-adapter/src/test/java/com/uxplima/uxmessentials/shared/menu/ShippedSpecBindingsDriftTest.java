@@ -30,18 +30,36 @@ import org.junit.jupiter.api.Test;
 class ShippedSpecBindingsDriftTest {
 
     /** Action ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_ACTIONS =
-            Set.of("warp:set-sound", "warp:custom-sound", "warp:remove-sound", "warp:edit-back", "vault:open-slot");
+    private static final Set<String> EXPECTED_ACTIONS = Set.of(
+            "warp:set-sound",
+            "warp:custom-sound",
+            "warp:remove-sound",
+            "warp:edit-back",
+            "vault:open-slot",
+            "communication:chat-lock",
+            "communication:clearchat",
+            "communication:broadcast",
+            "communication:open-announcer",
+            "communication:close");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of();
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_PLACEHOLDERS =
-            Set.of("sound", "sound_material", "vault_icon", "vault_name", "vault_lore");
+    private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
+            "sound",
+            "sound_material",
+            "vault_icon",
+            "vault_name",
+            "vault_lore",
+            "communication_lock_state",
+            "announcement_id",
+            "announcement_lines",
+            "announcement_channels");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_LISTS = Set.of("warp:sound-options", "vault:slots");
+    private static final Set<String> EXPECTED_LISTS =
+            Set.of("warp:sound-options", "vault:slots", "communication:announcements");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

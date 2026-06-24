@@ -16,7 +16,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationCommands;
 import com.uxplima.uxmessentials.communication.adapter.inbound.command.CommunicationGuiCommand;
 import com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementEditorView;
-import com.uxplima.uxmessentials.communication.adapter.inbound.gui.CommunicationAdminView;
+import com.uxplima.uxmessentials.communication.adapter.inbound.gui.CommunicationAdminMenu;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.AdvancementMessageListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ChatLockListener;
 import com.uxplima.uxmessentials.communication.adapter.inbound.listener.ConnectionMessageListener;
@@ -45,6 +45,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -84,13 +86,17 @@ public final class CommunicationWiring {
             AnnouncementStore announcementStore,
             AnnouncerSettingsStore announcerSettingsStore,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(announcementStore, "announcementStore");
         Objects.requireNonNull(announcerSettingsStore, "announcerSettingsStore");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
         CommunicationSettings settings = new CommunicationSettings(dir, kernel.log());
@@ -139,10 +145,10 @@ public final class CommunicationWiring {
                 announcerSettingsStore,
                 guiLayouts,
                 textInput);
-        CommunicationAdminView adminView = new CommunicationAdminView(
+        CommunicationAdminMenu adminMenu = new CommunicationAdminMenu(
+                menus,
                 guiText,
                 kernel.scheduler(),
-                guiLayouts,
                 kernel.messages(),
                 chatLock,
                 broadcaster,
@@ -151,6 +157,7 @@ public final class CommunicationWiring {
                 notifier,
                 kernel.messageSink(),
                 textInput);
+        adminMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         List<CommandRegistration> commands = new ArrayList<>(CommunicationCommands.all(
                 services.broadcastOptOut(),
                 registry,
@@ -165,7 +172,7 @@ public final class CommunicationWiring {
                 chatLock,
                 settings,
                 editorView));
-        commands.add(new CommunicationGuiCommand(adminView, kernel.messages()));
+        commands.add(new CommunicationGuiCommand(adminMenu, kernel.messages()));
         List<Listener> listeners = listeners(
                 services,
                 registry,
@@ -176,7 +183,7 @@ public final class CommunicationWiring {
                 channelBroadcaster,
                 optOutStore,
                 kernel.scheduler());
-        return new Wired(List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminView);
+        return new Wired(List.copyOf(commands), listeners, announcer, running, chatLock, optOutStore, adminMenu);
     }
 
     /**
@@ -271,7 +278,7 @@ public final class CommunicationWiring {
      * @param running the flag flipped false on stop so the announcer exits
      * @param chatLock the global chat lock the PAPI seam reads the chat-enabled state from
      * @param optOutStore the per-player announcer subscription the PAPI seam reads the broadcast state from
-     * @param adminView the admin panel the {@code /uxmess gui} hub entry opens
+     * @param adminMenu the engine-rendered admin panel the {@code /uxmess gui} hub entry opens
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -280,7 +287,7 @@ public final class CommunicationWiring {
             AtomicBoolean running,
             ChatLock chatLock,
             BroadcastOptOutStore optOutStore,
-            CommunicationAdminView adminView) {
+            CommunicationAdminMenu adminMenu) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -289,7 +296,7 @@ public final class CommunicationWiring {
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(chatLock, "chatLock");
             Objects.requireNonNull(optOutStore, "optOutStore");
-            Objects.requireNonNull(adminView, "adminView");
+            Objects.requireNonNull(adminMenu, "adminMenu");
         }
 
         /** Arm the announcer timer. */
