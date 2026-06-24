@@ -85,4 +85,30 @@ class ArchitectureTest {
             .dependOnClassesThat()
             .resideInAnyPackage("net.milkbowl.vault..", "me.lokka30.treasury..")
             .allowEmptyShould(true);
+
+    // The menu engine's spec model and evaluation are the pure core: plain JUnit can exercise them
+    // without a server. Keeping them free of Bukkit / Paper / NMS is what makes that possible.
+    @ArchTest
+    static final ArchRule menuPureCoreHasNoBukkit = noClasses()
+            .that()
+            .resideInAnyPackage("..gui.menu.spec..", "..gui.menu.eval..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("org.bukkit..", "io.papermc..", "net.minecraft..")
+            .because("the menu engine's spec model and evaluation must stay pure for plain-JUnit testing");
+
+    // Only the Menus facade and the binding registries are the engine's public surface. The render and
+    // runtime internals stay private to the engine, so features wire behaviour through the facade alone.
+    // Two packages are exempt for the same reason they are everywhere else: bootstrap is the composition
+    // root that constructs the engine (it is not a feature), and the engine's own tests under
+    // shared.menu.. legitimately exercise render/runtime directly.
+    @ArchTest
+    static final ArchRule menuInternalsAreNotUsedOutsideTheEngine = noClasses()
+            .that()
+            .resideOutsideOfPackages("..gui.menu..", "..bootstrap..", "com.uxplima.uxmessentials.shared.menu..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("..gui.menu.render..", "..gui.menu.runtime..")
+            .because(
+                    "only the Menus facade and MenuBindings are the public surface; render/runtime internals stay private to the engine");
 }
