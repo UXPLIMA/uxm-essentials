@@ -542,7 +542,18 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("staff"))) {
             wireStaff(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("npc"))) {
-            wireNpc(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+            wireNpc(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    bus,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("custommenus"))) {
             wireCustomMenus(plugin, ctx, resources, menus, menuBindings);
         }
@@ -1265,7 +1276,9 @@ public final class PluginModule {
             Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // npc builds its cached jOOQ NpcRepository over persistence.dsl() and its renderer over the uxmLib NPC
         // packet stack; the npc table ships in the persistence V38 baseline, always applied. Its one cross-context
         // edge is soft: a COST click action charges through the economy bridge captured during economy wiring (npc
@@ -1286,7 +1299,9 @@ public final class PluginModule {
                 guiText,
                 guiLayouts,
                 textInput,
-                guiRegistry);
+                guiRegistry,
+                menus,
+                menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

@@ -47,4 +47,18 @@ class NpcTypeIconTest {
         assertThat(NpcTypeIcon.iconFor(EntityType.BLOCK_DISPLAY)).isEqualTo(Material.EGG);
         assertThat(NpcTypeIcon.iconFor(EntityType.ITEM_DISPLAY)).isEqualTo(Material.EGG);
     }
+
+    @Test
+    void theStoredTypeNameResolvesToTheSameIconAsTheType() {
+        // The list reads the NPC's stored uppercase type name, so the String overload must map the same way.
+        assertThat(NpcTypeIcon.iconFor("PLAYER")).isEqualTo(Material.PLAYER_HEAD);
+        assertThat(NpcTypeIcon.iconFor("ZOMBIE")).isEqualTo(Material.ZOMBIE_SPAWN_EGG);
+    }
+
+    @Test
+    void anUnknownStoredTypeNameFallsBackToAPlayerHead() {
+        // A type that no longer names a real Bukkit type (a removed type, a hand-edited typo) must not break the
+        // list; it falls back to the player head the default fake-player NPC shows.
+        assertThat(NpcTypeIcon.iconFor("NOT_A_REAL_TYPE")).isEqualTo(Material.PLAYER_HEAD);
+    }
 }

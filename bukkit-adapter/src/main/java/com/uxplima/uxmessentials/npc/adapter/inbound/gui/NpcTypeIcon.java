@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.npc.adapter.inbound.gui;
 
+import java.util.Locale;
 import java.util.Objects;
 
 import org.bukkit.Material;
@@ -26,5 +27,19 @@ final class NpcTypeIcon {
         }
         Material egg = Material.getMaterial(type.name() + SPAWN_EGG_SUFFIX);
         return egg != null ? egg : Material.EGG;
+    }
+
+    /**
+     * The icon material for the stored uppercase entity-type name an NPC carries. A name that no longer maps to a
+     * real Bukkit type (a removed type, a hand-edited typo) falls back to a player head — the same icon the default
+     * fake-player NPC shows — rather than breaking the list.
+     */
+    static Material iconFor(String entityTypeName) {
+        Objects.requireNonNull(entityTypeName, "entityTypeName");
+        try {
+            return iconFor(EntityType.valueOf(entityTypeName.toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException unknown) {
+            return Material.PLAYER_HEAD;
+        }
     }
 }

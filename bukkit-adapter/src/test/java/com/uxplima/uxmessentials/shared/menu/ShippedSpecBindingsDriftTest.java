@@ -66,7 +66,9 @@ class ShippedSpecBindingsDriftTest {
             "holograms:edit",
             "holograms:create",
             "playerwarps:edit",
-            "playerwarps:create");
+            "playerwarps:create",
+            "npc:edit",
+            "npc:create");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm");
@@ -144,7 +146,14 @@ class ShippedSpecBindingsDriftTest {
             "pwarp_x",
             "pwarp_y",
             "pwarp_z",
-            "pwarp_visibility");
+            "pwarp_visibility",
+            "npc_icon",
+            "npc_name",
+            "npc_type",
+            "npc_world",
+            "npc_x",
+            "npc_y",
+            "npc_z");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
@@ -156,7 +165,8 @@ class ShippedSpecBindingsDriftTest {
             "itemworld:entity-tally",
             "staff:players",
             "holograms:list",
-            "playerwarps:list");
+            "playerwarps:list",
+            "npc:list");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcCommand;
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcSkinByName;
 import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcEditorSubLayouts;
 import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcEditorView;
-import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcListView;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcListMenu;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcInteractionListener;
 import com.uxplima.uxmessentials.npc.adapter.inbound.listener.NpcLifecycleListener;
 import com.uxplima.uxmessentials.npc.adapter.outbound.CompositeSkinService;
@@ -72,12 +72,13 @@ import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -129,7 +130,9 @@ public final class NpcWiring {
             GuiText guiText,
             GuiLayouts guiLayouts,
             TextInput textInput,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -139,6 +142,8 @@ public final class NpcWiring {
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         NpcSettings settings = new NpcSettings(ctx.config());
         // The concrete cache is what the cross-server listener reloads per name; the broadcasting decorator wraps
@@ -174,18 +179,20 @@ public final class NpcWiring {
         SkinService skinService = new CompositeSkinService(mojangSkins, mineSkins);
         NpcSkinByName skinByName =
                 new NpcSkinByName(skinService, services.skin(), repository, notifier, kernel.scheduler());
-        // The management GUI: an editor exposing every NPC property over the use cases, and a list that opens it.
-        // The list backs both /npc (no args) and the /uxmess gui hub entry; the editor's back button returns to it.
-        NpcListView listView =
-                buildGui(plugin, kernel, repository, services, skinByName, guiText, guiLayouts, textInput);
+        // The management GUI: an editor exposing every NPC property over the use cases, and a list — drawn through
+        // the menu engine — that opens it. The list backs both /npc (no args) and the /uxmess gui hub entry; the
+        // editor's back button returns to it. The list registers its bindings and spec with the engine here.
+        NpcListMenu listMenu =
+                buildGui(plugin, kernel, repository, services, skinByName, guiText, guiLayouts, textInput, menus);
+        listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         guiRegistry.register(new ManagementGuiEntry(
                 "npc",
                 NpcMessageKey.NPC_GUI_LIST_TITLE,
                 org.bukkit.Material.PLAYER_HEAD,
                 "uxmessentials.npc.gui",
-                listView::open));
+                listMenu::open));
         List<CommandRegistration> commands =
-                List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages(), listView));
+                List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages(), listMenu));
         ClickCommandRunner commandRunner = new FilteredClickCommandRunner(
                 new BukkitClickCommandRunner(), BlockedCommands.of(settings.blockedCommands()), kernel.log());
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
@@ -213,11 +220,13 @@ public final class NpcWiring {
             List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32);
 
     /**
-     * Build the NPC management list and editor over the shared GUI framework. The editor's back button reopens
-     * the list, so a one-slot holder breaks the list↔editor construction cycle (the editor is built first, the
-     * list second, and the holder is filled before either is shown).
+     * Build the NPC management list (drawn through the menu engine) and editor over the shared GUI framework. The
+     * editor's back button reopens the list, so a one-slot holder breaks the list↔editor construction cycle (the
+     * editor is built first, the list second, and the holder is filled before either is shown). The list still
+     * needs the bundled npc-editor layout loaded for the editor it opens; only the list geometry now lives in the
+     * engine spec rather than the npc-list.conf layout.
      */
-    private static NpcListView buildGui(
+    private static NpcListMenu buildGui(
             Plugin plugin,
             KernelPorts kernel,
             NpcRepository repository,
@@ -225,18 +234,15 @@ public final class NpcWiring {
             NpcSkinByName skinByName,
             GuiText guiText,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus) {
         NpcEditorSubLayouts subLayouts =
                 NpcEditorSubLayouts.load(plugin.getDataFolder().toPath(), "npc", "npc-editor", kernel.log());
-        EntityListLayout listLayout = guiLayouts.loadEntityList(
-                "npc",
-                "npc-list",
-                EntityListLayout.withCreate(org.bukkit.Material.PLAYER_HEAD, 49, org.bukkit.Material.LIME_DYE));
         EntityEditorLayout editorLayout = guiLayouts.loadEntityEditor("npc", "npc-editor", editorCodeDefault());
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout colourPicker =
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.load(
                         plugin.getDataFolder().toPath(), kernel.log());
-        NpcListView[] listHolder = new NpcListView[1];
+        NpcListMenu[] listHolder = new NpcListMenu[1];
         NpcEditorView editor = new NpcEditorView(
                 guiText,
                 kernel.scheduler(),
@@ -249,10 +255,9 @@ public final class NpcWiring {
                 subLayouts,
                 colourPicker,
                 (player, viewer) -> listHolder[0].open(player, viewer));
-        NpcListView listView =
-                new NpcListView(guiText, kernel.scheduler(), repository, services, textInput, listLayout, editor);
-        listHolder[0] = listView;
-        return listView;
+        NpcListMenu listMenu = new NpcListMenu(menus, kernel.scheduler(), repository, services, textInput, editor);
+        listHolder[0] = listMenu;
+        return listMenu;
     }
 
     /**

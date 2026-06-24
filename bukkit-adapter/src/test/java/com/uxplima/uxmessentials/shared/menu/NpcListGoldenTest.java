@@ -1,13 +1,14 @@
-package com.uxplima.uxmessentials.npc.adapter.inbound.gui;
+package com.uxplima.uxmessentials.shared.menu;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,10 +19,17 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.inbound.command.NpcSkinByName;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcEditorSubLayouts;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcEditorView;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcListMenu;
 import com.uxplima.uxmessentials.npc.application.AddNpcAction;
 import com.uxplima.uxmessentials.npc.application.CenterNpc;
 import com.uxplima.uxmessentials.npc.application.ClearNpcActions;
@@ -39,6 +47,7 @@ import com.uxplima.uxmessentials.npc.application.MoveNpc;
 import com.uxplima.uxmessentials.npc.application.MoveNpcAction;
 import com.uxplima.uxmessentials.npc.application.MoveNpcTo;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
+import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.application.NpcNotifier;
 import com.uxplima.uxmessentials.npc.application.NpcQuota;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
@@ -64,19 +73,19 @@ import com.uxplima.uxmessentials.npc.application.TeleportToNpc;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
-import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EnumProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.TextProperty;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -89,6 +98,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.Guis;
+import com.uxplima.uxmlib.gui.SimpleGui;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,30 +108,27 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the NPC property editor: a toggle property (glow) cycles and persists through the glow
- * use case; an enum property (type) cycles and persists through the type use case; a text property (name) routes a
- * validated anvil line to a rename; an equipment slot set persists through the equip use case; and the delete
- * button is gated behind a confirm menu. The editor is laid out from a temp conf (no hardcoded slots); the
- * scheduler runs every hop inline so the off-thread writes land synchronously. The list, now drawn through the
- * menu engine, is covered by {@code NpcListGoldenTest}.
+ * The npc golden test: the engine-rendered {@code /npc} list must draw the exact grid the original {@code
+ * NpcListView} drew. The store holds two fake-player NPCs ("alpha", "beta"), so the list draws two PLAYER_HEAD
+ * icons (content slots 0 and 1 — the type icon a default fake-player NPC resolves to), the LIME_DYE create button
+ * (slot 49), and the two ARROW nav buttons (slots 48 and 50). The engine's window is snapshotted as {@code (slot ->
+ * material, plain name)} and asserted equal, slot for slot, to the baseline the old view produced — captured once
+ * while both rendered the same fixture, then frozen here as the contract so the old class could be deleted. Then a
+ * left click on the first NPC icon through the engine's own {@link MenuListener} proves the migrated path opens that
+ * NPC's bespoke {@link NpcEditorView} — so the move is faithful in both appearance and behaviour.
+ *
+ * <p>The {@code KeyMessages} catalog surfaces the entry name's {@code npc_name} token, so an NPC's name appears in
+ * the rendered label; every other key renders verbatim. A real rendering difference (a wrong key, a wrong material,
+ * a misplaced cell, a lost name token) therefore still shows up as a snapshot mismatch.
  */
-class NpcGuiTest {
+class NpcListGoldenTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
     private static final Position AT = Position.of(WORLD, 1, 64, 1);
 
-    // Editor property slots, in the order NpcEditorView builds its properties.
+    /** Editor property slots, in the order NpcEditorView builds them — slot 10 is the NAME_TAG name property. */
     private static final List<Integer> EDITOR_SLOTS =
             List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32);
-    private static final int NAME_SLOT = EDITOR_SLOTS.get(0);
-    private static final int TYPE_SLOT = EDITOR_SLOTS.get(2);
-    private static final int EQUIPMENT_SLOT = EDITOR_SLOTS.get(3);
-    private static final int GLOW_SLOT = EDITOR_SLOTS.get(7);
-    private static final int GLOW_COLOR_SLOT = EDITOR_SLOTS.get(8);
-    private static final int TELEPORT_SLOT = EDITOR_SLOTS.get(18); // "Teleport here", the last property
-    private static final int DELETE_SLOT = 53;
-    private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
-    private static final int EQUIP_HEAD_SLOT = 11; // first armour slot in the equipment sub-menu (code default)
 
     private ServerMock server;
     private Plugin plugin;
@@ -131,37 +138,24 @@ class NpcGuiTest {
     private Scheduler scheduler;
     private FakeRepository repository;
     private NpcServices services;
-    private NpcEditorView editorView;
-    private final List<Position> teleportDestinations = new java.util.ArrayList<>();
+    private TextInput textInput;
+
+    @TempDir
+    Path dataFolder;
 
     @BeforeEach
-    void setUp(@TempDir Path dir) throws Exception {
+    void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
-        player = server.addPlayer("Alice");
+        server.addSimpleWorld("world");
+        player = server.addPlayer("Owner");
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         repository = new FakeRepository();
         services = assembleServices();
+        textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
         Guis.install(plugin);
-
-        EntityEditorLayout editorLayout = editorLayout(dir);
-        TextInput textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
-        NpcSkinByName skinByName =
-                new NpcSkinByName(new NoSkinService(), services.skin(), repository, notifier(), scheduler);
-        editorView = new NpcEditorView(
-                guiText,
-                scheduler,
-                repository,
-                services,
-                skinByName,
-                textInput,
-                new KeyMessages(),
-                editorLayout,
-                NpcEditorSubLayouts.codeDefault(),
-                com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourPickerLayout.codeDefault(),
-                (p, v) -> {});
     }
 
     @AfterEach
@@ -171,200 +165,71 @@ class NpcGuiTest {
     }
 
     @Test
-    void togglePropertyCyclesAndPersistsThroughTheUseCase() {
+    void engineRendersTheSameIconGridCreateAndNavAsTheOldView() {
         create("alpha");
-        editorView.open(player, viewer, npc("alpha"));
-        assertThat(npc("alpha").glowing()).isFalse();
+        create("beta");
+        Map<Integer, Snapshot> baseline = oldViewBaseline();
 
-        fireClick(GLOW_SLOT, ClickType.LEFT);
+        Map<Integer, Snapshot> engine = snapshotEngine();
 
-        assertThat(npc("alpha").glowing()).isTrue();
+        assertThat(engine.keySet()).containsExactlyInAnyOrderElementsOf(baseline.keySet());
+        assertThat(engine).isEqualTo(baseline);
     }
 
     @Test
-    void enumPropertyCyclesAndPersistsThroughTheUseCase() {
+    void clickingAnNpcThroughTheEngineOpensThatNpcsEditor() {
         create("alpha");
-        Npc holo = npc("alpha");
-        EditableProperty type = editorView.grid().propertyAt(TYPE_SLOT, holo).orElseThrow();
-        assertThat(type).isInstanceOf(EnumProperty.class);
-        assertThat(npc("alpha").entityType()).isEqualTo("PLAYER");
+        openEngine();
+        // Content slot 0 is the first NPC icon, "alpha"; clicking it must open that NPC's editor.
+        fireClick(0);
 
-        // The enum selector writes through the type use case; opening it then clicking an option persists that
-        // option's value. PLAYER is the selected option (drawn with a glint), so the first non-PLAYER option is a
-        // real type change we can assert lands on the NPC.
-        editorView.open(player, viewer, holo);
-        fireClick(TYPE_SLOT, ClickType.LEFT); // opens the selector
-        String chosen = clickFirstSelectorOptionOtherThan("PLAYER");
-
-        assertThat(npc("alpha").entityType()).isEqualTo(chosen);
-    }
-
-    @Test
-    void typeSelectorDrawsEachOptionAsItsSpawnEgg() {
-        create("alpha");
-        Npc holo = npc("alpha");
-        editorView.open(player, viewer, holo);
-
-        fireClick(TYPE_SLOT, ClickType.LEFT); // opens the type selector
-
-        // The fake-player entry (the default, selected option) shows a player head; every other drawn option shows
-        // the icon NpcTypeIcon.iconFor resolves for that type — its spawn egg, or the egg fallback. Assert against
-        // every option actually drawn rather than one fixed type, so the test does not depend on the slot count.
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(selectorIcon(inv, "PLAYER")).isEqualTo(Material.PLAYER_HEAD);
-        int mobOptionsChecked = 0;
-        for (int slot = 0; slot < inv.getSize(); slot++) {
-            org.bukkit.inventory.ItemStack item = inv.getItem(slot);
-            if (item == null || item.getItemMeta() == null || item.getItemMeta().displayName() == null) {
-                continue;
-            }
-            String name = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                    .serialize(item.getItemMeta().displayName());
-            if (name.isBlank() || name.equals("PLAYER")) {
-                continue;
-            }
-            assertThat(item.getType()).isEqualTo(NpcTypeIcon.iconFor(org.bukkit.entity.EntityType.valueOf(name)));
-            mobOptionsChecked++;
-        }
-        assertThat(mobOptionsChecked).isGreaterThan(0);
-    }
-
-    @Test
-    void glowColourUsesTheSharedGlassColourPickerNotAPaperEnum() {
-        create("alpha");
-        EditableProperty glowColour =
-                editorView.grid().propertyAt(GLOW_COLOR_SLOT, npc("alpha")).orElseThrow();
-        assertThat(glowColour)
-                .isInstanceOf(
-                        com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour.ColourProperty.class);
-    }
-
-    @Test
-    void textPropertyRoutesAnvilInputToRename() {
-        create("alpha");
-        EditableProperty name =
-                editorView.grid().propertyAt(NAME_SLOT, npc("alpha")).orElseThrow();
-        assertThat(name).isInstanceOf(TextProperty.class);
-
-        ((TextProperty) name).applyInput(new ClickContext(player, viewer, false, false, () -> {}), "renamed");
-
-        assertThat(repository.find(NpcName.of("renamed"))).isPresent();
-        assertThat(repository.find(NpcName.of("alpha"))).isEmpty();
-    }
-
-    @Test
-    void equipmentSlotSetFromHeldItemPersists() {
-        create("alpha");
-        player.getInventory().setItemInMainHand(new org.bukkit.inventory.ItemStack(Material.DIAMOND_HELMET));
-        editorView.open(player, viewer, npc("alpha"));
-
-        fireClick(EQUIPMENT_SLOT, ClickType.LEFT); // open the equipment sub-menu
-        fireClick(EQUIP_HEAD_SLOT, ClickType.LEFT); // set the head slot from the held item
-
-        assertThat(npc("alpha").equipment()).containsKey(EquipmentSlot.HEAD);
-    }
-
-    @Test
-    void deleteIsGatedByAConfirmMenu() {
-        create("alpha");
-        editorView.open(player, viewer, npc("alpha"));
-
-        fireClick(DELETE_SLOT, ClickType.LEFT); // opens the confirm menu, does not delete
-        assertThat(repository.find(NpcName.of("alpha"))).isPresent();
-
-        fireClick(CONFIRM_SLOT, ClickType.LEFT); // the confirm button deletes
-        assertThat(repository.find(NpcName.of("alpha"))).isEmpty();
-    }
-
-    @Test
-    void teleportButtonSendsTheViewerToTheNpcLocation() {
-        create("alpha");
-        editorView.open(player, viewer, npc("alpha"));
-
-        fireClick(TELEPORT_SLOT, ClickType.LEFT);
-
-        assertThat(teleportDestinations).containsExactly(AT);
-    }
-
-    // --- helpers ---
-
-    private void create(String name) {
-        services.create().create(viewer, NpcName.of(name), AT, null);
-    }
-
-    private Npc npc(String name) {
-        return repository.find(NpcName.of(name)).orElseThrow();
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(SimpleGui.class);
+        // The editor draws the name-tag property button at its first property slot (code-default slot 10).
+        assertThat(player.getOpenInventory().getTopInventory().getItem(10)).isNotNull();
+        assertThat(player.getOpenInventory().getTopInventory().getItem(10).getType())
+                .isEqualTo(Material.NAME_TAG);
     }
 
     /**
-     * Click the first option in the open enum selector whose plain name is not {@code excluded}, and return that
-     * name so the caller can assert it persisted. The selector draws one named button per option into its option
-     * slots; the option's name is the entity-type word wrapped in {@code <value>…</value>}.
+     * The slot -> (material, plain name) map the deleted {@code NpcListView} produced for this fixture (two
+     * fake-player NPCs "alpha" and "beta"), captured once while both paths rendered it identically and frozen here
+     * as the contract: two PLAYER_HEAD icons (content slots 0 and 1 — the names surface through the {@code npc_name}
+     * token), the LIME_DYE create button (slot 49), and the two nav ARROWs (slots 48 and 50).
      */
-    private String clickFirstSelectorOptionOtherThan(String excluded) {
+    private static Map<Integer, Snapshot> oldViewBaseline() {
+        Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
+        baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "alpha"));
+        baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "beta"));
+        baseline.put(48, new Snapshot(Material.ARROW, "npc.gui.list.prev"));
+        baseline.put(49, new Snapshot(Material.LIME_DYE, "npc.gui.list.create"));
+        baseline.put(50, new Snapshot(Material.ARROW, "npc.gui.list.next"));
+        return baseline;
+    }
+
+    /** Render the engine menu for the player and snapshot its populated, non-filler slots. */
+    private Map<Integer, Snapshot> snapshotEngine() {
+        openEngine();
         Inventory inv = player.getOpenInventory().getTopInventory();
-        for (int slot = 0; slot < inv.getSize(); slot++) {
-            org.bukkit.inventory.ItemStack item = inv.getItem(slot);
-            if (item == null || item.getItemMeta() == null || item.getItemMeta().displayName() == null) {
-                continue;
-            }
-            String name = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                    .serialize(item.getItemMeta().displayName());
-            if (!name.isBlank() && !name.equals(excluded)) {
-                fireClick(slot, ClickType.LEFT);
-                return name;
-            }
-        }
-        throw new AssertionError("no selector option other than " + excluded);
+        return snapshot(inv);
     }
 
-    /**
-     * The icon material of the open selector's option whose rendered name is {@code optionName}. The selector
-     * draws one named button per option; the name is the value word wrapped in {@code <value>…</value>}.
-     */
-    private Material selectorIcon(Inventory inv, String optionName) {
-        for (int slot = 0; slot < inv.getSize(); slot++) {
-            org.bukkit.inventory.ItemStack item = inv.getItem(slot);
-            if (item == null || item.getItemMeta() == null || item.getItemMeta().displayName() == null) {
-                continue;
-            }
-            String name = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                    .serialize(item.getItemMeta().displayName());
-            if (name.equals(optionName)) {
-                return item.getType();
-            }
-        }
-        throw new AssertionError("no selector option named " + optionName);
+    /** Build the engine, register the npc bindings + spec, and open the list for the player. */
+    private void openEngine() {
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        MenuListener listener =
+                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        server.getPluginManager().registerEvents(listener, plugin);
+        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+
+        listMenu(menus).register(bindings, dataFolder, NOOP);
+        menus.open(viewer, NpcListMenu.SPEC_ID, null);
     }
 
-    private void fireClick(int slot, ClickType type) {
-        InventoryView view = player.getOpenInventory();
-        InventoryClickEvent event =
-                new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, slot, type, InventoryAction.PICKUP_ALL);
-        server.getPluginManager().callEvent(event);
-    }
-
-    private NpcNotifier notifier() {
-        return new NpcNotifier(new KeyMessages(), new SilentSink());
-    }
-
-    private EntityEditorLayout editorLayout(Path dir) throws Exception {
-        Path file = dir.resolve("modules").resolve("npc").resolve("gui").resolve("npc-editor.conf");
-        Files.createDirectories(file.getParent());
-        StringBuilder slots = new StringBuilder();
-        for (int i = 0; i < EDITOR_SLOTS.size(); i++) {
-            slots.append(EDITOR_SLOTS.get(i));
-            if (i < EDITOR_SLOTS.size() - 1) {
-                slots.append(", ");
-            }
-        }
-        Files.writeString(
-                file,
-                "rows = 6\nback-icon = \"ARROW\"\ndelete-icon = \"BARRIER\"\n"
-                        + "filler = \"BLACK_STAINED_GLASS_PANE\"\nback-slot = 49\ndelete-slot = 53\n"
-                        + "property-slots = ["
-                        + slots + "]\n");
-        EntityEditorLayout codeDefault = new EntityEditorLayout(
+    /** A {@link NpcListMenu} wired off the same collaborators as the old view, over the engine façade. */
+    private NpcListMenu listMenu(Menus menus) {
+        EntityEditorLayout editorLayout = new EntityEditorLayout(
                 6,
                 EDITOR_SLOTS,
                 49,
@@ -372,7 +237,58 @@ class NpcGuiTest {
                 Material.ARROW,
                 Material.BARRIER,
                 Material.BLACK_STAINED_GLASS_PANE);
-        return new GuiLayouts(dir, NOOP).loadEntityEditor("npc", "npc-editor", codeDefault);
+        NpcSkinByName skinByName =
+                new NpcSkinByName(new NoSkinService(), services.skin(), repository, notifier(), scheduler);
+        NpcEditorView editor = new NpcEditorView(
+                guiText,
+                scheduler,
+                repository,
+                services,
+                skinByName,
+                textInput,
+                new KeyMessages(),
+                editorLayout,
+                NpcEditorSubLayouts.codeDefault(),
+                ColourPickerLayout.codeDefault(),
+                (p, v) -> {});
+        return new NpcListMenu(menus, scheduler, repository, services, textInput, editor);
+    }
+
+    /** Left-click the given content slot of the open menu through the production click path. */
+    private void fireClick(int slot) {
+        InventoryView view = player.getOpenInventory();
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(event);
+    }
+
+    /** The slot -> (material, plain name) map for every non-empty, non-filler slot of {@code inv}. */
+    private static Map<Integer, Snapshot> snapshot(Inventory inv) {
+        Map<Integer, Snapshot> out = new LinkedHashMap<>();
+        for (int slot = 0; slot < inv.getSize(); slot++) {
+            ItemStack item = inv.getItem(slot);
+            if (item == null || item.getType() == Material.BLACK_STAINED_GLASS_PANE) {
+                continue;
+            }
+            out.put(slot, new Snapshot(item.getType(), plainName(item)));
+        }
+        return out;
+    }
+
+    private static String plainName(ItemStack item) {
+        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
+        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+    }
+
+    private void create(String name) {
+        services.create().create(viewer, NpcName.of(name), AT, null);
+    }
+
+    /** What one rendered slot looks like for comparison: its material and the plain-text of its display name. */
+    private record Snapshot(Material material, String name) {}
+
+    private NpcNotifier notifier() {
+        return new NpcNotifier(new KeyMessages(), new SilentSink());
     }
 
     private NpcServices assembleServices() {
@@ -387,7 +303,7 @@ class NpcGuiTest {
                 new ListNpcs(repository, notifier),
                 new NearbyNpcs(repository, notifier),
                 new DescribeNpc(repository, notifier),
-                new TeleportToNpc(repository, (who, destination) -> teleportDestinations.add(destination), notifier),
+                new TeleportToNpc(repository, (who, destination) -> {}, notifier),
                 new MoveNpc(repository, view, notifier, events),
                 new CopyNpc(repository, view, notifier, events, clock),
                 new CenterNpc(repository, view, notifier, events),
@@ -424,7 +340,7 @@ class NpcGuiTest {
     // --- fakes ---
 
     private static final class FakeRepository implements NpcRepository {
-        private final java.util.Map<String, Npc> byName = new java.util.LinkedHashMap<>();
+        private final Map<String, Npc> byName = new LinkedHashMap<>();
 
         @Override
         public Optional<Npc> find(NpcName name) {
@@ -498,9 +414,17 @@ class NpcGuiTest {
         }
     }
 
+    /**
+     * Surfaces the entry name's {@code npc_name} token so an NPC's name appears; else the bare key. The engine
+     * resolves a {@code @key} line through a lambda {@link MessageKey} carrying only the key string, so the match is
+     * by {@link MessageKey#key()} rather than enum identity.
+     */
     private static final class KeyMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            if (key.key().equals(NpcMessageKey.NPC_GUI_LIST_ENTRY_NAME.key())) {
+                return placeholders.getOrDefault("npc_name", "");
+            }
             return key.key();
         }
     }

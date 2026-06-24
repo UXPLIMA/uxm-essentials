@@ -16,7 +16,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.npc.adapter.NpcServices;
-import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcListView;
+import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcListMenu;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
@@ -47,14 +47,14 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     private final NpcDataCommands dataCommands;
     private final NpcActionCommands actionCommands;
     private final NpcStateCommands stateCommands;
-    private final NpcListView listView;
+    private final NpcListMenu listView;
 
     public NpcCommand(
             NpcServices services,
             Supplier<? extends Collection<String>> npcNames,
             NpcSkinByName skinByName,
             Messages messages,
-            NpcListView listView) {
+            NpcListMenu listView) {
         super(services, npcNames, messages);
         this.skinCommands = new NpcSkinCommands(services, npcNames, skinByName, messages);
         this.appearanceCommands = new NpcAppearanceCommands(services, npcNames, messages);
