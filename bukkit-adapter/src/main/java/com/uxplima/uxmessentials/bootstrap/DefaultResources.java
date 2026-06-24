@@ -114,6 +114,7 @@ final class DefaultResources {
             "modules/menu/specs/hologram-list.conf",
             "modules/menu/specs/playerwarp-list.conf",
             "modules/menu/specs/npc-list.conf",
+            "modules/menu/specs/home-icon.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

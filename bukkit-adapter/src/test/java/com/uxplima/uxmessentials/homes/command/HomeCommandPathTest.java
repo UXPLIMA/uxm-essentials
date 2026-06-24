@@ -27,8 +27,6 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
@@ -44,7 +42,6 @@ import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
-import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
 import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
@@ -522,11 +519,6 @@ class HomeCommandPathTest {
         VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier);
         TextInput textInput = TextInputTestKit.create(
                 plugin, new GuiText(messages), scheduler, java.nio.file.Path.of("nonexistent"), new NoLogger());
-        IconSelectorView iconSelector = new IconSelectorView(
-                messages,
-                scheduler,
-                new SetHomeIcon(repository, notifier, events, clock),
-                IconSelectorLayout.codeDefault());
         InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
                 messages,
                 scheduler,
@@ -547,7 +539,7 @@ class HomeCommandPathTest {
                 new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
                 new SetHomeVisibility(repository, notifier, events, clock),
-                iconSelector,
+                (viewer, home) -> {},
                 invitesMenu,
                 repository,
                 textInput,
@@ -576,15 +568,7 @@ class HomeCommandPathTest {
                 fmt);
         HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, events, clock);
         return new HomeServices(
-                listView,
-                actionView,
-                iconSelector,
-                homeAdmin,
-                visitHome,
-                inviteToHome,
-                uninviteFromHome,
-                lookup,
-                repository);
+                listView, actionView, homeAdmin, visitHome, inviteToHome, uninviteFromHome, lookup, repository);
     }
 
     /**

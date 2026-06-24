@@ -38,7 +38,6 @@ import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
-import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
 import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
@@ -46,7 +45,6 @@ import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
-import com.uxplima.uxmessentials.homes.domain.HomeIcon;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
@@ -69,7 +67,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
 import com.uxplima.uxmlib.gui.SimpleGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -97,10 +94,6 @@ class HomeActionViewTest {
     private static final int RELOCATE_SLOT = 15;
     private static final int CHANGE_ICON_SLOT = 16;
     private static final int BACK_SLOT = 22;
-    // Default IconSelectorLayout: 6 rows, content fills slots 0..44 (RED_BED first), reset 45, prev 48, back 49,
-    // next 50.
-    private static final int ICON_FIRST_CELL = 0;
-    private static final int ICON_RESET_SLOT = 45;
 
     private ServerMock server;
     private Plugin plugin;
@@ -110,6 +103,7 @@ class HomeActionViewTest {
     private RecordingTeleporter teleporter;
     private RecordingSink sink;
     private TogglePermissions permissions;
+    private final List<Home> openedIconPicker = new ArrayList<>();
 
     @Nullable private SyncScheduler scheduler; // assigned by viewWith(...) on each build
 
@@ -127,6 +121,7 @@ class HomeActionViewTest {
         teleporter = new RecordingTeleporter();
         sink = new RecordingSink();
         permissions = new TogglePermissions(true);
+        openedIconPicker.clear();
         Guis.install(plugin);
     }
 
@@ -183,6 +178,8 @@ class HomeActionViewTest {
 
     @Test
     void changeIconButtonIsPlacedAndOpensTheSelectorWithThePermission() {
+        // The button is drawn in place, and clicking it hands the home to the icon-picker seam (the picker itself
+        // now renders through the engine, covered by HomeIconGoldenTest).
         Home home = seed(home(0));
         open(home);
 
@@ -192,10 +189,9 @@ class HomeActionViewTest {
 
         fireClick(CHANGE_ICON_SLOT);
 
-        Inventory selector = player.getOpenInventory().getTopInventory();
-        assertThat(selector.getHolder()).isInstanceOf(PaginatedGui.class);
-        assertThat(selector.getItem(ICON_RESET_SLOT)).isNotNull();
-        assertThat(selector.getItem(ICON_RESET_SLOT).getType()).isEqualTo(Material.BARRIER);
+        assertThat(openedIconPicker)
+                .extracting(h -> h.slot().index())
+                .containsExactly(home.slot().index());
     }
 
     @Test
@@ -243,30 +239,6 @@ class HomeActionViewTest {
         assertThat(unchanged.label()).map(HomeLabel::value).contains("Base");
         assertThat(sink.delivered).contains(HomesMessageKey.HOME_RENAME_TOO_LONG.key());
         assertThat(sink.delivered).doesNotContain(HomesMessageKey.HOME_RENAMED.key());
-    }
-
-    @Test
-    void iconSelectorPickSetsTheChosenMaterial() {
-        Home home = seed(home(0));
-        open(home);
-        fireClick(CHANGE_ICON_SLOT); // open the selector
-
-        fireClick(ICON_FIRST_CELL); // the first palette cell is RED_BED
-
-        Home iconed = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
-        assertThat(iconed.icon()).map(HomeIcon::materialName).contains(Material.RED_BED.name());
-    }
-
-    @Test
-    void iconSelectorResetClearsTheCustomIcon() {
-        Home home = seed(home(0).withIcon(Optional.of(HomeIcon.of("DIAMOND_BLOCK")), Instant.EPOCH));
-        open(home);
-        fireClick(CHANGE_ICON_SLOT); // open the selector
-
-        fireClick(ICON_RESET_SLOT);
-
-        Home cleared = repository.findSlot(viewer, HomeSlot.of(0)).orElseThrow();
-        assertThat(cleared.icon()).isEmpty();
     }
 
     // --- visibility toggle decision seam ---
@@ -700,11 +672,6 @@ class HomeActionViewTest {
         Clock clock = Clock.system(ZoneOffset.UTC);
         scheduler = new SyncScheduler();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
-        IconSelectorView iconSelector = new IconSelectorView(
-                messages,
-                scheduler,
-                new SetHomeIcon(repository, notifier, events, clock),
-                IconSelectorLayout.codeDefault());
         TextInput textInput = textInput(messages, scheduler);
         InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
                 messages,
@@ -726,7 +693,7 @@ class HomeActionViewTest {
                 new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
                 new SetHomeVisibility(repository, notifier, events, clock),
-                iconSelector,
+                (pickerViewer, pickerHome) -> openedIconPicker.add(pickerHome),
                 invitesMenu,
                 repository,
                 textInput,

@@ -27,8 +27,6 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
@@ -44,7 +42,6 @@ import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
-import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
 import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
@@ -276,11 +273,7 @@ class HomeListViewTest {
                 new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
                 new RenameHome(repository, notifier, events, clock),
                 new SetHomeVisibility(repository, notifier, events, clock),
-                new IconSelectorView(
-                        messages,
-                        scheduler,
-                        new SetHomeIcon(repository, notifier, events, clock),
-                        IconSelectorLayout.codeDefault()),
+                (viewer, home) -> {},
                 invitesMenu,
                 repository,
                 textInput,

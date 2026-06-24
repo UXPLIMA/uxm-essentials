@@ -19,8 +19,8 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenus;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.listener.HomesJoinListener;
@@ -56,6 +56,8 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
@@ -103,8 +105,21 @@ public final class HomesWiring {
             Bus bus,
             GuiLayouts guiLayouts,
             CloseableResources resources,
-            TextInput textInput) {
-        return wire(plugin, ctx, persistence, teleportEngine, Optional.empty(), bus, guiLayouts, resources, textInput);
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
+        return wire(
+                plugin,
+                ctx,
+                persistence,
+                teleportEngine,
+                Optional.empty(),
+                bus,
+                guiLayouts,
+                resources,
+                textInput,
+                menus,
+                menuBindings);
     }
 
     /**
@@ -122,7 +137,9 @@ public final class HomesWiring {
             Bus bus,
             GuiLayouts guiLayouts,
             CloseableResources resources,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -132,6 +149,8 @@ public final class HomesWiring {
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(resources, "resources");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         CachedHomeRepository cached = HomeRepositories.cachedConcrete(persistence);
         bus.registry().register(HomeSync.listener(cached));
@@ -141,7 +160,18 @@ public final class HomesWiring {
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx), limitMode(ctx));
         HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
         HomeServices services = assemble(
-                plugin, ctx, repository, invites, notifier, quota, teleporter, homeEconomy, guiLayouts, textInput);
+                plugin,
+                ctx,
+                repository,
+                invites,
+                notifier,
+                quota,
+                teleporter,
+                homeEconomy,
+                guiLayouts,
+                textInput,
+                menus,
+                menuBindings);
         HomesJoinListener joinWarmer = new HomesJoinListener(repository, kernel.scheduler());
         return new Wired(
                 HomeCommands.all(services, kernel.messages(), kernel.scheduler()),
@@ -161,7 +191,9 @@ public final class HomesWiring {
             HomeTeleporter teleporter,
             Optional<HomeEconomy> homeEconomy,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         int unlimitedMax = unlimitedMax(ctx);
@@ -189,8 +221,18 @@ public final class HomesWiring {
         boolean confirmRelocate = ctx.config().getBoolean("confirm-relocate", false);
         boolean confirmUnsafeTeleport = ctx.config().getBoolean("confirm-unsafe-teleport", true);
 
-        IconSelectorView iconSelector =
-                new IconSelectorView(kernel.messages(), kernel.scheduler(), setHomeIcon, iconLayout(guiLayouts));
+        // The icon picker re-opens whichever action menu the home was reached through; during the migration that
+        // is still the bespoke HomeActionView, so HomeMenus is given a reopener that points at it (resolved through
+        // a holder because the two reference each other), and the action view's change-icon button opens the engine
+        // picker through HomeMenus.
+        HomeActionView[] actionHolder = new HomeActionView[1];
+        HomeMenus homeMenus = new HomeMenus(
+                menus,
+                kernel.scheduler(),
+                setHomeIcon,
+                iconLayout(guiLayouts),
+                (player, viewer, home) -> actionHolder[0].open(player, viewer, home, () -> {}));
+        homeMenus.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
                 kernel.messages(),
                 kernel.scheduler(),
@@ -211,7 +253,7 @@ public final class HomesWiring {
                 relocateHome,
                 renameHome,
                 setHomeVisibility,
-                iconSelector,
+                homeMenus::openIcons,
                 invitesMenu,
                 repository,
                 textInput,
@@ -223,6 +265,7 @@ public final class HomesWiring {
                 safeGuard.blockUnsafe(),
                 (Position pos) -> safeGuard.isUnsafe(pos),
                 claimService);
+        actionHolder[0] = actionView;
         HomeListView listView = new HomeListView(
                 kernel.messages(),
                 notifier,
@@ -241,7 +284,6 @@ public final class HomesWiring {
         return new HomeServices(
                 listView,
                 actionView,
-                iconSelector,
                 homeAdmin,
                 visitHome,
                 inviteToHome,

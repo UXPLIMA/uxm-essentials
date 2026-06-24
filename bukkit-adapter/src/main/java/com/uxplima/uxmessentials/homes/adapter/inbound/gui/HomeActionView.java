@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
 import org.bukkit.entity.Player;
@@ -84,7 +85,7 @@ public final class HomeActionView {
     private final RelocateHome relocateHome;
     private final RenameHome renameHome;
     private final SetHomeVisibility setHomeVisibility;
-    private final IconSelectorView iconSelector;
+    private final BiConsumer<PlayerRef, Home> openIconPicker;
     private final InvitedPlayersMenu invitesMenu;
     private final HomeRepository repository;
     private final TextInput textInput;
@@ -107,7 +108,7 @@ public final class HomeActionView {
             RelocateHome relocateHome,
             RenameHome renameHome,
             SetHomeVisibility setHomeVisibility,
-            IconSelectorView iconSelector,
+            BiConsumer<PlayerRef, Home> openIconPicker,
             InvitedPlayersMenu invitesMenu,
             HomeRepository repository,
             TextInput textInput,
@@ -128,7 +129,7 @@ public final class HomeActionView {
         this.relocateHome = Objects.requireNonNull(relocateHome, "relocateHome");
         this.renameHome = Objects.requireNonNull(renameHome, "renameHome");
         this.setHomeVisibility = Objects.requireNonNull(setHomeVisibility, "setHomeVisibility");
-        this.iconSelector = Objects.requireNonNull(iconSelector, "iconSelector");
+        this.openIconPicker = Objects.requireNonNull(openIconPicker, "openIconPicker");
         this.invitesMenu = Objects.requireNonNull(invitesMenu, "invitesMenu");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
@@ -176,9 +177,7 @@ public final class HomeActionView {
                 GuiItem.button(relocateIcon(viewer), e -> handleRelocate(player, viewer, home, reopenList, confirm)));
         gui.set(layout.renameSlot(), GuiItem.button(renameIcon(viewer), e -> rename(player, viewer, home, reopenList)));
         if (permissions.has(viewer, ICON_PERMISSION)) {
-            gui.set(
-                    layout.changeIconSlot(),
-                    GuiItem.button(iconIcon(viewer), e -> changeIcon(player, viewer, home, reopenList)));
+            gui.set(layout.changeIconSlot(), GuiItem.button(iconIcon(viewer), e -> changeIcon(viewer, home)));
         }
         gui.set(
                 layout.visibilitySlot(),
@@ -303,11 +302,11 @@ public final class HomeActionView {
         });
     }
 
-    private void changeIcon(Player player, PlayerRef viewer, Home home, Runnable reopenList) {
+    private void changeIcon(PlayerRef viewer, Home home) {
         if (!permissions.has(viewer, ICON_PERMISSION)) {
             return;
         }
-        iconSelector.open(player, viewer, home, () -> open(player, viewer, home, reopenList));
+        openIconPicker.accept(viewer, home);
     }
 
     /**

@@ -461,7 +461,18 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("worlds"))) {
             wireWorlds(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("homes"))) {
-            wireHomes(plugin, ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput);
+            wireHomes(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    bus,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("economy"))) {
             wireEconomy(plugin, ctx, persistence, resources, links, bus, guiRegistry, textInput);
         } else if (module.id().equals(ModuleId.of("warps"))) {
@@ -674,7 +685,9 @@ public final class PluginModule {
             Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
         HomesWiring.Wired wired = HomesWiring.wire(
@@ -686,7 +699,9 @@ public final class PluginModule {
                 bus,
                 guiLayouts,
                 resources,
-                textInput);
+                textInput,
+                menus,
+                menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Rebind the teleport context's home-respawn seam (built while it still resolved to empty) to the

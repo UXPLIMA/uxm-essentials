@@ -4,7 +4,6 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorView;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
@@ -24,7 +23,6 @@ import org.jspecify.annotations.NullMarked;
  *
  * @param homeList the {@code /home} slot grid the player opens
  * @param homeActions the per-home action menu the grid opens (held so its lifecycle is owned in one place)
- * @param iconSelector the home-icon picker the action menu opens
  * @param homeAdmin the {@code /homeadmin} management use case
  * @param visitHome the {@code /visit} use case
  * @param inviteToHome the {@code /invite} use case
@@ -36,7 +34,6 @@ import org.jspecify.annotations.NullMarked;
 public record HomeServices(
         HomeListView homeList,
         HomeActionView homeActions,
-        IconSelectorView iconSelector,
         HomeAdmin homeAdmin,
         VisitHome visitHome,
         InviteToHome inviteToHome,
@@ -47,7 +44,6 @@ public record HomeServices(
     public HomeServices {
         Objects.requireNonNull(homeList, "homeList");
         Objects.requireNonNull(homeActions, "homeActions");
-        Objects.requireNonNull(iconSelector, "iconSelector");
         Objects.requireNonNull(homeAdmin, "homeAdmin");
         Objects.requireNonNull(visitHome, "visitHome");
         Objects.requireNonNull(inviteToHome, "inviteToHome");
