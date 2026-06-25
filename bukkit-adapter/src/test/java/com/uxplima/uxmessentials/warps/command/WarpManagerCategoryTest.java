@@ -13,7 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
@@ -27,41 +26,19 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryEditing;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorView;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView;
-import com.uxplima.uxmessentials.warps.application.UseWarp;
-import com.uxplima.uxmessentials.warps.application.WarpAccess;
-import com.uxplima.uxmessentials.warps.application.WarpNotifier;
-import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
-import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
-import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
-import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
-import com.uxplima.uxmessentials.warps.domain.WarpName;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,26 +47,28 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage that the warp-category administration GUIs drive the real use cases through
- * {@link WarpEditorListener} and {@link WarpCategoryEditing}. It proves:
+ * MockBukkit coverage that the engine-rendered warp-category settings panel drives the real category use cases. The
+ * panel renders through the menu engine and routes its clicks through the shared {@code MenuListener}, so this test
+ * installs that listener and proves:
  *
  * <ul>
- *   <li>the category manager's create button creates a category from the typed id;
- *   <li>a category-settings click that edits the display name saves the renamed category;
- *   <li>a category-settings delete click removes the category.
+ *   <li>a display-name click opens the shared chat prompt and the typed line saves the renamed category;
+ *   <li>a delete click removes the category.
  * </ul>
  *
- * The warp manager itself now renders through the menu engine; its create-button and slot-for-slot appearance are
- * covered by {@code WarpManagerGoldenTest}. The {@code warp.category.create-name}/{@code warp.category.display-name}
- * input points are configured as chat here so the typed line round-trips through the shared {@link TextInput} chat
- * backend.
+ * The warp manager itself renders through the menu engine; its create-button and slot-for-slot appearance are covered
+ * by {@code WarpManagerGoldenTest}, and the panel's full property grid by {@code WarpCategorySettingsGoldenTest}. The
+ * {@code warp.category.display-name} input point is configured as chat here so the typed line round-trips through the
+ * shared {@link TextInput} chat backend rather than the apply seam.
  */
 class WarpManagerCategoryTest {
+
+    private static final int NAME_SLOT = 10;
+    private static final int DELETE_SLOT = 22;
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
-    private RecordingRepository repository;
     private StubWarpCategoryRepository categories;
     private WarpCategorySettingsView categorySettingsView;
 
@@ -105,19 +84,13 @@ class WarpManagerCategoryTest {
         Files.writeString(inputDir.resolve("config.conf"), """
                 default-mode = anvil
                 modes {
-                  "warp.create-name" = chat
-                  "warp.category.create-name" = chat
                   "warp.category.display-name" = chat
                 }
                 """);
 
         Messages messages = new KeyMessages();
-        MessageSink sink = (viewer, text) -> {};
-        WarpNotifier notifier = new WarpNotifier(messages, sink);
-        repository = new RecordingRepository();
         categories = new StubWarpCategoryRepository();
         Scheduler scheduler = new SyncScheduler();
-        Permissions permissions = new AllowAllPermissions();
 
         var anvil = new com.uxplima.uxmlib.gui.anvil.AnvilInput(plugin);
         anvil.install();
@@ -130,49 +103,18 @@ class WarpManagerCategoryTest {
                         new SilentLogger())
                 .textInput();
 
-        WarpEditorView editorView = new WarpEditorView(
-                messages, scheduler, repository, WarpEditorLayout.defaultLayout(), new PlayerWarpRepositoryHandle());
-
-        var soundOptionSource = new WarpSoundSelectorView(messages, scheduler, WarpSoundSelectorView.defaultLayout());
-        var menuBindings = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings();
-        var menuItemRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
-                new GuiText(messages), menuBindings.placeholders());
-        var menuRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
-                menuItemRenderer, menuBindings.conditions());
-        var menus = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
-                menuRenderer, scheduler, menuBindings.lists());
-
-        var categoryManagerView = new WarpCategoryManagerView(messages, categories, textInput, menus, scheduler);
-        categorySettingsView = new WarpCategorySettingsView(messages, scheduler);
-        var parentSelectorView =
-                new WarpCategoryParentSelectorView(messages, categories, categorySettingsView, menus, scheduler);
-        var categorySelectorView =
-                new WarpCategorySelectorView(messages, categories, repository, editorView, menus, scheduler);
-        // The category manager's back button reopens the warp manager; these tests do not exercise it, so the seam
-        // is a no-op here.
+        TestMenuEngine engine = TestMenuEngine.create(messages, scheduler);
+        engine.installListener(plugin);
+        // The back button reopens the warp manager; these tests do not exercise it, so the seam is a no-op here.
+        categorySettingsView =
+                new WarpCategorySettingsView(engine.menus(), messages, textInput, categories, (p, v) -> {});
+        WarpCategoryManagerView categoryManagerView =
+                new WarpCategoryManagerView(messages, categories, textInput, engine.menus(), scheduler);
+        WarpCategoryParentSelectorView parentSelectorView = new WarpCategoryParentSelectorView(
+                messages, categories, categorySettingsView, engine.menus(), scheduler);
+        categorySettingsView.bind(parentSelectorView);
         categoryManagerView.bind(categorySettingsView, (p, v) -> {});
-        WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
-        UseWarp useWarp = new UseWarp(repository, access, new NoTeleport(), notifier, pos -> true, permissions);
-        WarpCategoryEditing categoryEditing = new WarpCategoryEditing(
-                categoryManagerView, categorySettingsView, parentSelectorView, categories, textInput, messages);
-
-        var soundMenu = WarpSoundMenu.create(menus, soundOptionSource, repository, editorView, textInput);
-        soundMenu.register(menuBindings, plugin.getDataFolder().toPath(), new SilentLogger());
-        WarpEditorListener listener = new WarpEditorListener(
-                editorView,
-                repository,
-                textInput,
-                messages,
-                soundOptionSource,
-                new WarpParticleSelectorView(messages, scheduler, WarpParticleSelectorView.defaultLayout()),
-                new WarpWelcomeMessagesView(
-                        messages, scheduler, repository, editorView, WarpWelcomeMessagesView.defaultLayout()),
-                useWarp,
-                new PlayerWarpGoToHandle(),
-                categorySelectorView,
-                categoryEditing,
-                soundMenu);
-        server.getPluginManager().registerEvents(listener, plugin);
+        categorySettingsView.register(engine.bindings(), plugin.getDataFolder().toPath(), new SilentLogger());
     }
 
     @AfterEach
@@ -185,7 +127,7 @@ class WarpManagerCategoryTest {
         categories.save(new WarpCategory("pvp", "pvp", Optional.empty(), List.of(), 0, Optional.empty()));
         categorySettingsView.open(player, ref(), categories.find("pvp").orElseThrow());
 
-        fireClick(10); // the display-name button
+        fireClick(NAME_SLOT); // the display-name button
         fireChat("PvP Arenas");
 
         assertThat(categories.find("pvp").orElseThrow().displayName()).isEqualTo("PvP Arenas");
@@ -196,7 +138,7 @@ class WarpManagerCategoryTest {
         categories.save(new WarpCategory("pvp", "pvp", Optional.empty(), List.of(), 0, Optional.empty()));
         categorySettingsView.open(player, ref(), categories.find("pvp").orElseThrow());
 
-        fireClick(22); // the delete button
+        fireClick(DELETE_SLOT); // the delete button
 
         assertThat(categories.find("pvp")).isEmpty();
     }
@@ -220,47 +162,30 @@ class WarpManagerCategoryTest {
         return new PlayerRef(player.getUniqueId(), player.getName());
     }
 
-    /** Records saved warps so the test can prove the create button created one. */
-    private static final class RecordingRepository implements WarpRepository {
-        private final Map<String, Warp> warps = new LinkedHashMap<>();
+    /** A category repository over a fixed, mutable map — the panel's saves and deletes land here. */
+    private static final class StubWarpCategoryRepository
+            implements com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository {
+        private final Map<String, WarpCategory> byId = new LinkedHashMap<>();
 
         @Override
-        public Optional<Warp> find(WarpName name) {
-            return Optional.ofNullable(warps.get(name.value()));
+        public Optional<WarpCategory> find(String id) {
+            return Optional.ofNullable(byId.get(id));
         }
 
         @Override
-        public List<Warp> all() {
-            return new ArrayList<>(warps.values());
+        public List<WarpCategory> all() {
+            return new ArrayList<>(byId.values());
         }
 
         @Override
-        public boolean exists(WarpName name) {
-            return warps.containsKey(name.value());
+        public void save(WarpCategory category) {
+            byId.put(category.id(), category);
         }
 
         @Override
-        public void save(Warp warp) {
-            warps.put(warp.name().value(), warp);
+        public void delete(String id) {
+            byId.remove(id);
         }
-
-        @Override
-        public void delete(WarpName name) {
-            warps.remove(name.value());
-        }
-
-        @Override
-        public void rate(WarpName name, UUID player, double rating) {}
-
-        @Override
-        public double averageRating(WarpName name) {
-            return 0.0;
-        }
-    }
-
-    private static final class NoTeleport implements WarpTeleporter {
-        @Override
-        public void teleportTo(PlayerRef who, Warp warp) {}
     }
 
     private static final class KeyMessages implements Messages {
@@ -294,19 +219,6 @@ class WarpManagerCategoryTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
-        }
-    }
-
-    private static final class AllowAllPermissions implements Permissions {
-        @Override
-        public boolean has(PlayerRef who, String node) {
-            return true;
-        }
-
-        @Override
-        public QuotaResult resolveQuota(
-                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
-            return QuotaResult.limited(configDefault);
         }
     }
 

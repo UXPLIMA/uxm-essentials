@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.warps.adapter.inbound.gui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -40,35 +41,38 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The warp-category manager golden test: the engine-rendered manager must draw the exact grid the original bespoke
- * {@code WarpCategoryManagerView} drew on its own {@code Bukkit.createInventory}. The fixture is two categories (a
- * {@code DIAMOND}-iconed "pvp" and a default-BOOK "misc") over the six-row layout (content slots 0..44, gray-glass
- * filler), so page 0 places one icon per category at content slots 0 and 1, the EMERALD_BLOCK "create category" button
- * at slot 49, and the back ARROW at slot 53. The window is snapshotted as {@code (slot -> material, plain name)} and
- * asserted equal, slot for slot, to the analytic baseline the old view produced — category icons, the two fixed
- * buttons, and the engine's mandatory nav arrows at 45/46.
+ * The warp-category settings golden test: the engine-rendered panel must draw the exact property grid the original
+ * bespoke {@code WarpCategorySettingsView} drew on its own {@code Bukkit.createInventory}, and each button's apply
+ * seam must run the same mutation the old click handler did. The fixture is a single {@code DIAMOND}-iconed "pvp"
+ * category. The panel snapshots as {@code (slot -> material, plain name)} and is asserted equal, slot for slot, to
+ * the analytic baseline the old window produced: NAME_TAG name button at slot 10, the category's own DIAMOND icon at
+ * slot 12 (the material button shows the configured icon), BOOK lore at 14, COMPARATOR slot at 16, BOOKSHELF parent
+ * at 18, REDSTONE_BLOCK delete at 22, ARROW back at 26.
  *
- * <p>Then, through the engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener},
- * a left click on the first category opens that category's still-bespoke 27-slot settings panel, the back button
- * invokes the manager's back seam, and the create seam saves a new category and opens its settings — proving the
- * migrated path runs what the old click did, in both appearance and behaviour.
+ * <p>The apply seams are driven directly (MockBukkit cannot drive a live anvil): {@code applyName} / {@code applyLore}
+ * / {@code applySlot} save the single-field copy the old prompts saved and re-open the panel; the material button is
+ * fired as a real click with an item in the main hand; delete and back are fired as real clicks through the engine's
+ * own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener}. So the move is faithful
+ * in both appearance and behaviour.
  */
-class WarpCategoryManagerGoldenTest {
+class WarpCategorySettingsGoldenTest {
 
-    private static final int PREV_SLOT = 45;
-    private static final int NEXT_SLOT = 46;
-    private static final int CREATE_SLOT = 49;
-    private static final int BACK_SLOT = 53;
+    private static final int NAME_SLOT = 10;
+    private static final int MATERIAL_SLOT = 12;
+    private static final int LORE_SLOT = 14;
+    private static final int SLOT_SLOT = 16;
+    private static final int PARENT_SLOT = 18;
+    private static final int DELETE_SLOT = 22;
+    private static final int BACK_SLOT = 26;
 
     private static final WarpCategory PVP =
-            new WarpCategory("pvp", "<red>PvP</red>", Optional.of("DIAMOND"), List.of(), 0, Optional.empty());
-    private static final WarpCategory MISC =
-            new WarpCategory("misc", "<gray>Misc</gray>", Optional.empty(), List.of(), 0, Optional.empty());
+            new WarpCategory("pvp", "<red>PvP</red>", Optional.of("DIAMOND"), List.of("a", "b"), 5, Optional.empty());
 
     private ServerMock server;
     private Plugin plugin;
@@ -77,11 +81,11 @@ class WarpCategoryManagerGoldenTest {
     private Scheduler scheduler;
     private TestMenuEngine engine;
     private RecordingCategories categories;
-    private WarpCategoryManagerView manager;
+    private WarpCategorySettingsView settings;
     private AtomicReference<PlayerRef> backTarget;
 
-    @org.junit.jupiter.api.io.TempDir
-    java.nio.file.Path tempFolder;
+    @TempDir
+    Path dataFolder;
 
     @BeforeEach
     void setUp() {
@@ -92,20 +96,17 @@ class WarpCategoryManagerGoldenTest {
         scheduler = new SyncScheduler();
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);
-        categories = new RecordingCategories(List.of(PVP, MISC));
+        categories = new RecordingCategories(List.of(PVP));
         backTarget = new AtomicReference<>();
         TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
-        manager = new WarpCategoryManagerView(new KeyMessages(), categories, textInput, engine.menus(), scheduler);
-        // A category click and a create open the engine-rendered settings panel; the back button records its target.
-        // The settings panel renders through the same engine and its spec is registered, so the click assertions then
-        // see a menu-backed window. Both seams are bound after the manager exists, exactly as in production wiring.
-        WarpCategorySettingsView settingsView = new WarpCategorySettingsView(
+        settings = new WarpCategorySettingsView(
                 engine.menus(), new KeyMessages(), textInput, categories, (p, v) -> backTarget.set(v));
-        WarpCategoryParentSelectorView parentSelector = new WarpCategoryParentSelectorView(
-                new KeyMessages(), categories, settingsView, engine.menus(), scheduler);
-        settingsView.bind(parentSelector);
-        settingsView.register(engine.bindings(), tempFolder, NOOP);
-        manager.bind(settingsView, (p, v) -> backTarget.set(v));
+        // The parent button opens the engine parent selector; binding a real one keeps the panel whole, but the parent
+        // assign itself is proven by the parent-selector golden test, so this test exercises the other six buttons.
+        WarpCategoryParentSelectorView parentSelector =
+                new WarpCategoryParentSelectorView(new KeyMessages(), categories, settings, engine.menus(), scheduler);
+        settings.bind(parentSelector);
+        settings.register(engine.bindings(), dataFolder, NOOP);
     }
 
     @AfterEach
@@ -114,8 +115,8 @@ class WarpCategoryManagerGoldenTest {
     }
 
     @Test
-    void engineRendersTheSameCategoryGridButtonsAndFillerAsTheOldView() {
-        manager.open(player, viewer);
+    void engineRendersTheSamePropertyPanelAsTheOldView() {
+        settings.open(player, viewer, PVP);
 
         Map<Integer, Snapshot> baseline = oldViewBaseline();
         Map<Integer, Snapshot> rendered = snapshot(player.getOpenInventory().getTopInventory());
@@ -126,70 +127,121 @@ class WarpCategoryManagerGoldenTest {
 
     @Test
     void theEngineWindowIsMenuBacked() {
-        manager.open(player, viewer);
+        settings.open(player, viewer, PVP);
         assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
-    void clickingACategoryOpensItsEngineSettingsPanel() {
-        manager.open(player, viewer);
+    void applyingANameSavesThatNameAndReopensThePanel() {
+        settings.open(player, viewer, PVP);
 
-        fireClick(0); // content slot 0 holds "pvp"
+        settings.applyName(player, viewer, PVP, "<gold>Combat</gold>");
 
-        Inventory open = player.getOpenInventory().getTopInventory();
-        // The engine category-settings window is a three-row (27-slot) menu-backed panel, not the six-row manager grid.
-        assertThat(open.getSize()).isEqualTo(27);
-        assertThat(open.getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(categories.lastSaved()).hasValueSatisfying(saved -> {
+            assertThat(saved.displayName()).isEqualTo("<gold>Combat</gold>");
+            assertThat(saved.id()).isEqualTo("pvp");
+        });
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
-    void clickingBackInvokesTheManagersBackSeam() {
-        manager.open(player, viewer);
+    void applyingLoreSavesThePipeSplitLinesAndReopensThePanel() {
+        settings.open(player, viewer, PVP);
+
+        settings.applyLore(player, viewer, PVP, "one|two|three");
+
+        assertThat(categories.lastSaved())
+                .hasValueSatisfying(saved -> assertThat(saved.displayLore()).containsExactly("one", "two", "three"));
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
+    }
+
+    @Test
+    void applyingNoneAsLoreClearsTheLore() {
+        settings.open(player, viewer, PVP);
+
+        settings.applyLore(player, viewer, PVP, "none");
+
+        assertThat(categories.lastSaved())
+                .hasValueSatisfying(saved -> assertThat(saved.displayLore()).isEmpty());
+    }
+
+    @Test
+    void applyingAValidSlotSavesIt() {
+        settings.open(player, viewer, PVP);
+
+        settings.applySlot(player, viewer, PVP, "12");
+
+        assertThat(categories.lastSaved())
+                .hasValueSatisfying(saved -> assertThat(saved.slot()).isEqualTo(12));
+    }
+
+    @Test
+    void applyingANonNumberSlotIsRejectedWithoutSaving() {
+        settings.open(player, viewer, PVP);
+
+        settings.applySlot(player, viewer, PVP, "abc");
+
+        assertThat(categories.lastSaved()).isEmpty();
+    }
+
+    @Test
+    void clickingTheMaterialButtonCopiesTheMainHandItem() {
+        settings.open(player, viewer, PVP);
+        player.getInventory().setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+
+        fireClick(MATERIAL_SLOT);
+
+        assertThat(categories.lastSaved())
+                .hasValueSatisfying(saved -> assertThat(saved.displayMaterial()).contains("NETHERITE_SWORD"));
+    }
+
+    @Test
+    void clickingDeleteRemovesTheCategoryAndReturnsToTheManager() {
+        settings.open(player, viewer, PVP);
+
+        fireClick(DELETE_SLOT);
+
+        assertThat(categories.find("pvp")).isEmpty();
+        assertThat(backTarget.get()).isEqualTo(viewer);
+    }
+
+    @Test
+    void clickingBackInvokesTheBackSeam() {
+        settings.open(player, viewer, PVP);
 
         fireClick(BACK_SLOT);
 
         assertThat(backTarget.get()).isEqualTo(viewer);
     }
 
-    @Test
-    void theCreateSeamSavesANewCategoryAndOpensItsSettings() {
-        manager.open(player, viewer);
-
-        manager.create(player, viewer, "events");
-
-        assertThat(categories.lastSaved())
-                .hasValueSatisfying(saved -> assertThat(saved.id()).isEqualTo("events"));
-        Inventory open = player.getOpenInventory().getTopInventory();
-        assertThat(open.getSize()).isEqualTo(27);
-        assertThat(open.getHolder()).isInstanceOf(MenuHolder.class);
-    }
-
-    @Test
-    void theCreateSeamRejectsAnIdWithASpaceWithoutSaving() {
-        manager.open(player, viewer);
-
-        manager.create(player, viewer, "two words");
-
-        assertThat(categories.lastSaved()).isEmpty();
-    }
-
     /**
-     * The slot -> (material, plain name) map the bespoke {@code WarpCategoryManagerView} produced for this fixture: a
-     * DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback), the
-     * EMERALD_BLOCK "create category" button at slot 49 and the back ARROW at slot 53, each named through the catalog
-     * key the test's {@code KeyMessages} returns verbatim, plus the engine's mandatory ARROW nav at 45 and 46. The
-     * gray-glass filler slots are dropped from the snapshot, so a wrong material, name, or misplaced icon shows up as a
-     * mismatch.
+     * The slot -> (material, plain name) map the bespoke {@code WarpCategorySettingsView} produced for the "pvp"
+     * fixture: a NAME_TAG name button at slot 10, the category's configured DIAMOND icon at the material button (slot
+     * 12), a BOOK lore button at 14, a COMPARATOR slot button at 16, a BOOKSHELF parent button at 18, a REDSTONE_BLOCK
+     * delete button at 22, and an ARROW back button at 26, each named through the catalog key the test's
+     * {@code KeyMessages} returns verbatim. The gray-glass filler slots are dropped from the snapshot.
      */
     private static Map<Integer, Snapshot> oldViewBaseline() {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
-        baseline.put(0, new Snapshot(Material.DIAMOND, "PvP"));
-        baseline.put(1, new Snapshot(Material.BOOK, "Misc"));
-        baseline.put(PREV_SLOT, new Snapshot(Material.ARROW, WarpsMessageKey.WARP_MENU_PREV.key()));
-        baseline.put(NEXT_SLOT, new Snapshot(Material.ARROW, WarpsMessageKey.WARP_MENU_NEXT.key()));
         baseline.put(
-                CREATE_SLOT,
-                new Snapshot(Material.EMERALD_BLOCK, WarpsMessageKey.WARP_EDITOR_CATEGORY_CREATE_BUTTON_NAME.key()));
+                NAME_SLOT,
+                new Snapshot(Material.NAME_TAG, WarpsMessageKey.WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_NAME_NAME.key()));
+        baseline.put(
+                MATERIAL_SLOT,
+                new Snapshot(
+                        Material.DIAMOND, WarpsMessageKey.WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_MATERIAL_NAME.key()));
+        baseline.put(
+                LORE_SLOT,
+                new Snapshot(Material.BOOK, WarpsMessageKey.WARP_EDITOR_CATEGORY_SETTINGS_DISPLAY_LORE_NAME.key()));
+        baseline.put(
+                SLOT_SLOT,
+                new Snapshot(Material.COMPARATOR, WarpsMessageKey.WARP_EDITOR_CATEGORY_SETTINGS_SLOT_NAME.key()));
+        baseline.put(
+                PARENT_SLOT,
+                new Snapshot(Material.BOOKSHELF, WarpsMessageKey.WARP_EDITOR_CATEGORY_SETTINGS_PARENT_NAME.key()));
+        baseline.put(
+                DELETE_SLOT,
+                new Snapshot(Material.REDSTONE_BLOCK, WarpsMessageKey.WARP_EDITOR_CATEGORY_SETTINGS_DELETE_NAME.key()));
         baseline.put(BACK_SLOT, new Snapshot(Material.ARROW, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK.key()));
         return baseline;
     }
@@ -222,7 +274,7 @@ class WarpCategoryManagerGoldenTest {
     /** What one rendered slot looks like for comparison: its material and the plain-text of its display name. */
     private record Snapshot(Material material, String name) {}
 
-    /** A category repository over a fixed, mutable list that records the category the create/save path stores. */
+    /** A category repository over a fixed, mutable list that records the category the save path stores. */
     private static final class RecordingCategories implements WarpCategoryRepository {
         private final List<WarpCategory> categories;
         private @Nullable WarpCategory saved;
@@ -231,7 +283,7 @@ class WarpCategoryManagerGoldenTest {
             this.categories = new ArrayList<>(categories);
         }
 
-        /** The last category {@link #save} stored, or empty if none was saved — read by the create-seam assertions. */
+        /** The last category {@link #save} stored, or empty if none was saved — read by the apply-seam assertions. */
         Optional<WarpCategory> lastSaved() {
             return Optional.ofNullable(saved);
         }

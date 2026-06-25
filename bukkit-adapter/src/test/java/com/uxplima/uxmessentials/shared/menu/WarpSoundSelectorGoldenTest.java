@@ -1,0 +1,275 @@
+package com.uxplima.uxmessentials.shared.menu;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.bukkit.Material;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView;
+import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
+import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmessentials.warps.domain.Warp;
+import com.uxplima.uxmessentials.warps.domain.WarpName;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.entity.PlayerMock;
+
+/**
+ * The warp sound-selector golden test: the engine-rendered selector must draw the exact grid the original bespoke
+ * {@code WarpSoundSelectorView} drew on its own {@code Bukkit.createInventory}, and a click must run the same set the
+ * old click did. The fixture is one server warp "spawn". The window is snapshotted as {@code (slot -> material, plain
+ * name)} and asserted equal, slot for slot, to the analytic baseline the old view produced: the fourteen preset sound
+ * icons at content slots 0..13, the ANVIL custom button at slot 18, the BARRIER back button at slot 22, and the
+ * LAVA_BUCKET remove button at slot 26. The gray-glass filler slots are dropped from the snapshot.
+ *
+ * <p>Then a left click on the first sound through the engine's own {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener}
+ * proves the migrated path runs the same set the old click did — the warp's departure sound saved through the
+ * repository — and a click on remove clears it, faithful in both appearance and behaviour.
+ */
+class WarpSoundSelectorGoldenTest {
+
+    private static final int CUSTOM_SLOT = 18;
+    private static final int BACK_SLOT = 22;
+    private static final int REMOVE_SLOT = 26;
+
+    private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
+
+    private ServerMock server;
+    private Plugin plugin;
+    private PlayerMock player;
+    private PlayerRef viewer;
+    private Scheduler scheduler;
+    private TestMenuEngine engine;
+    private RecordingRepository repository;
+    private WarpSoundSelectorView selector;
+
+    @BeforeEach
+    void setUp() {
+        server = MockBukkit.mock();
+        plugin = MockBukkit.createMockPlugin();
+        player = server.addPlayer("Alice");
+        viewer = new PlayerRef(player.getUniqueId(), player.getName());
+        scheduler = new SyncScheduler();
+        engine = TestMenuEngine.create(new KeyMessages(), scheduler);
+        engine.installListener(plugin);
+        repository = new RecordingRepository();
+        repository.save(Warp.create(WarpName.of("spawn"), Position.of(WORLD, 0, 64, 0), viewer, Instant.EPOCH));
+        WarpEditorView editorView = new WarpEditorView(
+                new KeyMessages(),
+                scheduler,
+                repository,
+                WarpEditorLayout.defaultLayout(),
+                new PlayerWarpRepositoryHandle());
+        TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
+        selector = WarpSoundSelectorView.create(new KeyMessages(), engine.menus(), repository, editorView, textInput);
+    }
+
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
+    }
+
+    @Test
+    void engineRendersTheSameSoundGridAsTheOldView() {
+        selector.open(player, viewer, "spawn", null, true);
+
+        Map<Integer, Snapshot> baseline = oldViewBaseline();
+        Map<Integer, Snapshot> rendered = snapshot(player.getOpenInventory().getTopInventory());
+
+        assertThat(rendered.keySet()).containsExactlyInAnyOrderElementsOf(baseline.keySet());
+        assertThat(rendered).isEqualTo(baseline);
+    }
+
+    @Test
+    void clickingASoundSetsTheDepartureSoundAndReopensTheEditor() {
+        selector.open(player, viewer, "spawn", null, true);
+
+        fireClick(0); // content slot 0 holds the first preset sound
+
+        WarpSoundSelectorView.SoundOption first = selector.getOptions().get(0);
+        assertThat(repository.find(WarpName.of("spawn")).orElseThrow().departureSound())
+                .contains(first.soundName());
+    }
+
+    @Test
+    void clickingASoundSetsTheArrivalSoundWhenNotDeparture() {
+        selector.open(player, viewer, "spawn", null, false);
+
+        fireClick(2);
+
+        WarpSoundSelectorView.SoundOption third = selector.getOptions().get(2);
+        assertThat(repository.find(WarpName.of("spawn")).orElseThrow().arrivalSound())
+                .contains(third.soundName());
+    }
+
+    @Test
+    void clickingRemoveClearsTheSound() {
+        repository.save(repository
+                .find(WarpName.of("spawn"))
+                .orElseThrow()
+                .withDepartureSound(Optional.of("minecraft:block.portal.travel")));
+        selector.open(player, viewer, "spawn", null, true);
+
+        fireClick(REMOVE_SLOT);
+
+        assertThat(repository.find(WarpName.of("spawn")).orElseThrow().departureSound())
+                .isEmpty();
+    }
+
+    /**
+     * The slot -> (material, plain name) map the bespoke {@code WarpSoundSelectorView} produced for this fixture: one
+     * icon per preset sound at content slots 0..13, the ANVIL custom button at slot 18, the BARRIER back button at slot
+     * 22, and the LAVA_BUCKET remove button at slot 26, each named through the catalog key the test's
+     * {@code KeyMessages} returns verbatim. The gray-glass filler slots are dropped from the snapshot.
+     */
+    private Map<Integer, Snapshot> oldViewBaseline() {
+        Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
+        List<WarpSoundSelectorView.SoundOption> options = selector.getOptions();
+        for (int i = 0; i < options.size(); i++) {
+            baseline.put(
+                    i,
+                    new Snapshot(
+                            options.get(i).material(), WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_NAME.key()));
+        }
+        baseline.put(
+                CUSTOM_SLOT,
+                new Snapshot(Material.ANVIL, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_CUSTOM_NAME.key()));
+        baseline.put(BACK_SLOT, new Snapshot(Material.BARRIER, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK.key()));
+        baseline.put(
+                REMOVE_SLOT,
+                new Snapshot(Material.LAVA_BUCKET, WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_REMOVE_NAME.key()));
+        return baseline;
+    }
+
+    private void fireClick(int slot) {
+        InventoryView view = player.getOpenInventory();
+        InventoryClickEvent event = new InventoryClickEvent(
+                view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(event);
+    }
+
+    private static Map<Integer, Snapshot> snapshot(Inventory inv) {
+        Map<Integer, Snapshot> out = new LinkedHashMap<>();
+        for (int slot = 0; slot < inv.getSize(); slot++) {
+            ItemStack item = inv.getItem(slot);
+            if (item == null || item.getType() == Material.GRAY_STAINED_GLASS_PANE) {
+                continue;
+            }
+            out.put(slot, new Snapshot(item.getType(), plainName(item)));
+        }
+        return out;
+    }
+
+    private static String plainName(ItemStack item) {
+        Component name = Objects.requireNonNull(item.getItemMeta()).displayName();
+        return name == null ? "" : PlainTextComponentSerializer.plainText().serialize(name);
+    }
+
+    private record Snapshot(Material material, String name) {}
+
+    /** A repository that records stored warps, so the selector's set lands somewhere the test can read. */
+    private static final class RecordingRepository implements WarpRepository {
+        private final List<Warp> warps = new CopyOnWriteArrayList<>();
+
+        @Override
+        public Optional<Warp> find(WarpName name) {
+            return warps.stream().filter(warp -> warp.name().equals(name)).findFirst();
+        }
+
+        @Override
+        public List<Warp> all() {
+            return List.copyOf(warps);
+        }
+
+        @Override
+        public boolean exists(WarpName name) {
+            return find(name).isPresent();
+        }
+
+        @Override
+        public void save(Warp warp) {
+            warps.removeIf(existing -> existing.name().equals(warp.name()));
+            warps.add(warp);
+        }
+
+        @Override
+        public void delete(WarpName name) {
+            warps.removeIf(warp -> warp.name().equals(name));
+        }
+
+        @Override
+        public void rate(WarpName name, UUID player, double rating) {}
+
+        @Override
+        public double averageRating(WarpName name) {
+            return 0.0;
+        }
+    }
+
+    private static final class KeyMessages implements Messages {
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            return key.key();
+        }
+    }
+
+    private static final class SyncScheduler implements Scheduler {
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+}

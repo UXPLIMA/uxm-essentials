@@ -45,7 +45,6 @@ public final class WarpEditorListener implements Listener {
     private final WarpWelcomeMessagesView welcomeMessagesView;
 
     private final WarpCategorySelectorView categorySelectorView;
-    private final WarpCategoryEditing categoryEditing;
     private final WarpSoundMenu soundMenu;
 
     public WarpEditorListener(
@@ -59,7 +58,6 @@ public final class WarpEditorListener implements Listener {
             UseWarp useWarp,
             PlayerWarpGoToHandle playerWarpGoTo,
             WarpCategorySelectorView categorySelectorView,
-            WarpCategoryEditing categoryEditing,
             WarpSoundMenu soundMenu) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
@@ -70,11 +68,9 @@ public final class WarpEditorListener implements Listener {
         this.useWarp = Objects.requireNonNull(useWarp, "useWarp");
         this.playerWarpGoTo = Objects.requireNonNull(playerWarpGoTo, "playerWarpGoTo");
         this.categorySelectorView = Objects.requireNonNull(categorySelectorView, "categorySelectorView");
-        this.categoryEditing = Objects.requireNonNull(categoryEditing, "categoryEditing");
         this.soundMenu = Objects.requireNonNull(soundMenu, "soundMenu");
         this.loader = new EditableWarpLoader(Objects.requireNonNull(warpRepository, "warpRepository"), editorView);
-        this.subMenuClicks = new WarpSubMenuClicks(
-                editorView, textInput, this.loader, soundSelectorView, particleSelectorView, welcomeMessagesView);
+        this.subMenuClicks = new WarpSubMenuClicks(editorView, textInput, this.loader, welcomeMessagesView);
     }
 
     @EventHandler
@@ -85,35 +81,12 @@ public final class WarpEditorListener implements Listener {
             return;
         }
 
-        if (holder instanceof WarpSoundSelectorHolder soundHolder) {
-            event.setCancelled(true);
-            int slot = event.getRawSlot();
-            Player player = (Player) event.getWhoClicked();
-            subMenuClicks.handleSoundSelectorClick(player, soundHolder, slot);
-            return;
-        }
-
-        if (holder instanceof WarpParticleSelectorHolder particleHolder) {
-            event.setCancelled(true);
-            int slot = event.getRawSlot();
-            Player player = (Player) event.getWhoClicked();
-            subMenuClicks.handleParticleSelectorClick(player, particleHolder, slot);
-            return;
-        }
-
         if (holder instanceof WarpWelcomeMessagesHolder welcomeHolder) {
             event.setCancelled(true);
             int slot = event.getRawSlot();
             Player player = (Player) event.getWhoClicked();
             ClickType click = event.getClick();
             subMenuClicks.handleWelcomeMessagesClick(player, welcomeHolder, slot, click);
-            return;
-        }
-
-        if (holder instanceof WarpCategorySettingsHolder categorySettingsHolder) {
-            event.setCancelled(true);
-            categoryEditing.onCategorySettingsClick(
-                    (Player) event.getWhoClicked(), categorySettingsHolder, event.getRawSlot());
             return;
         }
 

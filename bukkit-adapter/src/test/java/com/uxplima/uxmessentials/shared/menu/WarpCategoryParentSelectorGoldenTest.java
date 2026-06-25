@@ -23,7 +23,9 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -77,6 +79,9 @@ class WarpCategoryParentSelectorGoldenTest {
     private RecordingCategories categories;
     private WarpCategoryParentSelectorView selector;
 
+    @org.junit.jupiter.api.io.TempDir
+    java.nio.file.Path dataFolder;
+
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
@@ -87,9 +92,14 @@ class WarpCategoryParentSelectorGoldenTest {
         engine = TestMenuEngine.create(new KeyMessages(), scheduler);
         engine.installListener(plugin);
         categories = new RecordingCategories(List.of(CHILD, PVP, MISC));
-        // The still-bespoke settings panel the selector reopens after a pick opens its own 27-slot window; a pick must
-        // land the viewer back on that panel, which is the assign assertions' return surface.
-        WarpCategorySettingsView settingsView = new WarpCategorySettingsView(new KeyMessages(), scheduler);
+        // The settings panel the selector reopens after a pick renders through the same engine; it is registered so a
+        // pick lands the viewer back on that menu-backed panel, the assign assertions' return surface.
+        TextInput textInput = org.mockito.Mockito.mock(TextInput.class);
+        WarpCategorySettingsView settingsView =
+                new WarpCategorySettingsView(engine.menus(), new KeyMessages(), textInput, categories, (p, v) -> {});
+        settingsView.bind(new WarpCategoryParentSelectorView(
+                new KeyMessages(), categories, settingsView, engine.menus(), scheduler));
+        settingsView.register(engine.bindings(), dataFolder, NOOP);
         selector = new WarpCategoryParentSelectorView(
                 new KeyMessages(), categories, settingsView, engine.menus(), scheduler);
     }
@@ -236,6 +246,20 @@ class WarpCategoryParentSelectorGoldenTest {
         @Override
         public void delete(String id) {}
     }
+
+    private static final Logger NOOP = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
 
     private static final class KeyMessages implements Messages {
         @Override

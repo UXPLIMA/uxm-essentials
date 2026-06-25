@@ -204,15 +204,16 @@ class WarpManagerGoldenTest {
         Messages messages = new KeyMessages();
         WarpEditorView editorView = new WarpEditorView(
                 messages, scheduler, repository, WarpEditorLayout.defaultLayout(), new PlayerWarpRepositoryHandle());
-        WarpCategoryManagerView categoryManager = new WarpCategoryManagerView(
-                messages,
-                new StubCategoryRepository(),
-                org.mockito.Mockito.mock(com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput.class),
-                menus,
-                scheduler);
+        var textInput =
+                org.mockito.Mockito.mock(com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput.class);
+        WarpCategoryManagerView categoryManager =
+                new WarpCategoryManagerView(messages, new StubCategoryRepository(), textInput, menus, scheduler);
         // The category manager is only the warp manager's category-button target here; this test never drives its own
-        // create/click/back seams, so the loop-closing collaborators are no-ops.
-        categoryManager.bind(new WarpCategorySettingsView(messages, scheduler), (p, v) -> {});
+        // create/click/back seams, so the loop-closing collaborators are no-ops. The engine settings panel is bound but
+        // never opened, so its spec is not registered here.
+        categoryManager.bind(
+                new WarpCategorySettingsView(menus, messages, textInput, new StubCategoryRepository(), (p, v) -> {}),
+                (p, v) -> {});
         return new WarpManagerMenu(
                 menus,
                 scheduler,

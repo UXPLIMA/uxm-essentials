@@ -25,7 +25,6 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -109,9 +108,7 @@ class WarpSoundsPilotGoldenTest {
     void clickingAnOptionThroughTheEngineSetsTheWarpsDepartureSound() {
         openEngine();
         // The third preset is the portal-travel sound; clicking its slot must persist that sound on the warp.
-        WarpSoundSelectorView.SoundOption expected = new WarpSoundSelectorView(messages, sync(), soundLayout())
-                .getOptions()
-                .get(2);
+        WarpSoundSelectorView.SoundOption expected = options().get(2);
 
         InventoryView view = player.getOpenInventory();
         InventoryClickEvent event = new InventoryClickEvent(
@@ -122,12 +119,32 @@ class WarpSoundsPilotGoldenTest {
         assertThat(repository.lastSaved.departureSound()).contains(expected.soundName());
     }
 
-    /** Render the old fixed view for the warp and snapshot its populated slots. */
+    /** Render the migrated selector for the warp and snapshot its populated slots. */
     private Map<Integer, Snapshot> snapshotOldView() {
-        WarpSoundSelectorView view = new WarpSoundSelectorView(messages, sync(), soundLayout());
+        GuiText guiText = new GuiText(messages);
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        Menus menus = new Menus(renderer, sync(), bindings.lists());
+        WarpEditorView editorView =
+                new WarpEditorView(messages, sync(), repository, editorLayout(), playerWarpHandle());
+        WarpSoundSelectorView view = WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput());
         view.open(player, viewer, WARP.value(), null, true);
         Inventory inv = player.getOpenInventory().getTopInventory();
         return snapshot(inv);
+    }
+
+    /** The preset option list the migrated selector grids, read off a throwaway selector for the assertion. */
+    private java.util.List<WarpSoundSelectorView.SoundOption> options() {
+        GuiText guiText = new GuiText(messages);
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        Menus menus = new Menus(renderer, sync(), bindings.lists());
+        WarpEditorView editorView =
+                new WarpEditorView(messages, sync(), repository, editorLayout(), playerWarpHandle());
+        return WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput())
+                .getOptions();
     }
 
     /** Render the engine menu for the same warp+side and snapshot its populated slots. */
@@ -149,7 +166,8 @@ class WarpSoundsPilotGoldenTest {
 
         WarpEditorView editorView =
                 new WarpEditorView(messages, sync(), repository, editorLayout(), playerWarpHandle());
-        WarpSoundSelectorView optionSource = new WarpSoundSelectorView(messages, sync(), soundLayout());
+        WarpSoundSelectorView optionSource =
+                WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput());
         WarpSoundMenu menu = WarpSoundMenu.create(menus, optionSource, repository, editorView, textInput());
         menu.register(bindings, dataFolder, new NoopLogger());
         menu.open(viewer, new WarpSoundEdit(WARP, true));
@@ -177,10 +195,6 @@ class WarpSoundsPilotGoldenTest {
         Position location = Position.of(new WorldRef(UUID.randomUUID(), "world"), 1, 2, 3);
         PlayerRef owner = new PlayerRef(UUID.randomUUID(), "Owner");
         return Warp.create(WARP, location, owner, Instant.EPOCH);
-    }
-
-    private static FixedMenuLayout soundLayout() {
-        return WarpSoundSelectorView.defaultLayout();
     }
 
     private static WarpEditorLayout editorLayout() {

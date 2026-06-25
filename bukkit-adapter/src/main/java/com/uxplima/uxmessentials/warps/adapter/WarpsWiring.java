@@ -112,14 +112,6 @@ public final class WarpsWiring {
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry);
         WarpEditorLayout editorLayout =
                 guiLayouts.loadWarpEditor("warps", "warps-editor", WarpEditorLayout.defaultLayout());
-        var soundLayout = guiLayouts.loadFixedMenu(
-                "warps",
-                "warps-sound-selector",
-                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView.defaultLayout());
-        var particleLayout = guiLayouts.loadFixedMenu(
-                "warps",
-                "warps-particle-selector",
-                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView.defaultLayout());
         var welcomeLayout = guiLayouts.loadFixedMenu(
                 "warps",
                 "warps-welcome",
@@ -129,13 +121,16 @@ public final class WarpsWiring {
         var playerWarpGoTo = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle();
         var editorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView(
                 kernel.messages(), kernel.scheduler(), repository, editorLayout, playerWarpHandle);
-        var soundSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView(
-                kernel.messages(), kernel.scheduler(), soundLayout);
+        // The sound and particle selectors render through the menu engine's selector runtime now; both pick the warp's
+        // departure/arrival effect through the same editable-warp loader the editor listener uses and reopen the editor
+        // on a pick, so a single picker covers server and player warps exactly as before.
+        var soundSelectorView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView.create(
+                kernel.messages(), menus, repository, editorView, textInput);
         var soundMenu = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu.create(
                 menus, soundSelectorView, repository, editorView, textInput);
         soundMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
-        var particleSelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView(
-                kernel.messages(), kernel.scheduler(), particleLayout);
+        var particleSelectorView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView.create(
+                kernel.messages(), menus, repository, editorView, textInput);
         var welcomeMessagesView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpWelcomeMessagesView(
                 kernel.messages(), kernel.scheduler(), repository, editorView, welcomeLayout);
         // UseWarp is built once here so the editor's "go to" button and the /warp command share the exact same
@@ -152,13 +147,23 @@ public final class WarpsWiring {
         categoryRepository.all();
         var categoryManagerView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryManagerView(
                 kernel.messages(), categoryRepository, textInput, menus, kernel.scheduler());
+        // The per-category settings panel now renders through the menu engine: a declarative spec over the edited
+        // category as its subject. The manager opens it on a category click and on create; each shares this one
+        // instance. It closes a small cycle with the parent selector (settings opens the selector, the selector reopens
+        // settings), broken through the bind(...) setter once both exist.
         var categorySettingsView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySettingsView(
-                kernel.messages(), kernel.scheduler());
+                menus,
+                kernel.messages(),
+                textInput,
+                categoryRepository,
+                (player, viewer) -> categoryManagerView.open(player, viewer));
+        categorySettingsView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categorySelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorView(
                 kernel.messages(), categoryRepository, repository, editorView, menus, kernel.scheduler());
         var categoryParentSelectorView =
                 new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryParentSelectorView(
                         kernel.messages(), categoryRepository, categorySettingsView, menus, kernel.scheduler());
+        categorySettingsView.bind(categoryParentSelectorView);
         SetWarp setWarp = new SetWarp(
                 repository,
                 notifier,
@@ -191,13 +196,6 @@ public final class WarpsWiring {
         // a port read of its own.
         var browseMenu = new WarpBrowseMenu(menus, kernel.scheduler(), useWarp, kernel.messages(), categoryRepository);
         browseMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
-        var categoryEditing = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryEditing(
-                categoryManagerView,
-                categorySettingsView,
-                categoryParentSelectorView,
-                categoryRepository,
-                textInput,
-                kernel.messages());
         var editorListener = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorListener(
                 editorView,
                 repository,
@@ -209,7 +207,6 @@ public final class WarpsWiring {
                 useWarp,
                 playerWarpGoTo,
                 categorySelectorView,
-                categoryEditing,
                 soundMenu);
 
         WarpServices services =
