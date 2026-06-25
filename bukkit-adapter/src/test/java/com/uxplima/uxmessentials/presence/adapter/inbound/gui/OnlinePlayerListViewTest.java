@@ -20,7 +20,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
-import com.uxplima.uxmlib.gui.Guis;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,10 +30,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * MockBukkit coverage of {@link OnlinePlayerListView}: the read-only online-roster head grid. Given a
  * pre-snapshotted roster it draws one player head per entry into the paginated content slots through the engine
- * list runtime ({@link MenuHolder}); an empty roster opens the one-row empty-state title instead of a grid. The
- * scheduler is a synchronous double so the entity-bound build runs inline, and the engine's menu listener is
- * installed against a mock plugin. The head grid is the engine list; the empty-state menu stays a uxmLib filler
- * window, so {@code Guis.install} remains for that one path.
+ * list runtime ({@link MenuHolder}); an empty roster opens the same engine list under its empty-state title — a
+ * filler-and-nav panel, still a {@link MenuHolder}, never a bespoke uxmLib window. The scheduler is a synchronous
+ * double so the entity-bound build runs inline, and the engine's menu listener is installed against a mock plugin.
  */
 class OnlinePlayerListViewTest {
 
@@ -57,12 +55,10 @@ class OnlinePlayerListViewTest {
                 new GuiText(new KeyMessages()),
                 new SyncScheduler(),
                 EntityListLayout.paginatedDefault(Material.PLAYER_HEAD));
-        Guis.install(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -83,13 +79,16 @@ class OnlinePlayerListViewTest {
     }
 
     @Test
-    void anEmptyRosterOpensTheEmptyStateMenu() {
+    void anEmptyRosterOpensTheEngineListEmptyState() {
         view.open(player, viewer, List.of());
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        // The empty-state menu is a one-row filler menu, never the paginated head grid.
-        assertThat(inv.getHolder()).isNotInstanceOf(MenuHolder.class);
-        assertThat(inv.getSize()).isEqualTo(9);
+        // The empty roster opens the engine list (a MenuHolder), not a bespoke uxmLib window.
+        assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
+        // No roster entry, so every content slot is filler — there is no player head anywhere.
+        for (int slot = 0; slot < inv.getSize(); slot++) {
+            assertThat(inv.getItem(slot).getType()).isNotEqualTo(Material.PLAYER_HEAD);
+        }
     }
 
     /** Resolves a key to its own string so the view's rendering never needs a real catalog. */

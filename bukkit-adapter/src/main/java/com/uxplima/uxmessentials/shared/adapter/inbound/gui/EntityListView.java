@@ -55,6 +55,7 @@ public final class EntityListView<T> {
     private final GuiText guiText;
     private final EntityListLayout layout;
     private final MessageKey title;
+    private final @Nullable MessageKey emptyTitle;
     private final MessageKey prevName;
     private final MessageKey nextName;
     private final @Nullable MessageKey createName;
@@ -73,6 +74,7 @@ public final class EntityListView<T> {
         Objects.requireNonNull(builder.scheduler, "scheduler");
         this.layout = Objects.requireNonNull(builder.layout, "layout");
         this.title = Objects.requireNonNull(builder.title, "title");
+        this.emptyTitle = builder.emptyTitle;
         this.prevName = Objects.requireNonNull(builder.prevName, "prevName");
         this.nextName = Objects.requireNonNull(builder.nextName, "nextName");
         this.createName = builder.createName;
@@ -103,10 +105,16 @@ public final class EntityListView<T> {
      * so the spec is built per open (matching the bespoke view, which rebuilt its {@code PaginatedGui} per open); the
      * typed icon renderer and select handler close over {@code T} and cast the engine's type-erased {@link Object}
      * entity back, which is always one of the very entities this view's supplier produced.
+     *
+     * <p>When the snapshot is empty and the caller wired an {@code emptyTitle}, the window opens under that title
+     * instead — the engine then draws just the filler and nav, an empty-state panel rather than a head grid, so a
+     * list with nothing to show no longer needs a bespoke empty-state window.
      */
     private ListSpec spec(PlayerRef viewer) {
+        List<T> snapshot = entities.get();
+        MessageKey resolvedTitle = snapshot.isEmpty() && emptyTitle != null ? emptyTitle : title;
         ListSpec.Builder spec = ListSpec.builder()
-                .title(guiText.text(viewer, title))
+                .title(guiText.text(viewer, resolvedTitle))
                 .rows(layout.rows())
                 .contentSlots(contentSlots())
                 .navigation(
@@ -157,6 +165,7 @@ public final class EntityListView<T> {
         private @Nullable Scheduler scheduler;
         private @Nullable EntityListLayout layout;
         private @Nullable MessageKey title;
+        private @Nullable MessageKey emptyTitle;
         private @Nullable MessageKey prevName;
         private @Nullable MessageKey nextName;
         private @Nullable MessageKey createName;
@@ -194,6 +203,15 @@ public final class EntityListView<T> {
 
         public Builder<T> title(MessageKey title) {
             this.title = Objects.requireNonNull(title, "title");
+            return this;
+        }
+
+        /**
+         * The title shown when the entity snapshot is empty — an empty-state panel under this title rather than a
+         * head/icon grid. Optional: a list that omits it keeps the regular {@link #title} even when empty.
+         */
+        public Builder<T> emptyTitle(MessageKey emptyTitle) {
+            this.emptyTitle = Objects.requireNonNull(emptyTitle, "emptyTitle");
             return this;
         }
 

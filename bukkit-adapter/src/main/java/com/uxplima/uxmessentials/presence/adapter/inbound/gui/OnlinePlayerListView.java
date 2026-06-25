@@ -10,8 +10,6 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.Component;
-
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
@@ -19,9 +17,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.item.SkullData;
 import org.jspecify.annotations.NullMarked;
@@ -43,22 +38,21 @@ import org.jspecify.annotations.NullMarked;
 public final class OnlinePlayerListView {
 
     private final GuiText guiText;
-    private final Scheduler scheduler;
-    private final EntityListLayout layout;
     private final AtomicReference<List<Entry>> snapshot = new AtomicReference<>(List.of());
     private final EntityListView<Entry> view;
 
     public OnlinePlayerListView(Menus menus, GuiText guiText, Scheduler scheduler, EntityListLayout layout) {
         Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.layout = Objects.requireNonNull(layout, "layout");
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(layout, "layout");
         this.view = EntityListView.<Entry>builder()
                 .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)
                 .title(PresenceMessageKey.LIST_GUI_TITLE)
+                .emptyTitle(PresenceMessageKey.LIST_GUI_EMPTY_TITLE)
                 .navNames(PresenceMessageKey.LIST_GUI_PREV, PresenceMessageKey.LIST_GUI_NEXT)
                 .entities(snapshot::get)
                 // Read-only: clicking a head does nothing (no pick action, per item 32).
@@ -69,33 +63,16 @@ public final class OnlinePlayerListView {
 
     /**
      * Open the roster menu for {@code viewer} over the already-snapshotted {@code roster}. The caller enumerated
-     * the visible online set on the global region thread; this only renders it, so an empty roster opens the
-     * empty-state title instead of a head grid.
+     * the visible online set on the global region thread; this only renders it. An empty roster opens the same engine
+     * list under its empty-state title — the engine draws just the filler and nav, an empty-state panel rather than a
+     * head grid — so even the empty case is one holder-backed engine window, never a bespoke menu.
      */
     public void open(Player player, PlayerRef viewer, List<Entry> roster) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(roster, "roster");
-        if (roster.isEmpty()) {
-            scheduler.onEntity(viewer, () -> emptyMenu(viewer).open(player));
-            return;
-        }
         snapshot.set(List.copyOf(roster));
         view.open(player, viewer);
-    }
-
-    /** A one-row empty-state menu shown when no visible player is online — just the empty title over a filler. */
-    private SimpleGui emptyMenu(PlayerRef viewer) {
-        SimpleGui gui = Guis.gui()
-                .title(guiText.text(viewer, PresenceMessageKey.LIST_GUI_EMPTY_TITLE))
-                .rows(1)
-                .build();
-        ItemStack filler =
-                ItemBuilder.of(layout.filler()).name(Component.empty()).build();
-        for (int slot = 0; slot < 9; slot++) {
-            gui.set(slot, GuiItem.display(filler));
-        }
-        return gui;
     }
 
     private ItemStack head(PlayerRef viewer, Entry entry) {
