@@ -118,6 +118,58 @@ class ArchitectureTest {
                     + "binding reads are the public surface; the holder, listener, refresh task and renderer stay "
                     + "private to the engine");
 
+    // Every spec-driven menu renders through the engine (Menus / MenuBindings / holder / listener); none of them
+    // touch uxmLib's GUI library directly. The only production classes that legitimately depend on
+    // com.uxplima.uxmlib.gui are five non-menu leaves, and they stay that way:
+    //   - vaults VaultView and itemworld DisposalCommand are real item-STORAGE inventories (uxmLib StorageGui):
+    //     players put and take items, contents persist — these are not menus.
+    //   - the shared AnvilTextBackend and its TextInputInstaller are the anvil TEXT-INPUT seam (uxmLib
+    //     com.uxplima.uxmlib.gui.anvil) — the single runtime-neutral leaf the whole engine reuses for typed input.
+    //   - bootstrap PluginModule is the Guis.install(...) site: the uxmLib GUI runtime must stay installed for the
+    //     storage and anvil leaves above.
+    // Any other production class reaching for com.uxplima.uxmlib.gui would be a spec menu that slipped off the
+    // engine; this fence fails until it is migrated, rather than letting it bypass the engine silently.
+    @ArchTest
+    static final ArchRule onlyStorageAndAnvilLeavesUseUxmlibGui = noClasses()
+            .that()
+            .resideInAPackage("..uxmessentials..")
+            .and(areProductionClasses())
+            .and(areNotAllowedUxmlibGuiLeaves())
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("com.uxplima.uxmlib.gui..")
+            .because("spec-driven menus must render through the engine; only the item-storage inventories "
+                    + "(VaultView, DisposalCommand), the anvil text-input seam (AnvilTextBackend, "
+                    + "TextInputInstaller) and the Guis.install site (PluginModule) may touch uxmLib's GUI library");
+
+    /**
+     * The five non-menu leaves allowed to depend on uxmLib's GUI library, named by fully qualified name so this
+     * predicate itself adds no dependency on them. Two are item-storage inventories ({@code VaultView},
+     * {@code DisposalCommand}, built on uxmLib's {@code StorageGui}), two are the anvil text-input seam
+     * ({@code AnvilTextBackend}, {@code TextInputInstaller}, built on {@code com.uxplima.uxmlib.gui.anvil}), and one
+     * is the {@code Guis.install} site ({@code PluginModule}). Every spec-driven menu renders through the engine
+     * instead, so this allow-list must stay exactly these five.
+     *
+     * <p>A leaf's nested members ({@code VaultView.OpenWindow}, {@code TextInputInstaller.Installed},
+     * {@code PluginModule.ContextLinks}) carry the dependency too — a held {@code StorageGui} or {@code AnvilInput}
+     * surfaces as a nested record's field — so the match is on the top-level enclosing class, not the exact nested
+     * name. That keeps the allow-list to these five top-level leaves while still covering their inner classes.
+     */
+    private static DescribedPredicate<JavaClass> areNotAllowedUxmlibGuiLeaves() {
+        java.util.Set<String> allowed = java.util.Set.of(
+                "com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView",
+                "com.uxplima.uxmessentials.itemworld.adapter.inbound.command.DisposalCommand",
+                "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.AnvilTextBackend",
+                "com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller",
+                "com.uxplima.uxmessentials.bootstrap.di.PluginModule");
+        return DescribedPredicate.describe("are not the allowed uxmLib-GUI leaves", javaClass -> {
+            String fullName = javaClass.getFullName();
+            int nested = fullName.indexOf('$');
+            String topLevel = nested < 0 ? fullName : fullName.substring(0, nested);
+            return !allowed.contains(topLevel);
+        });
+    }
+
     /**
      * The engine's private machinery: everything under {@code render/} plus the runtime internals, but not the
      * two public context types a binding lambda reads. Naming the runtime internals one by one (by their fully
