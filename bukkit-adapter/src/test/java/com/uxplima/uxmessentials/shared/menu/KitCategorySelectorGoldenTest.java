@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.menu;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,8 +24,9 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsHolder;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
+import com.uxplima.uxmessentials.kits.application.DelKit;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
@@ -33,10 +35,11 @@ import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -45,6 +48,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
@@ -83,6 +87,9 @@ class KitCategorySelectorGoldenTest {
     private RecordingRepository kits;
     private KitCategorySelectorView selector;
 
+    @TempDir
+    Path dataFolder;
+
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
@@ -96,8 +103,19 @@ class KitCategorySelectorGoldenTest {
         kits = new RecordingRepository();
         KitEditor editor = new KitEditor(kits, new KitNotifier(new KeyMessages(), new NoSink()));
         KitCategoryRepository categories = new FixedCategories(List.of(PVP, MISC));
+        // The selector reopens the per-kit settings panel after a pick; that panel renders through the engine now, so
+        // it is built over the same engine and its spec registered. The assign assertions then see a menu-backed
+        // window.
         KitSettingsView settingsView = new KitSettingsView(
-                new KeyMessages(), scheduler, GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
+                engine.menus(),
+                guiText,
+                new KeyMessages(),
+                org.mockito.Mockito.mock(TextInput.class),
+                editor,
+                new DelKit(kits, new KitNotifier(new KeyMessages(), new NoSink())),
+                new KitEditorView(new KeyMessages(), editor, scheduler),
+                (p, v) -> {});
+        settingsView.register(engine.bindings(), dataFolder, NOOP);
         selector = new KitCategorySelectorView(guiText, categories, editor, settingsView, engine.menus(), scheduler);
     }
 
@@ -131,7 +149,7 @@ class KitCategorySelectorGoldenTest {
 
         assertThat(kits.lastSaved()).isNotNull();
         assertThat(kits.lastSaved().categoryId()).contains("pvp");
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(KitSettingsHolder.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
@@ -142,7 +160,7 @@ class KitCategorySelectorGoldenTest {
 
         assertThat(kits.lastSaved()).isNotNull();
         assertThat(kits.lastSaved().categoryId()).isEmpty();
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(KitSettingsHolder.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
@@ -152,7 +170,7 @@ class KitCategorySelectorGoldenTest {
         fireClick(BACK_SLOT);
 
         assertThat(kits.lastSaved()).isNull();
-        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(KitSettingsHolder.class);
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     /**
@@ -262,6 +280,20 @@ class KitCategorySelectorGoldenTest {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
     }
+
+    private static final Logger NOOP = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
 
     private static final class KeyMessages implements Messages {
         @Override

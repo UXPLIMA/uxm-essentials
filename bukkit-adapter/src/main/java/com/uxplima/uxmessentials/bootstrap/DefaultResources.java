@@ -112,6 +112,7 @@ final class DefaultResources {
             "modules/menu/specs/home-list.conf",
             "modules/menu/specs/kit-manager.conf",
             "modules/menu/specs/kit-category-settings.conf",
+            "modules/menu/specs/kit-settings.conf",
             "modules/menu/specs/kit-browse.conf",
             "modules/menu/specs/warp-manager.conf",
             "modules/menu/specs/warp-browse.conf",

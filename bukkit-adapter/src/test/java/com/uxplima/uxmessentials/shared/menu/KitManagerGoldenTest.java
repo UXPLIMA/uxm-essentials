@@ -25,9 +25,12 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsHolder;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
+import com.uxplima.uxmessentials.kits.application.DelKit;
+import com.uxplima.uxmessentials.kits.application.KitEditor;
+import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
@@ -35,7 +38,6 @@ import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
@@ -46,6 +48,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHol
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -119,13 +122,15 @@ class KitManagerGoldenTest {
     void leftClickingAKitThroughTheEngineOpensThatKitsSettings() {
         seed("alpha");
         openEngine();
-        // Content slot 0 is the first kit icon, "alpha"; a left click must open that kit's settings editor.
+        // Content slot 0 is the first kit icon, "alpha"; a left click must open that kit's settings editor, now an
+        // engine-backed window whose subject is the clicked kit.
         fireClick(0, ClickType.LEFT);
 
-        if (!(player.getOpenInventory().getTopInventory().getHolder() instanceof KitSettingsHolder holder)) {
+        if (!(player.getOpenInventory().getTopInventory().getHolder() instanceof MenuHolder holder)) {
             throw new AssertionError("left-click did not open a kit-settings window");
         }
-        assertThat(holder.kit().id()).isEqualTo(KitId.of("alpha"));
+        assertThat(holder.specId()).isEqualTo(KitSettingsView.SPEC_ID);
+        assertThat(holder.ctx().subject(KitDefinition.class).id()).isEqualTo(KitId.of("alpha"));
     }
 
     @Test
@@ -176,22 +181,28 @@ class KitManagerGoldenTest {
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
-        KitManagerMenu manager = managerMenu(menus);
+        KitManagerMenu manager = managerMenu(menus, bindings);
         manager.register(bindings, dataFolder, NOOP);
         manager.open(player, viewer);
     }
 
     /** A {@link KitManagerMenu} wired off the same collaborators as the old view, over the engine façade. */
-    private KitManagerMenu managerMenu(Menus menus) {
+    private KitManagerMenu managerMenu(Menus menus, MenuBindings bindings) {
         Messages messages = new KeyMessages();
-        GuiLayout settingsLayout = new GuiLayout(
-                3,
-                Material.GRAY_STAINED_GLASS_PANE,
-                Material.ARROW,
-                26,
-                22,
-                List.of(0, 2, 4, 6, 8, 10, 12, 14, 16, 22, 18, 20, 24));
-        KitSettingsView settingsView = new KitSettingsView(messages, scheduler, settingsLayout);
+        KitNotifier notifier = new KitNotifier(messages, new NoSink());
+        KitEditor kitEditor = new KitEditor(repository, notifier);
+        // The per-kit settings panel renders through the engine now: build it over the same engine and register its
+        // spec, so a manager kit click opens that menu-backed window.
+        KitSettingsView settingsView = new KitSettingsView(
+                menus,
+                guiText,
+                messages,
+                org.mockito.Mockito.mock(TextInput.class),
+                kitEditor,
+                new DelKit(repository, notifier),
+                new KitEditorView(messages, kitEditor, scheduler),
+                (p, v) -> {});
+        settingsView.register(bindings, dataFolder, NOOP);
         // The category manager renders through the engine now; the categories-button test only opens it (an empty
         // grid), so the input seam it would prompt through is a stand-in and the click/back collaborators stay unbound.
         KitCategoryManagerView categoryManager = new KitCategoryManagerView(
@@ -268,6 +279,11 @@ class KitManagerGoldenTest {
         public void delete(KitId id) {
             kits.removeIf(kit -> kit.id().equals(id));
         }
+    }
+
+    private static final class NoSink implements MessageSink {
+        @Override
+        public void deliver(PlayerRef viewer, String renderedText) {}
     }
 
     private static final class StubCategoryRepository implements KitCategoryRepository {

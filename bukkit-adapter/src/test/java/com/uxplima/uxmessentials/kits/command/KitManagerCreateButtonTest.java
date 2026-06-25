@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -28,16 +27,18 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreatePrompt;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
+import com.uxplima.uxmessentials.kits.application.DelKit;
+import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.application.KitNotifier;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
@@ -71,14 +72,6 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * chat here so the typed line round-trips through the shared {@link TextInput} chat backend.
  */
 class KitManagerCreateButtonTest {
-
-    private static final GuiLayout SETTINGS_LAYOUT = new GuiLayout(
-            3,
-            Material.GRAY_STAINED_GLASS_PANE,
-            Material.ARROW,
-            26,
-            22,
-            List.of(0, 2, 4, 6, 8, 10, 12, 14, 16, 22, 18, 20, 24));
 
     @TempDir
     Path dataFolder;
@@ -121,8 +114,6 @@ class KitManagerCreateButtonTest {
                         plugin, plugin.getDataFolder().toPath(), anvil, guiText, scheduler, new SilentLogger())
                 .textInput();
 
-        KitSettingsView settingsView = new KitSettingsView(messages, scheduler, SETTINGS_LAYOUT);
-
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
@@ -131,6 +122,20 @@ class KitManagerCreateButtonTest {
         bindings.action("close", ctx -> ctx.player().closeInventory());
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
+
+        // The per-kit settings panel renders through the engine now: build it over the same engine and register its
+        // spec, so the create flow's open lands on a menu-backed window.
+        KitEditor kitEditor = new KitEditor(repository, notifier);
+        KitSettingsView settingsView = new KitSettingsView(
+                menus,
+                guiText,
+                messages,
+                textInput,
+                kitEditor,
+                new DelKit(repository, notifier),
+                new KitEditorView(messages, kitEditor, scheduler),
+                (p, v) -> {});
+        settingsView.register(bindings, dataFolder, new SilentLogger());
 
         KitCategoryManagerView categoryManager = new KitCategoryManagerView(
                 guiText, messages, new StubCategoryRepository(), textInput, menus, scheduler);
@@ -183,7 +188,7 @@ class KitManagerCreateButtonTest {
                         .getHolder()
                         .getClass()
                         .getSimpleName())
-                .isEqualTo("KitSettingsHolder");
+                .isEqualTo("MenuHolder");
     }
 
     private void fireClick(int slot) {
