@@ -137,7 +137,7 @@ public final class BankActionsView {
                         actionIcon(viewerRef, "members"),
                         event -> scheduler.onEntity(
                                 viewerRef,
-                                () -> navigation.get().bankMembersView().open(player, bank))));
+                                () -> navigation.get().bankMembersMenu().open(player, bank))));
         gui.set(
                 layout.slot("logs"),
                 GuiItem.button(
@@ -157,7 +157,7 @@ public final class BankActionsView {
                 GuiItem.button(
                         backItem,
                         event -> scheduler.onEntity(
-                                viewerRef, () -> navigation.get().bankGuiView().open(player))));
+                                viewerRef, () -> navigation.get().bankListMenu().open(player))));
     }
 
     private record ActionKeys(EconomyMessageKey name, EconomyMessageKey lore, EconomyMessageKey hint) {}
@@ -216,12 +216,12 @@ public final class BankActionsView {
                             AmountParser.parse(input, bank.balance().currency());
                     if (parsed.isErr()) {
                         player.sendMessage(text(viewerRef, EconomyMessageKey.BANK_ACTIONS_INVALID_AMOUNT, Map.of()));
-                        navigation.get().bankGuiView().open(player);
+                        navigation.get().bankListMenu().open(player);
                         return;
                     }
                     applyTransfer(player, viewerRef, bank, parsed.orElseThrow(), deposit);
                 },
-                () -> navigation.get().bankGuiView().open(player));
+                () -> navigation.get().bankListMenu().open(player));
     }
 
     private void applyTransfer(Player player, PlayerRef viewerRef, SharedBank bank, Money money, boolean deposit) {
@@ -237,7 +237,7 @@ public final class BankActionsView {
                     : EconomyMessageKey.BANK_ACTIONS_WITHDRAW_FAILED;
             scheduler.onEntity(viewerRef, () -> {
                 player.sendMessage(text(viewerRef, res.isOk() ? okKey : errKey, Map.of("bank", bank.id())));
-                navigation.get().bankGuiView().open(player);
+                navigation.get().bankListMenu().open(player);
             });
         });
     }

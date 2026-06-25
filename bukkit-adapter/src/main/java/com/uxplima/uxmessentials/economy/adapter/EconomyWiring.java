@@ -11,8 +11,6 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.economy.adapter.inbound.command.EconomyCommands;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsView;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankGuiView;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankMembersView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.ExchangeGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmationView;
@@ -497,55 +495,49 @@ public final class EconomyWiring {
                 new com.uxplima.uxmessentials.economy.application.LoanService(
                         loanRepo, settings.loanPolicy(), kernel.events(), clock, nativeLedger);
 
-        // The three bank menus open each other, so they cannot all be constructed before the navigation router
-        // that links them. A holder supplies the router once it is built; each view holds the supplier as a
-        // final field and dereferences it only on a click, keeping the cross-links constructor-injected and
-        // non-null (no post-construction setters).
+        // The bank menus open each other, so they cannot all be constructed before the navigation router that links
+        // them. A holder supplies the router once it is built; each view holds the supplier as a final field and
+        // dereferences it only on a click, keeping the cross-links constructor-injected and non-null (no
+        // post-construction setters). The bank list and the members list are now engine-rendered menus that register
+        // their spec and bindings here once and open through the Menus façade; the actions hub stays bespoke.
         java.util.concurrent.atomic.AtomicReference<
                         com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation>
                 navigationHolder = new java.util.concurrent.atomic.AtomicReference<>();
         java.util.function.Supplier<com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation> navigation =
                 () -> Objects.requireNonNull(navigationHolder.get(), "bank navigation not yet wired");
 
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout bankListLayout = guiLayouts.load(
-                "economy",
-                "bank-list",
-                com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.paginatedDefault(
-                        org.bukkit.Material.CHEST));
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout bankMembersLayout = guiLayouts.load(
-                "economy",
-                "bank-members",
-                com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.paginatedDefault(
-                        org.bukkit.Material.PLAYER_HEAD));
-
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText bankGuiText =
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView bankCurrencyPicker =
                 new com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView(
                         bankGuiText, kernel.scheduler());
-        BankGuiView bankGuiView = new BankGuiView(
-                bankService,
-                currencies,
-                input,
-                bankCurrencyPicker,
-                kernel.scheduler(),
-                kernel.messages(),
-                navigation,
-                bankListLayout);
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu bankListMenu =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu(
+                        menus,
+                        bankService,
+                        currencies,
+                        input,
+                        bankCurrencyPicker,
+                        kernel.scheduler(),
+                        kernel.messages(),
+                        navigation);
+        bankListMenu.register(menuBindings, dataFolder, kernel.log());
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankMembersMenu bankMembersMenu =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankMembersMenu(
+                        menus,
+                        bankService,
+                        input,
+                        kernel.scheduler(),
+                        kernel.playerLookup(),
+                        kernel.messages(),
+                        navigation);
+        bankMembersMenu.register(menuBindings, dataFolder, kernel.log());
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout bankActionsLayout =
                 guiLayouts.loadFixedMenu("economy", "bank-actions", BankActionsView.defaultLayout());
         BankActionsView bankActionsView = new BankActionsView(
                 bankService, input, kernel.scheduler(), kernel.messages(), historyView, navigation, bankActionsLayout);
-        BankMembersView bankMembersView = new BankMembersView(
-                bankService,
-                input,
-                kernel.scheduler(),
-                kernel.playerLookup(),
-                kernel.messages(),
-                navigation,
-                bankMembersLayout);
         navigationHolder.set(new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation(
-                bankGuiView, bankActionsView, bankMembersView));
+                bankListMenu, bankActionsView, bankMembersMenu));
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout loanLayout =
                 guiLayouts.loadFixedMenu("economy", "loan-dashboard", LoanGuiView.defaultLayout());
         LoanGuiView loanGuiView =
@@ -580,7 +572,7 @@ public final class EconomyWiring {
                 bankService,
                 loanService,
                 backupManager,
-                bankGuiView,
+                bankListMenu,
                 loanGuiView);
     }
 

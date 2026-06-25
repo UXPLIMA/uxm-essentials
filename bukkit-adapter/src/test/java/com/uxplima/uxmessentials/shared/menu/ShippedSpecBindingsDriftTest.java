@@ -88,11 +88,16 @@ class ShippedSpecBindingsDriftTest {
             "homes:action-back",
             "homes:open-slot",
             "moderation:open-detail",
-            "moderation:release");
+            "moderation:release",
+            "economy:open-bank",
+            "economy:create-bank",
+            "economy:remove-member",
+            "economy:add-member",
+            "economy:bank-back");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS =
-            Set.of("perm", "has-prev", "has-next", "homes:home-public", "homes:home-private");
+            Set.of("perm", "has-prev", "has-next", "homes:home-public", "homes:home-private", "economy:can-add-member");
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
@@ -221,7 +226,15 @@ class ShippedSpecBindingsDriftTest {
             "history_from",
             "history_to",
             "history_amount",
-            "history_reason");
+            "history_reason",
+            "bank_name",
+            "bank_id",
+            "bank_balance",
+            "bank_creator",
+            "bank_members",
+            "bank_members_title",
+            "bank_member",
+            "bank_member_role");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
@@ -243,7 +256,9 @@ class ShippedSpecBindingsDriftTest {
             "moderation:history",
             "moderation:jailed",
             "economy:baltop",
-            "economy:transactions");
+            "economy:transactions",
+            "economy:banks",
+            "economy:bank-members");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

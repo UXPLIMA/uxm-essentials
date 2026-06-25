@@ -82,7 +82,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
         Player sender = player(ctx);
         if (sender == null) return 0;
 
-        services.bankGuiView().open(sender);
+        services.bankListMenu().open(sender);
         return Command.SINGLE_SUCCESS;
     }
 
