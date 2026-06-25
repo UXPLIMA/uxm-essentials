@@ -34,13 +34,10 @@ import com.uxplima.uxmessentials.homes.application.HomeCharge;
 import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
-import com.uxplima.uxmessentials.homes.application.InviteToHome;
-import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
-import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
@@ -59,7 +56,6 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -93,6 +89,7 @@ class HomeActionViewTest {
     private static final int DELETE_SLOT = 13;
     private static final int RELOCATE_SLOT = 15;
     private static final int CHANGE_ICON_SLOT = 16;
+    private static final int INVITES_SLOT = 25;
     private static final int BACK_SLOT = 22;
 
     private ServerMock server;
@@ -104,6 +101,7 @@ class HomeActionViewTest {
     private RecordingSink sink;
     private TogglePermissions permissions;
     private final List<Home> openedIconPicker = new ArrayList<>();
+    private final List<Home> openedInvites = new ArrayList<>();
 
     @Nullable private SyncScheduler scheduler; // assigned by viewWith(...) on each build
 
@@ -122,6 +120,7 @@ class HomeActionViewTest {
         sink = new RecordingSink();
         permissions = new TogglePermissions(true);
         openedIconPicker.clear();
+        openedInvites.clear();
         Guis.install(plugin);
     }
 
@@ -265,40 +264,20 @@ class HomeActionViewTest {
         assertThat(flipped.isPublic()).isFalse();
     }
 
-    // --- invited-players menu decision seams ---
+    // --- invited-players menu button ---
 
     @Test
-    void invitesMenuAddInvitesTheResolvedPlayer() {
+    void invitesButtonOpensTheInvitesMenuForThisHome() {
+        // The invited-players list now renders through the engine (covered by HomeInvitesGoldenTest); the action
+        // menu's job is to hand that home to the invites seam, which this asserts.
         Home home = seed(home(0));
-        PlayerMock bob = server.addPlayer("Bob");
-        InvitedPlayersMenu menu = invitesMenu();
+        open(home);
 
-        menu.handleAddInput(player, viewer, home, () -> {}, "Bob");
+        fireClick(INVITES_SLOT);
 
-        assertThat(invites.invites(viewer, HomeSlot.of(0))).contains(bob.getUniqueId());
-    }
-
-    @Test
-    void invitesMenuAddWithUnknownNameInvitesNobody() {
-        Home home = seed(home(0));
-        InvitedPlayersMenu menu = invitesMenu();
-
-        menu.handleAddInput(player, viewer, home, () -> {}, "Nobody");
-
-        assertThat(invites.invites(viewer, HomeSlot.of(0))).isEmpty();
-        assertThat(sink.delivered).contains(HomesMessageKey.HOME_INVITES_UNKNOWN_PLAYER.key());
-    }
-
-    @Test
-    void invitesMenuRevokeRemovesTheInvite() {
-        Home home = seed(home(0));
-        PlayerMock bob = server.addPlayer("Bob");
-        invites.addInvite(viewer, HomeSlot.of(0), bob.getUniqueId());
-        InvitedPlayersMenu menu = invitesMenu();
-
-        menu.revoke(player, viewer, home, bob.getUniqueId(), "Bob", () -> {});
-
-        assertThat(invites.invites(viewer, HomeSlot.of(0))).doesNotContain(bob.getUniqueId());
+        assertThat(openedInvites)
+                .extracting(h -> h.slot().index())
+                .containsExactly(home.slot().index());
     }
 
     // --- confirm-delete decision seam ---
@@ -622,23 +601,6 @@ class HomeActionViewTest {
         return viewWith(false, false, false, false, pos -> false);
     }
 
-    /** Build a standalone invited-players menu over the fakes for the add/revoke decision seams. */
-    private InvitedPlayersMenu invitesMenu() {
-        Messages messages = new KeyMessages();
-        HomeNotifier notifier = new HomeNotifier(messages, sink);
-        Scheduler sync = new SyncScheduler();
-        return new InvitedPlayersMenu(
-                messages,
-                sync,
-                new ListHomeInvites(invites),
-                new InviteToHome(repository, invites, notifier),
-                new UninviteFromHome(invites, notifier),
-                new ServerPlayerLookup(),
-                notifier,
-                textInput(messages, sync),
-                InvitesMenuLayout.codeDefault());
-    }
-
     private TextInput textInput(Messages messages, Scheduler scheduler) {
         return TextInputTestKit.create(
                 plugin, new GuiText(messages), scheduler, java.nio.file.Path.of("nonexistent"), new NoLogger());
@@ -673,16 +635,6 @@ class HomeActionViewTest {
         scheduler = new SyncScheduler();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
         TextInput textInput = textInput(messages, scheduler);
-        InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
-                messages,
-                scheduler,
-                new ListHomeInvites(invites),
-                new InviteToHome(repository, invites, notifier),
-                new UninviteFromHome(invites, notifier),
-                new ServerPlayerLookup(),
-                notifier,
-                textInput,
-                InvitesMenuLayout.codeDefault());
         return new HomeActionView(
                 messages,
                 notifier,
@@ -694,7 +646,7 @@ class HomeActionViewTest {
                 new RenameHome(repository, notifier, events, clock),
                 new SetHomeVisibility(repository, notifier, events, clock),
                 (pickerViewer, pickerHome) -> openedIconPicker.add(pickerHome),
-                invitesMenu,
+                (inviteViewer, inviteHome) -> openedInvites.add(inviteHome),
                 repository,
                 textInput,
                 HomeActionsLayout.codeDefault(),
@@ -788,30 +740,6 @@ class HomeActionViewTest {
         @Override
         public void removeAllForOwner(PlayerRef owner) {
             bySlot.keySet().removeIf(k -> k.startsWith(owner.uuid() + ":"));
-        }
-    }
-
-    /** Resolves players by name/uuid through the live mock server (online and offline-via-played). */
-    private final class ServerPlayerLookup implements PlayerLookup {
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.ofNullable(server.getPlayerExact(name))
-                    .map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
-        }
-
-        @Override
-        public Optional<PlayerRef> findByName(String name) {
-            return findOnlineByName(name);
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.ofNullable(server.getPlayer(uuid)).map(p -> new PlayerRef(p.getUniqueId(), p.getName()));
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return server.getPlayer(uuid) != null;
         }
     }
 

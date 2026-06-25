@@ -27,8 +27,6 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
@@ -37,14 +35,11 @@ import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
-import com.uxplima.uxmessentials.homes.application.InviteToHome;
-import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
-import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
@@ -62,7 +57,6 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -253,16 +247,6 @@ class HomeListViewTest {
                 repository, invites, quota, List.of(), notifier, events, freeCharge(), 1000, clock);
         TextInput textInput = TextInputTestKit.create(
                 plugin, new GuiText(messages), scheduler, java.nio.file.Path.of("nonexistent"), new NoLogger());
-        InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
-                messages,
-                scheduler,
-                new ListHomeInvites(invites),
-                new InviteToHome(repository, invites, notifier),
-                new UninviteFromHome(invites, notifier),
-                new NoPlayerLookup(),
-                notifier,
-                textInput,
-                InvitesMenuLayout.codeDefault());
         HomeActionView actionView = new HomeActionView(
                 messages,
                 notifier,
@@ -274,7 +258,7 @@ class HomeListViewTest {
                 new RenameHome(repository, notifier, events, clock),
                 new SetHomeVisibility(repository, notifier, events, clock),
                 (viewer, home) -> {},
-                invitesMenu,
+                (viewer, home) -> {},
                 repository,
                 textInput,
                 HomeActionsLayout.codeDefault(),
@@ -353,24 +337,6 @@ class HomeListViewTest {
         @Override
         public void removeAllForOwner(PlayerRef owner) {
             bySlot.keySet().removeIf(k -> k.startsWith(owner.uuid() + ":"));
-        }
-    }
-
-    /** A {@link PlayerLookup} that resolves nobody; the list view never opens the invited-players menu. */
-    private static final class NoPlayerLookup implements PlayerLookup {
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.empty();
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return false;
         }
     }
 

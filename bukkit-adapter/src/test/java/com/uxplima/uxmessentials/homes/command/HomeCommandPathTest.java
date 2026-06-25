@@ -27,8 +27,6 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
@@ -38,7 +36,6 @@ import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
-import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
@@ -519,16 +516,6 @@ class HomeCommandPathTest {
         VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier);
         TextInput textInput = TextInputTestKit.create(
                 plugin, new GuiText(messages), scheduler, java.nio.file.Path.of("nonexistent"), new NoLogger());
-        InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
-                messages,
-                scheduler,
-                new ListHomeInvites(invites),
-                inviteToHome,
-                uninviteFromHome,
-                lookup,
-                notifier,
-                textInput,
-                InvitesMenuLayout.codeDefault());
         HomeActionView actionView = new HomeActionView(
                 messages,
                 notifier,
@@ -540,7 +527,7 @@ class HomeCommandPathTest {
                 new RenameHome(repository, notifier, events, clock),
                 new SetHomeVisibility(repository, notifier, events, clock),
                 (viewer, home) -> {},
-                invitesMenu,
+                (viewer, home) -> {},
                 repository,
                 textInput,
                 HomeActionsLayout.codeDefault(),

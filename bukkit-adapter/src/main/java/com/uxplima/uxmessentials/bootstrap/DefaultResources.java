@@ -115,6 +115,7 @@ final class DefaultResources {
             "modules/menu/specs/playerwarp-list.conf",
             "modules/menu/specs/npc-list.conf",
             "modules/menu/specs/home-icon.conf",
+            "modules/menu/specs/home-invites.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

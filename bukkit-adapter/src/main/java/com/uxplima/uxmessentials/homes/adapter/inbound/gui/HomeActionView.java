@@ -86,7 +86,7 @@ public final class HomeActionView {
     private final RenameHome renameHome;
     private final SetHomeVisibility setHomeVisibility;
     private final BiConsumer<PlayerRef, Home> openIconPicker;
-    private final InvitedPlayersMenu invitesMenu;
+    private final BiConsumer<PlayerRef, Home> openInvitesMenu;
     private final HomeRepository repository;
     private final TextInput textInput;
     private final HomeActionsLayout layout;
@@ -109,7 +109,7 @@ public final class HomeActionView {
             RenameHome renameHome,
             SetHomeVisibility setHomeVisibility,
             BiConsumer<PlayerRef, Home> openIconPicker,
-            InvitedPlayersMenu invitesMenu,
+            BiConsumer<PlayerRef, Home> openInvitesMenu,
             HomeRepository repository,
             TextInput textInput,
             HomeActionsLayout layout,
@@ -130,7 +130,7 @@ public final class HomeActionView {
         this.renameHome = Objects.requireNonNull(renameHome, "renameHome");
         this.setHomeVisibility = Objects.requireNonNull(setHomeVisibility, "setHomeVisibility");
         this.openIconPicker = Objects.requireNonNull(openIconPicker, "openIconPicker");
-        this.invitesMenu = Objects.requireNonNull(invitesMenu, "invitesMenu");
+        this.openInvitesMenu = Objects.requireNonNull(openInvitesMenu, "openInvitesMenu");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.layout = Objects.requireNonNull(layout, "layout");
@@ -182,9 +182,7 @@ public final class HomeActionView {
         gui.set(
                 layout.visibilitySlot(),
                 GuiItem.button(visibilityIcon(viewer, home), e -> toggleVisibility(player, viewer, home, reopenList)));
-        gui.set(
-                layout.invitesSlot(),
-                GuiItem.button(invitesIcon(viewer), e -> openInvites(player, viewer, home, reopenList)));
+        gui.set(layout.invitesSlot(), GuiItem.button(invitesIcon(viewer), e -> openInvitesMenu.accept(viewer, home)));
         gui.set(layout.backSlot(), GuiItem.button(backIcon(viewer), e -> reopenList.run()));
     }
 
@@ -320,10 +318,6 @@ public final class HomeActionView {
             Home updated = repository.findSlot(home.owner(), home.slot()).orElse(home);
             scheduler.onEntity(viewer, () -> open(player, viewer, updated, reopenList));
         });
-    }
-
-    private void openInvites(Player player, PlayerRef viewer, Home home, Runnable reopenList) {
-        invitesMenu.open(player, viewer, home, () -> open(player, viewer, home, reopenList));
     }
 
     private void rename(Player player, PlayerRef viewer, Home home, Runnable reopenList) {

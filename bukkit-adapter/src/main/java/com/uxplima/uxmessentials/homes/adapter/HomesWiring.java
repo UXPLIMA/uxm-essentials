@@ -17,12 +17,11 @@ import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommands;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeInvitesMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenus;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.IconSelectorLayout;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitedPlayersMenu;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.InvitesMenuLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.listener.HomesJoinListener;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.adapter.outbound.TeleportHomeAdapter;
@@ -221,28 +220,28 @@ public final class HomesWiring {
         boolean confirmRelocate = ctx.config().getBoolean("confirm-relocate", false);
         boolean confirmUnsafeTeleport = ctx.config().getBoolean("confirm-unsafe-teleport", true);
 
-        // The icon picker re-opens whichever action menu the home was reached through; during the migration that
-        // is still the bespoke HomeActionView, so HomeMenus is given a reopener that points at it (resolved through
-        // a holder because the two reference each other), and the action view's change-icon button opens the engine
-        // picker through HomeMenus.
+        // The icon picker and the invited-players list both re-open whichever action menu the home was reached
+        // through; during the migration that is still the bespoke HomeActionView, so both engine menus are given a
+        // reopener that points at it (resolved through a holder because they reference each other), and the action
+        // view's change-icon / invites buttons open those engine menus through the seams below.
         HomeActionView[] actionHolder = new HomeActionView[1];
-        HomeMenus homeMenus = new HomeMenus(
+        HomeMenus.ActionMenuOpener reopenAction =
+                (player, viewer, home) -> actionHolder[0].open(player, viewer, home, () -> {});
+        HomeMenus homeMenus =
+                new HomeMenus(menus, kernel.scheduler(), setHomeIcon, iconLayout(guiLayouts), reopenAction);
+        homeMenus.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        HomeInvitesMenu invitesMenu = new HomeInvitesMenu(
                 menus,
                 kernel.scheduler(),
-                setHomeIcon,
-                iconLayout(guiLayouts),
-                (player, viewer, home) -> actionHolder[0].open(player, viewer, home, () -> {}));
-        homeMenus.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
-        InvitedPlayersMenu invitesMenu = new InvitedPlayersMenu(
                 kernel.messages(),
-                kernel.scheduler(),
                 listHomeInvites,
                 inviteToHome,
                 uninviteFromHome,
                 kernel.playerLookup(),
                 notifier,
                 textInput,
-                invitesLayout(guiLayouts));
+                reopenAction);
+        invitesMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         HomeActionView actionView = new HomeActionView(
                 kernel.messages(),
                 notifier,
@@ -254,7 +253,7 @@ public final class HomesWiring {
                 renameHome,
                 setHomeVisibility,
                 homeMenus::openIcons,
-                invitesMenu,
+                invitesMenu::open,
                 repository,
                 textInput,
                 actionsLayout(guiLayouts),
@@ -302,10 +301,6 @@ public final class HomesWiring {
 
     private static IconSelectorLayout iconLayout(GuiLayouts guiLayouts) {
         return guiLayouts.loadIconSelector("homes", "icon-selector", IconSelectorLayout.codeDefault());
-    }
-
-    private static InvitesMenuLayout invitesLayout(GuiLayouts guiLayouts) {
-        return guiLayouts.loadInvitesMenu("homes", "invites-menu", InvitesMenuLayout.codeDefault());
     }
 
     private static int defaultLimit(ModuleContext ctx) {

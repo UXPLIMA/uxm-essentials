@@ -71,7 +71,10 @@ class ShippedSpecBindingsDriftTest {
             "npc:create",
             "homes:set-icon",
             "homes:reset-icon",
-            "homes:icon-back");
+            "homes:icon-back",
+            "homes:uninvite",
+            "homes:invite-add",
+            "homes:invites-back");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm");
@@ -157,7 +160,9 @@ class ShippedSpecBindingsDriftTest {
             "npc_x",
             "npc_y",
             "npc_z",
-            "home_icon_name");
+            "home_icon_name",
+            "invited_player",
+            "invited_player_lore");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
@@ -171,7 +176,8 @@ class ShippedSpecBindingsDriftTest {
             "holograms:list",
             "playerwarps:list",
             "npc:list",
-            "homes:icon-palette");
+            "homes:icon-palette",
+            "homes:invited-players");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {
