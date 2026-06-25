@@ -198,7 +198,7 @@ public final class PluginModule {
         MenuListener menuListener = new MenuListener(
                 menuRenderer, menuBindings.actions(), menuBindings.conditions(), kernel.scheduler(), plugin);
         menuListener.install();
-        Menus menus = new Menus(menuRenderer, guiText, kernel.scheduler(), menuBindings.lists());
+        Menus menus = new Menus(menuRenderer, kernel.scheduler(), menuBindings.lists());
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
         // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted —
         // this flag only governs the generic console action a disk-loaded menu can reference.

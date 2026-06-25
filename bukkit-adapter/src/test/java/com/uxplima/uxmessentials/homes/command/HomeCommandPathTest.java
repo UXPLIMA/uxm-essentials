@@ -23,13 +23,10 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommand;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
-import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.HomeCharge;
 import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
@@ -37,10 +34,6 @@ import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
-import com.uxplima.uxmessentials.homes.application.RelocateHome;
-import com.uxplima.uxmessentials.homes.application.RenameHome;
-import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
-import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.application.VisitHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
@@ -49,13 +42,9 @@ import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -462,20 +451,6 @@ class HomeCommandPathTest {
         public void publish(DomainEvent event) {}
     }
 
-    private static final class NoLogger implements Logger {
-        @Override
-        public void info(String message, Object... args) {}
-
-        @Override
-        public void warn(String message, Object... args) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-
-        @Override
-        public void debug(String message, Object... args) {}
-    }
-
     private static final class SyncScheduler implements Scheduler {
         @Override
         public void onGlobal(Runnable task) {
@@ -514,30 +489,6 @@ class HomeCommandPathTest {
         InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);
         UninviteFromHome uninviteFromHome = new UninviteFromHome(invites, notifier);
         VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier);
-        TextInput textInput = TextInputTestKit.create(
-                plugin, new GuiText(messages), scheduler, java.nio.file.Path.of("nonexistent"), new NoLogger());
-        HomeActionView actionView = new HomeActionView(
-                messages,
-                notifier,
-                new AllowAllPermissions(),
-                scheduler,
-                new TeleportHome(repository, teleporter, notifier, freeCharge()),
-                new DeleteHome(repository, invites, notifier, events),
-                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
-                new RenameHome(repository, notifier, events, clock),
-                new SetHomeVisibility(repository, notifier, events, clock),
-                (viewer, home) -> {},
-                (viewer, home) -> {},
-                repository,
-                textInput,
-                HomeActionsLayout.codeDefault(),
-                fmt,
-                false,
-                false,
-                false,
-                false,
-                pos -> false,
-                new AlwaysAllowClaimService());
         HomeListView listView = new HomeListView(
                 messages,
                 notifier,
@@ -549,13 +500,12 @@ class HomeCommandPathTest {
                         repository, invites, quota, List.of(), notifier, events, freeCharge(), 1000, clock),
                 new SafeLocationGuard(server, false, false, 5),
                 new AlwaysAllowClaimService(),
-                actionView,
+                (viewer, home) -> {},
                 HomeListLayout.codeDefault(),
                 1000,
                 fmt);
         HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, events, clock);
-        return new HomeServices(
-                listView, actionView, homeAdmin, visitHome, inviteToHome, uninviteFromHome, lookup, repository);
+        return new HomeServices(listView, homeAdmin, visitHome, inviteToHome, uninviteFromHome, lookup, repository);
     }
 
     /**

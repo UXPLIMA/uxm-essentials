@@ -11,9 +11,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
-import net.kyori.adventure.text.Component;
-
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
@@ -21,7 +18,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHol
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuItemSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.Nullable;
@@ -39,15 +35,13 @@ import org.jspecify.annotations.Nullable;
 public final class Menus {
 
     private final MenuRenderer renderer;
-    private final GuiText guiText;
     private final Scheduler scheduler;
     private final ListSourceRegistry lists;
 
     private final Map<String, MenuSpec> specs = new ConcurrentHashMap<>();
 
-    public Menus(MenuRenderer renderer, GuiText guiText, Scheduler scheduler, ListSourceRegistry lists) {
+    public Menus(MenuRenderer renderer, Scheduler scheduler, ListSourceRegistry lists) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
-        this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.lists = Objects.requireNonNull(lists, "lists");
     }
@@ -105,7 +99,7 @@ public final class Menus {
         MenuContext ctx = MenuContext.of(viewer, subject, 0);
         MenuHolder holder = new MenuHolder(specId, spec, ctx);
         holder.setResolvedLists(resolved);
-        Inventory inv = Bukkit.createInventory(holder, spec.rows() * 9, title(viewer, spec));
+        Inventory inv = Bukkit.createInventory(holder, spec.rows() * 9, renderer.title(spec, ctx));
         holder.attach(inv);
         renderer.populate(inv, spec, ctx, holder::recordSlot, holder.resolvedLists());
         live.openInventory(inv);
@@ -126,20 +120,6 @@ public final class Menus {
             renderer.populate(
                     holder.getInventory(), holder.spec(), holder.ctx(), holder::recordSlot, holder.resolvedLists());
         });
-    }
-
-    /**
-     * The window title for {@code spec}. An empty title is left empty; a {@code @key} title resolves through the
-     * locale catalog in the viewer's language; any other title is an inline MiniMessage literal.
-     */
-    private Component title(PlayerRef viewer, MenuSpec spec) {
-        if (spec.title().isEmpty()) {
-            return Component.empty();
-        }
-        if (spec.title().startsWith("@")) {
-            return guiText.text(viewer, () -> spec.title().substring(1), Map.of());
-        }
-        return StyledText.render(spec.title());
     }
 
     /**

@@ -194,7 +194,7 @@ class PlayerWarpOffThreadReadTest {
         MenuBindings bindings = new MenuBindings();
         MenuRenderer renderer =
                 new MenuRenderer(new ItemRenderer(guiText, bindings.placeholders()), bindings.conditions());
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
         return new PlayerWarpListMenu(
                 menus, scheduler, permissions, messages, repository, setPlayerWarp, textInput, editor);
     }

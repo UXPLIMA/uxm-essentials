@@ -40,7 +40,7 @@ public final class TestMenuEngine {
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
         return new TestMenuEngine(bindings, renderer, menus, scheduler);
     }
 

@@ -182,7 +182,7 @@ class RecipeCommandTest {
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        return new Menus(renderer, guiText, new SyncScheduler(), bindings.lists());
+        return new Menus(renderer, new SyncScheduler(), bindings.lists());
     }
 
     private KernelPorts kernel() {

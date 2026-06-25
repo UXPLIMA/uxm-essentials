@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -40,7 +41,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The {@code /home} slot grid: one cell per addressable slot, drawn into the configured {@code home-slots}
  * cells and paged when the player owns more slots than fit. A filled slot shows the home's icon (its custom
- * {@link com.uxplima.uxmessentials.homes.domain.HomeIcon} or the fallback bed) and opens the {@link HomeActionView};
+ * {@link com.uxplima.uxmessentials.homes.domain.HomeIcon} or the fallback bed) and opens the {@link HomeActionMenu};
  * an empty slot shows the empty-bed icon and creates a home there at the player's current position on click. The
  * addressable-slot ceiling is the owner's resolved {@link HomeQuota} folded to a maximum-slot count (capped by the
  * configured unlimited ceiling). Every visible string resolves from a {@link MessageKey} in the viewer's locale,
@@ -61,7 +62,7 @@ public final class HomeListView {
     private final CreateHomeAtSlot createHome;
     private final SafeLocationGuard safeGuard;
     private final ClaimService claimService;
-    private final HomeActionView actionView;
+    private final BiConsumer<PlayerRef, Home> openAction;
     private final HomeListLayout layout;
     private final int unlimitedMax;
     private final DateTimeFormatter dateFormat;
@@ -76,7 +77,7 @@ public final class HomeListView {
             CreateHomeAtSlot createHome,
             SafeLocationGuard safeGuard,
             ClaimService claimService,
-            HomeActionView actionView,
+            BiConsumer<PlayerRef, Home> openAction,
             HomeListLayout layout,
             int unlimitedMax,
             DateTimeFormatter dateFormat) {
@@ -89,7 +90,7 @@ public final class HomeListView {
         this.createHome = Objects.requireNonNull(createHome, "createHome");
         this.safeGuard = Objects.requireNonNull(safeGuard, "safeGuard");
         this.claimService = Objects.requireNonNull(claimService, "claimService");
-        this.actionView = Objects.requireNonNull(actionView, "actionView");
+        this.openAction = Objects.requireNonNull(openAction, "openAction");
         this.layout = Objects.requireNonNull(layout, "layout");
         if (unlimitedMax < 1) {
             throw new IllegalArgumentException("unlimitedMax must be >= 1, was " + unlimitedMax);
@@ -138,7 +139,7 @@ public final class HomeListView {
             }
             Home home = bySlot.get(slotIndex);
             if (home != null) {
-                gui.set(cell, GuiItem.button(filledIcon(viewer, home), e -> openAction(player, viewer, home)));
+                gui.set(cell, GuiItem.button(filledIcon(viewer, home), e -> openAction(viewer, home)));
             } else {
                 int target = slotIndex;
                 gui.set(
@@ -165,8 +166,8 @@ public final class HomeListView {
         }
     }
 
-    private void openAction(Player player, PlayerRef viewer, Home home) {
-        actionView.open(player, viewer, home, () -> open(player, viewer));
+    private void openAction(PlayerRef viewer, Home home) {
+        openAction.accept(viewer, home);
     }
 
     private void create(Player player, PlayerRef viewer, int slotIndex) {

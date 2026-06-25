@@ -8,6 +8,8 @@ import java.util.function.BiConsumer;
 
 import org.bukkit.inventory.Inventory;
 
+import net.kyori.adventure.text.Component;
+
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.Pagination;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.eval.PriorityLayering;
@@ -39,6 +41,17 @@ public final class MenuRenderer {
     public MenuRenderer(ItemRenderer itemRenderer, ConditionRegistry conditions) {
         this.itemRenderer = Objects.requireNonNull(itemRenderer, "itemRenderer");
         this.conditions = Objects.requireNonNull(conditions, "conditions");
+    }
+
+    /**
+     * Resolve {@code spec}'s title for {@code ctx} through the same placeholder/catalog path an item name takes, so a
+     * subject-driven title fills its {@code {token}} arguments from the open context. Delegates to the item renderer,
+     * which already owns the placeholder registry and the catalog lookup, so no extra collaborator is threaded here.
+     */
+    public Component title(MenuSpec spec, MenuContext ctx) {
+        Objects.requireNonNull(spec, "spec");
+        Objects.requireNonNull(ctx, "ctx");
+        return itemRenderer.title(spec.title(), ctx);
     }
 
     /**

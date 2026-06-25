@@ -141,7 +141,7 @@ class RecipeGridGoldenTest {
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
         RecipeGridMenu menu = new RecipeGridMenu(menus, messages, Material.BLACK_STAINED_GLASS_PANE);
         menu.register(bindings, specDir(), new NoopLogger());
         return menu;

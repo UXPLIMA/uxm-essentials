@@ -3,15 +3,17 @@ package com.uxplima.uxmessentials.shared.menu;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,15 +30,18 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeInvitesMenu;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionMenu;
+import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
-import com.uxplima.uxmessentials.homes.application.InviteToHome;
-import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
-import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
-import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
+import com.uxplima.uxmessentials.homes.application.RelocateHome;
+import com.uxplima.uxmessentials.homes.application.RenameHome;
+import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
+import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
+import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
@@ -47,11 +52,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBin
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
+import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -63,16 +70,17 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * The invited-players list golden test: the engine-rendered list must draw the exact menu the original {@code
- * InvitedPlayersMenu} drew. The home has two invited players ("alpha", "beta"), so the list draws two PLAYER_HEAD
- * heads in the first two inner cells (slots 10 and 11, sorted by name), the LIME_DYE add button (slot 49), the
- * BARRIER back button (slot 45), and the two ARROW nav buttons (slots 48 and 50). The window is snapshotted as
- * {@code (slot -> material, plain name)} and asserted equal, slot for slot, to the baseline the old view produced —
- * captured while both rendered the same fixture, then frozen here so the old class could be deleted. Then a head
- * click, an add submission, and the back button through the engine's own {@link MenuListener} prove the migrated path
- * revokes an invite, invites a resolved player, and returns to the action menu — faithful in look and behaviour.
+ * The per-home action menu golden test: the engine-rendered panel must draw the exact buttons the original {@code
+ * HomeActionView} drew for one home. The fixture is a private home labelled "Base", so the panel shows the PAPER info
+ * display (slot 4), the NAME_TAG rename (10), ENDER_PEARL teleport (11), BARRIER delete (13), COMPASS relocate (15),
+ * ITEM_FRAME change-icon (16, the icon permission granted), GRAY_DYE private-visibility cell (19), PLAYER_HEAD invites
+ * (25), and the ARROW back button (22). The window is snapshotted as {@code (slot -> material, plain name)} and
+ * asserted equal, slot for slot, to the baseline the old view produced — including the subject-driven title and info
+ * label filled from the home through the home_* placeholders. Then clicks through the engine's own {@link
+ * MenuListener} prove teleport, delete, visibility-toggle, and the icon/invites/back buttons drive the same effects
+ * the old view did, and the rename seam renames — faithful in look and behaviour.
  */
-class HomeInvitesGoldenTest {
+class HomeActionGoldenTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
     private static final HomeSlot SLOT = HomeSlot.of(0);
@@ -82,13 +90,15 @@ class HomeInvitesGoldenTest {
     private PlayerMock player;
     private PlayerRef viewer;
     private GuiText guiText;
-    private Scheduler scheduler;
+    private SyncScheduler scheduler;
     private FakeHomeRepository repository;
-    private FakeInviteRepository invites;
-    private FakeLookup lookup;
+    private RecordingTeleporter teleporter;
     private TextInput textInput;
     private Home home;
-    private final List<Home> reopenedAction = new ArrayList<>();
+    private HomeActionMenu actionMenu;
+    private final List<Home> openedIcon = new ArrayList<>();
+    private final List<Home> openedInvites = new ArrayList<>();
+    private final List<UUID> openedList = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -100,12 +110,14 @@ class HomeInvitesGoldenTest {
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
         repository = new FakeHomeRepository();
-        invites = new FakeInviteRepository();
-        lookup = new FakeLookup();
+        teleporter = new RecordingTeleporter();
         textInput = TextInputTestKit.create(plugin, guiText, scheduler, Path.of("nonexistent"), NOOP);
-        home = Home.create(viewer, SLOT, Position.of(WORLD, 0, 64, 0), Instant.EPOCH);
+        home = Home.create(viewer, SLOT, Position.of(WORLD, 1, 64, 2), Instant.EPOCH)
+                .withLabel(Optional.of(HomeLabel.of("Base")), Instant.EPOCH);
         repository.save(home);
-        reopenedAction.clear();
+        openedIcon.clear();
+        openedInvites.clear();
+        openedList.clear();
     }
 
     @AfterEach
@@ -114,9 +126,7 @@ class HomeInvitesGoldenTest {
     }
 
     @Test
-    void engineRendersTheSameHeadsAddBackAndNavAsTheOldView() {
-        invitePlayer("alpha");
-        invitePlayer("beta");
+    void engineRendersTheSameButtonPanelAsTheOldView() {
         Map<Integer, Snapshot> baseline = oldViewBaseline();
 
         Map<Integer, Snapshot> engine = snapshotEngine();
@@ -126,49 +136,67 @@ class HomeInvitesGoldenTest {
     }
 
     @Test
-    void clickingAHeadThroughTheEngineRevokesThatInvite() {
-        UUID alpha = invitePlayer("alpha");
+    void teleportButtonTeleportsAndClosesTheMenu() {
         openEngine();
-        // Content slot 10 is the first inner cell, "alpha"; clicking it revokes that invite.
-        fireClick(10);
+        fireClick(11);
 
-        assertThat(invites.invites(viewer, SLOT)).doesNotContain(alpha);
+        assertThat(teleporter.hops).isEqualTo(1);
     }
 
     @Test
-    void addingAResolvedNameThroughTheEngineInvitesThatPlayer() {
+    void deleteButtonRemovesTheSlotAndReopensTheGrid() {
         openEngine();
-        UUID carol = lookup.register("carol");
+        fireClick(13);
 
-        HomeInvitesMenu menu = menu(menusFor());
-        menu.addByName(viewer, home, "carol");
-
-        assertThat(invites.invites(viewer, SLOT)).contains(carol);
+        assertThat(repository.findSlot(viewer, SLOT)).isEmpty();
+        assertThat(openedList).containsExactly(viewer.uuid());
     }
 
     @Test
-    void clickingBackThroughTheEngineReopensTheActionMenu() {
-        invitePlayer("alpha");
+    void visibilityButtonFlipsTheHomePublic() {
         openEngine();
-        fireClick(45); // the back button
+        fireClick(19); // the private cell turns it public
 
-        assertThat(reopenedAction).extracting(h -> h.slot().index()).containsExactly(SLOT.index());
+        assertThat(repository.findSlot(viewer, SLOT).orElseThrow().isPublic()).isTrue();
+    }
+
+    @Test
+    void iconAndInvitesButtonsDelegateToTheirMenus() {
+        openEngine();
+        fireClick(16);
+        fireClick(25);
+
+        assertThat(openedIcon).extracting(h -> h.slot().index()).containsExactly(SLOT.index());
+        assertThat(openedInvites).extracting(h -> h.slot().index()).containsExactly(SLOT.index());
+    }
+
+    @Test
+    void renameSeamRenamesTheHome() {
+        openEngine();
+        actionMenu.handleRenameInput(viewer, home, "Castle");
+
+        assertThat(repository.findSlot(viewer, SLOT).orElseThrow().label())
+                .map(HomeLabel::value)
+                .contains("Castle");
     }
 
     /**
-     * The slot -> (material, plain name) map the deleted {@code InvitedPlayersMenu} produced for this fixture (two
-     * invited players "alpha" and "beta"), captured while both paths rendered it identically and frozen here as the
-     * contract: two PLAYER_HEAD heads in the first inner cells (slots 10 and 11, names through {@code invited_player}),
-     * the LIME_DYE add button (slot 49), the BARRIER back button (slot 45), and the two nav ARROWs (slots 48 and 50).
+     * The slot -> (material, plain name) map the deleted {@code HomeActionView} produced for this fixture (a private
+     * home labelled "Base", icon permission granted), captured while both paths rendered it identically and frozen
+     * here: the info display, the eight buttons, and the back arrow, with the info label surfacing the home name
+     * through the {@code home_name} token.
      */
     private static Map<Integer, Snapshot> oldViewBaseline() {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
-        baseline.put(10, new Snapshot(Material.PLAYER_HEAD, "alpha"));
-        baseline.put(11, new Snapshot(Material.PLAYER_HEAD, "beta"));
-        baseline.put(45, new Snapshot(Material.BARRIER, "home.invites.back"));
-        baseline.put(48, new Snapshot(Material.ARROW, "home.invites.prev"));
-        baseline.put(49, new Snapshot(Material.LIME_DYE, "home.invites.add.name"));
-        baseline.put(50, new Snapshot(Material.ARROW, "home.invites.next"));
+        baseline.put(4, new Snapshot(Material.PAPER, "Base"));
+        baseline.put(10, new Snapshot(Material.NAME_TAG, "home.action.rename.name"));
+        baseline.put(11, new Snapshot(Material.ENDER_PEARL, "home.action.teleport.name"));
+        baseline.put(13, new Snapshot(Material.BARRIER, "home.action.delete.name"));
+        baseline.put(15, new Snapshot(Material.COMPASS, "home.action.relocate.name"));
+        baseline.put(16, new Snapshot(Material.ITEM_FRAME, "home.action.icon.name"));
+        baseline.put(19, new Snapshot(Material.GRAY_DYE, "home.action.visibility.private.name"));
+        baseline.put(22, new Snapshot(Material.ARROW, "home.action.back.name"));
+        baseline.put(25, new Snapshot(Material.PLAYER_HEAD, "home.action.invites.name"));
         return baseline;
     }
 
@@ -178,35 +206,56 @@ class HomeInvitesGoldenTest {
     }
 
     private void openEngine() {
-        Menus menus = menusFor();
-        menu(menus).open(viewer, home);
-    }
-
-    private Menus menusFor() {
         MenuBindings bindings = new MenuBindings();
+        // The change-icon button is gated by the perm condition; grant it so the cell renders.
+        bindings.condition("perm", (ctx, args) -> true);
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
-        menu(menus).register(bindings, Path.of("nonexistent"), NOOP);
-        return menus;
+        actionMenu = menu(menus);
+        actionMenu.register(bindings, Path.of("nonexistent"), NOOP);
+        actionMenu.open(viewer, home);
     }
 
-    private HomeInvitesMenu menu(Menus menus) {
+    private HomeActionMenu menu(Menus menus) {
         HomeNotifier notifier = new HomeNotifier(new KeyMessages(), (v, t) -> {});
-        return new HomeInvitesMenu(
+        DomainEventPublisher events = new SilentEvents();
+        Clock clock = Clock.systemUTC();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        HomeActionMenu.Collaborators collaborators = new HomeActionMenu.Collaborators(
                 menus,
-                scheduler,
                 new KeyMessages(),
-                new ListHomeInvites(invites),
-                new InviteToHome(repository, invites, notifier),
-                new UninviteFromHome(invites, notifier),
-                lookup,
                 notifier,
+                new AllowAllPermissions(),
+                scheduler,
+                new TeleportHome(repository, teleporter, notifier, freeCharge()),
+                new DeleteHome(repository, new NoInvites(), notifier, events),
+                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
+                new RenameHome(repository, notifier, events, clock),
+                new SetHomeVisibility(repository, notifier, events, clock),
+                repository,
                 textInput,
-                (p, v, h) -> reopenedAction.add(h));
+                fmt,
+                false,
+                false,
+                false,
+                false,
+                pos -> false,
+                new AlwaysAllowClaimService(),
+                (v, h) -> openedIcon.add(h),
+                (v, h) -> openedInvites.add(h),
+                p -> openedList.add(p.getUniqueId()));
+        return new HomeActionMenu(collaborators);
+    }
+
+    private static com.uxplima.uxmessentials.homes.application.HomeCharge freeCharge() {
+        return new com.uxplima.uxmessentials.homes.application.HomeCharge(
+                new AllowAllPermissions(),
+                Optional.empty(),
+                com.uxplima.uxmessentials.homes.application.HomeChargeSettings.allFree());
     }
 
     private void fireClick(int slot) {
@@ -214,12 +263,6 @@ class HomeInvitesGoldenTest {
         InventoryClickEvent event = new InventoryClickEvent(
                 view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
-    }
-
-    private UUID invitePlayer(String name) {
-        UUID id = lookup.register(name);
-        invites.addInvite(viewer, SLOT, id);
-        return id;
     }
 
     private static Map<Integer, Snapshot> snapshot(Inventory inv) {
@@ -281,76 +324,64 @@ class HomeInvitesGoldenTest {
         }
     }
 
-    /** A map-backed invite store keyed by (owner, slot). */
-    private static final class FakeInviteRepository implements HomeInviteRepository {
-        private final Map<String, Set<UUID>> bySlot = new ConcurrentHashMap<>();
-
-        private static String key(PlayerRef owner, HomeSlot slot) {
-            return owner.uuid() + ":" + slot.index();
-        }
+    private static final class RecordingTeleporter implements HomeTeleporter {
+        int hops;
 
         @Override
-        public Set<UUID> invites(PlayerRef owner, HomeSlot slot) {
-            return Set.copyOf(bySlot.getOrDefault(key(owner, slot), Set.of()));
-        }
-
-        @Override
-        public void addInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
-            bySlot.computeIfAbsent(key(owner, slot), k -> ConcurrentHashMap.newKeySet())
-                    .add(invited);
-        }
-
-        @Override
-        public void removeInvite(PlayerRef owner, HomeSlot slot, UUID invited) {
-            bySlot.computeIfAbsent(key(owner, slot), k -> ConcurrentHashMap.newKeySet())
-                    .remove(invited);
-        }
-
-        @Override
-        public void removeAll(PlayerRef owner, HomeSlot slot) {
-            bySlot.remove(key(owner, slot));
-        }
-
-        @Override
-        public void removeAllForOwner(PlayerRef owner) {
-            bySlot.keySet().removeIf(k -> k.startsWith(owner.uuid() + ":"));
+        public void teleportTo(PlayerRef who, Home home) {
+            hops++;
         }
     }
 
-    /** Resolves names to stable uuids registered up front, so a head's label and an add submission both resolve. */
-    private static final class FakeLookup implements PlayerLookup {
-        private final Map<String, UUID> byName = new ConcurrentHashMap<>();
-        private final Map<UUID, String> byId = new ConcurrentHashMap<>();
-
-        UUID register(String name) {
-            UUID id = UUID.randomUUID();
-            byName.put(name, id);
-            byId.put(id, name);
-            return id;
+    /** A no-op invite repository; the action menu's delete path clears invites through it. */
+    private static final class NoInvites
+            implements com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository {
+        @Override
+        public java.util.Set<UUID> invites(PlayerRef owner, HomeSlot slot) {
+            return java.util.Set.of();
         }
 
         @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.ofNullable(byName.get(name)).map(id -> new PlayerRef(id, name));
+        public void addInvite(PlayerRef owner, HomeSlot slot, UUID invited) {}
+
+        @Override
+        public void removeInvite(PlayerRef owner, HomeSlot slot, UUID invited) {}
+
+        @Override
+        public void removeAll(PlayerRef owner, HomeSlot slot) {}
+
+        @Override
+        public void removeAllForOwner(PlayerRef owner) {}
+    }
+
+    private static final class SilentEvents implements DomainEventPublisher {
+        @Override
+        public void publish(DomainEvent event) {}
+    }
+
+    private static final class AllowAllPermissions implements Permissions {
+        @Override
+        public boolean has(PlayerRef who, String node) {
+            return true;
         }
 
         @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.ofNullable(byId.get(uuid)).map(name -> new PlayerRef(uuid, name));
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return byId.containsKey(uuid);
+        public Permissions.QuotaResult resolveQuota(
+                PlayerRef who,
+                Permissions.QuotaFamily family,
+                @org.jspecify.annotations.Nullable WorldRef world,
+                long configDefault) {
+            return Permissions.QuotaResult.unlimited();
         }
     }
 
-    /** Surfaces the entry name's {@code invited_player} token; else the bare key, so a wrong key still shows. */
+    /** Surfaces the home_name token on the title and info name; else the bare key, so a wrong key still shows. */
     private static final class KeyMessages implements Messages {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            if (key.key().equals(HomesMessageKey.HOME_INVITES_ENTRY_NAME.key())) {
-                return placeholders.getOrDefault("invited_player", "");
+            if (key.key().equals(HomesMessageKey.HOME_ACTION_INFO_NAME.key())
+                    || key.key().equals(HomesMessageKey.HOME_ACTION_TITLE.key())) {
+                return placeholders.getOrDefault("home_name", "");
             }
             return key.key();
         }
@@ -370,7 +401,7 @@ class HomeInvitesGoldenTest {
         public void debug(String m, Object... a) {}
     };
 
-    private static final class SyncScheduler implements Scheduler {
+    private static final class SyncScheduler implements com.uxplima.uxmessentials.shared.application.port.Scheduler {
         @Override
         public void onGlobal(Runnable task) {
             task.run();

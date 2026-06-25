@@ -188,7 +188,7 @@ class VaultSelectorGoldenTest {
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
         vaultMenu(menus, scheduler).register(bindings, dataFolder, new NoopLogger());
         menus.open(viewer, VaultSelectorMenu.SPEC_ID, null);

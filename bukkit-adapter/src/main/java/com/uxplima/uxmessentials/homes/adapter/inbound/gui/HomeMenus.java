@@ -52,9 +52,9 @@ public final class HomeMenus {
     private static final String ICON_RESOURCE = "modules/menu/specs/home-icon.conf";
 
     /**
-     * Re-opens the home action menu for a clicked home. During the migration the action menu is still the bespoke
-     * {@link HomeActionView}; once it too renders through the engine, this becomes an engine open. Either way the
-     * icon picker and the invited-players list return to it without knowing which it is.
+     * Re-opens the home action menu ({@link HomeActionMenu}) for a clicked home, so the icon picker and the
+     * invited-players list return to it through one shared seam without holding a reference to it directly (the menus
+     * reference each other, so the seam is bound after construction).
      */
     @FunctionalInterface
     public interface ActionMenuOpener {

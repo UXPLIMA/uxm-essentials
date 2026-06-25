@@ -239,7 +239,7 @@ class StaffModeListenerTest {
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, guiText, new SyncScheduler(), bindings.lists());
+        Menus menus = new Menus(renderer, new SyncScheduler(), bindings.lists());
         StaffPlayerMenu playerMenu = new StaffPlayerMenu(menus, server, new EchoMessages(), new SilentSink(), teleport);
         playerMenu.register(bindings, specResources(), new StaffAdapterFakes.NoopLogger());
         StaffExamineMenu examineMenu =

@@ -197,7 +197,7 @@ class ItemworldHubGoldenTest {
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
         // The hub leans on the generic perm view-condition and close action, registered into the shared bindings
         // exactly as production wiring does.
         MenuVocabulary.registerConditions(bindings, permissions);

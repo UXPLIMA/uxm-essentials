@@ -189,7 +189,7 @@ class MailboxMenuGoldenTest {
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
         MailboxMenu menu = new MailboxMenu(menus, guiText, scheduler, mail, clearMail);
         menu.register(bindings, dataFolder, NOOP);

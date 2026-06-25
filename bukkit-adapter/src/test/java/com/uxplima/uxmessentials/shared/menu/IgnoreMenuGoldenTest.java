@@ -173,7 +173,7 @@ class IgnoreMenuGoldenTest {
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
         IgnoreListMenu menu =
                 new IgnoreListMenu(menus, scheduler, ignores, ignore, unignore, new OnlineLookup(), textInput);

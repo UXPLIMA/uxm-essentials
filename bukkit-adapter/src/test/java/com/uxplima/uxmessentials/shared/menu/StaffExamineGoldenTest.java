@@ -145,7 +145,7 @@ class StaffExamineGoldenTest {
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
         // The examine picker reuses the staff:players source + staff_player_name label StaffPlayerMenu registers, so
         // that one must register first; the examine menu then adds only its spec and the staff:examine click.
         new StaffPlayerMenu(menus, server, new KeyMessages(), new NoopSink(), new NoopTeleport())

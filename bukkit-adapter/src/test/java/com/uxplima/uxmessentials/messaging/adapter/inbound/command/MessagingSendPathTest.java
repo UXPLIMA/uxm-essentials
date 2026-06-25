@@ -274,7 +274,7 @@ class MessagingSendPathTest {
         var renderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
                 itemRenderer, bindings.conditions());
         var menus = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
-                renderer, guiText, scheduler, bindings.lists());
+                renderer, scheduler, bindings.lists());
         return MessagingGuiViews.create(
                 guiText,
                 scheduler,

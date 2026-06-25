@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.homes.adapter;
 
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
@@ -22,7 +21,6 @@ import org.jspecify.annotations.NullMarked;
  * adapter-side runtime state.
  *
  * @param homeList the {@code /home} slot grid the player opens
- * @param homeActions the per-home action menu the grid opens (held so its lifecycle is owned in one place)
  * @param homeAdmin the {@code /homeadmin} management use case
  * @param visitHome the {@code /visit} use case
  * @param inviteToHome the {@code /invite} use case
@@ -33,7 +31,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public record HomeServices(
         HomeListView homeList,
-        HomeActionView homeActions,
         HomeAdmin homeAdmin,
         VisitHome visitHome,
         InviteToHome inviteToHome,
@@ -43,7 +40,6 @@ public record HomeServices(
 
     public HomeServices {
         Objects.requireNonNull(homeList, "homeList");
-        Objects.requireNonNull(homeActions, "homeActions");
         Objects.requireNonNull(homeAdmin, "homeAdmin");
         Objects.requireNonNull(visitHome, "visitHome");
         Objects.requireNonNull(inviteToHome, "inviteToHome");

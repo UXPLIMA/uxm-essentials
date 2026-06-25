@@ -74,10 +74,18 @@ class ShippedSpecBindingsDriftTest {
             "homes:icon-back",
             "homes:uninvite",
             "homes:invite-add",
-            "homes:invites-back");
+            "homes:invites-back",
+            "homes:teleport",
+            "homes:delete",
+            "homes:relocate",
+            "homes:rename",
+            "homes:open-icons",
+            "homes:toggle-visibility",
+            "homes:open-invites",
+            "homes:action-back");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm");
+    private static final Set<String> EXPECTED_CONDITIONS = Set.of("perm", "homes:home-public", "homes:home-private");
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
@@ -162,7 +170,13 @@ class ShippedSpecBindingsDriftTest {
             "npc_z",
             "home_icon_name",
             "invited_player",
-            "invited_player_lore");
+            "invited_player_lore",
+            "home_name",
+            "home_world",
+            "home_x",
+            "home_y",
+            "home_z",
+            "home_created");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(

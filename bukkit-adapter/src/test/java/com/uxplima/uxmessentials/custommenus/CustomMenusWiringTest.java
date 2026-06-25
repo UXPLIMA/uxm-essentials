@@ -71,7 +71,7 @@ class CustomMenusWiringTest {
         GuiText guiText = new GuiText(new KeyMessages());
         ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        return new Menus(renderer, guiText, new SyncScheduler(), new ListSourceRegistry());
+        return new Menus(renderer, new SyncScheduler(), new ListSourceRegistry());
     }
 
     private static Path shippedExample() {

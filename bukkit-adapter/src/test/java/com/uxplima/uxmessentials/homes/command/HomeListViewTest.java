@@ -23,37 +23,25 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
 import com.uxplima.uxmessentials.homes.adapter.outbound.SafeLocationGuard;
 import com.uxplima.uxmessentials.homes.application.CreateHomeAtSlot;
-import com.uxplima.uxmessentials.homes.application.DeleteHome;
 import com.uxplima.uxmessentials.homes.application.HomeCharge;
 import com.uxplima.uxmessentials.homes.application.HomeChargeSettings;
 import com.uxplima.uxmessentials.homes.application.HomeNotifier;
 import com.uxplima.uxmessentials.homes.application.HomeQuota;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.ListHomes;
-import com.uxplima.uxmessentials.homes.application.RelocateHome;
-import com.uxplima.uxmessentials.homes.application.RenameHome;
-import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
-import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
-import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -92,6 +80,7 @@ class HomeListViewTest {
     private RecordingSink sink;
     private HomeListView listView;
     private PlayerRef viewer;
+    private final List<Home> openedAction = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -101,6 +90,7 @@ class HomeListViewTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         repository = new FakeHomeRepository();
         sink = new RecordingSink();
+        openedAction.clear();
         listView = listView();
         Guis.install(plugin);
     }
@@ -172,16 +162,14 @@ class HomeListViewTest {
 
     @Test
     void clickingAFilledCellOpensTheActionMenu() {
+        // The action menu now renders through the engine (covered by HomeActionGoldenTest); the grid's job is to hand
+        // the clicked home to the action-menu seam, which this asserts.
         repository.put(home(0));
         listView.open(player, viewer);
 
         fireClick(CELLS.get(0)); // the first cell holds the home in slot 0
 
-        InventoryView open = player.getOpenInventory();
-        assertThat(open.getTopInventory().getHolder()).isInstanceOf(SimpleGui.class);
-        // The action menu is a fresh 27-slot (3-row) menu, distinct from the grid by its teleport button slot.
-        assertThat(open.getTopInventory().getSize()).isEqualTo(27);
-        assertThat(open.getTopInventory().getItem(11)).isNotNull();
+        assertThat(openedAction).extracting(h -> h.slot().index()).containsExactly(0);
     }
 
     @Test
@@ -245,30 +233,6 @@ class HomeListViewTest {
         HomeInviteRepository invites = new FakeHomeInviteRepository();
         CreateHomeAtSlot create = new CreateHomeAtSlot(
                 repository, invites, quota, List.of(), notifier, events, freeCharge(), 1000, clock);
-        TextInput textInput = TextInputTestKit.create(
-                plugin, new GuiText(messages), scheduler, java.nio.file.Path.of("nonexistent"), new NoLogger());
-        HomeActionView actionView = new HomeActionView(
-                messages,
-                notifier,
-                new AllowAllPermissions(),
-                scheduler,
-                new TeleportHome(repository, new RecordingTeleporter(), notifier, freeCharge()),
-                new DeleteHome(repository, invites, notifier, events),
-                new RelocateHome(repository, List.of(), notifier, events, freeCharge(), clock),
-                new RenameHome(repository, notifier, events, clock),
-                new SetHomeVisibility(repository, notifier, events, clock),
-                (viewer, home) -> {},
-                (viewer, home) -> {},
-                repository,
-                textInput,
-                HomeActionsLayout.codeDefault(),
-                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC),
-                false,
-                false,
-                false,
-                false,
-                pos -> false,
-                claimService);
         return new HomeListView(
                 messages,
                 notifier,
@@ -279,7 +243,7 @@ class HomeListViewTest {
                 create,
                 safeGuard,
                 claimService,
-                actionView,
+                (clickViewer, clickHome) -> openedAction.add(clickHome),
                 HomeListLayout.codeDefault(),
                 1000,
                 DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC));
@@ -387,11 +351,6 @@ class HomeListViewTest {
         }
     }
 
-    private static final class RecordingTeleporter implements HomeTeleporter {
-        @Override
-        public void teleportTo(PlayerRef who, Home home) {}
-    }
-
     /** Captures every resolved message string the notifier delivers. */
     private static final class RecordingSink implements MessageSink {
         private final List<String> delivered = new java.util.concurrent.CopyOnWriteArrayList<>();
@@ -412,20 +371,6 @@ class HomeListViewTest {
     private static final class NoEvents implements DomainEventPublisher {
         @Override
         public void publish(DomainEvent event) {}
-    }
-
-    private static final class NoLogger implements Logger {
-        @Override
-        public void info(String message, Object... args) {}
-
-        @Override
-        public void warn(String message, Object... args) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-
-        @Override
-        public void debug(String message, Object... args) {}
     }
 
     /**

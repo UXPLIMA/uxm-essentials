@@ -215,7 +215,7 @@ class HologramListGoldenTest {
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
         listMenu(menus).register(bindings, dataFolder, NOOP);
         menus.open(viewer, HologramListMenu.SPEC_ID, null);

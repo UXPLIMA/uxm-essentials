@@ -149,7 +149,7 @@ class EntityCountCommandTest {
                 .registerEvents(
                         new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin),
                         plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
         EntityCountMenu menu = new EntityCountMenu(menus);
         menu.register(bindings, specDir(), new NoopLogger());
         return menu;

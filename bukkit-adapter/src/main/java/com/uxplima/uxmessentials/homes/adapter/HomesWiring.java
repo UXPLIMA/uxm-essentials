@@ -15,8 +15,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.homes.adapter.inbound.command.HomeCommands;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionView;
-import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionsLayout;
+import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeActionMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeInvitesMenu;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout;
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListView;
@@ -57,6 +56,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimProviders;
@@ -220,16 +220,38 @@ public final class HomesWiring {
         boolean confirmRelocate = ctx.config().getBoolean("confirm-relocate", false);
         boolean confirmUnsafeTeleport = ctx.config().getBoolean("confirm-unsafe-teleport", true);
 
-        // The icon picker and the invited-players list both re-open whichever action menu the home was reached
-        // through; during the migration that is still the bespoke HomeActionView, so both engine menus are given a
-        // reopener that points at it (resolved through a holder because they reference each other), and the action
-        // view's change-icon / invites buttons open those engine menus through the seams below.
-        HomeActionView[] actionHolder = new HomeActionView[1];
-        HomeMenus.ActionMenuOpener reopenAction =
-                (player, viewer, home) -> actionHolder[0].open(player, viewer, home, () -> {});
+        // The grid opens the action menu; the action menu's change-icon and invites buttons open the icon picker and
+        // invited-players list, which in turn re-open the action menu; the action menu's back / post-delete flow
+        // re-opens the grid. These three references form a cycle, so the three children are bound after construction
+        // through holders.
+        HomeListView[] listHolder = new HomeListView[1];
+        HomeMenus[] iconHolder = new HomeMenus[1];
+        HomeInvitesMenu[] invitesHolder = new HomeInvitesMenu[1];
+        HomeActionMenu actionMenu = buildActionMenu(
+                menus,
+                kernel,
+                notifier,
+                teleportHome,
+                deleteHome,
+                relocateHome,
+                renameHome,
+                setHomeVisibility,
+                repository,
+                textInput,
+                dateFormat,
+                confirmDelete,
+                confirmRelocate,
+                confirmUnsafeTeleport,
+                safeGuard,
+                claimService,
+                (viewer, home) -> iconHolder[0].openIcons(viewer, home),
+                (viewer, home) -> invitesHolder[0].open(viewer, home),
+                listHolder);
+        HomeMenus.ActionMenuOpener reopenAction = (player, viewer, home) -> actionMenu.open(viewer, home);
         HomeMenus homeMenus =
                 new HomeMenus(menus, kernel.scheduler(), setHomeIcon, iconLayout(guiLayouts), reopenAction);
         homeMenus.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
+        iconHolder[0] = homeMenus;
         HomeInvitesMenu invitesMenu = new HomeInvitesMenu(
                 menus,
                 kernel.scheduler(),
@@ -242,29 +264,8 @@ public final class HomesWiring {
                 textInput,
                 reopenAction);
         invitesMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
-        HomeActionView actionView = new HomeActionView(
-                kernel.messages(),
-                notifier,
-                kernel.permissions(),
-                kernel.scheduler(),
-                teleportHome,
-                deleteHome,
-                relocateHome,
-                renameHome,
-                setHomeVisibility,
-                homeMenus::openIcons,
-                invitesMenu::open,
-                repository,
-                textInput,
-                actionsLayout(guiLayouts),
-                dateFormat,
-                confirmDelete,
-                confirmRelocate,
-                confirmUnsafeTeleport,
-                safeGuard.blockUnsafe(),
-                (Position pos) -> safeGuard.isUnsafe(pos),
-                claimService);
-        actionHolder[0] = actionView;
+        invitesHolder[0] = invitesMenu;
+        actionMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         HomeListView listView = new HomeListView(
                 kernel.messages(),
                 notifier,
@@ -275,28 +276,76 @@ public final class HomesWiring {
                 createHome,
                 safeGuard,
                 claimService,
-                actionView,
+                actionMenu::open,
                 listLayout(guiLayouts),
                 unlimitedMax,
                 dateFormat);
+        listHolder[0] = listView;
         HomeAdmin homeAdmin = new HomeAdmin(repository, invites, teleporter, notifier, kernel.events(), clock);
         return new HomeServices(
-                listView,
-                actionView,
-                homeAdmin,
-                visitHome,
-                inviteToHome,
-                uninviteFromHome,
-                kernel.playerLookup(),
-                repository);
+                listView, homeAdmin, visitHome, inviteToHome, uninviteFromHome, kernel.playerLookup(), repository);
+    }
+
+    /**
+     * Assemble the engine action menu's collaborators. The icon-picker and invites openers are bound after this
+     * returns (they reopen the action menu), so they are passed as the menu's own {@code open} re-entered through the
+     * shared reopener; the change-icon / invites click bindings are registered on this menu and call the icon picker
+     * and invited-players list directly through the seams the caller wires up.
+     */
+    private static HomeActionMenu buildActionMenu(
+            Menus menus,
+            KernelPorts kernel,
+            HomeNotifier notifier,
+            TeleportHome teleportHome,
+            DeleteHome deleteHome,
+            RelocateHome relocateHome,
+            RenameHome renameHome,
+            SetHomeVisibility setHomeVisibility,
+            HomeRepository repository,
+            TextInput textInput,
+            DateTimeFormatter dateFormat,
+            boolean confirmDelete,
+            boolean confirmRelocate,
+            boolean confirmUnsafeTeleport,
+            SafeLocationGuard safeGuard,
+            ClaimService claimService,
+            java.util.function.BiConsumer<
+                            com.uxplima.uxmessentials.shared.domain.PlayerRef,
+                            com.uxplima.uxmessentials.homes.domain.Home>
+                    openIconPicker,
+            java.util.function.BiConsumer<
+                            com.uxplima.uxmessentials.shared.domain.PlayerRef,
+                            com.uxplima.uxmessentials.homes.domain.Home>
+                    openInvites,
+            HomeListView[] listHolder) {
+        HomeActionMenu.Collaborators collaborators = new HomeActionMenu.Collaborators(
+                menus,
+                kernel.messages(),
+                notifier,
+                kernel.permissions(),
+                kernel.scheduler(),
+                teleportHome,
+                deleteHome,
+                relocateHome,
+                renameHome,
+                setHomeVisibility,
+                repository,
+                textInput,
+                dateFormat,
+                confirmDelete,
+                confirmRelocate,
+                confirmUnsafeTeleport,
+                safeGuard.blockUnsafe(),
+                (Position pos) -> safeGuard.isUnsafe(pos),
+                claimService,
+                openIconPicker,
+                openInvites,
+                player -> listHolder[0].open(player, BukkitRefs.toRef(player)));
+        return new HomeActionMenu(collaborators);
     }
 
     private static HomeListLayout listLayout(GuiLayouts guiLayouts) {
         return guiLayouts.loadHomeList("homes", "home-list", HomeListLayout.codeDefault());
-    }
-
-    private static HomeActionsLayout actionsLayout(GuiLayouts guiLayouts) {
-        return guiLayouts.loadHomeActions("homes", "home-actions", HomeActionsLayout.codeDefault());
     }
 
     private static IconSelectorLayout iconLayout(GuiLayouts guiLayouts) {

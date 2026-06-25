@@ -43,6 +43,19 @@ public final class ItemRenderer {
         this.placeholders = Objects.requireNonNull(placeholders, "placeholders");
     }
 
+    /**
+     * Resolve a menu's raw title string for {@code ctx} the same way an item name resolves: every {@code %token%}
+     * is substituted, then a {@code @key} title is looked up in the viewer's catalog with its {@code {token}}
+     * arguments filled from the same placeholders. This lets a subject-driven title (a home's label, a warp's name)
+     * render through the open context rather than being frozen to a static key. A blank title yields an empty
+     * component so a spec may still open titleless.
+     */
+    public Component title(String rawTitle, MenuContext ctx) {
+        Objects.requireNonNull(rawTitle, "rawTitle");
+        Objects.requireNonNull(ctx, "ctx");
+        return resolveText(rawTitle, ctx);
+    }
+
     public ItemStack render(MenuItemSpec item, MenuContext ctx) {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(ctx, "ctx");

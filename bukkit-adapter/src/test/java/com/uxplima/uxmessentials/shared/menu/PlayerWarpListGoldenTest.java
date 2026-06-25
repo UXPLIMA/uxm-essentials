@@ -204,7 +204,7 @@ class PlayerWarpListGoldenTest {
         MenuListener listener =
                 new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, scheduler, bindings.lists());
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
         PlayerWarpListMenu listMenu = listMenu(menus);
         listMenu.register(bindings, dataFolder, NOOP);

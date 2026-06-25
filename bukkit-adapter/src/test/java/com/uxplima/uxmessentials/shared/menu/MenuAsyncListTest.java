@@ -90,7 +90,7 @@ class MenuAsyncListTest {
         MenuListener listener =
                 new MenuListener(renderer, new ActionRegistry(), new ConditionRegistry(), scheduler, plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        menus = new Menus(renderer, guiText, scheduler, lists);
+        menus = new Menus(renderer, scheduler, lists);
         MenuSpec spec = new MenuSpecLoader().parse(HOCON);
         menus.registerSpec("test", spec);
     }

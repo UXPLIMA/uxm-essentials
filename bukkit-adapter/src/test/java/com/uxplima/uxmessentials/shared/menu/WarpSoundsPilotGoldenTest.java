@@ -145,7 +145,7 @@ class WarpSoundsPilotGoldenTest {
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         MenuListener listener = new MenuListener(renderer, bindings.actions(), bindings.conditions(), sync(), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
-        Menus menus = new Menus(renderer, guiText, sync(), bindings.lists());
+        Menus menus = new Menus(renderer, sync(), bindings.lists());
 
         WarpEditorView editorView =
                 new WarpEditorView(messages, sync(), repository, editorLayout(), playerWarpHandle());
