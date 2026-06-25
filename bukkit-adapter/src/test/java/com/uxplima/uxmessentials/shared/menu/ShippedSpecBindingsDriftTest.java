@@ -103,7 +103,10 @@ class ShippedSpecBindingsDriftTest {
             "economy:create-bank",
             "economy:remove-member",
             "economy:add-member",
-            "economy:bank-back");
+            "economy:bank-back",
+            "economy:open-history",
+            "economy:pay-confirm",
+            "economy:pay-cancel");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of(
@@ -272,7 +275,11 @@ class ShippedSpecBindingsDriftTest {
             "bank_members",
             "bank_members_title",
             "bank_member",
-            "bank_member_role");
+            "bank_member_role",
+            "wallet_balance",
+            "wallet_banknotes",
+            "payconfirm_target",
+            "payconfirm_amount");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(

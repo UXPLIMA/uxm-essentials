@@ -13,9 +13,9 @@ import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.ExchangeGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmationView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryMenu;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteListener;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.CommandCostListener;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
@@ -441,23 +441,13 @@ public final class EconomyWiring {
         TransactionsHistoryMenu historyView =
                 new TransactionsHistoryMenu(menus, history, kernel.scheduler(), settings.historyTimeZone());
         historyView.register(menuBindings, dataFolder, kernel.log());
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout payConfirmLayout =
-                guiLayouts.loadFixedMenu("economy", "pay-confirm", PayConfirmationView.defaultLayout());
-        PayConfirmationView payConfirmationView =
-                new PayConfirmationView(pay, kernel.scheduler(), kernel.messages(), payConfirmLayout);
+        PayConfirmPanelMenu payConfirmationView = new PayConfirmPanelMenu(menus, pay, kernel.scheduler());
+        payConfirmationView.register(menuBindings, dataFolder, kernel.log());
         BaltopMenu baltopGuiView = new BaltopMenu(menus, snapshots, notifier);
         baltopGuiView.register(menuBindings, dataFolder, kernel.log());
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout walletLayout =
-                guiLayouts.loadFixedMenu("economy", "wallet", WalletGuiView.defaultLayout());
-        WalletGuiView walletGuiView = new WalletGuiView(
-                plugin,
-                resolved,
-                kernel.scheduler(),
-                notifier,
-                kernel.messages(),
-                historyView,
-                walletLayout,
-                kernel.log());
+        WalletPanelMenu walletGuiView =
+                new WalletPanelMenu(plugin, menus, resolved, kernel.scheduler(), notifier, historyView);
+        walletGuiView.register(menuBindings, dataFolder, kernel.log());
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout exchangeLayout =
                 guiLayouts.loadFixedMenu("economy", "exchange", ExchangeGuiView.defaultLayout());
         ExchangeGuiView exchangeView = new ExchangeGuiView(
@@ -616,7 +606,7 @@ public final class EconomyWiring {
             @org.jspecify.annotations.Nullable LoanRepaymentTask loanRepaymentTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask bankInterestTask,
-            WalletGuiView walletView) {
+            WalletPanelMenu walletView) {
 
         public Wired {
             commands = List.copyOf(commands);

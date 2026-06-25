@@ -4,9 +4,9 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.ExchangeGuiView;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmationView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryMenu;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.Balance;
@@ -52,9 +52,9 @@ public record EconomyServices(
         EconomyNotifier notifier,
         TransactionHistory history,
         TransactionsHistoryMenu historyView,
-        PayConfirmationView payConfirmationView,
+        PayConfirmPanelMenu payConfirmationView,
         BaltopMenu baltopView,
-        WalletGuiView walletView,
+        WalletPanelMenu walletView,
         ExchangeGuiView exchangeView,
         EconomyProvider provider,
         com.uxplima.uxmessentials.economy.application.port.BanknoteStore banknoteStore,
