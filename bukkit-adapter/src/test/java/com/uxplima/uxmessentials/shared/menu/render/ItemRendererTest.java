@@ -72,6 +72,43 @@ class ItemRendererTest {
         assertThat(it.getItemMeta().getEnchantmentGlintOverride()).isTrue();
     }
 
+    @Test
+    void multiLinePlaceholderExpandsIntoSeparateLoreLines() {
+        // A per-entry icon (kit/warp browse) emits a variable number of lines through one placeholder; the engine
+        // must turn each newline-separated segment into its own lore component, in order.
+        PlaceholderRegistry ph = new PlaceholderRegistry();
+        ph.register("status", c -> "line one\nline two\nline three");
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+
+        assertThat(plainLore(r, itemWithLore(List.of("%status%"))))
+                .containsExactly("line one", "line two", "line three");
+    }
+
+    @Test
+    void singleLineLiteralStaysOneLoreLine() {
+        // Regression: a spec line with no embedded newline must still render as exactly one component.
+        assertThat(plainLore(renderer, itemWithLore(List.of("just one line")))).containsExactly("just one line");
+    }
+
+    @Test
+    void catalogLineIsNotSplitEvenWhenMultiLine() {
+        // Catalog output owns its own layout, so an @key line stays a single lore component even if the resolved
+        // text carries a newline — only inline/placeholder literals expand. Asserted on the renderer's own output,
+        // since the downstream ItemBuilder breaks any newline-bearing component into visual lines.
+        assertThat(plainLore(renderer, itemWithLore(List.of("@first\nsecond")))).containsExactly("first\nsecond");
+    }
+
+    @Test
+    void mixedLoreExpandsOnlyTheMultiLinePlaceholder() {
+        // A real browse icon mixes a catalog header, a multi-line placeholder body, and a plain footer: 1 + 2 + 1.
+        PlaceholderRegistry ph = new PlaceholderRegistry();
+        ph.register("status", c -> "ok\ncost 10");
+        ItemRenderer r = new ItemRenderer(new GuiText(new KeyMessages()), ph);
+
+        assertThat(plainLore(r, itemWithLore(List.of("@some_key", "%status%", "plain"))))
+                .containsExactly("some_key", "ok", "cost 10", "plain");
+    }
+
     private static MenuItemSpec item(String material, ItemDecor decor) {
         return new MenuItemSpec(
                 new SlotSet(List.of(0)),
@@ -85,6 +122,30 @@ class ItemRendererTest {
                 false,
                 Optional.empty(),
                 ItemType.NONE);
+    }
+
+    private static MenuItemSpec itemWithLore(List<String> lore) {
+        return new MenuItemSpec(
+                new SlotSet(List.of(0)),
+                0,
+                "STONE",
+                "",
+                lore,
+                new ItemDecor(1, Optional.empty(), false, List.of()),
+                List.of(),
+                new ClickSpec(Map.of(), Map.of()),
+                false,
+                Optional.empty(),
+                ItemType.NONE);
+    }
+
+    // Assert on the renderer's own lore components, before ItemBuilder breaks any newline-bearing line into
+    // visual lines on the stack; this is the layer the expansion feature owns.
+    private List<String> plainLore(ItemRenderer r, MenuItemSpec spec) {
+        return r.lore(spec, ctx).stream()
+                .map(line -> net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(line))
+                .toList();
     }
 
     @Test

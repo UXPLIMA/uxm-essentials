@@ -61,12 +61,48 @@ public final class ItemRenderer {
         Objects.requireNonNull(ctx, "ctx");
         Material material = resolveMaterial(item.material(), ctx);
         Component name = resolveText(item.name(), ctx);
-        List<Component> lore = new ArrayList<>(item.lore().size());
-        for (String line : item.lore()) {
-            lore.add(resolveText(line, ctx));
-        }
-        return applyDecor(ItemBuilder.of(material).name(name).lore(lore), item.decor())
+        return applyDecor(ItemBuilder.of(material).name(name).lore(lore(item, ctx)), item.decor())
                 .build();
+    }
+
+    /**
+     * Build the lore components for {@code item}. Each spec line maps to one component as before, except an
+     * inline/placeholder literal whose resolved value carries newlines, which expands into one component per
+     * {@code \n}-separated segment. This lets a per-entry icon (the kit/warp browse rows) emit a variable number
+     * of lore lines from a single {@code %placeholder%} — a {@code ✔/✘} per requirement, plus the conditional
+     * cooldown/cost/claimable lines — rather than being capped at the spec's fixed line count.
+     */
+    public List<Component> lore(MenuItemSpec item, MenuContext ctx) {
+        Objects.requireNonNull(item, "item");
+        Objects.requireNonNull(ctx, "ctx");
+        List<Component> out = new ArrayList<>(item.lore().size());
+        for (String line : item.lore()) {
+            appendLore(line, ctx, out);
+        }
+        return out;
+    }
+
+    /**
+     * Append the component(s) for one lore spec line to {@code out}. A blank spec stays one blank line, and a
+     * {@code @key} catalog line stays a single component (the catalog owns its own layout, so its output is never
+     * split here). Any other line is an inline/placeholder literal: its {@code %token%}s are substituted, then the
+     * result is split on {@code \n} so a multi-line placeholder value becomes one lore component per segment. The
+     * {@code -1} split limit keeps trailing empty segments, and a value with no newline yields exactly one
+     * component — identical to a plain literal line.
+     */
+    private void appendLore(String spec, MenuContext ctx, List<Component> out) {
+        if (spec.isEmpty()) {
+            out.add(Component.empty());
+            return;
+        }
+        if (spec.startsWith("@")) {
+            out.add(resolveText(spec, ctx));
+            return;
+        }
+        String substituted = substitutePlaceholders(spec, ctx);
+        for (String segment : substituted.split("\n", -1)) {
+            out.add(StyledText.render(segment));
+        }
     }
 
     /**
