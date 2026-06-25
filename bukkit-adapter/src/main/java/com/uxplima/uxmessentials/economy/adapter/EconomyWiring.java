@@ -268,7 +268,11 @@ public final class EconomyWiring {
                             kernel.messageSink());
             adminGui = com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews.create(
                     menus,
+                    menuBindings,
+                    dataFolder,
+                    kernel.log(),
                     guiText,
+                    kernel.messages(),
                     kernel.scheduler(),
                     plugin.getServer(),
                     picker,

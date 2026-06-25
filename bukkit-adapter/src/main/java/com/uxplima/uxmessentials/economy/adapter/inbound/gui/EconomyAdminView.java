@@ -47,8 +47,8 @@ public final class EconomyAdminView {
     private final Scheduler scheduler;
     private final PlayerPickerView picker;
     private final PlayerLookup players;
-    private final EconomyTargetView targetView;
-    private final EconomyBulkView bulkView;
+    private final EconomyTargetMenu targetMenu;
+    private final EconomyBulkMenu bulkMenu;
     private final TransactionsHistoryMenu historyView;
 
     public EconomyAdminView(
@@ -56,15 +56,15 @@ public final class EconomyAdminView {
             Scheduler scheduler,
             PlayerPickerView picker,
             PlayerLookup players,
-            EconomyTargetView targetView,
-            EconomyBulkView bulkView,
+            EconomyTargetMenu targetMenu,
+            EconomyBulkMenu bulkMenu,
             TransactionsHistoryMenu historyView) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.picker = Objects.requireNonNull(picker, "picker");
         this.players = Objects.requireNonNull(players, "players");
-        this.targetView = Objects.requireNonNull(targetView, "targetView");
-        this.bulkView = Objects.requireNonNull(bulkView, "bulkView");
+        this.targetMenu = Objects.requireNonNull(targetMenu, "targetMenu");
+        this.bulkMenu = Objects.requireNonNull(bulkMenu, "bulkMenu");
         this.historyView = Objects.requireNonNull(historyView, "historyView");
     }
 
@@ -96,7 +96,7 @@ public final class EconomyAdminView {
                         EconomyMessageKey.ECO_ADMIN_GUI_BULK_NAME,
                         EconomyMessageKey.ECO_ADMIN_GUI_BULK_LORE,
                         Material.BEACON,
-                        () -> bulkView.open(viewer, viewerRef)));
+                        () -> bulkMenu.open(viewer, viewerRef)));
         gui.set(
                 HISTORY_SLOT,
                 entry(
@@ -114,7 +114,7 @@ public final class EconomyAdminView {
     private void openPicker(Player viewer, PlayerRef viewerRef) {
         PlayerPickerView.Request request = new PlayerPickerView.Request(
                 EconomyMessageKey.ECO_ADMIN_GUI_PICK_TITLE,
-                target -> targetView.open(viewer, viewerRef, target),
+                target -> targetMenu.open(viewer, viewerRef, target),
                 this::resolveOffline,
                 EconomyMessageKey.ECO_ADMIN_TARGET_UNKNOWN);
         picker.open(viewer, viewerRef, request);

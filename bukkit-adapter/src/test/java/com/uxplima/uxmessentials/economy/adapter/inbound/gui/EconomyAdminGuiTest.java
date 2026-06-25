@@ -8,8 +8,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 
 import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
@@ -32,13 +34,17 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 import org.junit.jupiter.api.AfterEach;
@@ -49,13 +55,15 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the bare-{@code /eco} admin GUI: the per-player Give / Take / Set / Reset flow reaches
- * {@code EcoAdmin} with the chosen {@link Money} (right currency and parsed amount), a malformed amount runs no
- * op, the currency selector switches the active currency the amount applies to, and the server-wide give-all /
- * reset-all reach the bulk ops. {@code EcoAdmin} is a Mockito mock so the wiring is asserted without a live
- * persistence stack; the scheduler runs each hop inline. The amount-entry branch is driven through the
- * package-private {@code applyAmount}/{@code applyGiveAll} (the same seam {@code PlayerPickerView.resolveTyped}
- * exposes), so the test does not depend on driving a live anvil.
+ * MockBukkit coverage of the bare-{@code /eco} admin GUI now that the per-player manage screen and the server-wide
+ * bulk screen render through the menu engine: the Give / Take / Set / Reset flow reaches {@code EcoAdmin} with the
+ * chosen {@link Money} (right currency and parsed amount), a malformed amount runs no op, the currency selector
+ * switches the active currency the amount applies to, and the server-wide give-all / reset-all reach the bulk ops.
+ * {@code EcoAdmin} is a Mockito mock so the wiring is asserted without a live persistence stack; the scheduler runs
+ * each hop inline. The amount-entry branch is driven through the package-private {@code applyAmount}/{@code
+ * applyGiveAll} (the same seam {@code PlayerPickerView.resolveTyped} exposes), so the test does not depend on
+ * driving a live anvil. Clicks fire through the engine's own {@code MenuListener}; the still-bespoke hub rides
+ * uxmLib's {@code Guis}.
  */
 class EconomyAdminGuiTest {
 
@@ -85,7 +93,9 @@ class EconomyAdminGuiTest {
     private EconomyProvider provider;
     private GuiText guiText;
     private Scheduler scheduler;
-    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus;
+    private TestMenuEngine engine;
+    private MenuBindings bindings;
+    private Menus menus;
     private AnvilInput anvil;
     private com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput;
     private PlayerPickerView picker;
@@ -108,18 +118,15 @@ class EconomyAdminGuiTest {
 
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
-        menus = com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(new KeyMessages(), scheduler)
-                .menus();
+        engine = TestMenuEngine.create(new KeyMessages(), scheduler);
+        bindings = engine.bindings();
+        menus = engine.menus();
+        engine.installListener(plugin);
         anvil = new AnvilInput(plugin);
         anvil.install();
         Guis.install(plugin);
         textInput = com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller.install(
-                        plugin,
-                        plugin.getDataFolder().toPath(),
-                        anvil,
-                        guiText,
-                        scheduler,
-                        mock(com.uxplima.uxmessentials.shared.application.port.Logger.class))
+                        plugin, plugin.getDataFolder().toPath(), anvil, guiText, scheduler, mock(Logger.class))
                 .textInput();
         notifier = new EconomyNotifier(new KeyMessages(), new NoopSink());
         historyView = mock(TransactionsHistoryMenu.class);
@@ -136,10 +143,17 @@ class EconomyAdminGuiTest {
         return new CurrencyPickerView(menus, guiText, scheduler);
     }
 
-    private EconomyTargetView targetView(CurrencyRegistry currencies) {
+    /**
+     * Build and register both engine menus over {@code currencies} exactly once on the shared bindings. The manage
+     * screen owns the shared {@code eco_currency} placeholder and the multi-currency condition, so it registers
+     * first; both screens then ride the one engine the test installed its listener on.
+     */
+    private Screens wire(CurrencyRegistry currencies) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
-        return new EconomyTargetView(
+        EconomyTargetMenu target = new EconomyTargetMenu(
+                menus,
                 guiText,
+                new KeyMessages(),
                 scheduler,
                 textInput,
                 provider,
@@ -149,13 +163,23 @@ class EconomyAdminGuiTest {
                 historyView,
                 picker(),
                 (p, v) -> {});
+        target.register(bindings, specDir(), NOOP);
+        EconomyBulkMenu bulk = new EconomyBulkMenu(
+                menus, guiText, scheduler, textInput, server, ops, currencies, notifier, picker(), (p, v) -> {});
+        bulk.register(bindings, specDir(), NOOP);
+        return new Screens(target, bulk);
     }
 
-    private EconomyBulkView bulkView(CurrencyRegistry currencies) {
-        EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
-        return new EconomyBulkView(
-                guiText, scheduler, textInput, server, ops, currencies, notifier, picker(), (p, v) -> {});
+    private EconomyTargetMenu targetMenu(CurrencyRegistry currencies) {
+        return wire(currencies).target();
     }
+
+    private EconomyBulkMenu bulkMenu(CurrencyRegistry currencies) {
+        return wire(currencies).bulk();
+    }
+
+    /** Both engine-rendered admin screens registered together on one bindings, as production wires them. */
+    private record Screens(EconomyTargetMenu target, EconomyBulkMenu bulk) {}
 
     private static CurrencyRegistry singleCoins() {
         return CurrencyRegistry.single(COINS);
@@ -167,58 +191,58 @@ class EconomyAdminGuiTest {
 
     @Test
     void giveButtonCallsGiveWithTheParsedAmountInTheActiveCurrency() {
-        EconomyTargetView view = targetView(singleCoins());
-        view.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.GIVE, "100");
+        EconomyTargetMenu menu = targetMenu(singleCoins());
+        menu.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.GIVE, "100");
 
         verify(ecoAdmin).give(eq(adminRef), eq(target), eq(Money.of(COINS, new BigDecimal("100"))));
     }
 
     @Test
     void takeButtonCallsTakeWithTheParsedAmount() {
-        EconomyTargetView view = targetView(singleCoins());
-        view.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.TAKE, "25.50");
+        EconomyTargetMenu menu = targetMenu(singleCoins());
+        menu.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.TAKE, "25.50");
 
         verify(ecoAdmin).take(eq(adminRef), eq(target), eq(Money.of(COINS, new BigDecimal("25.50"))));
     }
 
     @Test
     void setButtonCallsSetWithTheParsedAmount() {
-        EconomyTargetView view = targetView(singleCoins());
-        view.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.SET, "1k");
+        EconomyTargetMenu menu = targetMenu(singleCoins());
+        menu.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.SET, "1k");
 
         verify(ecoAdmin).set(eq(adminRef), eq(target), eq(Money.of(COINS, new BigDecimal("1000"))));
     }
 
     @Test
     void aMalformedAmountRunsNoOp() {
-        EconomyTargetView view = targetView(singleCoins());
-        view.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.GIVE, "abc");
+        EconomyTargetMenu menu = targetMenu(singleCoins());
+        menu.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.GIVE, "abc");
 
         verifyNoInteractions(ecoAdmin);
     }
 
     @Test
     void aNegativeAmountRunsNoOp() {
-        EconomyTargetView view = targetView(singleCoins());
-        view.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.GIVE, "-5");
+        EconomyTargetMenu menu = targetMenu(singleCoins());
+        menu.applyAmount(admin, adminRef, target, COINS, EcoAdminOps.Verb.GIVE, "-5");
 
         verifyNoInteractions(ecoAdmin);
     }
 
     @Test
     void anAmountIsParsedAgainstTheChosenSecondCurrency() {
-        EconomyTargetView view = targetView(coinsAndGems());
-        view.applyAmount(admin, adminRef, target, GEMS, EcoAdminOps.Verb.GIVE, "7");
+        EconomyTargetMenu menu = targetMenu(coinsAndGems());
+        menu.applyAmount(admin, adminRef, target, GEMS, EcoAdminOps.Verb.GIVE, "7");
 
         verify(ecoAdmin).give(eq(adminRef), eq(target), eq(Money.of(GEMS, 7L)));
     }
 
     @Test
     void theResetButtonConfirmsThenCallsResetWithTheActiveCurrency() {
-        EconomyTargetView view = targetView(singleCoins());
-        view.open(admin, adminRef, target);
+        EconomyTargetMenu menu = targetMenu(singleCoins());
+        menu.open(admin, adminRef, target);
         // The manage screen's reset button opens the confirm menu; the confirm (slot 11) calls reset.
-        fireClick(25); // RESET_SLOT on the manage screen
+        fireClick(25); // reset slot on the manage screen
         fireClick(CONFIRM_SLOT); // confirm yes
 
         verify(ecoAdmin).reset(eq(adminRef), eq(target), eq(COINS));
@@ -226,82 +250,82 @@ class EconomyAdminGuiTest {
 
     @Test
     void theManageScreenShowsAnActionPerVerb() {
-        EconomyTargetView view = targetView(singleCoins());
-        view.open(admin, adminRef, target);
+        EconomyTargetMenu menu = targetMenu(singleCoins());
+        menu.open(admin, adminRef, target);
 
-        Inventory menu = admin.getOpenInventory().getTopInventory();
-        assertThat(menu.getItem(19).getType()).isEqualTo(Material.EMERALD); // give
-        assertThat(menu.getItem(21).getType()).isEqualTo(Material.REDSTONE); // take
-        assertThat(menu.getItem(23).getType()).isEqualTo(Material.COMPARATOR); // set
-        assertThat(menu.getItem(25).getType()).isEqualTo(Material.TNT); // reset
+        Inventory inv = admin.getOpenInventory().getTopInventory();
+        assertThat(inv.getItem(19).getType()).isEqualTo(Material.EMERALD); // give
+        assertThat(inv.getItem(21).getType()).isEqualTo(Material.REDSTONE); // take
+        assertThat(inv.getItem(23).getType()).isEqualTo(Material.COMPARATOR); // set
+        assertThat(inv.getItem(25).getType()).isEqualTo(Material.TNT); // reset
     }
 
     @Test
     void theSelectCurrencyItemIsAbsentWithASingleCurrency() {
-        EconomyTargetView view = targetView(singleCoins());
-        view.open(admin, adminRef, target);
+        EconomyTargetMenu menu = targetMenu(singleCoins());
+        menu.open(admin, adminRef, target);
 
-        Inventory menu = admin.getOpenInventory().getTopInventory();
+        Inventory inv = admin.getOpenInventory().getTopInventory();
         // The select-currency slot (38) carries only filler when a single currency is configured.
-        assertThat(menu.getItem(38).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(38).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test
     void theSelectCurrencyItemIsPresentWithMultipleCurrencies() {
-        EconomyTargetView view = targetView(coinsAndGems());
-        view.open(admin, adminRef, target);
+        EconomyTargetMenu menu = targetMenu(coinsAndGems());
+        menu.open(admin, adminRef, target);
 
-        Inventory menu = admin.getOpenInventory().getTopInventory();
+        Inventory inv = admin.getOpenInventory().getTopInventory();
         // The single [Currency] item opens the paginated picker; it is the sunflower at slot 38.
-        assertThat(menu.getItem(38).getType()).isEqualTo(Material.SUNFLOWER);
+        assertThat(inv.getItem(38).getType()).isEqualTo(Material.SUNFLOWER);
     }
 
     @Test
     void clickingTheSelectCurrencyItemOpensThePaginatedPicker() {
-        EconomyTargetView view = targetView(coinsAndGems());
-        view.open(admin, adminRef, target);
+        EconomyTargetMenu menu = targetMenu(coinsAndGems());
+        menu.open(admin, adminRef, target);
         fireClick(38); // [Currency] -> the paginated picker
 
-        Inventory picker = admin.getOpenInventory().getTopInventory();
+        Inventory pickerInv = admin.getOpenInventory().getTopInventory();
         // The picker grids one icon per currency in its content slots; both currencies are present.
-        assertThat(picker.getSize()).isEqualTo(54); // 6-row picker
-        assertThat(picker.getItem(0)).isNotNull();
-        assertThat(picker.getItem(1)).isNotNull();
+        assertThat(pickerInv.getSize()).isEqualTo(54); // 6-row picker
+        assertThat(pickerInv.getItem(0)).isNotNull();
+        assertThat(pickerInv.getItem(1)).isNotNull();
     }
 
     @Test
     void pickingACurrencyInThePickerReopensTheManageScreenWithItActive() {
-        EconomyTargetView view = targetView(coinsAndGems());
-        view.open(admin, adminRef, target);
+        EconomyTargetMenu menu = targetMenu(coinsAndGems());
+        menu.open(admin, adminRef, target);
         fireClick(38); // open the picker
         // The picker lists COINS at slot 0 and GEMS at slot 1 (registry order); pick GEMS.
         fireClick(1);
         // Back on the manage screen, entering an amount now parses against GEMS (precision 0).
-        view.applyAmount(admin, adminRef, target, GEMS, EcoAdminOps.Verb.GIVE, "7");
+        menu.applyAmount(admin, adminRef, target, GEMS, EcoAdminOps.Verb.GIVE, "7");
 
         verify(ecoAdmin).give(eq(adminRef), eq(target), eq(Money.of(GEMS, 7L)));
     }
 
     @Test
     void theBulkScreenSelectCurrencyItemOpensThePicker() {
-        EconomyBulkView view = bulkView(coinsAndGems());
-        view.open(admin, adminRef);
+        EconomyBulkMenu menu = bulkMenu(coinsAndGems());
+        menu.open(admin, adminRef);
 
-        Inventory menu = admin.getOpenInventory().getTopInventory();
+        Inventory inv = admin.getOpenInventory().getTopInventory();
         // The single [Currency] item sits between give-all (11) and reset-all (15) at slot 13.
-        assertThat(menu.getItem(13).getType()).isEqualTo(Material.SUNFLOWER);
+        assertThat(inv.getItem(13).getType()).isEqualTo(Material.SUNFLOWER);
 
         fireClick(13); // -> the paginated picker
-        Inventory picker = admin.getOpenInventory().getTopInventory();
-        assertThat(picker.getSize()).isEqualTo(54);
-        assertThat(picker.getItem(0)).isNotNull();
-        assertThat(picker.getItem(1)).isNotNull();
+        Inventory pickerInv = admin.getOpenInventory().getTopInventory();
+        assertThat(pickerInv.getSize()).isEqualTo(54);
+        assertThat(pickerInv.getItem(0)).isNotNull();
+        assertThat(pickerInv.getItem(1)).isNotNull();
     }
 
     @Test
     void giveAllCreditsTheOnlineRosterWithTheParsedAmount() {
-        EconomyBulkView view = bulkView(singleCoins());
-        view.applyGiveAll(admin, adminRef, COINS, "50");
+        EconomyBulkMenu menu = bulkMenu(singleCoins());
+        menu.applyGiveAll(admin, adminRef, COINS, "50");
 
         verify(ecoAdmin)
                 .giveAll(eq(adminRef), eq(List.of(adminRef, target)), eq(Money.of(COINS, new BigDecimal("50"))));
@@ -309,16 +333,16 @@ class EconomyAdminGuiTest {
 
     @Test
     void giveAllWithAMalformedAmountRunsNoOp() {
-        EconomyBulkView view = bulkView(singleCoins());
-        view.applyGiveAll(admin, adminRef, COINS, "nope");
+        EconomyBulkMenu menu = bulkMenu(singleCoins());
+        menu.applyGiveAll(admin, adminRef, COINS, "nope");
 
         verifyNoInteractions(ecoAdmin);
     }
 
     @Test
     void resetAllConfirmsThenResetsTheOnlineRoster() {
-        EconomyBulkView view = bulkView(singleCoins());
-        view.open(admin, adminRef);
+        EconomyBulkMenu menu = bulkMenu(singleCoins());
+        menu.open(admin, adminRef);
         fireClick(RESETALL_SLOT); // reset-all on the bulk screen -> confirm
         fireClick(CONFIRM_SLOT); // confirm yes
 
@@ -327,26 +351,29 @@ class EconomyAdminGuiTest {
 
     @Test
     void theHubOpensTheManageScreenWhenAPlayerIsPicked() {
-        EconomyTargetView targetView = targetView(singleCoins());
-        EconomyBulkView bulkView = bulkView(singleCoins());
+        Screens screens = wire(singleCoins());
         PlayerLookup players = mock(PlayerLookup.class);
-        EconomyAdminView hub =
-                new EconomyAdminView(guiText, scheduler, picker, players, targetView, bulkView, historyView);
+        EconomyAdminView hub = new EconomyAdminView(
+                guiText, scheduler, picker, players, screens.target(), screens.bulk(), historyView);
 
         hub.open(admin, adminRef);
         fireClick(MANAGE_SLOT); // [Manage a player] -> player picker
         // The picker grids online heads in roster order: admin at slot 0, target at slot 1.
         fireClick(1); // pick Target -> manage screen
 
-        Inventory menu = admin.getOpenInventory().getTopInventory();
-        assertThat(menu.getItem(19).getType()).isEqualTo(Material.EMERALD); // the manage screen's give button
+        Inventory inv = admin.getOpenInventory().getTopInventory();
+        assertThat(inv.getItem(19).getType()).isEqualTo(Material.EMERALD); // the manage screen's give button
     }
 
     @Test
     void bareEcoInstallsTheGuiOpenerWhenTheAdminGuiIsSupplied() {
         EconomyAdminGuiViews adminGui = EconomyAdminGuiViews.create(
                 menus,
+                bindings,
+                specDir(),
+                NOOP,
                 guiText,
+                new KeyMessages(),
                 scheduler,
                 server,
                 picker,
@@ -380,6 +407,16 @@ class EconomyAdminGuiTest {
         return services;
     }
 
+    /** The bundled spec directory under the source tree, so the menus load the shipped target/bulk specs. */
+    private static Path specDir() {
+        Path repoRoot = Path.of("").toAbsolutePath();
+        while (repoRoot != null && !java.nio.file.Files.exists(repoRoot.resolve("settings.gradle.kts"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        Objects.requireNonNull(repoRoot, "repo root");
+        return repoRoot.resolve("bukkit-adapter/src/main/resources");
+    }
+
     private void fireClick(int slot) {
         InventoryView view = admin.getOpenInventory();
         InventoryClickEvent event = new InventoryClickEvent(
@@ -398,6 +435,20 @@ class EconomyAdminGuiTest {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {}
     }
+
+    private static final Logger NOOP = new Logger() {
+        @Override
+        public void info(String m, Object... a) {}
+
+        @Override
+        public void warn(String m, Object... a) {}
+
+        @Override
+        public void error(String m, Throwable t) {}
+
+        @Override
+        public void debug(String m, Object... a) {}
+    };
 
     private static final class SyncScheduler implements Scheduler {
         @Override

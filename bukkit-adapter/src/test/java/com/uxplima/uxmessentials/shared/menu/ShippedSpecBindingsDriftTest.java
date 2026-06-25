@@ -106,7 +106,18 @@ class ShippedSpecBindingsDriftTest {
             "economy:bank-back",
             "economy:open-history",
             "economy:pay-confirm",
-            "economy:pay-cancel");
+            "economy:pay-cancel",
+            "economy:target-give",
+            "economy:target-take",
+            "economy:target-set",
+            "economy:target-reset",
+            "economy:target-history",
+            "economy:target-select-currency",
+            "economy:target-back",
+            "economy:bulk-giveall",
+            "economy:bulk-resetall",
+            "economy:bulk-select-currency",
+            "economy:bulk-back");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_CONDITIONS = Set.of(
@@ -116,6 +127,7 @@ class ShippedSpecBindingsDriftTest {
             "homes:home-public",
             "homes:home-private",
             "economy:can-add-member",
+            "economy:multi-currency",
             "warps:browse-has-parent",
             "kits:browse-has-parent");
 
@@ -279,7 +291,10 @@ class ShippedSpecBindingsDriftTest {
             "wallet_balance",
             "wallet_banknotes",
             "payconfirm_target",
-            "payconfirm_amount");
+            "payconfirm_amount",
+            "eco_target",
+            "eco_currency",
+            "eco_target_balances");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(

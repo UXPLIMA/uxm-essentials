@@ -127,6 +127,8 @@ final class DefaultResources {
             "modules/menu/specs/economy-bank-members.conf",
             "modules/menu/specs/economy-wallet.conf",
             "modules/menu/specs/economy-pay-confirm.conf",
+            "modules/menu/specs/economy-target.conf",
+            "modules/menu/specs/economy-bulk.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

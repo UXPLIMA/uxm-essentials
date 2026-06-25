@@ -181,7 +181,7 @@ class FoliaThreadingDriftTest {
                 pkg + "shared.adapter.inbound.gui.menu.Menus",
                 "GLOBAL: engine shutdown() closes open menus inside scheduler.onGlobal");
         allow.put(
-                pkg + "economy.adapter.inbound.gui.EconomyBulkView",
+                pkg + "economy.adapter.inbound.gui.EconomyBulkMenu",
                 "GLOBAL: give-all/reset-all roster snapshot taken inside scheduler.onGlobal, then applied async");
         allow.put(
                 pkg + "staff.adapter.inbound.command.StaffListCommand",
