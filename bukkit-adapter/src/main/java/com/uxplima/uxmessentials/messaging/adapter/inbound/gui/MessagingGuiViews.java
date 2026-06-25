@@ -81,8 +81,8 @@ public final class MessagingGuiViews {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
 
-        MessagingSettingsView settingsView =
-                new MessagingSettingsView(guiText, scheduler, layouts, messages, toggles, socialSpy, permissions);
+        MessagingSettingsView settingsView = new MessagingSettingsView(
+                guiText, scheduler, layouts, messages, toggles, socialSpy, permissions, menus);
 
         // The ignore-list manager now renders through the menu engine: its grid geometry lives in the
         // messaging-ignore spec, its un-ignore and add-by-name clicks route through the same use cases.

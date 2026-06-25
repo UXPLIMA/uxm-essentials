@@ -21,6 +21,15 @@ import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -100,10 +109,10 @@ class MessagingGuiTest {
     @Test
     void socialSpyToggleIsPresentForStaffAndAbsentForAPlayer() throws Exception {
         MessagingSettingsView staffView = settingsView(dir, new GrantingPermissions(true));
-        assertThat(staffView.panel().settingAt(SOCIALSPY_SLOT, viewer)).isPresent();
+        assertThat(staffView.settingAt(SOCIALSPY_SLOT, viewer)).isPresent();
 
         MessagingSettingsView playerView = settingsView(dir, new GrantingPermissions(false));
-        assertThat(playerView.panel().settingAt(SOCIALSPY_SLOT, viewer)).isEmpty();
+        assertThat(playerView.settingAt(SOCIALSPY_SLOT, viewer)).isEmpty();
     }
 
     // --- view builders ---
@@ -111,7 +120,25 @@ class MessagingGuiTest {
     private MessagingSettingsView settingsView(Path dir, Permissions permissions) throws Exception {
         settingsLayout(dir);
         return new MessagingSettingsView(
-                guiText, scheduler, new GuiLayouts(dir, NOOP), new KeyMessages(), toggles, socialSpy, permissions);
+                guiText,
+                scheduler,
+                new GuiLayouts(dir, NOOP),
+                new KeyMessages(),
+                toggles,
+                socialSpy,
+                permissions,
+                engine());
+    }
+
+    /** A minimal editor-capable engine + listener so the migrated view can open through the runtime. */
+    private Menus engine() {
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
+        MenuListener listener = new MenuListener(
+                renderer, new ActionRegistry(), new ConditionRegistry(), scheduler, plugin, editorRenderer);
+        server.getPluginManager().registerEvents(listener, plugin);
+        return new Menus(renderer, scheduler, new ListSourceRegistry(), editorRenderer);
     }
 
     private void settingsLayout(Path dir) throws Exception {
