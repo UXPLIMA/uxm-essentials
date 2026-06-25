@@ -105,8 +105,8 @@ class PunishmentGuiFlowTest {
         Scheduler scheduler = new SyncScheduler();
         TextInput textInput = TextInputTestKit.create(
                 plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), new NoopLogger());
-        // The picker and duration steps run on the menu engine; the confirm screen is still a uxmLib view, so both the
-        // engine listener and the uxmLib listener are installed and the flow hops cleanly between the two runtimes.
+        // The picker, duration and confirm steps all run on the menu engine; the text-input anvil seam still needs the
+        // uxmLib listener, so both are installed and the flow hops cleanly across the open chain.
         Guis.install(plugin);
         com.uxplima.uxmessentials.shared.menu.TestMenuEngine engine =
                 com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(new KeyMessages(), scheduler);
@@ -115,7 +115,8 @@ class PunishmentGuiFlowTest {
                 engine.menus(), guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
         DurationPickerView durations = new DurationPickerView(
                 engine.menus(), guiText, scheduler, textInput, new KeyMessages(), new NoopSink());
-        PunishmentConfirmView confirm = new PunishmentConfirmView(guiText, scheduler, textInput);
+        PunishmentConfirmView confirm = new PunishmentConfirmView(engine.menus(), scheduler, textInput);
+        confirm.register(engine.bindings(), specDir(), new NoopLogger());
         flow = new PunishmentGuiFlow(services, picker, durations, confirm, new KeyMessages(), new NoopSink());
     }
 
@@ -208,6 +209,16 @@ class PunishmentGuiFlowTest {
         InventoryClickEvent event = new InventoryClickEvent(
                 view, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
+    }
+
+    /** The bundled spec directory under the source tree, so the confirm view loads the shipped confirm spec. */
+    private static java.nio.file.Path specDir() {
+        java.nio.file.Path repoRoot = java.nio.file.Path.of("").toAbsolutePath();
+        while (repoRoot != null && !java.nio.file.Files.exists(repoRoot.resolve("settings.gradle.kts"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        java.util.Objects.requireNonNull(repoRoot, "repo root");
+        return repoRoot.resolve("bukkit-adapter/src/main/resources");
     }
 
     private static final class KeyMessages implements Messages {

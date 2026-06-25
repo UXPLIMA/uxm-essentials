@@ -239,7 +239,8 @@ public final class ModerationWiring {
                 kernel.messageSink());
         DurationPickerView durationPicker = new DurationPickerView(
                 menus, guiText, kernel.scheduler(), textInput, kernel.messages(), kernel.messageSink());
-        PunishmentConfirmView confirmView = new PunishmentConfirmView(guiText, kernel.scheduler(), textInput);
+        PunishmentConfirmView confirmView = new PunishmentConfirmView(menus, kernel.scheduler(), textInput);
+        confirmView.register(menuBindings, dataFolder, kernel.log());
         PunishmentGuiFlow guiFlow = new PunishmentGuiFlow(
                 services, picker, durationPicker, confirmView, kernel.messages(), kernel.messageSink());
         // The bare-/jail management GUI: the jail-a-player flow (picker → jail chooser → duration, permanent
@@ -251,6 +252,7 @@ public final class ModerationWiring {
                 new com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitJailLocator(settings, jailLocations);
         JailGuiViews jailGui = JailGuiViews.create(
                 menus,
+                menuBindings,
                 guiText,
                 kernel.scheduler(),
                 services,
@@ -262,7 +264,9 @@ public final class ModerationWiring {
                 textInput,
                 kernel.messages(),
                 kernel.messageSink(),
-                guiLayouts);
+                guiLayouts,
+                dataFolder,
+                kernel.log());
         java.util.List<CommandRegistration> commands = new java.util.ArrayList<>(ModerationCommands.all(
                 services,
                 kernel.messages(),

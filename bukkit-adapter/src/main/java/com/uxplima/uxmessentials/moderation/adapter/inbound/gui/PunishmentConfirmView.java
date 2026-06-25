@@ -1,71 +1,110 @@
 package com.uxplima.uxmessentials.moderation.adapter.inbound.gui;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-
-import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.item.GuiItem;
-import com.uxplima.uxmlib.item.ItemBuilder;
-import com.uxplima.uxmlib.item.SkullData;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The per-target confirm screen the bare {@code /ban}/{@code /mute} GUI flow opens once a target is chosen in the
- * {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView}. It shows the target's head, two
- * unambiguous confirm actions — apply (broadcast) and apply silently — plus an optional "set reason" button that
- * captures a free-text reason through the shared text-input seam, and a back button to the picker. One view serves both
- * sanctions: the {@link PunishmentAction} supplies the title and the two confirm-button labels, and the caller
- * passes the {@link PunishmentAction.Executor} the confirm click runs, so this class holds no ban/mute-specific
- * branch.
+ * Registers the per-target punishment confirm screen with the menu engine and opens it. The bare {@code /ban},
+ * {@code /mute}, {@code /tempban}, {@code /tempmute}, {@code /warn} and {@code /banip} GUI flow opens this once a
+ * target is chosen in the {@link com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView}. It shows
+ * the target's head, two unambiguous confirm actions — apply (broadcast) and apply silently — an optional "set
+ * reason" button that captures a free-text reason through the shared text-input seam, and a back button to the
+ * picker. One spec serves every sanction: the {@link Confirm} subject carries the {@link PunishmentAction}, so the
+ * title and the two confirm-button labels resolve through subject-driven catalog keys, and the
+ * {@link PunishmentAction.Executor} the confirm click runs is carried on the subject too — this class holds no
+ * ban/mute-specific branch.
  *
- * <p>Every visible string is a catalog key in the viewer's locale; the target name and the typed reason are
- * substituted outside any tag argument, per the UI canon. The confirm click hops to the actor's entity region
+ * <p>{@code /banip} has no silent form, so its silent button is hidden by the
+ * {@code moderation:confirm-silent-offered} view condition. The confirm click hops to the actor's entity region
  * thread, runs the audited use-case call there, and closes — the use case itself kicks/notifies and broadcasts.
- * The reason is carried across the input round-trip by reopening the screen with the captured value, so the menu
- * stays single-viewer and stateless between opens. {@link #confirm} is package-private so a test can drive the
- * normal/silent click and assert the executor sees the right {@code silent} flag without a live inventory.
+ * The reason is carried across the input round-trip by reopening the screen with the captured value in the
+ * subject, so the menu stays single-viewer and stateless between opens. {@link #confirm} is package-private so a
+ * test can drive the normal/silent click and assert the executor sees the right {@code silent} flag.
  */
 @NullMarked
 public final class PunishmentConfirmView {
 
-    private static final int ROWS = 3;
-    private static final int TARGET_SLOT = 4;
-    private static final int APPLY_SLOT = 10;
-    private static final int SILENT_SLOT = 12;
-    private static final int REASON_SLOT = 14;
-    private static final int BACK_SLOT = 22;
-    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
-    private static final Material APPLY_ICON = Material.REDSTONE_BLOCK;
-    private static final Material SILENT_ICON = Material.BARRIER;
-    private static final Material REASON_ICON = Material.WRITABLE_BOOK;
-    private static final Material BACK_ICON = Material.ARROW;
+    /** The engine spec id this view registers and opens under. */
+    public static final String SPEC_ID = "moderation-punishment-confirm";
 
+    private static final String SPEC_RESOURCE = "modules/menu/specs/moderation-punishment-confirm.conf";
+    private static final int ROWS = 3;
     private static final String REASON_KEY = "moderation.reason";
 
-    private final GuiText guiText;
+    private final Menus menus;
     private final Scheduler scheduler;
     private final TextInput textInput;
 
-    public PunishmentConfirmView(GuiText guiText, Scheduler scheduler, TextInput textInput) {
-        this.guiText = Objects.requireNonNull(guiText, "guiText");
+    public PunishmentConfirmView(Menus menus, Scheduler scheduler, TextInput textInput) {
+        this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
+    }
+
+    /**
+     * Register the subject placeholders the spec reads, the silent-offered view condition, the apply / apply-silent
+     * / set-reason / back actions, and the spec itself. Every label key is resolved from the subject's
+     * {@link PunishmentAction}, so one registration serves all six verbs.
+     */
+    public void register(MenuBindings bindings, Path dataFolder, Logger log) {
+        Objects.requireNonNull(bindings, "bindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
+        bindings.placeholder(
+                "mod_confirm_title_key",
+                ctx -> subject(ctx).action().confirmTitle().key());
+        bindings.placeholder("mod_confirm_player", ctx -> subject(ctx).target().name());
+        bindings.placeholder(
+                "mod_confirm_apply_label_key",
+                ctx -> subject(ctx).action().applyLabel().key());
+        bindings.placeholder(
+                "mod_confirm_apply_lore_key",
+                ctx -> subject(ctx).action().applyLore().key());
+        bindings.placeholder(
+                "mod_confirm_silent_label_key",
+                ctx -> silentLabelKey(subject(ctx).action()));
+        bindings.placeholder(
+                "mod_confirm_silent_lore_key", ctx -> silentLoreKey(subject(ctx).action()));
+        bindings.placeholder("mod_confirm_reason", ctx -> subject(ctx).reason().orElse(""));
+        bindings.placeholder("mod_confirm_reason_lore_key", ctx -> reasonLoreKey(subject(ctx)));
+        bindings.condition(
+                "moderation:confirm-silent-offered",
+                (ctx, args) -> subject(ctx).action().silentSupported());
+        bindings.action("moderation:punish-apply", ctx -> confirm(ctx, false));
+        bindings.action("moderation:punish-apply-silent", ctx -> confirm(ctx, true));
+        bindings.action("moderation:set-reason", this::promptReason);
+        bindings.action(
+                "moderation:punish-back",
+                ctx -> ctx.subject(Confirm.class).onBack().run());
+        menus.registerSpec(SPEC_ID, loadSpec(dataFolder, log));
     }
 
     /**
@@ -80,92 +119,60 @@ public final class PunishmentConfirmView {
             PunishmentAction action,
             PunishmentAction.Executor executor,
             Runnable onBack) {
-        open(viewer, actor, target, action, executor, onBack, Optional.empty());
+        open(actor, target, action, executor, onBack, Optional.empty());
     }
 
     private void open(
-            Player viewer,
             PlayerRef actor,
             PlayerRef target,
             PunishmentAction action,
             PunishmentAction.Executor executor,
             Runnable onBack,
             Optional<String> reason) {
-        Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(action, "action");
         Objects.requireNonNull(executor, "executor");
         Objects.requireNonNull(onBack, "onBack");
         Objects.requireNonNull(reason, "reason");
-        scheduler.onEntity(
-                actor,
-                () -> build(viewer, actor, target, action, executor, onBack, reason)
-                        .open(viewer));
-    }
-
-    private SimpleGui build(
-            Player viewer,
-            PlayerRef actor,
-            PlayerRef target,
-            PunishmentAction action,
-            PunishmentAction.Executor executor,
-            Runnable onBack,
-            Optional<String> reason) {
-        Component title = guiText.text(actor, action.confirmTitle(), Map.of("player", target.name()));
-        SimpleGui gui = Guis.gui().title(title).rows(ROWS).build();
-        fill(gui);
-        gui.set(TARGET_SLOT, GuiItem.display(targetHead(actor, target)));
-        gui.set(
-                APPLY_SLOT,
-                GuiItem.button(applyIcon(actor, action), e -> confirm(viewer, actor, target, executor, reason, false)));
-        // /banip has no silent form, so its confirm screen omits the silent button; every other verb shows both.
-        if (action.silentSupported()) {
-            gui.set(
-                    SILENT_SLOT,
-                    GuiItem.button(
-                            silentIcon(actor, action), e -> confirm(viewer, actor, target, executor, reason, true)));
-        }
-        gui.set(
-                REASON_SLOT,
-                GuiItem.button(
-                        reasonIcon(actor, reason), e -> promptReason(viewer, actor, target, action, executor, onBack)));
-        gui.set(BACK_SLOT, GuiItem.button(backIcon(actor), e -> onBack.run()));
-        return gui;
+        menus.open(actor, SPEC_ID, new Confirm(action, target, executor, reason, onBack));
     }
 
     /**
-     * Run the executor for the chosen target on the actor's entity thread and close the screen. Package-private
-     * so a test drives the normal vs silent button and asserts the {@code silent} flag the executor receives.
+     * Run the executor for the chosen target on the actor's entity thread and close the screen. Package-private so
+     * a test drives the normal vs silent button and asserts the {@code silent} flag the executor receives.
      */
-    void confirm(
-            Player viewer,
-            PlayerRef actor,
-            PlayerRef target,
-            PunishmentAction.Executor executor,
-            Optional<String> reason,
-            boolean silent) {
+    void confirm(MenuActionContext ctx, boolean silent) {
+        Player viewer = ctx.player();
+        PlayerRef actor = ctx.viewer();
+        Confirm subject = ctx.subject(Confirm.class);
         scheduler.onEntity(actor, () -> {
             viewer.closeInventory();
-            executor.execute(actor, target, reason, silent);
+            subject.executor().execute(actor, subject.target(), subject.reason(), silent);
         });
     }
 
     /** Prompt for a reason; a submission reopens the confirm screen carrying the typed reason, a cancel keeps it. */
-    private void promptReason(
-            Player viewer,
-            PlayerRef actor,
-            PlayerRef target,
-            PunishmentAction action,
-            PunishmentAction.Executor executor,
-            Runnable onBack) {
+    private void promptReason(MenuActionContext ctx) {
+        Player viewer = ctx.player();
+        PlayerRef actor = ctx.viewer();
+        Confirm subject = ctx.subject(Confirm.class);
         InputRequest request = InputRequest.of(REASON_KEY, ModerationMessageKey.MOD_GUI_CONFIRM_REASON_PROMPT);
         textInput.prompt(
                 viewer,
                 actor,
                 request,
-                text -> open(viewer, actor, target, action, executor, onBack, reasonOf(text)),
-                () -> open(viewer, actor, target, action, executor, onBack, Optional.empty()));
+                text -> applyReason(actor, subject, reasonOf(text)),
+                () -> applyReason(actor, subject, subject.reason()));
+    }
+
+    /**
+     * Reopen the confirm screen for {@code actor} carrying {@code reason} in the subject. Package-private so a test
+     * drives the reason-input submit branch — the round-trip that reopens with the captured reason — without a live
+     * anvil (MockBukkit cannot drive one), mirroring the economy amount seam.
+     */
+    void applyReason(PlayerRef actor, Confirm subject, Optional<String> reason) {
+        open(actor, subject.target(), subject.action(), subject.executor(), subject.onBack(), reason);
     }
 
     /** A blank submission clears the reason; otherwise the trimmed line becomes the carried reason. */
@@ -173,55 +180,90 @@ public final class PunishmentConfirmView {
         return text.isBlank() ? Optional.empty() : Optional.of(text.strip());
     }
 
-    private ItemStack targetHead(PlayerRef viewer, PlayerRef target) {
-        return ItemBuilder.of(Material.PLAYER_HEAD)
-                .name(guiText.text(
-                        viewer, ModerationMessageKey.MOD_GUI_CONFIRM_TARGET_NAME, Map.of("player", target.name())))
-                .lore(List.of(guiText.text(viewer, ModerationMessageKey.MOD_GUI_CONFIRM_TARGET_LORE)))
-                .skull(SkullData.ofUuid(target.uuid()))
-                .build();
+    /** The silent-button label key; an absent silent form falls back to the apply key (the button is then hidden). */
+    private static String silentLabelKey(PunishmentAction action) {
+        return action.silentLabel().orElse(action.applyLabel()).key();
     }
 
-    private ItemStack applyIcon(PlayerRef viewer, PunishmentAction action) {
-        return labelled(viewer, APPLY_ICON, action.applyLabel(), action.applyLore());
+    /** The silent-button lore key; an absent silent form falls back to the apply key (the button is then hidden). */
+    private static String silentLoreKey(PunishmentAction action) {
+        return action.silentLore().orElse(action.applyLore()).key();
     }
 
-    private ItemStack silentIcon(PlayerRef viewer, PunishmentAction action) {
-        // Only reached when silentSupported() is true, so the two labels are present.
-        return labelled(
-                viewer,
-                SILENT_ICON,
-                action.silentLabel().orElseThrow(),
-                action.silentLore().orElseThrow());
+    /** The reason-button lore key: the "reason set" line when one is carried, otherwise the "no reason" line. */
+    private static String reasonLoreKey(Confirm subject) {
+        return subject.reason().isPresent()
+                ? ModerationMessageKey.MOD_GUI_CONFIRM_REASON_SET_LORE.key()
+                : ModerationMessageKey.MOD_GUI_CONFIRM_REASON_NONE_LORE.key();
     }
 
-    private ItemStack reasonIcon(PlayerRef viewer, Optional<String> reason) {
-        Component lore = reason.map(set -> guiText.text(
-                        viewer, ModerationMessageKey.MOD_GUI_CONFIRM_REASON_SET_LORE, Map.of("reason", set)))
-                .orElseGet(() -> guiText.text(viewer, ModerationMessageKey.MOD_GUI_CONFIRM_REASON_NONE_LORE));
-        return ItemBuilder.of(REASON_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_CONFIRM_REASON))
-                .lore(List.of(lore))
-                .build();
+    private Confirm subject(MenuContext ctx) {
+        return ctx.subject(Confirm.class);
     }
 
-    private ItemStack backIcon(PlayerRef viewer) {
-        return ItemBuilder.of(BACK_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_CONFIRM_BACK))
-                .build();
+    /**
+     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
+     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting moderation
+     * wiring. Resolution mirrors {@code GuiLayouts}: disk first, then the classpath default.
+     */
+    private MenuSpec loadSpec(Path dataFolder, Logger log) {
+        MenuSpecLoader specLoader = new MenuSpecLoader();
+        Path onDisk = dataFolder.resolve(SPEC_RESOURCE);
+        if (Files.isRegularFile(onDisk)) {
+            try {
+                return specLoader.load(onDisk);
+            } catch (MenuSpecException malformed) {
+                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
+            }
+        }
+        return loadBundledSpec(specLoader, log);
     }
 
-    private ItemStack labelled(PlayerRef viewer, Material material, MessageKey name, MessageKey lore) {
-        return ItemBuilder.of(material)
-                .name(guiText.text(viewer, name))
-                .lore(List.of(guiText.text(viewer, lore)))
-                .build();
+    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, Logger log) {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream(SPEC_RESOURCE)) {
+            if (in == null) {
+                log.warn("bundled menu spec {} is missing from the jar", SPEC_RESOURCE);
+                return emptySpec();
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
+            }
+        } catch (IOException | MenuSpecException failure) {
+            log.error("could not read bundled menu spec " + SPEC_RESOURCE, failure);
+            return emptySpec();
+        }
     }
 
-    private void fill(SimpleGui gui) {
-        ItemStack filler = ItemBuilder.of(FILLER).name(Component.empty()).build();
-        for (int slot = 0; slot < ROWS * 9; slot++) {
-            gui.set(slot, GuiItem.display(filler));
+    /** A minimal valid spec used only when the real one cannot be read, so moderation still wires cleanly. */
+    private static MenuSpec emptySpec() {
+        return new MenuSpec("", ROWS, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
+    }
+
+    /**
+     * The subject of an open confirm screen: the sanction being confirmed, its target, the executor the confirm
+     * buttons run, the reason captured so far, and the back callback. The head and button placeholders read these
+     * directly, so the render touches no port; the set-reason round-trip reopens with a fresh subject carrying the
+     * new reason.
+     *
+     * @param action the sanction this screen confirms, supplying the title and confirm-button label keys
+     * @param target the player the sanction applies to
+     * @param executor the audited use-case call the apply / apply-silent buttons run
+     * @param reason the reason captured so far, empty until the operator sets one
+     * @param onBack reopens the player picker from the back button
+     */
+    public record Confirm(
+            PunishmentAction action,
+            PlayerRef target,
+            PunishmentAction.Executor executor,
+            Optional<String> reason,
+            Runnable onBack) {
+
+        public Confirm {
+            Objects.requireNonNull(action, "action");
+            Objects.requireNonNull(target, "target");
+            Objects.requireNonNull(executor, "executor");
+            Objects.requireNonNull(reason, "reason");
+            Objects.requireNonNull(onBack, "onBack");
         }
     }
 }

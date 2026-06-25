@@ -47,16 +47,21 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of {@link JailListView} (capability B): the list renders one icon per defined jail name,
- * clicking a jail opens the edit screen whose re-anchor button saves the jail at the viewer's location through
- * {@code SetJail} and whose delete button removes it through {@code DelJail}, and the create path saves a new
- * jail at the viewer's location. The use cases are Mockito mocks; the synchronous scheduler runs each hop inline.
+ * clicking a jail opens the engine-rendered edit screen (drawn slot for slot through the shipped
+ * {@code moderation-jail-edit} spec and the real {@code MenuListener}) whose re-anchor button saves the jail at
+ * the viewer's location through {@code SetJail}, whose teleport button reuses {@code Sanctions.sendToJail}, whose
+ * delete button removes it through {@code DelJail}, and whose back button reopens the list; the create path saves
+ * a new jail at the viewer's location. The use cases are Mockito mocks; the synchronous scheduler runs each hop
+ * inline.
  */
 class JailListViewTest {
 
     private static final int FIRST_JAIL_SLOT = 0;
+    private static final int EDIT_ROWS = 3;
     private static final int EDIT_ANCHOR_SLOT = 11;
     private static final int EDIT_GOTO_SLOT = 13;
     private static final int EDIT_DELETE_SLOT = 15;
+    private static final int EDIT_BACK_SLOT = 18;
 
     private ServerMock server;
     private Plugin plugin;
@@ -109,6 +114,7 @@ class JailListViewTest {
                 jailLocator,
                 textInput,
                 EntityListLayout.withCreate(Material.IRON_BARS, 49, Material.ANVIL));
+        view.register(engine.bindings(), specDir(), new NoopLogger());
     }
 
     @AfterEach
@@ -124,6 +130,34 @@ class JailListViewTest {
         Inventory menu = staff.getOpenInventory().getTopInventory();
         assertThat(menu.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(menu.getItem(FIRST_JAIL_SLOT).getType()).isEqualTo(Material.IRON_BARS);
+    }
+
+    @Test
+    void clickingAJailRendersTheEngineEditScreenSlotForSlot() {
+        view.open(staff, staffRef);
+        fireClick(FIRST_JAIL_SLOT); // open the edit screen for "alcatraz"
+
+        Inventory edit = staff.getOpenInventory().getTopInventory();
+        assertThat(edit.getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(edit.getSize()).isEqualTo(EDIT_ROWS * 9);
+        assertThat(edit.getItem(EDIT_ANCHOR_SLOT).getType()).isEqualTo(Material.COMPASS);
+        assertThat(edit.getItem(EDIT_GOTO_SLOT).getType()).isEqualTo(Material.ENDER_PEARL);
+        assertThat(edit.getItem(EDIT_DELETE_SLOT).getType()).isEqualTo(Material.LAVA_BUCKET);
+        assertThat(edit.getItem(EDIT_BACK_SLOT).getType()).isEqualTo(Material.ARROW);
+        // Every non-button cell is the grey-glass backdrop, exactly as the old SimpleGui edit screen filled it.
+        assertThat(edit.getItem(0).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
+    }
+
+    @Test
+    void backReopensTheJailList() {
+        view.open(staff, staffRef);
+        fireClick(FIRST_JAIL_SLOT); // open the edit screen for "alcatraz"
+
+        fireClick(EDIT_BACK_SLOT);
+
+        Inventory reopened = staff.getOpenInventory().getTopInventory();
+        assertThat(reopened.getHolder()).isInstanceOf(MenuHolder.class);
+        assertThat(reopened.getItem(FIRST_JAIL_SLOT).getType()).isEqualTo(Material.IRON_BARS);
     }
 
     @Test
@@ -188,6 +222,16 @@ class JailListViewTest {
         InventoryClickEvent event = new InventoryClickEvent(
                 inventoryView, InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(event);
+    }
+
+    /** The bundled spec directory under the source tree, so the view loads the shipped jail-edit spec. */
+    private static java.nio.file.Path specDir() {
+        java.nio.file.Path repoRoot = java.nio.file.Path.of("").toAbsolutePath();
+        while (repoRoot != null && !java.nio.file.Files.exists(repoRoot.resolve("settings.gradle.kts"))) {
+            repoRoot = repoRoot.getParent();
+        }
+        java.util.Objects.requireNonNull(repoRoot, "repo root");
+        return repoRoot.resolve("bukkit-adapter/src/main/resources");
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.moderation.adapter.inbound.gui;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
@@ -14,7 +15,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -55,6 +58,7 @@ public final class JailGuiViews {
     /** Build the three jail views over the existing use cases, the shared pickers, and the module's GUI layouts. */
     public static JailGuiViews create(
             Menus menus,
+            MenuBindings menuBindings,
             GuiText guiText,
             Scheduler scheduler,
             ModerationServices services,
@@ -66,8 +70,11 @@ public final class JailGuiViews {
             TextInput textInput,
             Messages messages,
             MessageSink sink,
-            GuiLayouts layouts) {
+            GuiLayouts layouts,
+            Path dataFolder,
+            Logger log) {
         Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(services, "services");
@@ -80,11 +87,14 @@ public final class JailGuiViews {
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(sink, "sink");
         Objects.requireNonNull(layouts, "layouts");
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
 
         EntityListLayout listLayout = layouts.loadEntityList(MODULE, "jail-list", jailListCodeDefault());
 
         JailListView jailList = new JailListView(
                 menus, guiText, messages, scheduler, services, sanctions, jailLocator, textInput, listLayout);
+        jailList.register(menuBindings, dataFolder, log);
         JailGuiFlow flow = new JailGuiFlow(menus, guiText, scheduler, services, picker, durations, messages, sink);
         return new JailGuiViews(flow, jailList, jailedPlayers);
     }

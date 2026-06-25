@@ -118,6 +118,8 @@ final class DefaultResources {
             "modules/menu/specs/moderation-active.conf",
             "modules/menu/specs/moderation-history.conf",
             "modules/menu/specs/moderation-jailed.conf",
+            "modules/menu/specs/moderation-jail-edit.conf",
+            "modules/menu/specs/moderation-punishment-confirm.conf",
             "modules/menu/specs/economy-baltop.conf",
             "modules/menu/specs/economy-transactions.conf",
             "modules/menu/specs/economy-banks.conf",

@@ -66,7 +66,7 @@ class BanMuteGuiRootTest {
                 engine.menus(), guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
         DurationPickerView durations = new DurationPickerView(
                 engine.menus(), guiText, scheduler, textInput, new KeyMessages(), new NoopSink());
-        PunishmentConfirmView confirm = new PunishmentConfirmView(guiText, scheduler, textInput);
+        PunishmentConfirmView confirm = new PunishmentConfirmView(engine.menus(), scheduler, textInput);
         flow = new PunishmentGuiFlow(services, picker, durations, confirm, new KeyMessages(), new NoopSink());
     }
 

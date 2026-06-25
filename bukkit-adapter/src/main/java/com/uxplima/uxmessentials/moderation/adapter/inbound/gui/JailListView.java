@@ -1,15 +1,21 @@
 package com.uxplima.uxmessentials.moderation.adapter.inbound.gui;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-
-import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
@@ -21,46 +27,49 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuActionContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecException;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.RefreshSpec;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * The jail-management list (capability B of the {@code /jail} GUI): a config-driven, paginated grid of every
  * defined jail name (the config jails merged with the DB-backed {@code /setjail} jails) drawn through the shared
- * {@link EntityListView}, plus a "create jail" button. Clicking a jail opens a small edit screen offering
- * re-anchor (save the jail at the staff member's current location) and delete; the create button prompts for a
- * name through the shared text-input seam and saves a new jail at the staff member's current location.
+ * {@link EntityListView}, plus a "create jail" button. Clicking a jail opens the engine-rendered per-jail edit
+ * screen offering re-anchor (save the jail at the staff member's current location), teleport, and delete; the
+ * create button prompts for a name through the shared text-input seam and saves a new jail at the staff member's
+ * current location.
  *
  * <p>The name union is a DB read, so the open resolves it off the tick thread and hops back to the viewer's
- * entity thread to render. Re-anchoring and creating both read the viewer's own location <em>on the viewer's
- * thread</em> (a region-local read) before delegating to the audited {@code SetJail} use case; delete delegates
- * to {@code DelJail}. The view holds no domain logic — it threads the existing use cases the {@code /setjail}
- * and {@code /jail del} commands take.
+ * entity thread to render. Opening the edit screen resolves the jail's coordinates off-thread and hands them in
+ * as the edit subject, so the engine render touches no port. Re-anchoring and creating both read the viewer's own
+ * location <em>on the viewer's thread</em> (a region-local read) before delegating to the audited {@code SetJail}
+ * use case; delete delegates to {@code DelJail}. The view holds no domain logic — it threads the existing use
+ * cases the {@code /setjail} and {@code /jail del} commands take.
  */
 @NullMarked
 public final class JailListView {
 
+    /** The engine spec id the per-jail edit screen registers and opens under. */
+    public static final String EDIT_SPEC_ID = "moderation-jail-edit";
+
+    private static final String EDIT_SPEC_RESOURCE = "modules/menu/specs/moderation-jail-edit.conf";
     private static final int EDIT_ROWS = 3;
-    private static final int EDIT_BACK_SLOT = 18;
-    private static final int EDIT_ANCHOR_SLOT = 11;
-    private static final int EDIT_GOTO_SLOT = 13;
-    private static final int EDIT_DELETE_SLOT = 15;
-    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
-    private static final Material ANCHOR_ICON = Material.COMPASS;
-    private static final Material GOTO_ICON = Material.ENDER_PEARL;
-    private static final Material DELETE_ICON = Material.LAVA_BUCKET;
-    private static final Material BACK_ICON = Material.ARROW;
     private static final Material JAIL_ICON = Material.IRON_BARS;
     private static final String CREATE_KEY = "moderation.jail-create";
 
+    private final Menus menus;
     private final GuiText guiText;
     private final Messages messages;
     private final Scheduler scheduler;
@@ -81,7 +90,7 @@ public final class JailListView {
             JailLocator jailLocator,
             TextInput textInput,
             EntityListLayout layout) {
-        Objects.requireNonNull(menus, "menus");
+        this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -99,9 +108,27 @@ public final class JailListView {
                 .navNames(ModerationMessageKey.MOD_GUI_JAIL_LIST_PREV, ModerationMessageKey.MOD_GUI_JAIL_LIST_NEXT)
                 .entities(snapshot::get)
                 .iconRenderer(this::icon)
-                .onSelect((player, name) -> openEdit(player, BukkitRefs.toRef(player), name))
+                .onSelect((player, name) -> openEdit(BukkitRefs.toRef(player), name))
                 .onCreate(ModerationMessageKey.MOD_GUI_JAIL_LIST_CREATE, this::promptCreate)
                 .build();
+    }
+
+    /**
+     * Register the per-jail edit screen's subject placeholders and the re-anchor / teleport / delete / back
+     * actions the spec names, and the spec itself. The jail list itself draws through the shared
+     * {@link EntityListView} and needs no spec registration.
+     */
+    public void register(MenuBindings bindings, Path dataFolder, Logger log) {
+        Objects.requireNonNull(bindings, "bindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(log, "log");
+        bindings.placeholder("mod_jail_edit_jail", ctx -> subject(ctx).name());
+        bindings.placeholder("mod_jail_edit_coords", ctx -> subject(ctx).coords());
+        bindings.action("moderation:jail-reanchor", this::reAnchor);
+        bindings.action("moderation:jail-goto", this::goTo);
+        bindings.action("moderation:jail-delete", this::delete);
+        bindings.action("moderation:jail-back", ctx -> open(ctx.player(), ctx.viewer()));
+        menus.registerSpec(EDIT_SPEC_ID, loadSpec(dataFolder, log));
     }
 
     /** Resolve the jail-name union off-thread, then open the list on the viewer's entity thread. */
@@ -123,10 +150,10 @@ public final class JailListView {
     }
 
     /**
-     * The placeholder map every jail item shares: the jail name and its location as a single {@code world x, y, z}
-     * string. The coordinates are resolved store-first then config (the same precedence a jailed player is sent
-     * to); a jail whose world cannot be resolved shows the localised "unknown" word so the lore line is never
-     * blank.
+     * The placeholder map every jail list item shares: the jail name and its location as a single
+     * {@code world x, y, z} string. The coordinates are resolved store-first then config (the same precedence a
+     * jailed player is sent to); a jail whose world cannot be resolved shows the localised "unknown" word so the
+     * lore line is never blank.
      */
     private Map<String, String> placeholders(PlayerRef viewer, String name) {
         return Map.of("jail", name, "coords", coords(viewer, name));
@@ -140,30 +167,23 @@ public final class JailListView {
                         () -> messages.resolve(viewer, ModerationMessageKey.MOD_GUI_JAIL_LOCATION_UNKNOWN, Map.of()));
     }
 
-    /** The per-jail edit screen: re-anchor at the viewer's location, delete, or go back to the list. */
-    private void openEdit(Player player, PlayerRef viewer, String name) {
-        scheduler.onEntity(viewer, () -> build(viewer, player, name).open(player));
-    }
-
-    private SimpleGui build(PlayerRef viewer, Player player, String name) {
-        Map<String, String> ph = placeholders(viewer, name);
-        SimpleGui gui = Guis.gui()
-                .title(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_TITLE, ph))
-                .rows(EDIT_ROWS)
-                .build();
-        fill(gui);
-        gui.set(EDIT_ANCHOR_SLOT, GuiItem.button(anchorIcon(viewer, ph), e -> reAnchor(player, viewer, name)));
-        gui.set(EDIT_GOTO_SLOT, GuiItem.button(goToIcon(viewer, ph), e -> goTo(player, viewer, name)));
-        gui.set(EDIT_DELETE_SLOT, GuiItem.button(deleteIcon(viewer, ph), e -> delete(player, viewer, name)));
-        gui.set(EDIT_BACK_SLOT, GuiItem.button(backIcon(viewer), e -> open(player, viewer)));
-        return gui;
+    /** Open the engine edit screen: resolve the jail's coordinates off-thread, then hand them in as the subject. */
+    private void openEdit(PlayerRef viewer, String name) {
+        scheduler.async(() -> {
+            String coords = coords(viewer, name);
+            menus.open(viewer, EDIT_SPEC_ID, new JailEdit(name, coords));
+        });
     }
 
     /** Re-anchor the jail at the viewer's current location, read here on the viewer's own region thread. */
-    private void reAnchor(Player player, PlayerRef viewer, String name) {
-        Position at = position(player);
-        services.setJail().set(viewer, name, at);
-        open(player, viewer);
+    private void reAnchor(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        String name = ctx.subject(JailEdit.class).name();
+        scheduler.onEntity(viewer, () -> {
+            services.setJail().set(viewer, name, position(player));
+            open(player, viewer);
+        });
     }
 
     /**
@@ -173,13 +193,15 @@ public final class JailListView {
      * so the operator arrives exactly where a jailed player would. No confirm and no re-open — the viewer is
      * leaving for the jail.
      */
-    private void goTo(Player player, PlayerRef viewer, String name) {
-        player.closeInventory();
-        sanctions.sendToJail(viewer, name);
+    private void goTo(MenuActionContext ctx) {
+        ctx.player().closeInventory();
+        sanctions.sendToJail(ctx.viewer(), ctx.subject(JailEdit.class).name());
     }
 
-    private void delete(Player player, PlayerRef viewer, String name) {
-        services.delJail().delete(viewer, name);
+    private void delete(MenuActionContext ctx) {
+        Player player = ctx.player();
+        PlayerRef viewer = ctx.viewer();
+        services.delJail().delete(viewer, ctx.subject(JailEdit.class).name());
         open(player, viewer);
     }
 
@@ -211,41 +233,65 @@ public final class JailListView {
         });
     }
 
-    private ItemStack anchorIcon(PlayerRef viewer, Map<String, String> ph) {
-        return ItemBuilder.of(ANCHOR_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_ANCHOR))
-                .lore(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_ANCHOR_LORE, ph))
-                .build();
+    private JailEdit subject(MenuContext ctx) {
+        return ctx.subject(JailEdit.class);
     }
 
-    private ItemStack goToIcon(PlayerRef viewer, Map<String, String> ph) {
-        return ItemBuilder.of(GOTO_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_GOTO))
-                .lore(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_GOTO_LORE, ph))
-                .build();
-    }
-
-    private ItemStack deleteIcon(PlayerRef viewer, Map<String, String> ph) {
-        return ItemBuilder.of(DELETE_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_DELETE))
-                .lore(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_DELETE_LORE, ph))
-                .build();
-    }
-
-    private ItemStack backIcon(PlayerRef viewer) {
-        return ItemBuilder.of(BACK_ICON)
-                .name(guiText.text(viewer, ModerationMessageKey.MOD_GUI_JAIL_EDIT_BACK))
-                .build();
-    }
-
-    private void fill(SimpleGui gui) {
-        ItemStack filler = ItemBuilder.of(FILLER).name(Component.empty()).build();
-        for (int slot = 0; slot < EDIT_ROWS * 9; slot++) {
-            gui.set(slot, GuiItem.display(filler));
+    /**
+     * Load the spec, preferring an operator's edit on disk over the bundled resource and finally a built-in empty
+     * fallback, so a typo or a missing file degrades to a closeable empty window rather than aborting moderation
+     * wiring. Resolution mirrors {@code GuiLayouts}: disk first, then the classpath default.
+     */
+    private MenuSpec loadSpec(Path dataFolder, Logger log) {
+        MenuSpecLoader specLoader = new MenuSpecLoader();
+        Path onDisk = dataFolder.resolve(EDIT_SPEC_RESOURCE);
+        if (Files.isRegularFile(onDisk)) {
+            try {
+                return specLoader.load(onDisk);
+            } catch (MenuSpecException malformed) {
+                log.error("failed to load menu spec " + onDisk + ", using bundled default", malformed);
+            }
         }
+        return loadBundledSpec(specLoader, log);
+    }
+
+    private MenuSpec loadBundledSpec(MenuSpecLoader specLoader, Logger log) {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream(EDIT_SPEC_RESOURCE)) {
+            if (in == null) {
+                log.warn("bundled menu spec {} is missing from the jar", EDIT_SPEC_RESOURCE);
+                return emptySpec();
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                return specLoader.parse(reader.lines().collect(Collectors.joining("\n")));
+            }
+        } catch (IOException | MenuSpecException failure) {
+            log.error("could not read bundled menu spec " + EDIT_SPEC_RESOURCE, failure);
+            return emptySpec();
+        }
+    }
+
+    /** A minimal valid spec used only when the real one cannot be read, so moderation still wires cleanly. */
+    private static MenuSpec emptySpec() {
+        return new MenuSpec("", EDIT_ROWS, new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     private static Position position(Player player) {
         return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));
+    }
+
+    /**
+     * The subject of an open per-jail edit screen: the jail name and its resolved display coordinates. The
+     * re-anchor / teleport / delete lore read these directly, so the render touches no port; the coordinates are
+     * resolved off the tick thread at open time, exactly as the list entries resolve them.
+     *
+     * @param name the jail being edited
+     * @param coords the jail's location as a single {@code world x, y, z} string, or the localised "unknown" word
+     */
+    public record JailEdit(String name, String coords) {
+
+        public JailEdit {
+            Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(coords, "coords");
+        }
     }
 }
