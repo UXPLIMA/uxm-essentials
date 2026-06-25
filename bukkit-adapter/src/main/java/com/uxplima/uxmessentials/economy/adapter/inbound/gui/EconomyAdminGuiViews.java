@@ -47,7 +47,7 @@ public final class EconomyAdminGuiViews {
             EcoAdmin ecoAdmin,
             CurrencyRegistry currencies,
             EconomyNotifier notifier,
-            TransactionsHistoryView historyView) {
+            TransactionsHistoryMenu historyView) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
         CurrencyPickerView currencyPicker = new CurrencyPickerView(guiText, scheduler);
         // Both child screens return to the hub; the hub is constructed last, so the back-callbacks read it

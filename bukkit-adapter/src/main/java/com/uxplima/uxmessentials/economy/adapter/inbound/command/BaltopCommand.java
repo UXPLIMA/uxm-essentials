@@ -101,7 +101,7 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
             rejectUnknownCurrency(ref(sender));
             return Command.SINGLE_SUCCESS;
         }
-        services.baltopView().open(sender, currency.get());
+        services.baltopView().open(ref(sender), currency.get());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -112,7 +112,7 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
         if (sender == null) {
             return 0;
         }
-        services.baltopView().open(sender, currency);
+        services.baltopView().open(ref(sender), currency);
         return Command.SINGLE_SUCCESS;
     }
 }

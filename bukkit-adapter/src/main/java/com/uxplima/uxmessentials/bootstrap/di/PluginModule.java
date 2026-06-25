@@ -484,7 +484,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("economy"))) {
-            wireEconomy(plugin, ctx, persistence, resources, links, bus, guiRegistry, textInput);
+            wireEconomy(plugin, ctx, persistence, resources, links, bus, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("warps"))) {
             wireWarps(ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("kits"))) {
@@ -758,8 +758,18 @@ public final class PluginModule {
             ContextLinks links,
             Bus bus,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
-        EconomyWiring.Wired wired = EconomyWiring.wire(plugin, ctx, persistence, bus, textInput);
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
+        EconomyWiring.Wired wired = EconomyWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                bus,
+                textInput,
+                menus,
+                menuBindings,
+                plugin.getDataFolder().toPath());
         links.economyProvider = wired.provider();
         links.economyCurrency = wired.defaultCurrency();
         wired.commands().forEach(resources::addCommand);

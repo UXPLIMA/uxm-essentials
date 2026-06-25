@@ -206,7 +206,22 @@ class ShippedSpecBindingsDriftTest {
             "mod_jailed_jail",
             "mod_jailed_issuer",
             "mod_jailed_reason",
-            "mod_jailed_remaining");
+            "mod_jailed_remaining",
+            "baltop_currency",
+            "baltop_rank",
+            "baltop_player",
+            "baltop_amount",
+            "history_title_key",
+            "history_player",
+            "history_bank",
+            "history_icon",
+            "history_type_key",
+            "history_id",
+            "history_date",
+            "history_from",
+            "history_to",
+            "history_amount",
+            "history_reason");
 
     /** List-source ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_LISTS = Set.of(
@@ -226,7 +241,9 @@ class ShippedSpecBindingsDriftTest {
             "home:slots",
             "moderation:active",
             "moderation:history",
-            "moderation:jailed");
+            "moderation:jailed",
+            "economy:baltop",
+            "economy:transactions");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

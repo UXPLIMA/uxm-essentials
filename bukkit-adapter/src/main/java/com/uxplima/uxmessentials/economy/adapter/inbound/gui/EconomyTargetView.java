@@ -69,7 +69,7 @@ public final class EconomyTargetView {
     private final EcoAdminOps ops;
     private final CurrencyRegistry currencies;
     private final EconomyNotifier notifier;
-    private final TransactionsHistoryView historyView;
+    private final TransactionsHistoryMenu historyView;
     private final CurrencyPickerView currencyPicker;
     private final java.util.function.BiConsumer<Player, PlayerRef> onBack;
 
@@ -81,7 +81,7 @@ public final class EconomyTargetView {
             EcoAdminOps ops,
             CurrencyRegistry currencies,
             EconomyNotifier notifier,
-            TransactionsHistoryView historyView,
+            TransactionsHistoryMenu historyView,
             CurrencyPickerView currencyPicker,
             java.util.function.BiConsumer<Player, PlayerRef> onBack) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
@@ -162,7 +162,7 @@ public final class EconomyTargetView {
                         currencyName,
                         Material.TNT,
                         () -> confirmReset(viewer, viewerRef, target, active)));
-        gui.set(HISTORY_SLOT, GuiItem.button(historyIcon(viewerRef), e -> openHistory(viewer, viewerRef, target)));
+        gui.set(HISTORY_SLOT, GuiItem.button(historyIcon(viewerRef), e -> openHistory(viewerRef, target)));
         selectCurrency(gui, viewer, viewerRef, target, active);
         gui.set(BACK_SLOT, GuiItem.button(backIcon(viewerRef), e -> onBack.accept(viewer, viewerRef)));
         gui.open(viewer);
@@ -228,8 +228,8 @@ public final class EconomyTargetView {
                         .open(viewer));
     }
 
-    private void openHistory(Player viewer, PlayerRef viewerRef, PlayerRef target) {
-        scheduler.onEntity(viewerRef, () -> historyView.open(viewer, target.uuid(), target.name()));
+    private void openHistory(PlayerRef viewerRef, PlayerRef target) {
+        scheduler.onEntity(viewerRef, () -> historyView.open(viewerRef, target.uuid(), target.name()));
     }
 
     private GuiItem action(

@@ -48,7 +48,7 @@ public final class BankActionsView {
     private final TextInput textInput;
     private final Scheduler scheduler;
     private final Messages messages;
-    private final TransactionsHistoryView historyView;
+    private final TransactionsHistoryMenu historyView;
     private final Supplier<BankNavigation> navigation;
     private final FixedMenuLayout layout;
 
@@ -57,7 +57,7 @@ public final class BankActionsView {
             TextInput textInput,
             Scheduler scheduler,
             Messages messages,
-            TransactionsHistoryView historyView,
+            TransactionsHistoryMenu historyView,
             Supplier<BankNavigation> navigation,
             FixedMenuLayout layout) {
         this.bankService = Objects.requireNonNull(bankService, "bankService");
@@ -144,7 +144,7 @@ public final class BankActionsView {
                         actionIcon(viewerRef, "logs"),
                         event -> scheduler.onEntity(viewerRef, () -> {
                             gui.close(player);
-                            historyView.openForBank(player, bank.id(), bank.name());
+                            historyView.openForBank(viewerRef, bank.id(), bank.name());
                         })));
     }
 

@@ -89,7 +89,7 @@ class EconomyAdminGuiTest {
     private com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput;
     private PlayerPickerView picker;
     private EconomyNotifier notifier;
-    private TransactionsHistoryView historyView;
+    private TransactionsHistoryMenu historyView;
 
     @BeforeEach
     void setUp() {
@@ -119,7 +119,7 @@ class EconomyAdminGuiTest {
                         mock(com.uxplima.uxmessentials.shared.application.port.Logger.class))
                 .textInput();
         notifier = new EconomyNotifier(new KeyMessages(), new NoopSink());
-        historyView = mock(TransactionsHistoryView.class);
+        historyView = mock(TransactionsHistoryMenu.class);
         picker = new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
     }
 

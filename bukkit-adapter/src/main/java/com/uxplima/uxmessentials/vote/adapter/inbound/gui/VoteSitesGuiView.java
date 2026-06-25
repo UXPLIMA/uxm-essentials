@@ -39,7 +39,8 @@ import org.jspecify.annotations.NullMarked;
  * site with no URL is a no-op.
  *
  * <p>The view fetches cooldown data off the tick thread via {@link Scheduler#async}, then hops back to
- * the player's entity thread to build and open the inventory — matching the {@code BaltopGuiView} pattern.
+ * the player's entity thread to build and open the inventory — the standard read-off-thread, render-on-entity
+ * pattern the menu-engine list sources follow.
  */
 @NullMarked
 public final class VoteSitesGuiView {

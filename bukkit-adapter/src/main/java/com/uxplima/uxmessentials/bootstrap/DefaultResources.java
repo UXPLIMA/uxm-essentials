@@ -122,6 +122,8 @@ final class DefaultResources {
             "modules/menu/specs/moderation-active.conf",
             "modules/menu/specs/moderation-history.conf",
             "modules/menu/specs/moderation-jailed.conf",
+            "modules/menu/specs/economy-baltop.conf",
+            "modules/menu/specs/economy-transactions.conf",
             "menus/example.conf",
             "input/config.conf",
             "messages/messages_en.conf",

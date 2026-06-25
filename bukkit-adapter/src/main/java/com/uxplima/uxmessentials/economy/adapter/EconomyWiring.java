@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.economy.adapter;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -8,14 +9,14 @@ import java.util.Optional;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.command.EconomyCommands;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopGuiView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankActionsView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankMembersView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.ExchangeGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmationView;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryView;
+import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteListener;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.CommandCostListener;
@@ -70,6 +71,8 @@ import com.uxplima.uxmessentials.persistence.economy.WalletLedger;
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WalletSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -99,17 +102,16 @@ public final class EconomyWiring {
 
     private EconomyWiring() {}
 
-    /** Build the economy context from {@code plugin}, {@code ctx}, and the shared {@code persistence} DSL. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus) {
-        return wire(plugin, ctx, persistence, bus, null);
-    }
-
     /**
      * Build the economy context, threading the shared {@code textInput} seam into every menu that captures a typed
      * line — the bare-{@code /eco} admin GUI's Give / Take / Set / bulk amount entry and the bank, loan, and
      * exchange dashboards. A {@code null} {@code textInput} disables the admin GUI (bare {@code /eco} then falls
      * through to usage); the bank/loan/exchange views always receive the seam, and the raw subcommands are
      * unaffected either way.
+     *
+     * <p>The {@code menus} façade, the shared {@code menuBindings}, and the {@code dataFolder} carry the menu
+     * engine into the economy context: the baltop leaderboard and the transaction-history list both render through
+     * a registered engine spec rather than a bespoke view, so each registers its spec and bindings here once.
      */
     public static Wired wire(
             Plugin plugin,
@@ -117,11 +119,17 @@ public final class EconomyWiring {
             Persistence persistence,
             Bus bus,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
-                    textInput) {
+                    textInput,
+            Menus menus,
+            MenuBindings menuBindings,
+            Path dataFolder) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
+        Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
         EconomyConfig settings = new EconomyConfig(ctx.config());
         CurrencyRegistry currencies = settings.currencies();
@@ -169,7 +177,10 @@ public final class EconomyWiring {
                 resolved,
                 decoratedRepository,
                 pendingRepo,
-                textInput);
+                textInput,
+                menus,
+                menuBindings,
+                dataFolder);
     }
 
     private static EconomyProvider resolveProvider(
@@ -205,7 +216,10 @@ public final class EconomyWiring {
             WalletRepository repository,
             PendingTransactionRepository pendingRepo,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
-                    textInput) {
+                    textInput,
+            Menus menus,
+            MenuBindings menuBindings,
+            Path dataFolder) {
         KernelPorts kernel = ctx.kernel();
         BaltopExemption exemption = new PermissionBaltopExemption(kernel.permissions(), settings.baltopExemptNode());
         BaltopSnapshots snapshots = new BaltopSnapshots(
@@ -234,7 +248,10 @@ public final class EconomyWiring {
                 snapshots,
                 ledger.telemetry(),
                 textInput,
-                guiLayouts);
+                guiLayouts,
+                menus,
+                menuBindings,
+                dataFolder);
         // The bare-/eco admin GUI (item 19): a hub over picker → per-player Give/Take/Set/Reset and a server-wide
         // bulk screen, reusing the shared input seam for amount entry. Built only when a seam is supplied (the
         // module is wired with GUIs available); GuiRootBinding then opens it on bare /eco when the catalog gui flag
@@ -371,7 +388,10 @@ public final class EconomyWiring {
             com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
                     textInput,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts guiLayouts) {
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts guiLayouts,
+            Menus menus,
+            MenuBindings menuBindings,
+            Path dataFolder) {
         // The bank, loan, and exchange dashboards all capture a typed amount through the shared input seam, so a
         // non-null TextInput is required to build them; bootstrap always supplies it.
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput input =
@@ -416,18 +436,19 @@ public final class EconomyWiring {
         boolean nativeLedger = resolved instanceof NativeEconomyProvider;
         ExchangeService exchangeService = new ExchangeService(repository, settings.exchangeRegistry(), nativeLedger);
 
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout logsLayout = guiLayouts.load(
-                "economy",
-                "transaction-logs",
-                com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout.paginatedDefault(
-                        org.bukkit.Material.PAPER));
-        TransactionsHistoryView historyView = new TransactionsHistoryView(
-                history, kernel.scheduler(), kernel.messages(), logsLayout, settings.historyTimeZone());
+        // The read-only transaction-history list and the baltop leaderboard both render through the menu engine:
+        // each registers its spec and bindings here once, then opens through the Menus façade. The history read
+        // runs off the tick thread at the open site and hands the rows in as the menu subject; the baltop snapshot
+        // is a lock-free Bukkit-free read the engine resolves off-thread directly.
+        TransactionsHistoryMenu historyView =
+                new TransactionsHistoryMenu(menus, history, kernel.scheduler(), settings.historyTimeZone());
+        historyView.register(menuBindings, dataFolder, kernel.log());
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout payConfirmLayout =
                 guiLayouts.loadFixedMenu("economy", "pay-confirm", PayConfirmationView.defaultLayout());
         PayConfirmationView payConfirmationView =
                 new PayConfirmationView(pay, kernel.scheduler(), kernel.messages(), payConfirmLayout);
-        BaltopGuiView baltopGuiView = new BaltopGuiView(snapshots, kernel.scheduler(), notifier, kernel.messages());
+        BaltopMenu baltopGuiView = new BaltopMenu(menus, snapshots, notifier);
+        baltopGuiView.register(menuBindings, dataFolder, kernel.log());
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout walletLayout =
                 guiLayouts.loadFixedMenu("economy", "wallet", WalletGuiView.defaultLayout());
         WalletGuiView walletGuiView = new WalletGuiView(

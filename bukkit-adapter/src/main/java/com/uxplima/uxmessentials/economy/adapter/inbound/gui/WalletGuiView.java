@@ -43,7 +43,7 @@ public final class WalletGuiView {
     private final Scheduler scheduler;
     private final EconomyNotifier notifier;
     private final Messages messages;
-    private final TransactionsHistoryView historyView;
+    private final TransactionsHistoryMenu historyView;
     private final FixedMenuLayout layout;
     private final Logger log;
     private final NamespacedKey valueKey;
@@ -55,7 +55,7 @@ public final class WalletGuiView {
             Scheduler scheduler,
             EconomyNotifier notifier,
             Messages messages,
-            TransactionsHistoryView historyView,
+            TransactionsHistoryMenu historyView,
             FixedMenuLayout layout,
             Logger log) {
         Objects.requireNonNull(plugin, "plugin");
@@ -142,7 +142,7 @@ public final class WalletGuiView {
                         historyItem,
                         event -> scheduler.onEntity(viewerRef, () -> {
                             gui.close(viewer);
-                            historyView.open(viewer, viewer.getUniqueId(), viewer.getName());
+                            historyView.open(viewerRef, viewer.getUniqueId(), viewer.getName());
                         })));
     }
 

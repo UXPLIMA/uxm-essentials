@@ -49,7 +49,7 @@ public final class EconomyAdminView {
     private final PlayerLookup players;
     private final EconomyTargetView targetView;
     private final EconomyBulkView bulkView;
-    private final TransactionsHistoryView historyView;
+    private final TransactionsHistoryMenu historyView;
 
     public EconomyAdminView(
             GuiText guiText,
@@ -58,7 +58,7 @@ public final class EconomyAdminView {
             PlayerLookup players,
             EconomyTargetView targetView,
             EconomyBulkView bulkView,
-            TransactionsHistoryView historyView) {
+            TransactionsHistoryMenu historyView) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.picker = Objects.requireNonNull(picker, "picker");
@@ -104,7 +104,7 @@ public final class EconomyAdminView {
                         EconomyMessageKey.ECO_ADMIN_GUI_HISTORY_NAME,
                         EconomyMessageKey.ECO_ADMIN_GUI_HISTORY_LORE,
                         Material.BOOK,
-                        () -> openGlobalHistory(viewer, viewerRef)));
+                        () -> openGlobalHistory(viewerRef)));
         gui.set(
                 CLOSE_SLOT,
                 GuiItem.button(closeIcon(viewerRef), e -> scheduler.onEntity(viewerRef, () -> gui.close(viewer))));
@@ -124,8 +124,8 @@ public final class EconomyAdminView {
         return players.findByName(name);
     }
 
-    private void openGlobalHistory(Player viewer, PlayerRef viewerRef) {
-        scheduler.onEntity(viewerRef, () -> historyView.open(viewer, null, "Global"));
+    private void openGlobalHistory(PlayerRef viewerRef) {
+        scheduler.onEntity(viewerRef, () -> historyView.open(viewerRef, null, "Global"));
     }
 
     private GuiItem entry(PlayerRef viewer, MessageKey nameKey, MessageKey loreKey, Material icon, Runnable onClick) {
