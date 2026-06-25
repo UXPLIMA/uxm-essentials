@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.colour;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -20,6 +21,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ClickContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorOpener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -43,6 +46,12 @@ import org.jspecify.annotations.NullMarked;
  * redrawn. The setters are the module's existing application use cases wrapped as callbacks; this property holds
  * no domain logic. Geometry and materials come from a {@link ColourPickerLayout} loaded from conf, so nothing is
  * hardcoded.
+ *
+ * <p>When the click context carries a {@code SelectorOpener} (the engine editor runtime threads one in) the picker
+ * opens as an engine child window the one menu listener routes — its swatch/custom/clear/back buttons are
+ * single-gesture {@code SelectorButton}s and a swatch, clear, or back reopens the parent editor through the
+ * context's reopen hook. With no opener (the legacy {@code EntityEditorView} path) it falls back to the uxmLib
+ * {@code SimpleGui} unchanged, so both runtimes coexist while editors migrate.
  */
 @NullMarked
 public final class ColourProperty implements EditableProperty {
@@ -111,7 +120,46 @@ public final class ColourProperty implements EditableProperty {
     @Override
     public void onClick(ClickContext context) {
         Objects.requireNonNull(context, "context");
-        scheduler.onEntity(context.viewer(), () -> openPicker(context));
+        scheduler.onEntity(context.viewer(), () -> open(context));
+    }
+
+    /** Open the picker, as an engine child window when the context carries an opener, else as a uxmLib menu. */
+    private void open(ClickContext context) {
+        SelectorOpener opener = context.opener();
+        if (opener != null) {
+            openEngine(context, opener);
+        } else {
+            openPicker(context);
+        }
+    }
+
+    /**
+     * The engine picker child: the same swatch/custom/clear/back buttons as the uxmLib menu, handed to the engine
+     * opener as single-gesture {@link SelectorButton}s so the one menu listener routes them. A swatch writes its packed
+     * ARGB and reopens the parent editor; custom opens the anvil seam; clear fires the clear runnable then reopens the
+     * parent; back reopens the parent — the same {@code context.reopen()} contract the uxmLib picker uses.
+     */
+    private void openEngine(ClickContext context, SelectorOpener opener) {
+        int selected = current.getAsInt();
+        List<ColourSwatch> palette = ColourSwatch.palette();
+        List<Integer> slots = layout.paletteSlots();
+        List<Material> icons = layout.paletteIcons();
+        List<SelectorButton> buttons = new ArrayList<>();
+        for (int i = 0; i < palette.size() && i < slots.size(); i++) {
+            ColourSwatch swatch = palette.get(i);
+            ItemStack icon = swatchIcon(context.viewer(), swatch, icons.get(i), selected);
+            buttons.add(SelectorButton.of(slots.get(i), icon, () -> pick(context, swatch.argb())));
+        }
+        buttons.add(SelectorButton.of(layout.customSlot(), customIcon(context), () -> openCustom(context)));
+        buttons.add(SelectorButton.of(layout.clearSlot(), clearIcon(context), () -> clear(context)));
+        buttons.add(SelectorButton.of(
+                layout.backSlot(), backIcon(context), () -> context.reopen().run()));
+        opener.openSelector(
+                context.viewer(),
+                guiText.text(context.viewer(), text.title()),
+                layout.rows(),
+                layout.filler(),
+                buttons);
     }
 
     private void openPicker(ClickContext context) {
@@ -145,24 +193,33 @@ public final class ColourProperty implements EditableProperty {
     }
 
     private GuiItem customButton(ClickContext context) {
-        ItemStack item = ItemBuilder.of(layout.customIcon())
-                .name(guiText.text(context.viewer(), text.customName()))
-                .build();
-        return GuiItem.button(item, e -> openCustom(context));
+        return GuiItem.button(customIcon(context), e -> openCustom(context));
     }
 
     private GuiItem clearButton(ClickContext context) {
-        ItemStack item = ItemBuilder.of(layout.clearIcon())
-                .name(guiText.text(context.viewer(), text.clearName()))
-                .build();
-        return GuiItem.button(item, e -> clear(context));
+        return GuiItem.button(clearIcon(context), e -> clear(context));
     }
 
     private GuiItem backButton(ClickContext context) {
-        ItemStack item = ItemBuilder.of(layout.backIcon())
+        return GuiItem.button(backIcon(context), e -> context.reopen().run());
+    }
+
+    private ItemStack customIcon(ClickContext context) {
+        return ItemBuilder.of(layout.customIcon())
+                .name(guiText.text(context.viewer(), text.customName()))
+                .build();
+    }
+
+    private ItemStack clearIcon(ClickContext context) {
+        return ItemBuilder.of(layout.clearIcon())
+                .name(guiText.text(context.viewer(), text.clearName()))
+                .build();
+    }
+
+    private ItemStack backIcon(ClickContext context) {
+        return ItemBuilder.of(layout.backIcon())
                 .name(guiText.text(context.viewer(), text.backName()))
                 .build();
-        return GuiItem.button(item, e -> context.reopen().run());
     }
 
     private void openCustom(ClickContext context) {
@@ -171,7 +228,7 @@ public final class ColourProperty implements EditableProperty {
                 context.viewer(),
                 InputRequest.of(INPUT_KEY, text.customPrompt()),
                 raw -> applyCustom(context, raw),
-                () -> openPicker(context));
+                () -> open(context));
     }
 
     /**
@@ -184,7 +241,7 @@ public final class ColourProperty implements EditableProperty {
         Objects.requireNonNull(raw, "raw");
         Optional<Integer> parsed = ColourHex.parse(raw);
         if (parsed.isEmpty()) {
-            openPicker(context);
+            open(context);
             return;
         }
         pick(context, parsed.get());
