@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -45,18 +46,21 @@ public final class PresenceSettingsView {
             GuiLayouts guiLayouts,
             Messages messages,
             PresenceServices services,
-            PresenceStore store) {
+            PresenceStore store,
+            Menus menus) {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(services, "services");
         Objects.requireNonNull(store, "store");
+        Objects.requireNonNull(menus, "menus");
         EntityEditorLayout layout =
                 guiLayouts.loadEntityEditor(MODULE, LAYOUT, EntityEditorLayout.codeDefault(List.of(11, 15), 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
                 .scheduler(scheduler)
+                .menus(menus)
                 .layout(layout)
                 .title(PresenceMessageKey.GUI_SETTINGS_TITLE)
                 .valueLore(PresenceMessageKey.GUI_SETTINGS_VALUE_LORE)

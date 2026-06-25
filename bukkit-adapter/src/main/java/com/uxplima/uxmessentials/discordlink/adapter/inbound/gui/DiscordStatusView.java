@@ -22,13 +22,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ActionProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.ConfirmMenu;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -61,6 +61,7 @@ public final class DiscordStatusView {
     private final GuiText guiText;
     private final Scheduler scheduler;
     private final DiscordBridge bridge;
+    private final Menus menus;
 
     public DiscordStatusView(
             GuiText guiText,
@@ -71,7 +72,8 @@ public final class DiscordStatusView {
             Unlink unlink,
             LinkStatus linkStatus,
             DiscordLinkNotifier notifier,
-            DiscordBridge bridge) {
+            DiscordBridge bridge,
+            Menus menus) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
@@ -81,12 +83,14 @@ public final class DiscordStatusView {
         this.linkStatus = Objects.requireNonNull(linkStatus, "linkStatus");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.bridge = Objects.requireNonNull(bridge, "bridge");
+        this.menus = Objects.requireNonNull(menus, "menus");
 
         EntityEditorLayout layout = guiLayouts.loadEntityEditor(
                 MODULE, PANEL_LAYOUT, EntityEditorLayout.codeDefault(List.of(STATUS_SLOT, ACTION_SLOT), 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
                 .scheduler(scheduler)
+                .menus(menus)
                 .layout(layout)
                 .title(DiscordlinkMessageKey.GUI_TITLE)
                 .valueLore(DiscordlinkMessageKey.GUI_VALUE_LORE)
@@ -138,7 +142,8 @@ public final class DiscordStatusView {
     private void confirmUnlink(Player player, Runnable reopen) {
         PlayerRef viewer = BukkitRefs.toRef(player);
         Component title = guiText.text(viewer, DiscordlinkMessageKey.GUI_UNLINK_CONFIRM);
-        ConfirmMenu.of(title, () -> runUnlink(viewer, reopen), reopen).open(player);
+        // The unlink gate is the engine's two-button confirm menu: yes runs Unlink, no reopens the status panel.
+        menus.confirm(viewer, title, () -> runUnlink(viewer, reopen), reopen);
     }
 
     private void runUnlink(PlayerRef viewer, Runnable reopen) {

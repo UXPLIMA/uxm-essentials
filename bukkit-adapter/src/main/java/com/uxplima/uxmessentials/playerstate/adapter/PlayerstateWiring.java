@@ -71,6 +71,7 @@ import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -93,11 +94,16 @@ public final class PlayerstateWiring {
 
     /** Build the playerstate adapters and use cases from {@code ctx}, ready to register with the plugin. */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, PlaytimeRepository playtimeRepository, GuiLayouts guiLayouts) {
+            Plugin plugin,
+            ModuleContext ctx,
+            PlaytimeRepository playtimeRepository,
+            GuiLayouts guiLayouts,
+            Menus menus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(playtimeRepository, "playtimeRepository");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
         ConfigStore config = ctx.config();
         Clock clock = Clock.systemUTC();
@@ -137,7 +143,8 @@ public final class PlayerstateWiring {
                 kernel.scheduler(),
                 guiLayouts,
                 kernel.messages(),
-                services.showPlaytime());
+                services.showPlaytime(),
+                menus);
         List<CommandRegistration> commands =
                 PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds, playtimeView);
         List<Listener> listeners = List.of(

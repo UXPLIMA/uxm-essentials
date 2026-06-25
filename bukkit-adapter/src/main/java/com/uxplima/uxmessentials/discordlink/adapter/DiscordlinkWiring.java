@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -46,11 +47,13 @@ public final class DiscordlinkWiring {
     private DiscordlinkWiring() {}
 
     /** Build the discord-link adapters and use cases over the kernel ports and the persistence DSL. */
-    public static Wired wire(ModuleContext ctx, Persistence persistence, GuiLayouts guiLayouts, DiscordBridge bridge) {
+    public static Wired wire(
+            ModuleContext ctx, Persistence persistence, GuiLayouts guiLayouts, DiscordBridge bridge, Menus menus) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(bridge, "bridge");
+        Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
         DiscordLinkStore store = DiscordLinkStores.jooq(persistence);
         Clock clock = Clock.systemUTC();
@@ -75,7 +78,8 @@ public final class DiscordlinkWiring {
                 unlink,
                 linkStatus,
                 notifier,
-                bridge);
+                bridge,
+                menus);
         DiscordLinkConfirmation confirmation = new ConfirmLinkService(confirmLink, kernel.playerLookup());
         return new Wired(DiscordLinkCommands.all(services, view), confirmation, store, view);
     }

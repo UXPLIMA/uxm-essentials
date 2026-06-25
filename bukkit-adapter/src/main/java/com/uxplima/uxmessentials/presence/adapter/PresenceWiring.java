@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -62,11 +63,12 @@ public final class PresenceWiring {
 
     /** Build the presence adapters and use cases from {@code plugin} and {@code ctx}, ready to register. */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, ManagementGuiRegistry guiRegistry) {
+            Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, ManagementGuiRegistry guiRegistry, Menus menus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
+        Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
         PresenceSettings settings = new PresenceSettings(ctx.config());
         Clock clock = Clock.systemUTC();
@@ -92,8 +94,8 @@ public final class PresenceWiring {
         // /afk and /vanish commands do, so /presencesettings, the panel, and the commands all see one state. The
         // presence entry on the /uxmess gui hub opens the same panel for an admin (gated uxmessentials.presence.gui).
         GuiText guiText = new GuiText(kernel.messages());
-        PresenceSettingsView settingsView =
-                new PresenceSettingsView(guiText, kernel.scheduler(), guiLayouts, kernel.messages(), services, store);
+        PresenceSettingsView settingsView = new PresenceSettingsView(
+                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), services, store, menus);
         guiRegistry.register(new ManagementGuiEntry(
                 "presence",
                 com.uxplima.uxmessentials.presence.application.PresenceMessageKey.GUI_SETTINGS_TITLE,

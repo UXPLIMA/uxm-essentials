@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -53,14 +54,21 @@ public final class PlaytimeView {
     private final Scheduler scheduler;
     private final Messages messages;
     private final ShowPlaytime showPlaytime;
+    private final Menus menus;
     private final EntityEditorLayout layout;
 
     public PlaytimeView(
-            GuiText guiText, Scheduler scheduler, GuiLayouts guiLayouts, Messages messages, ShowPlaytime showPlaytime) {
+            GuiText guiText,
+            Scheduler scheduler,
+            GuiLayouts guiLayouts,
+            Messages messages,
+            ShowPlaytime showPlaytime,
+            Menus menus) {
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.showPlaytime = Objects.requireNonNull(showPlaytime, "showPlaytime");
+        this.menus = Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         // A 3-row panel (slots 0..26): the five breakdown rows sit in the middle band, the close button last.
         this.layout = guiLayouts.loadEntityEditor(
@@ -88,6 +96,7 @@ public final class PlaytimeView {
         return SettingsPanelView.builder()
                 .guiText(guiText)
                 .scheduler(scheduler)
+                .menus(menus)
                 .layout(layout)
                 .title(title)
                 .valueLore(PlayerstateMessageKey.PLAYTIME_GUI_VALUE_LORE)

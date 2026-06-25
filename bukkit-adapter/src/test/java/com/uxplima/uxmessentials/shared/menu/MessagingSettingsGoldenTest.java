@@ -26,7 +26,6 @@ import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingSettings
 import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
@@ -39,8 +38,6 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRe
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -167,56 +164,31 @@ class MessagingSettingsGoldenTest {
     }
 
     /**
-     * Render the bespoke {@link SettingsPanelView} for the same fixture as the parity reference. It is built here
-     * directly (not through the migrated view) because the view no longer rides it; the panel class itself still
-     * exists for the other settings panels, so it remains a faithful "before" snapshot.
+     * The frozen parity baseline the engine render is asserted against: the exact {@code (slot → material, name,
+     * value-lore)} the bespoke {@code SettingsPanelView} drew for a staff fixture with social-spy off. The shim now
+     * makes {@code SettingsPanelView} ride the engine, so a live "before" render is no longer a faithful "before";
+     * the baseline is therefore the geometry + catalog keys read off the retired view — the same way the kit/warp
+     * golden tests freeze their baseline. Names resolve to the catalog key itself ({@code KeyMessages} echoes it),
+     * and each toggle's value-lore is {@code value=<on/off key>}, with the social-spy toggle always off here.
      */
     private Map<Integer, Snapshot> snapshotOldView(boolean accepts, boolean staff) {
-        FakeToggles toggles = new FakeToggles(accepts);
-        FakeSocialSpy socialSpy = new FakeSocialSpy(false);
-        SettingsPanelView panel = SettingsPanelView.builder()
-                .guiText(guiText)
-                .scheduler(scheduler)
-                .layout(layout())
-                .title(MessagingMessageKey.GUI_SETTINGS_TITLE)
-                .valueLore(MessagingMessageKey.GUI_SETTINGS_VALUE_LORE)
-                .backName(MessagingMessageKey.GUI_SETTINGS_BACK)
-                .settings(v -> settings(toggles, socialSpy, perms(staff), v))
-                .onBack((p, v) -> p.closeInventory())
-                .build();
-        panel.open(player, viewer);
-        return snapshot(player.getOpenInventory().getTopInventory());
-    }
-
-    /** The same two toggles the migrated view builds, replicated here for the old-view parity reference. */
-    private List<EditableProperty> settings(
-            FakeToggles toggles, FakeSocialSpy socialSpy, Permissions permissions, PlayerRef who) {
-        java.util.List<EditableProperty> props = new java.util.ArrayList<>(2);
-        props.add(ToggleProperty.ofBoolean(
-                MessagingMessageKey.GUI_SETTINGS_ACCEPT,
-                Material.WRITABLE_BOOK,
-                () -> toggles.acceptsMessages(who),
-                (v, on) -> onOff(v, on),
-                on -> {
-                    if (toggles.acceptsMessages(who) != on) {
-                        toggles.toggle(who);
-                    }
-                },
-                scheduler));
-        if (permissions.has(who, "uxmessentials.msg.socialspy")) {
-            props.add(ToggleProperty.ofBoolean(
-                    MessagingMessageKey.GUI_SETTINGS_SOCIALSPY,
-                    Material.ENDER_EYE,
-                    () -> socialSpy.isSpying(who),
-                    (v, on) -> onOff(v, on),
-                    on -> {
-                        if (socialSpy.isSpying(who) != on) {
-                            socialSpy.toggle(who);
-                        }
-                    },
-                    scheduler));
+        Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
+        baseline.put(
+                ACCEPT_SLOT,
+                new Snapshot(
+                        Material.WRITABLE_BOOK,
+                        MessagingMessageKey.GUI_SETTINGS_ACCEPT.key(),
+                        "value=" + onOff(viewer, accepts)));
+        if (staff) {
+            baseline.put(
+                    SOCIALSPY_SLOT,
+                    new Snapshot(
+                            Material.ENDER_EYE,
+                            MessagingMessageKey.GUI_SETTINGS_SOCIALSPY.key(),
+                            "value=" + onOff(viewer, false)));
         }
-        return List.copyOf(props);
+        baseline.put(BACK_SLOT, new Snapshot(Material.ARROW, MessagingMessageKey.GUI_SETTINGS_BACK.key(), ""));
+        return baseline;
     }
 
     private String onOff(PlayerRef who, boolean on) {
@@ -238,10 +210,6 @@ class MessagingSettingsGoldenTest {
         // No conf on disk and no bundled resource under the temp root, so the loader falls to the code default;
         // it carries the same geometry the production messaging-settings.conf ships, so the snapshot is faithful.
         return new GuiLayouts(java.nio.file.Path.of("nonexistent-" + UUID.randomUUID()), NOOP);
-    }
-
-    private static EntityEditorLayout layout() {
-        return EntityEditorLayout.codeDefault(SLOTS, BACK_SLOT);
     }
 
     private static Permissions perms(boolean grant) {

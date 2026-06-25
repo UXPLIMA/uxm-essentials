@@ -21,6 +21,16 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -29,8 +39,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.TeleportSettingsView;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFlags;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,8 +50,9 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * MockBukkit coverage of the teleport per-player settings panel. The panel draws one toggle per conf slot,
  * each reading and writing the same {@link TeleportFlags} the {@code /tptoggle} and {@code /tpauto} commands
- * do: opening reflects the stored flag, a click flips it through the port, and a re-open shows the new value.
- * The scheduler is synchronous so the off-thread setter runs inline.
+ * do: opening reflects the stored flag, a click flips it through the port, and an in-place re-render shows the
+ * new value. The panel now rides the menu engine's property-editor runtime, so the window is a {@link MenuHolder}
+ * routed by the one {@link MenuListener}. The scheduler is synchronous so the off-thread setter runs inline.
  */
 class TeleportSettingsViewTest {
 
@@ -68,7 +77,6 @@ class TeleportSettingsViewTest {
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -77,7 +85,7 @@ class TeleportSettingsViewTest {
         view(dir).open(player, viewer);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getHolder()).isInstanceOf(SimpleGui.class);
+        assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(inv.getItem(11).getType()).isEqualTo(Material.ENDER_PEARL); // accept-requests toggle
         assertThat(inv.getItem(15).getType()).isEqualTo(Material.LIME_DYE); // auto-accept toggle
         assertThat(inv.getItem(22).getType()).isEqualTo(Material.ARROW); // back / close
@@ -132,10 +140,20 @@ class TeleportSettingsViewTest {
     }
 
     private TeleportSettingsView view(Path dir) throws Exception {
-        Guis.install(plugin);
         writeLayout(dir);
         GuiLayouts layouts = new GuiLayouts(dir, NOOP);
-        return new TeleportSettingsView(guiText, scheduler, layouts, new KeyMessages(), flags);
+        return new TeleportSettingsView(guiText, scheduler, layouts, new KeyMessages(), flags, engine());
+    }
+
+    /** A minimal editor-capable engine + listener so the migrated panel can open through the runtime. */
+    private Menus engine() {
+        EditorRenderer editorRenderer = new EditorRenderer(guiText);
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, new PlaceholderRegistry());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
+        MenuListener listener = new MenuListener(
+                renderer, new ActionRegistry(), new ConditionRegistry(), scheduler, plugin, editorRenderer);
+        server.getPluginManager().registerEvents(listener, plugin);
+        return new Menus(renderer, scheduler, new ListSourceRegistry(), editorRenderer);
     }
 
     private void writeLayout(Path dir) throws Exception {

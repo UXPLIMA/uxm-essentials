@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.EditableProperty;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.ToggleProperty;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -48,19 +49,22 @@ public final class ScoreboardSettingsView {
             GuiLayouts guiLayouts,
             Messages messages,
             ScoreboardVisibilityStore visibility,
-            ToggleScoreboard toggle) {
+            ToggleScoreboard toggle,
+            Menus menus) {
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(messages, "messages");
         Objects.requireNonNull(visibility, "visibility");
         Objects.requireNonNull(toggle, "toggle");
+        Objects.requireNonNull(menus, "menus");
 
         EntityEditorLayout layout = guiLayouts.loadEntityEditor(
                 MODULE, PANEL_LAYOUT, EntityEditorLayout.codeDefault(List.of(VISIBILITY_SLOT), 22));
         this.panel = SettingsPanelView.builder()
                 .guiText(guiText)
                 .scheduler(scheduler)
+                .menus(menus)
                 .layout(layout)
                 .title(ScoreboardMessageKey.GUI_TITLE)
                 .valueLore(ScoreboardMessageKey.GUI_VALUE_LORE)

@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilit
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.nametag.NameVisibilityCoordinator;
@@ -62,11 +63,16 @@ public final class ScoreboardWiring {
      * team registry.
      */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, NameVisibilityCoordinator nameVisibility, GuiLayouts guiLayouts) {
+            Plugin plugin,
+            ModuleContext ctx,
+            NameVisibilityCoordinator nameVisibility,
+            GuiLayouts guiLayouts,
+            Menus menus) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(nameVisibility, "nameVisibility");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
+        Objects.requireNonNull(menus, "menus");
         KernelPorts kernel = ctx.kernel();
         Path dir = plugin.getDataFolder().toPath().resolve(MODULE_DIR);
         ScoreboardSettings settings = new ScoreboardSettings(dir, kernel.log());
@@ -89,7 +95,7 @@ public final class ScoreboardWiring {
         // the live board on its next tick from the same PDC bit. /scoreboard gui and the /uxmess gui hub both open it.
         GuiText guiText = new GuiText(kernel.messages());
         ScoreboardSettingsView settingsView = new ScoreboardSettingsView(
-                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), visibility, toggle);
+                guiText, kernel.scheduler(), guiLayouts, kernel.messages(), visibility, toggle, menus);
 
         List<CommandRegistration> commands =
                 List.of(new ScoreboardCommand(toggle, renderer, kernel.scheduler(), kernel.messages(), settingsView));

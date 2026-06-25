@@ -467,7 +467,7 @@ public final class PluginModule {
         // started. teleport builds its durable jOOQ spawn directory over persistence.dsl(); homes builds
         // its jOOQ repository the same way and delegates execution to the captured teleport engine.
         if (module.id().equals(ModuleId.of("teleport"))) {
-            wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
+            wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
             wireWorlds(
                     plugin,
@@ -500,7 +500,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("kits"))) {
             wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
-            wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts);
+            wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts, menus);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
             wireMessaging(
                     plugin,
@@ -515,7 +515,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("presence"))) {
-            wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry);
+            wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
             wireModeration(
                     plugin,
@@ -572,13 +572,13 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("scoreboard"))) {
-            wireScoreboard(plugin, ctx, resources, links, guiLayouts, guiRegistry);
+            wireScoreboard(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
             wireTablist(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("discordlink"))) {
-            wireDiscordlink(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
+            wireDiscordlink(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
             wireNametags(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("staff"))) {
@@ -628,8 +628,9 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
-        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx, persistence, guiLayouts, guiRegistry);
+            ManagementGuiRegistry guiRegistry,
+            Menus menus) {
+        TeleportWiring.Wired wired = TeleportWiring.wire(plugin, ctx, persistence, guiLayouts, guiRegistry, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -891,13 +892,14 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            GuiLayouts guiLayouts) {
+            GuiLayouts guiLayouts,
+            Menus menus) {
         // playerstate's only durable state is the per-day playtime ledger behind /playtime, built over
         // persistence.dsl(); the per-player snapshot map stays transient in-memory and all live-player
         // reconciliation routes through the kernel Scheduler port onto the owning region thread. The AFK-aware
         // playtime sampler is armed below and stopped on module disable, leaving no orphaned tick.
         PlaytimeRepository playtimeRepository = PlaytimeRepositories.jooq(persistence);
-        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts);
+        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -1112,14 +1114,15 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            Menus menus) {
         // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Its
         // BukkitVisibilityApplier drives the canSee graph that messaging's /msg resolution and teleport's /tpa
         // listing already read, so the vanish soft-couple needs no extra cross-context handle wired here. The
         // AFK soft-couple does need one: presence rebinds messaging's MutableAfkStatus (captured during the
         // earlier messaging wiring) to a PresenceAfkStatus over this store so /msg adds the AFK courtesy
         // notice. When messaging is disabled the holder is absent and the bind is a no-op.
-        PresenceWiring.Wired wired = PresenceWiring.wire(plugin, ctx, guiLayouts, guiRegistry);
+        PresenceWiring.Wired wired = PresenceWiring.wire(plugin, ctx, guiLayouts, guiRegistry, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -1284,7 +1287,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            Menus menus) {
         // scoreboard persists nothing: the per-player "hidden" bit is PDC-backed (survives relog) and the sidebar /
         // tablist content is config-authored under modules/scoreboard/config.conf. Its one cross-context handle is the
         // shared NameVisibilityCoordinator: the SidebarManager re-applies the vanilla-name-hide team after every board
@@ -1293,7 +1297,7 @@ public final class PluginModule {
         // on the Scheduler port is stopped and every active board torn down on disable. The settings panel consumes
         // the SP0 GUI framework (a GuiText over the shared catalog, the data-folder layout loader) and registers its
         // /uxmess gui hub entry; /scoreboard gui opens the same single-toggle panel, gated on the GUI node.
-        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.nameVisibility, guiLayouts);
+        ScoreboardWiring.Wired wired = ScoreboardWiring.wire(plugin, ctx, links.nameVisibility, guiLayouts, menus);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The scoreboard PAPI seam reads the same PDC-backed "hidden" bit the /scoreboard toggle flips, so the
@@ -1457,7 +1461,8 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            Menus menus) {
         // discordlink builds its un-cached jOOQ store over persistence.dsl() (the discord_link_pending and
         // discord_links tables ship in the persistence V16 baseline, always applied) and the /discordlink and
         // /discordunlink commands. It registers its ConfirmLink seam into the ServicesManager so the optional
@@ -1469,7 +1474,7 @@ public final class PluginModule {
         com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge bridge =
                 new com.uxplima.uxmessentials.discordlink.adapter.outbound.ServicesManagerDiscordBridge(
                         plugin.getServer().getServicesManager());
-        DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence, guiLayouts, bridge);
+        DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence, guiLayouts, bridge, menus);
         wired.commands().forEach(resources::addCommand);
         // The discordlink PAPI seam reads the same DB-backed link store the /discordlink commands hold, so a
         // placeholder matches the binding the player redeemed (and answers for an offline player too).

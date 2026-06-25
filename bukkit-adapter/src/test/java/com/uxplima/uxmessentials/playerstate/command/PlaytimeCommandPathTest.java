@@ -265,8 +265,25 @@ class PlaytimeCommandPathTest {
         com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts layouts =
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(dataFolder, new NoopLogger());
         var view = new com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView(
-                guiText, new SyncScheduler(), layouts, new EchoMessages(), show);
+                guiText, new SyncScheduler(), layouts, new EchoMessages(), show, engine(guiText));
         return new PlaytimeCommand(servicesWith(), new EchoMessages(), view);
+    }
+
+    /** A minimal editor-capable engine; this test only wires the view into a command and never opens it. */
+    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus engine(
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText guiText) {
+        var editorRenderer =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer(guiText);
+        var itemRenderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer(
+                guiText, new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.PlaceholderRegistry());
+        var renderer = new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer(
+                itemRenderer,
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry());
+        return new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus(
+                renderer,
+                new SyncScheduler(),
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry(),
+                editorRenderer);
     }
 
     /** The same mock service bundle as {@link #setUp}, with the real show/reset use cases wired. */
