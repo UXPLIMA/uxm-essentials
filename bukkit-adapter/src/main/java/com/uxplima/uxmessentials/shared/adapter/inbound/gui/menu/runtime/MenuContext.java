@@ -22,18 +22,21 @@ public final class MenuContext {
 
     private final int page;
 
+    private final int pageCount;
+
     @Nullable private final Object entry;
 
-    private MenuContext(PlayerRef viewer, @Nullable Object subject, int page, @Nullable Object entry) {
+    private MenuContext(PlayerRef viewer, @Nullable Object subject, int page, int pageCount, @Nullable Object entry) {
         this.viewer = Objects.requireNonNull(viewer, "viewer");
         this.subject = subject;
         this.page = page;
+        this.pageCount = pageCount;
         this.entry = entry;
     }
 
-    /** Opens a fresh context with no list element bound yet. */
+    /** Opens a fresh context with no list element bound yet and a single-page count until the renderer knows better. */
     public static MenuContext of(PlayerRef viewer, @Nullable Object subject, int page) {
-        return new MenuContext(viewer, subject, page, null);
+        return new MenuContext(viewer, subject, page, 1, null);
     }
 
     public PlayerRef viewer() {
@@ -42,6 +45,11 @@ public final class MenuContext {
 
     public int page() {
         return page;
+    }
+
+    /** How many pages the menu's list spans, one-based; the renderer stamps it before drawing static items. */
+    public int pageCount() {
+        return pageCount;
     }
 
     public Optional<Object> subjectRaw() {
@@ -75,14 +83,19 @@ public final class MenuContext {
         return type.cast(value);
     }
 
-    /** A copy bound to one list element, leaving viewer, subject and page untouched. */
+    /** A copy bound to one list element, leaving viewer, subject, page and page count untouched. */
     public MenuContext withEntry(Object entry) {
         Objects.requireNonNull(entry, "entry");
-        return new MenuContext(viewer, subject, page, entry);
+        return new MenuContext(viewer, subject, page, pageCount, entry);
     }
 
-    /** A copy on a new page, used when the renderer or listener advances pagination. */
+    /** A copy on a new page, used when the renderer or listener advances pagination; resets nothing else. */
     public MenuContext withPage(int page) {
-        return new MenuContext(viewer, subject, page, entry);
+        return new MenuContext(viewer, subject, page, pageCount, entry);
+    }
+
+    /** A copy carrying the page count the renderer computed, so a static item's {@code %max_page%} can read it. */
+    public MenuContext withPageCount(int pageCount) {
+        return new MenuContext(viewer, subject, page, pageCount, entry);
     }
 }

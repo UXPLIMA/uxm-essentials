@@ -75,10 +75,33 @@ public final class MenuRenderer {
         for (MenuItemSpec item : spec.items().values()) {
             (item.list().isPresent() ? listItems : staticItems).add(item);
         }
-        populateStatic(inv, staticItems, ctx, clickSink);
+        MenuContext staticCtx = ctx.withPageCount(pageCount(listItems, ctx, resolvedLists));
+        populateStatic(inv, staticItems, staticCtx, clickSink);
         for (MenuItemSpec listItem : listItems) {
             populateList(inv, listItem, ctx, clickSink, resolvedLists);
         }
+    }
+
+    /**
+     * How many pages the menu's list spans, computed once before static items render so a static item's
+     * {@code %max_page%} resolves to the same count {@link #populateList} will page across. A spec with no list item
+     * stays a single page. Only the first list item is consulted — a spec pairs one scrollable list with its page
+     * controls, and the page count those controls report is that list's.
+     */
+    private int pageCount(List<MenuItemSpec> listItems, MenuContext ctx, Map<String, List<?>> resolvedLists) {
+        if (listItems.isEmpty()) {
+            return 1;
+        }
+        MenuItemSpec listItem = listItems.get(0);
+        List<?> entries = entriesOf(listItem, resolvedLists);
+        return Pagination.paginate(entries, listItem.slots().slots(), ctx.page())
+                .pageCount();
+    }
+
+    /** The pre-resolved entries backing {@code listItem}, or an empty list when its source resolved to nothing. */
+    private List<?> entriesOf(MenuItemSpec listItem, Map<String, List<?>> resolvedLists) {
+        ListSpec listSpec = listItem.list().orElseThrow();
+        return resolvedLists.getOrDefault(listSpec.source().id(), List.of());
     }
 
     /** Resolve the static items to one-per-slot and render the survivors, recording each as a static slot. */
@@ -104,7 +127,7 @@ public final class MenuRenderer {
             BiConsumer<Integer, RenderedSlot> clickSink,
             Map<String, List<?>> resolvedLists) {
         ListSpec listSpec = item.list().orElseThrow();
-        List<?> entries = resolvedLists.getOrDefault(listSpec.source().id(), List.of());
+        List<?> entries = entriesOf(item, resolvedLists);
         List<Integer> contentSlots = item.slots().slots();
         @SuppressWarnings("unchecked") // a list source's element type is opaque to the engine; entries flow as Object
         Pagination.Page<Object> page = Pagination.paginate((List<Object>) entries, contentSlots, ctx.page());

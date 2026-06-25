@@ -128,15 +128,16 @@ public final class MenuVocabulary {
     }
 
     /**
-     * Register the generic placeholders into {@code bindings}. {@code player} expands to the viewer's name and
-     * {@code page} to the one-based page number for display ({@code ctx.page()} is zero-based). {@code max-page} is
-     * deliberately left out: it needs the render-time page count, which the {@link MenuContext} does not carry — a
-     * later refinement resolves it where the renderer knows how many pages a list produced.
+     * Register the generic placeholders into {@code bindings}. {@code player} expands to the viewer's name,
+     * {@code page} to the one-based current page number for display ({@code ctx.page()} is zero-based), and
+     * {@code max_page} to the total page count the renderer stamps onto the context before drawing static items, so a
+     * "Page %page%/%max_page%" indicator reads the same count its list paginates across.
      */
     public static void registerPlaceholders(MenuBindings bindings) {
         Objects.requireNonNull(bindings, "bindings");
         bindings.placeholder("player", ctx -> ctx.viewer().name());
         bindings.placeholder("page", ctx -> String.valueOf(ctx.page() + 1));
+        bindings.placeholder("max_page", ctx -> String.valueOf(ctx.pageCount()));
     }
 
     /**
