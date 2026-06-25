@@ -87,6 +87,7 @@ class ShippedSpecBindingsDriftTest {
             "homes:open-invites",
             "homes:action-back",
             "homes:open-slot",
+            "moderation:open-detail",
             "moderation:release");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
@@ -190,6 +191,12 @@ class ShippedSpecBindingsDriftTest {
             "home_icon",
             "home_cell_name",
             "home_cell_lore",
+            "mod_active_icon",
+            "mod_active_player",
+            "mod_active_type",
+            "mod_active_issuer",
+            "mod_active_reason",
+            "mod_active_remaining",
             "mod_history_icon",
             "mod_history_action",
             "mod_history_issuer",
@@ -217,6 +224,7 @@ class ShippedSpecBindingsDriftTest {
             "homes:icon-palette",
             "homes:invited-players",
             "home:slots",
+            "moderation:active",
             "moderation:history",
             "moderation:jailed");
 

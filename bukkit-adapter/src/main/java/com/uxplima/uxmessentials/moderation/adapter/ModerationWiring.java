@@ -196,15 +196,15 @@ public final class ModerationWiring {
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
         gates.bindJail(jailGate);
-        // The management GUI consumes the SP0 framework: a GuiText over the shared catalog and the data-folder
-        // layout loader (disk-first, then bundled). The three views (active-punishments list → per-punishment
-        // detail/revoke → player history) read FRESH from the same repository / history port the list commands
-        // use and revoke through the same audited unban/unmute/unjail use cases the /un* commands take. The
-        // /mod command and the /uxmess gui hub entry both open the active-punishments list.
-        // The history list and the jailed-players release list render through the shared menu engine: each
-        // registers its spec and bindings once here, then opens through the Menus façade. The history read and the
-        // jailed read (with its name/remaining resolution) both run off the tick thread at the open site, so the
-        // list sources only read a pre-resolved subject.
+        // The management GUI's three views (active-punishments list → per-punishment detail/revoke → player history)
+        // read FRESH from the same repository / history port the list commands use and revoke through the same
+        // audited unban/unmute/unjail use cases the /un* commands take. The /mod command and the /uxmess gui hub
+        // entry both open the active-punishments list.
+        // The active-punishments list, the history list and the jailed-players release list all render through the
+        // shared menu engine: each registers its spec and bindings once here, then opens through the Menus façade.
+        // Every list's read (with its name/kind/remaining resolution) runs off the tick thread at the open site, so
+        // the list sources only read a pre-resolved subject. The active list's left click opens the still-bespoke
+        // PunishmentDetailView; that view's back reopens the engine list, a cycle broken inside ModerationGuiViews.
         ModerationHistoryMenu historyMenu = new ModerationHistoryMenu(menus, kernel.scheduler(), sanctionHistory);
         historyMenu.register(menuBindings, dataFolder, kernel.log());
         ModerationJailedMenu jailedMenu = new ModerationJailedMenu(
@@ -216,9 +216,14 @@ public final class ModerationWiring {
                 services,
                 repository,
                 kernel.playerLookup(),
+                kernel.messages(),
                 historyMenu,
                 clock,
-                guiLayouts);
+                guiLayouts,
+                menus,
+                menuBindings,
+                dataFolder,
+                kernel.log());
         // The bare-command GUI flow for the named sanctions (/ban /mute /tempban /tempmute /warn /banip): the
         // reusable player picker — and, for the timed verbs, the reusable duration picker — into the per-target
         // confirm screen, ending in the same audited use cases the raw subcommands take. The views stay generic:

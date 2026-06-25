@@ -19,7 +19,6 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
 
@@ -36,13 +35,11 @@ import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityEditorLayout;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -56,18 +53,17 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the moderation management GUI: the active-punishments list renders one icon per active
- * ban/mute/jail at the conf slots; clicking one opens the detail/manage view; the Revoke button is confirm-gated
- * and, only on confirm, calls the matching revoke seam (which the production wiring binds to unban/unmute/unjail);
- * the "view history" button hands the clicked target to the engine-rendered history menu (its rendering is covered
- * by {@code ModerationHistoryListGoldenTest}); and the entry point is permission-gated. The views are laid out from
- * temp confs (no hardcoded slots); the
- * scheduler runs every hop inline so the off-thread reads and writes land synchronously.
+ * MockBukkit coverage of the moderation management GUI's bespoke detail/manage view: the Revoke button is
+ * confirm-gated and, only on confirm, calls the matching revoke seam (which the production wiring binds to
+ * unban/unmute/unjail); the "view history" button hands the clicked target to the engine-rendered history menu (its
+ * rendering is covered by {@code ModerationHistoryListGoldenTest}); and the entry point is permission-gated. The
+ * active-punishments list itself now renders through the menu engine — its grid and its click-opens-detail gesture
+ * are covered slot-for-slot by {@code ModerationActiveListGoldenTest}. The detail view is laid out from a temp conf
+ * (no hardcoded slots); the scheduler runs every hop inline so the off-thread reads and writes land synchronously.
  */
 class ModerationGuiTest {
 
     private static final List<Integer> DETAIL_SLOTS = List.of(10, 11, 12, 13, 14, 16);
-    private static final int TARGET_SLOT = DETAIL_SLOTS.get(0);
     private static final int HISTORY_SLOT = DETAIL_SLOTS.get(5);
     private static final int REVOKE_SLOT = 26;
     private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu's confirm button slot
@@ -82,7 +78,6 @@ class ModerationGuiTest {
     private FakeRepository repository;
     private RecordingRevoker revoker;
 
-    private ActivePunishmentsView list;
     private PunishmentDetailView detail;
     private final List<UUID> historyOpened = new ArrayList<>();
 
@@ -100,54 +95,26 @@ class ModerationGuiTest {
         historyOpened.clear();
         Guis.install(plugin);
 
-        EntityListLayout listLayout = listLayout(dir, "punishments-list");
         EntityEditorLayout detailLayout = detailLayout(dir);
 
-        // The history button now hands the clicked punishment's target to the engine-rendered history menu (covered
-        // by ModerationHistoryListGoldenTest); here it captures the target so the button's wiring is asserted.
+        // The back button now reopens the engine-rendered active list (covered by ModerationActiveListGoldenTest) and
+        // the history button hands the clicked punishment's target to the engine-rendered history menu (covered by
+        // ModerationHistoryListGoldenTest); here back is a no-op and history captures the target so the button's
+        // wiring is asserted.
         detail = new PunishmentDetailView(
                 guiText,
                 scheduler,
                 revoker,
                 clock,
                 detailLayout,
-                (p, v) -> list.open(p, v),
+                (p, v) -> {},
                 (p, punishment) -> historyOpened.add(punishment.target()));
-        list = new ActivePunishmentsView(guiText, scheduler, repository, new FakeLookup(), clock, listLayout, detail);
     }
 
     @AfterEach
     void tearDown() {
         Guis.uninstall();
         MockBukkit.unmock();
-    }
-
-    @Test
-    void listRendersOnePunishmentIconPerActiveSanctionAtTheConfSlots() {
-        repository.addBan(uuid("Mallory"), Instant.now().plus(Duration.ofDays(7)));
-        repository.addMute(uuid("Eve"));
-
-        list.open(player, viewer);
-
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        // Two content slots are configured; the ban and the mute fill them, a third carries the filler.
-        assertThat(inv.getItem(10).getType()).isEqualTo(Material.BARRIER); // ban icon
-        assertThat(inv.getItem(11).getType()).isEqualTo(Material.BOOK); // mute icon
-        assertThat(inv.getItem(12).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
-    }
-
-    @Test
-    void clickingAPunishmentOpensTheDetailView() {
-        repository.addBan(uuid("Mallory"), Instant.now().plus(Duration.ofDays(7)));
-        list.open(player, viewer);
-
-        fireClick(10, ClickType.LEFT);
-
-        Inventory inv = player.getOpenInventory().getTopInventory();
-        // The detail grid replaces the inventory: a read-only target label sits at the first property slot.
-        assertThat(inv.getItem(TARGET_SLOT)).isNotNull();
-        assertThat(inv.getItem(TARGET_SLOT).getType()).isEqualTo(Material.PLAYER_HEAD);
-        assertThat(inv.getItem(REVOKE_SLOT).getType()).isEqualTo(Material.LAVA_BUCKET);
     }
 
     @Test
@@ -199,23 +166,6 @@ class ModerationGuiTest {
         server.getPluginManager().callEvent(event);
     }
 
-    private EntityListLayout listLayout(Path dir, String name) throws Exception {
-        Path file = dir.resolve("modules").resolve("moderation").resolve("gui").resolve(name + ".conf");
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, """
-                rows = 6
-                fallback-icon = "BARRIER"
-                nav-icon = "ARROW"
-                filler = "BLACK_STAINED_GLASS_PANE"
-                prev-slot = 48
-                next-slot = 50
-                create-slot = -1
-                content-slots = [10, 11]
-                """);
-        return new GuiLayouts(dir, NOOP)
-                .loadEntityList("moderation", name, EntityListLayout.paginatedDefault(Material.BARRIER));
-    }
-
     private EntityEditorLayout detailLayout(Path dir) throws Exception {
         Path file = dir.resolve("modules").resolve("moderation").resolve("gui").resolve("punishment-detail.conf");
         Files.createDirectories(file.getParent());
@@ -249,23 +199,6 @@ class ModerationGuiTest {
         @Override
         public void revoke(PlayerRef actor, PlayerRef target, PunishmentKind kind) {
             revoked.add(new Revoked(actor, target, kind));
-        }
-    }
-
-    private static final class FakeLookup implements PlayerLookup {
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.of(new PlayerRef(uuid(name), name));
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.of(new PlayerRef(uuid, "player"));
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return true;
         }
     }
 
@@ -325,10 +258,6 @@ class ModerationGuiTest {
 
         void addBan(UUID target, Instant until) {
             bans.add(new BanEntry(target, Issuer.console("console"), Optional.of("test"), until));
-        }
-
-        void addMute(UUID target) {
-            mutes.add(new MuteEntry(target, Issuer.console("console"), Optional.of("test"), Optional.empty()));
         }
 
         /** The first active punishment as the list projects it — for driving the detail view directly. */

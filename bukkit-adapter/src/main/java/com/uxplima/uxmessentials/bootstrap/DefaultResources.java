@@ -119,6 +119,7 @@ final class DefaultResources {
             "modules/menu/specs/home-action.conf",
             "modules/menu/specs/home-list.conf",
             "modules/menu/specs/world-list.conf",
+            "modules/menu/specs/moderation-active.conf",
             "modules/menu/specs/moderation-history.conf",
             "modules/menu/specs/moderation-jailed.conf",
             "menus/example.conf",
