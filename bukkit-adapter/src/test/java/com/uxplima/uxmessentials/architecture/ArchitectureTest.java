@@ -1,11 +1,15 @@
 package com.uxplima.uxmessentials.architecture;
 
+import static com.tngtech.archunit.lang.conditions.ArchConditions.callMethodWhere;
+import static com.tngtech.archunit.lang.conditions.ArchConditions.implement;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 
 /**
@@ -141,6 +145,111 @@ class ArchitectureTest {
             .because("spec-driven menus must render through the engine; only the item-storage inventories "
                     + "(VaultView, DisposalCommand), the anvil text-input seam (AnvilTextBackend, "
                     + "TextInputInstaller) and the Guis.install site (PluginModule) may touch uxmLib's GUI library");
+
+    // The completeness twin of the uxmLib fence above. That rule proves no spec menu reaches for uxmLib's GUI
+    // library; this one proves no spec menu drops a level lower and hand-rolls a raw Bukkit inventory instead —
+    // the exact way an editor cluster once slipped past a uxmLib-imports-only completeness check. Two signatures
+    // betray a hand-rolled GUI: implementing org.bukkit.inventory.InventoryHolder (every bespoke menu holder
+    // carries it) and calling Bukkit.createInventory / HumanEntity.openInventory (building or showing the frame).
+    //
+    // Outside the engine package, exactly fourteen production classes are allowed to do either, and all fourteen
+    // are genuine non-menu item containers, not spec menus:
+    //   - itemworld Workstation opens the vanilla MenuType workstations (anvil, loom, furnace, ...) and the
+    //     player's own ender chest — real game containers, no menu spec.
+    //   - playerstate InvseeView / InvseeHolder, EnderseeView / EnderseeHolder and OfflineContainerView /
+    //     OfflineHolder are inventory MIRRORS: a managed copy of another player's (or an offline player's stored)
+    //     inventory or ender chest that the viewer edits and that reconciles back on close. InvseeCommand,
+    //     BukkitInventoryViewer and the staff PlayerstateStaffInspector drive those mirrors through the
+    //     OpenContainer / InventoryViewer use cases.
+    // Every spec-driven MENU instead renders through the engine (the Menus facade); the engine's own MenuHolder,
+    // Menus and EditorRefresh live inside ..gui.menu.. and are exempt by package. A new bespoke createInventory /
+    // InventoryHolder GUI appearing anywhere else fails this fence until it is migrated onto the engine, rather
+    // than letting it bypass the engine silently the way the editor cluster once did.
+    @ArchTest
+    static final ArchRule onlyTheEngineAndInventoryLeavesTouchRawBukkitInventories = noClasses()
+            .that()
+            .resideInAPackage("..uxmessentials..")
+            .and(areProductionClasses())
+            .and(areNotAllowedRawBukkitInventoryLeaves())
+            .should(buildsOrOpensARawBukkitInventory())
+            .because("spec-driven menus must render through the engine (the Menus facade); only the engine itself "
+                    + "and the fourteen genuine inventory leaves — the itemworld Workstation, and the playerstate "
+                    + "invsee/endersee/offline inventory mirrors and the use cases that drive them — may create or "
+                    + "open a raw Bukkit inventory");
+
+    /**
+     * Builds the condition matching either raw-Bukkit-GUI signature: implementing
+     * {@code org.bukkit.inventory.InventoryHolder} (which every bespoke menu holder carries to tag its frame), or
+     * calling a Bukkit inventory-construction / open method — {@code Bukkit.createInventory(...)} or
+     * {@code HumanEntity.openInventory(Inventory)}. The call check matches by the called method's owner residing in
+     * {@code org.bukkit..} and its name, so the playerstate use-case method that happens to be named
+     * {@code openInventory} but lives on a domain port is not mistaken for the Bukkit one.
+     */
+    private static ArchCondition<JavaClass> buildsOrOpensARawBukkitInventory() {
+        return implement("org.bukkit.inventory.InventoryHolder")
+                .or(callMethodWhere(callsBukkitInventoryFactoryOrOpen()))
+                .as("create or open a raw Bukkit inventory");
+    }
+
+    /**
+     * Matches a method call that builds or shows a Bukkit inventory frame: {@code Bukkit.createInventory} or
+     * {@code HumanEntity.openInventory}. The match keys on the called method's declaring class residing in
+     * {@code org.bukkit..} (so {@code Player.openInventory}, declared on {@code HumanEntity}, counts) together with
+     * the method name — never on the name alone, so the playerstate {@code OpenContainer.openInventory} use case is
+     * left untouched.
+     */
+    private static DescribedPredicate<JavaMethodCall> callsBukkitInventoryFactoryOrOpen() {
+        return DescribedPredicate.describe("call Bukkit.createInventory or HumanEntity.openInventory", call -> {
+            String owner = call.getTargetOwner().getPackageName();
+            String method = call.getName();
+            return owner.startsWith("org.bukkit")
+                    && (method.equals("createInventory") || method.equals("openInventory"));
+        });
+    }
+
+    /**
+     * The fourteen non-menu inventory leaves allowed to create or open a raw Bukkit inventory outside the engine,
+     * named by fully qualified name so this predicate itself adds no dependency on them. None is a spec menu: the
+     * itemworld {@code Workstation} opens vanilla game containers, and the playerstate invsee / endersee / offline
+     * classes are inventory mirrors (and the use cases driving them). Every spec-driven menu renders through the
+     * engine instead, so this allow-list must stay exactly these fourteen.
+     *
+     * <p>A leaf's nested members carry the same signature (a holder built as a private inner class, a view's nested
+     * record), so the match is on the top-level enclosing class, not the exact nested name — mirroring the uxmLib
+     * fence's allow-list above.
+     */
+    private static DescribedPredicate<JavaClass> areNotAllowedRawBukkitInventoryLeaves() {
+        java.util.Set<String> allowed = java.util.Set.of(
+                "com.uxplima.uxmessentials.itemworld.adapter.inbound.command.Workstation",
+                "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView",
+                "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorHolder",
+                "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView",
+                "com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewHolder",
+                "com.uxplima.uxmessentials.playerstate.adapter.inbound.command.InvseeCommand",
+                "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView",
+                "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeHolder",
+                "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView",
+                "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeHolder",
+                "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView",
+                "com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineHolder",
+                "com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer",
+                "com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector");
+        return DescribedPredicate.describe("are not the allowed raw-Bukkit inventory leaves", javaClass -> {
+            String fullName = javaClass.getFullName();
+            int nested = fullName.indexOf('$');
+            String topLevel = nested < 0 ? fullName : fullName.substring(0, nested);
+            return !allowed.contains(topLevel) && !isMenuEngine(topLevel);
+        });
+    }
+
+    /**
+     * The menu engine package is exempt by location: its {@code MenuHolder} implements {@code InventoryHolder} and
+     * its {@code Menus} / {@code EditorRefresh} call {@code createInventory} / {@code openInventory} — that is the
+     * one sanctioned place a Bukkit inventory is created, and every spec menu funnels through it.
+     */
+    private static boolean isMenuEngine(String topLevelName) {
+        return topLevelName.startsWith("com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.");
+    }
 
     /**
      * The five non-menu leaves allowed to depend on uxmLib's GUI library, named by fully qualified name so this
