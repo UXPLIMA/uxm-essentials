@@ -54,6 +54,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
@@ -164,10 +165,15 @@ public final class KitsWiring {
         kitManager.register(menuBindings, dataFolder, kernel.log());
         KitCategorySettingsView categorySettingsView =
                 new KitCategorySettingsView(kernel.messages(), kernel.scheduler());
-        KitCategorySelectorView categorySelectorView =
-                new KitCategorySelectorView(kernel.messages(), categoryRepository, kernel.scheduler());
-        KitCategoryParentSelectorView categoryParentSelectorView =
-                new KitCategoryParentSelectorView(kernel.messages(), categoryRepository, kernel.scheduler());
+        // The two category selectors now render through the menu engine, so they take the engine façade, the GuiText
+        // catalog adapter, and the use case / repository their pick saves through, plus the bespoke settings view each
+        // reopens once the assign is done. The kit editor is shared with assemble() below, so it is built here once.
+        GuiText guiText = new GuiText(kernel.messages());
+        KitEditor kitEditor = new KitEditor(repository, notifier);
+        KitCategorySelectorView categorySelectorView = new KitCategorySelectorView(
+                guiText, categoryRepository, kitEditor, settingsView, menus, kernel.scheduler());
+        KitCategoryParentSelectorView categoryParentSelectorView = new KitCategoryParentSelectorView(
+                guiText, categoryRepository, categorySettingsView, menus, kernel.scheduler());
 
         // The placeholder requirement evaluator soft-couples to PlaceholderAPI exactly like the economy bridge:
         // present only when PlaceholderAPI is installed, otherwise empty, in which case a kit that declares
@@ -194,6 +200,7 @@ public final class KitsWiring {
                 actionRunner,
                 notifier,
                 economy,
+                kitEditor,
                 menuLayout,
                 previewLayout,
                 kitManager,
@@ -248,6 +255,7 @@ public final class KitsWiring {
             KitActionRunner actionRunner,
             KitNotifier notifier,
             Optional<KitEconomy> economy,
+            KitEditor kitEditor,
             GuiLayout menuLayout,
             GuiLayout previewLayout,
             KitManagerMenu kitManager,
@@ -279,7 +287,6 @@ public final class KitsWiring {
                 menuLayout,
                 clock);
         kitMenu.register(menuBindings, dataFolder, kernel.log());
-        KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(kernel.messages(), kitEditor, kernel.scheduler());
         return new KitServices(
                 claimKit,

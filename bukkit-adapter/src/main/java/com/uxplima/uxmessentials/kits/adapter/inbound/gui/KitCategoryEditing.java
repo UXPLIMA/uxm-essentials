@@ -12,7 +12,6 @@ import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
-import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -161,56 +160,6 @@ final class KitCategoryEditing {
         if (view != null) {
             view.open(player, viewer);
         }
-    }
-
-    void onCategorySelectorClick(
-            Player player, KitCategorySelectorHolder selectorHolder, int slot, KitSettingsView settingsView) {
-        PlayerRef viewer = selectorHolder.viewer();
-        KitDefinition kit = selectorHolder.kit();
-        if (slot == 53) {
-            settingsView.open(player, viewer, kit);
-            return;
-        }
-        if (slot == 49) {
-            saveAndReopen(player, viewer, kit.withCategoryId(Optional.empty()), settingsView);
-            return;
-        }
-        List<KitCategory> categories = categoryRepository.all();
-        if (slot >= 0 && slot < categories.size()) {
-            saveAndReopen(
-                    player,
-                    viewer,
-                    kit.withCategoryId(Optional.of(categories.get(slot).id())),
-                    settingsView);
-        }
-    }
-
-    void onCategoryParentSelectorClick(Player player, KitCategoryParentSelectorHolder selectorHolder, int slot) {
-        PlayerRef viewer = selectorHolder.viewer();
-        KitCategory category = selectorHolder.category();
-        if (slot == 53) {
-            openCategorySettings(player, viewer, category);
-            return;
-        }
-        if (slot == 49) {
-            saveCategory(player, viewer, category.withParentCategoryId(Optional.empty()));
-            return;
-        }
-        List<KitCategory> candidates = categoryRepository.all().stream()
-                .filter(cat -> !cat.id().equals(category.id()))
-                .toList();
-        if (slot >= 0 && slot < candidates.size()) {
-            saveCategory(
-                    player,
-                    viewer,
-                    category.withParentCategoryId(
-                            Optional.of(candidates.get(slot).id())));
-        }
-    }
-
-    private void saveAndReopen(Player player, PlayerRef viewer, KitDefinition kit, KitSettingsView settingsView) {
-        services.kitEditor().save(viewer, kit);
-        settingsView.open(player, viewer, kit);
     }
 
     private void saveCategory(Player player, PlayerRef viewer, KitCategory category) {

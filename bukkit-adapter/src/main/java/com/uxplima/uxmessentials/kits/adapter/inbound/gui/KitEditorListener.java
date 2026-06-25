@@ -102,17 +102,9 @@ public final class KitEditorListener implements Listener {
             if (categoryEditing != null) {
                 categoryEditing.onCategorySettingsClick(player, h, slot);
             }
-        } else if (holder instanceof KitCategorySelectorHolder h) {
-            event.setCancelled(true);
-            if (categoryEditing != null && settingsView != null) {
-                categoryEditing.onCategorySelectorClick(player, h, slot, settingsView);
-            }
-        } else if (holder instanceof KitCategoryParentSelectorHolder h) {
-            event.setCancelled(true);
-            if (categoryEditing != null) {
-                categoryEditing.onCategoryParentSelectorClick(player, h, slot);
-            }
         }
+        // The kit→category and parent-category selectors now render through the menu engine, so their clicks are
+        // routed by the engine's own MenuListener; this listener owns only the still-bespoke editor windows.
     }
 
     private void onSettingsClick(Player player, KitSettingsHolder settingsHolder, int slot) {
