@@ -116,6 +116,7 @@ final class DefaultResources {
             "modules/menu/specs/home-invites.conf",
             "modules/menu/specs/home-action.conf",
             "modules/menu/specs/home-list.conf",
+            "modules/menu/specs/kit-manager.conf",
             "modules/menu/specs/world-list.conf",
             "modules/menu/specs/moderation-active.conf",
             "modules/menu/specs/moderation-history.conf",

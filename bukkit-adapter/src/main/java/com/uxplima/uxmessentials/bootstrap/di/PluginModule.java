@@ -488,7 +488,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("warps"))) {
             wireWarps(ctx, persistence, resources, links, bus, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("kits"))) {
-            wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry, textInput);
+            wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
             wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
@@ -851,12 +851,15 @@ public final class PluginModule {
             ContextLinks links,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // kits need no database: definitions live in modules/kits/kits/<id>.conf and claim/cooldown state
         // is transient PDC.
-        // The per-kit cost charges through the economy bridge captured during economy wiring when present.
-        KitsWiring.Wired wired =
-                KitsWiring.wire(plugin, ctx, Optional.ofNullable(links.kitEconomy), guiLayouts, textInput);
+        // The per-kit cost charges through the economy bridge captured during economy wiring when present. The admin
+        // /kit editor manager renders through the always-on menu engine, so the engine façade + bindings are handed in.
+        KitsWiring.Wired wired = KitsWiring.wire(
+                plugin, ctx, Optional.ofNullable(links.kitEconomy), guiLayouts, textInput, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

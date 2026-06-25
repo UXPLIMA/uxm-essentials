@@ -219,9 +219,9 @@ final class KitCategoryEditing {
     }
 
     private void openManager(Player player, PlayerRef viewer) {
-        KitManagerView view = services.kitManagerView();
-        if (view != null) {
-            view.open(player, viewer);
+        KitManagerMenu manager = services.kitManager();
+        if (manager != null) {
+            manager.open(player, viewer);
         }
     }
 

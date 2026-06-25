@@ -16,9 +16,10 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreatePrompt;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
@@ -54,6 +55,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import org.jspecify.annotations.NullMarked;
@@ -80,8 +83,14 @@ public final class KitsWiring {
     private KitsWiring() {}
 
     /** Build the kits adapters and use cases with no economy bridge (a recorded kit cost is not charged). */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, GuiLayouts guiLayouts, TextInput textInput) {
-        return wire(plugin, ctx, Optional.empty(), guiLayouts, textInput);
+    public static Wired wire(
+            Plugin plugin,
+            ModuleContext ctx,
+            GuiLayouts guiLayouts,
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
+        return wire(plugin, ctx, Optional.empty(), guiLayouts, textInput, menus, menuBindings);
     }
 
     /**
@@ -95,12 +104,16 @@ public final class KitsWiring {
             ModuleContext ctx,
             Optional<KitEconomy> economy,
             GuiLayouts guiLayouts,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         Path dataFolder = plugin.getDataFolder().toPath();
         Path kitsDir = dataFolder.resolve("modules").resolve("kits").resolve("kits");
@@ -114,10 +127,6 @@ public final class KitsWiring {
         KitActionRunner actionRunner = new BukkitKitActionRunner(kernel.scheduler(), kernel.log());
         KitNotifier notifier = new KitNotifier(kernel.messages(), kernel.messageSink());
         GuiLayout menuLayout = guiLayouts.load("kits", "kits-menu", GuiLayout.paginatedDefault(Material.CHEST));
-        GuiLayout managerLayout = guiLayouts.load(
-                "kits",
-                "kits-manager",
-                new GuiLayout(6, Material.GRAY_STAINED_GLASS_PANE, Material.ARROW, 49, 53, List.of()));
         GuiLayout settingsLayout = guiLayouts.load(
                 "kits",
                 "kits-settings",
@@ -133,10 +142,26 @@ public final class KitsWiring {
                 "kits-preview",
                 new GuiLayout(6, Material.GRAY_STAINED_GLASS_PANE, Material.ARROW, 0, 1, List.of()));
 
-        KitManagerView kitManagerView =
-                new KitManagerView(kernel.messages(), repository, kernel.scheduler(), managerLayout);
+        // The kit settings editor a manager click opens, and the create flow that opens a fresh kit's settings, are
+        // shared by the engine-rendered manager. Build them before the manager so it can seam to both.
+        KitSettingsView settingsView = new KitSettingsView(kernel.messages(), kernel.scheduler(), settingsLayout);
         KitCategoryManagerView categoryManagerView =
                 new KitCategoryManagerView(kernel.messages(), categoryRepository, kernel.scheduler());
+        KitCreatePrompt createPrompt = new KitCreatePrompt(
+                kernel.messages(), textInput, new CreateKit(repository, notifier), repository, settingsView);
+        // One-element holder breaks the cycle: the manager's create button reopens the manager on cancel, and the
+        // category manager's back button reopens it, but both are wired before the manager exists.
+        KitManagerMenu[] managerHolder = new KitManagerMenu[1];
+        KitManagerMenu kitManager = new KitManagerMenu(
+                menus,
+                kernel.scheduler(),
+                repository,
+                kernel.messages(),
+                settingsView,
+                categoryManagerView,
+                createPrompt.boundTo((player, viewer) -> managerHolder[0].open(player, viewer)));
+        managerHolder[0] = kitManager;
+        kitManager.register(menuBindings, dataFolder, kernel.log());
         KitCategorySettingsView categorySettingsView =
                 new KitCategorySettingsView(kernel.messages(), kernel.scheduler());
         KitCategorySelectorView categorySelectorView =
@@ -171,7 +196,7 @@ public final class KitsWiring {
                 economy,
                 menuLayout,
                 previewLayout,
-                kitManagerView,
+                kitManager,
                 categoryManagerView,
                 categorySettingsView,
                 categorySelectorView,
@@ -184,14 +209,11 @@ public final class KitsWiring {
                 () -> ListDisplayMode.from(ctx.config(), SHOWKIT_DISPLAY_KEY),
                 kernel.scheduler());
 
-        KitSettingsView settingsView = new KitSettingsView(kernel.messages(), kernel.scheduler(), settingsLayout);
-
         List<Listener> listeners = List.of(
                 new KitPreviewListener(),
                 new KitEditorListener(
                         services.kitEditorView(),
                         services,
-                        repository,
                         categoryRepository,
                         settingsView,
                         textInput,
@@ -225,7 +247,7 @@ public final class KitsWiring {
             Optional<KitEconomy> economy,
             GuiLayout menuLayout,
             GuiLayout previewLayout,
-            KitManagerView kitManagerView,
+            KitManagerMenu kitManager,
             KitCategoryManagerView categoryManagerView,
             KitCategorySettingsView categorySettingsView,
             KitCategorySelectorView categorySelectorView,
@@ -259,7 +281,7 @@ public final class KitsWiring {
                 kitMenu,
                 kitPreview,
                 kitEditorView,
-                kitManagerView,
+                kitManager,
                 kernel.playerLookup(),
                 categoryManagerView,
                 categorySettingsView,

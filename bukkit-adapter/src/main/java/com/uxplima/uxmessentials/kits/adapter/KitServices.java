@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelec
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
@@ -38,7 +38,7 @@ import org.jspecify.annotations.Nullable;
  * @param kitMenu the read-only browse menu {@code /kit list} opens
  * @param kitPreview the read-only preview menu the {@code /kit show} GUI path opens
  * @param kitEditorView the editable window the {@code /kit editor} GUI path opens
- * @param kitManagerView the admin {@code /kit editor} manager GUI
+ * @param kitManager the admin {@code /kit editor} manager menu, rendered through the menu engine
  * @param players name → ref resolution for the {@code /kit <name> <player>} and {@code /kit reset} targets
  */
 @NullMarked
@@ -53,7 +53,7 @@ public record KitServices(
         KitMenuView kitMenu,
         KitPreviewView kitPreview,
         KitEditorView kitEditorView,
-        @Nullable KitManagerView kitManagerView,
+        @Nullable KitManagerMenu kitManager,
         PlayerLookup players,
         @Nullable KitCategoryManagerView kitCategoryManagerView,
         @Nullable KitCategorySettingsView kitCategorySettingsView,

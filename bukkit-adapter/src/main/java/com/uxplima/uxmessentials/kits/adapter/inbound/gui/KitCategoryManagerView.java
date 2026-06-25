@@ -78,7 +78,7 @@ public final class KitCategoryManagerView {
                         .lore(List.of(text(viewer, KitsMessageKey.KIT_EDITOR_CATEGORY_CREATE_BUTTON_LORE)))
                         .build());
 
-        // Close button at slot 53 (goes back to KitManagerView)
+        // Close button at slot 53 (goes back to the engine-rendered kit manager)
         inventory.setItem(
                 53,
                 ItemBuilder.of(Material.ARROW)

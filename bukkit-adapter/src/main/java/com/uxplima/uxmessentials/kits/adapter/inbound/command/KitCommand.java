@@ -24,7 +24,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
@@ -265,9 +265,9 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         if (sender == null) {
             return 0;
         }
-        KitManagerView managerView = services.kitManagerView();
-        if (managerView != null) {
-            managerView.open(sender, ref(sender));
+        KitManagerMenu manager = services.kitManager();
+        if (manager != null) {
+            manager.open(sender, ref(sender));
         }
         return Command.SINGLE_SUCCESS;
     }

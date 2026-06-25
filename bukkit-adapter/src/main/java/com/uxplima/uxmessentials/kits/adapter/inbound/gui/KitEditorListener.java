@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.kits.adapter.inbound.gui;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -22,10 +21,8 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
-import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCost;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
-import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -36,9 +33,10 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Handles close and click events for all Kit administration GUIs (KitEditorView, KitManagerView,
- * KitSettingsView and the category GUIs). The click handler dispatches by inventory-holder type to one
- * focused per-GUI handler, each of which is self-contained: it cancels the click, re-checks the optional
+ * Handles close and click events for the bespoke Kit administration GUIs (KitEditorView, KitSettingsView and the
+ * category GUIs). The admin kit-manager list itself now renders through the menu engine, so its clicks are handled
+ * there; this listener owns only the still-bespoke editor windows. The click handler dispatches by inventory-holder
+ * type to one focused per-GUI handler, each of which is self-contained: it cancels the click, re-checks the optional
  * collaborators it needs, and acts. Every kit/category edit is expressed through a single-field copy method
  * on the domain value object, so an edit never silently defaults the kit's other settings.
  */
@@ -47,7 +45,6 @@ public final class KitEditorListener implements Listener {
 
     private final KitEditorView editorView;
     private final @Nullable KitServices services;
-    private final @Nullable KitRepository repository;
     private final @Nullable KitSettingsView settingsView;
     private final @Nullable TextInput textInput;
     private final @Nullable KitEditorText text;
@@ -56,7 +53,6 @@ public final class KitEditorListener implements Listener {
     public KitEditorListener(KitEditorView editorView) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.services = null;
-        this.repository = null;
         this.settingsView = null;
         this.textInput = null;
         this.text = null;
@@ -66,14 +62,12 @@ public final class KitEditorListener implements Listener {
     public KitEditorListener(
             KitEditorView editorView,
             KitServices services,
-            KitRepository repository,
             KitCategoryRepository categoryRepository,
             KitSettingsView settingsView,
             TextInput textInput,
             Messages messages) {
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.services = Objects.requireNonNull(services, "services");
-        this.repository = Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(categoryRepository, "categoryRepository");
         this.settingsView = Objects.requireNonNull(settingsView, "settingsView");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
@@ -95,10 +89,7 @@ public final class KitEditorListener implements Listener {
         InventoryHolder holder = inventory.getHolder();
         Player player = (Player) event.getWhoClicked();
         int slot = event.getRawSlot();
-        if (holder instanceof KitManagerHolder h) {
-            event.setCancelled(true);
-            onManagerClick(player, h, slot);
-        } else if (holder instanceof KitSettingsHolder h) {
+        if (holder instanceof KitSettingsHolder h) {
             event.setCancelled(true);
             onSettingsClick(player, h, slot);
         } else if (holder instanceof KitCategoryManagerHolder h) {
@@ -122,41 +113,6 @@ public final class KitEditorListener implements Listener {
                 categoryEditing.onCategoryParentSelectorClick(player, h, slot);
             }
         }
-    }
-
-    private void onManagerClick(Player player, KitManagerHolder managerHolder, int slot) {
-        if (services == null || settingsView == null || services.kitManagerView() == null) {
-            return;
-        }
-        PlayerRef viewer = managerHolder.viewer();
-        GuiLayout layout = services.kitManagerView().layout();
-        if (slot == layout.prevSlot()) {
-            // Category creation already lives in the category manager, so the create button starts a kit
-            // directly (name prompt → new kit → its settings) rather than opening a redundant chooser.
-            promptCreateKit(player, viewer);
-        } else if (slot == layout.nextSlot()) {
-            player.closeInventory();
-        } else if (slot == 51) {
-            if (services.kitCategoryManagerView() != null) {
-                services.kitCategoryManagerView().open(player, viewer);
-            }
-        } else {
-            int index = managerContentSlots(layout).indexOf(slot);
-            if (index >= 0 && index < managerHolder.kits().size()) {
-                settingsView.open(player, viewer, managerHolder.kits().get(index));
-            }
-        }
-    }
-
-    private static List<Integer> managerContentSlots(GuiLayout layout) {
-        return layout.explicitContentSlots().orElseGet(() -> {
-            List<Integer> defaults = new ArrayList<>();
-            int contentLimit = (layout.rows() - 1) * 9;
-            for (int i = 0; i < contentLimit; i++) {
-                defaults.add(i);
-            }
-            return defaults;
-        });
     }
 
     private void onSettingsClick(Player player, KitSettingsHolder settingsHolder, int slot) {
@@ -326,33 +282,6 @@ public final class KitEditorListener implements Listener {
         }
     }
 
-    private void promptCreateKit(Player player, PlayerRef viewer) {
-        if (services == null || textInput == null || repository == null) {
-            return;
-        }
-        prompt(
-                player,
-                viewer,
-                "kit.create-name",
-                KitsMessageKey.KIT_EDITOR_PROMPT_CREATE,
-                name -> {
-                    String clean = sanitizeId(name);
-                    if (clean.isEmpty()) {
-                        player.sendMessage(text(viewer, KitsMessageKey.KIT_EDITOR_ERROR_INVALID_NAME));
-                        return;
-                    }
-                    KitId id = KitId.of(clean);
-                    Objects.requireNonNull(services)
-                            .createKit()
-                            .create(
-                                    viewer,
-                                    new KitDefinition(id, List.of(), Duration.ZERO, false, false, KitCost.free()));
-                    KitSettingsView view = Objects.requireNonNull(settingsView);
-                    Objects.requireNonNull(repository).find(id).ifPresent(kit -> view.open(player, viewer, kit));
-                },
-                () -> openManager(player, viewer));
-    }
-
     private void saveAndReopen(Player player, PlayerRef viewer, KitDefinition kit) {
         Objects.requireNonNull(services).kitEditor().save(viewer, kit);
         Objects.requireNonNull(settingsView).open(player, viewer, kit);
@@ -363,9 +292,9 @@ public final class KitEditorListener implements Listener {
     }
 
     private void openManager(Player player, PlayerRef viewer) {
-        KitManagerView view = Objects.requireNonNull(services).kitManagerView();
-        if (view != null) {
-            view.open(player, viewer);
+        KitManagerMenu manager = Objects.requireNonNull(services).kitManager();
+        if (manager != null) {
+            manager.open(player, viewer);
         }
     }
 
@@ -378,11 +307,6 @@ public final class KitEditorListener implements Listener {
             Runnable reopen) {
         player.closeInventory();
         Objects.requireNonNull(textInput).prompt(player, viewer, InputRequest.of(inputKey, key), action, reopen);
-    }
-
-    private static String sanitizeId(String name) {
-        String clean = name.trim().toLowerCase(java.util.Locale.ROOT);
-        return clean.contains(" ") ? "" : clean;
     }
 
     private static List<String> splitLines(String input) {

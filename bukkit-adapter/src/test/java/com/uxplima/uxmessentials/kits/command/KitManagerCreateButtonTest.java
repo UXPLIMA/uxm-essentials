@@ -7,12 +7,10 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.bukkit.Material;
@@ -28,26 +26,13 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.kits.adapter.KitServices;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorListener;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreatePrompt;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
-import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
-import com.uxplima.uxmessentials.kits.application.DelKit;
-import com.uxplima.uxmessentials.kits.application.KitAccess;
-import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.application.KitNotifier;
-import com.uxplima.uxmessentials.kits.application.KitReset;
-import com.uxplima.uxmessentials.kits.application.ListKits;
-import com.uxplima.uxmessentials.kits.application.ShowKit;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
-import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
-import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
-import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
@@ -56,42 +41,37 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputInstaller;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
-import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage that the kit manager's "create new kit" button starts kit creation directly — the kit
- * name prompt, then the new kit's settings window — instead of opening the old create-kit/create-category
- * chooser (category creation already lives in the category manager, so the chooser was redundant). Clicking
- * the create-button slot of an open {@link KitManagerView} closes the manager (the prompt path closes it) and
- * arms a chat prompt for the kit name; the next chat line names the kit, which is created in the repository and
- * its settings window opens. The {@code kit.create-name} input point is configured as chat here so the typed
- * line round-trips through the shared {@link TextInput} chat backend.
+ * MockBukkit coverage that the engine-rendered kit manager's "create new kit" button starts kit creation directly —
+ * the kit name prompt, then the new kit's settings window — instead of opening a redundant chooser. Clicking the
+ * create-button slot of the open {@link KitManagerMenu} through the engine's own {@link MenuListener} closes the
+ * manager (the prompt path closes it) and arms a chat prompt for the kit name; the next chat line names the kit, which
+ * is created in the repository and its settings window opens. The {@code kit.create-name} input point is configured as
+ * chat here so the typed line round-trips through the shared {@link TextInput} chat backend.
  */
 class KitManagerCreateButtonTest {
 
-    // The manager layout default: 6 rows, prev/create button at slot 49, close at 53.
-    private static final GuiLayout MANAGER_LAYOUT =
-            new GuiLayout(6, Material.GRAY_STAINED_GLASS_PANE, Material.ARROW, 49, 53, List.of());
     private static final GuiLayout SETTINGS_LAYOUT = new GuiLayout(
             3,
             Material.GRAY_STAINED_GLASS_PANE,
@@ -99,13 +79,17 @@ class KitManagerCreateButtonTest {
             26,
             22,
             List.of(0, 2, 4, 6, 8, 10, 12, 14, 16, 22, 18, 20, 24));
-    private static final GuiLayout BROWSE_LAYOUT = GuiLayout.paginatedDefault(Material.CHEST);
+
+    @TempDir
+    Path dataFolder;
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
     private RecordingRepository repository;
-    private KitManagerView managerView;
+    private GuiText guiText;
+    private Scheduler scheduler;
+    private KitManagerMenu manager;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -128,8 +112,8 @@ class KitManagerCreateButtonTest {
         MessageSink sink = (viewer, text) -> {};
         KitNotifier notifier = new KitNotifier(messages, sink);
         repository = new RecordingRepository();
-        Scheduler scheduler = new SyncScheduler();
-        GuiText guiText = new GuiText(messages);
+        scheduler = new SyncScheduler();
+        guiText = new GuiText(messages);
         AnvilInput anvil = new AnvilInput(plugin);
         anvil.install();
         // The installer registers the shared chat backend as a listener, so the AsyncChatEvent below routes.
@@ -137,15 +121,32 @@ class KitManagerCreateButtonTest {
                         plugin, plugin.getDataFolder().toPath(), anvil, guiText, scheduler, new SilentLogger())
                 .textInput();
 
-        managerView = new KitManagerView(messages, repository, scheduler, MANAGER_LAYOUT);
         KitSettingsView settingsView = new KitSettingsView(messages, scheduler, SETTINGS_LAYOUT);
-        KitEditor kitEditor = new KitEditor(repository, notifier);
-        KitEditorView editorView = new KitEditorView(messages, kitEditor, scheduler);
-        KitServices services = services(messages, notifier, scheduler, kitEditor, editorView);
+        KitCategoryManagerView categoryManager =
+                new KitCategoryManagerView(messages, new StubCategoryRepository(), scheduler);
+        KitCreatePrompt createPrompt =
+                new KitCreatePrompt(messages, textInput, new CreateKit(repository, notifier), repository, settingsView);
 
-        KitEditorListener listener = new KitEditorListener(
-                editorView, services, repository, new StubCategoryRepository(), settingsView, textInput, messages);
+        MenuBindings bindings = new MenuBindings();
+        ItemRenderer itemRenderer = new ItemRenderer(guiText, bindings.placeholders());
+        MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
+        MenuListener listener =
+                new MenuListener(renderer, bindings.actions(), bindings.conditions(), scheduler, plugin);
+        bindings.action("close", ctx -> ctx.player().closeInventory());
         server.getPluginManager().registerEvents(listener, plugin);
+        Menus menus = new Menus(renderer, scheduler, bindings.lists());
+
+        KitManagerMenu[] holder = new KitManagerMenu[1];
+        manager = new KitManagerMenu(
+                menus,
+                scheduler,
+                repository,
+                messages,
+                settingsView,
+                categoryManager,
+                createPrompt.boundTo((p, v) -> holder[0].open(p, v)));
+        holder[0] = manager;
+        manager.register(bindings, dataFolder, new SilentLogger());
     }
 
     @AfterEach
@@ -155,20 +156,20 @@ class KitManagerCreateButtonTest {
 
     @Test
     void createButtonClosesTheManagerForTheNamePromptInsteadOfOpeningAChooser() {
-        managerView.open(player, ref(player));
-        Inventory manager = player.getOpenInventory().getTopInventory();
-        assertThat(manager.getHolder().getClass().getSimpleName()).isEqualTo("KitManagerHolder");
+        manager.open(player, ref(player));
+        Inventory open = player.getOpenInventory().getTopInventory();
+        assertThat(open.getHolder().getClass().getSimpleName()).isEqualTo("MenuHolder");
 
         fireClick(49); // the create-new-kit button
 
         // Going straight to kit creation means the create button closes the manager to ask for a kit name —
-        // it must NOT open any further inventory (the removed create-kit/create-category chooser would have).
+        // it must NOT open any further inventory (a chooser would have).
         assertThat(player.getOpenInventory().getType()).isEqualTo(InventoryType.CRAFTING);
     }
 
     @Test
     void namingTheKitCreatesItAndOpensItsSettings() {
-        managerView.open(player, ref(player));
+        manager.open(player, ref(player));
         fireClick(49);
 
         // The create button armed a chat prompt; the next chat line names the kit, which is created and its
@@ -198,47 +199,6 @@ class KitManagerCreateButtonTest {
         // The mock would otherwise report a null handler list; point it at the real one the backend registered on.
         when(event.getHandlers()).thenReturn(AsyncChatEvent.getHandlerList());
         server.getPluginManager().callEvent(event);
-    }
-
-    private KitServices services(
-            Messages messages,
-            KitNotifier notifier,
-            Scheduler scheduler,
-            KitEditor kitEditor,
-            KitEditorView editorView) {
-        Permissions permissions = new AllowAllPermissions();
-        KitClaimStore claims = new NoClaims();
-        KitAccess access = new KitAccess(permissions, new NoCooldowns(), claims, Optional.<KitEconomy>empty());
-        ClaimKit claimKit = new ClaimKit(
-                repository, access, new NoGranter(), notifier, new NoEvents(), Clock.systemUTC(), Optional.empty());
-        KitPreviewView preview = new KitPreviewView(messages, scheduler, BROWSE_LAYOUT);
-        KitMenuView menu = new KitMenuView(
-                messages,
-                notifier,
-                scheduler,
-                claimKit,
-                new StubCategoryRepository(),
-                access,
-                preview,
-                BROWSE_LAYOUT,
-                Clock.systemUTC());
-        return new KitServices(
-                claimKit,
-                new ListKits(repository, permissions, claims, notifier),
-                new ShowKit(repository, notifier),
-                new CreateKit(repository, notifier),
-                new DelKit(repository, notifier),
-                kitEditor,
-                new KitReset(repository, claims, notifier),
-                menu,
-                preview,
-                editorView,
-                managerView,
-                new NoPlayerLookup(),
-                null,
-                null,
-                null,
-                null);
     }
 
     private static PlayerRef ref(PlayerMock player) {
@@ -294,81 +254,24 @@ class KitManagerCreateButtonTest {
         public void delete(String id) {}
     }
 
-    private static final class NoClaims implements KitClaimStore {
+    private static final class SilentLogger implements Logger {
         @Override
-        public boolean hasClaimed(PlayerRef who, KitId kit) {
-            return false;
-        }
+        public void info(String message, Object... args) {}
 
         @Override
-        public void markClaimed(PlayerRef who, KitId kit) {}
+        public void warn(String message, Object... args) {}
 
         @Override
-        public void reset(PlayerRef who, KitId kit) {}
+        public void error(String message, Throwable cause) {}
 
         @Override
-        public void resetAll(PlayerRef who) {}
+        public void debug(String message, Object... args) {}
     }
 
-    private static final class NoCooldowns implements Cooldowns {
+    private static final class KeyMessages implements Messages {
         @Override
-        public com.uxplima.uxmessentials.shared.domain.Result<com.uxplima.uxmessentials.shared.domain.Unit, Duration>
-                check(PlayerRef who, CooldownKind kind) {
-            return com.uxplima.uxmessentials.shared.domain.Result.ok();
-        }
-
-        @Override
-        public void stamp(PlayerRef who, CooldownKind kind) {}
-
-        @Override
-        public com.uxplima.uxmessentials.shared.domain.Result<com.uxplima.uxmessentials.shared.domain.Unit, Duration>
-                checkLabel(PlayerRef who, String label) {
-            return com.uxplima.uxmessentials.shared.domain.Result.ok();
-        }
-
-        @Override
-        public void stampLabel(PlayerRef who, String label) {}
-    }
-
-    private static final class NoGranter implements KitGranter {
-        @Override
-        public Grant grant(PlayerRef recipient, KitDefinition kit) {
-            return Grant.complete();
-        }
-    }
-
-    private static final class NoEvents implements DomainEventPublisher {
-        @Override
-        public void publish(DomainEvent event) {}
-    }
-
-    private static final class NoPlayerLookup implements PlayerLookup {
-        @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
-            return Optional.empty();
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            return false;
-        }
-    }
-
-    private static final class AllowAllPermissions implements Permissions {
-        @Override
-        public boolean has(PlayerRef who, String node) {
-            return true;
-        }
-
-        @Override
-        public QuotaResult resolveQuota(
-                PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
-            return QuotaResult.limited(configDefault);
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            return key.key();
         }
     }
 
@@ -396,27 +299,6 @@ class KitManagerCreateButtonTest {
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
-        }
-    }
-
-    private static final class SilentLogger implements Logger {
-        @Override
-        public void info(String message, Object... args) {}
-
-        @Override
-        public void warn(String message, Object... args) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-
-        @Override
-        public void debug(String message, Object... args) {}
-    }
-
-    private static final class KeyMessages implements Messages {
-        @Override
-        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            return key.key();
         }
     }
 }

@@ -28,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The admin warp manager: a paginated chest listing every server warp as a clickable icon, with a button to
  * create a new warp at the operator's current position, a close button, and an entry into the category
- * manager. Mirrors {@code KitManagerView}: clicking a warp opens its {@link WarpEditorView}, the create button
+ * manager. Like the kit manager, clicking a warp opens its {@link WarpEditorView}, the create button
  * runs through the same {@code /warp create} path the command uses, and the categories button opens
  * {@link WarpCategoryManagerView}. Click routing lives in {@link WarpEditorListener}; every line resolves from
  * a {@link MessageKey} in the viewer's locale.
