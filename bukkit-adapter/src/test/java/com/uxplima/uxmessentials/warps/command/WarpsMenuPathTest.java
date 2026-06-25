@@ -11,15 +11,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.bukkit.Material;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -29,9 +25,10 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
 import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommand;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpBrowseMenu;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
 import com.uxplima.uxmessentials.warps.application.MoveWarp;
@@ -46,8 +43,6 @@ import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,17 +53,14 @@ import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the warps browse menu through the real Brigadier {@code /warp list} subcommand and
- * uxmLib's {@code PaginatedGui}. {@code /warp list} opens a paginated menu whose content slots hold one display
- * icon per warp the player may use — backed by a fake {@link WarpRepository} of three warps — proving the
- * read-only menu renders one icon per available warp. In {@code chat} display mode {@code /warp list} prints
- * the clickable chat list instead, asserted by the {@code WARP_LIST} keys it produces and the absence of any
- * open inventory. The scheduler is a synchronous double so the entity-bound open runs inline, and uxmLib's
- * menu listener is installed against a mock plugin (reset on teardown) exactly as the kits GUI test does.
+ * MockBukkit coverage of the warps command's {@code /warp list} paths and per-subcommand permission gating. In
+ * {@code chat} display mode {@code /warp list} prints the clickable chat list, asserted by the {@code WARP_LIST}
+ * keys it produces and the absence of any open inventory; the GUI display mode's slot-for-slot rendering lives in
+ * {@code WarpBrowseGoldenTest}, so this class no longer opens an inventory. Every subcommand is reachable only with
+ * its own permission, and {@code /warp create} and {@code /warp set} are aliases that both create a warp. The
+ * scheduler is a synchronous double so the entity-bound work runs inline.
  */
 class WarpsMenuPathTest {
-
-    private static final int WARP_COUNT = 3;
 
     private ServerMock server;
     private Plugin plugin;
@@ -84,26 +76,11 @@ class WarpsMenuPathTest {
         player.setOp(true);
         sink = new RecordingSink();
         services = services();
-        Guis.install(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall(); // reset the static install state so the next test re-installs the menu listener
         MockBukkit.unmock();
-    }
-
-    @Test
-    void warpListOpensPaginatedMenuWithOneIconPerUsableWarp() {
-        CommandDispatcher<CommandSourceStack> dispatcher =
-                registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
-
-        execute(dispatcher, "warp list");
-
-        Inventory menu = player.getOpenInventory().getTopInventory();
-        assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
-        assertThat(menu.getSize()).isEqualTo(54); // a 6-row paginated menu
-        assertThat(contentIcons(menu)).isEqualTo(WARP_COUNT);
     }
 
     @Test
@@ -200,18 +177,6 @@ class WarpsMenuPathTest {
         return CommandSourceStackMock.from(holder);
     }
 
-    /** Non-air icons in the content rows (slots 0..44), excluding the reserved bottom-row nav buttons. */
-    private int contentIcons(Inventory menu) {
-        int count = 0;
-        for (int slot = 0; slot < 45; slot++) {
-            ItemStack item = menu.getItem(slot);
-            if (item != null && !item.getType().isAir()) {
-                count++;
-            }
-        }
-        return count;
-    }
-
     private CommandDispatcher<CommandSourceStack> registerCommand(
             com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode mode) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
@@ -236,11 +201,13 @@ class WarpsMenuPathTest {
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         Clock clock = Clock.systemUTC();
         UseWarp useWarp = new UseWarp(repository, access, teleporter, notifier, pos -> true, permissions);
-        WarpMenuView warpMenu = new WarpMenuView(
-                messages,
+        // The browse menu is a WarpServices collaborator these command-path tests never open, so it stands up over a
+        // bare test engine façade with no spec registered.
+        WarpBrowseMenu warpMenu = new WarpBrowseMenu(
+                TestMenuEngine.create(messages, new SyncScheduler()).menus(),
                 new SyncScheduler(),
                 useWarp,
-                GuiLayout.paginatedDefault(Material.ENDER_PEARL),
+                messages,
                 new StubWarpCategoryRepository());
         return new WarpServices(
                 useWarp,

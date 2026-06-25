@@ -19,7 +19,6 @@ class GuiLayoutDriftTest {
     @Test
     void everyBrowseMenuShipsItsLayoutResourceWithTheExpectedRows() {
         assertRows("kits", "kits-menu", 6);
-        assertRows("warps", "warps-menu", 6);
         assertRows("homes", "home-list", 3);
         assertRows("homes", "home-actions", 3);
         assertRows("homes", "icon-selector", 6);
@@ -39,7 +38,6 @@ class GuiLayoutDriftTest {
         // form (key = value) rather than the bare substring.
         for (String[] menu : new String[][] {
             {"kits", "kits-menu"},
-            {"warps", "warps-menu"},
             {"homes", "home-list"},
             {"homes", "home-actions"},
             {"homes", "icon-selector"},

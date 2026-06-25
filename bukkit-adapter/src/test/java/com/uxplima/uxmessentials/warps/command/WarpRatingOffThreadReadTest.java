@@ -12,12 +12,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.bukkit.Material;
-
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -27,9 +24,10 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
 import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommand;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpBrowseMenu;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
 import com.uxplima.uxmessentials.warps.application.MoveWarp;
@@ -150,11 +148,13 @@ class WarpRatingOffThreadReadTest {
         Permissions permissions = new AllowAllPermissions();
         WarpAccess access = new WarpAccess(permissions, Optional.<WarpEconomy>empty());
         UseWarp useWarp = new UseWarp(repository, access, new NoTeleport(), notifier, pos -> true, permissions);
-        WarpMenuView warpMenu = new WarpMenuView(
-                messages,
+        // The browse menu is a WarpServices collaborator this rating test never opens, so it stands up over a bare
+        // test engine façade with no spec registered.
+        WarpBrowseMenu warpMenu = new WarpBrowseMenu(
+                TestMenuEngine.create(messages, scheduler).menus(),
                 scheduler,
                 useWarp,
-                GuiLayout.paginatedDefault(Material.ENDER_PEARL),
+                messages,
                 new StubWarpCategoryRepository());
         return new WarpServices(
                 useWarp,

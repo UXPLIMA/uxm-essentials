@@ -95,6 +95,8 @@ class ShippedSpecBindingsDriftTest {
             "warps:manager-edit",
             "warps:manager-create",
             "warps:manager-categories",
+            "warps:browse-click",
+            "warps:browse-back",
             "economy:open-bank",
             "economy:create-bank",
             "economy:remove-member",
@@ -102,8 +104,14 @@ class ShippedSpecBindingsDriftTest {
             "economy:bank-back");
 
     /** Condition ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
-    private static final Set<String> EXPECTED_CONDITIONS =
-            Set.of("perm", "has-prev", "has-next", "homes:home-public", "homes:home-private", "economy:can-add-member");
+    private static final Set<String> EXPECTED_CONDITIONS = Set.of(
+            "perm",
+            "has-prev",
+            "has-next",
+            "homes:home-public",
+            "homes:home-private",
+            "economy:can-add-member",
+            "warps:browse-has-parent");
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
@@ -233,6 +241,9 @@ class ShippedSpecBindingsDriftTest {
             "warp_manager_x",
             "warp_manager_y",
             "warp_manager_z",
+            "warp_browse_icon",
+            "warp_browse_name",
+            "warp_browse_lore",
             "baltop_currency",
             "baltop_rank",
             "baltop_player",
@@ -278,6 +289,7 @@ class ShippedSpecBindingsDriftTest {
             "moderation:jailed",
             "kits:manager",
             "warps:manager",
+            "warps:browse",
             "economy:baltop",
             "economy:transactions",
             "economy:banks",

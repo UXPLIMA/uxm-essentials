@@ -5,14 +5,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.bukkit.Material;
-
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.CachedWarpRepository;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.WarpEditorLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
@@ -22,7 +19,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommands;
-import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpMenuView;
+import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpBrowseMenu;
 import com.uxplima.uxmessentials.warps.adapter.outbound.TeleportWarpAdapter;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
@@ -113,7 +110,6 @@ public final class WarpsWiring {
         WarpNotifier notifier = new WarpNotifier(kernel.messages(), kernel.messageSink());
         WarpTeleportRegistry teleportRegistry = new WarpTeleportRegistry();
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry);
-        GuiLayout menuLayout = guiLayouts.load("warps", "warps-menu", GuiLayout.paginatedDefault(Material.ENDER_PEARL));
         WarpEditorLayout editorLayout =
                 guiLayouts.loadWarpEditor("warps", "warps-editor", WarpEditorLayout.defaultLayout());
         var soundLayout = guiLayouts.loadFixedMenu(
@@ -186,6 +182,11 @@ public final class WarpsWiring {
                 createPrompt.boundTo((player, viewer) -> managerHolder[0].open(player, viewer)));
         managerHolder[0] = managerView;
         managerView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
+        // The read-only /warp browse menu now renders through the always-on menu engine. It opens off the same UseWarp
+        // path the command drives and resolves its tiles off the warm warp/category sets, so the engine renders without
+        // a port read of its own.
+        var browseMenu = new WarpBrowseMenu(menus, kernel.scheduler(), useWarp, kernel.messages(), categoryRepository);
+        browseMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categoryEditing = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryEditing(
                 (player, viewer) -> managerView.open(player, viewer),
                 categoryManagerView,
@@ -210,8 +211,8 @@ public final class WarpsWiring {
                 categoryEditing,
                 soundMenu);
 
-        WarpServices services = assemble(
-                kernel, repository, notifier, menuLayout, editorView, ctx, useWarp, categoryRepository, managerView);
+        WarpServices services =
+                assemble(kernel, repository, notifier, browseMenu, editorView, ctx, useWarp, managerView);
         var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
         var listeners = List.<org.bukkit.event.Listener>of(
                 new com.uxplima.uxmessentials.warps.adapter.inbound.listener.WarpArrivalNotificationListener(
@@ -235,15 +236,12 @@ public final class WarpsWiring {
             KernelPorts kernel,
             WarpRepository repository,
             WarpNotifier notifier,
-            GuiLayout menuLayout,
+            WarpBrowseMenu browseMenu,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView editorView,
             com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx,
             UseWarp useWarp,
-            com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository categoryRepository,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu managerView) {
         Clock clock = Clock.systemUTC();
-        WarpMenuView warpMenu =
-                new WarpMenuView(kernel.messages(), kernel.scheduler(), useWarp, menuLayout, categoryRepository);
         return new WarpServices(
                 useWarp,
                 new SetWarp(
@@ -256,7 +254,7 @@ public final class WarpsWiring {
                 new ListWarps(repository, kernel.permissions(), notifier),
                 new WarpInfo(repository, notifier),
                 new MoveWarp(repository, notifier),
-                warpMenu,
+                browseMenu,
                 kernel.playerLookup(),
                 repository,
                 editorView,
@@ -281,7 +279,7 @@ public final class WarpsWiring {
             List<CommandRegistration> commands,
             List<org.bukkit.event.Listener> listeners,
             ListWarps listWarps,
-            WarpMenuView warpMenu,
+            WarpBrowseMenu warpMenu,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle playerWarpHandle,
