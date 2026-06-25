@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.worlds.adapter.inbound.command;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.entity.Player;
 
@@ -24,7 +26,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
@@ -60,14 +61,14 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * MockBukkit coverage of the {@code /worlds gui} verb through its real Brigadier node: the bare form opens the
- * world-picker {@link WorldListView}, while {@code gui <world>} opens the per-world {@link WorldMainView} for a
- * managed world. An unmanaged world name opens neither view.
+ * engine-rendered world picker through the {@code openWorldList} seam, while {@code gui <world>} opens the per-world
+ * {@link WorldMainView} for a managed world. An unmanaged world name opens neither.
  */
 class WorldGuiCommandTest {
 
     private ServerMock server;
     private PlayerMock alice;
-    private WorldListView listView;
+    private AtomicInteger listOpens;
     private WorldMainView mainView;
     private Messages messages;
     private WorldsServices services;
@@ -77,7 +78,7 @@ class WorldGuiCommandTest {
         server = MockBukkit.mock();
         alice = server.addPlayer("Alice");
         alice.setOp(true);
-        listView = mock(WorldListView.class);
+        listOpens = new AtomicInteger();
         mainView = mock(WorldMainView.class);
         messages = mock(Messages.class);
         when(messages.resolve(any(), any(), any())).thenReturn(""); // a render the feedback path can parse
@@ -93,7 +94,7 @@ class WorldGuiCommandTest {
     void guiWithoutArgumentOpensTheWorldPicker() {
         execute("worlds gui");
 
-        verify(listView).open(any(Player.class), any(PlayerRef.class), eq(0));
+        assertThat(listOpens).hasValue(1);
         verifyNoInteractions(mainView);
     }
 
@@ -102,14 +103,14 @@ class WorldGuiCommandTest {
         execute("worlds gui world");
 
         verify(mainView).open(any(Player.class), any(PlayerRef.class), eq(WorldName.of("world")));
-        verifyNoInteractions(listView);
+        assertThat(listOpens).hasValue(0);
     }
 
     @Test
     void guiWithUnmanagedWorldOpensNeitherView() {
         execute("worlds gui missing");
 
-        verifyNoInteractions(listView);
+        assertThat(listOpens).hasValue(0);
         verifyNoInteractions(mainView);
     }
 
@@ -146,7 +147,7 @@ class WorldGuiCommandTest {
                 mock(BackupWorld.class),
                 mock(ListBackups.class),
                 mock(RestoreWorld.class),
-                listView,
+                (player, viewer) -> listOpens.incrementAndGet(),
                 mainView);
     }
 

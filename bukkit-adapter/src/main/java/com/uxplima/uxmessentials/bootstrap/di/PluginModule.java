@@ -459,7 +459,17 @@ public final class PluginModule {
         if (module.id().equals(ModuleId.of("teleport"))) {
             wireTeleport(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry);
         } else if (module.id().equals(ModuleId.of("worlds"))) {
-            wireWorlds(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, textInput);
+            wireWorlds(
+                    plugin,
+                    ctx,
+                    persistence,
+                    resources,
+                    links,
+                    guiLayouts,
+                    guiRegistry,
+                    textInput,
+                    menus,
+                    menuBindings);
         } else if (module.id().equals(ModuleId.of("homes"))) {
             wireHomes(
                     plugin,
@@ -630,7 +640,9 @@ public final class PluginModule {
             ContextLinks links,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
-            TextInput textInput) {
+            TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings) {
         // worlds builds its cached jOOQ WorldRepository over persistence.dsl() and its BukkitWorldEngine over the
         // plugin's Server. It delegates /worlds tp and /worlds spawn execution to the captured teleport engine (wired
         // earlier) and charges the per-world entry fee through the economy bridge — but economy lands after worlds, so
@@ -657,6 +669,8 @@ public final class PluginModule {
                 entryFee,
                 guiLayouts,
                 textInput,
+                menus,
+                menuBindings,
                 plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -673,7 +687,7 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey.LIST_TITLE,
                 Material.GRASS_BLOCK,
                 "uxmessentials.world.gui",
-                (player, viewer) -> wired.listView().open(player, viewer, 0)));
+                (player, viewer) -> wired.openWorldList().accept(player, viewer)));
     }
 
     private static void wireHomes(

@@ -22,7 +22,6 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
@@ -158,7 +157,7 @@ class WorldBackupCommandTest {
                 backupWorld,
                 listBackups,
                 restoreWorld,
-                mock(WorldListView.class),
+                (player, viewer) -> {},
                 mock(WorldMainView.class));
     }
 

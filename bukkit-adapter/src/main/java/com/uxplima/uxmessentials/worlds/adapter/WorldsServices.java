@@ -4,11 +4,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
@@ -62,7 +65,7 @@ public final class WorldsServices {
     private final WorldRepository repository;
     private final Scheduler scheduler;
     private final Supplier<Set<WorldName>> onDiskScanner;
-    private final WorldListView worldListView;
+    private final BiConsumer<Player, PlayerRef> openWorldList;
     private final WorldMainView worldMainView;
     private final AtomicReference<List<String>> importable = new AtomicReference<>(List.of());
 
@@ -88,7 +91,7 @@ public final class WorldsServices {
             BackupWorld backupWorld,
             ListBackups listBackups,
             RestoreWorld restoreWorld,
-            WorldListView worldListView,
+            BiConsumer<Player, PlayerRef> openWorldList,
             WorldMainView worldMainView) {
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
         this.importWorld = Objects.requireNonNull(importWorld, "importWorld");
@@ -111,7 +114,7 @@ public final class WorldsServices {
         this.backupWorld = Objects.requireNonNull(backupWorld, "backupWorld");
         this.listBackups = Objects.requireNonNull(listBackups, "listBackups");
         this.restoreWorld = Objects.requireNonNull(restoreWorld, "restoreWorld");
-        this.worldListView = Objects.requireNonNull(worldListView, "worldListView");
+        this.openWorldList = Objects.requireNonNull(openWorldList, "openWorldList");
         this.worldMainView = Objects.requireNonNull(worldMainView, "worldMainView");
     }
 
@@ -187,9 +190,13 @@ public final class WorldsServices {
         return restoreWorld;
     }
 
-    /** The world-picker view {@code /worlds editor} opens, exposed so the command can launch it. */
-    public WorldListView worldListView() {
-        return worldListView;
+    /**
+     * Open the engine-rendered world picker for {@code viewer}, the menu {@code /worlds editor} / {@code /world gui}
+     * launches. Exposed as a seam so the command opens the list without depending on the menu engine directly; worlds
+     * wiring binds it to {@code WorldListMenu.open} once that menu is built.
+     */
+    public void openWorldList(Player player, PlayerRef viewer) {
+        openWorldList.accept(player, viewer);
     }
 
     /** The per-world hub view {@code /worlds editor <world>} opens, exposed so the command can launch it. */

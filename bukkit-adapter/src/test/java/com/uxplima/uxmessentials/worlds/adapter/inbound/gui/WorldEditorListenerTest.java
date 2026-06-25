@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.worlds.adapter.inbound.gui;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -74,10 +73,11 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the single click-routing listener that ties the four world-editor views together. The
- * scheduler is synchronous so the entity-bound view opens run inline; the repository is a seeded fake and a fake
- * {@link WorldEngine} answers loaded-state queries. The three mutating use cases are Mockito mocks so a click can be
- * asserted to route into exactly one of them with the expected arguments.
+ * MockBukkit coverage of the single click-routing listener that ties the bespoke world-editor screens together (the
+ * world picker is now an engine-rendered menu and no longer routed here). The scheduler is synchronous so the
+ * entity-bound view opens run inline; the repository is a seeded fake and a fake {@link WorldEngine} answers
+ * loaded-state queries. The three mutating use cases are Mockito mocks so a click can be asserted to route into
+ * exactly one of them with the expected arguments.
  *
  * <p>Every case is exercised live: the listener is registered with the plugin manager and a real
  * {@link InventoryClickEvent} is fired against the open editor window, so the whole holder-recognition,
@@ -96,7 +96,6 @@ class WorldEditorListenerTest {
     private SetWorldProperty setWorldProperty;
     private LoadWorld loadWorld;
     private UnloadWorld unloadWorld;
-    private WorldListView listView;
     private WorldMainView mainView;
     private WorldGenerationView generationView;
     private WorldPropertyGridView gridView;
@@ -116,7 +115,6 @@ class WorldEditorListenerTest {
         WorldEditorText text = new WorldEditorText(new KeyMessages());
         Scheduler scheduler = new SyncScheduler();
         GuiLayout layout = GuiLayout.paginatedDefault(Material.PAPER);
-        listView = new WorldListView(text, repository, engine, scheduler, layout);
         mainView = new WorldMainView(text, repository, engine, scheduler, layout);
         generationView = new WorldGenerationView(text, repository, scheduler, layout);
         gridView = new WorldPropertyGridView(text, repository, scheduler, layout);
@@ -134,7 +132,7 @@ class WorldEditorListenerTest {
         WorldsServices services = services();
         WorldCreateView createView = mock(WorldCreateView.class);
         WorldEditorListener listener = new WorldEditorListener(
-                listView, createView, mainView, generationView, gridView, services, repository, engine);
+                createView, mainView, generationView, gridView, services, repository, engine, (player, v) -> {});
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -224,30 +222,6 @@ class WorldEditorListenerTest {
         assertThat(servicesScheduler.globalHops).isGreaterThanOrEqualTo(1);
     }
 
-    @Test
-    void rightClickingAWorldOnTheListTeleportsTheViewerToItOnTheGlobalThread() {
-        listView.open(viewer, ref(viewer), 0);
-
-        fireClick(firstContentSlot(), ClickType.RIGHT);
-
-        // Right-click is the "visit" affordance: it mirrors /worlds tp <self> (staff override, no gate/fee) and,
-        // because loading a world is Folia-legal only on the global region thread, the hand-off hops there first.
-        verify(worldTeleport).forced(ref(viewer), ref(viewer), WORLD);
-        assertThat(servicesScheduler.globalHops).isGreaterThanOrEqualTo(1);
-    }
-
-    @Test
-    void leftClickingAWorldOnTheListOpensItsEditorHubWithoutTeleporting() {
-        listView.open(viewer, ref(viewer), 0);
-
-        fireClick(firstContentSlot(), ClickType.LEFT);
-
-        InventoryHolder holder = viewer.getOpenInventory().getTopInventory().getHolder();
-        assertThat(holder).isInstanceOf(WorldEditorHolder.class);
-        assertThat(((WorldEditorHolder) holder).screen()).isEqualTo(WorldEditorScreen.MAIN);
-        verify(worldTeleport, never()).forced(any(), any(), any());
-    }
-
     private void fireClick(int slot, ClickType type) {
         server.getPluginManager().callEvent(clickEvent(slot, type));
     }
@@ -300,7 +274,7 @@ class WorldEditorListenerTest {
                 mock(BackupWorld.class),
                 mock(ListBackups.class),
                 mock(RestoreWorld.class),
-                listView,
+                (player, viewer) -> {},
                 mainView);
     }
 

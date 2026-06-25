@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorText;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationView;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldPropertyGridView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
@@ -121,7 +120,7 @@ class WorldsWiringSmokeTest {
                 editorListener());
 
         WorldsWiring.Wired wired = new WorldsWiring.Wired(
-                List.of(), listeners, () -> {}, () -> {}, resolver(), placeholders(), mock(WorldListView.class));
+                List.of(), listeners, () -> {}, () -> {}, resolver(), placeholders(), (player, viewer) -> {});
 
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(ForceGamemodeListener.class);
         assertThat(wired.listeners()).hasAtLeastOneElementOfType(WorldAccessListener.class);
@@ -141,11 +140,13 @@ class WorldsWiringSmokeTest {
     }
 
     @Test
-    void servicesExposeTheEditorListAndMainViews() {
+    void servicesExposeTheMainViewAndTheWorldListOpener() {
         WorldsServices services = services(mock(WorldTeleportService.class));
 
-        assertThat(services.worldListView()).isNotNull();
         assertThat(services.worldMainView()).isNotNull();
+        // The world picker is opened through a seam (the engine list); invoking it with a no-op seam must not throw.
+        PlayerRef who = new PlayerRef(java.util.UUID.randomUUID(), "Staff");
+        assertThatNoException().isThrownBy(() -> services.openWorldList(mock(org.bukkit.entity.Player.class), who));
     }
 
     @Test
@@ -167,7 +168,7 @@ class WorldsWiringSmokeTest {
     @Test
     void runningTheStopHookDoesNotThrow() {
         WorldsWiring.Wired wired = new WorldsWiring.Wired(
-                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), mock(WorldListView.class));
+                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), (player, viewer) -> {});
 
         assertThatNoException().isThrownBy(() -> wired.stop().run());
     }
@@ -175,7 +176,7 @@ class WorldsWiringSmokeTest {
     @Test
     void wiredExposesAWorldsPlaceholderSeam() {
         WorldsWiring.Wired wired = new WorldsWiring.Wired(
-                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), mock(WorldListView.class));
+                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), (player, viewer) -> {});
 
         assertThat(wired.worldsPlaceholders()).isNotNull();
     }
@@ -223,13 +224,8 @@ class WorldsWiringSmokeTest {
                 mock(BackupWorld.class),
                 mock(ListBackups.class),
                 mock(RestoreWorld.class),
-                listView(),
+                (player, viewer) -> {},
                 mainView());
-    }
-
-    private static WorldListView listView() {
-        return new WorldListView(
-                editorText(), new NoOpRepository(), mock(WorldEngine.class), new NoOpScheduler(), listLayout());
     }
 
     private static WorldMainView mainView() {
@@ -247,20 +243,20 @@ class WorldsWiringSmokeTest {
 
     private static WorldEditorListener editorListener() {
         return new WorldEditorListener(
-                listView(),
                 mock(com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateView.class),
                 mainView(),
                 new WorldGenerationView(editorText(), new NoOpRepository(), new NoOpScheduler(), listLayout()),
                 new WorldPropertyGridView(editorText(), new NoOpRepository(), new NoOpScheduler(), listLayout()),
                 services(mock(WorldTeleportService.class)),
                 new NoOpRepository(),
-                mock(WorldEngine.class));
+                mock(WorldEngine.class),
+                (player, viewer) -> {});
     }
 
     @Test
     void wiredExposesAGeneratorResolverThatResolvesTheVoidId() {
         WorldsWiring.Wired wired = new WorldsWiring.Wired(
-                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), mock(WorldListView.class));
+                List.of(), List.of(), () -> {}, () -> {}, resolver(), placeholders(), (player, viewer) -> {});
 
         assertThat(wired.generatorResolver()).isNotNull();
         assertThat(wired.generatorResolver().resolve("void")).isPresent();

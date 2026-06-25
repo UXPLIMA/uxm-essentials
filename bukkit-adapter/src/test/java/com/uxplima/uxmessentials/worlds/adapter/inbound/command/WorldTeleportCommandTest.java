@@ -21,7 +21,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
@@ -149,7 +148,7 @@ class WorldTeleportCommandTest {
                 mock(BackupWorld.class),
                 mock(ListBackups.class),
                 mock(RestoreWorld.class),
-                mock(WorldListView.class),
+                (player, viewer) -> {},
                 mock(WorldMainView.class));
     }
 

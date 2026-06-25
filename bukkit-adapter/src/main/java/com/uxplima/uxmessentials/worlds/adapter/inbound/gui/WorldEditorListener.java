@@ -2,13 +2,14 @@ package com.uxplima.uxmessentials.worlds.adapter.inbound.gui;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
@@ -20,12 +21,14 @@ import com.uxplima.uxmessentials.worlds.domain.WorldSettings;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The single click-routing listener tying the four world-editor views together. It recognises a click in any
- * {@code /worlds editor} window by its {@link WorldEditorHolder}, cancels it, and dispatches by the holder's
- * {@link WorldEditorScreen}: list navigation and world selection (left-click edits, right-click teleports the viewer
- * to that world), the main hub's branch/back/toggle buttons, the
- * read-only generation back button, and the rules/access property grids where a click cycles the clicked property's
- * value through {@link WorldPropertyCycle} and persists it via {@link com.uxplima.uxmessentials.worlds.application.SetWorldProperty}.
+ * The single click-routing listener tying the bespoke world-editor screens together. It recognises a click in any
+ * {@code /worlds editor} editor window by its {@link WorldEditorHolder}, cancels it, and dispatches by the holder's
+ * {@link WorldEditorScreen}: the create screen, the main hub's branch/back/toggle buttons, the read-only generation
+ * back button, and the rules/access property grids where a click cycles the clicked property's value through
+ * {@link WorldPropertyCycle} and persists it via {@link com.uxplima.uxmessentials.worlds.application.SetWorldProperty}.
+ * The world picker (the {@link WorldEditorScreen#LIST} screen) is no longer routed here — it is rendered by the menu
+ * engine as a {@code world-list} {@code MenuHolder} and handled by the engine's own listener — so a "back" from the
+ * main hub reopens that engine list through {@link #reopenList}.
  *
  * <p>A property cycle is optimistic: the new value is written through the use case (which persists off-tick) and the
  * single clicked button is rebuilt in place showing that value, so the viewer sees the change immediately without
@@ -35,7 +38,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WorldEditorListener implements Listener {
 
-    private final WorldListView listView;
     private final WorldCreateView createView;
     private final WorldMainView mainView;
     private final WorldGenerationView generationView;
@@ -43,17 +45,17 @@ public final class WorldEditorListener implements Listener {
     private final WorldsServices services;
     private final WorldRepository repository;
     private final WorldEngine engine;
+    private final BiConsumer<Player, PlayerRef> reopenList;
 
     public WorldEditorListener(
-            WorldListView listView,
             WorldCreateView createView,
             WorldMainView mainView,
             WorldGenerationView generationView,
             WorldPropertyGridView gridView,
             WorldsServices services,
             WorldRepository repository,
-            WorldEngine engine) {
-        this.listView = Objects.requireNonNull(listView, "listView");
+            WorldEngine engine,
+            BiConsumer<Player, PlayerRef> reopenList) {
         this.createView = Objects.requireNonNull(createView, "createView");
         this.mainView = Objects.requireNonNull(mainView, "mainView");
         this.generationView = Objects.requireNonNull(generationView, "generationView");
@@ -61,6 +63,7 @@ public final class WorldEditorListener implements Listener {
         this.services = Objects.requireNonNull(services, "services");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
+        this.reopenList = Objects.requireNonNull(reopenList, "reopenList");
         // The views and SetWorldProperty self-schedule their entity/async hops, so the listener holds no scheduler
         // of its own — the optimistic single-slot rebuild is the only synchronous work, and it runs on the click
         // thread.
@@ -77,41 +80,15 @@ public final class WorldEditorListener implements Listener {
         }
         int slot = event.getRawSlot();
         switch (h.screen()) {
-            case LIST -> onList(player, h, slot, event);
             case CREATE -> onCreate(player, h, slot, event);
             case MAIN -> onMain(player, h, slot);
             case GENERATION -> onGeneration(player, h, slot);
             case RULES, ACCESS -> onGrid(player, h, slot, event);
+            case LIST -> {
+                // The world picker is now an engine-rendered world-list MenuHolder handled by the engine's own
+                // listener; a LIST-tagged WorldEditorHolder no longer reaches this editor listener.
+            }
         }
-    }
-
-    private void onList(Player player, WorldEditorHolder h, int slot, InventoryClickEvent event) {
-        GuiLayout layout = listView.layout();
-        if (slot == layout.prevSlot()) {
-            listView.open(player, h.viewer(), Math.max(0, h.page() - 1));
-        } else if (slot == layout.nextSlot()) {
-            listView.open(player, h.viewer(), h.page() + 1);
-        } else if (listView.isCreate(slot)) {
-            createView.open(player, h.viewer());
-        } else {
-            listView.worldAt(h.page(), slot).ifPresent(world -> selectWorld(player, h, world, event.isRightClick()));
-        }
-    }
-
-    private void selectWorld(Player player, WorldEditorHolder h, WorldName world, boolean teleport) {
-        if (teleport) {
-            visit(player, h, world);
-        } else {
-            mainView.open(player, h.viewer(), world);
-        }
-    }
-
-    private void visit(Player player, WorldEditorHolder h, WorldName world) {
-        // Right-clicking a world icon teleports the viewer there, mirroring /worlds tp <self>: the staff override
-        // skips the access gate and entry fee (the editor is already permission-gated), and the load-then-teleport
-        // runs on the global region thread because loading a world is legal under Folia only there.
-        player.closeInventory();
-        services.scheduler().onGlobal(() -> services.worldTeleport().forced(h.viewer(), h.viewer(), world));
     }
 
     private void onCreate(Player player, WorldEditorHolder h, int slot, InventoryClickEvent event) {
@@ -138,7 +115,7 @@ public final class WorldEditorListener implements Listener {
             case ACCESS ->
                 gridView.open(
                         player, h.viewer(), world, WorldEditorScreen.ACCESS, WorldPropertyGridView.ACCESS_PROPERTIES);
-            case BACK -> listView.open(player, h.viewer(), 0);
+            case BACK -> reopenList.accept(player, h.viewer());
             case TOGGLE_LOAD -> toggleLoad(player, h, world);
         }
     }

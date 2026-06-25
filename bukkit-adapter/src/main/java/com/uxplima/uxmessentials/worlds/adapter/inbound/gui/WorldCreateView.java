@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -65,7 +66,7 @@ public final class WorldCreateView {
     private final WorldEditorText text;
     private final CreateWorld createWorld;
     private final WorldNotifier notifier;
-    private final WorldListView listView;
+    private final BiConsumer<Player, PlayerRef> reopenList;
     private final TextInput textInput;
     private final Scheduler scheduler;
     private final GuiLayout layout;
@@ -74,14 +75,14 @@ public final class WorldCreateView {
             WorldEditorText text,
             CreateWorld createWorld,
             WorldNotifier notifier,
-            WorldListView listView,
+            BiConsumer<Player, PlayerRef> reopenList,
             TextInput textInput,
             Scheduler scheduler,
             GuiLayout layout) {
         this.text = Objects.requireNonNull(text, "text");
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
-        this.listView = Objects.requireNonNull(listView, "listView");
+        this.reopenList = Objects.requireNonNull(reopenList, "reopenList");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.layout = Objects.requireNonNull(layout, "layout");
@@ -121,7 +122,7 @@ public final class WorldCreateView {
             case NAME_SLOT -> promptName(player, viewer, draft);
             case SEED_SLOT -> promptSeed(player, viewer, draft);
             case CREATE_SLOT -> create(player, viewer, draft);
-            case BACK_SLOT -> listView.open(player, viewer, 0);
+            case BACK_SLOT -> reopenList.accept(player, viewer);
             default -> {
                 // Filler/summary slots are inert.
             }
@@ -193,7 +194,7 @@ public final class WorldCreateView {
         // world shows up. Reopen self-schedules back onto the viewer's entity thread.
         scheduler.onGlobal(() -> {
             createWorld.create(viewer, name, draft.toSpec(), true);
-            listView.open(player, viewer, 0);
+            reopenList.accept(player, viewer);
         });
     }
 

@@ -6,10 +6,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.bukkit.Material;
 import org.bukkit.Server;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
@@ -19,6 +21,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWorldsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.WorldsPlaceholders;
@@ -26,13 +30,14 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorListener;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorText;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationView;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldPropertyGridView;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.ForceGamemodeListener;
@@ -111,6 +116,8 @@ public final class WorldsWiring {
             WorldEntryFee entryFee,
             GuiLayouts guiLayouts,
             TextInput textInput,
+            Menus menus,
+            MenuBindings menuBindings,
             Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -120,6 +127,8 @@ public final class WorldsWiring {
         Objects.requireNonNull(entryFee, "entryFee");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
+        Objects.requireNonNull(menus, "menus");
+        Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
 
@@ -203,6 +212,12 @@ public final class WorldsWiring {
         WorldsPlaceholders worldsPlaceholders = new RepositoryWorldsPlaceholders(repository, engine);
 
         Editor editor = buildEditor(kernel, guiLayouts, repository, engine, tracked);
+        // The world picker is now an engine-rendered world-list menu, built after the views it opens (the main hub
+        // and the create screen) yet itself reopened by them — a one-element holder breaks that cycle, exactly the
+        // grid<->action seam the homes/npc list migrations use. The reopen seam every "back" path calls resolves to
+        // the menu once it is built; until then the array is empty, but no back can fire before the menu opens.
+        WorldListMenu[] listHolder = new WorldListMenu[1];
+        BiConsumer<Player, PlayerRef> reopenList = (player, viewer) -> listHolder[0].open(player, viewer);
         WorldsServices services = assemble(
                 kernel,
                 tracked,
@@ -218,29 +233,30 @@ public final class WorldsWiring {
                 backupWorld,
                 listBackups,
                 restoreWorld,
-                editor.listView(),
+                reopenList,
                 editor.mainView());
-        // The create screen reuses the list view (to reopen on cancel/create) and the started CreateWorld use case,
-        // and captures text through the shared input seam; its layout is a fixed three-row window like the main and
-        // generation screens.
+        // The create screen reopens the engine list on cancel/create through the shared reopen seam, runs the started
+        // CreateWorld use case, and captures text through the shared input seam; its layout is a fixed three-row
+        // window like the main and generation screens.
         GuiLayout createLayout = guiLayouts.load("worlds", "editor-create", threeRow());
         WorldCreateView createView = new WorldCreateView(
-                editor.editorText(),
-                services.createWorld(),
-                notifier,
-                editor.listView(),
-                textInput,
-                tracked,
-                createLayout);
+                editor.editorText(), services.createWorld(), notifier, reopenList, textInput, tracked, createLayout);
+        // Build the engine list over the bespoke views it launches (left-click opens the main hub, the create button
+        // opens the create screen) and the forced-teleport service (right-click), then close the cycle and register
+        // its bindings and spec with the menu engine.
+        WorldListMenu worldListMenu =
+                new WorldListMenu(menus, tracked, repository, engine, worldTeleport, editor.mainView(), createView);
+        listHolder[0] = worldListMenu;
+        worldListMenu.register(menuBindings, dataFolder, kernel.log());
         WorldEditorListener editorListener = new WorldEditorListener(
-                editor.listView(),
                 createView,
                 editor.mainView(),
                 editor.generationView(),
                 editor.gridView(),
                 services,
                 repository,
-                engine);
+                engine,
+                reopenList);
         ReconcileWorldsOnEnable reconcile = new ReconcileWorldsOnEnable(
                 repository, engine, kernel.events(), clock, settings::autoAdoptLoaded, settings::autoLoadRegistered);
 
@@ -279,7 +295,7 @@ public final class WorldsWiring {
                 },
                 resolver,
                 worldsPlaceholders,
-                editor.listView());
+                reopenList);
     }
 
     /** Close a stop-time handle, logging any failure rather than stranding the rest of the teardown. */
@@ -314,7 +330,7 @@ public final class WorldsWiring {
             BackupWorld backupWorld,
             ListBackups listBackups,
             RestoreWorld restoreWorld,
-            WorldListView worldListView,
+            BiConsumer<Player, PlayerRef> openWorldList,
             WorldMainView worldMainView) {
         CreateWorld createWorld = new CreateWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
         ImportWorld importWorld = new ImportWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
@@ -358,16 +374,17 @@ public final class WorldsWiring {
                 backupWorld,
                 listBackups,
                 restoreWorld,
-                worldListView,
+                openWorldList,
                 worldMainView);
     }
 
     /**
-     * Build the four world-editor views, their shared text helper, and bundle them so {@link #wire} can both feed the
-     * list/main views into {@link WorldsServices} and hand all four to the {@link WorldEditorListener}. The list and
-     * grid screens paginate (a chest default sized to the world or property count); the per-world main hub and the
-     * read-only generation screen are fixed three-row windows whose buttons sit at fixed slots, so a {@link #threeRow}
-     * layout supplies only the row count those two views read.
+     * Build the bespoke world-editor screens (main hub, read-only generation, and the rules/access property grids)
+     * and their shared text helper, so {@link #wire} can feed the main view into {@link WorldsServices} and the engine
+     * list and hand all the editor screens to the {@link WorldEditorListener}. The world picker is no longer built
+     * here — it is the engine-rendered {@code world-list} menu. The grid screen paginates (a chest default sized to
+     * the property count); the per-world main hub and the read-only generation screen are fixed three-row windows
+     * whose buttons sit at fixed slots, so a {@link #threeRow} layout supplies only the row count those two views read.
      */
     private static Editor buildEditor(
             KernelPorts kernel,
@@ -375,17 +392,14 @@ public final class WorldsWiring {
             com.uxplima.uxmessentials.worlds.application.port.WorldRepository repository,
             com.uxplima.uxmessentials.worlds.application.port.WorldEngine engine,
             Scheduler tracked) {
-        GuiLayout listLayout =
-                guiLayouts.load("worlds", "editor-list", GuiLayout.paginatedDefault(Material.GRASS_BLOCK));
         GuiLayout gridLayout = guiLayouts.load("worlds", "editor-grid", GuiLayout.paginatedDefault(Material.PAPER));
         GuiLayout mainLayout = guiLayouts.load("worlds", "editor-main", threeRow());
         GuiLayout genLayout = guiLayouts.load("worlds", "editor-generation", threeRow());
         WorldEditorText editorText = new WorldEditorText(kernel.messages());
-        WorldListView listView = new WorldListView(editorText, repository, engine, tracked, listLayout);
         WorldMainView mainView = new WorldMainView(editorText, repository, engine, tracked, mainLayout);
         WorldGenerationView generationView = new WorldGenerationView(editorText, repository, tracked, genLayout);
         WorldPropertyGridView gridView = new WorldPropertyGridView(editorText, repository, tracked, gridLayout);
-        return new Editor(editorText, listView, mainView, generationView, gridView);
+        return new Editor(editorText, mainView, generationView, gridView);
     }
 
     /**
@@ -398,12 +412,12 @@ public final class WorldsWiring {
     }
 
     /**
-     * The world-editor views built together with their shared text helper, so {@link #wire} threads them into the
-     * services and the listener (and builds the create screen against the same {@link WorldEditorText}).
+     * The bespoke world-editor screens built together with their shared text helper, so {@link #wire} threads the main
+     * view into the services and the engine list, and hands every screen to the listener (and builds the create screen
+     * against the same {@link WorldEditorText}).
      */
     private record Editor(
             WorldEditorText editorText,
-            WorldListView listView,
             WorldMainView mainView,
             WorldGenerationView generationView,
             WorldPropertyGridView gridView) {}
@@ -416,7 +430,7 @@ public final class WorldsWiring {
      * onto the holder the plugin retains so {@code getDefaultWorldGenerator} can serve {@code generator:
      * uxmEssentials:void|flat} worlds loaded from server.properties. The placeholder seam is registered onto
      * the shared placeholder contexts so the {@code worlds_*} tokens resolve while the module is enabled. The
-     * list view is the {@code /world gui} world picker the management hub also opens.
+     * open-world-list seam opens the engine-rendered {@code /world gui} world picker the management hub also opens.
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -425,7 +439,7 @@ public final class WorldsWiring {
             Runnable stop,
             WorldGeneratorResolver generatorResolver,
             WorldsPlaceholders worldsPlaceholders,
-            WorldListView listView) {
+            BiConsumer<Player, PlayerRef> openWorldList) {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
@@ -433,7 +447,7 @@ public final class WorldsWiring {
             Objects.requireNonNull(stop, "stop");
             Objects.requireNonNull(generatorResolver, "generatorResolver");
             Objects.requireNonNull(worldsPlaceholders, "worldsPlaceholders");
-            Objects.requireNonNull(listView, "listView");
+            Objects.requireNonNull(openWorldList, "openWorldList");
         }
     }
 }

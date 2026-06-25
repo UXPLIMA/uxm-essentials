@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,6 +58,7 @@ class WorldCreateViewPathTest {
     private PlayerMock viewer;
     private CreateWorld createWorld;
     private WorldCreateView view;
+    private int listReopens;
 
     @BeforeEach
     void setUp() {
@@ -70,19 +70,15 @@ class WorldCreateViewPathTest {
         WorldEditorText text = new WorldEditorText(new KeyMessages());
         WorldNotifier notifier = new WorldNotifier(new KeyMessages(), new NoopSink());
         Scheduler scheduler = new SyncScheduler();
-        WorldListView listView = new WorldListView(
-                text,
-                new EmptyRepository(),
-                mock(com.uxplima.uxmessentials.worlds.application.port.WorldEngine.class),
-                scheduler,
-                GuiLayout.paginatedDefault(Material.GRASS_BLOCK));
+        listReopens = 0;
         TextInput textInput = TextInputTestKit.create(
                 MockBukkit.createMockPlugin(),
                 new GuiText(new KeyMessages()),
                 scheduler,
                 Path.of("nonexistent"),
                 new NoopLogger());
-        view = new WorldCreateView(text, createWorld, notifier, listView, textInput, scheduler, threeRow());
+        view = new WorldCreateView(
+                text, createWorld, notifier, (player, v) -> listReopens++, textInput, scheduler, threeRow());
     }
 
     @AfterEach
@@ -175,9 +171,8 @@ class WorldCreateViewPathTest {
     void clickingBackReturnsToTheWorldList() {
         view.onClick(viewer, ref(viewer), WorldCreateDraft.empty(), WorldCreateView.BACK_SLOT, false);
 
-        WorldEditorHolder h =
-                (WorldEditorHolder) viewer.getOpenInventory().getTopInventory().getHolder();
-        assertThat(h.screen()).isEqualTo(WorldEditorScreen.LIST);
+        // Back reopens the engine-rendered world picker through the reopen seam rather than a bespoke LIST holder.
+        assertThat(listReopens).isEqualTo(1);
     }
 
     @Test
@@ -204,30 +199,6 @@ class WorldCreateViewPathTest {
 
     private static PlayerRef ref(PlayerMock player) {
         return new PlayerRef(player.getUniqueId(), player.getName());
-    }
-
-    private static final class EmptyRepository
-            implements com.uxplima.uxmessentials.worlds.application.port.WorldRepository {
-        @Override
-        public Optional<com.uxplima.uxmessentials.worlds.domain.ManagedWorld> find(WorldName name) {
-            return Optional.empty();
-        }
-
-        @Override
-        public List<com.uxplima.uxmessentials.worlds.domain.ManagedWorld> all() {
-            return new ArrayList<>();
-        }
-
-        @Override
-        public boolean exists(WorldName name) {
-            return false;
-        }
-
-        @Override
-        public void save(com.uxplima.uxmessentials.worlds.domain.ManagedWorld world) {}
-
-        @Override
-        public void delete(WorldName name) {}
     }
 
     private static final class KeyMessages implements Messages {

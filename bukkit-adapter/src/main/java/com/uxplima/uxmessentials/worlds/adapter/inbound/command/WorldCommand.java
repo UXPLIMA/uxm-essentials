@@ -489,7 +489,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (sender == null) {
             return 0;
         }
-        services.worldListView().open(sender, ref(sender), 0); // the view self-schedules onEntity
+        services.openWorldList(sender, ref(sender)); // the menu self-schedules onEntity
         return Command.SINGLE_SUCCESS;
     }
 
