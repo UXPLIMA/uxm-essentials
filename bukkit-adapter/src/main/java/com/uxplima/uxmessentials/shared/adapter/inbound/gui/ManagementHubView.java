@@ -6,6 +6,7 @@ import java.util.Objects;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -27,6 +28,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ManagementHubView {
 
+    private final Menus menus;
     private final GuiText guiText;
     private final Scheduler scheduler;
     private final Permissions permissions;
@@ -34,11 +36,13 @@ public final class ManagementHubView {
     private final EntityListLayout layout;
 
     public ManagementHubView(
+            Menus menus,
             GuiText guiText,
             Scheduler scheduler,
             Permissions permissions,
             ManagementGuiRegistry registry,
             EntityListLayout layout) {
+        this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
@@ -55,6 +59,7 @@ public final class ManagementHubView {
 
     private EntityListView<ManagementGuiEntry> view(PlayerRef viewer) {
         return EntityListView.<ManagementGuiEntry>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)

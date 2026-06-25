@@ -109,7 +109,7 @@ public final class PresenceWiring {
                 "list",
                 com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.paginatedDefault(
                         org.bukkit.Material.PLAYER_HEAD));
-        OnlinePlayerListView listView = new OnlinePlayerListView(guiText, kernel.scheduler(), listLayout);
+        OnlinePlayerListView listView = new OnlinePlayerListView(menus, guiText, kernel.scheduler(), listLayout);
         List<CommandRegistration> commands =
                 new ArrayList<>(PresenceCommands.all(services, kernel.messages(), kernel.scheduler(), listView));
         commands.add(new PresenceSettingsCommand(services, kernel.messages(), kernel.scheduler(), settingsView));

@@ -260,7 +260,7 @@ public final class PluginModule {
         EntityListLayout hubLayout =
                 guiLayouts.loadEntityList("management", "hub", EntityListLayout.paginatedDefault(Material.NETHER_STAR));
         ManagementHubView hub =
-                new ManagementHubView(guiText, kernel.scheduler(), kernel.permissions(), guiRegistry, hubLayout);
+                new ManagementHubView(menus, guiText, kernel.scheduler(), kernel.permissions(), guiRegistry, hubLayout);
         GuiSubcommand guiNode = new GuiSubcommand(guiRegistry, hub, kernel.permissions(), kernel.messages());
         resources.addCommand(
                 new UxmessCommand(registry, config, importNode, guiNode, kernel.scheduler(), healthChecks));

@@ -13,15 +13,11 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.Component;
-
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
-import com.uxplima.uxmlib.gui.item.GuiItem;
-import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -33,12 +29,18 @@ import org.jspecify.annotations.Nullable;
  * click on an entity icon invokes {@code onSelect} (a module wires that to open its {@link EntityEditorView});
  * a click on the create button invokes the optional {@code onCreate}.
  *
+ * <p>The view is a thin shim over the menu engine's paginated-list runtime: it turns the {@code (layout, title,
+ * entities, icon renderer, select, optional create/action)} a module hands it into a {@link ListSpec} and opens it
+ * through {@link Menus#openList}, so the window is a holder-backed engine list routed and torn down by the one menu
+ * listener and one {@code closeMenu}. The geometry, materials and catalog keys are unchanged, so the rendered list
+ * is identical slot-for-slot to the bespoke {@code PaginatedGui} it replaces, and page flips re-paginate the same
+ * holder rather than rebuilding a window.
+ *
  * <p>The view holds no module logic: the entity supplier, the per-entity icon renderer, and the callbacks are
- * all supplied by the caller. The menu is a uxmLib {@link PaginatedGui} whose holder is itself, so click
- * routing flows through the installed menu listener — there is no bespoke listener. {@link #open} builds and
- * shows the inventory in the viewer's screen, so it is scheduled on their entity thread through the shared
- * {@link Scheduler}; if the entity list read is expensive a caller passes a supplier that has already been
- * resolved off-thread.
+ * all supplied by the caller. {@link #open} hands the list to the engine, which resolves the live player and shows
+ * the inventory on the viewer's entity thread; the caller pre-resolves the entity supplier off-thread (an
+ * {@link java.util.concurrent.atomic.AtomicReference} snapshot), so the imperative icon renderer reads only that and
+ * never touches Bukkit on a background thread.
  *
  * <p>A caller may also wire one optional <em>action button</em> at a fixed slot — a non-entity control such as a
  * settings opener — through {@code onAction}. It is drawn over the filler at its slot and its click runs the
@@ -49,8 +51,8 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class EntityListView<T> {
 
+    private final Menus menus;
     private final GuiText guiText;
-    private final Scheduler scheduler;
     private final EntityListLayout layout;
     private final MessageKey title;
     private final MessageKey prevName;
@@ -66,8 +68,9 @@ public final class EntityListView<T> {
     private final @Nullable Consumer<Player> onAction;
 
     private EntityListView(Builder<T> builder) {
+        this.menus = Objects.requireNonNull(builder.menus, "menus");
         this.guiText = Objects.requireNonNull(builder.guiText, "guiText");
-        this.scheduler = Objects.requireNonNull(builder.scheduler, "scheduler");
+        Objects.requireNonNull(builder.scheduler, "scheduler");
         this.layout = Objects.requireNonNull(builder.layout, "layout");
         this.title = Objects.requireNonNull(builder.title, "title");
         this.prevName = Objects.requireNonNull(builder.prevName, "prevName");
@@ -88,62 +91,53 @@ public final class EntityListView<T> {
         return new Builder<>();
     }
 
-    /** Open the list for {@code viewer} on its first page, scheduled on the viewer's entity thread. */
+    /** Open the list for {@code viewer} on its first page; the engine resolves the live player and entity-hops. */
     public void open(Player player, PlayerRef viewer) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
-        scheduler.onEntity(viewer, () -> build(player, viewer).open(player));
+        menus.openList(viewer, spec(viewer));
     }
 
-    private PaginatedGui build(Player player, PlayerRef viewer) {
-        Component titleText = guiText.text(viewer, title);
-        PaginatedGui gui = Guis.paginated()
-                .title(titleText)
+    /**
+     * Build the engine {@link ListSpec} for one viewer. The title and button names resolve against {@code viewer},
+     * so the spec is built per open (matching the bespoke view, which rebuilt its {@code PaginatedGui} per open); the
+     * typed icon renderer and select handler close over {@code T} and cast the engine's type-erased {@link Object}
+     * entity back, which is always one of the very entities this view's supplier produced.
+     */
+    private ListSpec spec(PlayerRef viewer) {
+        ListSpec.Builder spec = ListSpec.builder()
+                .title(guiText.text(viewer, title))
                 .rows(layout.rows())
                 .contentSlots(contentSlots())
-                .build();
-        fill(gui);
-        for (T entity : entities.get()) {
-            gui.addPageItem(GuiItem.button(iconRenderer.apply(viewer, entity), e -> onSelect.accept(player, entity)));
-        }
-        navigation(gui, player, viewer);
-        return gui;
-    }
-
-    private void navigation(PaginatedGui gui, Player player, PlayerRef viewer) {
-        gui.set(layout.base().prevSlot(), GuiItem.button(navButton(viewer, prevName), e -> gui.previousPage()));
-        gui.set(layout.base().nextSlot(), GuiItem.button(navButton(viewer, nextName), e -> gui.nextPage()));
+                .navigation(
+                        layout.base().prevSlot(),
+                        layout.base().nextSlot(),
+                        layout.base().navIcon())
+                .navNames(guiText.text(viewer, prevName), guiText.text(viewer, nextName))
+                .filler(layout.filler())
+                .entities(() -> List.<Object>copyOf(entities.get()))
+                .iconRenderer((v, entity) -> iconRenderer.apply(v, cast(entity)))
+                .onSelect((player, entity) -> onSelect.accept(player, cast(entity)));
         if (onCreate != null && createName != null && layout.createSlot().isPresent()) {
-            ItemStack create = ItemBuilder.of(layout.createIcon())
-                    .name(guiText.text(viewer, createName))
-                    .build();
-            gui.set(layout.createSlot().getAsInt(), GuiItem.button(create, e -> onCreate.accept(player)));
+            spec.onCreate(
+                    layout.createSlot().getAsInt(), layout.createIcon(), guiText.text(viewer, createName), onCreate);
         }
         if (onAction != null && actionName != null && actionSlot.isPresent()) {
-            ItemStack action = ItemBuilder.of(actionIcon)
-                    .name(guiText.text(viewer, actionName))
-                    .build();
-            gui.set(actionSlot.getAsInt(), GuiItem.button(action, e -> onAction.accept(player)));
+            spec.onAction(actionSlot.getAsInt(), actionIcon, guiText.text(viewer, actionName), onAction);
         }
+        return spec.build();
     }
 
-    private ItemStack navButton(PlayerRef viewer, MessageKey name) {
-        return ItemBuilder.of(layout.base().navIcon())
-                .name(guiText.text(viewer, name))
-                .build();
+    /** Cast the engine's type-erased entity back to {@code T}; it is always one of this view's own entities. */
+    @SuppressWarnings("unchecked") // the engine carries the very entities this typed view's supplier produced
+    private T cast(Object entity) {
+        return (T) entity;
     }
 
-    private void fill(PaginatedGui gui) {
-        ItemStack filler =
-                ItemBuilder.of(layout.filler()).name(Component.empty()).build();
-        List<Integer> content = contentSlots();
-        for (int slot = 0; slot < layout.rows() * 9; slot++) {
-            if (!content.contains(slot)) {
-                gui.set(slot, GuiItem.display(filler));
-            }
-        }
-    }
-
+    /**
+     * The content slots an entity icon may occupy: the conf's explicit slots if it set any, else the default page
+     * region (every slot of all but the bottom row), matching the bespoke view's {@code PaginatedGui} default.
+     */
     private List<Integer> contentSlots() {
         return layout.explicitContentSlots().orElseGet(() -> {
             List<Integer> defaults = new ArrayList<>();
@@ -158,6 +152,7 @@ public final class EntityListView<T> {
     /** Fluent builder so a module names only the parts it uses; create is optional. */
     @NullMarked
     public static final class Builder<T> {
+        private @Nullable Menus menus;
         private @Nullable GuiText guiText;
         private @Nullable Scheduler scheduler;
         private @Nullable EntityListLayout layout;
@@ -175,6 +170,12 @@ public final class EntityListView<T> {
         private @Nullable Consumer<Player> onAction;
 
         private Builder() {}
+
+        /** The menu engine the list opens through; the list it builds is a holder-backed engine menu. */
+        public Builder<T> menus(Menus menus) {
+            this.menus = Objects.requireNonNull(menus, "menus");
+            return this;
+        }
 
         public Builder<T> guiText(GuiText guiText) {
             this.guiText = Objects.requireNonNull(guiText, "guiText");

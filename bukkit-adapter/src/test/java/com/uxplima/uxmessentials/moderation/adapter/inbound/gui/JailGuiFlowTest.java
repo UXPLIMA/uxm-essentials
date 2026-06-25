@@ -94,12 +94,18 @@ class JailGuiFlowTest {
         Scheduler scheduler = new SyncScheduler();
         TextInput textInput = TextInputTestKit.create(
                 plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), new NoopLogger());
+        // The picker and duration screens stay on uxmLib; the jail chooser is now an engine list, so both the uxmLib
+        // listener and the engine listener are installed and the flow hops cleanly between the two runtimes.
         Guis.install(plugin);
+        com.uxplima.uxmessentials.shared.menu.TestMenuEngine engine =
+                com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(new KeyMessages(), scheduler);
+        engine.installListener(plugin);
         PlayerPickerView picker =
                 new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
         DurationPickerView durations =
                 new DurationPickerView(guiText, scheduler, textInput, new KeyMessages(), new NoopSink());
-        flow = new JailGuiFlow(guiText, scheduler, services, picker, durations, new KeyMessages(), new NoopSink());
+        flow = new JailGuiFlow(
+                engine.menus(), guiText, scheduler, services, picker, durations, new KeyMessages(), new NoopSink());
     }
 
     @AfterEach

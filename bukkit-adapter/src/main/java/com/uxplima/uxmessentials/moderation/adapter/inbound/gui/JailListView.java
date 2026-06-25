@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -71,6 +72,7 @@ public final class JailListView {
     private final EntityListView<String> view;
 
     public JailListView(
+            Menus menus,
             GuiText guiText,
             Messages messages,
             Scheduler scheduler,
@@ -79,6 +81,7 @@ public final class JailListView {
             JailLocator jailLocator,
             TextInput textInput,
             EntityListLayout layout) {
+        Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -88,6 +91,7 @@ public final class JailListView {
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(layout, "layout");
         this.view = EntityListView.<String>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)

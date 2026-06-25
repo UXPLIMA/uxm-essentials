@@ -62,6 +62,14 @@ public final class MenuHolder implements InventoryHolder {
      */
     @Nullable private SelectorState selector;
 
+    /**
+     * Set only on the entity-list path: the paginated list's per-open entity/button slot routing. Any other menu
+     * kind leaves this null; an entity list sets it and the one listener routes its clicks through it (an entity
+     * icon to {@code onSelect}, the nav buttons to a re-paginate, create/action to their handlers), so all five
+     * menu kinds ride the same holder and the same teardown without a separate listener.
+     */
+    @Nullable private ListViewState listView;
+
     public MenuHolder(String specId, MenuSpec spec, MenuContext ctx) {
         this.specId = Objects.requireNonNull(specId, "specId");
         this.spec = Objects.requireNonNull(spec, "spec");
@@ -151,6 +159,16 @@ public final class MenuHolder implements InventoryHolder {
     /** The selector state if this holder backs a picker window, or empty for any other menu kind. */
     public Optional<SelectorState> selector() {
         return Optional.ofNullable(selector);
+    }
+
+    /** Attaches the list-view state for an entity-list open; any other menu kind never calls this. */
+    public void attachListView(ListViewState listView) {
+        this.listView = Objects.requireNonNull(listView, "listView");
+    }
+
+    /** The list-view state if this holder backs an entity list, or empty for any other menu kind. */
+    public Optional<ListViewState> listView() {
+        return Optional.ofNullable(listView);
     }
 
     public void setRefreshHandle(Cancellable handle) {

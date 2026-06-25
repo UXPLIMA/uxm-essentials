@@ -17,11 +17,13 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ListSourceRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ConfirmRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.SelectorRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ConfirmState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorRefresh;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.EditorState;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.ListViewState;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuRefresh;
@@ -65,6 +67,9 @@ public final class Menus {
 
     /** Paints a selector child window; stateless, so one instance serves every picker open. */
     private final SelectorRenderer selectorRenderer = new SelectorRenderer();
+
+    /** Paints a paginated entity list; stateless, so one instance serves every list open. */
+    private final ListViewRenderer listViewRenderer = new ListViewRenderer();
 
     /** The opener a property's click hook calls to show its picker as an engine child window; wraps this façade. */
     private final SelectorOpener selectorOpener = this::openSelector;
@@ -159,6 +164,44 @@ public final class Menus {
     public void reRenderEditor(MenuHolder holder) {
         Objects.requireNonNull(holder, "holder");
         EditorRefresh.reRender(holder, requireEditorRenderer(), scheduler);
+    }
+
+    /**
+     * Open a paginated entity list for {@code viewer} as a holder-backed engine menu — the engine's replacement for the
+     * bespoke {@code EntityListView}'s uxmLib {@code PaginatedGui}. It builds the same {@link MenuHolder} every other
+     * menu uses — recognised and torn down by the one listener and one {@code closeMenu} — but tags it with a
+     * {@link ListViewState} so the listener routes its clicks through the list's entity/nav/create/action slots rather
+     * than a spec's. The window is shown on the viewer's entity thread, where touching the live inventory is legal; the
+     * entity supplier was already resolved off-thread by the caller, so there is no off-thread resolve step here and the
+     * imperative icon renderer reads only the snapshot. A page flip re-paginates the same holder (the listener's list
+     * branch), so a list arms no refresh timer and stays leak-balanced.
+     */
+    public void openList(PlayerRef viewer, ListSpec spec) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(spec, "spec");
+        scheduler.onEntity(viewer, () -> openListResolved(viewer, spec));
+    }
+
+    /** On the viewer's entity thread: build the list holder + window, render page zero, show it. No refresh. */
+    private void openListResolved(PlayerRef viewer, ListSpec spec) {
+        Player live = Bukkit.getPlayer(viewer.uuid());
+        if (live == null || !live.isOnline()) {
+            return;
+        }
+        MenuContext ctx = MenuContext.of(viewer, null, 0);
+        MenuHolder holder = new MenuHolder("list:" + spec.getClass().getSimpleName(), listMenuSpec(spec), ctx);
+        ListViewState state = new ListViewState(spec);
+        holder.attachListView(state);
+        Inventory inv = Bukkit.createInventory(holder, spec.rows() * 9, spec.title());
+        holder.attach(inv);
+        int clamped = listViewRenderer.populate(inv, spec, state, live, viewer, 0);
+        holder.setCtx(ctx.withPage(clamped));
+        live.openInventory(inv);
+    }
+
+    /** The minimal {@link MenuSpec} a list holder carries: the row count, refresh off, no items — clicks ride state. */
+    private static MenuSpec listMenuSpec(ListSpec spec) {
+        return new MenuSpec("", spec.rows(), new RefreshSpec(false, 0), List.of(), List.of(), List.of(), Map.of());
     }
 
     /**

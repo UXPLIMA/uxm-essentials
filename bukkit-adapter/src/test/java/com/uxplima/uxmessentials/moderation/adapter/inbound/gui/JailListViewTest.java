@@ -29,14 +29,15 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,7 +97,10 @@ class JailListViewTest {
                 java.nio.file.Path.of("nonexistent"),
                 new NoopLogger());
         Guis.install(plugin);
+        TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
+        engine.installListener(plugin);
         view = new JailListView(
+                engine.menus(),
                 new GuiText(new KeyMessages()),
                 new KeyMessages(),
                 new SyncScheduler(),
@@ -118,7 +122,7 @@ class JailListViewTest {
         view.open(staff, staffRef);
 
         Inventory menu = staff.getOpenInventory().getTopInventory();
-        assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(menu.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(menu.getItem(FIRST_JAIL_SLOT).getType()).isEqualTo(Material.IRON_BARS);
     }
 

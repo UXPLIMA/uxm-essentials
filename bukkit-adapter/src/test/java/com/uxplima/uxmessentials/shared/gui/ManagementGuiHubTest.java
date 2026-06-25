@@ -26,6 +26,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -35,8 +37,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +66,7 @@ class ManagementGuiHubTest {
     private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
+    private Menus menus;
 
     @BeforeEach
     void setUp() {
@@ -74,12 +76,13 @@ class ManagementGuiHubTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
-        Guis.install(plugin);
+        TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), scheduler);
+        engine.installListener(plugin);
+        menus = engine.menus();
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -116,9 +119,10 @@ class ManagementGuiHubTest {
         hub(dir, registry, new FakePermissions(Set.of(NODE_B))).open(player, viewer);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(inv.getItem(10).getType()).isEqualTo(Material.EMERALD);
-        assertThat(inv.getItem(11)).isNull();
+        // The second content slot has no permitted entry, so the engine draws the layout filler there.
+        assertThat(inv.getItem(11).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test
@@ -140,11 +144,12 @@ class ManagementGuiHubTest {
         hub(dir, registry, new FakePermissions(Set.of())).open(player, viewer);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getItem(10)).isNull();
+        // No entries, so every content slot shows the layout filler rather than an icon.
+        assertThat(inv.getItem(10).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     private ManagementHubView hub(Path dir, ManagementGuiRegistry registry, Permissions permissions) throws Exception {
-        return new ManagementHubView(guiText, scheduler, permissions, registry, layout(dir));
+        return new ManagementHubView(menus, guiText, scheduler, permissions, registry, layout(dir));
     }
 
     private EntityListLayout layout(Path dir) throws Exception {

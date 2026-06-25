@@ -17,9 +17,11 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.ListSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ActionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.ConditionRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.EditorRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ListViewRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.RenderedSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.spec.ClickKind;
@@ -78,6 +80,9 @@ public final class MenuListener implements Listener {
      * it, in which case a property that confirms a removal falls back to its uxmLib {@code ConfirmMenu}.
      */
     @Nullable private final ConfirmOpener confirmOpener;
+
+    /** Re-paints an entity list's page on a nav click; stateless, so one instance serves every list this routes. */
+    private final ListViewRenderer listViewRenderer = new ListViewRenderer();
 
     public MenuListener(
             MenuRenderer renderer,
@@ -162,6 +167,11 @@ public final class MenuListener implements Listener {
         EditorState editor = holder.editor().orElse(null);
         if (editor != null) {
             handleEditorClick(holder, editor, slot, event.isRightClick(), event.isShiftClick());
+            return;
+        }
+        ListViewState list = holder.listView().orElse(null);
+        if (list != null) {
+            handleListClick(holder, list, slot);
             return;
         }
         holder.clickAt(slot).ifPresent(rs -> handleClick(holder, rs, event.getClick()));
@@ -258,6 +268,60 @@ public final class MenuListener implements Listener {
         if (editorRenderer != null) {
             EditorRefresh.reRender(holder, editorRenderer, scheduler);
         }
+    }
+
+    /**
+     * Route a click in an entity-list window: an entity icon runs the spec's {@code onSelect} for the entity drawn at
+     * that slot on the current page, a previous/next nav button re-paginates the same holder in place, and a
+     * create/action button runs its recorded handler. Each branch hops to the viewer's entity thread and re-resolves
+     * the live player there — the same hop the editor and spec paths take — so a viewer who logged off in the gap is
+     * simply skipped and Bukkit is only ever touched on the owning thread. A nav flip re-renders the live inventory
+     * (no new window), so the one listener and one teardown keep owning it.
+     */
+    private void handleListClick(MenuHolder holder, ListViewState list, int slot) {
+        if (list.isPrev(slot) || list.isNext(slot)) {
+            int next = list.isPrev(slot)
+                    ? Math.max(0, holder.ctx().page() - 1)
+                    : holder.ctx().page() + 1;
+            scheduler.onEntity(holder.ctx().viewer(), () -> repaginateList(holder, list, next));
+            return;
+        }
+        Object entity = list.entityAt(slot).orElse(null);
+        if (entity != null) {
+            runOnList(holder, live -> ((ListSpec) list.spec()).onSelect().accept(live, entity));
+            return;
+        }
+        list.buttonAt(slot).ifPresent(action -> runOnList(holder, ignored -> action.run()));
+    }
+
+    /** Hop to the viewer's entity thread, re-resolve the live player, and run one list handler there. */
+    private void runOnList(MenuHolder holder, Consumer<Player> handler) {
+        scheduler.onEntity(holder.ctx().viewer(), () -> {
+            Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
+            if (live != null) {
+                handler.accept(live);
+            }
+        });
+    }
+
+    /** Re-paint an open entity list one page over, but only if that window is still this holder's list window. */
+    private void repaginateList(MenuHolder holder, ListViewState list, int page) {
+        Player live = Bukkit.getPlayer(holder.ctx().viewer().uuid());
+        if (live == null) {
+            return;
+        }
+        if (!(live.getOpenInventory().getTopInventory().getHolder() instanceof MenuHolder h) || h != holder) {
+            return;
+        }
+        list.clearSlots();
+        int clamped = listViewRenderer.populate(
+                holder.getInventory(),
+                (ListSpec) list.spec(),
+                list,
+                live,
+                holder.ctx().viewer(),
+                page);
+        holder.setCtx(holder.ctx().withPage(clamped));
     }
 
     private void handleClick(MenuHolder holder, RenderedSlot rs, ClickType click) {

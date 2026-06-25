@@ -173,6 +173,7 @@ public final class AnnouncementEditorView {
                 .build();
 
         this.list = EntityListView.<StoredAnnouncement>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(listLayout)

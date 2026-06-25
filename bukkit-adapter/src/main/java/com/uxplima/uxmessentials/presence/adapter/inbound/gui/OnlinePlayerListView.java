@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.Guis;
@@ -47,11 +48,13 @@ public final class OnlinePlayerListView {
     private final AtomicReference<List<Entry>> snapshot = new AtomicReference<>(List.of());
     private final EntityListView<Entry> view;
 
-    public OnlinePlayerListView(GuiText guiText, Scheduler scheduler, EntityListLayout layout) {
+    public OnlinePlayerListView(Menus menus, GuiText guiText, Scheduler scheduler, EntityListLayout layout) {
+        Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.view = EntityListView.<Entry>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)

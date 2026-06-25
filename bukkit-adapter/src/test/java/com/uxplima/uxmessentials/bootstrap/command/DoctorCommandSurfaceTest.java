@@ -94,7 +94,10 @@ class DoctorCommandSurfaceTest {
         ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
         GuiText guiText = new GuiText(messages);
         EntityListLayout layout = EntityListLayout.paginatedDefault(org.bukkit.Material.NETHER_STAR);
-        ManagementHubView hub = new ManagementHubView(guiText, scheduler, permissions, guiRegistry, layout);
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus =
+                com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(messages, scheduler)
+                        .menus();
+        ManagementHubView hub = new ManagementHubView(menus, guiText, scheduler, permissions, guiRegistry, layout);
         return new GuiSubcommand(guiRegistry, hub, permissions, messages);
     }
 

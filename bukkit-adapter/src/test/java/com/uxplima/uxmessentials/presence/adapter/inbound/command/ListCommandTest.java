@@ -81,33 +81,35 @@ class ListCommandTest {
 
     @Test
     void withAGuiViewBareListOpensTheHeadGridWhileTheChatFormStillWorks() {
-        com.uxplima.uxmlib.gui.Guis.install(MockBukkit.createMockPlugin());
-        try {
-            OnlinePlayerListView view = new OnlinePlayerListView(
-                    new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyEchoMessages()),
-                    new InlineScheduler(),
-                    com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.paginatedDefault(
-                            org.bukkit.Material.PLAYER_HEAD));
-            ListCommand guiCommand = new ListCommand(services(), new KeyEchoMessages(), new InlineScheduler(), view);
-            // The gui opener is exposed for the bare root; firing it opens the head grid.
-            assertThat(guiCommand.guiRoot()).isPresent();
+        org.bukkit.plugin.Plugin plugin = MockBukkit.createMockPlugin();
+        // The head grid is an engine list, so the engine's listener is installed; opening it produces a MenuHolder.
+        com.uxplima.uxmessentials.shared.menu.TestMenuEngine engine =
+                com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(
+                        new KeyEchoMessages(), new InlineScheduler());
+        engine.installListener(plugin);
+        OnlinePlayerListView view = new OnlinePlayerListView(
+                engine.menus(),
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(new KeyEchoMessages()),
+                new InlineScheduler(),
+                com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout.paginatedDefault(
+                        org.bukkit.Material.PLAYER_HEAD));
+        ListCommand guiCommand = new ListCommand(services(), new KeyEchoMessages(), new InlineScheduler(), view);
+        // The gui opener is exposed for the bare root; firing it opens the head grid.
+        assertThat(guiCommand.guiRoot()).isPresent();
 
-            PlayerMock alice = server.addPlayer("Alice");
-            server.addPlayer("Bob");
-            alice.addAttachment(MockBukkit.createMockPlugin(), PERMISSION, true);
+        PlayerMock alice = server.addPlayer("Alice");
+        server.addPlayer("Bob");
+        alice.addAttachment(plugin, PERMISSION, true);
 
-            com.mojang.brigadier.CommandDispatcher<CommandSourceStack> dispatcher =
-                    new com.mojang.brigadier.CommandDispatcher<>();
-            com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> node = guiCommand.build();
-            // Install the gui opener on the bare root the way the GuiRootBinding would when gui is on.
-            dispatcher.getRoot().addChild(rebindRoot(node, guiCommand.guiRoot().orElseThrow()));
-            execute(dispatcher, CommandSourceStackMock.from(alice), "list");
+        com.mojang.brigadier.CommandDispatcher<CommandSourceStack> dispatcher =
+                new com.mojang.brigadier.CommandDispatcher<>();
+        com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> node = guiCommand.build();
+        // Install the gui opener on the bare root the way the GuiRootBinding would when gui is on.
+        dispatcher.getRoot().addChild(rebindRoot(node, guiCommand.guiRoot().orElseThrow()));
+        execute(dispatcher, CommandSourceStackMock.from(alice), "list");
 
-            assertThat(alice.getOpenInventory().getTopInventory().getHolder())
-                    .isInstanceOf(com.uxplima.uxmlib.gui.PaginatedGui.class);
-        } finally {
-            com.uxplima.uxmlib.gui.Guis.uninstall();
-        }
+        assertThat(alice.getOpenInventory().getTopInventory().getHolder())
+                .isInstanceOf(com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder.class);
     }
 
     private static com.mojang.brigadier.tree.LiteralCommandNode<CommandSourceStack> rebindRoot(

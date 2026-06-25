@@ -23,14 +23,15 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +46,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * conf (no hardcoded slots), renders one icon per fake entity into the conf's content slots, pages a list
  * longer than one page, invokes {@code onSelect} when an entity icon is clicked, and invokes {@code onCreate}
  * when the conf'd create button is clicked. The scheduler is a synchronous double so the entity-bound build
- * runs inline, and uxmLib's menu listener is installed against a mock plugin (reset on teardown).
+ * runs inline, and the engine's menu listener is installed against a mock plugin.
  */
 class EntityListViewTest {
 
@@ -58,6 +59,7 @@ class EntityListViewTest {
     private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
+    private Menus menus;
 
     @BeforeEach
     void setUp() {
@@ -67,12 +69,13 @@ class EntityListViewTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
-        Guis.install(plugin);
+        TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), scheduler);
+        engine.installListener(plugin);
+        menus = engine.menus();
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -83,7 +86,7 @@ class EntityListViewTest {
         view(layout, () -> widgets, (p, w) -> {}).open(player, viewer);
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(inv.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(inv.getItem(10).getType()).isEqualTo(Material.DIAMOND);
         assertThat(inv.getItem(11).getType()).isEqualTo(Material.GOLD_INGOT);
         // A non-content, non-nav slot carries the configured glass filler.
@@ -121,7 +124,8 @@ class EntityListViewTest {
 
         Inventory paged = player.getOpenInventory().getTopInventory();
         assertThat(paged.getItem(10).getType()).isEqualTo(Material.EMERALD);
-        assertThat(paged.getItem(11)).isNull();
+        // The second content slot has no entry on the last page, so the engine draws the filler there, not null.
+        assertThat(paged.getItem(11).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test
@@ -130,6 +134,7 @@ class EntityListViewTest {
                 layout(dir, "content-slots = [10, 11]\ncreate-slot = 49\ncreate-icon = \"EMERALD\"\n");
         AtomicBoolean created = new AtomicBoolean(false);
         EntityListView<Widget> view = EntityListView.<Widget>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)
@@ -154,6 +159,7 @@ class EntityListViewTest {
             java.util.function.Supplier<List<Widget>> entities,
             java.util.function.BiConsumer<org.bukkit.entity.Player, Widget> onSelect) {
         return EntityListView.<Widget>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(layout)

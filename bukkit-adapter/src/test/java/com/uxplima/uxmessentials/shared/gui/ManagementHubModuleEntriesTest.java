@@ -38,10 +38,10 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
-import com.uxplima.uxmlib.gui.Guis;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +84,7 @@ class ManagementHubModuleEntriesTest {
     private PlayerRef viewer;
     private GuiText guiText;
     private Scheduler scheduler;
+    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus;
 
     @BeforeEach
     void setUp() {
@@ -93,12 +94,13 @@ class ManagementHubModuleEntriesTest {
         viewer = new PlayerRef(player.getUniqueId(), player.getName());
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
-        Guis.install(plugin);
+        TestMenuEngine engine = TestMenuEngine.create(new KeyMessages(), scheduler);
+        engine.installListener(plugin);
+        menus = engine.menus();
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -128,7 +130,7 @@ class ManagementHubModuleEntriesTest {
         Set<String> allNodes = new HashSet<>();
         EXPECTED.forEach(e -> allNodes.add(e.permission()));
         ManagementHubView hub = new ManagementHubView(
-                guiText, scheduler, new FakePermissions(allNodes), registry, layout(dir, EXPECTED.size()));
+                menus, guiText, scheduler, new FakePermissions(allNodes), registry, layout(dir, EXPECTED.size()));
 
         for (int i = 0; i < EXPECTED.size(); i++) {
             ModuleEntry expected = EXPECTED.get(i);
@@ -146,6 +148,7 @@ class ManagementHubModuleEntriesTest {
         register(registry, new LinkedHashMap<>());
         // The viewer holds only the homes node, so only the homes icon is drawn in the first content slot.
         ManagementHubView hub = new ManagementHubView(
+                menus,
                 guiText,
                 scheduler,
                 new FakePermissions(Set.of("uxmessentials.home.use")),
@@ -155,7 +158,8 @@ class ManagementHubModuleEntriesTest {
 
         Inventory inv = player.getOpenInventory().getTopInventory();
         assertThat(inv.getItem(FIRST_CONTENT_SLOT).getType()).isEqualTo(Material.RED_BED);
-        assertThat(inv.getItem(FIRST_CONTENT_SLOT + 1)).isNull();
+        // The second content slot has no permitted entry, so the engine draws the layout filler there, not a head.
+        assertThat(inv.getItem(FIRST_CONTENT_SLOT + 1).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     /** Register one entry per expected module, each opener recording its own id into {@code opened}. */

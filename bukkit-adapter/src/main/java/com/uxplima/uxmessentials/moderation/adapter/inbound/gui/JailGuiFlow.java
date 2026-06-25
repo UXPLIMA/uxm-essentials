@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -50,6 +51,7 @@ public final class JailGuiFlow {
 
     private static final Material JAIL_ICON = Material.IRON_BARS;
 
+    private final Menus menus;
     private final GuiText guiText;
     private final Scheduler scheduler;
     private final ModerationServices services;
@@ -60,6 +62,7 @@ public final class JailGuiFlow {
     private final MessageSink sink;
 
     public JailGuiFlow(
+            Menus menus,
             GuiText guiText,
             Scheduler scheduler,
             ModerationServices services,
@@ -67,6 +70,7 @@ public final class JailGuiFlow {
             DurationPickerView durations,
             Messages messages,
             MessageSink sink) {
+        this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.services = Objects.requireNonNull(services, "services");
@@ -98,6 +102,7 @@ public final class JailGuiFlow {
     private void openChooser(Player viewer, PlayerRef viewerRef, PlayerRef target) {
         AtomicReference<List<String>> snapshot = new AtomicReference<>(List.of());
         EntityListView<String> chooser = EntityListView.<String>builder()
+                .menus(menus)
                 .guiText(guiText)
                 .scheduler(scheduler)
                 .layout(chooserLayout)

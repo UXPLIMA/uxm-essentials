@@ -244,6 +244,7 @@ public final class ModerationWiring {
         com.uxplima.uxmessentials.moderation.application.port.JailLocator jailLocator =
                 new com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitJailLocator(settings, jailLocations);
         JailGuiViews jailGui = JailGuiViews.create(
+                menus,
                 guiText,
                 kernel.scheduler(),
                 services,

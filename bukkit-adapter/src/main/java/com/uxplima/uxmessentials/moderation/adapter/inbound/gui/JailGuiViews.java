@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -53,6 +54,7 @@ public final class JailGuiViews {
 
     /** Build the three jail views over the existing use cases, the shared pickers, and the module's GUI layouts. */
     public static JailGuiViews create(
+            Menus menus,
             GuiText guiText,
             Scheduler scheduler,
             ModerationServices services,
@@ -65,6 +67,7 @@ public final class JailGuiViews {
             Messages messages,
             MessageSink sink,
             GuiLayouts layouts) {
+        Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(services, "services");
@@ -80,9 +83,9 @@ public final class JailGuiViews {
 
         EntityListLayout listLayout = layouts.loadEntityList(MODULE, "jail-list", jailListCodeDefault());
 
-        JailListView jailList =
-                new JailListView(guiText, messages, scheduler, services, sanctions, jailLocator, textInput, listLayout);
-        JailGuiFlow flow = new JailGuiFlow(guiText, scheduler, services, picker, durations, messages, sink);
+        JailListView jailList = new JailListView(
+                menus, guiText, messages, scheduler, services, sanctions, jailLocator, textInput, listLayout);
+        JailGuiFlow flow = new JailGuiFlow(menus, guiText, scheduler, services, picker, durations, messages, sink);
         return new JailGuiViews(flow, jailList, jailedPlayers);
     }
 
