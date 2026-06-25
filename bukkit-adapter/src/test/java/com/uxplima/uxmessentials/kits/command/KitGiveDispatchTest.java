@@ -17,8 +17,8 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommand;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
@@ -134,14 +134,18 @@ class KitGiveDispatchTest {
                 new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock, Optional.empty());
         KitPreviewView kitPreview = new KitPreviewView(
                 messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
-        KitMenuView kitMenu = new KitMenuView(
-                messages,
-                notifier,
+        // The /kit give dispatch path never opens the browse menu, so the engine-backed browse view is built here
+        // only to satisfy KitServices; it is never registered or opened in this test.
+        KitBrowseMenu kitMenu = new KitBrowseMenu(
+                com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(messages, new SyncScheduler())
+                        .menus(),
                 new SyncScheduler(),
                 claimKit,
+                notifier,
                 new StubKitCategoryRepository(),
                 access,
                 kitPreview,
+                messages,
                 GuiLayout.paginatedDefault(Material.CHEST),
                 Clock.systemUTC());
         KitEditor kitEditor = new KitEditor(repository, notifier);

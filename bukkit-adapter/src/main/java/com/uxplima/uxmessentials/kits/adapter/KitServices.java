@@ -2,13 +2,13 @@ package com.uxplima.uxmessentials.kits.adapter;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySettingsView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
@@ -35,7 +35,7 @@ import org.jspecify.annotations.Nullable;
  * @param delKit {@code /kit del}
  * @param kitEditor {@code /kit editor}
  * @param kitReset {@code /kit reset}
- * @param kitMenu the read-only browse menu {@code /kit list} opens
+ * @param kitMenu the read-only browse menu {@code /kit list} opens, rendered through the menu engine
  * @param kitPreview the read-only preview menu the {@code /kit show} GUI path opens
  * @param kitEditorView the editable window the {@code /kit editor} GUI path opens
  * @param kitManager the admin {@code /kit editor} manager menu, rendered through the menu engine
@@ -50,7 +50,7 @@ public record KitServices(
         DelKit delKit,
         KitEditor kitEditor,
         KitReset kitReset,
-        KitMenuView kitMenu,
+        KitBrowseMenu kitMenu,
         KitPreviewView kitPreview,
         KitEditorView kitEditorView,
         @Nullable KitManagerMenu kitManager,

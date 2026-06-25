@@ -93,6 +93,19 @@ class MenuRendererTest {
     }
 
     @Test
+    void reRenderingAShorterPageIntoTheSameWindowClearsTheStaleListSlots() {
+        Inventory inv = Bukkit.createInventory(null, 9);
+        // Page 0 fills content slots 3, 4, 5 with a, b, c.
+        renderer.populate(inv, spec, MenuContext.of(ref, null, 0), (s, r) -> {}, RESOLVED);
+        // Re-rendering page 1 into the same window must leave only its single entry, clearing the stale b and c.
+        renderer.populate(inv, spec, MenuContext.of(ref, null, 1), (s, r) -> {}, RESOLVED);
+        assertThat(plainName(inv, 3)).isEqualTo("d");
+        assertThat(inv.getItem(4)).isNull();
+        assertThat(inv.getItem(5)).isNull();
+        assertThat(inv.getItem(0)).isNotNull(); // the static border outside the content slots is untouched
+    }
+
+    @Test
     void recordsRenderedSlotsForClickRouting() {
         Inventory inv = Bukkit.createInventory(null, 9);
         Map<Integer, RenderedSlot> sink = new HashMap<>();

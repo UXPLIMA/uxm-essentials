@@ -20,8 +20,8 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import com.mojang.brigadier.CommandDispatcher;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommand;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.application.ClaimKit;
 import com.uxplima.uxmessentials.kits.application.CreateKit;
@@ -52,36 +52,55 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the kits browse menu through the real Brigadier {@code /kit list} subcommand and
- * uxmLib's {@code PaginatedGui}. {@code /kit list} opens a paginated menu whose content slots hold one display
+ * MockBukkit coverage of the kits browse menu through the real Brigadier {@code /kit list} subcommand and the
+ * data-driven menu engine. {@code /kit list} opens a six-row engine window whose content slots hold one display
  * icon per kit the player may claim — backed by a fake {@link KitRepository} of three kits — proving the
  * read-only menu renders one icon per available kit. In {@code chat} display mode {@code /kit list} prints the
  * clickable chat list instead, asserted by the {@code KIT_LIST} keys it produces and the absence of any open
  * inventory. Per-subcommand permission gating is asserted directly off the built node's {@code .requires(...)}.
- * The scheduler is a synchronous double so the entity-bound open runs inline, and uxmLib's menu listener is
- * installed against a mock plugin (reset on teardown) exactly as the vault GUI test does.
+ * The scheduler is a synchronous double so the entity-bound open runs inline, and the engine's menu listener is
+ * installed against a mock plugin.
  */
 class KitsMenuPathTest {
 
     private static final int KIT_COUNT = 3;
+
+    private static final com.uxplima.uxmessentials.shared.application.port.Logger NOOP_LOG =
+            new com.uxplima.uxmessentials.shared.application.port.Logger() {
+                @Override
+                public void info(String m, Object... a) {}
+
+                @Override
+                public void warn(String m, Object... a) {}
+
+                @Override
+                public void error(String m, Throwable t) {}
+
+                @Override
+                public void debug(String m, Object... a) {}
+            };
 
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock player;
     private KitServices services;
     private RecordingSink sink;
+    private TestMenuEngine engine;
+
+    @TempDir
+    java.nio.file.Path dataFolder;
 
     @BeforeEach
     void setUp() {
@@ -91,25 +110,22 @@ class KitsMenuPathTest {
         player.setOp(true);
         sink = new RecordingSink();
         services = services();
-        Guis.install(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall(); // reset the static install state so the next test re-installs the menu listener
         MockBukkit.unmock();
     }
 
     @Test
-    void kitListOpensAPaginatedMenuWithOneIconPerAvailableKit() {
+    void kitListOpensAnEngineMenuWithOneIconPerAvailableKit() {
         CommandDispatcher<CommandSourceStack> dispatcher =
                 registerCommand(com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode.GUI);
 
         execute(dispatcher, "kit list");
 
         Inventory menu = player.getOpenInventory().getTopInventory();
-        assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
-        assertThat(menu.getSize()).isEqualTo(54); // a 6-row paginated menu
+        assertThat(menu.getSize()).isEqualTo(54); // a 6-row engine menu
         assertThat(contentIcons(menu)).isEqualTo(KIT_COUNT);
     }
 
@@ -232,16 +248,20 @@ class KitsMenuPathTest {
                 new ClaimKit(repository, access, granter, notifier, new NoEvents(), clock, Optional.empty());
         KitPreviewView kitPreview = new KitPreviewView(
                 messages, new SyncScheduler(), GuiLayout.paginatedDefault(Material.GRAY_STAINED_GLASS_PANE));
-        KitMenuView kitMenu = new KitMenuView(
-                messages,
-                notifier,
+        engine = TestMenuEngine.create(messages, new SyncScheduler());
+        engine.installListener(plugin);
+        KitBrowseMenu kitMenu = new KitBrowseMenu(
+                engine.menus(),
                 new SyncScheduler(),
                 claimKit,
+                notifier,
                 new StubKitCategoryRepository(),
                 access,
                 kitPreview,
+                messages,
                 GuiLayout.paginatedDefault(Material.CHEST),
                 Clock.systemUTC());
+        kitMenu.register(engine.bindings(), dataFolder, NOOP_LOG);
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(messages, kitEditor, new SyncScheduler());
         return new KitServices(

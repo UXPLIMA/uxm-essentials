@@ -131,6 +131,11 @@ public final class MenuRenderer {
         List<Integer> contentSlots = item.slots().slots();
         @SuppressWarnings("unchecked") // a list source's element type is opaque to the engine; entries flow as Object
         Pagination.Page<Object> page = Pagination.paginate((List<Object>) entries, contentSlots, ctx.page());
+        // Clear every content slot first so a re-render into a reused window — a page flip to a shorter page, or a
+        // refresh that dropped entries — leaves no stale tile behind in a slot this page does not fill.
+        for (int slot : contentSlots) {
+            inv.setItem(slot, null);
+        }
         MenuItemSpec template = listSpec.template();
         for (Map.Entry<Integer, Object> placement : page.placements()) {
             MenuContext entryCtx = ctx.withEntry(placement.getValue());

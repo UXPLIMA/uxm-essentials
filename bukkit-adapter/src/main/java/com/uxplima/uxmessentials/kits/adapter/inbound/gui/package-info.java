@@ -1,7 +1,9 @@
 /**
- * The kits context's GUI. {@link com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView} opens the
- * read-only {@code /kit list} browse menu as a uxmLib {@code PaginatedGui}, one display icon per claimable kit
- * (drawn from the {@code ListKits.available} filter the chat list shares) with paged previous/next buttons.
+ * The kits context's GUI. {@link com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu} opens the
+ * read-only {@code /kit list} browse menu through the data-driven menu engine, one display icon per claimable kit
+ * (drawn from the {@code ListKits.available} filter the chat list shares) with paged previous/next buttons; the
+ * per-tile icon, name, and lore resolve through {@link com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitIconRenderer},
+ * and a configured category pins to its content slot on every page.
  *
  * <p>{@link com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView} opens the {@code /kit show}
  * read-only preview as a managed menu sized to fit the kit, with the kit's stacks laid out at their

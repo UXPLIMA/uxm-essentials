@@ -92,6 +92,8 @@ class ShippedSpecBindingsDriftTest {
             "kits:manager-edit",
             "kits:manager-create",
             "kits:manager-categories",
+            "kits:browse-click",
+            "kits:browse-back",
             "warps:manager-edit",
             "warps:manager-create",
             "warps:manager-categories",
@@ -111,7 +113,8 @@ class ShippedSpecBindingsDriftTest {
             "homes:home-public",
             "homes:home-private",
             "economy:can-add-member",
-            "warps:browse-has-parent");
+            "warps:browse-has-parent",
+            "kits:browse-has-parent");
 
     /** Placeholder ids any shipped spec may reference. Keep in sync with the ids registered in production wiring. */
     private static final Set<String> EXPECTED_PLACEHOLDERS = Set.of(
@@ -244,6 +247,9 @@ class ShippedSpecBindingsDriftTest {
             "warp_browse_icon",
             "warp_browse_name",
             "warp_browse_lore",
+            "kit_browse_icon",
+            "kit_browse_name",
+            "kit_browse_lore",
             "baltop_currency",
             "baltop_rank",
             "baltop_player",
@@ -288,6 +294,7 @@ class ShippedSpecBindingsDriftTest {
             "moderation:history",
             "moderation:jailed",
             "kits:manager",
+            "kits:browse",
             "warps:manager",
             "warps:browse",
             "economy:baltop",

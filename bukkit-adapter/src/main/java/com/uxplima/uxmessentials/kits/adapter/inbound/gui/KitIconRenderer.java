@@ -65,19 +65,10 @@ final class KitIconRenderer {
             loreLines.add(text(viewer, KitsMessageKey.KIT_MENU_CATEGORY_LORE, Map.of()));
         }
 
-        Material mat = Material.BOOK;
-        if (category.displayMaterial().isPresent()) {
-            try {
-                Material parsed =
-                        Material.matchMaterial(category.displayMaterial().get().toUpperCase(java.util.Locale.ROOT));
-                if (parsed != null && !parsed.isAir()) {
-                    mat = parsed;
-                }
-            } catch (IllegalArgumentException absent) {
-                // Keep default
-            }
-        }
-        return ItemBuilder.of(mat).name(name).lore(loreLines).build();
+        return ItemBuilder.of(categoryMaterial(category))
+                .name(name)
+                .lore(loreLines)
+                .build();
     }
 
     ItemStack icon(PlayerRef viewer, KitDefinition base) {
@@ -86,6 +77,65 @@ final class KitIconRenderer {
                 .name(resolveName(viewer, kit))
                 .lore(resolveLore(viewer, kit))
                 .build();
+    }
+
+    /**
+     * The engine-rendered kit browse menu draws a kit's tile from these three source strings rather than from a
+     * pre-built {@link ItemStack}: the icon's material name, its name as a MiniMessage source, and its full lore
+     * as the rendered lines joined by {@code \n} for the engine's multi-line placeholder to expand back. They are
+     * the exact name/material/lore the {@link #icon} path builds — the same resolveMaterial/resolveName/resolveLore
+     * passes feed both — so a tile drawn through the engine matches the tile the old view drew icon for icon. The
+     * variant is resolved once here so the browse menu hands the same already-resolved kit to a later claim.
+     */
+    String kitMaterialName(PlayerRef viewer, KitDefinition variant) {
+        return resolveMaterial(viewer, variant).name();
+    }
+
+    String kitNameSource(PlayerRef viewer, KitDefinition variant) {
+        return nameSource(viewer, variant);
+    }
+
+    /** The kit tile's full lore as its catalog/override source lines joined by {@code \n}, for the engine to split. */
+    String kitLoreSource(PlayerRef viewer, KitDefinition variant) {
+        return String.join("\n", loreSource(viewer, variant));
+    }
+
+    /** The viewer-relative variant a tile (and a later claim) acts on, resolved once so both agree. */
+    KitDefinition variantOf(PlayerRef viewer, KitDefinition base) {
+        return access.resolveVariant(viewer, base);
+    }
+
+    String categoryMaterialName(KitCategory category) {
+        return categoryMaterial(category).name();
+    }
+
+    String categoryNameSource(PlayerRef viewer, KitCategory category) {
+        return messages.resolve(
+                viewer, KitsMessageKey.KIT_MENU_CATEGORY_NAME, Map.of("category", category.displayName()));
+    }
+
+    /** The category tile's lore: its own display lore when set, else the catalog drill-in hint, joined by {@code \n}. */
+    String categoryLoreSource(PlayerRef viewer, KitCategory category) {
+        if (!category.displayLore().isEmpty()) {
+            return String.join("\n", category.displayLore());
+        }
+        return messages.resolve(viewer, KitsMessageKey.KIT_MENU_CATEGORY_LORE, Map.of());
+    }
+
+    /** The category icon's material, factored out so both the ItemStack path and the browse strings agree. */
+    private Material categoryMaterial(KitCategory category) {
+        if (category.displayMaterial().isPresent()) {
+            try {
+                Material parsed =
+                        Material.matchMaterial(category.displayMaterial().get().toUpperCase(java.util.Locale.ROOT));
+                if (parsed != null && !parsed.isAir()) {
+                    return parsed;
+                }
+            } catch (IllegalArgumentException absent) {
+                // Keep default
+            }
+        }
+        return Material.BOOK;
     }
 
     private String formatDuration(java.time.Duration duration) {
@@ -163,6 +213,16 @@ final class KitIconRenderer {
     }
 
     private Component resolveName(PlayerRef viewer, KitDefinition kit) {
+        return StyledText.render(nameSource(viewer, kit));
+    }
+
+    /**
+     * The kit icon's name as the MiniMessage source string the engine renders, factored out of {@link #resolveName}
+     * so the engine-rendered browse tile and the old ItemStack path resolve the identical text. An operator's
+     * per-state override is free text with its cost/cooldown/PAPI tokens substituted; otherwise the per-state
+     * catalog name is resolved in the viewer's locale, again with those tokens substituted.
+     */
+    private String nameSource(PlayerRef viewer, KitDefinition kit) {
         DisplayState state = stateOf(viewer, kit);
         Optional<String> nameOpt =
                 switch (state) {
@@ -175,11 +235,8 @@ final class KitIconRenderer {
                     // The two locked states force their own name so the icon always reads as closed/sold out.
                     case UNAVAILABLE, OUT_OF_STOCK -> Optional.empty();
                 };
-
-        // An operator-supplied per-state name is free text and stays on the bare parser; the catalog
-        // fallback carries the project tokens and goes through the styled parser.
         if (nameOpt.isPresent()) {
-            return miniMessage.deserialize(processPlaceholders(viewer, kit, nameOpt.get()));
+            return processPlaceholders(viewer, kit, nameOpt.get());
         }
         KitsMessageKey defaultKey =
                 switch (state) {
@@ -189,7 +246,7 @@ final class KitIconRenderer {
                 };
         String rawName =
                 messages.resolve(viewer, defaultKey, Map.of("kit", kit.id().value()));
-        return StyledText.render(processPlaceholders(viewer, kit, rawName));
+        return processPlaceholders(viewer, kit, rawName);
     }
 
     private Material resolveMaterial(PlayerRef viewer, KitDefinition kit) {
@@ -235,9 +292,24 @@ final class KitIconRenderer {
     }
 
     private List<Component> resolveLore(PlayerRef viewer, KitDefinition kit) {
+        List<Component> lines = new ArrayList<>();
+        for (String line : loreSource(viewer, kit)) {
+            lines.add(StyledText.render(line));
+        }
+        return lines;
+    }
+
+    /**
+     * The kit icon's full lore as the catalog/override source lines, factored out of {@link #resolveLore} so the
+     * engine-rendered browse tile (which joins these with {@code \n} and re-splits per line through its multi-line
+     * placeholder) and the old ItemStack path resolve the identical lore. The order is the old view's: the
+     * per-state or display lore, then a status line per requirement, then the conditional cooldown/one-time/cost
+     * lines and the claim hint, and finally the preview hint — unless the kit is locked, which shows its own lore.
+     */
+    private List<String> loreSource(PlayerRef viewer, KitDefinition kit) {
         DisplayState state = stateOf(viewer, kit);
         if (state == DisplayState.UNAVAILABLE || state == DisplayState.OUT_OF_STOCK) {
-            return lockedLore(viewer, kit, state);
+            return lockedLoreSource(viewer, kit, state);
         }
         List<String> stateLore =
                 switch (state) {
@@ -252,11 +324,9 @@ final class KitIconRenderer {
         boolean hasOverride = !stateLore.isEmpty();
         List<String> rawLore = hasOverride ? stateLore : kit.displayLore();
 
-        List<Component> lines = new ArrayList<>();
-        if (!rawLore.isEmpty()) {
-            for (String line : rawLore) {
-                lines.add(miniMessage.deserialize(processPlaceholders(viewer, kit, line)));
-            }
+        List<String> lines = new ArrayList<>();
+        for (String line : rawLore) {
+            lines.add(processPlaceholders(viewer, kit, line));
         }
 
         // One ✔/✘ status line per requirement, evaluated for the viewer. The PlaceholderAPI resolution behind
@@ -265,46 +335,46 @@ final class KitIconRenderer {
 
         // Only append default status lore lines if we did not use a state override lore
         if (!hasOverride) {
-            lines.add(text(
+            lines.add(resolve(
                     viewer,
                     KitsMessageKey.KIT_MENU_LORE_COOLDOWN,
                     Map.of("seconds", Long.toString(kit.cooldownSeconds()))));
             if (kit.isOneTime()) {
-                lines.add(text(viewer, KitsMessageKey.KIT_MENU_LORE_ONETIME, Map.of()));
+                lines.add(resolve(viewer, KitsMessageKey.KIT_MENU_LORE_ONETIME, Map.of()));
             }
             if (kit.hasCost()) {
-                lines.add(text(
+                lines.add(resolve(
                         viewer,
                         KitsMessageKey.KIT_MENU_LORE_COST,
                         Map.of("amount", kit.cost().amount().toPlainString())));
             }
-            lines.add(text(
+            lines.add(resolve(
                     viewer,
                     KitsMessageKey.KIT_MENU_LORE_CLAIMABLE,
                     Map.of("kit", kit.id().value())));
         }
         if (kit.preview()) {
-            lines.add(text(viewer, KitsMessageKey.KIT_MENU_PREVIEW_HINT, Map.of()));
+            lines.add(resolve(viewer, KitsMessageKey.KIT_MENU_PREVIEW_HINT, Map.of()));
         }
         return lines;
     }
 
     /**
-     * The lore for a kit the viewer cannot claim because its rotation window is closed or its global stock is
-     * spent: the kit's own display lore for context, then the single locked-reason line, then the preview hint
+     * The lore source for a kit the viewer cannot claim because its rotation window is closed or its global stock
+     * is spent: the kit's own display lore for context, then the single locked-reason line, then the preview hint
      * when the kit allows a preview. No cooldown/cost/claimable lines — none of them apply to a locked kit.
      */
-    private List<Component> lockedLore(PlayerRef viewer, KitDefinition kit, DisplayState state) {
-        List<Component> lines = new ArrayList<>();
+    private List<String> lockedLoreSource(PlayerRef viewer, KitDefinition kit, DisplayState state) {
+        List<String> lines = new ArrayList<>();
         for (String line : kit.displayLore()) {
-            lines.add(miniMessage.deserialize(processPlaceholders(viewer, kit, line)));
+            lines.add(processPlaceholders(viewer, kit, line));
         }
         KitsMessageKey reason = state == DisplayState.UNAVAILABLE
                 ? KitsMessageKey.KIT_MENU_LORE_UNAVAILABLE
                 : KitsMessageKey.KIT_MENU_LORE_OUT_OF_STOCK;
-        lines.add(text(viewer, reason, Map.of("kit", kit.id().value())));
+        lines.add(resolve(viewer, reason, Map.of("kit", kit.id().value())));
         if (kit.preview()) {
-            lines.add(text(viewer, KitsMessageKey.KIT_MENU_PREVIEW_HINT, Map.of()));
+            lines.add(resolve(viewer, KitsMessageKey.KIT_MENU_PREVIEW_HINT, Map.of()));
         }
         return lines;
     }
@@ -315,18 +385,22 @@ final class KitIconRenderer {
      * PlaceholderAPI lookup runs on the same (viewer entity / region) thread the icon is built on, so this never
      * touches PlaceholderAPI off-thread. With no evaluator wired every condition reads as unmet (fail-closed).
      */
-    private void appendRequirementStatus(PlayerRef viewer, KitDefinition kit, List<Component> lines) {
+    private void appendRequirementStatus(PlayerRef viewer, KitDefinition kit, List<String> lines) {
         if (!kit.hasRequirements()) {
             return;
         }
         for (com.uxplima.uxmessentials.kits.domain.KitRequirement requirement : kit.requirements()) {
             boolean met = access.meetsRequirement(viewer, requirement);
             KitsMessageKey key = met ? KitsMessageKey.KIT_REQUIREMENT_MET : KitsMessageKey.KIT_REQUIREMENT_UNMET;
-            lines.add(text(viewer, key, Map.of("condition", requirement.asText())));
+            lines.add(resolve(viewer, key, Map.of("condition", requirement.asText())));
         }
     }
 
     private Component text(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-        return StyledText.render(messages.resolve(viewer, key, placeholders));
+        return StyledText.render(resolve(viewer, key, placeholders));
+    }
+
+    private String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+        return messages.resolve(viewer, key, placeholders);
     }
 }

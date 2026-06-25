@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.kits.adapter.inbound.command.KitCommands;
+import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitBrowseMenu;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryManagerView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategoryParentSelectorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCategorySelectorView;
@@ -20,7 +21,6 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitCreatePrompt;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitEditorView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitManagerMenu;
-import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitMenuView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
@@ -200,7 +200,10 @@ public final class KitsWiring {
                 categoryManagerView,
                 categorySettingsView,
                 categorySelectorView,
-                categoryParentSelectorView);
+                categoryParentSelectorView,
+                menus,
+                menuBindings,
+                dataFolder);
 
         List<CommandRegistration> commands = KitCommands.all(
                 services,
@@ -251,23 +254,31 @@ public final class KitsWiring {
             KitCategoryManagerView categoryManagerView,
             KitCategorySettingsView categorySettingsView,
             KitCategorySelectorView categorySelectorView,
-            KitCategoryParentSelectorView categoryParentSelectorView) {
+            KitCategoryParentSelectorView categoryParentSelectorView,
+            Menus menus,
+            MenuBindings menuBindings,
+            Path dataFolder) {
         // Server-local zone so kit schedules (and the matching browse-menu lock state) read in the time an
         // operator authors a window in; the event timestamp uses clock.instant(), which is zone-independent.
         Clock clock = Clock.system(ZoneId.systemDefault());
         ClaimKit claimKit = new ClaimKit(
                 repository, access, granter, notifier, kernel.events(), clock, economy, Optional.of(actionRunner));
         KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler(), previewLayout);
-        KitMenuView kitMenu = new KitMenuView(
-                kernel.messages(),
-                notifier,
+        // The read-only /kit browse menu now renders through the always-on menu engine. It claims through the same
+        // ClaimKit path the command drives and resolves its tiles off the warm kit/category sets, so the engine
+        // renders without a port read of its own; a category configured to a content slot pins to it on every page.
+        KitBrowseMenu kitMenu = new KitBrowseMenu(
+                menus,
                 kernel.scheduler(),
                 claimKit,
+                notifier,
                 categoryRepository,
                 access,
                 kitPreview,
+                kernel.messages(),
                 menuLayout,
                 clock);
+        kitMenu.register(menuBindings, dataFolder, kernel.log());
         KitEditor kitEditor = new KitEditor(repository, notifier);
         KitEditorView kitEditorView = new KitEditorView(kernel.messages(), kitEditor, kernel.scheduler());
         return new KitServices(
@@ -314,7 +325,7 @@ public final class KitsWiring {
             KitRepository repository,
             KitAccess access,
             ListKits listKits,
-            KitMenuView kitMenu,
+            KitBrowseMenu kitMenu,
             Runnable stopAction) {
 
         public Wired {
