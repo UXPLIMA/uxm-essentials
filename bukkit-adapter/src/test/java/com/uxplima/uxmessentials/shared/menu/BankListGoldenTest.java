@@ -216,7 +216,7 @@ class BankListGoldenTest {
     /** A {@link BankListMenu} wired off the same collaborators as the old view, over the engine façade. */
     private BankListMenu listMenu(Menus menus) {
         Messages messages = new KeyMessages();
-        CurrencyPickerView picker = new CurrencyPickerView(guiText, scheduler);
+        CurrencyPickerView picker = new CurrencyPickerView(menus, guiText, scheduler);
         Supplier<BankNavigation> navigation = () -> Objects.requireNonNull(navigationHolder.get(), "navigation");
         BankListMenu listMenu = new BankListMenu(
                 menus, bankService, CurrencyRegistry.single(COINS), textInput, picker, scheduler, messages, navigation);

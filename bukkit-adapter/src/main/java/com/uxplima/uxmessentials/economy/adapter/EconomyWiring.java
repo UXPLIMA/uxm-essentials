@@ -267,6 +267,7 @@ public final class EconomyWiring {
                             kernel.messages(),
                             kernel.messageSink());
             adminGui = com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiViews.create(
+                    menus,
                     guiText,
                     kernel.scheduler(),
                     plugin.getServer(),
@@ -500,7 +501,7 @@ public final class EconomyWiring {
                 new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView bankCurrencyPicker =
                 new com.uxplima.uxmessentials.economy.adapter.inbound.gui.CurrencyPickerView(
-                        bankGuiText, kernel.scheduler());
+                        menus, bankGuiText, kernel.scheduler());
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu bankListMenu =
                 new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu(
                         menus,

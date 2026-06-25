@@ -85,6 +85,7 @@ class EconomyAdminGuiTest {
     private EconomyProvider provider;
     private GuiText guiText;
     private Scheduler scheduler;
+    private com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus;
     private AnvilInput anvil;
     private com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput textInput;
     private PlayerPickerView picker;
@@ -107,6 +108,8 @@ class EconomyAdminGuiTest {
 
         guiText = new GuiText(new KeyMessages());
         scheduler = new SyncScheduler();
+        menus = com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(new KeyMessages(), scheduler)
+                .menus();
         anvil = new AnvilInput(plugin);
         anvil.install();
         Guis.install(plugin);
@@ -130,7 +133,7 @@ class EconomyAdminGuiTest {
     }
 
     private CurrencyPickerView picker() {
-        return new CurrencyPickerView(guiText, scheduler);
+        return new CurrencyPickerView(menus, guiText, scheduler);
     }
 
     private EconomyTargetView targetView(CurrencyRegistry currencies) {
@@ -342,6 +345,7 @@ class EconomyAdminGuiTest {
     @Test
     void bareEcoInstallsTheGuiOpenerWhenTheAdminGuiIsSupplied() {
         EconomyAdminGuiViews adminGui = EconomyAdminGuiViews.create(
+                menus,
                 guiText,
                 scheduler,
                 server,

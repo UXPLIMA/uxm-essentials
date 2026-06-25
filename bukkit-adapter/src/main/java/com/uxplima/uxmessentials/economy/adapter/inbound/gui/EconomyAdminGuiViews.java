@@ -37,6 +37,7 @@ public final class EconomyAdminGuiViews {
 
     /** Build the eco-admin GUI stack over the resolved provider, the kernel ports, and the shared picker/seam. */
     public static EconomyAdminGuiViews create(
+            com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus menus,
             GuiText guiText,
             Scheduler scheduler,
             Server server,
@@ -49,7 +50,7 @@ public final class EconomyAdminGuiViews {
             EconomyNotifier notifier,
             TransactionsHistoryMenu historyView) {
         EcoAdminOps ops = new EcoAdminOps(ecoAdmin);
-        CurrencyPickerView currencyPicker = new CurrencyPickerView(guiText, scheduler);
+        CurrencyPickerView currencyPicker = new CurrencyPickerView(menus, guiText, scheduler);
         // Both child screens return to the hub; the hub is constructed last, so the back-callbacks read it
         // through a one-slot holder rather than a setter, keeping every cross-link constructor-injected.
         EconomyAdminView[] hubHolder = new EconomyAdminView[1];
