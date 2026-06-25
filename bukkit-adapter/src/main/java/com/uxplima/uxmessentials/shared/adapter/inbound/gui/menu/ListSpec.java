@@ -59,6 +59,7 @@ public final class ListSpec {
     private final Material actionIcon;
     private final @Nullable Component actionName;
     private final @Nullable Consumer<Player> onAction;
+    private final List<ExtraButton> extraButtons;
 
     private ListSpec(Builder builder) {
         this.title = Objects.requireNonNull(builder.title, "title");
@@ -81,6 +82,7 @@ public final class ListSpec {
         this.actionIcon = Objects.requireNonNull(builder.actionIcon, "actionIcon");
         this.actionName = builder.actionName;
         this.onAction = builder.onAction;
+        this.extraButtons = List.copyOf(Objects.requireNonNull(builder.extraButtons, "extraButtons"));
         if (rows < 1 || rows > 6) {
             throw new IllegalArgumentException("rows must be 1..6, was " + rows);
         }
@@ -174,6 +176,16 @@ public final class ListSpec {
         return Optional.ofNullable(onAction);
     }
 
+    /**
+     * Any fixed, pre-built buttons the list draws alongside the entities and nav — beyond the single create and action
+     * buttons — each at its own slot with its own click handler. The list renderer paints each icon as-is and records
+     * its click, so a caller that needs more than the create/action pair (the shared player picker's offline-name
+     * button plus its optional footer buttons) is not capped at two. Empty for a list that uses none.
+     */
+    public List<ExtraButton> extraButtons() {
+        return extraButtons;
+    }
+
     /** Fluent builder mirroring the bespoke {@code EntityListView.Builder} so the later shim is mechanical. */
     public static final class Builder {
         private @Nullable Component title;
@@ -196,6 +208,7 @@ public final class ListSpec {
         private Material actionIcon = Material.COMPARATOR;
         private @Nullable Component actionName;
         private @Nullable Consumer<Player> onAction;
+        private List<ExtraButton> extraButtons = List.of();
 
         private Builder() {}
 
@@ -267,9 +280,33 @@ public final class ListSpec {
             return this;
         }
 
+        /** Wire any fixed, pre-built buttons beyond the create/action pair, each at its own slot with its own click. */
+        public Builder extraButtons(List<ExtraButton> extraButtons) {
+            this.extraButtons = List.copyOf(Objects.requireNonNull(extraButtons, "extraButtons"));
+            return this;
+        }
+
         /** Build the spec; the constructor validates that every required field was set. */
         public ListSpec build() {
             return new ListSpec(this);
+        }
+    }
+
+    /**
+     * One fixed, pre-built button the list draws beyond the create/action pair: the slot it sits at, the already-built
+     * icon to place there (name and lore baked in by the caller, like a {@code SelectorButton}'s icon), and the handler
+     * run with the live viewer when it is clicked. The list renderer places the icon as-is and records the click, so
+     * this carries no presentation decision of its own.
+     *
+     * @param slot the inventory slot the button is drawn at
+     * @param icon the prepared icon to place (name/lore already applied)
+     * @param onClick invoked with the live viewer when the button is clicked
+     */
+    public record ExtraButton(int slot, ItemStack icon, Consumer<Player> onClick) {
+
+        public ExtraButton {
+            Objects.requireNonNull(icon, "icon");
+            Objects.requireNonNull(onClick, "onClick");
         }
     }
 }

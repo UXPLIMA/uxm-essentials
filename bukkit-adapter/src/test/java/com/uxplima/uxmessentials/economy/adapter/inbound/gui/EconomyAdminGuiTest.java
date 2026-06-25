@@ -130,7 +130,7 @@ class EconomyAdminGuiTest {
                 .textInput();
         notifier = new EconomyNotifier(new KeyMessages(), new NoopSink());
         historyView = mock(TransactionsHistoryMenu.class);
-        picker = new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        picker = new PlayerPickerView(menus, guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
     }
 
     @AfterEach

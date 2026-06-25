@@ -2,9 +2,6 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +21,7 @@ import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -31,63 +29,62 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of {@link DurationPickerView}: opening it builds the preset grid with clock buttons, a
- * preset click fires the callback with that exact duration string, a custom anvil submission of a valid timed
- * span fires it with the trimmed string, a malformed span replies with the reject key without firing, and a
- * permanent parse is rejected for a timed verb (the validator the flow supplies refuses it). The scheduler
- * double runs each hop inline so a click resolves on the test thread.
+ * MockBukkit coverage of {@link DurationPickerView} on the menu engine: opening it builds an engine selector window
+ * (a {@link MenuHolder}) with clock preset buttons, a preset click through the one menu listener fires the callback
+ * with that exact duration string, a custom anvil submission of a valid timed span fires it with the trimmed string
+ * (driven through the package-private {@code resolveTyped} seam, since MockBukkit cannot open a live anvil), a
+ * malformed span replies with the reject key without firing, and a permanent parse is rejected for a timed verb (the
+ * validator the flow supplies refuses it). The scheduler double runs each hop inline so a click resolves on the test
+ * thread.
  */
 class DurationPickerViewTest {
 
     // The first preset sits one slot in from the top-left corner (see DurationPickerView#presetSlot).
     private static final int FIRST_PRESET_SLOT = 1;
 
-    @TempDir
-    private Path inputDir;
-
     private ServerMock server;
     private Plugin plugin;
     private PlayerMock viewer;
     private PlayerRef viewerRef;
     private TextInput textInput;
+    private TestMenuEngine engine;
 
     @BeforeEach
-    void setUp() throws IOException {
+    void setUp() {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         viewer = server.addPlayer("Staff");
         viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
-        // A rejected span reopens the prompt; chat mode keeps that reopen off the anvil (MockBukkit cannot render
-        // a live anvil), so the reject branch is observable while the reopen is a harmless chat send.
-        Files.writeString(inputDir.resolve("config.conf"), "default-mode = chat\n");
         textInput = TextInputTestKit.create(
-                plugin, new GuiText(new KeyMessages()), new SyncScheduler(), inputDir, new NoopLogger());
-        Guis.install(plugin);
+                plugin,
+                new GuiText(new KeyMessages()),
+                new SyncScheduler(),
+                java.nio.file.Path.of("nonexistent"),
+                new NoopLogger());
+        engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
+        engine.installListener(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
     @Test
-    void opensThePresetGridWithClockButtons() {
+    void opensTheEngineSelectorWithClockButtons() {
         view().open(viewer, viewerRef, request(new RecordingPick()));
 
         Inventory menu = viewer.getOpenInventory().getTopInventory();
-        assertThat(menu.getHolder()).isInstanceOf(SimpleGui.class);
+        assertThat(menu.getHolder()).isInstanceOf(MenuHolder.class);
         assertThat(menu.getItem(FIRST_PRESET_SLOT).getType()).isEqualTo(Material.CLOCK);
     }
 
@@ -139,7 +136,12 @@ class DurationPickerViewTest {
 
     private DurationPickerView view(MessageSink sink) {
         return new DurationPickerView(
-                new GuiText(new KeyMessages()), new SyncScheduler(), textInput, new KeyMessages(), sink);
+                engine.menus(),
+                new GuiText(new KeyMessages()),
+                new SyncScheduler(),
+                textInput,
+                new KeyMessages(),
+                sink);
     }
 
     // The validator mirrors the timed-verb rule the moderation flow supplies: only a positive, well-formed span.

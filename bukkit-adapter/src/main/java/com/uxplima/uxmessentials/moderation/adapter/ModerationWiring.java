@@ -230,9 +230,15 @@ public final class ModerationWiring {
         // the flow supplies the moderation TargetResolver as its offline-name resolver, the unknown-target reply,
         // and the SanctionDuration-backed validator for the timed verbs.
         PlayerPickerView picker = new PlayerPickerView(
-                guiText, kernel.scheduler(), textInput, plugin.getServer(), kernel.messages(), kernel.messageSink());
-        DurationPickerView durationPicker =
-                new DurationPickerView(guiText, kernel.scheduler(), textInput, kernel.messages(), kernel.messageSink());
+                menus,
+                guiText,
+                kernel.scheduler(),
+                textInput,
+                plugin.getServer(),
+                kernel.messages(),
+                kernel.messageSink());
+        DurationPickerView durationPicker = new DurationPickerView(
+                menus, guiText, kernel.scheduler(), textInput, kernel.messages(), kernel.messageSink());
         PunishmentConfirmView confirmView = new PunishmentConfirmView(guiText, kernel.scheduler(), textInput);
         PunishmentGuiFlow guiFlow = new PunishmentGuiFlow(
                 services, picker, durationPicker, confirmView, kernel.messages(), kernel.messageSink());

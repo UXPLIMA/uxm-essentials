@@ -250,6 +250,7 @@ public final class EconomyWiring {
                     new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView picker =
                     new com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView(
+                            menus,
                             guiText,
                             kernel.scheduler(),
                             textInput,

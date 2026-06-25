@@ -21,6 +21,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -30,8 +31,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.PaginatedGui;
+import com.uxplima.uxmessentials.shared.menu.TestMenuEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,12 +40,13 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
- * MockBukkit coverage of the reusable {@link PlayerPickerView}: it builds a head per online player, clicking a
- * head fires the pick callback with that target, the offline button's anvil submission resolves a typed name
- * through the supplied resolver and fires the same callback, an unresolvable typed name replies with the
- * supplied unknown-player key (and fires no pick), and a roster longer than one page splits across pages with a
- * working next-page button. The scheduler double runs every hop inline so the global→entity marshal and the
- * async resolve resolve in the test thread.
+ * MockBukkit coverage of the reusable {@link PlayerPickerView} on the menu engine: it builds an engine list (a
+ * {@link MenuHolder}) with a head per online player, clicking a head through the one menu listener fires the pick
+ * callback with that target, the offline button's anvil submission resolves a typed name through the supplied resolver
+ * and fires the same callback (driven through the package-private {@code resolveTyped} seam, since MockBukkit cannot
+ * open a live anvil), an unresolvable typed name replies with the supplied unknown-player key (and fires no pick), and
+ * a roster longer than one page splits across pages with a working next-page button. The scheduler double runs every
+ * hop inline so the global→entity marshal and the async resolve resolve in the test thread.
  */
 class PlayerPickerViewTest {
 
@@ -58,6 +59,7 @@ class PlayerPickerViewTest {
     private PlayerRef viewerRef;
     private TextInput textInput;
     private RecordingSink sink;
+    private TestMenuEngine engine;
 
     @BeforeEach
     void setUp() {
@@ -72,12 +74,12 @@ class PlayerPickerViewTest {
                 java.nio.file.Path.of("nonexistent"),
                 new NoopLogger());
         sink = new RecordingSink();
-        Guis.install(plugin);
+        engine = TestMenuEngine.create(new KeyMessages(), new SyncScheduler());
+        engine.installListener(plugin);
     }
 
     @AfterEach
     void tearDown() {
-        Guis.uninstall();
         MockBukkit.unmock();
     }
 
@@ -90,7 +92,7 @@ class PlayerPickerViewTest {
         view().open(viewer, viewerRef, request(picked, name -> Optional.empty()));
 
         Inventory menu = viewer.getOpenInventory().getTopInventory();
-        assertThat(menu.getHolder()).isInstanceOf(PaginatedGui.class);
+        assertThat(menu.getHolder()).isInstanceOf(MenuHolder.class);
         // Viewer + Bob + Carol = three heads in the content slots.
         assertThat(headCount(menu)).isEqualTo(3);
     }
@@ -160,7 +162,13 @@ class PlayerPickerViewTest {
 
     private PlayerPickerView view() {
         return new PlayerPickerView(
-                new GuiText(new KeyMessages()), new SyncScheduler(), textInput, server, new KeyMessages(), sink);
+                engine.menus(),
+                new GuiText(new KeyMessages()),
+                new SyncScheduler(),
+                textInput,
+                server,
+                new KeyMessages(),
+                sink);
     }
 
     private static PlayerPickerView.Request request(

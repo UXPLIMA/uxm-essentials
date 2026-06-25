@@ -52,6 +52,7 @@ public final class ListViewRenderer {
         paintNav(inv, spec, state);
         paintCreate(inv, spec, state, live);
         paintAction(inv, spec, state, live);
+        paintExtras(inv, spec, state, live);
         return clamped;
     }
 
@@ -108,6 +109,14 @@ public final class ListViewRenderer {
                         .name(spec.actionName().orElseThrow())
                         .build());
         state.recordButton(slot, () -> spec.onAction().orElseThrow().accept(live));
+    }
+
+    /** Paint each of the spec's fixed extra buttons as-is, recording each click as a plain button on the state. */
+    private void paintExtras(Inventory inv, ListSpec spec, ListViewState state, Player live) {
+        for (ListSpec.ExtraButton button : spec.extraButtons()) {
+            inv.setItem(button.slot(), button.icon());
+            state.recordButton(button.slot(), () -> button.onClick().accept(live));
+        }
     }
 
     /** Fill every slot with the spec's filler so no vanilla slot shows through behind the icons and buttons. */

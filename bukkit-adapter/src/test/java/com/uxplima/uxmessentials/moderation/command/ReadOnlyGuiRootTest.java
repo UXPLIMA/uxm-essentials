@@ -62,7 +62,10 @@ class ReadOnlyGuiRootTest {
         scheduler = new SyncScheduler();
         TextInput textInput = TextInputTestKit.create(
                 plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), new NoopLogger());
-        picker = new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        com.uxplima.uxmessentials.shared.menu.TestMenuEngine engine =
+                com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(new KeyMessages(), scheduler);
+        picker = new PlayerPickerView(
+                engine.menus(), guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
         // A fully built ModerationGuiViews needs a repository/history fake; the wiring tests only need a non-null
         // instance because they assert the opener is installed, not that it opens a live menu.
         views = mock(ModerationGuiViews.class);

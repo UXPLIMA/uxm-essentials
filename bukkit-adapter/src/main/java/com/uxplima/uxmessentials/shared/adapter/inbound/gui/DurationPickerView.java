@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.gui;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -10,40 +11,38 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.Component;
-
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.property.SelectorButton;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.item.GuiItem;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * A reusable duration step for the timed sanction flows ({@code /tempban}, {@code /tempmute}): a fixed grid of
  * preset duration buttons (each labelled with its own {@code SanctionDuration}-grammar string, e.g. {@code 30m},
- * {@code 1h}, {@code 7d}) plus a "custom" button that opens a vanilla anvil for a typed span. Clicking a preset,
- * or submitting a string the supplied validator accepts, fires the caller's {@code onPick} with that exact
- * duration string; a malformed typed string replies with the caller's reject {@link MessageKey} and reopens the
- * anvil.
+ * {@code 1h}, {@code 7d}) plus a "custom" button that opens an anvil for a typed span. Clicking a preset, or
+ * submitting a string the supplied validator accepts, fires the caller's {@code onPick} with that exact duration
+ * string; a malformed typed string replies with the caller's reject {@link MessageKey} and reopens the anvil.
  *
- * <p>The view holds no sanction logic. One instance is shared across callers — the framework collaborators
- * (text, scheduler, anvil, sink, messages) live on the instance, and the per-use parts (the title, the preset
- * list, the pick callback, the reject key, and whether a permanent parse is allowed) are passed to {@link #open}
- * through a {@link Request}. The typed string is validated through {@link Request#validator}, which a caller
- * backs with {@code SanctionDuration.parse} so the moderation context owns its own grammar; this class only
- * distinguishes "accepted" from "rejected".
+ * <p>The view holds no sanction logic. One instance is shared across callers — the framework collaborators (the menu
+ * engine, text, scheduler, anvil, sink, messages) live on the instance, and the per-use parts (the title, the preset
+ * list, the pick callback, the reject key, and an optional back action) are passed to {@link #open} through a
+ * {@link Request}. The typed string is validated through {@link Request#validator}, which a caller backs with
+ * {@code SanctionDuration.parse} so the moderation context owns its own grammar; this class only distinguishes
+ * "accepted" from "rejected".
  *
- * <p>Folia: the menu is built and opened on the viewer's own entity region thread (where its clicks also run),
- * matching {@link PlayerPickerView}. No roster is read, so there is no global-thread hop. The validator is pure
- * and runs inline on the click thread.
+ * <p>It draws through the menu engine's selector runtime ({@link Menus#openSelector}): a single-page child window of
+ * option buttons routed and torn down by the one menu listener and one {@code closeMenu}. Each preset, the custom
+ * button, and the optional back button is one {@link SelectorButton} whose icon (name and lore) is baked here, so the
+ * engine only places it and wires the click. No roster or list source is read, so the engine shows the window straight
+ * on the viewer's entity thread (where its clicks also run); the validator is pure and runs inline on the click thread.
  */
 @NullMarked
 public final class DurationPickerView {
@@ -62,19 +61,26 @@ public final class DurationPickerView {
     private static final List<String> DEFAULT_PRESETS =
             List.of("30m", "1h", "6h", "12h", "1d", "3d", "7d", "14d", "30d");
 
+    private final Menus menus;
     private final GuiText guiText;
-    private final Scheduler scheduler;
     private final TextInput textInput;
     private final Messages messages;
     private final MessageSink sink;
 
     public DurationPickerView(
-            GuiText guiText, Scheduler scheduler, TextInput textInput, Messages messages, MessageSink sink) {
+            Menus menus,
+            GuiText guiText,
+            Scheduler scheduler,
+            TextInput textInput,
+            Messages messages,
+            MessageSink sink) {
+        this.menus = Objects.requireNonNull(menus, "menus");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
+        // The engine hops onto the viewer's entity thread inside openSelector, so the scheduler is only validated here.
+        Objects.requireNonNull(scheduler, "scheduler");
     }
 
     /** The sensible default preset ladder, exposed so a caller can offer it without re-listing the spans. */
@@ -87,26 +93,25 @@ public final class DurationPickerView {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(viewerRef, "viewerRef");
         Objects.requireNonNull(request, "request");
-        scheduler.onEntity(viewerRef, () -> build(viewer, viewerRef, request).open(viewer));
+        menus.openSelector(
+                viewerRef, guiText.text(viewerRef, request.title()), ROWS, FILLER, buttons(viewer, viewerRef, request));
     }
 
-    private SimpleGui build(Player viewer, PlayerRef viewerRef, Request request) {
-        SimpleGui gui = Guis.gui()
-                .title(guiText.text(viewerRef, request.title()))
-                .rows(ROWS)
-                .build();
-        fill(gui);
+    /** Build one selector button per preset, the custom-span anvil button, and (when supplied) the back button. */
+    private List<SelectorButton> buttons(Player viewer, PlayerRef viewerRef, Request request) {
+        List<SelectorButton> buttons = new ArrayList<>();
         List<String> presets = request.presets();
-        for (int i = 0; i < presets.size() && i < CUSTOM_SLOT; i++) {
+        for (int i = 0; i < presets.size() && presetSlot(i) < CUSTOM_SLOT; i++) {
             String preset = presets.get(i);
-            gui.set(
+            buttons.add(SelectorButton.of(
                     presetSlot(i),
-                    GuiItem.button(
-                            presetIcon(viewerRef, preset), e -> request.onPick().accept(preset)));
+                    presetIcon(viewerRef, preset),
+                    () -> request.onPick().accept(preset)));
         }
-        gui.set(CUSTOM_SLOT, GuiItem.button(customIcon(viewerRef), e -> promptCustom(viewer, viewerRef, request)));
-        request.onBack().ifPresent(back -> gui.set(BACK_SLOT, GuiItem.button(backIcon(viewerRef), e -> back.run())));
-        return gui;
+        buttons.add(
+                SelectorButton.of(CUSTOM_SLOT, customIcon(viewerRef), () -> promptCustom(viewer, viewerRef, request)));
+        request.onBack().ifPresent(back -> buttons.add(SelectorButton.of(BACK_SLOT, backIcon(viewerRef), back)));
+        return buttons;
     }
 
     /** Open the input prompt for a typed span; a submission flows through {@link #resolveTyped}. */
@@ -157,13 +162,6 @@ public final class DurationPickerView {
     // The presets occupy the centre of the top two rows; the bottom row carries the custom and back buttons.
     private static int presetSlot(int index) {
         return index + (index / 7) * 2 + 1;
-    }
-
-    private void fill(SimpleGui gui) {
-        ItemStack filler = ItemBuilder.of(FILLER).name(Component.empty()).build();
-        for (int slot = 0; slot < ROWS * 9; slot++) {
-            gui.set(slot, GuiItem.display(filler));
-        }
     }
 
     /**

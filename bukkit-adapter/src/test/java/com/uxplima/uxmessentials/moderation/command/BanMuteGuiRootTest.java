@@ -60,10 +60,12 @@ class BanMuteGuiRootTest {
         Scheduler scheduler = new SyncScheduler();
         TextInput textInput = TextInputTestKit.create(
                 plugin, guiText, scheduler, java.nio.file.Path.of("nonexistent"), new NoopLogger());
-        PlayerPickerView picker =
-                new PlayerPickerView(guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
-        DurationPickerView durations =
-                new DurationPickerView(guiText, scheduler, textInput, new KeyMessages(), new NoopSink());
+        com.uxplima.uxmessentials.shared.menu.TestMenuEngine engine =
+                com.uxplima.uxmessentials.shared.menu.TestMenuEngine.create(new KeyMessages(), scheduler);
+        PlayerPickerView picker = new PlayerPickerView(
+                engine.menus(), guiText, scheduler, textInput, server, new KeyMessages(), new NoopSink());
+        DurationPickerView durations = new DurationPickerView(
+                engine.menus(), guiText, scheduler, textInput, new KeyMessages(), new NoopSink());
         PunishmentConfirmView confirm = new PunishmentConfirmView(guiText, scheduler, textInput);
         flow = new PunishmentGuiFlow(services, picker, durations, confirm, new KeyMessages(), new NoopSink());
     }
