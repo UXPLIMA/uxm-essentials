@@ -12,7 +12,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
@@ -66,7 +66,7 @@ public final class WorldsServices {
     private final Scheduler scheduler;
     private final Supplier<Set<WorldName>> onDiskScanner;
     private final BiConsumer<Player, PlayerRef> openWorldList;
-    private final WorldMainView worldMainView;
+    private final WorldMainOpener openWorldMain;
     private final AtomicReference<List<String>> importable = new AtomicReference<>(List.of());
 
     public WorldsServices(
@@ -92,7 +92,7 @@ public final class WorldsServices {
             ListBackups listBackups,
             RestoreWorld restoreWorld,
             BiConsumer<Player, PlayerRef> openWorldList,
-            WorldMainView worldMainView) {
+            WorldMainOpener openWorldMain) {
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
         this.importWorld = Objects.requireNonNull(importWorld, "importWorld");
         this.loadWorld = Objects.requireNonNull(loadWorld, "loadWorld");
@@ -115,7 +115,7 @@ public final class WorldsServices {
         this.listBackups = Objects.requireNonNull(listBackups, "listBackups");
         this.restoreWorld = Objects.requireNonNull(restoreWorld, "restoreWorld");
         this.openWorldList = Objects.requireNonNull(openWorldList, "openWorldList");
-        this.worldMainView = Objects.requireNonNull(worldMainView, "worldMainView");
+        this.openWorldMain = Objects.requireNonNull(openWorldMain, "openWorldMain");
     }
 
     public CreateWorld createWorld() {
@@ -199,9 +199,13 @@ public final class WorldsServices {
         openWorldList.accept(player, viewer);
     }
 
-    /** The per-world hub view {@code /worlds editor <world>} opens, exposed so the command can launch it. */
-    public WorldMainView worldMainView() {
-        return worldMainView;
+    /**
+     * Open the engine-rendered per-world editor hub {@code /world gui <world>} launches. Exposed as a seam so the
+     * command opens the hub without depending on the menu engine directly; worlds wiring binds it to
+     * {@code WorldMainMenu.open} once that menu is built.
+     */
+    public void openWorldMain(Player player, PlayerRef viewer, WorldName world) {
+        openWorldMain.open(player, viewer, world);
     }
 
     /** The server's gamerule names for {@code /world gamerule} tab-completion. */

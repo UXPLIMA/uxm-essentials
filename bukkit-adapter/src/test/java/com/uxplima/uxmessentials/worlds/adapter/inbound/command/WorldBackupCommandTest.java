@@ -22,7 +22,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
@@ -158,7 +158,7 @@ class WorldBackupCommandTest {
                 listBackups,
                 restoreWorld,
                 (player, viewer) -> {},
-                mock(WorldMainView.class));
+                mock(WorldMainOpener.class));
     }
 
     /** A repository that recognises exactly one managed world, so the name argument suggests and resolves it. */

@@ -1,11 +1,14 @@
 /**
- * The worlds context's GUI editor. {@link com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorHolder}
- * tags a {@code /worlds editor} window with the {@link com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorScreen}
- * it is showing and the world being edited, so the editor listener can recognise its own windows; the
- * {@code LIST} screen is the world picker and carries no world.
- * {@link com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorText} resolves the editor's
- * {@code MessageKey} catalog entries into Adventure components in the viewer's locale, so every prompt and label
- * reads identically across the editor's screens.
+ * The worlds context's GUI editor, rendered through the menu engine. The
+ * {@link com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListMenu} world picker, the per-world
+ * {@link com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainMenu} hub, the
+ * {@link com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateMenu} new-world screen, the read-only
+ * {@link com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationMenu} summary, and the shared
+ * rules/access {@link com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGridMenu} each register their
+ * {@code world-*} spec and bindings with the engine and open through {@code menus.open(...)}; the engine's one
+ * holder/listener owns every window. Each screen hands the world (or an in-flight create draft) in as the menu
+ * subject, so the engine renders the labels from the worlds editor catalog without the screens touching a port
+ * off-thread.
  */
 @org.jspecify.annotations.NullMarked
 package com.uxplima.uxmessentials.worlds.adapter.inbound.gui;

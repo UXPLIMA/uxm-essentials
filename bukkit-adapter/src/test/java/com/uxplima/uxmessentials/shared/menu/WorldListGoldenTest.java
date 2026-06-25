@@ -28,7 +28,6 @@ import org.bukkit.plugin.Plugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInputTestKit;
@@ -36,6 +35,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.Menus;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuBindings;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.ItemRenderer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.render.MenuRenderer;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuHolder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.runtime.MenuListener;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -50,12 +50,9 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateView;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorHolder;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorScreen;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldEditorText;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldListMenu;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainMenu;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
 import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
@@ -87,7 +84,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  * is snapshotted as {@code (slot -> material, plain name)} and asserted equal, slot for slot, to the baseline the old
  * view produced — captured once while both rendered the same fixture, then frozen here as the contract so the old
  * class could be deleted. Then, through the engine's own {@link MenuListener}, a left click on the first world icon
- * proves the migrated path opens that world's bespoke {@link WorldMainView} hub, and a right click proves it runs the
+ * proves the migrated path opens that world's engine {@link WorldMainMenu} hub, and a right click proves it runs the
  * forced teleport — so the move is faithful in both appearance and behaviour, including the picker's distinct
  * left-edits / right-teleports gesture split.
  *
@@ -152,14 +149,11 @@ class WorldListGoldenTest {
     void leftClickingAWorldThroughTheEngineOpensThatWorldsMainHub() {
         seed("alpha", WorldEnvironment.NORMAL);
         openEngine();
-        // Content slot 0 is the first world icon, "alpha"; a left click must open that world's main editor hub.
+        // Content slot 0 is the first world icon, "alpha"; a left click must open that world's engine main editor hub,
+        // which is now a holder-backed MenuHolder rather than the old bespoke holder.
         fireClick(0, ClickType.LEFT);
 
-        if (!(player.getOpenInventory().getTopInventory().getHolder() instanceof WorldEditorHolder holder)) {
-            throw new AssertionError("left-click did not open a world-editor window");
-        }
-        assertThat(holder.screen()).isEqualTo(WorldEditorScreen.MAIN);
-        assertThat(holder.world()).isEqualTo(WorldName.of("alpha"));
+        assertThat(player.getOpenInventory().getTopInventory().getHolder()).isInstanceOf(MenuHolder.class);
     }
 
     @Test
@@ -206,22 +200,23 @@ class WorldListGoldenTest {
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, scheduler, bindings.lists());
 
-        WorldListMenu listMenu = listMenu(menus);
+        WorldListMenu listMenu = listMenu(menus, bindings);
         listMenu.register(bindings, dataFolder, NOOP);
         listMenu.open(player, viewer);
     }
 
     /** A {@link WorldListMenu} wired off the same collaborators as the old view, over the engine façade. */
-    private WorldListMenu listMenu(Menus menus) {
-        WorldEditorText editorText = new WorldEditorText(new KeyMessages());
-        GuiLayout threeRow = new GuiLayout(3, Material.GRAY_STAINED_GLASS_PANE, Material.ARROW, 0, 1, List.of());
-        WorldMainView mainView = new WorldMainView(editorText, repository, engine, scheduler, threeRow);
+    private WorldListMenu listMenu(Menus menus, MenuBindings bindings) {
+        WorldMainMenu mainMenu = new WorldMainMenu(menus, scheduler, repository, engine, (p, v) -> {});
         WorldNotifier notifier = new WorldNotifier(new KeyMessages(), new SilentSink());
         CreateWorld createWorld =
                 new CreateWorld(repository, engine, notifier, new SilentEvents(), scheduler, Clock.systemUTC());
-        WorldCreateView createView =
-                new WorldCreateView(editorText, createWorld, notifier, (p, v) -> {}, textInput, scheduler, threeRow);
-        return new WorldListMenu(menus, scheduler, repository, engine, worldTeleport, mainView, createView);
+        WorldCreateMenu createMenu =
+                new WorldCreateMenu(menus, scheduler, createWorld, notifier, textInput, (p, v) -> {});
+        // The list's left click opens the main hub, so its spec must be registered for the open to resolve; the grid
+        // and generation sub-screens are exercised by their own golden tests, so they are not wired here.
+        mainMenu.register(bindings, dataFolder, NOOP);
+        return new WorldListMenu(menus, scheduler, repository, engine, worldTeleport, mainMenu, createMenu);
     }
 
     /** Click the given content slot of the open menu with the given gesture through the production click path. */

@@ -12,14 +12,14 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The in-flight configuration the {@link WorldEditorScreen#CREATE} screen carries while a staff member builds a new
+ * The in-flight configuration the {@link WorldCreateMenu} create screen carries while a staff member builds a new
  * world: the chosen name (empty until typed), environment, generation type, optional built-in generator, and optional
- * seed. It is an immutable value the create screen re-renders from; each selector cycle or input submission produces a
- * fresh draft, which the holder carries on the rebuilt window. The mapping to a {@link WorldSpec} mirrors
+ * seed. It is an immutable value the create screen re-renders from as the menu subject; each selector cycle or input
+ * submission produces a fresh draft the screen re-opens with. The mapping to a {@link WorldSpec} mirrors
  * {@code WorldCommand.runCreate} exactly so a GUI-built world is byte-for-byte identical to a command-built one.
  *
  * <p>The {@code generator} field holds a bare built-in id ({@code void}/{@code flat}) or {@code null} for vanilla
- * generation — only the two built-ins are offered in the GUI, the same set {@code WorldGenerationView} reports and the
+ * generation — only the two built-ins are offered in the GUI, the same set {@code WorldGenerationMenu} reports and the
  * {@code /worlds create} generator tab-completion suggests. {@link #toSpec()} maps a built-in id onto the namespaced
  * {@link BuiltInGenerators} ref the engine resolves, leaving the seed and dimension empty exactly as the command does.
  */

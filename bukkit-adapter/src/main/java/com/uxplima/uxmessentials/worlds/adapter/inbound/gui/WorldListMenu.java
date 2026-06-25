@@ -46,10 +46,10 @@ import org.jspecify.annotations.NullMarked;
  * {@code world_icon} / {@code world_name} / {@code world_environment} / {@code world_loaded} placeholders read the
  * bound row, so the menu touches no Bukkit API off-thread.
  *
- * <p>A left click runs {@code worlds:edit}, opening that world's still-bespoke {@link WorldMainView} hub; a right
+ * <p>A left click runs {@code worlds:edit}, opening that world's engine-rendered {@link WorldMainMenu} hub; a right
  * click runs {@code worlds:teleport}, the forced staff hand-off {@code /worlds tp <self>} drives (it skips the access
  * gate and entry fee, and loads-then-teleports on the global region thread); the create button runs
- * {@code worlds:create}, opening the still-bespoke {@link WorldCreateView} — so the list adds no domain logic of its
+ * {@code worlds:create}, opening the engine-rendered {@link WorldCreateMenu} — so the list adds no domain logic of its
  * own.
  */
 @NullMarked
@@ -66,8 +66,8 @@ public final class WorldListMenu {
     private final WorldRepository repository;
     private final WorldEngine engine;
     private final WorldTeleportService worldTeleport;
-    private final WorldMainView mainView;
-    private final WorldCreateView createView;
+    private final WorldMainMenu mainMenu;
+    private final WorldCreateMenu createMenu;
 
     public WorldListMenu(
             Menus menus,
@@ -75,15 +75,15 @@ public final class WorldListMenu {
             WorldRepository repository,
             WorldEngine engine,
             WorldTeleportService worldTeleport,
-            WorldMainView mainView,
-            WorldCreateView createView) {
+            WorldMainMenu mainMenu,
+            WorldCreateMenu createMenu) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.worldTeleport = Objects.requireNonNull(worldTeleport, "worldTeleport");
-        this.mainView = Objects.requireNonNull(mainView, "mainView");
-        this.createView = Objects.requireNonNull(createView, "createView");
+        this.mainMenu = Objects.requireNonNull(mainMenu, "mainMenu");
+        this.createMenu = Objects.requireNonNull(createMenu, "createMenu");
     }
 
     /** Register the bindings the spec names and the spec itself; called once at worlds wiring time. */
@@ -131,9 +131,9 @@ public final class WorldListMenu {
         return row.world().spec().environment();
     }
 
-    /** Left-click a world icon: open that world's bespoke main editor hub on the viewer's entity thread. */
+    /** Left-click a world icon: open that world's engine main editor hub on the viewer's entity thread. */
     private void edit(MenuActionContext ctx) {
-        mainView.open(
+        mainMenu.open(
                 ctx.player(), ctx.viewer(), ctx.entry(WorldRow.class).world().name());
     }
 
@@ -150,9 +150,9 @@ public final class WorldListMenu {
         scheduler.onGlobal(() -> worldTeleport.forced(viewer, viewer, world));
     }
 
-    /** Left-click the create button: open the bespoke new-world configuration screen, exactly as the old button did. */
+    /** Left-click the create button: open the engine new-world configuration screen, exactly as the old button did. */
     private void create(MenuActionContext ctx) {
-        createView.open(ctx.player(), ctx.viewer());
+        createMenu.open(ctx.player(), ctx.viewer());
     }
 
     private static String envMaterial(ManagedWorld world) {

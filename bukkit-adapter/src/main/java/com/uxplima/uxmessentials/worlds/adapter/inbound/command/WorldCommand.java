@@ -506,7 +506,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
             feedback.send(sender, WorldsMessageKey.WORLD_NOT_FOUND, Map.of("world", name.value()));
             return 0;
         }
-        services.worldMainView().open(sender, ref(sender), name); // the view self-schedules onEntity
+        services.openWorldMain(sender, ref(sender), name); // the menu self-schedules onEntity
         return Command.SINGLE_SUCCESS;
     }
 

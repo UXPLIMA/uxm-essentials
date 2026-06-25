@@ -26,7 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
-import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainView;
+import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
@@ -62,14 +62,14 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 /**
  * MockBukkit coverage of the {@code /worlds gui} verb through its real Brigadier node: the bare form opens the
  * engine-rendered world picker through the {@code openWorldList} seam, while {@code gui <world>} opens the per-world
- * {@link WorldMainView} for a managed world. An unmanaged world name opens neither.
+ * editor hub through the {@code openWorldMain} seam for a managed world. An unmanaged world name opens neither.
  */
 class WorldGuiCommandTest {
 
     private ServerMock server;
     private PlayerMock alice;
     private AtomicInteger listOpens;
-    private WorldMainView mainView;
+    private WorldMainOpener openMain;
     private Messages messages;
     private WorldsServices services;
 
@@ -79,7 +79,7 @@ class WorldGuiCommandTest {
         alice = server.addPlayer("Alice");
         alice.setOp(true);
         listOpens = new AtomicInteger();
-        mainView = mock(WorldMainView.class);
+        openMain = mock(WorldMainOpener.class);
         messages = mock(Messages.class);
         when(messages.resolve(any(), any(), any())).thenReturn(""); // a render the feedback path can parse
         services = services(new SingleWorldRepository(WorldName.of("world")));
@@ -95,14 +95,14 @@ class WorldGuiCommandTest {
         execute("worlds gui");
 
         assertThat(listOpens).hasValue(1);
-        verifyNoInteractions(mainView);
+        verifyNoInteractions(openMain);
     }
 
     @Test
     void guiWithManagedWorldOpensThatWorldsHub() {
         execute("worlds gui world");
 
-        verify(mainView).open(any(Player.class), any(PlayerRef.class), eq(WorldName.of("world")));
+        verify(openMain).open(any(Player.class), any(PlayerRef.class), eq(WorldName.of("world")));
         assertThat(listOpens).hasValue(0);
     }
 
@@ -111,7 +111,7 @@ class WorldGuiCommandTest {
         execute("worlds gui missing");
 
         assertThat(listOpens).hasValue(0);
-        verifyNoInteractions(mainView);
+        verifyNoInteractions(openMain);
     }
 
     private void execute(String input) {
@@ -148,7 +148,7 @@ class WorldGuiCommandTest {
                 mock(ListBackups.class),
                 mock(RestoreWorld.class),
                 (player, viewer) -> listOpens.incrementAndGet(),
-                mainView);
+                openMain);
     }
 
     /** A repository that recognises exactly one managed world (so {@code gui <world>} resolves it). */
