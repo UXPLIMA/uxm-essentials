@@ -126,6 +126,8 @@ class ShippedSpecBindingsDriftTest {
             "economy:admin-manage",
             "economy:admin-bulk",
             "economy:admin-history",
+            "economy:loan-entry",
+            "economy:loan-request",
             "economy:exchange-source",
             "economy:exchange-target",
             "economy:exchange-convert");
@@ -309,6 +311,11 @@ class ShippedSpecBindingsDriftTest {
             "eco_target",
             "eco_currency",
             "eco_target_balances",
+            "loan_profile_name",
+            "loan_profile_lore",
+            "loan_entry_icon",
+            "loan_entry_name",
+            "loan_entry_lore",
             "exchange_source_material",
             "exchange_target_material",
             "exchange_source_currency",
@@ -344,7 +351,8 @@ class ShippedSpecBindingsDriftTest {
             "economy:baltop",
             "economy:transactions",
             "economy:banks",
-            "economy:bank-members");
+            "economy:bank-members",
+            "economy:loan-list");
 
     @Test
     void everyShippedSpecReferencesOnlyKnownBindingIds() {

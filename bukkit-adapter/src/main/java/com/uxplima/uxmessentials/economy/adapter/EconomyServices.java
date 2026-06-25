@@ -63,7 +63,7 @@ public record EconomyServices(
         com.uxplima.uxmessentials.economy.application.LoanService loanService,
         com.uxplima.uxmessentials.persistence.economy.EconomyBackupManager backupManager,
         com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankListMenu bankListMenu,
-        com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView loanGuiView) {
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanDashboardMenu loanGuiView) {
 
     public EconomyServices {
         Objects.requireNonNull(balance, "balance");

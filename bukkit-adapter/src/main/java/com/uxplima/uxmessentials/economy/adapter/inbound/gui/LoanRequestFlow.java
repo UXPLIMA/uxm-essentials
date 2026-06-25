@@ -1,19 +1,14 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.TextDecoration;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.LoanService;
 import com.uxplima.uxmessentials.economy.domain.AmountParseError;
 import com.uxplima.uxmessentials.economy.domain.AmountParser;
@@ -24,21 +19,16 @@ import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.InputRequest;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.TextInput;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
-import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
-import com.uxplima.uxmlib.gui.Guis;
-import com.uxplima.uxmlib.gui.SimpleGui;
-import com.uxplima.uxmlib.gui.item.GuiItem;
-import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The request-a-new-loan flow split out of {@link LoanGuiView}: pick a currency, prompt for an amount and
- * installment count, then submit the loan. Every label resolves through a {@code MessageKey} in the viewer's
- * locale. The {@code refresh} callback reopens the dashboard once the flow finishes or aborts.
+ * The request-a-new-loan flow split out of {@link LoanDashboardMenu}: pick a currency through the shared engine
+ * {@link CurrencyPickerView}, then prompt for an amount and an installment count through the shared input seam, then
+ * submit the loan. Every label resolves through a {@code MessageKey} in the viewer's locale. The {@code refresh}
+ * callback reopens the dashboard once the flow finishes or aborts.
  */
 @NullMarked
 final class LoanRequestFlow {
@@ -47,8 +37,8 @@ final class LoanRequestFlow {
     private final CurrencyRegistry currencies;
     private final TextInput textInput;
     private final Scheduler scheduler;
-    private final Messages messages;
-    private final LoanIcons icons;
+    private final EconomyNotifier notifier;
+    private final CurrencyPickerView picker;
     private final Consumer<Player> refresh;
 
     LoanRequestFlow(
@@ -56,56 +46,36 @@ final class LoanRequestFlow {
             CurrencyRegistry currencies,
             TextInput textInput,
             Scheduler scheduler,
-            Messages messages,
-            LoanIcons icons,
+            EconomyNotifier notifier,
+            CurrencyPickerView picker,
             Consumer<Player> refresh) {
         this.loanService = Objects.requireNonNull(loanService, "loanService");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.messages = Objects.requireNonNull(messages, "messages");
-        this.icons = Objects.requireNonNull(icons, "icons");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.picker = Objects.requireNonNull(picker, "picker");
         this.refresh = Objects.requireNonNull(refresh, "refresh");
     }
 
-    void openCurrencySelector(Player player) {
+    /**
+     * Begin the request flow: with no configured currency the request is rejected and the dashboard reopens; with a
+     * single currency the amount prompt opens directly; otherwise the shared engine currency picker opens and the
+     * pick continues the flow with the chosen currency.
+     */
+    void start(Player player) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
-        List<Currency> allCurrencies = new ArrayList<>(currencies.all());
-        if (allCurrencies.isEmpty()) {
-            player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_NO_CURRENCIES, Map.of()));
+        List<Currency> all = List.copyOf(currencies.all());
+        if (all.isEmpty()) {
+            notifier.send(viewerRef, EconomyMessageKey.LOAN_GUI_NO_CURRENCIES);
             refresh.accept(player);
             return;
         }
-        if (allCurrencies.size() == 1) {
-            promptLoanAmount(player, allCurrencies.get(0));
+        if (all.size() == 1) {
+            promptLoanAmount(player, all.get(0));
             return;
         }
-        SimpleGui currencyGui = Guis.gui()
-                .title(text(viewerRef, EconomyMessageKey.LOAN_GUI_CURRENCY_TITLE, Map.of()))
-                .rows(1)
-                .build();
-        ItemStack filler = ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
-                .build();
-        for (int i = 0; i < 9; i++) {
-            currencyGui.set(i, GuiItem.display(filler));
-        }
-        int slot = 0;
-        for (Currency c : allCurrencies) {
-            if (slot >= 9) {
-                break;
-            }
-            currencyGui.set(
-                    slot,
-                    GuiItem.button(
-                            icons.currency(viewerRef, c),
-                            event -> scheduler.onEntity(viewerRef, () -> {
-                                currencyGui.close(player);
-                                promptLoanAmount(player, c);
-                            })));
-            slot++;
-        }
-        currencyGui.open(player);
+        picker.open(player, viewerRef, all, all.get(0), chosen -> promptLoanAmount(player, chosen));
     }
 
     private void promptLoanAmount(Player player, Currency currency) {
@@ -117,16 +87,19 @@ final class LoanRequestFlow {
                         "loan.amount",
                         EconomyMessageKey.LOAN_GUI_AMOUNT_PROMPT,
                         Map.of("currency", currency.id().value())),
-                amountStr -> {
-                    Result<Money, AmountParseError> parsed = AmountParser.parse(amountStr, currency);
-                    if (parsed.isErr()) {
-                        player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_INVALID_AMOUNT, Map.of()));
-                        refresh.accept(player);
-                        return;
-                    }
-                    promptInstallments(player, viewerRef, currency, parsed.orElseThrow());
-                },
+                amountStr -> applyAmount(player, viewerRef, currency, amountStr),
                 () -> refresh.accept(player));
+    }
+
+    /** Parse the typed amount against {@code currency}; on success continue to the installment prompt. Package-private for tests. */
+    void applyAmount(Player player, PlayerRef viewerRef, Currency currency, String amountStr) {
+        Result<Money, AmountParseError> parsed = AmountParser.parse(amountStr, currency);
+        if (parsed.isErr()) {
+            notifier.send(viewerRef, EconomyMessageKey.LOAN_GUI_INVALID_AMOUNT);
+            refresh.accept(player);
+            return;
+        }
+        promptInstallments(player, viewerRef, currency, parsed.orElseThrow());
     }
 
     private void promptInstallments(Player player, PlayerRef viewerRef, Currency currency, Money amount) {
@@ -134,23 +107,27 @@ final class LoanRequestFlow {
                 player,
                 viewerRef,
                 InputRequest.of("loan.installments", EconomyMessageKey.LOAN_GUI_INSTALLMENTS_PROMPT),
-                installmentsStr -> {
-                    int installments;
-                    try {
-                        installments = Integer.parseInt(installmentsStr.trim());
-                    } catch (NumberFormatException malformed) {
-                        player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_INSTALLMENTS_INVALID, Map.of()));
-                        refresh.accept(player);
-                        return;
-                    }
-                    if (installments < 1 || installments > 100) {
-                        player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_INSTALLMENTS_RANGE, Map.of()));
-                        refresh.accept(player);
-                        return;
-                    }
-                    submitLoan(player, viewerRef, currency, amount, installments);
-                },
+                installmentsStr -> applyInstallments(player, viewerRef, currency, amount, installmentsStr),
                 () -> refresh.accept(player));
+    }
+
+    /** Parse and range-check the installment count; on success submit the loan. Package-private for tests. */
+    void applyInstallments(
+            Player player, PlayerRef viewerRef, Currency currency, Money amount, String installmentsStr) {
+        int installments;
+        try {
+            installments = Integer.parseInt(installmentsStr.trim());
+        } catch (NumberFormatException malformed) {
+            notifier.send(viewerRef, EconomyMessageKey.LOAN_GUI_INSTALLMENTS_INVALID);
+            refresh.accept(player);
+            return;
+        }
+        if (installments < 1 || installments > 100) {
+            notifier.send(viewerRef, EconomyMessageKey.LOAN_GUI_INSTALLMENTS_RANGE);
+            refresh.accept(player);
+            return;
+        }
+        submitLoan(player, viewerRef, currency, amount, installments);
     }
 
     private void submitLoan(Player player, PlayerRef viewerRef, Currency currency, Money amount, int installments) {
@@ -158,34 +135,28 @@ final class LoanRequestFlow {
             Result<Loan, LoanError> res = loanService.takeLoan(viewerRef, amount, installments);
             scheduler.onEntity(viewerRef, () -> {
                 if (res.isOk()) {
-                    Loan loan = res.orElseThrow();
-                    player.sendMessage(text(
-                            viewerRef,
-                            EconomyMessageKey.LOAN_GUI_APPROVED,
-                            Map.of(
-                                    "amount",
-                                    amount.amount().toPlainString(),
-                                    "currency",
-                                    currency.id().value())));
-                    player.sendMessage(text(
-                            viewerRef,
-                            EconomyMessageKey.LOAN_GUI_APPROVED_DETAIL,
-                            Map.of(
-                                    "amount",
-                                    loan.remainingAmount().amount().toPlainString(),
-                                    "currency",
-                                    currency.id().value(),
-                                    "installments",
-                                    Integer.toString(loan.remainingInstallments()))));
+                    announceApproval(viewerRef, currency, amount, res.orElseThrow());
                 } else {
-                    player.sendMessage(text(viewerRef, EconomyMessageKey.LOAN_GUI_REJECTED, Map.of()));
+                    notifier.send(viewerRef, EconomyMessageKey.LOAN_GUI_REJECTED);
                 }
                 refresh.accept(player);
             });
         });
     }
 
-    private Component text(PlayerRef viewer, EconomyMessageKey key, Map<String, String> placeholders) {
-        return StyledText.render(messages.resolve(viewer, key, placeholders)).decoration(TextDecoration.ITALIC, false);
+    private void announceApproval(PlayerRef viewerRef, Currency currency, Money amount, Loan loan) {
+        notifier.send(
+                viewerRef,
+                EconomyMessageKey.LOAN_GUI_APPROVED,
+                Map.of(
+                        "amount", amount.amount().toPlainString(),
+                        "currency", currency.id().value()));
+        notifier.send(
+                viewerRef,
+                EconomyMessageKey.LOAN_GUI_APPROVED_DETAIL,
+                Map.of(
+                        "amount", loan.remainingAmount().amount().toPlainString(),
+                        "currency", currency.id().value(),
+                        "installments", Integer.toString(loan.remainingInstallments())));
     }
 }

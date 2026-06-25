@@ -10,7 +10,6 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.economy.adapter.inbound.command.EconomyCommands;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.BaltopMenu;
-import com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanGuiView;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.PayConfirmPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistoryMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletPanelMenu;
@@ -227,12 +226,6 @@ public final class EconomyWiring {
                 settings.baltopExcludeBanned(),
                 settings.baltopMinBalance(),
                 new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitBannedLookup());
-
-        // GUI geometry is operator-editable in modules/economy/gui/*.conf; titles and labels stay in the catalog.
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts guiLayouts =
-                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts(
-                        plugin.getDataFolder().toPath(), kernel.log());
-
         EconomyServices services = useCases(
                 plugin,
                 persistence,
@@ -244,7 +237,6 @@ public final class EconomyWiring {
                 snapshots,
                 ledger.telemetry(),
                 textInput,
-                guiLayouts,
                 menus,
                 menuBindings,
                 dataFolder);
@@ -389,7 +381,6 @@ public final class EconomyWiring {
             com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.input.@org.jspecify.annotations.Nullable TextInput
                     textInput,
-            com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts guiLayouts,
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder) {
@@ -538,10 +529,22 @@ public final class EconomyWiring {
         bankActionsView.register(menuBindings, dataFolder, kernel.log());
         navigationHolder.set(new com.uxplima.uxmessentials.economy.adapter.inbound.gui.BankNavigation(
                 bankListMenu, bankActionsView, bankMembersMenu));
-        com.uxplima.uxmessentials.shared.adapter.inbound.gui.FixedMenuLayout loanLayout =
-                guiLayouts.loadFixedMenu("economy", "loan-dashboard", LoanGuiView.defaultLayout());
-        LoanGuiView loanGuiView =
-                new LoanGuiView(loanService, currencies, input, kernel.scheduler(), kernel.messages(), loanLayout);
+        // The loan dashboard is an engine-rendered panel now: it registers its spec and bindings here once, then
+        // opens through the Menus façade. Its active-loan strip is the economy:loan-list source; the request button
+        // hands off to the shared currency picker and the input seam.
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText loanGuiText =
+                new com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText(kernel.messages());
+        com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanDashboardMenu loanGuiView =
+                new com.uxplima.uxmessentials.economy.adapter.inbound.gui.LoanDashboardMenu(
+                        menus,
+                        loanService,
+                        currencies,
+                        input,
+                        kernel.scheduler(),
+                        kernel.messages(),
+                        notifier,
+                        loanGuiText);
+        loanGuiView.register(menuBindings, dataFolder, kernel.log());
 
         return new EconomyServices(
                 new Balance(resolved, notifier),
